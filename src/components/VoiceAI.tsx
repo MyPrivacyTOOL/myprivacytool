@@ -13,6 +13,11 @@ interface VoiceAIProps {
 export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: VoiceAIProps) {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
+
+  const handleVoiceClick = () => {
+    setIsVoiceActive(!isVoiceActive);
+  };
 
   useEffect(() => {
     let newMessage = '';
@@ -89,10 +94,29 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           <p className="text-green-300/90 text-sm leading-relaxed mb-3">
             Hover over any hexagon to see what I found, then click to confirm if it's correct. If you want click this Voice AI button and I will explain 'The Risks' to you.
           </p>
-          <button className="flex items-center justify-center gap-3 px-8 py-4 bg-green-500/20 border-2 border-green-500/50 rounded-xl text-green-400 font-bold text-lg hover:bg-green-500/30 hover:border-green-400 transition-all cursor-pointer animate-pulse" style={{ boxShadow: '0 0 20px rgba(0, 255, 65, 0.4), 0 0 40px rgba(0, 255, 65, 0.2)' }}>
-            <Mic className="w-7 h-7" />
-            Voice AI
-          </button>
+          <div className="relative flex items-center justify-center">
+            {/* Sound wave rings */}
+            {isVoiceActive && (
+              <>
+                <span className="absolute w-full h-full rounded-xl border-2 border-green-400/60 animate-ping" style={{ animationDuration: '1.5s' }} />
+                <span className="absolute w-full h-full rounded-xl border-2 border-green-400/40 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
+                <span className="absolute w-full h-full rounded-xl border-2 border-green-400/20 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
+              </>
+            )}
+            <button 
+              onClick={handleVoiceClick}
+              className={cn(
+                "relative z-10 flex items-center justify-center gap-3 px-8 py-4 border-2 rounded-xl font-bold text-lg transition-all cursor-pointer",
+                isVoiceActive 
+                  ? "bg-green-500/40 border-green-400 text-green-300" 
+                  : "bg-green-500/20 border-green-500/50 text-green-400 animate-pulse hover:bg-green-500/30 hover:border-green-400"
+              )} 
+              style={{ boxShadow: isVoiceActive ? '0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3)' : '0 0 20px rgba(0, 255, 65, 0.4), 0 0 40px rgba(0, 255, 65, 0.2)' }}
+            >
+              <Mic className={cn("w-7 h-7", isVoiceActive && "animate-bounce")} />
+              {isVoiceActive ? "Listening..." : "Voice AI"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
