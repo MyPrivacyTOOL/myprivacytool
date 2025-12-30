@@ -86,11 +86,8 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           />
         </div>
 
-        {/* Message below video */}
+        {/* Voice AI Button */}
         <div className="w-full text-center">
-          <p className="text-green-400 font-semibold mb-2" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
-            The PrivacyTOOL found {totalCount} data points.
-          </p>
           <p className="text-green-300/90 text-sm leading-relaxed mb-3">
             Hover over any hexagon to see what I found, then click to confirm if it's correct. If you want click this Voice AI button and I will explain 'The Risks' to you.
           </p>
