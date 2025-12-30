@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
 import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDetection';
-import { Shield, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import logo from '@/assets/logo.jpeg';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -36,10 +37,9 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-background">
         <div className="relative mb-6">
-          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin-slow" />
-          <Shield className="absolute inset-0 m-auto w-6 h-6 text-primary" />
+          <div className="w-20 h-20 border-4 border-primary/30 border-t-primary rounded-full animate-spin-slow" />
         </div>
         <p className="text-lg text-foreground font-medium mb-2">Scanning your digital shadow...</p>
         <p className="text-sm text-muted-foreground">This only takes a few seconds</p>
@@ -49,10 +49,10 @@ const Index = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-background">
         <div className="glass-card rounded-xl p-8 text-center max-w-md">
-          <div className="w-16 h-16 bg-destructive/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-8 h-8 text-destructive" />
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <img src={logo} alt="MyPrivacyTOOL" className="w-10 h-10 rounded-full object-cover" />
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">Scan Failed</h2>
           <p className="text-muted-foreground mb-6">{error}</p>
@@ -66,14 +66,14 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 glass-card border-b border-border/50">
+      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="w-7 h-7 text-primary" />
-            <span className="text-xl font-bold text-primary">
-              MyPrivacyTOOL
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="MyPrivacyTOOL" className="w-10 h-10 rounded-full object-cover" />
+            <span className="text-xl font-bold text-foreground">
+              MyPrivacy<span className="text-matrix">TOOL</span>.IO
             </span>
           </div>
           <div className="text-sm text-muted-foreground hidden sm:block">
@@ -101,10 +101,10 @@ const Index = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-8 mt-12">
+      <footer className="border-t border-border py-8 mt-12 bg-secondary/30">
         <div className="container mx-auto px-4 text-center">
           <p className="text-muted-foreground text-sm">
-            © 2025 MyPrivacyTOOL.io • Protecting Your Digital Privacy
+            © 2025 MyPrivacy<span className="text-matrix">TOOL</span>.io • Protecting Your Digital Privacy
           </p>
           <p className="text-xs text-muted-foreground/60 mt-2">
             No data is stored. All detection happens in your browser.

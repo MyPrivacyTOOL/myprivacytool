@@ -51,10 +51,10 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
             "absolute inset-0 clip-hexagon transition-all duration-300",
             "border-2",
             data.confirmed
-              ? "bg-success/20 border-success glow-success"
+              ? "bg-primary/10 border-primary glow-success"
               : isHovered
-              ? "bg-primary/20 border-primary glow-primary"
-              : "bg-secondary/60 border-border hover:border-primary/50"
+              ? "bg-muted border-foreground/30 shadow-lg"
+              : "bg-card border-border hover:border-foreground/20"
           )}
         />
 
@@ -68,7 +68,7 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
           {/* Label */}
           <span className={cn(
             "text-xs font-semibold uppercase tracking-wider mb-1",
-            data.confirmed ? "text-success" : "text-primary"
+            data.confirmed ? "text-primary" : "text-foreground/60"
           )}>
             {data.label}
           </span>
@@ -81,15 +81,15 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
           {/* Confidence */}
           <span className={cn(
             "text-xs italic",
-            data.confirmed ? "text-success/80" : "text-muted-foreground"
+            data.confirmed ? "text-primary/80" : "text-muted-foreground"
           )}>
             {data.confidence}% confident
           </span>
 
           {/* Confirmed checkmark */}
           {data.confirmed && (
-            <div className="absolute top-4 right-4 w-7 h-7 bg-success rounded-full flex items-center justify-center animate-check-pop">
-              <Check className="w-4 h-4 text-success-foreground" />
+            <div className="absolute top-4 right-4 w-7 h-7 bg-primary rounded-full flex items-center justify-center animate-check-pop">
+              <Check className="w-4 h-4 text-primary-foreground" />
             </div>
           )}
         </div>

@@ -51,7 +51,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
           YOUR DIGITAL SHADOW
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          We found <span className="text-primary font-semibold">{hexagons.length} data points</span> about you without asking. 
+          We found <span className="text-matrix font-semibold">{hexagons.length} data points</span> about you without asking. 
           Click the ones that are correct.
         </p>
       </div>

@@ -9,9 +9,9 @@ interface RiskScoreProps {
 
 export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
   const getRiskLevel = (score: number) => {
-    if (score >= 8) return { label: 'High Risk', color: 'text-destructive', bgColor: 'bg-destructive/20', Icon: AlertCircle };
-    if (score >= 5) return { label: 'Medium Risk', color: 'text-warning', bgColor: 'bg-warning/20', Icon: AlertTriangle };
-    if (score >= 1) return { label: 'Low Risk', color: 'text-success', bgColor: 'bg-success/20', Icon: Shield };
+    if (score >= 8) return { label: 'High Risk', color: 'text-destructive', bgColor: 'bg-destructive/10', Icon: AlertCircle };
+    if (score >= 5) return { label: 'Medium Risk', color: 'text-warning', bgColor: 'bg-warning/10', Icon: AlertTriangle };
+    if (score >= 1) return { label: 'Low Risk', color: 'text-primary', bgColor: 'bg-primary/10', Icon: Shield };
     return { label: 'Scanning...', color: 'text-muted-foreground', bgColor: 'bg-muted', Icon: Shield };
   };
 
@@ -19,7 +19,7 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
   const percentage = total > 0 ? (confirmed / total) * 100 : 0;
 
   return (
-    <div className="glass-card rounded-xl p-6 max-w-2xl mx-auto mb-8">
+    <div className="bg-card border border-border rounded-xl p-6 max-w-2xl mx-auto mb-8 shadow-sm">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6">
         {/* Score Circle */}
         <div className="relative">
@@ -39,7 +39,7 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
               cy="50"
               r="40"
               fill="none"
-              stroke={score >= 8 ? 'hsl(var(--destructive))' : score >= 5 ? 'hsl(var(--warning))' : 'hsl(var(--success))'}
+              stroke={score >= 8 ? 'hsl(var(--destructive))' : score >= 5 ? 'hsl(var(--warning))' : 'hsl(var(--primary))'}
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={`${percentage * 2.51} 251`}
@@ -74,7 +74,7 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
             <div 
               className={cn(
                 "h-full rounded-full transition-all duration-500 ease-out",
-                score >= 8 ? "bg-destructive" : score >= 5 ? "bg-warning" : "bg-success"
+                score >= 8 ? "bg-destructive" : score >= 5 ? "bg-warning" : "bg-primary"
               )}
               style={{ width: `${percentage}%` }}
             />
