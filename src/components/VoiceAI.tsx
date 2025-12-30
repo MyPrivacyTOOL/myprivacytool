@@ -54,7 +54,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   }, [confirmedCount, totalCount, hexagonData, message]);
 
   return (
-    <div className="bg-black/40 border border-green-500/30 rounded-xl p-6 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '600px', maxWidth: '100%' }}>
+    <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
       <div className="flex flex-col items-center gap-4">
         {/* Alice Video - larger size */}
         <div className={cn(
