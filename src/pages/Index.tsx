@@ -76,10 +76,10 @@ const Index = () => {
       {/* Content Layer */}
       <div className="relative z-10">
         {/* Navbar */}
-        <nav className="bg-transparent border-b border-green-500/20">
+        <nav className="bg-white">
           <div className="container mx-auto px-4 flex items-center justify-center">
             <div className="flex items-center -my-10">
-              <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain invert brightness-0 invert" />
+              <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain" />
             </div>
           </div>
         </nav>
