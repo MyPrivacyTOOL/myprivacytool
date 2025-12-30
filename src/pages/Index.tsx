@@ -77,7 +77,7 @@ const Index = () => {
         {/* Navbar */}
         <nav className="bg-white border-b border-border">
           <div className="container mx-auto px-4 flex items-center justify-center">
-            <div className="flex items-center">
+            <div className="flex items-center -my-4">
               <img src={logoFull} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain" />
             </div>
           </div>
