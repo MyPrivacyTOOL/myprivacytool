@@ -1,17 +1,52 @@
-/* Revealing hexagon animation */
+/* Revealing hexagon animation - Matrix theme */
 .hexagon.revealing .hexagon-inner {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(96, 165, 250, 0.3));
-  border-color: rgba(16, 185, 129, 0.8);
-  animation: revealPulse 2s ease-in-out infinite;
+  background: linear-gradient(135deg, 
+    rgba(0, 255, 0, 0.1), 
+    rgba(0, 255, 0, 0.3));
+  border: 2px solid #00ff00;
+  animation: matrixReveal 2s ease-in-out infinite;
+}
+
+@keyframes matrixReveal {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(0, 255, 0, 0.4),
+      inset 0 0 20px rgba(0, 255, 0, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 0 40px rgba(0, 255, 0, 0.8),
+      inset 0 0 40px rgba(0, 255, 0, 0.4);
+  }
+}
+
+/* Add matrix rain effect during reveal */
+.hexagon.revealing .hexagon-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(0deg, 
+    transparent 0%, 
+    rgba(0, 255, 0, 0.1) 50%, 
+    transparent 100%);
+  animation: matrixFlow 1s linear infinite;
+}
+
+@keyframes matrixFlow {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100%); }
 }
 
 @keyframes revealPulse {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 40px rgba(16, 185, 129, 0.8);
+    box-shadow: 0 0 40px rgba(0, 255, 0, 0.8);
     transform: scale(1.05);
   }
 }
