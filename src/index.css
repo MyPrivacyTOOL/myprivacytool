@@ -264,4 +264,17 @@
   .animate-hand-push-right {
     animation: hand-push-right 3.5s ease-in-out infinite;
   }
+
+  @keyframes hexagon-glow {
+    0%, 100% {
+      filter: brightness(1) drop-shadow(0 0 8px rgba(0, 255, 65, 0.5));
+    }
+    50% {
+      filter: brightness(1.2) drop-shadow(0 0 15px rgba(0, 255, 65, 0.8));
+    }
+  }
+
+  .animate-hexagon-glow {
+    animation: hexagon-glow 2s ease-in-out infinite;
+  }
 }

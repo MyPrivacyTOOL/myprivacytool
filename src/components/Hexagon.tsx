@@ -45,15 +45,29 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         )}
         aria-label={`${data.label}: ${data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Click to confirm'}`}
       >
+        {/* Glowing border effect */}
+        <div 
+          className={cn(
+            "absolute inset-0 clip-hexagon animate-hexagon-glow",
+            data.confirmed ? "opacity-100" : "opacity-70"
+          )}
+          style={{
+            background: 'transparent',
+            boxShadow: data.confirmed 
+              ? '0 0 20px rgba(0, 255, 65, 0.6), inset 0 0 20px rgba(0, 255, 65, 0.1)' 
+              : '0 0 15px rgba(0, 255, 65, 0.4), inset 0 0 15px rgba(0, 255, 65, 0.05)',
+          }}
+        />
+        
         {/* Hexagon shape with clip-path */}
         <div
           className={cn(
-            "absolute inset-0 clip-hexagon transition-all duration-300",
+            "absolute inset-[3px] clip-hexagon transition-all duration-300",
             data.confirmed
-              ? "bg-black/60 border-2 border-primary glow-success"
+              ? "bg-black/70 border-2 border-primary"
               : isHovered
-              ? "bg-black/70 border-2 border-green-400/60 shadow-lg"
-              : "bg-black/50 border-2 border-green-500/30 hover:border-green-400/50"
+              ? "bg-black/80 border-2 border-green-400"
+              : "bg-black/60 border-2 border-green-500/50"
           )}
         />
 
