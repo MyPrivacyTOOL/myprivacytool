@@ -85,7 +85,7 @@ const Index = () => {
         <MatrixRain />
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10">
           <h1 className="text-4xl md:text-6xl font-bold mb-6 text-center leading-tight text-white drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]">
-            What Do Data Brokers Know About You?
+            What is your Digital Shadow?
           </h1>
           <p className="text-xl text-center max-w-2xl mx-auto leading-relaxed text-green-300/90">
             We found information about you without asking. 
