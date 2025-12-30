@@ -9,18 +9,13 @@ interface HexagonGridProps {
 }
 
 export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridProps) {
-  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons.slice(0, 6));
+  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons.slice(0, 7));
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
 
   useEffect(() => {
-    if (confirmedCount >= 3 && hexagons.length === 6 && initialHexagons.length > 6) {
-      const timer = setTimeout(() => {
-        setHexagons(initialHexagons.slice(0, 8));
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [confirmedCount, hexagons.length, initialHexagons]);
+    setHexagons(initialHexagons.slice(0, 7));
+  }, [initialHexagons]);
 
   const handleConfirm = (id: string) => {
     setHexagons(prev =>
@@ -41,17 +36,35 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     ? Math.round((hexagons.filter(h => h.confirmed).length / hexagons.length) * 10)
     : 0;
 
-  // Honeycomb positions for 7 hexagons (center + 6 around)
-  // Using the pattern from reference: top-left, top-right, middle-left, center, middle-right, bottom-left, bottom-right
-  const honeycombPositions = [
-    { row: 0, col: 0, offset: true },   // Top left
-    { row: 0, col: 1, offset: true },   // Top right
-    { row: 1, col: -0.5, offset: false }, // Middle left
-    { row: 1, col: 0.5, offset: false },  // Center
-    { row: 1, col: 1.5, offset: false },  // Middle right
-    { row: 2, col: 0, offset: true },   // Bottom left
-    { row: 2, col: 1, offset: true },   // Bottom right
+  // Hexagon size for calculations
+  const hexWidth = 140; // md size
+  const hexHeight = 140;
+  
+  // For pointy-top hexagons in honeycomb:
+  // Horizontal spacing = width * 0.75 (hexagons overlap on sides)
+  // Vertical spacing = height * 0.5 (rows interlock)
+  const hSpacing = hexWidth * 0.87;
+  const vSpacing = hexHeight * 0.75;
+
+  // Honeycomb layout matching reference image:
+  // Row 0: 2 hexagons (top)
+  // Row 1: 3 hexagons (middle) - offset left by half
+  // Row 2: 2 hexagons (bottom) - aligned with row 0
+  const positions = [
+    // Row 0 - top 2
+    { x: hSpacing * 0.5, y: 0 },
+    { x: hSpacing * 1.5, y: 0 },
+    // Row 1 - middle 3 (offset)
+    { x: 0, y: vSpacing },
+    { x: hSpacing, y: vSpacing },
+    { x: hSpacing * 2, y: vSpacing },
+    // Row 2 - bottom 2
+    { x: hSpacing * 0.5, y: vSpacing * 2 },
+    { x: hSpacing * 1.5, y: vSpacing * 2 },
   ];
+
+  const containerWidth = hSpacing * 2 + hexWidth;
+  const containerHeight = vSpacing * 2 + hexHeight;
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
@@ -74,27 +87,25 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
       />
 
       {/* Honeycomb Hexagon Grid */}
-      <div className="flex justify-center my-12">
-        <div className="relative" style={{ width: '320px', height: '340px' }}>
-          {hexagons.slice(0, 7).map((hex, index) => {
-            const pos = honeycombPositions[index];
+      <div className="flex justify-center my-8">
+        <div 
+          className="relative"
+          style={{ 
+            width: `${containerWidth}px`, 
+            height: `${containerHeight}px` 
+          }}
+        >
+          {hexagons.map((hex, index) => {
+            const pos = positions[index];
             if (!pos) return null;
-            
-            // Tighter hexagon spacing for real honeycomb effect
-            const hexSize = 112; // Base size for positioning
-            const horizontalSpacing = hexSize * 0.78;
-            const verticalSpacing = hexSize * 0.68;
-            
-            const left = pos.col * horizontalSpacing + (pos.offset ? horizontalSpacing / 2 : 0);
-            const top = pos.row * verticalSpacing;
             
             return (
               <div
                 key={hex.id}
                 className="absolute"
                 style={{
-                  left: `${left + 45}px`,
-                  top: `${top}px`,
+                  left: `${pos.x}px`,
+                  top: `${pos.y}px`,
                 }}
               >
                 <Hexagon
