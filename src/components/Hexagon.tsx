@@ -39,7 +39,7 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
       <svg
         viewBox="0 0 100 100"
         className={cn(
-          "w-[120px] h-[120px] md:w-[140px] md:h-[140px] cursor-pointer transition-transform duration-300",
+          "w-[150px] h-[150px] md:w-[170px] md:h-[170px] cursor-pointer transition-transform duration-300",
           "hover:scale-105",
           data.confirmed && "cursor-default"
         )}
