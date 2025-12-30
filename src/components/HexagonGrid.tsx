@@ -37,9 +37,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     setHoveredHexagon(data);
   };
 
-  const riskScore = hexagons.length > 0 
-    ? Math.round((hexagons.filter(h => h.confirmed).length / hexagons.length) * 10)
-    : 0;
 
   // Hexagon size for calculations
   const hexWidth = 170; // md size
@@ -123,7 +120,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
 
       {/* Risk Score */}
       <RiskScore 
-        score={riskScore} 
         confirmed={confirmedCount} 
         total={hexagons.length} 
       />
