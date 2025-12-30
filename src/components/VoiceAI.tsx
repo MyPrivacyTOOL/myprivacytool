@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
-import { Mic } from 'lucide-react';
+import { Mic, Volume2, VolumeX } from 'lucide-react';
 import aliceVideo from '@/assets/alice-video.mp4';
 
 interface VoiceAIProps {
@@ -10,40 +10,87 @@ interface VoiceAIProps {
   totalCount: number;
 }
 
+// Browser's built-in voice synthesis (Free)
+const speakText = (text: string, onEnd?: () => void) => {
+  if ('speechSynthesis' in window) {
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.1;
+    utterance.volume = 1;
+    
+    // Try to use a female voice
+    const voices = speechSynthesis.getVoices();
+    const femaleVoice = voices.find(v => 
+      v.name.includes('Female') || 
+      v.name.includes('Samantha') || 
+      v.name.includes('Victoria') ||
+      v.name.includes('Karen') ||
+      v.name.includes('Moira')
+    );
+    if (femaleVoice) utterance.voice = femaleVoice;
+    
+    if (onEnd) {
+      utterance.onend = onEnd;
+    }
+    
+    speechSynthesis.speak(utterance);
+    return true;
+  }
+  return false;
+};
+
 export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: VoiceAIProps) {
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const handleVoiceClick = () => {
-    setIsVoiceActive(!isVoiceActive);
-  };
+  const handleVoiceClick = useCallback(() => {
+    if (isSpeaking) {
+      // Stop speaking
+      speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setIsVoiceActive(false);
+    } else {
+      // Start speaking
+      setIsVoiceActive(true);
+      const introMessage = `Hi, I'm Alice, your AI privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points about you without asking. This includes your location, device type, browser, internet provider, and more. Hover over any hexagon to see what I found, then click to confirm if it's correct. The more you confirm, the clearer your digital shadow becomes. This is the same data that attackers and data brokers can access about you right now.`;
+      
+      setIsSpeaking(true);
+      speakText(introMessage, () => {
+        setIsSpeaking(false);
+        setIsVoiceActive(false);
+      });
+    }
+  }, [isSpeaking, totalCount]);
+
+  useEffect(() => {
+    // Load voices (some browsers need this)
+    speechSynthesis.getVoices();
+  }, []);
 
   useEffect(() => {
     let newMessage = '';
 
     // Determine the message based on state
     if (hexagonData && !hexagonData.confirmed) {
-      // Hovering over an unconfirmed hexagon
       newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
     } else if (confirmedCount === 0 && totalCount > 0) {
-      // Initial welcome message
       newMessage = `Hi, I'm Alice, your privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points without asking. Hover over any hexagon to see what I found, then click to confirm if it's correct.`;
     } else if (confirmedCount === 1) {
-      // After first confirmation
       newMessage = `Great! That boosted my confidence. I'm scanning deeper... ${totalCount - confirmedCount} more to go.`;
     } else if (confirmedCount === 2) {
       newMessage = `Interesting... Your digital footprint is becoming clearer. Keep confirming to see the full picture.`;
     } else if (confirmedCount === 3) {
-      // Mid-point
       newMessage = `This is getting serious. You're on multiple data broker sites. I found your location, device info, and browsing patterns. Keep confirming to see everything.`;
     } else if (confirmedCount === 4) {
       newMessage = `The more you confirm, the more I understand about your exposure. Attackers can find this information with just a few dollars.`;
     } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0) {
-      // Near completion
       newMessage = `Almost there! I now have a complete picture of your digital shadow. This is what attackers can find about you with just $50.`;
     } else if (confirmedCount === totalCount && totalCount > 0) {
-      // All confirmed
       newMessage = `Complete! Your digital shadow is fully mapped. This data is being sold by 100+ data brokers right now. Ready to take back control?`;
     } else if (hexagonData?.confirmed) {
       newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
@@ -89,7 +136,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         {/* Voice AI Button */}
         <div className="w-full text-center">
           <p className="text-green-300/90 text-sm leading-relaxed mb-3">
-            Hover over any hexagon to see what I found, then click to confirm if it's correct. If you want click this Voice AI button and I will explain 'The Risks' to you.
+            Hover over any hexagon to see what I found, then click to confirm if it's correct. Click the Voice AI button and I will explain 'The Risks' to you.
           </p>
           <div className="relative flex items-center justify-center">
             {/* Sound wave rings */}
@@ -110,8 +157,12 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
               )} 
               style={{ boxShadow: isVoiceActive ? '0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3)' : '0 0 20px rgba(0, 255, 65, 0.4), 0 0 40px rgba(0, 255, 65, 0.2)' }}
             >
-              <Mic className={cn("w-7 h-7", isVoiceActive && "animate-bounce")} />
-              {isVoiceActive ? "Listening..." : "Voice AI"}
+              {isSpeaking ? (
+                <VolumeX className="w-7 h-7 animate-pulse" />
+              ) : (
+                <Volume2 className={cn("w-7 h-7", isVoiceActive && "animate-bounce")} />
+              )}
+              {isSpeaking ? "Stop Alice" : "Voice AI"}
             </button>
           </div>
         </div>
