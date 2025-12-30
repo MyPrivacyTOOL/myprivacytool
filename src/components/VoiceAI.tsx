@@ -53,20 +53,20 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   }, [confirmedCount, totalCount, hexagonData, message]);
 
   return (
-    <div className="glass-card rounded-xl p-6 max-w-3xl mx-auto">
+    <div className="bg-card border border-border rounded-xl p-6 max-w-3xl mx-auto shadow-sm">
       <div className="flex items-start gap-4">
         {/* AI Icon */}
         <div className={cn(
           "flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center",
-          "bg-accent/20 border border-accent/40",
+          "bg-primary/10 border border-primary/30",
           isTyping && "animate-pulse"
         )}>
-          <Mic className="w-6 h-6 text-accent" />
+          <Mic className="w-6 h-6 text-primary" />
         </div>
 
         {/* Message */}
         <div className="flex-1 min-h-[60px]">
-          <div className="text-xs text-accent font-semibold uppercase tracking-wider mb-2">
+          <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-2">
             Shadow AI
           </div>
           <p className={cn(
