@@ -10,37 +10,20 @@ interface HexagonGridProps {
 }
 
 export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridProps) {
-  // TEMPORARY: Show all 20 hexagons for template preview
-  const [hexagons, setHexagons] = useState<HexagonData[]>(() => {
-    // Generate 20 placeholder hexagons for preview
-    const placeholders: HexagonData[] = [];
-    for (let i = 0; i < 20; i++) {
-      placeholders.push({
-        id: `hex-${i + 1}`,
-        label: `HEXAGON ${i + 1}`,
-        value: `Position ${i + 1}`,
-        icon: '🔷',
-        confidence: 50,
-        risk: 'Template hexagon',
-        confirmed: false,
-      });
-    }
-    return placeholders;
-  });
+  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons.slice(0, 5));
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [revealingHexagon, setRevealingHexagon] = useState<HexagonData | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // DISABLED FOR TEMPLATE PREVIEW
-  // useEffect(() => {
-  //   setHexagons(initialHexagons.slice(0, 6));
-  // }, [initialHexagons]);
-
-  // Progressive reveal: show more hexagons as user confirms
   useEffect(() => {
-    if (confirmedCount === 3 && hexagons.length === 6) {
-      const nextHexagons = initialHexagons.slice(6, 8);
+    setHexagons(initialHexagons.slice(0, 5));
+  }, [initialHexagons]);
+
+  // Progressive reveal: show 3 more hexagons after all 5 initial ones are confirmed
+  useEffect(() => {
+    if (confirmedCount === 5 && hexagons.length === 5) {
+      const nextHexagons = initialHexagons.slice(5, 8); // Reveal 3 more (positions 6-8)
       
       trackDeepScanUnlocked(confirmedCount);
       
@@ -147,7 +130,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
         </h2>
         <p className="text-muted-foreground">
           We found {hexagons.length} data points about you without asking.
-          {confirmedCount >= 3 && hexagons.length < 8 && ' Deeper scan unlocked...'}
+          {confirmedCount >= 5 && hexagons.length < 8 && ' Deeper scan unlocked...'}
         </p>
       </div>
 
