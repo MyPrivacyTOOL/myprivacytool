@@ -102,7 +102,7 @@ const Index = () => {
         {/* Footer */}
         <footer className="py-8 mt-12 bg-white">
           <div className="container mx-auto px-4 text-center">
-            <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-12 object-contain mx-auto mb-4" />
+            <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-20 md:h-24 object-contain mx-auto mb-4" />
             <p className="text-gray-600 text-sm">
               © 2025 MyPrivacyTOOL.IO • Protecting Your Digital Privacy
             </p>
