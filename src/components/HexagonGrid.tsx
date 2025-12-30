@@ -41,6 +41,18 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     ? Math.round((hexagons.filter(h => h.confirmed).length / hexagons.length) * 10)
     : 0;
 
+  // Honeycomb positions for 7 hexagons (center + 6 around)
+  // Using the pattern from reference: top-left, top-right, middle-left, center, middle-right, bottom-left, bottom-right
+  const honeycombPositions = [
+    { row: 0, col: 0, offset: true },   // Top left
+    { row: 0, col: 1, offset: true },   // Top right
+    { row: 1, col: -0.5, offset: false }, // Middle left
+    { row: 1, col: 0.5, offset: false },  // Center
+    { row: 1, col: 1.5, offset: false },  // Middle right
+    { row: 2, col: 0, offset: true },   // Bottom left
+    { row: 2, col: 1, offset: true },   // Bottom right
+  ];
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
@@ -63,34 +75,38 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
 
       {/* Honeycomb Hexagon Grid */}
       <div className="flex justify-center my-12">
-        <div className="relative">
-          {/* Honeycomb layout - 2 rows of 3 */}
-          <div className="flex flex-col items-center gap-2">
-            {/* Top row - 3 hexagons */}
-            <div className="flex gap-2">
-              {hexagons.slice(0, 3).map((hex, index) => (
+        <div className="relative" style={{ width: '340px', height: '380px' }}>
+          {hexagons.slice(0, 7).map((hex, index) => {
+            const pos = honeycombPositions[index];
+            if (!pos) return null;
+            
+            // Hexagon dimensions
+            const hexWidth = 110;
+            const hexHeight = 128;
+            const horizontalSpacing = hexWidth * 0.88;
+            const verticalSpacing = hexHeight * 0.75;
+            
+            const left = pos.col * horizontalSpacing + (pos.offset ? horizontalSpacing / 2 : 0);
+            const top = pos.row * verticalSpacing;
+            
+            return (
+              <div
+                key={hex.id}
+                className="absolute"
+                style={{
+                  left: `${left + 50}px`,
+                  top: `${top}px`,
+                }}
+              >
                 <Hexagon
-                  key={hex.id}
                   data={hex}
                   index={index}
                   onConfirm={handleConfirm}
                   onHover={handleHover}
                 />
-              ))}
-            </div>
-            {/* Bottom row - 3 hexagons, offset to create honeycomb */}
-            <div className="flex gap-2 -mt-6 md:-mt-8">
-              {hexagons.slice(3, 6).map((hex, index) => (
-                <Hexagon
-                  key={hex.id}
-                  data={hex}
-                  index={index + 3}
-                  onConfirm={handleConfirm}
-                  onHover={handleHover}
-                />
-              ))}
-            </div>
-          </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
