@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import VoiceAI from '@/components/VoiceAI';
 import { captureDeviceData, generateHexagonsAsync, HexagonData } from '@/lib/deviceDetection';
-import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link } from 'lucide-react';
+import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
@@ -141,7 +142,7 @@ const Index = () => {
                 <Globe className="w-4 h-4 text-gray-600" />
               </a>
               <a href="https://linktr.ee/MyPrivacyTOOL" target="_blank" rel="noopener noreferrer" onClick={() => trackSocialClick('linktree', 'https://linktr.ee/MyPrivacyTOOL')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Link className="w-4 h-4 text-gray-600" />
+                <LinkIcon className="w-4 h-4 text-gray-600" />
               </a>
             </div>
             
@@ -151,6 +152,9 @@ const Index = () => {
             <p className="text-xs text-gray-400 mt-1">
               No data is stored. All detection happens in your browser.
             </p>
+            <Link to="/privacy-policy" className="text-xs text-gray-500 hover:text-gray-700 mt-2 inline-block transition-colors">
+              Privacy Policy
+            </Link>
           </div>
         </footer>
       </div>
