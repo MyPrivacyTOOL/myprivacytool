@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 import { Mic } from 'lucide-react';
-import aliceImage from '@/assets/alice-curtain.png';
+import aliceImage from '@/assets/alice-generated.png';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -55,10 +55,10 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
   return (
     <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
-      <div className="flex items-start gap-4">
-        {/* Alice Image */}
+      <div className="flex flex-col items-center gap-4">
+        {/* Alice Image - same size as hexagons */}
         <div className={cn(
-          "flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
+          "flex-shrink-0 w-[170px] h-[170px] rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
           isTyping && "animate-pulse"
         )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)' }}>
           <img 
@@ -69,15 +69,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         </div>
 
         {/* Message */}
-        <div className="flex-1 min-h-[60px]">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-green-400 font-semibold uppercase tracking-wider" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
+        <div className="w-full text-center">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-sm text-green-400 font-semibold uppercase tracking-wider" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
               Alice
             </span>
             <span className="text-xs text-green-400/60">• Privacy Expert</span>
-            <div className="ml-auto">
-              <Mic className="w-4 h-4 text-green-400 cursor-pointer hover:text-green-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))' }} />
-            </div>
+            <Mic className="w-4 h-4 text-green-400 cursor-pointer hover:text-green-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))' }} />
           </div>
           <p className={cn(
             "text-green-300/90 leading-relaxed transition-opacity duration-200 text-sm",
