@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
-import VoiceAI from '@/components/VoiceAI';
 import { captureDeviceData, generateHexagonsAsync, HexagonData } from '@/lib/deviceDetection';
 import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -95,15 +94,6 @@ const Index = () => {
               What is your Digital Shadow?
             </h1>
           </div>
-        </section>
-
-        {/* Alice VoiceAI Section */}
-        <section className="py-8">
-          <VoiceAI 
-            hexagonData={null} 
-            confirmedCount={0} 
-            totalCount={hexagons.length}
-          />
         </section>
 
         {/* Description Text */}
