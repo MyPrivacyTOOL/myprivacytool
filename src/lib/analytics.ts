@@ -133,13 +133,17 @@ export const trackDeepScanUnlocked = (confirmedCount: number) => {
 // Voice AI tracking events
 let voiceSessionStartTime: number = 0;
 
-export const trackVoiceAIStart = () => {
+export const trackVoiceSessionStarted = () => {
   trackActivity();
   voiceSessionStartTime = Date.now();
-  trackEvent('voice_ai_start', {
+  trackEvent('voice_session_started', {
     action: 'started',
+    timestamp: Date.now(),
   });
 };
+
+// Legacy alias for backwards compatibility
+export const trackVoiceAIStart = trackVoiceSessionStarted;
 
 export const trackVoiceAIStop = () => {
   trackActivity();
@@ -154,8 +158,15 @@ export const trackVoiceAIMessage = (messageType: string) => {
   });
 };
 
+// Track hexagons completed with voice assistance
+export const trackHexagonsCompletedWithVoice = (hexagonsCompleted: number) => {
+  trackEvent('hexagons_completed_with_voice', {
+    hexagons_completed: hexagonsCompleted,
+  });
+};
+
 // Enhanced voice session complete tracking
-export const trackVoiceSessionComplete = (params: {
+export const trackVoiceSessionCompleted = (params: {
   hexagonsCompleted: number;
   totalHexagons: number;
   userCompletedScan: boolean;
@@ -164,14 +175,24 @@ export const trackVoiceSessionComplete = (params: {
     ? Math.round((Date.now() - voiceSessionStartTime) / 1000) 
     : 0;
   
-  trackEvent('voice_session_complete', {
+  trackEvent('voice_session_completed', {
     hexagons_completed: params.hexagonsCompleted,
     total_hexagons: params.totalHexagons,
     session_duration_seconds: sessionDuration,
     user_completed_scan: params.userCompletedScan,
-    completion_rate: Math.round((params.hexagonsCompleted / params.totalHexagons) * 100),
+    completion_rate: params.totalHexagons > 0 
+      ? Math.round((params.hexagonsCompleted / params.totalHexagons) * 100) 
+      : 0,
   });
+  
+  // Also track hexagons completed with voice
+  if (params.hexagonsCompleted > 0) {
+    trackHexagonsCompletedWithVoice(params.hexagonsCompleted);
+  }
 };
+
+// Legacy alias for backwards compatibility
+export const trackVoiceSessionComplete = trackVoiceSessionCompleted;
 
 // Social media tracking
 export const trackSocialClick = (platform: string, url: string) => {
