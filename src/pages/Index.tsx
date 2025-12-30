@@ -4,7 +4,7 @@ import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import VoiceAI from '@/components/VoiceAI';
 import { captureDeviceData, generateHexagonsAsync, HexagonData } from '@/lib/deviceDetection';
-import { RefreshCw, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
+import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
@@ -127,17 +127,20 @@ const Index = () => {
             
             {/* Social Media Icons */}
             <div className="flex justify-center gap-3 mb-4">
-              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://www.facebook.com/MyPrivacyTOOL.IO" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Facebook className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://twitter.com/myprivacytool" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Twitter className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Linkedin className="w-4 h-4 text-gray-600" />
-              </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://www.instagram.com/myprivacytool.io/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Instagram className="w-4 h-4 text-gray-600" />
+              </a>
+              <a href="https://myprivacytool.business.site/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Globe className="w-4 h-4 text-gray-600" />
+              </a>
+              <a href="https://linktr.ee/MyPrivacyTOOL" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Link className="w-4 h-4 text-gray-600" />
               </a>
             </div>
             
