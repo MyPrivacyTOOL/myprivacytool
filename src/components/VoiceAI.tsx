@@ -27,6 +27,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import VoiceDebugPanel from './VoiceDebugPanel';
 import VoiceStatsBadge from './VoiceStatsBadge';
+import AliceHDBadge from './AliceHDBadge';
+import AliceHDModal from './AliceHDModal';
+import FreeVoiceBadge from './FreeVoiceBadge';
+import { trackUpgradeModalOpened } from '@/lib/analytics';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -233,6 +237,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   const [remainingSessions, setRemainingSessions] = useState(getRemainingVoiceSessions());
   const [hasIntroduced, setHasIntroduced] = useState(false);
   const [previousRiskScore, setPreviousRiskScore] = useState(100);
+  const [showRateLimitModal, setShowRateLimitModal] = useState(false);
   const { toast } = useToast();
 
   // Get current risk score for debug panel
@@ -267,11 +272,8 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       if (!canStartVoiceSession()) {
         const data = getVoiceData();
         trackVoiceRateLimitHit(data.voiceSessionCount);
-        toast({
-          title: "Daily limit reached",
-          description: "You've used your 20 free sessions today. More tomorrow!",
-          variant: "destructive",
-        });
+        trackUpgradeModalOpened();
+        setShowRateLimitModal(true);
         return;
       }
 
@@ -389,12 +391,15 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
     <>
       <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
         <div className="flex flex-col items-center gap-4">
-          {/* Header text above video */}
-          <div className="w-full text-center">
-            <h2 className="text-lg text-green-400 font-semibold mb-2" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
-              Hi, I'm Alice, your AI Privacy TOOL
-            </h2>
-            <p className="text-green-300/90 text-sm leading-relaxed">
+          {/* Header with Alice HD badge */}
+          <div className="w-full">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg text-green-400 font-semibold" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
+                Hi, I'm Alice, your AI Privacy TOOL
+              </h2>
+              <AliceHDBadge />
+            </div>
+            <p className="text-green-300/90 text-sm leading-relaxed text-center">
               Let's peek behind the digital curtain to find out what information is available about you!
             </p>
           </div>
@@ -416,9 +421,14 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
           {/* Voice AI Button */}
           <div className="w-full text-center">
-            <p className="text-green-300/90 text-sm leading-relaxed mb-3">
-              Hover over any hexagon to see what I found, then click to confirm if it's correct. Click the Voice AI button and I will explain 'The Risks' to you.
+            <p className="text-green-300/90 text-sm leading-relaxed mb-2">
+              Hover over any hexagon to see what I found, then click to confirm if it's correct.
             </p>
+            
+            {/* Free Voice Badge */}
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <FreeVoiceBadge />
+            </div>
             {/* Remaining sessions indicator */}
             <p className="text-green-500/70 text-xs mb-2">
               {remainingSessions} / {MAX_SESSIONS_PER_DAY} free voice sessions remaining today
@@ -461,6 +471,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       <VoiceDebugPanel 
         currentRiskScore={currentRiskScore} 
         onSimulateComplete={handleSimulateComplete}
+      />
+
+      {/* Rate limit modal */}
+      <AliceHDModal 
+        isOpen={showRateLimitModal} 
+        onClose={() => setShowRateLimitModal(false)}
+        showRateLimitMessage={true}
       />
     </>
   );
