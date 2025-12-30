@@ -29,94 +29,137 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
     onHover(null);
   };
 
+  // Flat-top hexagon path
+  const hexPath = "M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z";
+
   return (
     <div 
       className="animate-fade-in-up opacity-0"
       style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'forwards' }}
     >
-      <button
+      <svg
+        viewBox="0 0 100 100"
+        className={cn(
+          "w-28 h-28 md:w-32 md:h-32 cursor-pointer transition-all duration-300",
+          "hover:scale-105",
+          data.confirmed && "cursor-default"
+        )}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={cn(
-          "relative w-28 h-32 md:w-32 md:h-36 transition-all duration-300 ease-out cursor-pointer group",
-          "hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent",
-          data.confirmed && "cursor-default"
-        )}
         aria-label={`${data.label}: ${data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Click to confirm'}`}
       >
-        {/* Glowing border effect */}
-        <div 
-          className={cn(
-            "absolute inset-0 clip-hexagon animate-hexagon-glow",
-            data.confirmed ? "opacity-100" : "opacity-70"
-          )}
-          style={{
-            background: 'transparent',
-            boxShadow: data.confirmed 
-              ? '0 0 20px rgba(0, 255, 65, 0.6), inset 0 0 20px rgba(0, 255, 65, 0.1)' 
-              : '0 0 15px rgba(0, 255, 65, 0.4), inset 0 0 15px rgba(0, 255, 65, 0.05)',
-          }}
-        />
-        
-        {/* Hexagon shape with clip-path */}
-        <div
-          className={cn(
-            "absolute inset-[3px] clip-hexagon transition-all duration-300",
-            data.confirmed
-              ? "bg-black/70 border-2 border-primary"
-              : isHovered
-              ? "bg-black/80 border-2 border-green-400"
-              : "bg-black/60 border-2 border-green-500/50"
-          )}
+        <defs>
+          <filter id={`glow-${data.id}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <clipPath id={`hexClip-${data.id}`}>
+            <path d={hexPath} />
+          </clipPath>
+        </defs>
+
+        {/* Outer glow hexagon */}
+        <path
+          d={hexPath}
+          fill="none"
+          stroke={data.confirmed ? "#00ff41" : "#00ff41"}
+          strokeWidth={data.confirmed ? "3" : "2"}
+          opacity={data.confirmed ? 1 : 0.6}
+          filter={`url(#glow-${data.id})`}
+          className="animate-hexagon-glow"
         />
 
-        {/* Content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
+        {/* Inner hexagon background */}
+        <path
+          d={hexPath}
+          fill={isHovered ? "rgba(0,0,0,0.85)" : "rgba(0,0,0,0.7)"}
+          stroke={data.confirmed ? "#00ff41" : isHovered ? "#00ff41" : "#00ff41"}
+          strokeWidth={data.confirmed ? "2.5" : "1.5"}
+          strokeOpacity={data.confirmed ? 1 : isHovered ? 0.8 : 0.5}
+        />
+
+        {/* Content group */}
+        <g clipPath={`url(#hexClip-${data.id})`}>
           {/* Icon */}
-          <span className="text-2xl mb-1" role="img" aria-hidden="true">
+          <text
+            x="50"
+            y="32"
+            textAnchor="middle"
+            fontSize="20"
+            className="select-none"
+          >
             {data.icon}
-          </span>
+          </text>
 
           {/* Label */}
-          <span className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider mb-0.5",
-            data.confirmed ? "text-primary" : "text-green-300/70"
-          )}>
+          <text
+            x="50"
+            y="48"
+            textAnchor="middle"
+            fontSize="7"
+            fontWeight="600"
+            fill={data.confirmed ? "#00ff41" : "#86efac"}
+            className="uppercase tracking-wider select-none"
+          >
             {data.label}
-          </span>
+          </text>
 
           {/* Value */}
-          <span className="text-xs font-medium text-white leading-tight mb-1 max-w-[90px] truncate">
-            {data.value}
-          </span>
+          <text
+            x="50"
+            y="62"
+            textAnchor="middle"
+            fontSize="8"
+            fontWeight="500"
+            fill="#ffffff"
+            className="select-none"
+          >
+            {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
+          </text>
 
           {/* Confidence */}
-          <span className={cn(
-            "text-[10px]",
-            data.confirmed ? "text-primary/80" : "text-green-400/60"
-          )}>
+          <text
+            x="50"
+            y="76"
+            textAnchor="middle"
+            fontSize="7"
+            fill={data.confirmed ? "#00ff41" : "#4ade80"}
+            opacity={0.8}
+            className="select-none"
+          >
             {data.confidence}%
-          </span>
+          </text>
+        </g>
 
-          {/* Confirmed checkmark */}
-          {data.confirmed && (
-            <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center animate-check-pop">
-              <Check className="w-3 h-3 text-primary-foreground" />
-            </div>
-          )}
-        </div>
-
-        {/* Hover hint */}
-        {!data.confirmed && (
-          <div className={cn(
-            "absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-green-400/60 transition-opacity duration-200 whitespace-nowrap",
-            isHovered ? "opacity-100" : "opacity-0"
-          )}>
-            Click to confirm
-          </div>
+        {/* Confirmed checkmark */}
+        {data.confirmed && (
+          <g transform="translate(70, 10)">
+            <circle cx="10" cy="10" r="10" fill="#00ff41" />
+            <path
+              d="M6 10 L9 13 L14 7"
+              stroke="#000"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
         )}
-      </button>
+      </svg>
+
+      {/* Hover hint */}
+      {!data.confirmed && (
+        <div className={cn(
+          "text-center text-[9px] text-green-400/60 transition-opacity duration-200 mt-1",
+          isHovered ? "opacity-100" : "opacity-0"
+        )}>
+          Click to confirm
+        </div>
+      )}
     </div>
   );
 }
