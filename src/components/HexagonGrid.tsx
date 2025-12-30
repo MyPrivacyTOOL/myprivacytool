@@ -71,26 +71,8 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]">
-          YOUR DIGITAL SHADOW
-        </h2>
-        <p className="text-lg text-green-300/80 max-w-2xl mx-auto">
-          We found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking. 
-          Click the ones that are correct.
-        </p>
-      </div>
-
-      {/* Risk Score */}
-      <RiskScore 
-        score={riskScore} 
-        confirmed={confirmedCount} 
-        total={hexagons.length} 
-      />
-
-      {/* Honeycomb Hexagon Grid */}
-      <div className="flex justify-center my-8">
+      {/* Honeycomb Hexagon Grid - Now above text */}
+      <div className="flex justify-center mb-8">
         <div 
           className="relative"
           style={{ 
@@ -122,6 +104,24 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
           })}
         </div>
       </div>
+
+      {/* Header - Now below hexagons */}
+      <div className="text-center mb-8">
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]">
+          YOUR DIGITAL SHADOW
+        </h2>
+        <p className="text-lg text-green-300/80 max-w-2xl mx-auto">
+          We found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking. 
+          Click the ones that are correct.
+        </p>
+      </div>
+
+      {/* Risk Score */}
+      <RiskScore 
+        score={riskScore} 
+        confirmed={confirmedCount} 
+        total={hexagons.length} 
+      />
 
       {/* Voice AI */}
       <VoiceAI 
