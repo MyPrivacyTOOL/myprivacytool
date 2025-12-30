@@ -3,7 +3,14 @@ import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData } from '@/lib/deviceDetection';
-import { trackHexagonConfirm, trackDeepScanUnlocked } from '@/lib/analytics';
+import { 
+  trackHexagonConfirm, 
+  trackDeepScanUnlocked, 
+  trackFunnelStep,
+  trackHexagonAccuracy,
+  trackTimeToFirstConfirmation,
+  trackActivity
+} from '@/lib/analytics';
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
@@ -15,14 +22,29 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [revealingHexagons, setRevealingHexagons] = useState<Set<string>>(new Set());
   const gridRef = useRef<HTMLDivElement>(null);
+  const isFirstConfirmation = useRef(true);
 
   // Get visible hexagons based on count
   const visibleHexagons = allHexagons.slice(0, visibleCount);
+
+  // Track funnel milestones
+  useEffect(() => {
+    if (confirmedCount === 3) {
+      trackFunnelStep('three_confirmed');
+    }
+    if (confirmedCount === 5) {
+      trackFunnelStep('five_confirmed');
+    }
+    if (confirmedCount === 8) {
+      trackFunnelStep('all_hexagons_confirmed');
+    }
+  }, [confirmedCount]);
 
   // Progressive reveal: show 3 more hexagons after all 5 initial ones are confirmed
   useEffect(() => {
     if (confirmedCount === 5 && visibleCount === 5) {
       trackDeepScanUnlocked(confirmedCount);
+      trackFunnelStep('deep_scan_triggered');
       
       // Smooth scroll to the grid area
       setTimeout(() => {
@@ -60,7 +82,20 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
     
     const hex = visibleHexagons.find(h => h.id === id);
     if (hex && !hex.confirmed) {
+      // Track activity
+      trackActivity();
+      
+      // Track first confirmation timing
+      if (isFirstConfirmation.current) {
+        trackTimeToFirstConfirmation();
+        trackFunnelStep('first_hexagon_confirmed');
+        isFirstConfirmation.current = false;
+      }
+      
+      // Track hexagon confirmation
       trackHexagonConfirm(hex.id, hex.label, true);
+      trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
+      
       setConfirmedCount(c => c + 1);
       
       // Update the hexagon's confirmed state
@@ -139,7 +174,7 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
       />
 
       {/* Honeycomb Hexagon Grid */}
-      <div ref={gridRef} className="flex justify-center mb-8">
+      <div ref={gridRef} className="flex justify-center mb-8" role="list" aria-label="Detected data points">
         <div 
           className="relative transition-all duration-500"
           style={{ 
@@ -174,6 +209,7 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
                   top: `${pos.y}px`,
                   animationDelay: `${index * 0.1}s`,
                 }}
+                role="listitem"
               >
                 <Hexagon
                   data={displayData}

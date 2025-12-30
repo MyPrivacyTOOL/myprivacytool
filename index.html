@@ -3,18 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MyPrivacyTOOL.IO - Discover Your Digital Shadow</title>
-    <meta name="description" content="See what data is exposed about you online. MyPrivacyTOOL.IO reveals your digital shadow - the personal information data brokers and attackers can find about you." />
+    
+    <!-- Primary Meta Tags -->
+    <title>MyPrivacyTOOL.IO - See Your Digital Shadow Without Asking</title>
+    <meta name="title" content="MyPrivacyTOOL.IO - See Your Digital Shadow Without Asking" />
+    <meta name="description" content="Discover what data brokers know about you in 3 minutes. See your location, device, ISP, and 8+ data points detected without asking. Free privacy scan." />
+    <meta name="keywords" content="privacy tool, data broker, digital footprint, OSINT, personal data, privacy scan, data removal, cyber security" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
     <meta name="author" content="MyPrivacyTOOL.IO" />
 
-    <meta property="og:title" content="MyPrivacyTOOL.IO - Discover Your Digital Shadow" />
-    <meta property="og:description" content="See what data is exposed about you online. Reveal your digital shadow in seconds." />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://www.myprivacytool.io" />
 
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.myprivacytool.io" />
+    <meta property="og:title" content="MyPrivacyTOOL.IO - See Your Digital Shadow" />
+    <meta property="og:description" content="We found 8+ data points about you without asking. See what data brokers know in 3 minutes." />
+    <meta property="og:image" content="https://www.myprivacytool.io/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:site_name" content="MyPrivacyTOOL.IO" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@MyPrivacyTOOL" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:url" content="https://www.myprivacytool.io" />
+    <meta name="twitter:title" content="MyPrivacyTOOL.IO - See Your Digital Shadow" />
+    <meta name="twitter:description" content="We found 8+ data points about you without asking. See what data brokers know in 3 minutes." />
+    <meta name="twitter:image" content="https://www.myprivacytool.io/twitter-card.jpg" />
+    <meta name="twitter:site" content="@myprivacytool" />
+    <meta name="twitter:creator" content="@myprivacytool" />
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#000000" />
+    <meta name="msapplication-TileColor" content="#00ff41" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Preconnect to external domains for performance -->
+    <link rel="preconnect" href="https://api.ipify.org" />
+    <link rel="preconnect" href="https://ipapi.co" />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://cdn.consentmanager.net" />
 
     <!-- Consent Manager -->
     <script type="text/javascript" data-cmp-ab="1" src="https://cdn.consentmanager.net/delivery/autoblocking/e71fec59020f9.js" data-cmp-host="c.delivery.consentmanager.net" data-cmp-cdn="cdn.consentmanager.net" data-cmp-codesrc="16"></script>
@@ -32,5 +68,85 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "MyPrivacyTOOL.IO",
+      "description": "Privacy awareness tool that reveals your digital footprint without asking for information",
+      "url": "https://www.myprivacytool.io",
+      "applicationCategory": "SecurityApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "MyPrivacyTOOL.IO",
+        "url": "https://www.myprivacytool.io"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "MyPrivacyTOOL.IO",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.myprivacytool.io/logo-full.png"
+        }
+      },
+      "potentialAction": {
+        "@type": "UseAction",
+        "target": "https://www.myprivacytool.io",
+        "name": "Scan Your Digital Shadow"
+      }
+    }
+    </script>
+
+    <!-- Breadcrumb Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [{
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.myprivacytool.io"
+      }]
+    }
+    </script>
+
+    <!-- FAQ Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [{
+        "@type": "Question",
+        "name": "How does MyPrivacyTOOL detect my information?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "We use your browser's public information (IP address, user agent, screen resolution) combined with free IP geolocation APIs to detect your location, device type, ISP, and other data points. No personal information is stored."
+        }
+      }, {
+        "@type": "Question",
+        "name": "Is MyPrivacyTOOL free?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes, the digital shadow scan is 100% free. We show you what data brokers can find about you without requiring any sign-up or payment."
+        }
+      }, {
+        "@type": "Question",
+        "name": "What data can attackers find about me?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Attackers can find your location, device type, operating system, browser, ISP provider, screen resolution, timezone, language preferences, and privacy settings - all without you providing any information."
+        }
+      }]
+    }
+    </script>
   </body>
 </html>
