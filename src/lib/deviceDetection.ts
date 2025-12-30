@@ -112,6 +112,63 @@ function getConnectionType(): string {
   return nav.connection?.effectiveType || 'Unknown';
 }
 
+// Get connection display value
+function getConnectionDisplay(): string {
+  const nav = navigator as Navigator & {
+    connection?: {
+      effectiveType?: string;
+      type?: string;
+    };
+  };
+  
+  const effectiveType = nav.connection?.effectiveType;
+  const type = nav.connection?.type;
+  
+  if (type === 'wifi') return 'WiFi';
+  if (effectiveType === '4g') return 'Fast (4G/5G)';
+  if (effectiveType === '3g') return 'Moderate (3G)';
+  if (effectiveType === '2g') return 'Slow (2G)';
+  return 'WiFi'; // Default assumption for desktop
+}
+
+// Get battery info (async)
+async function getBatteryInfo(): Promise<{ level: number; charging: boolean } | null> {
+  try {
+    const nav = navigator as Navigator & {
+      getBattery?: () => Promise<{ level: number; charging: boolean }>;
+    };
+    if (nav.getBattery) {
+      const battery = await nav.getBattery();
+      return { level: Math.round(battery.level * 100), charging: battery.charging };
+    }
+  } catch {
+    // Battery API not available
+  }
+  return null;
+}
+
+// Estimate demographic based on various signals
+function estimateDemographic(data: DeviceData): string {
+  const hour = new Date().getHours();
+  const os = data.device.os.toLowerCase();
+  const browser = data.device.browser.toLowerCase();
+  
+  // Simple heuristic (very rough estimates)
+  if (os.includes('ios') && browser.includes('safari')) {
+    return 'Adult (25-45)';
+  }
+  if (os.includes('android') && hour >= 22 || hour <= 6) {
+    return 'Young Adult (18-30)';
+  }
+  if (data.device.type === 'Desktop' && os.includes('windows')) {
+    return 'Adult (30-55)';
+  }
+  if (os.includes('macos')) {
+    return 'Professional (25-50)';
+  }
+  return 'Adult (25-55)';
+}
+
 // Capture all device data
 export async function captureDeviceData(): Promise<DeviceData> {
   const ua = navigator.userAgent;
@@ -269,5 +326,50 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
         : 'Do Not Track is disabled - your activity is being tracked.',
       confirmed: false,
     },
+    // Hexagon 9: Connection Type
+    {
+      id: 'connection',
+      label: 'Connection Type',
+      value: getConnectionDisplay(),
+      icon: '📶',
+      confidence: 85,
+      risk: 'Public WiFi? Attackers can intercept unencrypted traffic.',
+      confirmed: false,
+    },
+    // Hexagon 10: Estimated Demographic
+    {
+      id: 'demographic',
+      label: 'Estimated Profile',
+      value: estimateDemographic(data),
+      icon: '👤',
+      confidence: 60,
+      risk: 'Age-targeted scams (retirement fraud, health scams) are tailored to your demographic.',
+      confirmed: false,
+    },
   ];
+}
+
+// Async version that includes battery info
+export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonData[]> {
+  const baseHexagons = generateHexagons(data);
+  
+  // Try to get battery info
+  const batteryInfo = await getBatteryInfo();
+  if (batteryInfo) {
+    // Insert battery hexagon after connection
+    const connectionIndex = baseHexagons.findIndex(h => h.id === 'connection');
+    baseHexagons.splice(connectionIndex + 1, 0, {
+      id: 'battery',
+      label: 'Device Status',
+      value: batteryInfo.charging 
+        ? `Charging ${batteryInfo.level}%` 
+        : `Battery ${batteryInfo.level}%`,
+      icon: batteryInfo.charging ? '🔌' : '🔋',
+      confidence: 90,
+      risk: 'Battery level patterns reveal your daily routine and when you might be vulnerable.',
+      confirmed: false,
+    });
+  }
+  
+  return baseHexagons;
 }
