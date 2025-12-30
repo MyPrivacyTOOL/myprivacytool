@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
-import { Mic, Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import aliceVideo from '@/assets/alice-video.mp4';
+import { trackVoiceAIStart, trackVoiceAIStop, trackVoiceAIMessage } from '@/lib/analytics';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -54,9 +55,11 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       speechSynthesis.cancel();
       setIsSpeaking(false);
       setIsVoiceActive(false);
+      trackVoiceAIStop();
     } else {
       // Start speaking
       setIsVoiceActive(true);
+      trackVoiceAIStart();
       const introMessage = `Hi, I'm Alice, your AI privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points about you without asking. This includes your location, device type, browser, internet provider, and more. Hover over any hexagon to see what I found, then click to confirm if it's correct. The more you confirm, the clearer your digital shadow becomes. This is the same data that attackers and data brokers can access about you right now.`;
       
       setIsSpeaking(true);
@@ -98,6 +101,16 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
     if (newMessage && newMessage !== message) {
       setIsTyping(true);
+      
+      // Track message type for analytics
+      if (confirmedCount === totalCount && totalCount > 0) {
+        trackVoiceAIMessage('complete');
+      } else if (hexagonData?.confirmed) {
+        trackVoiceAIMessage('hexagon_confirmed');
+      } else if (confirmedCount > 0) {
+        trackVoiceAIMessage('progress_update');
+      }
+      
       setTimeout(() => {
         setMessage(newMessage);
         setIsTyping(false);
