@@ -4,12 +4,66 @@ import { cn } from '@/lib/utils';
 import { Volume2, VolumeX } from 'lucide-react';
 import aliceVideo from '@/assets/alice-video.mp4';
 import { trackVoiceAIStart, trackVoiceAIStop, trackVoiceAIMessage } from '@/lib/analytics';
+import { useToast } from '@/hooks/use-toast';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
   confirmedCount: number;
   totalCount: number;
 }
+
+// Rate limiting constants
+const MAX_SESSIONS_PER_DAY = 20;
+const STORAGE_KEY = 'alice_voice_sessions';
+
+// Get today's date string for session tracking
+const getTodayKey = (): string => {
+  return new Date().toISOString().split('T')[0];
+};
+
+// Get user session count from localStorage
+const getUserSessionCount = (): number => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return 0;
+    
+    const data = JSON.parse(stored);
+    const today = getTodayKey();
+    
+    // Reset if it's a new day
+    if (data.date !== today) {
+      return 0;
+    }
+    
+    return data.count || 0;
+  } catch {
+    return 0;
+  }
+};
+
+// Increment session count
+const incrementSessionCount = (): number => {
+  const today = getTodayKey();
+  const currentCount = getUserSessionCount();
+  const newCount = currentCount + 1;
+  
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    date: today,
+    count: newCount
+  }));
+  
+  return newCount;
+};
+
+// Check if user can start a new session
+const canStartSession = (): boolean => {
+  return getUserSessionCount() < MAX_SESSIONS_PER_DAY;
+};
+
+// Get remaining sessions
+const getRemainingSessionsCount = (): number => {
+  return Math.max(0, MAX_SESSIONS_PER_DAY - getUserSessionCount());
+};
 
 // Calculate risk score based on confirmed hexagons
 const calculateRiskScore = (confirmedCount: number, totalCount: number): number => {
@@ -119,6 +173,8 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [remainingSessions, setRemainingSessions] = useState(getRemainingSessionsCount());
+  const { toast } = useToast();
 
   const handleVoiceClick = useCallback(() => {
     if (isSpeaking) {
@@ -128,6 +184,20 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       setIsVoiceActive(false);
       trackVoiceAIStop();
     } else {
+      // Check rate limit before starting
+      if (!canStartSession()) {
+        toast({
+          title: "Daily limit reached",
+          description: "You've used your 20 free voice sessions today. Tomorrow you'll get 20 more, or upgrade to Alice HD for unlimited!",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Increment session count and update remaining
+      incrementSessionCount();
+      setRemainingSessions(getRemainingSessionsCount());
+
       // Start speaking with structured 4-part response
       setIsVoiceActive(true);
       trackVoiceAIStart();
@@ -139,7 +209,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         setIsVoiceActive(false);
       });
     }
-  }, [isSpeaking, hexagonData, confirmedCount, totalCount]);
+  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast]);
 
   useEffect(() => {
     // Load voices (some browsers need this)
@@ -231,6 +301,10 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         <div className="w-full text-center">
           <p className="text-green-300/90 text-sm leading-relaxed mb-3">
             Hover over any hexagon to see what I found, then click to confirm if it's correct. Click the Voice AI button and I will explain 'The Risks' to you.
+          </p>
+          {/* Remaining sessions indicator */}
+          <p className="text-green-500/70 text-xs mb-2">
+            {remainingSessions} / {MAX_SESSIONS_PER_DAY} free voice sessions remaining today
           </p>
           <div className="relative flex items-center justify-center">
             {/* Sound wave rings */}
