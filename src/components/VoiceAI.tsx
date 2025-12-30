@@ -53,24 +53,24 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   }, [confirmedCount, totalCount, hexagonData, message]);
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6 max-w-3xl mx-auto shadow-sm">
+    <div className="bg-black/40 border border-green-500/30 rounded-xl p-6 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
       <div className="flex items-start gap-4">
         {/* AI Icon */}
         <div className={cn(
           "flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center",
-          "bg-primary/10 border border-primary/30",
+          "bg-green-500/10 border border-green-500/30",
           isTyping && "animate-pulse"
-        )}>
-          <Mic className="w-6 h-6 text-primary" />
+        )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)' }}>
+          <Mic className="w-6 h-6 text-green-400" style={{ filter: 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))' }} />
         </div>
 
         {/* Message */}
         <div className="flex-1 min-h-[60px]">
-          <div className="text-xs text-primary font-semibold uppercase tracking-wider mb-2">
+          <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
             Shadow AI
           </div>
           <p className={cn(
-            "text-foreground/90 leading-relaxed transition-opacity duration-200",
+            "text-green-300/90 leading-relaxed transition-opacity duration-200",
             isTyping ? "opacity-50" : "opacity-100"
           )}>
             {message || 'Analyzing your digital footprint...'}
