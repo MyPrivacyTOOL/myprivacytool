@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 import { Mic } from 'lucide-react';
+import aliceImage from '@/assets/alice-curtain.jpg';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -22,7 +23,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
     } else if (confirmedCount === 0 && totalCount > 0) {
       // Initial welcome message
-      newMessage = `Hi, I'm Shadow, your privacy assistant. I found ${totalCount} data points about you without asking. Hover over any hexagon to see what I found, then click to confirm if it's correct.`;
+      newMessage = `Hi, I'm Alice, your privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points without asking. Hover over any hexagon to see what I found, then click to confirm if it's correct.`;
     } else if (confirmedCount === 1) {
       // After first confirmation
       newMessage = `Great! That boosted my confidence. I'm scanning deeper... ${totalCount - confirmedCount} more to go.`;
@@ -53,27 +54,36 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   }, [confirmedCount, totalCount, hexagonData, message]);
 
   return (
-    <div className="bg-black/40 border border-green-500/30 rounded-xl p-6 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
+    <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
       <div className="flex items-start gap-4">
-        {/* AI Icon */}
+        {/* Alice Image */}
         <div className={cn(
-          "flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center",
-          "bg-green-500/10 border border-green-500/30",
+          "flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
           isTyping && "animate-pulse"
         )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)' }}>
-          <Mic className="w-6 h-6 text-green-400" style={{ filter: 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))' }} />
+          <img 
+            src={aliceImage} 
+            alt="Alice - Your Privacy Expert" 
+            className="w-full h-full object-cover"
+          />
         </div>
 
         {/* Message */}
         <div className="flex-1 min-h-[60px]">
-          <div className="text-xs text-green-400 font-semibold uppercase tracking-wider mb-2" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
-            Shadow AI
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-green-400 font-semibold uppercase tracking-wider" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
+              Alice
+            </span>
+            <span className="text-xs text-green-400/60">• Privacy Expert</span>
+            <div className="ml-auto">
+              <Mic className="w-4 h-4 text-green-400 cursor-pointer hover:text-green-300 transition-colors" style={{ filter: 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))' }} />
+            </div>
           </div>
           <p className={cn(
-            "text-green-300/90 leading-relaxed transition-opacity duration-200",
+            "text-green-300/90 leading-relaxed transition-opacity duration-200 text-sm",
             isTyping ? "opacity-50" : "opacity-100"
           )}>
-            {message || 'Analyzing your digital footprint...'}
+            {message || 'Looking behind the curtain for you...'}
           </p>
         </div>
       </div>
