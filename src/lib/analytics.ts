@@ -48,3 +48,11 @@ export const trackVoiceAIMessage = (messageType: string) => {
     message_type: messageType,
   });
 };
+
+// Social media tracking
+export const trackSocialClick = (platform: string, url: string) => {
+  trackEvent('social_click', {
+    platform,
+    url,
+  });
+};
