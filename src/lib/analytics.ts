@@ -274,3 +274,29 @@ export const trackError = (
 export const trackScrollToFooter = () => {
   trackFunnelStep('scroll_to_footer');
 };
+
+// Alice HD Upgrade tracking events
+export const trackUpgradeModalOpened = () => {
+  trackActivity();
+  trackEvent('upgrade_modal_opened', {
+    tier: 'alice_hd',
+    timestamp: Date.now(),
+  });
+};
+
+export const trackUpgradeModalClosed = () => {
+  trackActivity();
+  trackEvent('upgrade_modal_closed', {
+    tier: 'alice_hd',
+    timestamp: Date.now(),
+  });
+};
+
+export const trackWaitlistEmailSubmitted = (email: string) => {
+  trackActivity();
+  trackEvent('waitlist_email_submitted', {
+    tier: 'alice_hd',
+    email_domain: email.split('@')[1] || 'unknown',
+    timestamp: Date.now(),
+  });
+};
