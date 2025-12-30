@@ -10,7 +10,23 @@ interface HexagonGridProps {
 }
 
 export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridProps) {
-  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons.slice(0, 6));
+  // TEMPORARY: Show all 20 hexagons for template preview
+  const [hexagons, setHexagons] = useState<HexagonData[]>(() => {
+    // Generate 20 placeholder hexagons for preview
+    const placeholders: HexagonData[] = [];
+    for (let i = 0; i < 20; i++) {
+      placeholders.push({
+        id: `hex-${i + 1}`,
+        label: `HEXAGON ${i + 1}`,
+        value: `Position ${i + 1}`,
+        icon: '🔷',
+        confidence: 50,
+        risk: 'Template hexagon',
+        confirmed: false,
+      });
+    }
+    return placeholders;
+  });
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [revealingHexagon, setRevealingHexagon] = useState<HexagonData | null>(null);
@@ -72,20 +88,42 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const hSpacing = hexWidth * 0.87 + gap;
   const vSpacing = hexHeight * 0.75 + gap;
 
-  const positions = [
-    { x: hSpacing * 0.5, y: 0 },
-    { x: hSpacing * 1.5, y: 0 },
-    { x: 0, y: vSpacing },
-    { x: hSpacing, y: vSpacing },
-    { x: hSpacing * 2, y: vSpacing },
-    { x: hSpacing * 0.5, y: vSpacing * 2 },
-    { x: hSpacing * 1.5, y: vSpacing * 2 },
-    { x: 0, y: vSpacing * 2 },
-    { x: hSpacing * 2, y: vSpacing * 2 },
-  ];
+  // Generate positions dynamically for 2-3-2-3 honeycomb pattern
+  const generatePositions = (count: number) => {
+    const positions: { x: number; y: number }[] = [];
+    let currentIndex = 0;
+    let row = 0;
+    
+    while (currentIndex < count) {
+      const isEvenRow = row % 2 === 0;
+      const hexagonsInRow = isEvenRow ? 2 : 3;
+      
+      for (let col = 0; col < hexagonsInRow && currentIndex < count; col++) {
+        let x: number;
+        if (isEvenRow) {
+          // 2-hexagon rows: centered, offset by 0.5
+          x = hSpacing * (0.5 + col);
+        } else {
+          // 3-hexagon rows: starts at 0
+          x = hSpacing * col;
+        }
+        const y = vSpacing * row;
+        positions.push({ x, y });
+        currentIndex++;
+      }
+      row++;
+    }
+    
+    return positions;
+  };
 
+  // Generate 20 positions for template display
+  const positions = generatePositions(20);
+  
+  // Calculate container size based on positions
+  const maxY = positions.length > 0 ? Math.max(...positions.map(p => p.y)) : 0;
   const containerWidth = hSpacing * 2 + hexWidth;
-  const containerHeight = vSpacing * 2 + hexHeight;
+  const containerHeight = maxY + hexHeight;
 
   const revealingHexagonData: HexagonData | null = revealingHexagon ? {
     id: 'revealing',
@@ -137,8 +175,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
                 style={{
                   left: `${pos.x}px`,
                   top: `${pos.y}px`,
-                  opacity: index >= 6 ? 0 : 1,
-                  animation: index >= 6 ? 'fadeIn 0.5s ease-out forwards' : undefined,
                 }}
               >
                 <Hexagon
