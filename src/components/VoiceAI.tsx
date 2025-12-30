@@ -3,8 +3,30 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 import { Volume2, VolumeX } from 'lucide-react';
 import aliceVideo from '@/assets/alice-video.mp4';
-import { trackVoiceAIStart, trackVoiceAIStop, trackVoiceAIMessage, trackVoiceSessionComplete } from '@/lib/analytics';
+import { 
+  trackVoiceAIStart, 
+  trackVoiceAIStop, 
+  trackVoiceSessionComplete,
+  trackVoiceIntroPlayed,
+  trackVoiceRateLimitHit,
+  trackVoiceToggleOff,
+  trackVoiceScanCompleted,
+  trackVoiceHexagonCompleted,
+  trackVoiceAIMessage
+} from '@/lib/analytics';
+import { 
+  getVoiceData, 
+  incrementVoiceSession, 
+  getRemainingVoiceSessions, 
+  canStartVoiceSession,
+  addResponseToHistory,
+  updateBestRiskScore,
+  incrementScansCompleted,
+  addCompletedHexagon
+} from '@/lib/voiceStorage';
 import { useToast } from '@/hooks/use-toast';
+import VoiceDebugPanel from './VoiceDebugPanel';
+import VoiceStatsBadge from './VoiceStatsBadge';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -14,56 +36,6 @@ interface VoiceAIProps {
 
 // Rate limiting constants
 const MAX_SESSIONS_PER_DAY = 20;
-const STORAGE_KEY = 'alice_voice_sessions';
-
-// Get today's date string for session tracking
-const getTodayKey = (): string => {
-  return new Date().toISOString().split('T')[0];
-};
-
-// Get user session count from localStorage
-const getUserSessionCount = (): number => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return 0;
-    
-    const data = JSON.parse(stored);
-    const today = getTodayKey();
-    
-    // Reset if it's a new day
-    if (data.date !== today) {
-      return 0;
-    }
-    
-    return data.count || 0;
-  } catch {
-    return 0;
-  }
-};
-
-// Increment session count
-const incrementSessionCount = (): number => {
-  const today = getTodayKey();
-  const currentCount = getUserSessionCount();
-  const newCount = currentCount + 1;
-  
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({
-    date: today,
-    count: newCount
-  }));
-  
-  return newCount;
-};
-
-// Check if user can start a new session
-const canStartSession = (): boolean => {
-  return getUserSessionCount() < MAX_SESSIONS_PER_DAY;
-};
-
-// Get remaining sessions
-const getRemainingSessionsCount = (): number => {
-  return Math.max(0, MAX_SESSIONS_PER_DAY - getUserSessionCount());
-};
 
 // Risk level type
 type RiskLevel = 'low' | 'medium' | 'high';
@@ -258,10 +230,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [remainingSessions, setRemainingSessions] = useState(getRemainingSessionsCount());
+  const [remainingSessions, setRemainingSessions] = useState(getRemainingVoiceSessions());
   const [hasIntroduced, setHasIntroduced] = useState(false);
   const [previousRiskScore, setPreviousRiskScore] = useState(100);
   const { toast } = useToast();
+
+  // Get current risk score for debug panel
+  const { score: currentRiskScore } = calculateRiskScore(confirmedCount, totalCount);
 
   // Update previous risk score when confirmed count changes
   useEffect(() => {
@@ -272,6 +247,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
     };
   }, [confirmedCount, totalCount]);
 
+  // Simulate completing all hexagons (for debug panel)
+  const handleSimulateComplete = useCallback(() => {
+    // This would need to be passed up to parent, for now just track
+    incrementScansCompleted();
+    updateBestRiskScore(0);
+  }, []);
+
   const handleVoiceClick = useCallback(() => {
     if (isSpeaking) {
       // Stop speaking
@@ -279,9 +261,12 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       setIsSpeaking(false);
       setIsVoiceActive(false);
       trackVoiceAIStop();
+      trackVoiceToggleOff();
     } else {
       // Check rate limit before starting
-      if (!canStartSession()) {
+      if (!canStartVoiceSession()) {
+        const data = getVoiceData();
+        trackVoiceRateLimitHit(data.voiceSessionCount);
         toast({
           title: "Daily limit reached",
           description: "You've used your 20 free sessions today. More tomorrow!",
@@ -291,8 +276,8 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       }
 
       // Increment session count and update remaining
-      incrementSessionCount();
-      setRemainingSessions(getRemainingSessionsCount());
+      incrementVoiceSession();
+      setRemainingSessions(getRemainingVoiceSessions());
 
       // Start speaking with structured 4-part response
       setIsVoiceActive(true);
@@ -302,13 +287,24 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       const isFirstInteraction = !hasIntroduced;
       const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction, previousRiskScore);
       
+      // Add response to history for debug panel
+      addResponseToHistory(structuredResponse);
+      
       if (isFirstInteraction) {
         setHasIntroduced(true);
+        trackVoiceIntroPlayed();
       }
       
       // Update previous score after generating response
       const { score } = calculateRiskScore(confirmedCount, totalCount);
       setPreviousRiskScore(score);
+      updateBestRiskScore(score);
+      
+      // Track hexagon if one is selected
+      if (hexagonData?.id && hexagonData?.label) {
+        addCompletedHexagon(hexagonData.id);
+        trackVoiceHexagonCompleted(hexagonData.id, hexagonData.label);
+      }
       
       setIsSpeaking(true);
       speakText(structuredResponse, () => {
@@ -321,9 +317,15 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           totalHexagons: totalCount,
           userCompletedScan: confirmedCount === totalCount && totalCount > 0,
         });
+        
+        // If scan is complete, track it
+        if (confirmedCount === totalCount && totalCount > 0) {
+          incrementScansCompleted();
+          trackVoiceScanCompleted(totalCount, score);
+        }
       });
     }
-  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced]);
+  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced, previousRiskScore]);
 
   useEffect(() => {
     // Load voices (some browsers need this)
@@ -384,71 +386,82 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   }, [confirmedCount, totalCount, hexagonData, message]);
 
   return (
-    <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
-      <div className="flex flex-col items-center gap-4">
-        {/* Header text above video */}
-        <div className="w-full text-center">
-          <h2 className="text-lg text-green-400 font-semibold mb-2" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
-            Hi, I'm Alice, your AI Privacy TOOL
-          </h2>
-          <p className="text-green-300/90 text-sm leading-relaxed">
-            Let's peek behind the digital curtain to find out what information is available about you!
-          </p>
-        </div>
+    <>
+      <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
+        <div className="flex flex-col items-center gap-4">
+          {/* Header text above video */}
+          <div className="w-full text-center">
+            <h2 className="text-lg text-green-400 font-semibold mb-2" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
+              Hi, I'm Alice, your AI Privacy TOOL
+            </h2>
+            <p className="text-green-300/90 text-sm leading-relaxed">
+              Let's peek behind the digital curtain to find out what information is available about you!
+            </p>
+          </div>
 
-        {/* Alice Video */}
-        <div className={cn(
-          "w-full aspect-square rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
-          isTyping && "animate-pulse"
-        )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)', borderTopWidth: '6px', borderTopColor: 'white' }}>
-          <video 
-            src={aliceVideo} 
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover"
-          />
-        </div>
+          {/* Alice Video */}
+          <div className={cn(
+            "w-full aspect-square rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
+            isTyping && "animate-pulse"
+          )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)', borderTopWidth: '6px', borderTopColor: 'white' }}>
+            <video 
+              src={aliceVideo} 
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-        {/* Voice AI Button */}
-        <div className="w-full text-center">
-          <p className="text-green-300/90 text-sm leading-relaxed mb-3">
-            Hover over any hexagon to see what I found, then click to confirm if it's correct. Click the Voice AI button and I will explain 'The Risks' to you.
-          </p>
-          {/* Remaining sessions indicator */}
-          <p className="text-green-500/70 text-xs mb-2">
-            {remainingSessions} / {MAX_SESSIONS_PER_DAY} free voice sessions remaining today
-          </p>
-          <div className="relative flex items-center justify-center">
-            {/* Sound wave rings */}
-            {isVoiceActive && (
-              <>
-                <span className="absolute w-full h-full rounded-xl border-2 border-green-400/60 animate-ping" style={{ animationDuration: '1.5s' }} />
-                <span className="absolute w-full h-full rounded-xl border-2 border-green-400/40 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
-                <span className="absolute w-full h-full rounded-xl border-2 border-green-400/20 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
-              </>
-            )}
-            <button 
-              onClick={handleVoiceClick}
-              className={cn(
-                "relative z-10 flex items-center justify-center gap-3 px-8 py-4 border-2 rounded-xl font-bold text-lg transition-all cursor-pointer",
-                isVoiceActive 
-                  ? "bg-green-500/40 border-green-400 text-green-300" 
-                  : "bg-green-500/20 border-green-500/50 text-green-400 animate-pulse hover:bg-green-500/30 hover:border-green-400"
-              )} 
-              style={{ boxShadow: isVoiceActive ? '0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3)' : '0 0 20px rgba(0, 255, 65, 0.4), 0 0 40px rgba(0, 255, 65, 0.2)' }}
-            >
-              {isSpeaking ? (
-                <VolumeX className="w-7 h-7 animate-pulse" />
-              ) : (
-                <Volume2 className={cn("w-7 h-7", isVoiceActive && "animate-bounce")} />
+          {/* Voice AI Button */}
+          <div className="w-full text-center">
+            <p className="text-green-300/90 text-sm leading-relaxed mb-3">
+              Hover over any hexagon to see what I found, then click to confirm if it's correct. Click the Voice AI button and I will explain 'The Risks' to you.
+            </p>
+            {/* Remaining sessions indicator */}
+            <p className="text-green-500/70 text-xs mb-2">
+              {remainingSessions} / {MAX_SESSIONS_PER_DAY} free voice sessions remaining today
+            </p>
+            <div className="relative flex items-center justify-center">
+              {/* Sound wave rings */}
+              {isVoiceActive && (
+                <>
+                  <span className="absolute w-full h-full rounded-xl border-2 border-green-400/60 animate-ping" style={{ animationDuration: '1.5s' }} />
+                  <span className="absolute w-full h-full rounded-xl border-2 border-green-400/40 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
+                  <span className="absolute w-full h-full rounded-xl border-2 border-green-400/20 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
+                </>
               )}
-              {isSpeaking ? "Stop Alice" : "Voice AI"}
-            </button>
+              <button 
+                onClick={handleVoiceClick}
+                className={cn(
+                  "relative z-10 flex items-center justify-center gap-3 px-8 py-4 border-2 rounded-xl font-bold text-lg transition-all cursor-pointer",
+                  isVoiceActive 
+                    ? "bg-green-500/40 border-green-400 text-green-300" 
+                    : "bg-green-500/20 border-green-500/50 text-green-400 animate-pulse hover:bg-green-500/30 hover:border-green-400"
+                )} 
+                style={{ boxShadow: isVoiceActive ? '0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3)' : '0 0 20px rgba(0, 255, 65, 0.4), 0 0 40px rgba(0, 255, 65, 0.2)' }}
+              >
+                {isSpeaking ? (
+                  <VolumeX className="w-7 h-7 animate-pulse" />
+                ) : (
+                  <Volume2 className={cn("w-7 h-7", isVoiceActive && "animate-bounce")} />
+                )}
+                {isSpeaking ? "Stop Alice" : "Voice AI"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Stats badge for users */}
+      <VoiceStatsBadge />
+
+      {/* Debug panel for developers */}
+      <VoiceDebugPanel 
+        currentRiskScore={currentRiskScore} 
+        onSimulateComplete={handleSimulateComplete}
+      />
+    </>
   );
 }
