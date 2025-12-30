@@ -100,13 +100,13 @@ const Index = () => {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-green-500/20 py-8 mt-12 bg-black/80">
+        <footer className="py-8 mt-12 bg-white">
           <div className="container mx-auto px-4 text-center">
-            <img src={logoFull} alt="MyPrivacyTOOL.IO" className="h-8 object-contain mx-auto mb-4" />
-            <p className="text-green-300/70 text-sm">
+            <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-12 object-contain mx-auto mb-4" />
+            <p className="text-gray-600 text-sm">
               © 2025 MyPrivacyTOOL.IO • Protecting Your Digital Privacy
             </p>
-            <p className="text-xs text-green-400/40 mt-2">
+            <p className="text-xs text-gray-400 mt-2">
               No data is stored. All detection happens in your browser.
             </p>
           </div>
