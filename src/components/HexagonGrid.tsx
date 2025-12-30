@@ -75,16 +75,15 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
 
       {/* Honeycomb Hexagon Grid */}
       <div className="flex justify-center my-12">
-        <div className="relative" style={{ width: '340px', height: '380px' }}>
+        <div className="relative" style={{ width: '320px', height: '340px' }}>
           {hexagons.slice(0, 7).map((hex, index) => {
             const pos = honeycombPositions[index];
             if (!pos) return null;
             
-            // Hexagon dimensions
-            const hexWidth = 110;
-            const hexHeight = 128;
-            const horizontalSpacing = hexWidth * 0.88;
-            const verticalSpacing = hexHeight * 0.75;
+            // Tighter hexagon spacing for real honeycomb effect
+            const hexSize = 112; // Base size for positioning
+            const horizontalSpacing = hexSize * 0.78;
+            const verticalSpacing = hexSize * 0.68;
             
             const left = pos.col * horizontalSpacing + (pos.offset ? horizontalSpacing / 2 : 0);
             const top = pos.row * verticalSpacing;
@@ -94,7 +93,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
                 key={hex.id}
                 className="absolute"
                 style={{
-                  left: `${left + 50}px`,
+                  left: `${left + 45}px`,
                   top: `${top}px`,
                 }}
               >
