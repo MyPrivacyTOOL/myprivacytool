@@ -1,55 +1,59 @@
 import { useState, useEffect } from 'react';
 import Hexagon from './Hexagon';
+import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData } from '@/lib/deviceDetection';
 import { toast } from '@/hooks/use-toast';
 import { trackHexagonConfirm, trackDeepScanUnlocked } from '@/lib/analytics';
+
 interface HexagonGridProps {
   hexagons: HexagonData[];
 }
 
 export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridProps) {
-  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons);
+  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons.slice(0, 6));
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
-  const [visibleCount, setVisibleCount] = useState(6);
+  const [revealingHexagon, setRevealingHexagon] = useState<HexagonData | null>(null);
 
   useEffect(() => {
-    setHexagons(initialHexagons);
+    setHexagons(initialHexagons.slice(0, 6));
   }, [initialHexagons]);
 
-  // Reveal more hexagons after 3 confirmations
+  // Progressive reveal: show more hexagons as user confirms
   useEffect(() => {
-    if (confirmedCount >= 3 && visibleCount === 6) {
-      setTimeout(() => {
-        setVisibleCount(8);
-        trackDeepScanUnlocked(confirmedCount);
-        toast({
-          title: "🔓 Deep Scan Unlocked!",
-          description: "2 more data points revealed. Your digital shadow runs deeper than you thought...",
-          duration: 5000,
-        });
-      }, 500);
+    if (confirmedCount === 3 && hexagons.length === 6) {
+      const nextHexagons = initialHexagons.slice(6, 8);
+      
+      trackDeepScanUnlocked(confirmedCount);
+      toast({
+        title: "🔓 Deep Scan Unlocked!",
+        description: "Revealing deeper data points...",
+        duration: 5000,
+      });
+      
+      nextHexagons.forEach((hex, index) => {
+        setTimeout(() => {
+          setRevealingHexagon(hex);
+          
+          setTimeout(() => {
+            setHexagons(prev => [...prev, hex]);
+            setRevealingHexagon(null);
+          }, 2000);
+        }, index * 2500);
+      });
     }
-  }, [confirmedCount, visibleCount]);
+  }, [confirmedCount, hexagons.length, initialHexagons]);
 
   const handleConfirm = (id: string) => {
     setHexagons(prev => {
       const hex = prev.find(h => h.id === id);
-      const wasConfirmed = hex?.confirmed || false;
-      
-      // Track hexagon confirmation event
-      if (hex) {
-        trackHexagonConfirm(hex.id, hex.label, !wasConfirmed);
+      if (hex && !hex.confirmed) {
+        trackHexagonConfirm(hex.id, hex.label, true);
+        setConfirmedCount(c => c + 1);
       }
-      
-      // Update confirmed count
-      setConfirmedCount(c => wasConfirmed ? c - 1 : c + 1);
-      
       return prev.map(h =>
-        h.id === id 
-          ? { ...h, confirmed: !h.confirmed, confidence: wasConfirmed ? h.confidence - 5 : Math.min(h.confidence + 5, 99) } 
-          : h
+        h.id === id ? { ...h, confirmed: true, confidence: Math.min(h.confidence + 5, 99) } : h
       );
     });
   };
@@ -58,37 +62,21 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     setHoveredHexagon(data);
   };
 
-
   // Hexagon size for calculations
-  const hexWidth = 170; // md size
+  const hexWidth = 170;
   const hexHeight = 170;
-  
-  // Gap between hexagons
   const gap = 12;
-  
-  // For pointy-top hexagons in honeycomb with gaps:
-  // Horizontal spacing = width * 0.87 + gap
-  // Vertical spacing = height * 0.75 + gap
   const hSpacing = hexWidth * 0.87 + gap;
   const vSpacing = hexHeight * 0.75 + gap;
 
-  // Honeycomb layout:
-  // Row 0: 2 hexagons (top)
-  // Row 1: 3 hexagons (middle) - offset left by half
-  // Row 2: 2 hexagons (bottom) - aligned with row 0
-  // Row 3: 1 hexagon (bonus, center) - revealed after confirmations
   const positions = [
-    // Row 0 - top 2
     { x: hSpacing * 0.5, y: 0 },
     { x: hSpacing * 1.5, y: 0 },
-    // Row 1 - middle 3 (offset)
     { x: 0, y: vSpacing },
     { x: hSpacing, y: vSpacing },
     { x: hSpacing * 2, y: vSpacing },
-    // Row 2 - bottom 2
     { x: hSpacing * 0.5, y: vSpacing * 2 },
     { x: hSpacing * 1.5, y: vSpacing * 2 },
-    // Row 3 - bonus hexagons (revealed after 3 confirmations)
     { x: 0, y: vSpacing * 2 },
     { x: hSpacing * 2, y: vSpacing * 2 },
   ];
@@ -96,11 +84,36 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const containerWidth = hSpacing * 2 + hexWidth;
   const containerHeight = vSpacing * 2 + hexHeight;
 
-  // Get visible hexagons
-  const visibleHexagons = hexagons.slice(0, visibleCount);
+  const revealingHexagonData: HexagonData | null = revealingHexagon ? {
+    id: 'revealing',
+    label: 'SCANNING...',
+    value: 'Data Point Revealed',
+    icon: '🔍',
+    confidence: 0,
+    risk: 'Analyzing deeper patterns...',
+    confirmed: false,
+  } : null;
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
+      {/* Title Section */}
+      <div className="text-center mb-8">
+        <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+          YOUR DIGITAL SHADOW
+        </h2>
+        <p className="text-muted-foreground">
+          We found {hexagons.length} data points about you without asking.
+          {confirmedCount >= 3 && hexagons.length < 8 && ' Deeper scan unlocked...'}
+        </p>
+      </div>
+
+      {/* Voice AI */}
+      <VoiceAI 
+        hexagonData={hoveredHexagon} 
+        confirmedCount={confirmedCount} 
+        totalCount={Math.max(hexagons.length, 8)} 
+      />
+
       {/* Honeycomb Hexagon Grid */}
       <div className="flex justify-center mb-8">
         <div 
@@ -110,7 +123,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
             height: `${containerHeight}px` 
           }}
         >
-          {visibleHexagons.map((hex, index) => {
+          {hexagons.map((hex, index) => {
             const pos = positions[index];
             if (!pos) return null;
             
@@ -134,13 +147,31 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
               </div>
             );
           })}
+          
+          {/* Show revealing hexagon during animation */}
+          {revealingHexagonData && (
+            <div
+              className="absolute transition-all duration-500 animate-pulse"
+              style={{
+                left: `${positions[hexagons.length]?.x || 0}px`,
+                top: `${positions[hexagons.length]?.y || 0}px`,
+              }}
+            >
+              <Hexagon
+                data={revealingHexagonData}
+                index={hexagons.length}
+                onConfirm={() => {}}
+                onHover={handleHover}
+              />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Risk Score */}
       <RiskScore 
         confirmed={confirmedCount} 
-        total={visibleCount} 
+        total={Math.max(hexagons.length, 8)} 
       />
     </div>
   );
