@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 import { Mic } from 'lucide-react';
-import aliceImage from '@/assets/alice-generated.png';
+import aliceVideo from '@/assets/alice-video.mp4';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -61,9 +61,12 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           "flex-shrink-0 w-[170px] h-[170px] rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
           isTyping && "animate-pulse"
         )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)' }}>
-          <img 
-            src={aliceImage} 
-            alt="Alice - Your Privacy Expert" 
+          <video 
+            src={aliceVideo} 
+            autoPlay
+            loop
+            muted
+            playsInline
             className="w-full h-full object-cover"
           />
         </div>
