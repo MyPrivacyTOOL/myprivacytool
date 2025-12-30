@@ -73,7 +73,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
         {/* Alice Video */}
         <div className={cn(
-          "w-full aspect-square rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
+          "w-full aspect-square rounded-lg overflow-hidden border border-green-500/30 border-t-white/80 cursor-pointer hover:border-green-400 hover:border-t-white transition-colors",
           isTyping && "animate-pulse"
         )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)' }}>
           <video 
