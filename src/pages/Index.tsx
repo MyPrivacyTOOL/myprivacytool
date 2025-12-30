@@ -101,9 +101,9 @@ const Index = () => {
         </section>
 
         {/* Footer */}
-        <footer className="py-6 mt-12 bg-white">
+        <footer className="py-4 mt-12 bg-white">
           <div className="container mx-auto px-4 text-center">
-            <img src={logoFooter} alt="MyPrivacyTOOL.IO" className="h-14 object-contain mx-auto mb-4" />
+            <img src={logoFooter} alt="MyPrivacyTOOL.IO" className="h-20 object-contain mx-auto mb-3" />
             
             {/* Social Media Icons */}
             <div className="flex justify-center gap-3 mb-4">
