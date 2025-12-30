@@ -3,7 +3,6 @@ import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData } from '@/lib/deviceDetection';
-import { toast } from '@/hooks/use-toast';
 import { trackHexagonConfirm, trackDeepScanUnlocked } from '@/lib/analytics';
 
 interface HexagonGridProps {
@@ -26,11 +25,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
       const nextHexagons = initialHexagons.slice(6, 8);
       
       trackDeepScanUnlocked(confirmedCount);
-      toast({
-        title: "🔓 Deep Scan Unlocked!",
-        description: "Revealing deeper data points...",
-        duration: 5000,
-      });
       
       nextHexagons.forEach((hex, index) => {
         setTimeout(() => {
