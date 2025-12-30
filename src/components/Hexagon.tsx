@@ -13,9 +13,7 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = () => {
-    if (!data.confirmed) {
-      onConfirm(data.id);
-    }
+    onConfirm(data.id);
   };
 
   const handleMouseEnter = () => {
@@ -40,8 +38,7 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         viewBox="0 0 100 100"
         className={cn(
           "w-[150px] h-[150px] md:w-[170px] md:h-[170px] cursor-pointer transition-transform duration-300",
-          "hover:scale-105",
-          data.confirmed && "cursor-default"
+          "hover:scale-105"
         )}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
