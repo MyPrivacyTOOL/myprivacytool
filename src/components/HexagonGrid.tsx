@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Hexagon from './Hexagon';
 import RiskScore from './RiskScore';
 import { HexagonData } from '@/lib/deviceDetection';
+import { toast } from '@/hooks/use-toast';
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
@@ -21,7 +22,12 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   useEffect(() => {
     if (confirmedCount >= 3 && visibleCount === 6) {
       setTimeout(() => {
-        setVisibleCount(8); // Show 2 more hexagons
+        setVisibleCount(8);
+        toast({
+          title: "🔓 Deep Scan Unlocked!",
+          description: "2 more data points revealed. Your digital shadow runs deeper than you thought...",
+          duration: 5000,
+        });
       }, 500);
     }
   }, [confirmedCount, visibleCount]);
