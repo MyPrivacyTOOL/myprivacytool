@@ -68,15 +68,16 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
           fill={`url(#hexGradient-${data.id})`}
         />
 
-        {/* Border - white/light until confirmed, then bright green */}
+        {/* Border - white/light until confirmed, green glow on hover, bright green when confirmed */}
         <path
           d={hexPath}
           fill="none"
-          stroke={data.confirmed ? "#00ff41" : isHovered ? "#a8ffba" : "#ffffff"}
-          strokeWidth={data.confirmed ? "3" : "2"}
-          opacity={data.confirmed ? 1 : 0.6}
-          filter={data.confirmed ? `url(#glow-${data.id})` : undefined}
+          stroke={data.confirmed ? "#00ff41" : isHovered ? "#00ff41" : "#ffffff"}
+          strokeWidth={data.confirmed ? "3" : isHovered ? "2.5" : "2"}
+          opacity={data.confirmed ? 1 : isHovered ? 0.85 : 0.6}
+          filter={data.confirmed || isHovered ? `url(#glow-${data.id})` : undefined}
           className={data.confirmed ? "animate-hexagon-glow" : ""}
+          style={{ transition: 'all 0.3s ease' }}
         />
 
         {/* Icon */}
