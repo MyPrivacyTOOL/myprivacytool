@@ -11,6 +11,77 @@ interface VoiceAIProps {
   totalCount: number;
 }
 
+// Calculate risk score based on confirmed hexagons
+const calculateRiskScore = (confirmedCount: number, totalCount: number): number => {
+  if (totalCount === 0) return 0;
+  const baseRisk = 40; // Base risk just from visiting
+  const confirmationRisk = (confirmedCount / totalCount) * 50; // Up to 50 more from confirmations
+  const exposureBonus = confirmedCount >= 5 ? 10 : 0; // Bonus for deep scan
+  return Math.min(100, Math.round(baseRisk + confirmationRisk + exposureBonus));
+};
+
+// Explain what the risk score means
+const explainRisk = (riskScore: number): string => {
+  if (riskScore >= 80) return "your data is highly exposed and actively being sold by data brokers";
+  if (riskScore >= 60) return "attackers can easily build a profile on you with this information";
+  if (riskScore >= 40) return "there's enough data exposed for targeted phishing attacks";
+  return "basic information is available but your exposure is limited";
+};
+
+// Get top recommendation based on current state
+const getTopRecommendation = (confirmedCount: number, hexagonData: HexagonData | null): string => {
+  if (confirmedCount === 0) return "Start by confirming the data points I found to understand your exposure.";
+  if (confirmedCount < 5) return "Keep confirming to unlock the deep scan and see your full digital shadow.";
+  if (confirmedCount >= 5 && hexagonData?.label?.includes('Privacy')) {
+    return "Consider enabling Do Not Track in your browser settings.";
+  }
+  if (confirmedCount >= 5 && hexagonData?.label?.includes('Location')) {
+    return "Use a VPN to mask your real location from trackers.";
+  }
+  if (confirmedCount >= 5) return "Request data removal from major data brokers to reduce your exposure.";
+  return "Continue confirming data points to get personalized protection recommendations.";
+};
+
+// Generate Alice's 4-part structured response
+const generateAliceResponse = (
+  hexagonData: HexagonData | null,
+  confirmedCount: number,
+  totalCount: number
+): string => {
+  // HOOK (1-2 lines): Acknowledge user
+  let hook = "";
+  if (confirmedCount === 0) {
+    hook = `Hi, I'm Alice, your AI privacy expert.`;
+  } else if (confirmedCount < 3) {
+    hook = `Good progress! You've confirmed ${confirmedCount} privacy area${confirmedCount > 1 ? 's' : ''}.`;
+  } else if (confirmedCount < 5) {
+    hook = `Nice work! ${confirmedCount} areas confirmed, you're getting closer to the deep scan.`;
+  } else if (confirmedCount === totalCount) {
+    hook = `Impressive! You've mapped your complete digital shadow.`;
+  } else {
+    hook = `Deep scan unlocked! I found ${totalCount - 5} additional data points.`;
+  }
+
+  // INSIGHT: Plain explanation + why
+  const riskScore = calculateRiskScore(confirmedCount, totalCount);
+  const insight = `Your risk score is ${riskScore} out of 100. This means ${explainRisk(riskScore)}.`;
+
+  // ACTION: One concrete suggestion
+  const action = getTopRecommendation(confirmedCount, hexagonData);
+
+  // CHOICE: Let user decide
+  let choice = "";
+  if (confirmedCount === 0) {
+    choice = "Hover over any hexagon to see what I found, or click Voice AI for a detailed explanation.";
+  } else if (confirmedCount < totalCount) {
+    choice = "Want me to explain more about a specific data point, or shall we continue mapping?";
+  } else {
+    choice = "Want me to explain how to remove your data, or see which brokers have it?";
+  }
+
+  return `${hook} ${insight} ${action} ${choice}`;
+};
+
 // Browser's built-in voice synthesis (Free)
 const speakText = (text: string, onEnd?: () => void) => {
   if ('speechSynthesis' in window) {
@@ -57,18 +128,18 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       setIsVoiceActive(false);
       trackVoiceAIStop();
     } else {
-      // Start speaking
+      // Start speaking with structured 4-part response
       setIsVoiceActive(true);
       trackVoiceAIStart();
-      const introMessage = `Hi, I'm Alice, your AI privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points about you without asking. This includes your location, device type, browser, internet provider, and more. Hover over any hexagon to see what I found, then click to confirm if it's correct. The more you confirm, the clearer your digital shadow becomes. This is the same data that attackers and data brokers can access about you right now.`;
+      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount);
       
       setIsSpeaking(true);
-      speakText(introMessage, () => {
+      speakText(structuredResponse, () => {
         setIsSpeaking(false);
         setIsVoiceActive(false);
       });
     }
-  }, [isSpeaking, totalCount]);
+  }, [isSpeaking, hexagonData, confirmedCount, totalCount]);
 
   useEffect(() => {
     // Load voices (some browsers need this)
