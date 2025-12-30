@@ -2,21 +2,21 @@ import { cn } from '@/lib/utils';
 import { Shield, AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface RiskScoreProps {
-  score: number;
   confirmed: number;
   total: number;
 }
 
-export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
-  const getRiskLevel = (score: number) => {
-    if (score >= 8) return { label: 'High Risk', color: 'text-destructive', bgColor: 'bg-destructive/10', Icon: AlertCircle };
-    if (score >= 5) return { label: 'Medium Risk', color: 'text-warning', bgColor: 'bg-warning/10', Icon: AlertTriangle };
-    if (score >= 1) return { label: 'Low Risk', color: 'text-primary', bgColor: 'bg-primary/10', Icon: Shield };
-    return { label: 'Scanning...', color: 'text-muted-foreground', bgColor: 'bg-muted', Icon: Shield };
+export default function RiskScore({ confirmed, total }: RiskScoreProps) {
+  const percentage = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+  
+  const getRiskLevel = (pct: number) => {
+    if (pct >= 80) return { label: 'High Risk', Icon: AlertCircle };
+    if (pct >= 50) return { label: 'Medium Risk', Icon: AlertTriangle };
+    if (pct >= 1) return { label: 'Low Risk', Icon: Shield };
+    return { label: 'Scanning...', Icon: Shield };
   };
 
-  const risk = getRiskLevel(score);
-  const percentage = total > 0 ? (confirmed / total) * 100 : 0;
+  const risk = getRiskLevel(percentage);
 
   return (
     <div className="bg-black/40 border border-green-500/30 rounded-xl p-6 mx-auto mb-4 shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
@@ -39,7 +39,7 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
               cy="50"
               r="40"
               fill="none"
-              stroke={score >= 8 ? '#ff4444' : score >= 5 ? '#ffaa00' : '#00ff41'}
+              stroke={percentage >= 80 ? '#ff4444' : percentage >= 50 ? '#ffaa00' : '#00ff41'}
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={`${percentage * 2.51} 251`}
@@ -48,10 +48,9 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={cn("text-3xl font-bold", score >= 8 ? 'text-red-500' : score >= 5 ? 'text-yellow-500' : 'text-green-400')} style={{ textShadow: '0 0 10px currentColor' }}>
-              {score.toFixed(1)}
+            <span className={cn("text-2xl font-bold", percentage >= 80 ? 'text-red-500' : percentage >= 50 ? 'text-yellow-500' : 'text-green-400')} style={{ textShadow: '0 0 10px currentColor' }}>
+              {percentage}%
             </span>
-            <span className="text-xs text-green-400/60">/ 10</span>
           </div>
         </div>
 
@@ -59,8 +58,8 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
         <div className="flex-1 text-center md:text-left">
           <div className={cn(
             "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold mb-2 border",
-            score >= 8 ? "bg-red-500/10 text-red-400 border-red-500/30" : 
-            score >= 5 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" : 
+            percentage >= 80 ? "bg-red-500/10 text-red-400 border-red-500/30" : 
+            percentage >= 50 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" : 
             "bg-green-500/10 text-green-400 border-green-500/30"
           )}>
             <risk.Icon className="w-4 h-4" />
@@ -77,7 +76,7 @@ export default function RiskScore({ score, confirmed, total }: RiskScoreProps) {
             <div 
               className={cn(
                 "h-full rounded-full transition-all duration-500 ease-out",
-                score >= 8 ? "bg-red-500" : score >= 5 ? "bg-yellow-500" : "bg-green-500"
+                percentage >= 80 ? "bg-red-500" : percentage >= 50 ? "bg-yellow-500" : "bg-green-500"
               )}
               style={{ width: `${percentage}%`, boxShadow: '0 0 10px currentColor' }}
             />
