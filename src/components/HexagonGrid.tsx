@@ -89,7 +89,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const hSpacing = hexWidth * 0.87 + gap;
   const vSpacing = hexHeight * 0.75 + gap;
 
-  // Generate positions dynamically for 2-3-2-3 honeycomb pattern
+  // Generate positions dynamically for 3-2-3-2 honeycomb pattern (3 on top)
   const generatePositions = (count: number) => {
     const positions: { x: number; y: number }[] = [];
     let currentIndex = 0;
@@ -97,16 +97,16 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     
     while (currentIndex < count) {
       const isEvenRow = row % 2 === 0;
-      const hexagonsInRow = isEvenRow ? 2 : 3;
+      const hexagonsInRow = isEvenRow ? 3 : 2; // 3 on even rows, 2 on odd rows
       
       for (let col = 0; col < hexagonsInRow && currentIndex < count; col++) {
         let x: number;
         if (isEvenRow) {
-          // 2-hexagon rows: centered, offset by 0.5
-          x = hSpacing * (0.5 + col);
-        } else {
           // 3-hexagon rows: starts at 0
           x = hSpacing * col;
+        } else {
+          // 2-hexagon rows: centered, offset by 0.5
+          x = hSpacing * (0.5 + col);
         }
         const y = vSpacing * row;
         positions.push({ x, y });
