@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
@@ -14,6 +14,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [revealingHexagon, setRevealingHexagon] = useState<HexagonData | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHexagons(initialHexagons.slice(0, 6));
@@ -25,6 +26,14 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
       const nextHexagons = initialHexagons.slice(6, 8);
       
       trackDeepScanUnlocked(confirmedCount);
+      
+      // Smooth scroll to the grid area
+      setTimeout(() => {
+        gridRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
       
       nextHexagons.forEach((hex, index) => {
         setTimeout(() => {
@@ -109,7 +118,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
       />
 
       {/* Honeycomb Hexagon Grid */}
-      <div className="flex justify-center mb-8">
+      <div ref={gridRef} className="flex justify-center mb-8">
         <div 
           className="relative"
           style={{ 
