@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
+import VoiceAI from '@/components/VoiceAI';
 import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDetection';
 import { RefreshCw, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,25 @@ const Index = () => {
               What is your Digital Shadow?
             </h1>
           </div>
+        </section>
+
+        {/* Alice VoiceAI Section */}
+        <section className="py-8">
+          <VoiceAI 
+            hexagonData={null} 
+            confirmedCount={0} 
+            totalCount={hexagons.length}
+          />
+        </section>
+
+        {/* Description Text */}
+        <section className="text-center pb-6 px-4">
+          <p className="text-lg text-white">
+            The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking.
+          </p>
+          <p className="text-lg text-white">
+            Click the ones that are correct.
+          </p>
         </section>
 
         {/* Hexagon Grid Section */}

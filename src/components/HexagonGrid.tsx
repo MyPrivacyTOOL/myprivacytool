@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Hexagon from './Hexagon';
-import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData } from '@/lib/deviceDetection';
 
@@ -73,16 +72,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
-      {/* Description text - above hexagons */}
-      <div className="text-center mb-6">
-        <p className="text-lg text-white">
-          The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking.
-        </p>
-        <p className="text-lg text-white">
-          Click the ones that are correct.
-        </p>
-      </div>
-
       {/* Honeycomb Hexagon Grid */}
       <div className="flex justify-center mb-8">
         <div 
@@ -117,18 +106,10 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
         </div>
       </div>
 
-
       {/* Risk Score */}
       <RiskScore 
         confirmed={confirmedCount} 
         total={hexagons.length} 
-      />
-
-      {/* Voice AI */}
-      <VoiceAI 
-        hexagonData={hoveredHexagon} 
-        confirmedCount={confirmedCount} 
-        totalCount={hexagons.length}
       />
     </div>
   );
