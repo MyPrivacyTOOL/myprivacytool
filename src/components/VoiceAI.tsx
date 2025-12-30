@@ -96,42 +96,33 @@ const getTopRecommendation = (confirmedCount: number, hexagonData: HexagonData |
   return "Continue confirming data points to get personalized protection recommendations.";
 };
 
+// Alice introduction message for first interaction
+const ALICE_INTRODUCTION = "Hi, I'm Alice, your digital shadow guide. Let's explore your privacy together.";
+
 // Generate Alice's 4-part structured response
 const generateAliceResponse = (
   hexagonData: HexagonData | null,
   confirmedCount: number,
-  totalCount: number
+  totalCount: number,
+  isFirstInteraction: boolean = false
 ): string => {
-  // HOOK (1-2 lines): Acknowledge user
-  let hook = "";
-  if (confirmedCount === 0) {
-    hook = `Hi, I'm Alice, your AI privacy expert.`;
-  } else if (confirmedCount < 3) {
-    hook = `Good progress! You've confirmed ${confirmedCount} privacy area${confirmedCount > 1 ? 's' : ''}.`;
-  } else if (confirmedCount < 5) {
-    hook = `Nice work! ${confirmedCount} areas confirmed, you're getting closer to the deep scan.`;
-  } else if (confirmedCount === totalCount) {
-    hook = `Impressive! You've mapped your complete digital shadow.`;
-  } else {
-    hook = `Deep scan unlocked! I found ${totalCount - 5} additional data points.`;
+  // If first interaction, return introduction
+  if (isFirstInteraction) {
+    return ALICE_INTRODUCTION;
   }
 
-  // INSIGHT: Plain explanation + why
+  // HOOK: Acknowledge user with confirmed count
+  const hook = `Hi, I'm Alice. I can see you've checked ${confirmedCount} privacy area${confirmedCount !== 1 ? 's' : ''}.`;
+
+  // INSIGHT: Risk score with explanation
   const riskScore = calculateRiskScore(confirmedCount, totalCount);
-  const insight = `Your risk score is ${riskScore} out of 100. This means ${explainRisk(riskScore)}.`;
+  const insight = `Your risk score is ${riskScore} out of 100. ${explainRisk(riskScore)}.`;
 
-  // ACTION: One concrete suggestion
-  const action = getTopRecommendation(confirmedCount, hexagonData);
+  // ACTION: Top priority recommendation
+  const action = `I recommend you ${getTopRecommendation(confirmedCount, hexagonData).toLowerCase()}`;
 
-  // CHOICE: Let user decide
-  let choice = "";
-  if (confirmedCount === 0) {
-    choice = "Hover over any hexagon to see what I found, or click Voice AI for a detailed explanation.";
-  } else if (confirmedCount < totalCount) {
-    choice = "Want me to explain more about a specific data point, or shall we continue mapping?";
-  } else {
-    choice = "Want me to explain how to remove your data, or see which brokers have it?";
-  }
+  // CHOICE: Let user decide next step
+  const choice = "Want me to explain more, or help you fix it?";
 
   return `${hook} ${insight} ${action} ${choice}`;
 };
@@ -174,6 +165,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [remainingSessions, setRemainingSessions] = useState(getRemainingSessionsCount());
+  const [hasIntroduced, setHasIntroduced] = useState(false);
   const { toast } = useToast();
 
   const handleVoiceClick = useCallback(() => {
@@ -188,7 +180,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       if (!canStartSession()) {
         toast({
           title: "Daily limit reached",
-          description: "You've used your 20 free voice sessions today. Tomorrow you'll get 20 more, or upgrade to Alice HD for unlimited!",
+          description: "You've used your 20 free sessions today. More tomorrow!",
           variant: "destructive",
         });
         return;
@@ -201,7 +193,14 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       // Start speaking with structured 4-part response
       setIsVoiceActive(true);
       trackVoiceAIStart();
-      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount);
+      
+      // Use introduction for first interaction, then 4-part response
+      const isFirstInteraction = !hasIntroduced;
+      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction);
+      
+      if (isFirstInteraction) {
+        setHasIntroduced(true);
+      }
       
       setIsSpeaking(true);
       speakText(structuredResponse, () => {
@@ -216,7 +215,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         });
       });
     }
-  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast]);
+  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced]);
 
   useEffect(() => {
     // Load voices (some browsers need this)
