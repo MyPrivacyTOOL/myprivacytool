@@ -3,7 +3,7 @@ import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDetection';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
@@ -100,9 +100,26 @@ const Index = () => {
         </section>
 
         {/* Footer */}
-        <footer className="py-8 mt-12 bg-white">
+        <footer className="py-10 mt-12 bg-white">
           <div className="container mx-auto px-4 text-center">
-            <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-20 md:h-24 object-contain mx-auto mb-4" />
+            <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-28 md:h-32 object-contain mx-auto mb-6" />
+            
+            {/* Social Media Icons */}
+            <div className="flex justify-center gap-4 mb-6">
+              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Facebook className="w-5 h-5 text-gray-600" />
+              </a>
+              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Twitter className="w-5 h-5 text-gray-600" />
+              </a>
+              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Linkedin className="w-5 h-5 text-gray-600" />
+              </a>
+              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Instagram className="w-5 h-5 text-gray-600" />
+              </a>
+            </div>
+            
             <p className="text-gray-600 text-sm">
               © 2025 MyPrivacyTOOL.IO • Protecting Your Digital Privacy
             </p>
