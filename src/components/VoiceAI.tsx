@@ -3,7 +3,7 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 import { Volume2, VolumeX } from 'lucide-react';
 import aliceVideo from '@/assets/alice-video.mp4';
-import { trackVoiceAIStart, trackVoiceAIStop, trackVoiceAIMessage } from '@/lib/analytics';
+import { trackVoiceAIStart, trackVoiceAIStop, trackVoiceAIMessage, trackVoiceSessionComplete } from '@/lib/analytics';
 import { useToast } from '@/hooks/use-toast';
 
 interface VoiceAIProps {
@@ -207,6 +207,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       speakText(structuredResponse, () => {
         setIsSpeaking(false);
         setIsVoiceActive(false);
+        
+        // Track voice session completion
+        trackVoiceSessionComplete({
+          hexagonsCompleted: confirmedCount,
+          totalHexagons: totalCount,
+          userCompletedScan: confirmedCount === totalCount && totalCount > 0,
+        });
       });
     }
   }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast]);

@@ -131,8 +131,11 @@ export const trackDeepScanUnlocked = (confirmedCount: number) => {
 };
 
 // Voice AI tracking events
+let voiceSessionStartTime: number = 0;
+
 export const trackVoiceAIStart = () => {
   trackActivity();
+  voiceSessionStartTime = Date.now();
   trackEvent('voice_ai_start', {
     action: 'started',
   });
@@ -148,6 +151,25 @@ export const trackVoiceAIStop = () => {
 export const trackVoiceAIMessage = (messageType: string) => {
   trackEvent('voice_ai_message', {
     message_type: messageType,
+  });
+};
+
+// Enhanced voice session complete tracking
+export const trackVoiceSessionComplete = (params: {
+  hexagonsCompleted: number;
+  totalHexagons: number;
+  userCompletedScan: boolean;
+}) => {
+  const sessionDuration = voiceSessionStartTime 
+    ? Math.round((Date.now() - voiceSessionStartTime) / 1000) 
+    : 0;
+  
+  trackEvent('voice_session_complete', {
+    hexagons_completed: params.hexagonsCompleted,
+    total_hexagons: params.totalHexagons,
+    session_duration_seconds: sessionDuration,
+    user_completed_scan: params.userCompletedScan,
+    completion_rate: Math.round((params.hexagonsCompleted / params.totalHexagons) * 100),
   });
 };
 
