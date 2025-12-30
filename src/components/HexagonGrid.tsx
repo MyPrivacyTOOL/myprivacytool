@@ -76,7 +76,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
       {/* Description text - above hexagons */}
       <div className="text-center mb-6">
         <p className="text-lg text-green-300/80">
-          We found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking.
+          The PrivacyTOOL found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking.
         </p>
         <p className="text-lg text-green-300/80">
           Click the ones that are correct.
