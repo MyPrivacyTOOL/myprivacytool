@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
 import logoFooter from '@/assets/logo-footer.png';
+import { trackSocialClick } from '@/lib/analytics';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -127,19 +128,19 @@ const Index = () => {
             
             {/* Social Media Icons */}
             <div className="flex justify-center gap-3 mb-4">
-              <a href="https://www.facebook.com/MyPrivacyTOOL.IO" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://www.facebook.com/MyPrivacyTOOL.IO" target="_blank" rel="noopener noreferrer" onClick={() => trackSocialClick('facebook', 'https://www.facebook.com/MyPrivacyTOOL.IO')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Facebook className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="https://twitter.com/myprivacytool" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://twitter.com/myprivacytool" target="_blank" rel="noopener noreferrer" onClick={() => trackSocialClick('twitter', 'https://twitter.com/myprivacytool')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Twitter className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="https://www.instagram.com/myprivacytool.io/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://www.instagram.com/myprivacytool.io/" target="_blank" rel="noopener noreferrer" onClick={() => trackSocialClick('instagram', 'https://www.instagram.com/myprivacytool.io/')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Instagram className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="https://myprivacytool.business.site/" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://myprivacytool.business.site/" target="_blank" rel="noopener noreferrer" onClick={() => trackSocialClick('google_business', 'https://myprivacytool.business.site/')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Globe className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="https://linktr.ee/MyPrivacyTOOL" target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+              <a href="https://linktr.ee/MyPrivacyTOOL" target="_blank" rel="noopener noreferrer" onClick={() => trackSocialClick('linktree', 'https://linktr.ee/MyPrivacyTOOL')} className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
                 <Link className="w-4 h-4 text-gray-600" />
               </a>
             </div>
