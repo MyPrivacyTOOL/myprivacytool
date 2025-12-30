@@ -75,13 +75,10 @@ const Index = () => {
       {/* Content Layer */}
       <div className="relative z-10">
         {/* Navbar */}
-        <nav className="sticky top-0 z-50 bg-black/60 backdrop-blur-md border-b border-green-500/20">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <nav className="sticky top-0 z-50 bg-white backdrop-blur-md border-b border-border">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-center">
             <div className="flex items-center">
               <img src={logoFull} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain" />
-            </div>
-            <div className="text-sm text-green-400/70 hidden sm:block">
-              Your privacy, revealed
             </div>
           </div>
         </nav>
