@@ -39,8 +39,8 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         className={cn(
-          "relative w-48 h-56 transition-all duration-300 ease-out cursor-pointer group",
-          "hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-background",
+          "relative w-28 h-32 md:w-32 md:h-36 transition-all duration-300 ease-out cursor-pointer group",
+          "hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent",
           data.confirmed && "cursor-default"
         )}
         aria-label={`${data.label}: ${data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Click to confirm'}`}
@@ -49,47 +49,46 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         <div
           className={cn(
             "absolute inset-0 clip-hexagon transition-all duration-300",
-            "border-2",
             data.confirmed
-              ? "bg-primary/10 border-primary glow-success"
+              ? "bg-black/60 border-2 border-primary glow-success"
               : isHovered
-              ? "bg-muted border-foreground/30 shadow-lg"
-              : "bg-card border-border hover:border-foreground/20"
+              ? "bg-black/70 border-2 border-green-400/60 shadow-lg"
+              : "bg-black/50 border-2 border-green-500/30 hover:border-green-400/50"
           )}
         />
 
         {/* Content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-2">
           {/* Icon */}
-          <span className="text-4xl mb-2" role="img" aria-hidden="true">
+          <span className="text-2xl mb-1" role="img" aria-hidden="true">
             {data.icon}
           </span>
 
           {/* Label */}
           <span className={cn(
-            "text-xs font-semibold uppercase tracking-wider mb-1",
-            data.confirmed ? "text-primary" : "text-foreground/60"
+            "text-[10px] font-semibold uppercase tracking-wider mb-0.5",
+            data.confirmed ? "text-primary" : "text-green-300/70"
           )}>
             {data.label}
           </span>
 
           {/* Value */}
-          <span className="text-sm font-medium text-foreground leading-tight mb-2 max-w-[140px] truncate">
+          <span className="text-xs font-medium text-white leading-tight mb-1 max-w-[90px] truncate">
             {data.value}
           </span>
 
           {/* Confidence */}
           <span className={cn(
-            "text-xs italic",
-            data.confirmed ? "text-primary/80" : "text-muted-foreground"
+            "text-[10px]",
+            data.confirmed ? "text-primary/80" : "text-green-400/60"
           )}>
-            {data.confidence}% confident
+            {data.confidence}%
           </span>
 
           {/* Confirmed checkmark */}
           {data.confirmed && (
-            <div className="absolute top-4 right-4 w-7 h-7 bg-primary rounded-full flex items-center justify-center animate-check-pop">
-              <Check className="w-4 h-4 text-primary-foreground" />
+            <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center animate-check-pop">
+              <Check className="w-3 h-3 text-primary-foreground" />
             </div>
           )}
         </div>
@@ -97,7 +96,7 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         {/* Hover hint */}
         {!data.confirmed && (
           <div className={cn(
-            "absolute -bottom-2 left-1/2 -translate-x-1/2 text-xs text-muted-foreground transition-opacity duration-200",
+            "absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-green-400/60 transition-opacity duration-200 whitespace-nowrap",
             isHovered ? "opacity-100" : "opacity-0"
           )}>
             Click to confirm
