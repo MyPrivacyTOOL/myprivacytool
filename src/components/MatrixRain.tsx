@@ -72,64 +72,151 @@ const MatrixRain = () => {
       
       {/* Shadow Hands Overlay */}
       <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
-        {/* Left hand */}
-        <div className="absolute left-[10%] bottom-0 w-32 h-64 md:w-48 md:h-80">
-          <svg viewBox="0 0 100 200" className="w-full h-full opacity-80 animate-hand-push-left">
+        {/* Left hand - realistic open palm */}
+        <div className="absolute left-[5%] md:left-[10%] bottom-0 w-28 h-56 md:w-40 md:h-72">
+          <svg viewBox="0 0 100 180" className="w-full h-full animate-hand-push-left">
             <defs>
-              <linearGradient id="handGradientLeft" x1="0%" y1="100%" x2="0%" y2="0%">
-                <stop offset="0%" stopColor="rgba(0,0,0,0.9)" />
-                <stop offset="100%" stopColor="rgba(0,0,0,0.3)" />
-              </linearGradient>
+              <radialGradient id="handGradientLeft" cx="50%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="rgba(0,0,0,0.85)" />
+                <stop offset="60%" stopColor="rgba(0,0,0,0.5)" />
+                <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              </radialGradient>
+              <filter id="blurLeft" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
+              </filter>
             </defs>
+            {/* Realistic hand shape - open palm pressing */}
             <path
-              d="M50 200 L50 120 L30 80 L30 60 M50 120 L40 70 L40 50 M50 120 L50 55 L50 40 M50 120 L60 70 L60 50 M50 120 L70 85 L70 65 L70 120 L80 130 L80 160 L50 200"
+              d="M50 180 
+                 C45 160, 40 150, 38 140
+                 L35 120
+                 C32 110, 28 100, 25 85
+                 L22 65
+                 C20 55, 18 45, 20 35
+                 C22 28, 26 25, 28 30
+                 L32 50
+                 C33 55, 34 60, 35 65
+                 L35 55
+                 C35 45, 34 35, 36 25
+                 C38 15, 42 12, 44 18
+                 L46 40
+                 C47 50, 47 55, 47 60
+                 L48 45
+                 C48 35, 48 25, 50 15
+                 C52 5, 56 5, 58 12
+                 L58 35
+                 C58 45, 58 52, 58 58
+                 L60 45
+                 C60 35, 62 28, 65 22
+                 C68 16, 72 18, 73 25
+                 L72 45
+                 C71 55, 70 60, 70 65
+                 L73 55
+                 C75 48, 78 45, 82 48
+                 C86 52, 85 60, 82 72
+                 L78 90
+                 C75 105, 70 115, 68 125
+                 L65 140
+                 C62 155, 58 165, 55 180
+                 Z"
               fill="url(#handGradientLeft)"
-              stroke="rgba(0,255,65,0.3)"
-              strokeWidth="1"
+              filter="url(#blurLeft)"
             />
           </svg>
         </div>
         
-        {/* Center hand - larger, more prominent */}
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-40 h-72 md:w-56 md:h-96">
-          <svg viewBox="0 0 120 220" className="w-full h-full opacity-90 animate-hand-push-center">
+        {/* Right hand - realistic open palm (mirrored) */}
+        <div className="absolute right-[5%] md:right-[10%] bottom-0 w-28 h-56 md:w-40 md:h-72">
+          <svg viewBox="0 0 100 180" className="w-full h-full animate-hand-push-right" style={{ transform: 'scaleX(-1)' }}>
             <defs>
-              <linearGradient id="handGradientCenter" x1="0%" y1="100%" x2="0%" y2="0%">
-                <stop offset="0%" stopColor="rgba(0,0,0,0.95)" />
-                <stop offset="100%" stopColor="rgba(0,0,0,0.2)" />
-              </linearGradient>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                <feMerge>
-                  <feMergeNode in="coloredBlur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
+              <radialGradient id="handGradientRight" cx="50%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="rgba(0,0,0,0.85)" />
+                <stop offset="60%" stopColor="rgba(0,0,0,0.5)" />
+                <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              </radialGradient>
+              <filter id="blurRight" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
               </filter>
             </defs>
             <path
-              d="M60 220 L60 140 L35 95 L35 55 M60 140 L45 85 L45 45 M60 140 L60 70 L60 35 M60 140 L75 85 L75 45 M60 140 L85 100 L85 70 L85 140 L100 155 L100 185 L60 220"
-              fill="url(#handGradientCenter)"
-              stroke="rgba(0,255,65,0.4)"
-              strokeWidth="1.5"
-              filter="url(#glow)"
+              d="M50 180 
+                 C45 160, 40 150, 38 140
+                 L35 120
+                 C32 110, 28 100, 25 85
+                 L22 65
+                 C20 55, 18 45, 20 35
+                 C22 28, 26 25, 28 30
+                 L32 50
+                 C33 55, 34 60, 35 65
+                 L35 55
+                 C35 45, 34 35, 36 25
+                 C38 15, 42 12, 44 18
+                 L46 40
+                 C47 50, 47 55, 47 60
+                 L48 45
+                 C48 35, 48 25, 50 15
+                 C52 5, 56 5, 58 12
+                 L58 35
+                 C58 45, 58 52, 58 58
+                 L60 45
+                 C60 35, 62 28, 65 22
+                 C68 16, 72 18, 73 25
+                 L72 45
+                 C71 55, 70 60, 70 65
+                 L73 55
+                 C75 48, 78 45, 82 48
+                 C86 52, 85 60, 82 72
+                 L78 90
+                 C75 105, 70 115, 68 125
+                 L65 140
+                 C62 155, 58 165, 55 180
+                 Z"
+              fill="url(#handGradientRight)"
+              filter="url(#blurRight)"
             />
           </svg>
         </div>
-        
-        {/* Right hand */}
-        <div className="absolute right-[10%] bottom-0 w-32 h-64 md:w-48 md:h-80">
-          <svg viewBox="0 0 100 200" className="w-full h-full opacity-80 animate-hand-push-right transform scale-x-[-1]">
+
+        {/* Center shadow figure - like pressing against frosted glass */}
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-48 h-80 md:w-64 md:h-[420px]">
+          <svg viewBox="0 0 200 320" className="w-full h-full animate-hand-push-center">
             <defs>
-              <linearGradient id="handGradientRight" x1="0%" y1="100%" x2="0%" y2="0%">
-                <stop offset="0%" stopColor="rgba(0,0,0,0.9)" />
-                <stop offset="100%" stopColor="rgba(0,0,0,0.3)" />
-              </linearGradient>
+              <radialGradient id="bodyGradient" cx="50%" cy="25%" r="60%">
+                <stop offset="0%" stopColor="rgba(0,0,0,0.7)" />
+                <stop offset="50%" stopColor="rgba(0,0,0,0.35)" />
+                <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              </radialGradient>
+              <radialGradient id="headGradient" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="rgba(0,0,0,0.6)" />
+                <stop offset="70%" stopColor="rgba(0,0,0,0.25)" />
+                <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              </radialGradient>
+              <filter id="blurBody" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="8" />
+              </filter>
+              <filter id="blurHead" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="12" />
+              </filter>
             </defs>
-            <path
-              d="M50 200 L50 120 L30 80 L30 60 M50 120 L40 70 L40 50 M50 120 L50 55 L50 40 M50 120 L60 70 L60 50 M50 120 L70 85 L70 65 L70 120 L80 130 L80 160 L50 200"
-              fill="url(#handGradientRight)"
-              stroke="rgba(0,255,65,0.3)"
-              strokeWidth="1"
+            
+            {/* Head silhouette */}
+            <ellipse
+              cx="100"
+              cy="60"
+              rx="35"
+              ry="45"
+              fill="url(#headGradient)"
+              filter="url(#blurHead)"
+            />
+            
+            {/* Body/shoulders silhouette */}
+            <ellipse
+              cx="100"
+              cy="180"
+              rx="70"
+              ry="120"
+              fill="url(#bodyGradient)"
+              filter="url(#blurBody)"
             />
           </svg>
         </div>
