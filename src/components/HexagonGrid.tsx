@@ -75,10 +75,10 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
       {/* Description text - above hexagons */}
       <div className="text-center mb-6">
-        <p className="text-lg text-green-300/80">
+        <p className="text-lg text-white">
           The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking.
         </p>
-        <p className="text-lg text-green-300/80">
+        <p className="text-lg text-white">
           Click the ones that are correct.
         </p>
       </div>
