@@ -65,61 +65,155 @@ const getRemainingSessionsCount = (): number => {
   return Math.max(0, MAX_SESSIONS_PER_DAY - getUserSessionCount());
 };
 
+// Risk level type
+type RiskLevel = 'low' | 'medium' | 'high';
+
+interface RiskResult {
+  score: number;
+  level: RiskLevel;
+}
+
 // Calculate risk score based on confirmed hexagons
-const calculateRiskScore = (confirmedCount: number, totalCount: number): number => {
-  if (totalCount === 0) return 0;
-  const baseRisk = 40; // Base risk just from visiting
-  const confirmationRisk = (confirmedCount / totalCount) * 50; // Up to 50 more from confirmations
-  const exposureBonus = confirmedCount >= 5 ? 10 : 0; // Bonus for deep scan
-  return Math.min(100, Math.round(baseRisk + confirmationRisk + exposureBonus));
+// Each confirmed (green) hexagon = -10 points from base 100
+// Unconfirmed = stays at 100
+const calculateRiskScore = (confirmedCount: number, totalCount: number): RiskResult => {
+  if (totalCount === 0) return { score: 100, level: 'high' };
+  
+  const baseScore = 100;
+  const reductionPerHexagon = 10;
+  const score = Math.max(0, baseScore - (confirmedCount * reductionPerHexagon));
+  
+  let level: RiskLevel;
+  if (score >= 70) {
+    level = 'high';
+  } else if (score >= 40) {
+    level = 'medium';
+  } else {
+    level = 'low';
+  }
+  
+  return { score, level };
 };
 
-// Explain what the risk score means
-const explainRisk = (riskScore: number): string => {
-  if (riskScore >= 80) return "your data is highly exposed and actively being sold by data brokers";
-  if (riskScore >= 60) return "attackers can easily build a profile on you with this information";
-  if (riskScore >= 40) return "there's enough data exposed for targeted phishing attacks";
-  return "basic information is available but your exposure is limited";
+// Get risk level message
+const getRiskLevelMessage = (level: RiskLevel): string => {
+  switch (level) {
+    case 'high':
+      return "Your privacy risk is high. Let me help you reduce it.";
+    case 'medium':
+      return "Your privacy is okay, but there's room for improvement.";
+    case 'low':
+      return "Great job! Your privacy protection is strong.";
+  }
+};
+
+// Get hexagon-specific insight
+const getHexagonInsight = (hexagonData: HexagonData | null): string => {
+  if (!hexagonData) return "";
+  
+  const label = hexagonData.label?.toLowerCase() || '';
+  
+  if (label.includes('browser')) {
+    return "I found multiple third-party cookies tracking you across websites.";
+  }
+  if (label.includes('location')) {
+    return "Your location data is being shared with advertising services.";
+  }
+  if (label.includes('device')) {
+    const isProtected = hexagonData.confirmed;
+    return `Your device fingerprint is ${isProtected ? 'now verified' : 'visible to trackers'}.`;
+  }
+  if (label.includes('network') || label.includes('isp')) {
+    return "I detected tracking scripts monitoring your network activity.";
+  }
+  if (label.includes('screen') || label.includes('resolution')) {
+    return "Your screen resolution is part of your unique device fingerprint.";
+  }
+  if (label.includes('privacy') || label.includes('dnt')) {
+    const isProtected = hexagonData.value?.toLowerCase().includes('enabled');
+    return `Your privacy settings are ${isProtected ? 'properly configured' : 'not fully enabled'}.`;
+  }
+  if (label.includes('time') || label.includes('pattern')) {
+    return "Your browsing time patterns reveal your daily routine.";
+  }
+  if (label.includes('battery') || label.includes('connection')) {
+    return "Your connection status helps identify your device uniquely.";
+  }
+  
+  return `${hexagonData.label} is part of your digital shadow.`;
 };
 
 // Get top recommendation based on current state
-const getTopRecommendation = (confirmedCount: number, hexagonData: HexagonData | null): string => {
-  if (confirmedCount === 0) return "Start by confirming the data points I found to understand your exposure.";
-  if (confirmedCount < 5) return "Keep confirming to unlock the deep scan and see your full digital shadow.";
-  if (confirmedCount >= 5 && hexagonData?.label?.includes('Privacy')) {
-    return "Consider enabling Do Not Track in your browser settings.";
+const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | null): string => {
+  const label = hexagonData?.label?.toLowerCase() || '';
+  
+  if (riskLevel === 'high') {
+    if (label.includes('location')) return "use a VPN to mask your real location";
+    if (label.includes('browser')) return "clear your cookies and enable tracking protection";
+    if (label.includes('privacy')) return "enable Do Not Track in your browser settings";
+    return "confirm more data points to understand your full exposure";
   }
-  if (confirmedCount >= 5 && hexagonData?.label?.includes('Location')) {
-    return "Use a VPN to mask your real location from trackers.";
+  
+  if (riskLevel === 'medium') {
+    if (label.includes('network')) return "consider using a privacy-focused DNS service";
+    if (label.includes('device')) return "review your browser's fingerprint protection settings";
+    return "keep confirming to further reduce your risk score";
   }
-  if (confirmedCount >= 5) return "Request data removal from major data brokers to reduce your exposure.";
-  return "Continue confirming data points to get personalized protection recommendations.";
+  
+  return "maintain your privacy habits and stay vigilant";
 };
 
 // Alice introduction message for first interaction
 const ALICE_INTRODUCTION = "Hi, I'm Alice, your digital shadow guide. Let's explore your privacy together.";
+
+// Generate progress feedback
+const getProgressFeedback = (confirmedCount: number, totalCount: number, previousScore: number, currentScore: number): string => {
+  if (confirmedCount === 0) return "";
+  
+  const remaining = totalCount - confirmedCount;
+  
+  if (previousScore > currentScore) {
+    const dropped = previousScore - currentScore;
+    if (confirmedCount >= 3) {
+      return `Nice! Your risk score dropped by ${dropped} points. You're making great progress! ${remaining > 0 ? `${remaining} more to go.` : 'All done!'}`;
+    }
+    return `Nice! Your risk score dropped from ${previousScore} to ${currentScore}.`;
+  }
+  
+  if (confirmedCount >= 3 && remaining > 0) {
+    return `You're making great progress! ${remaining} more to go.`;
+  }
+  
+  return "";
+};
 
 // Generate Alice's 4-part structured response
 const generateAliceResponse = (
   hexagonData: HexagonData | null,
   confirmedCount: number,
   totalCount: number,
-  isFirstInteraction: boolean = false
+  isFirstInteraction: boolean = false,
+  previousRiskScore: number = 100
 ): string => {
   // If first interaction, return introduction
   if (isFirstInteraction) {
     return ALICE_INTRODUCTION;
   }
 
+  const { score, level } = calculateRiskScore(confirmedCount, totalCount);
+
   // HOOK: Acknowledge user with confirmed count
   const hook = `Hi, I'm Alice. I can see you've checked ${confirmedCount} privacy area${confirmedCount !== 1 ? 's' : ''}.`;
 
-  // INSIGHT: Risk score with explanation
-  const riskScore = calculateRiskScore(confirmedCount, totalCount);
-  const insight = `Your risk score is ${riskScore} out of 100. ${explainRisk(riskScore)}.`;
+  // INSIGHT: Risk level message + hexagon-specific insight
+  const riskMessage = getRiskLevelMessage(level);
+  const hexagonInsight = getHexagonInsight(hexagonData);
+  const progressFeedback = getProgressFeedback(confirmedCount, totalCount, previousRiskScore, score);
+  const insight = `Your risk score is ${score} out of 100. ${riskMessage} ${hexagonInsight} ${progressFeedback}`.trim();
 
   // ACTION: Top priority recommendation
-  const action = `I recommend you ${getTopRecommendation(confirmedCount, hexagonData).toLowerCase()}`;
+  const recommendation = getTopRecommendation(level, hexagonData);
+  const action = `I recommend you ${recommendation}.`;
 
   // CHOICE: Let user decide next step
   const choice = "Want me to explain more, or help you fix it?";
@@ -166,7 +260,17 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [remainingSessions, setRemainingSessions] = useState(getRemainingSessionsCount());
   const [hasIntroduced, setHasIntroduced] = useState(false);
+  const [previousRiskScore, setPreviousRiskScore] = useState(100);
   const { toast } = useToast();
+
+  // Update previous risk score when confirmed count changes
+  useEffect(() => {
+    const { score } = calculateRiskScore(confirmedCount, totalCount);
+    // Store current as previous for next comparison
+    return () => {
+      setPreviousRiskScore(score);
+    };
+  }, [confirmedCount, totalCount]);
 
   const handleVoiceClick = useCallback(() => {
     if (isSpeaking) {
@@ -196,11 +300,15 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       
       // Use introduction for first interaction, then 4-part response
       const isFirstInteraction = !hasIntroduced;
-      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction);
+      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction, previousRiskScore);
       
       if (isFirstInteraction) {
         setHasIntroduced(true);
       }
+      
+      // Update previous score after generating response
+      const { score } = calculateRiskScore(confirmedCount, totalCount);
+      setPreviousRiskScore(score);
       
       setIsSpeaking(true);
       speakText(structuredResponse, () => {
