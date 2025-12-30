@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
+import MatrixRain from '@/components/MatrixRain';
 import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -79,13 +80,14 @@ const Index = () => {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="py-12 md:py-20 px-4">
-        <div className="container mx-auto text-center max-w-4xl">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gradient leading-tight">
+      {/* Matrix Rain Hero Section */}
+      <section className="relative">
+        <MatrixRain />
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10">
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-center leading-tight text-white drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]">
             What Do Data Brokers Know About You?
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          <p className="text-xl text-center max-w-2xl mx-auto leading-relaxed text-green-300/90">
             We found information about you without asking. 
             See what attackers can find — and take back control.
           </p>
