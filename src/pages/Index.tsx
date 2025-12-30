@@ -3,7 +3,7 @@ import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import VoiceAI from '@/components/VoiceAI';
-import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDetection';
+import { captureDeviceData, generateHexagonsAsync, HexagonData } from '@/lib/deviceDetection';
 import { RefreshCw, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
@@ -21,7 +21,7 @@ const Index = () => {
         setLoading(true);
         setError(null);
         const data = await captureDeviceData();
-        const hexagonData = generateHexagons(data);
+        const hexagonData = await generateHexagonsAsync(data);
         setHexagons(hexagonData);
       } catch (err) {
         console.error('Error capturing device data:', err);
