@@ -6,6 +6,7 @@ import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDe
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
+import logoHeader from '@/assets/logo-header.png';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -78,7 +79,7 @@ const Index = () => {
         <nav className="bg-transparent border-b border-green-500/20">
           <div className="container mx-auto px-4 flex items-center justify-center">
             <div className="flex items-center -my-10">
-              <img src={logoFull} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain" />
+              <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain invert brightness-0 invert" />
             </div>
           </div>
         </nav>
