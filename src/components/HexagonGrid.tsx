@@ -37,14 +37,17 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     : 0;
 
   // Hexagon size for calculations
-  const hexWidth = 140; // md size
-  const hexHeight = 140;
+  const hexWidth = 170; // md size
+  const hexHeight = 170;
   
-  // For pointy-top hexagons in honeycomb:
-  // Horizontal spacing = width * 0.75 (hexagons overlap on sides)
-  // Vertical spacing = height * 0.5 (rows interlock)
-  const hSpacing = hexWidth * 0.87;
-  const vSpacing = hexHeight * 0.75;
+  // Gap between hexagons
+  const gap = 12;
+  
+  // For pointy-top hexagons in honeycomb with gaps:
+  // Horizontal spacing = width * 0.87 + gap
+  // Vertical spacing = height * 0.75 + gap
+  const hSpacing = hexWidth * 0.87 + gap;
+  const vSpacing = hexHeight * 0.75 + gap;
 
   // Honeycomb layout matching reference image:
   // Row 0: 2 hexagons (top)
