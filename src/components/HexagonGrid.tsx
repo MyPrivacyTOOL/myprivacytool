@@ -32,9 +32,10 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const [revealingHexagon, setRevealingHexagon] = useState<HexagonData | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setHexagons(initialHexagons.slice(0, 6));
-  }, [initialHexagons]);
+  // DISABLED FOR TEMPLATE PREVIEW
+  // useEffect(() => {
+  //   setHexagons(initialHexagons.slice(0, 6));
+  // }, [initialHexagons]);
 
   // Progressive reveal: show more hexagons as user confirms
   useEffect(() => {
