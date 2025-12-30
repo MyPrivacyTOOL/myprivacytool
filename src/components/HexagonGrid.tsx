@@ -90,6 +90,8 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const vSpacing = hexHeight * 0.75 + gap;
 
   // Generate positions dynamically for 3-2-3-2 honeycomb pattern (3 on top)
+  const topPadding = 20; // Space between top hexagons and container edge
+  
   const generatePositions = (count: number) => {
     const positions: { x: number; y: number }[] = [];
     let currentIndex = 0;
@@ -108,7 +110,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
           // 2-hexagon rows: centered, offset by 0.5
           x = hSpacing * (0.5 + col);
         }
-        const y = vSpacing * row;
+        const y = topPadding + vSpacing * row;
         positions.push({ x, y });
         currentIndex++;
       }
