@@ -87,6 +87,14 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       newMessage = `Great! That boosted my confidence. I'm scanning deeper... ${totalCount - confirmedCount} more to go.`;
     } else if (confirmedCount === 2) {
       newMessage = `Interesting... Your digital footprint is becoming clearer. Keep confirming to see the full picture.`;
+    } else if (confirmedCount === 3 && totalCount === 6) {
+      // Deep scan activated - scanning in progress
+      newMessage = `Deep scan activated! I'm analyzing your digital patterns... Scanning social footprints, connection history, and device signatures. Stand by...`;
+      trackVoiceAIMessage('deep_scan_activated');
+    } else if (confirmedCount === 3 && totalCount === 8) {
+      // New hexagons revealed
+      newMessage = `New data points revealed! I found your screen resolution and privacy settings. Click to confirm if accurate.`;
+      trackVoiceAIMessage('new_hexagons_revealed');
     } else if (confirmedCount === 3) {
       newMessage = `This is getting serious. You're on multiple data broker sites. I found your location, device info, and browsing patterns. Keep confirming to see everything.`;
     } else if (confirmedCount === 4) {
