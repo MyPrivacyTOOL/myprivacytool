@@ -108,7 +108,7 @@ const Index = () => {
         {/* Description Text */}
         <section className="text-center pb-6 px-4">
           <p className="text-lg text-white">
-            The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking.
+            The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">{Math.min(hexagons.length, 7)} data points</span> about you without asking.
           </p>
           <p className="text-lg text-white">
             Click the ones that are correct.
