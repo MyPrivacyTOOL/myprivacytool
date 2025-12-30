@@ -87,17 +87,19 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       newMessage = `Great! That boosted my confidence. I'm scanning deeper... ${totalCount - confirmedCount} more to go.`;
     } else if (confirmedCount === 2) {
       newMessage = `Interesting... Your digital footprint is becoming clearer. Keep confirming to see the full picture.`;
-    } else if (confirmedCount === 3 && totalCount === 6) {
+    } else if (confirmedCount === 3) {
+      newMessage = `This is getting serious. You're on multiple data broker sites. I found your location, device info, and browsing patterns.`;
+    } else if (confirmedCount === 4) {
+      newMessage = `Almost there! One more confirmation and I'll unlock a deeper scan of your digital shadow.`;
+    } else if (confirmedCount === 5 && totalCount === 5) {
       // Deep scan activated - scanning in progress
       newMessage = `Deep scan activated! I'm analyzing your digital patterns... Scanning social footprints, connection history, and device signatures. Stand by...`;
       trackVoiceAIMessage('deep_scan_activated');
-    } else if (confirmedCount === 3 && totalCount === 8) {
+    } else if (confirmedCount === 5 && totalCount === 8) {
       // New hexagons revealed
-      newMessage = `New data points revealed! I found your screen resolution and privacy settings. Click to confirm if accurate.`;
+      newMessage = `New data points revealed! I found 3 more pieces of your digital shadow. Click to confirm if accurate.`;
       trackVoiceAIMessage('new_hexagons_revealed');
-    } else if (confirmedCount === 3) {
-      newMessage = `This is getting serious. You're on multiple data broker sites. I found your location, device info, and browsing patterns. Keep confirming to see everything.`;
-    } else if (confirmedCount === 4) {
+    } else if (confirmedCount === 6) {
       newMessage = `The more you confirm, the more I understand about your exposure. Attackers can find this information with just a few dollars.`;
     } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow. This is what attackers can find about you with just $50.`;
