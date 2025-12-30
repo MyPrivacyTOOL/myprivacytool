@@ -140,7 +140,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
               >
                 <Hexagon
                   data={hex}
-                  index={index}
                   onConfirm={handleConfirm}
                   onHover={handleHover}
                 />
@@ -159,7 +158,6 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
             >
               <Hexagon
                 data={revealingHexagonData}
-                index={hexagons.length}
                 onConfirm={() => {}}
                 onHover={handleHover}
               />
