@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 
@@ -6,19 +6,30 @@ interface HexagonProps {
   data: HexagonData;
   onConfirm: (id: string) => void;
   onHover: (data: HexagonData | null) => void;
-  index: number;
 }
 
-export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProps) {
+export default function Hexagon({ data, onConfirm, onHover }: HexagonProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
+
+  // Detect if this is a "revealing" hexagon
+  useEffect(() => {
+    if (data.id === 'revealing') {
+      setIsRevealing(true);
+    }
+  }, [data.id]);
 
   const handleClick = () => {
-    onConfirm(data.id);
+    if (!data.confirmed && data.id !== 'revealing') {
+      onConfirm(data.id);
+    }
   };
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    onHover(data);
+    if (data.id !== 'revealing') {
+      onHover(data);
+    }
   };
 
   const handleMouseLeave = () => {
@@ -30,15 +41,13 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
   const hexPath = "M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z";
 
   return (
-    <div 
-      className="animate-fade-in-up opacity-0"
-      style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'forwards' }}
-    >
+    <div className="animate-fade-in">
       <svg
         viewBox="0 0 100 100"
         className={cn(
-          "w-[150px] h-[150px] md:w-[170px] md:h-[170px] cursor-pointer transition-transform duration-300",
-          "hover:scale-105"
+          "w-[150px] h-[150px] md:w-[170px] md:h-[170px] transition-transform duration-300",
+          data.id !== 'revealing' && "cursor-pointer hover:scale-105",
+          isRevealing && "animate-pulse"
         )}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
@@ -114,19 +123,21 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
           {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
         </text>
 
-        {/* Confidence */}
-        <text
-          x="50"
-          y="72"
-          textAnchor="middle"
-          fontSize="6"
-          fill="#00ff41"
-          opacity={0.7}
-          fontStyle="italic"
-          className="select-none"
-        >
-          {data.confidence}%
-        </text>
+        {/* Confidence - hide for revealing hexagons */}
+        {!isRevealing && (
+          <text
+            x="50"
+            y="72"
+            textAnchor="middle"
+            fontSize="6"
+            fill="#00ff41"
+            opacity={0.7}
+            fontStyle="italic"
+            className="select-none"
+          >
+            {data.confidence}%
+          </text>
+        )}
 
         {/* Confirmed checkmark */}
         {data.confirmed && (
