@@ -68,23 +68,23 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
           fill={`url(#hexGradient-${data.id})`}
         />
 
-        {/* Glowing border */}
+        {/* Border - white/light until confirmed, then bright green */}
         <path
           d={hexPath}
           fill="none"
-          stroke="#00ff41"
+          stroke={data.confirmed ? "#00ff41" : isHovered ? "#a8ffba" : "#ffffff"}
           strokeWidth={data.confirmed ? "3" : "2"}
-          opacity={data.confirmed ? 1 : isHovered ? 0.9 : 0.7}
-          filter={`url(#glow-${data.id})`}
-          className="animate-hexagon-glow"
+          opacity={data.confirmed ? 1 : 0.6}
+          filter={data.confirmed ? `url(#glow-${data.id})` : undefined}
+          className={data.confirmed ? "animate-hexagon-glow" : ""}
         />
 
         {/* Icon */}
         <text
           x="50"
-          y="30"
+          y="32"
           textAnchor="middle"
-          fontSize="22"
+          fontSize="18"
           className="select-none"
         >
           {data.icon}
@@ -93,9 +93,9 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         {/* Label */}
         <text
           x="50"
-          y="50"
+          y="48"
           textAnchor="middle"
-          fontSize="8"
+          fontSize="6"
           fontWeight="600"
           fill={data.confirmed ? "#00ff41" : "#00ff41"}
           className="uppercase tracking-wider select-none"
@@ -106,22 +106,22 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         {/* Value */}
         <text
           x="50"
-          y="65"
+          y="60"
           textAnchor="middle"
-          fontSize="9"
+          fontSize="7"
           fontWeight="500"
           fill="#ffffff"
           className="select-none"
         >
-          {data.value.length > 12 ? data.value.substring(0, 12) + '...' : data.value}
+          {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
         </text>
 
         {/* Confidence */}
         <text
           x="50"
-          y="80"
+          y="72"
           textAnchor="middle"
-          fontSize="8"
+          fontSize="6"
           fill="#00ff41"
           opacity={0.7}
           fontStyle="italic"
@@ -133,11 +133,11 @@ export default function Hexagon({ data, onConfirm, onHover, index }: HexagonProp
         {/* Confirmed checkmark */}
         {data.confirmed && (
           <g transform="translate(65, 8)">
-            <circle cx="12" cy="12" r="12" fill="#00ff41" />
+            <circle cx="10" cy="10" r="10" fill="#00ff41" />
             <path
-              d="M7 12 L10 15 L17 8"
+              d="M6 10 L9 13 L15 7"
               stroke="#000"
-              strokeWidth="2.5"
+              strokeWidth="2"
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
