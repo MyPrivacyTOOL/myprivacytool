@@ -7,6 +7,7 @@ import { RefreshCw, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
+import logoFooter from '@/assets/logo-footer.png';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -100,30 +101,30 @@ const Index = () => {
         </section>
 
         {/* Footer */}
-        <footer className="py-10 mt-12 bg-white">
+        <footer className="py-6 mt-12 bg-white">
           <div className="container mx-auto px-4 text-center">
-            <img src={logoHeader} alt="MyPrivacyTOOL.IO" className="h-28 md:h-32 object-contain mx-auto mb-6" />
+            <img src={logoFooter} alt="MyPrivacyTOOL.IO" className="h-14 object-contain mx-auto mb-4" />
             
             {/* Social Media Icons */}
-            <div className="flex justify-center gap-4 mb-6">
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Facebook className="w-5 h-5 text-gray-600" />
+            <div className="flex justify-center gap-3 mb-4">
+              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Facebook className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Twitter className="w-5 h-5 text-gray-600" />
+              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Twitter className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Linkedin className="w-5 h-5 text-gray-600" />
+              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Linkedin className="w-4 h-4 text-gray-600" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
-                <Instagram className="w-5 h-5 text-gray-600" />
+              <a href="#" className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <Instagram className="w-4 h-4 text-gray-600" />
               </a>
             </div>
             
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 text-xs">
               © 2025 MyPrivacyTOOL.IO • Protecting Your Digital Privacy
             </p>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-gray-400 mt-1">
               No data is stored. All detection happens in your browser.
             </p>
           </div>
