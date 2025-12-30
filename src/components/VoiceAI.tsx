@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 import { Mic } from 'lucide-react';
-import aliceImage from '@/assets/alice-curtain.jpg';
+import aliceImage from '@/assets/alice-curtain.png';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
