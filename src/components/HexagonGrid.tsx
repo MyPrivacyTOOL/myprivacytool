@@ -179,6 +179,7 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
                   data={displayData}
                   onConfirm={handleConfirm}
                   onHover={handleHover}
+                  isRevealing={isRevealing}
                 />
               </div>
             );

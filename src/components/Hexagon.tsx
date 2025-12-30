@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
 
@@ -6,28 +6,21 @@ interface HexagonProps {
   data: HexagonData;
   onConfirm: (id: string) => void;
   onHover: (data: HexagonData | null) => void;
+  isRevealing?: boolean;
 }
 
-export default function Hexagon({ data, onConfirm, onHover }: HexagonProps) {
+export default function Hexagon({ data, onConfirm, onHover, isRevealing = false }: HexagonProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isRevealing, setIsRevealing] = useState(false);
-
-  // Detect if this is a "revealing" hexagon
-  useEffect(() => {
-    if (data.id === 'revealing') {
-      setIsRevealing(true);
-    }
-  }, [data.id]);
 
   const handleClick = () => {
-    if (!data.confirmed && data.id !== 'revealing') {
+    if (!data.confirmed && !isRevealing && data.id !== 'revealing') {
       onConfirm(data.id);
     }
   };
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    if (data.id !== 'revealing') {
+    if (!isRevealing && data.id !== 'revealing') {
       onHover(data);
     }
   };
@@ -43,6 +36,8 @@ export default function Hexagon({ data, onConfirm, onHover }: HexagonProps) {
   return (
     <div className={cn(
       "animate-fade-in hexagon-wrapper",
+      data.confirmed && "confirmed",
+      isHovered && "hovered",
       isRevealing && "hexagon revealing revealing-wrapper"
     )}>
       <div className={cn(
@@ -53,7 +48,7 @@ export default function Hexagon({ data, onConfirm, onHover }: HexagonProps) {
           viewBox="0 0 100 100"
           className={cn(
             "w-[150px] h-[150px] md:w-[170px] md:h-[170px] transition-transform duration-300",
-            data.id !== 'revealing' && "cursor-pointer hover:scale-105"
+            !isRevealing && "cursor-pointer hover:scale-105"
           )}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
@@ -119,61 +114,61 @@ export default function Hexagon({ data, onConfirm, onHover }: HexagonProps) {
             {data.icon}
           </text>
 
-        {/* Label */}
-        <text
-          x="50"
-          y="48"
-          textAnchor="middle"
-          fontSize="6"
-          fontWeight="600"
-          fill={data.confirmed ? "#00ff41" : "#00ff41"}
-          className="uppercase tracking-wider select-none"
-        >
-          {data.label}
-        </text>
-
-        {/* Value */}
-        <text
-          x="50"
-          y="60"
-          textAnchor="middle"
-          fontSize="7"
-          fontWeight="500"
-          fill="#ffffff"
-          className="select-none"
-        >
-          {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
-        </text>
-
-        {/* Confidence - hide for revealing hexagons */}
-        {!isRevealing && (
+          {/* Label */}
           <text
             x="50"
-            y="72"
+            y="48"
             textAnchor="middle"
             fontSize="6"
-            fill="#00ff41"
-            opacity={0.7}
-            fontStyle="italic"
+            fontWeight="600"
+            fill={data.confirmed ? "#00ff41" : "#00ff41"}
+            className="uppercase tracking-wider select-none"
+          >
+            {data.label}
+          </text>
+
+          {/* Value */}
+          <text
+            x="50"
+            y="60"
+            textAnchor="middle"
+            fontSize="7"
+            fontWeight="500"
+            fill="#ffffff"
             className="select-none"
           >
-            {data.confidence}%
+            {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
           </text>
-        )}
 
-        {/* Confirmed checkmark */}
-        {data.confirmed && (
-          <g transform="translate(65, 8)">
-            <circle cx="10" cy="10" r="10" fill="#00ff41" />
-            <path
-              d="M6 10 L9 13 L15 7"
-              stroke="#000"
-              strokeWidth="2"
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </g>
+          {/* Confidence - hide for revealing hexagons */}
+          {!isRevealing && data.confidence > 0 && (
+            <text
+              x="50"
+              y="72"
+              textAnchor="middle"
+              fontSize="6"
+              fill="#00ff41"
+              opacity={0.7}
+              fontStyle="italic"
+              className="select-none"
+            >
+              {data.confidence}%
+            </text>
+          )}
+
+          {/* Confirmed checkmark */}
+          {data.confirmed && !isRevealing && (
+            <g transform="translate(65, 8)">
+              <circle cx="10" cy="10" r="10" fill="#00ff41" />
+              <path
+                d="M6 10 L9 13 L15 7"
+                stroke="#000"
+                strokeWidth="2"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
           )}
         </svg>
       </div>
