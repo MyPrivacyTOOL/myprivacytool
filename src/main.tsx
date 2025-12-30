@@ -7,5 +7,6 @@ import "@fontsource/inter/700.css";
 import "@fontsource/space-grotesk/500.css";
 import "@fontsource/space-grotesk/700.css";
 import "./index.css";
+import "./styles/hexagon.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
