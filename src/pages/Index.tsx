@@ -3,7 +3,7 @@ import HexagonGrid from '@/components/HexagonGrid';
 import { captureDeviceData, generateHexagons, HexagonData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import logoFull from '@/assets/logo-full.jpg';
+import logoFull from '@/assets/logo-full.png';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
