@@ -18,14 +18,19 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   }, [initialHexagons]);
 
   const handleConfirm = (id: string) => {
-    setHexagons(prev =>
-      prev.map(hex =>
-        hex.id === id 
-          ? { ...hex, confirmed: true, confidence: Math.min(hex.confidence + 5, 99) } 
-          : hex
-      )
-    );
-    setConfirmedCount(prev => prev + 1);
+    setHexagons(prev => {
+      const hex = prev.find(h => h.id === id);
+      const wasConfirmed = hex?.confirmed || false;
+      
+      // Update confirmed count
+      setConfirmedCount(c => wasConfirmed ? c - 1 : c + 1);
+      
+      return prev.map(h =>
+        h.id === id 
+          ? { ...h, confirmed: !h.confirmed, confidence: wasConfirmed ? h.confidence - 5 : Math.min(h.confidence + 5, 99) } 
+          : h
+      );
+    });
   };
 
   const handleHover = (data: HexagonData | null) => {
