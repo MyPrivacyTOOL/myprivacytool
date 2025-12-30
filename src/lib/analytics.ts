@@ -133,6 +133,15 @@ export const trackDeepScanUnlocked = (confirmedCount: number) => {
 // Voice AI tracking events
 let voiceSessionStartTime: number = 0;
 
+// Track first time user hears Alice
+export const trackVoiceIntroPlayed = () => {
+  trackActivity();
+  trackEvent('voice_intro_played', {
+    first_interaction: true,
+    timestamp: Date.now(),
+  });
+};
+
 export const trackVoiceSessionStarted = () => {
   trackActivity();
   voiceSessionStartTime = Date.now();
@@ -152,9 +161,28 @@ export const trackVoiceAIStop = () => {
   });
 };
 
+// Track when user disables voice
+export const trackVoiceToggleOff = () => {
+  trackActivity();
+  trackEvent('voice_toggle_off', {
+    action: 'disabled',
+    timestamp: Date.now(),
+  });
+};
+
 export const trackVoiceAIMessage = (messageType: string) => {
   trackEvent('voice_ai_message', {
     message_type: messageType,
+  });
+};
+
+// Track hexagon completed with voice guidance
+export const trackVoiceHexagonCompleted = (hexagonId: string, hexagonLabel: string) => {
+  trackActivity();
+  trackEvent('voice_hexagon_completed', {
+    hexagon_id: hexagonId,
+    hexagon_label: hexagonLabel,
+    timestamp: Date.now(),
   });
 };
 
@@ -162,6 +190,26 @@ export const trackVoiceAIMessage = (messageType: string) => {
 export const trackHexagonsCompletedWithVoice = (hexagonsCompleted: number) => {
   trackEvent('hexagons_completed_with_voice', {
     hexagons_completed: hexagonsCompleted,
+  });
+};
+
+// Track when all hexagons are done with voice
+export const trackVoiceScanCompleted = (totalHexagons: number, riskScore: number) => {
+  trackActivity();
+  trackEvent('voice_scan_completed', {
+    total_hexagons: totalHexagons,
+    final_risk_score: riskScore,
+    timestamp: Date.now(),
+  });
+};
+
+// Track when user hits rate limit
+export const trackVoiceRateLimitHit = (sessionsUsed: number) => {
+  trackActivity();
+  trackEvent('voice_rate_limit_hit', {
+    sessions_used: sessionsUsed,
+    limit: 20,
+    timestamp: Date.now(),
   });
 };
 
