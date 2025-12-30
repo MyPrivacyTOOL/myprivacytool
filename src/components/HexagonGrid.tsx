@@ -8,13 +8,23 @@ interface HexagonGridProps {
 }
 
 export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridProps) {
-  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons.slice(0, 7));
+  const [hexagons, setHexagons] = useState<HexagonData[]>(initialHexagons);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(6);
 
   useEffect(() => {
-    setHexagons(initialHexagons.slice(0, 7));
+    setHexagons(initialHexagons);
   }, [initialHexagons]);
+
+  // Reveal more hexagons after 3 confirmations
+  useEffect(() => {
+    if (confirmedCount >= 3 && visibleCount === 6) {
+      setTimeout(() => {
+        setVisibleCount(8); // Show 2 more hexagons
+      }, 500);
+    }
+  }, [confirmedCount, visibleCount]);
 
   const handleConfirm = (id: string) => {
     setHexagons(prev => {
@@ -50,10 +60,11 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const hSpacing = hexWidth * 0.87 + gap;
   const vSpacing = hexHeight * 0.75 + gap;
 
-  // Honeycomb layout matching reference image:
+  // Honeycomb layout:
   // Row 0: 2 hexagons (top)
   // Row 1: 3 hexagons (middle) - offset left by half
   // Row 2: 2 hexagons (bottom) - aligned with row 0
+  // Row 3: 1 hexagon (bonus, center) - revealed after confirmations
   const positions = [
     // Row 0 - top 2
     { x: hSpacing * 0.5, y: 0 },
@@ -65,10 +76,16 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     // Row 2 - bottom 2
     { x: hSpacing * 0.5, y: vSpacing * 2 },
     { x: hSpacing * 1.5, y: vSpacing * 2 },
+    // Row 3 - bonus hexagons (revealed after 3 confirmations)
+    { x: 0, y: vSpacing * 2 },
+    { x: hSpacing * 2, y: vSpacing * 2 },
   ];
 
   const containerWidth = hSpacing * 2 + hexWidth;
   const containerHeight = vSpacing * 2 + hexHeight;
+
+  // Get visible hexagons
+  const visibleHexagons = hexagons.slice(0, visibleCount);
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
@@ -81,17 +98,19 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
             height: `${containerHeight}px` 
           }}
         >
-          {hexagons.map((hex, index) => {
+          {visibleHexagons.map((hex, index) => {
             const pos = positions[index];
             if (!pos) return null;
             
             return (
               <div
                 key={hex.id}
-                className="absolute"
+                className="absolute transition-all duration-500"
                 style={{
                   left: `${pos.x}px`,
                   top: `${pos.y}px`,
+                  opacity: index >= 6 ? 0 : 1,
+                  animation: index >= 6 ? 'fadeIn 0.5s ease-out forwards' : undefined,
                 }}
               >
                 <Hexagon
@@ -109,7 +128,7 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
       {/* Risk Score */}
       <RiskScore 
         confirmed={confirmedCount} 
-        total={hexagons.length} 
+        total={visibleCount} 
       />
     </div>
   );
