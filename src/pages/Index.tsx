@@ -72,8 +72,8 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src={logo} alt="MyPrivacyTOOL" className="w-10 h-10 rounded-full object-cover" />
-            <span className="text-xl text-foreground">
-              MyPrivacy<span className="font-bold">TOOL.IO</span>
+            <span className="text-xl text-foreground tracking-tight">
+              <span className="font-normal">MyPrivacy</span><span className="font-black">TOOL.IO</span>
             </span>
           </div>
           <div className="text-sm text-muted-foreground hidden sm:block">
@@ -104,7 +104,7 @@ const Index = () => {
       <footer className="border-t border-border py-8 mt-12 bg-secondary/30">
         <div className="container mx-auto px-4 text-center">
           <p className="text-muted-foreground text-sm">
-            © 2025 MyPrivacy<span className="font-bold">TOOL.IO</span> • Protecting Your Digital Privacy
+            © 2025 <span className="font-normal">MyPrivacy</span><span className="font-black">TOOL.IO</span> • Protecting Your Digital Privacy
           </p>
           <p className="text-xs text-muted-foreground/60 mt-2">
             No data is stored. All detection happens in your browser.
