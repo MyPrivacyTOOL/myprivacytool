@@ -87,10 +87,6 @@ const Index = () => {
           <h1 className="text-4xl md:text-6xl font-bold mb-6 text-center leading-tight text-white drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]">
             What is your Digital Shadow?
           </h1>
-          <p className="text-xl text-center max-w-2xl mx-auto leading-relaxed text-green-300/90">
-            We found information about you without asking. 
-            See what attackers can find — and take back control.
-          </p>
         </div>
       </section>
 
