@@ -76,7 +76,7 @@ const Index = () => {
       <div className="relative z-10">
         {/* Navbar */}
         <nav className="bg-white border-b border-border">
-          <div className="container mx-auto px-4 py-1 flex items-center justify-center">
+          <div className="container mx-auto px-4 flex items-center justify-center">
             <div className="flex items-center">
               <img src={logoFull} alt="MyPrivacyTOOL.IO" className="h-40 md:h-48 object-contain" />
             </div>
