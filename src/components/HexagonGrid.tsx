@@ -13,10 +13,8 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
 
-  // Progressive reveal: show more hexagons as user confirms
   useEffect(() => {
     if (confirmedCount >= 3 && hexagons.length === 6 && initialHexagons.length > 6) {
-      // Reveal 2 more hexagons after 3 confirmations
       const timer = setTimeout(() => {
         setHexagons(initialHexagons.slice(0, 8));
       }, 500);
@@ -44,14 +42,14 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
     : 0;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-8">
+    <div className="w-full max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="text-center mb-12">
-        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-3 drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]">
           YOUR DIGITAL SHADOW
         </h2>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          We found <span className="text-matrix font-semibold">{hexagons.length} data points</span> about you without asking. 
+        <p className="text-lg text-green-300/80 max-w-2xl mx-auto">
+          We found <span className="text-green-400 font-semibold">{hexagons.length} data points</span> about you without asking. 
           Click the ones that are correct.
         </p>
       </div>
@@ -63,17 +61,37 @@ export default function HexagonGrid({ hexagons: initialHexagons }: HexagonGridPr
         total={hexagons.length} 
       />
 
-      {/* Hexagon Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 justify-items-center my-12">
-        {hexagons.map((hex, index) => (
-          <Hexagon
-            key={hex.id}
-            data={hex}
-            index={index}
-            onConfirm={handleConfirm}
-            onHover={handleHover}
-          />
-        ))}
+      {/* Honeycomb Hexagon Grid */}
+      <div className="flex justify-center my-12">
+        <div className="relative">
+          {/* Honeycomb layout - 2 rows of 3 */}
+          <div className="flex flex-col items-center gap-2">
+            {/* Top row - 3 hexagons */}
+            <div className="flex gap-2">
+              {hexagons.slice(0, 3).map((hex, index) => (
+                <Hexagon
+                  key={hex.id}
+                  data={hex}
+                  index={index}
+                  onConfirm={handleConfirm}
+                  onHover={handleHover}
+                />
+              ))}
+            </div>
+            {/* Bottom row - 3 hexagons, offset to create honeycomb */}
+            <div className="flex gap-2 -mt-6 md:-mt-8">
+              {hexagons.slice(3, 6).map((hex, index) => (
+                <Hexagon
+                  key={hex.id}
+                  data={hex}
+                  index={index + 3}
+                  onConfirm={handleConfirm}
+                  onHover={handleHover}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Voice AI */}
