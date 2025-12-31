@@ -115,6 +115,19 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   if (label.includes('battery') || label.includes('connection')) {
     return "Your connection status helps identify your device uniquely.";
   }
+  // Language-related hexagons
+  if (label.includes('primary language')) {
+    return `I detected ${hexagonData.value} as your preferred language. This reveals your cultural background.`;
+  }
+  if (label.includes('language fallback')) {
+    return "Your multiple language preferences suggest you travel or live abroad.";
+  }
+  if (label.includes('locale mismatch') || label.includes('mismatch')) {
+    return "Your language settings don't match your timezone - you're likely an expatriate.";
+  }
+  if (label.includes('user profile')) {
+    return `You appear to be ${hexagonData.value.toLowerCase()}. This lifestyle pattern is valuable for targeted attacks.`;
+  }
   
   return `${hexagonData.label} is part of your digital shadow.`;
 };
