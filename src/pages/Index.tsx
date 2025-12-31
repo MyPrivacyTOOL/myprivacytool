@@ -20,6 +20,7 @@ import {
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
+  const [deviceData, setDeviceData] = useState<DeviceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const footerRef = useRef<HTMLElement>(null);
@@ -35,6 +36,7 @@ const Index = () => {
         setLoading(true);
         setError(null);
         const data = await captureDeviceData();
+        setDeviceData(data);
         
         // Track device profile for analytics
         trackDeviceProfile(data as DeviceData);
@@ -175,7 +177,7 @@ const Index = () => {
 
         {/* Hexagon Grid Section */}
         <section className="pb-12" aria-label="Your detected data points">
-          <HexagonGrid hexagons={hexagons} />
+          <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
         </section>
 
         {/* Footer */}

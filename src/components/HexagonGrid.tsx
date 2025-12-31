@@ -2,7 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
-import { HexagonData } from '@/lib/deviceDetection';
+import LanguageIntelligencePanel from './LanguageIntelligencePanel';
+import { HexagonData, DeviceData, getLanguageName, determineUserProfile } from '@/lib/deviceDetection';
+import { 
+  initializeModel as initLanguageModel,
+  analyzeLanguages,
+  predictLanguagePreference,
+  cachePrediction,
+  getCachedPrediction,
+  LanguageAnalysis,
+  LanguagePrediction,
+} from '@/lib/languagePredictor';
 import { 
   trackHexagonConfirm, 
   trackDeepScanUnlocked, 
@@ -14,15 +24,22 @@ import {
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
+  deviceData?: DeviceData;
 }
 
-export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps) {
+export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
   const [visibleCount, setVisibleCount] = useState(5);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [revealingHexagons, setRevealingHexagons] = useState<Set<string>>(new Set());
   const gridRef = useRef<HTMLDivElement>(null);
   const isFirstConfirmation = useRef(true);
+  
+  // Language Intelligence state
+  const [languageAnalysis, setLanguageAnalysis] = useState<LanguageAnalysis | null>(null);
+  const [languagePrediction, setLanguagePrediction] = useState<LanguagePrediction | null>(null);
+  const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
+  const [showLanguagePanel, setShowLanguagePanel] = useState(false);
 
   // Get visible hexagons based on count
   const visibleHexagons = allHexagons.slice(0, visibleCount);
@@ -37,8 +54,40 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
     }
     if (confirmedCount === 8) {
       trackFunnelStep('all_hexagons_confirmed');
+      // Show Language Intelligence panel after 8 confirmations
+      if (!showLanguagePanel) {
+        setShowLanguagePanel(true);
+        loadLanguagePrediction();
+      }
     }
-  }, [confirmedCount]);
+  }, [confirmedCount, showLanguagePanel]);
+
+  // Load language prediction using TensorFlow.js
+  const loadLanguagePrediction = async () => {
+    setIsLoadingPrediction(true);
+    
+    // Check cache first
+    const cached = getCachedPrediction();
+    if (cached) {
+      setLanguagePrediction(cached);
+      setIsLoadingPrediction(false);
+      return;
+    }
+    
+    try {
+      await initLanguageModel();
+      const analysis = analyzeLanguages();
+      setLanguageAnalysis(analysis);
+      
+      const prediction = await predictLanguagePreference(analysis);
+      setLanguagePrediction(prediction);
+      cachePrediction(prediction);
+    } catch (error) {
+      console.error('Failed to load language prediction:', error);
+    } finally {
+      setIsLoadingPrediction(false);
+    }
+  };
 
   // Progressive reveal: show 3 more hexagons after all 5 initial ones are confirmed
   useEffect(() => {
@@ -228,6 +277,17 @@ export default function HexagonGrid({ hexagons: allHexagons }: HexagonGridProps)
         confirmed={confirmedCount} 
         total={Math.max(visibleCount, 8)} 
       />
+
+      {/* Language Intelligence Panel - shown after 8 confirmations */}
+      {showLanguagePanel && (
+        <div className="mt-8 animate-fade-in">
+          <LanguageIntelligencePanel
+            analysis={languageAnalysis}
+            prediction={languagePrediction}
+            isLoading={isLoadingPrediction}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -31,6 +31,15 @@ export interface DeviceData {
     doNotTrack: boolean;
     cookiesEnabled: boolean;
   };
+  // New language analysis fields
+  language: {
+    languages: string[];
+    primaryLanguage: string;
+    fallbackLanguages: string[];
+    locale: string;
+    hasLocationMismatch: boolean;
+    mismatchDetails: string | null;
+  };
 }
 
 export interface HexagonData {
@@ -41,6 +50,59 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile';
+}
+
+// Language code to name mapping
+const languageNames: Record<string, string> = {
+  'en': 'English', 'en-US': 'English (US)', 'en-GB': 'English (UK)',
+  'es': 'Spanish', 'es-ES': 'Spanish (Spain)', 'es-MX': 'Spanish (Mexico)',
+  'fr': 'French', 'de': 'German', 'it': 'Italian', 'pt': 'Portuguese',
+  'pt-BR': 'Portuguese (Brazil)', 'zh': 'Chinese', 'zh-CN': 'Chinese (Simplified)',
+  'ja': 'Japanese', 'ko': 'Korean', 'ru': 'Russian', 'ar': 'Arabic',
+  'hi': 'Hindi', 'nl': 'Dutch', 'pl': 'Polish', 'tr': 'Turkish',
+};
+
+// Timezone to expected language mapping
+const timezoneLanguages: Record<string, string[]> = {
+  'America/New_York': ['en'], 'America/Los_Angeles': ['en', 'es'],
+  'Europe/London': ['en'], 'Europe/Paris': ['fr'], 'Europe/Berlin': ['de'],
+  'Europe/Madrid': ['es'], 'Asia/Tokyo': ['ja'], 'Asia/Shanghai': ['zh'],
+  'Asia/Seoul': ['ko'], 'America/Sao_Paulo': ['pt'], 'America/Mexico_City': ['es'],
+};
+
+// Get readable language name
+export function getLanguageName(code: string): string {
+  return languageNames[code] || languageNames[code.split('-')[0]] || code;
+}
+
+// Analyze language settings and detect mismatches
+function analyzeLanguageSettings(timezone: string): DeviceData['language'] {
+  const languages = navigator.languages ? [...navigator.languages] : [navigator.language];
+  const primaryLanguage = navigator.language;
+  const fallbackLanguages = languages.slice(1);
+  const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+  
+  // Check for language-location mismatch
+  const primaryLangCode = primaryLanguage.split('-')[0].toLowerCase();
+  const expectedLanguages = timezoneLanguages[timezone] || [];
+  const hasLocationMismatch = expectedLanguages.length > 0 && 
+    !expectedLanguages.includes(primaryLangCode);
+  
+  let mismatchDetails: string | null = null;
+  if (hasLocationMismatch) {
+    const expectedLangNames = expectedLanguages.map(l => languageNames[l] || l).join(', ');
+    mismatchDetails = `Browser set to ${getLanguageName(primaryLangCode)}, but timezone typically uses ${expectedLangNames}`;
+  }
+  
+  return {
+    languages,
+    primaryLanguage,
+    fallbackLanguages,
+    locale,
+    hasLocationMismatch,
+    mismatchDetails,
+  };
 }
 
 // Detect device type from user agent
@@ -197,6 +259,8 @@ export async function captureDeviceData(): Promise<DeviceData> {
     console.warn('Could not fetch IP/geo data:', error);
   }
 
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  
   return {
     ip,
     location: {
@@ -221,7 +285,7 @@ export async function captureDeviceData(): Promise<DeviceData> {
       colorDepth: screen.colorDepth,
     },
     session: {
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone,
       language: navigator.language,
       referrer: document.referrer || 'Direct',
       timestamp: new Date().toISOString(),
@@ -230,10 +294,11 @@ export async function captureDeviceData(): Promise<DeviceData> {
       doNotTrack: navigator.doNotTrack === '1',
       cookiesEnabled: navigator.cookieEnabled,
     },
+    language: analyzeLanguageSettings(timezone),
   };
 }
 
-// Convert device data to hexagons
+// Convert device data to hexagons (initial 5)
 export function generateHexagons(data: DeviceData): HexagonData[] {
   return [
     {
@@ -246,6 +311,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 95,
       risk: 'Attackers use your location to create localized phishing scams targeting your area.',
       confirmed: false,
+      category: 'device',
     },
     {
       id: 'device',
@@ -255,6 +321,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 92,
       risk: 'Device info helps attackers target OS-specific malware and exploits.',
       confirmed: false,
+      category: 'device',
     },
     {
       id: 'browser',
@@ -264,6 +331,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 100,
       risk: "Browser version reveals if you're vulnerable to known security exploits.",
       confirmed: false,
+      category: 'device',
     },
     {
       id: 'isp',
@@ -273,6 +341,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 90,
       risk: 'ISP data helps attackers spoof legitimate service provider emails.',
       confirmed: false,
+      category: 'network',
     },
     {
       id: 'time',
@@ -286,6 +355,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 100,
       risk: 'Activity patterns reveal your timezone and daily schedule to potential attackers.',
       confirmed: false,
+      category: 'device',
     },
     {
       id: 'referrer',
@@ -305,6 +375,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 100,
       risk: 'Your browsing patterns and interests are tracked across websites.',
       confirmed: false,
+      category: 'privacy',
     },
     {
       id: 'screen',
@@ -314,6 +385,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 100,
       risk: 'Screen size helps fingerprint your device uniquely across websites.',
       confirmed: false,
+      category: 'device',
     },
     {
       id: 'privacy',
@@ -325,8 +397,9 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
         ? 'DNT is enabled, but many websites ignore this signal.'
         : 'Do Not Track is disabled - your activity is being tracked.',
       confirmed: false,
+      category: 'privacy',
     },
-    // Hexagon 9: Connection Type
+    // Connection Type
     {
       id: 'connection',
       label: 'Connection Type',
@@ -335,8 +408,9 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 85,
       risk: 'Public WiFi? Attackers can intercept unencrypted traffic.',
       confirmed: false,
+      category: 'network',
     },
-    // Hexagon 10: Estimated Demographic
+    // Estimated Demographic
     {
       id: 'demographic',
       label: 'Estimated Profile',
@@ -345,11 +419,86 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 60,
       risk: 'Age-targeted scams (retirement fraud, health scams) are tailored to your demographic.',
       confirmed: false,
+      category: 'profile',
     },
+    // NEW: Language hexagons for LocaleIntent integration
+    // Primary Language
+    {
+      id: 'primary-language',
+      label: 'Primary Language',
+      value: getLanguageName(data.language.primaryLanguage),
+      icon: '🗣️',
+      confidence: 95,
+      risk: 'Your language preference reveals your cultural background and can be used for targeted phishing.',
+      confirmed: false,
+      category: 'language',
+    },
+    // Language Fallbacks (if multiple)
+    ...(data.language.fallbackLanguages.length > 0 ? [{
+      id: 'language-fallbacks',
+      label: 'Language Fallbacks',
+      value: data.language.fallbackLanguages.slice(0, 2).map(l => getLanguageName(l)).join(', '),
+      icon: '🔄',
+      confidence: 88,
+      risk: 'Multiple languages suggest you travel or live abroad - valuable for social engineering.',
+      confirmed: false,
+      category: 'language' as const,
+    }] : []),
+    // Language-Location Mismatch (if detected)
+    ...(data.language.hasLocationMismatch ? [{
+      id: 'language-mismatch',
+      label: 'Locale Mismatch',
+      value: 'Detected',
+      icon: '⚠️',
+      confidence: 85,
+      risk: data.language.mismatchDetails || 'Your language settings don\'t match your timezone location.',
+      confirmed: false,
+      category: 'language' as const,
+    }] : []),
   ];
 }
 
-// Async version that includes battery info
+// Determine user profile from language analysis
+export function determineUserProfile(data: DeviceData): { 
+  profile: 'local' | 'expatriate' | 'traveler' | 'multilingual';
+  confidence: number;
+  description: string;
+} {
+  const { languages, hasLocationMismatch, fallbackLanguages } = data.language;
+  const uniqueFamilies = new Set(languages.map(l => l.split('-')[0]));
+  
+  if (hasLocationMismatch) {
+    return {
+      profile: 'expatriate',
+      confidence: 85,
+      description: 'Living abroad, using native language',
+    };
+  }
+  
+  if (uniqueFamilies.size >= 3) {
+    return {
+      profile: 'multilingual',
+      confidence: 82,
+      description: 'Comfortable in multiple languages',
+    };
+  }
+  
+  if (fallbackLanguages.length >= 2 && uniqueFamilies.size > 1) {
+    return {
+      profile: 'traveler',
+      confidence: 75,
+      description: 'Frequently visits different regions',
+    };
+  }
+  
+  return {
+    profile: 'local',
+    confidence: 70,
+    description: 'Uses local language in home region',
+  };
+}
+
+// Async version that includes battery info and user profile hexagon
 export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonData[]> {
   const baseHexagons = generateHexagons(data);
   
@@ -368,8 +517,26 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       confidence: 90,
       risk: 'Battery level patterns reveal your daily routine and when you might be vulnerable.',
       confirmed: false,
+      category: 'device',
     });
   }
+  
+  // Add user profile hexagon based on language analysis
+  const userProfile = determineUserProfile(data);
+  const profileEmoji = userProfile.profile === 'expatriate' ? '🌍' :
+    userProfile.profile === 'traveler' ? '✈️' :
+    userProfile.profile === 'multilingual' ? '🗣️' : '🏠';
+    
+  baseHexagons.push({
+    id: 'user-profile',
+    label: 'User Profile',
+    value: userProfile.profile.charAt(0).toUpperCase() + userProfile.profile.slice(1),
+    icon: profileEmoji,
+    confidence: userProfile.confidence,
+    risk: `Detected as ${userProfile.description}. This reveals lifestyle patterns valuable for targeted attacks.`,
+    confirmed: false,
+    category: 'profile',
+  });
   
   return baseHexagons;
 }
