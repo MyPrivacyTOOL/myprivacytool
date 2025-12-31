@@ -300,3 +300,88 @@ export const trackWaitlistEmailSubmitted = (email: string) => {
     timestamp: Date.now(),
   });
 };
+
+// ============================================
+// Language Intelligence Analytics
+// ============================================
+
+// Track when Language Intelligence panel is viewed
+export const trackLanguagePredictionViewed = (profile: string, confidence: number) => {
+  trackActivity();
+  trackEvent('language_prediction_viewed', {
+    predicted_profile: profile,
+    confidence_score: confidence,
+    timestamp: Date.now(),
+  });
+};
+
+// Track detected user profile
+export const trackLanguageProfileDetected = (profile: string, confidence: number) => {
+  trackEvent('language_profile_detected', {
+    profile_type: profile,
+    confidence: confidence,
+    event_category: 'language_intelligence',
+  });
+};
+
+// Track user feedback on language prediction
+export const trackLanguageFeedback = (isCorrect: boolean, predictedProfile: string) => {
+  trackActivity();
+  trackEvent('language_prediction_feedback', {
+    prediction_correct: isCorrect,
+    predicted_profile: predictedProfile,
+    feedback_type: isCorrect ? 'positive' : 'negative',
+    timestamp: Date.now(),
+  });
+};
+
+// Track language mismatch detection
+export const trackLanguageMismatchDetected = (
+  primaryLanguage: string, 
+  timezone: string,
+  mismatchType: 'timezone' | 'vpn' | 'expatriate'
+) => {
+  trackEvent('language_mismatch_detected', {
+    primary_language: primaryLanguage,
+    timezone: timezone,
+    mismatch_type: mismatchType,
+    event_category: 'language_intelligence',
+  });
+};
+
+// Track VPN likelihood detection
+export const trackVpnLikelihoodDetected = (likelihood: 'low' | 'medium' | 'high', probability: number) => {
+  trackEvent('vpn_likelihood_detected', {
+    likelihood_level: likelihood,
+    probability_score: probability,
+    event_category: 'language_intelligence',
+  });
+};
+
+// Track language family analysis
+export const trackLanguageFamilyAnalysis = (
+  primaryFamily: string,
+  totalFamilies: number,
+  languageCount: number
+) => {
+  trackEvent('language_family_analysis', {
+    primary_family: primaryFamily,
+    total_families: totalFamilies,
+    language_count: languageCount,
+    event_category: 'language_intelligence',
+  });
+};
+
+// Track aggregate prediction accuracy
+export const trackPredictionAccuracyStats = (
+  totalPredictions: number,
+  correctPredictions: number,
+  accuracy: number
+) => {
+  trackEvent('prediction_accuracy_stats', {
+    total: totalPredictions,
+    correct: correctPredictions,
+    accuracy_percentage: accuracy,
+    event_category: 'language_intelligence',
+  });
+};
