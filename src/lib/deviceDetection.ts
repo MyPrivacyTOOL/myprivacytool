@@ -255,8 +255,11 @@ export async function captureDeviceData(): Promise<DeviceData> {
     // Get geolocation data
     const geoResponse = await fetch(`https://ipapi.co/${ip}/json/`);
     geoData = await geoResponse.json();
-  } catch (error) {
-    console.warn('Could not fetch IP/geo data:', error);
+  } catch {
+    // Only log in development to prevent information leakage in production
+    if (import.meta.env.DEV) {
+      console.warn('Could not fetch IP/geo data');
+    }
   }
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
