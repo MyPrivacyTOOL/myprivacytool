@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -8,8 +8,14 @@ import {
   getAccuracyStats,
   getContributionCount,
   getTotalPredictions,
+  trainModel,
+  getModelMetadata,
+  resetToDefaultModel,
+  hasTrainedModel,
   type LanguagePrediction,
   type LanguageAnalysis,
+  type TrainingProgress,
+  type ModelMetadata,
 } from '@/lib/languagePredictor';
 import { getRewardStats, clearRewards, getAllRewards, type RewardStats, type RewardEvent } from '@/lib/rewardTracking';
 import { generateSyntheticData, exportToJSON, getDataStats, validateExamples, type SyntheticExample } from '@/lib/syntheticDataGenerator';
@@ -71,11 +77,50 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
   const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
   const [syntheticData, setSyntheticData] = useState<SyntheticExample[] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isTraining, setIsTraining] = useState(false);
+  const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
+  const [modelMetadata, setModelMetadata] = useState<ModelMetadata | null>(null);
+  const [trainingResult, setTrainingResult] = useState<{ accuracy: number; validationAccuracy: number } | null>(null);
 
   // Refresh data
   const refreshData = useCallback(() => {
     setData(getVoiceData());
     setRewardEvents(getAllRewards().slice(-10).reverse());
+    setModelMetadata(getModelMetadata());
+  }, []);
+
+  // Train model on synthetic data
+  const handleTrainModel = useCallback(async () => {
+    if (!syntheticData || syntheticData.length === 0) {
+      // Generate data first if not available
+      const data = generateSyntheticData(1000);
+      setSyntheticData(data);
+    }
+    
+    const dataToUse = syntheticData || generateSyntheticData(1000);
+    setIsTraining(true);
+    setTrainingResult(null);
+    
+    try {
+      const result = await trainModel(dataToUse, (progress) => {
+        setTrainingProgress(progress);
+      });
+      
+      setTrainingResult({ accuracy: result.accuracy, validationAccuracy: result.validationAccuracy });
+      setModelMetadata(getModelMetadata());
+    } catch (error) {
+      console.error('Training failed:', error);
+    } finally {
+      setIsTraining(false);
+    }
+  }, [syntheticData]);
+
+  // Reset model to default
+  const handleResetModel = useCallback(async () => {
+    await resetToDefaultModel();
+    setModelMetadata(null);
+    setTrainingResult(null);
+    setTrainingProgress(null);
   }, []);
 
   // Export rewards as JSON
@@ -560,6 +605,137 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   </button>
                 </>
               )}
+            </div>
+
+            {/* Model Training Section */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-violet-400" />
+                  <h4 className="text-violet-400 text-xs font-medium">TensorFlow Model</h4>
+                </div>
+                {modelMetadata && (
+                  <span className="text-[10px] text-violet-400/60 font-mono">{modelMetadata.version}</span>
+                )}
+              </div>
+              
+              {/* Model Status */}
+              {modelMetadata ? (
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-green-400 text-xs font-medium">Trained Model Active</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-violet-300/70">Training Accuracy:</span>
+                    <span className="text-violet-400 font-mono">{modelMetadata.trainingAccuracy}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-violet-300/70">Validation Accuracy:</span>
+                    <span className="text-violet-400 font-mono">{modelMetadata.validationAccuracy}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-violet-300/70">Trained On:</span>
+                    <span className="text-violet-400 font-mono">{modelMetadata.examplesUsed} examples</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-violet-300/70">Trained At:</span>
+                    <span className="text-violet-400/70 font-mono text-[10px]">
+                      {new Date(modelMetadata.trainedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-2 mb-3 bg-yellow-500/10 border border-yellow-500/30 rounded">
+                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-yellow-400 text-xs">Using heuristic model (not trained)</span>
+                </div>
+              )}
+              
+              {/* Training Progress */}
+              {isTraining && trainingProgress && (
+                <div className="mb-3 p-2 bg-black/30 rounded">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-violet-400/70">
+                      {trainingProgress.phase === 'preparing' ? 'Preparing...' :
+                       trainingProgress.phase === 'training' ? `Epoch ${trainingProgress.epoch}/${trainingProgress.totalEpochs}` :
+                       trainingProgress.phase === 'validating' ? 'Validating...' : 'Complete!'}
+                    </span>
+                    <span className="text-violet-400 font-mono">{trainingProgress.accuracy.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-2 bg-black/40 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all duration-300"
+                      style={{ width: `${(trainingProgress.epoch / trainingProgress.totalEpochs) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-violet-400/50 mt-1">
+                    <span>Loss: {trainingProgress.loss.toFixed(4)}</span>
+                    <span>Accuracy: {trainingProgress.accuracy.toFixed(1)}%</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Training Result */}
+              {trainingResult && !isTraining && (
+                <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded">
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <Zap className="w-3 h-3" />
+                    Training complete! Accuracy: {trainingResult.accuracy}% (val: {trainingResult.validationAccuracy}%)
+                  </div>
+                </div>
+              )}
+              
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleTrainModel}
+                  disabled={isTraining}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-500/20 border border-violet-500/50 rounded-lg text-violet-400 text-xs font-medium hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                >
+                  {isTraining ? (
+                    <>
+                      <RotateCcw className="w-3 h-3 animate-spin" />
+                      Training...
+                    </>
+                  ) : (
+                    <>
+                      <Cpu className="w-3 h-3" />
+                      {syntheticData ? 'Train Model' : 'Generate & Train'}
+                    </>
+                  )}
+                </button>
+                
+                {modelMetadata && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button
+                        disabled={isTraining}
+                        className="px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-black/95 border-red-500/30">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-400">Reset to Default Model?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-violet-400/70">
+                          This will remove the trained model and revert to the heuristic-based predictions. You can retrain anytime.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-transparent border-violet-500/30 text-violet-400 hover:bg-violet-500/10">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleResetModel}
+                          className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                        >
+                          Reset Model
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
             </div>
 
             {/* Quick Links */}
