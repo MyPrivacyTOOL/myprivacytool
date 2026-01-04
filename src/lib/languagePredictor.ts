@@ -50,6 +50,34 @@ export interface FeedbackData {
   timestamp: number;
   confidenceScore?: number;
   predictionShown?: string;
+  sessionId?: string;
+}
+
+// Generate or get session ID
+export function getSessionId(): string {
+  let sessionId = sessionStorage.getItem('language_session_id');
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    sessionStorage.setItem('language_session_id', sessionId);
+  }
+  return sessionId;
+}
+
+// Get total prediction count
+export function getTotalPredictions(): number {
+  try {
+    const cached = localStorage.getItem('language_prediction_cache');
+    const feedback = localStorage.getItem('language_feedback');
+    let count = 0;
+    if (cached) count++;
+    if (feedback) {
+      const feedbackData = JSON.parse(feedback);
+      if (Array.isArray(feedbackData)) count = feedbackData.length;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
 }
 
 // Language code to name mapping
