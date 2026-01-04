@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -12,6 +12,7 @@ import {
   type LanguageAnalysis,
 } from '@/lib/languagePredictor';
 import { getRewardStats, clearRewards, getAllRewards, type RewardStats, type RewardEvent } from '@/lib/rewardTracking';
+import { generateSyntheticData, exportToJSON, getDataStats, validateExamples, type SyntheticExample } from '@/lib/syntheticDataGenerator';
 import { testScenarios, createMockAnalysis } from '@/lib/testScenarios';
 import {
   AlertDialog,
@@ -68,6 +69,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
   const [testResults, setTestResults] = useState<Map<string, { prediction: LanguagePrediction | null; passed: boolean }>>(new Map());
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
+  const [syntheticData, setSyntheticData] = useState<SyntheticExample[] | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Refresh data
   const refreshData = useCallback(() => {
@@ -452,6 +455,111 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   );
                 })}
               </div>
+            </div>
+
+            {/* Synthetic Data Generator */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <h4 className="text-emerald-400 text-xs font-medium">Training Data Generator</h4>
+                </div>
+              </div>
+              
+              {syntheticData ? (
+                <>
+                  {/* Stats Preview */}
+                  {(() => {
+                    const stats = getDataStats(syntheticData);
+                    const validation = validateExamples(syntheticData);
+                    return (
+                      <div className="space-y-2 mb-3">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-emerald-300/70">Total Examples:</span>
+                          <span className="text-emerald-400 font-mono">{stats.total}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-emerald-300/70">Unique Language Combos:</span>
+                          <span className="text-emerald-400 font-mono">{stats.uniqueLanguageCombos}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-emerald-300/70">Unique Timezones:</span>
+                          <span className="text-emerald-400 font-mono">{stats.uniqueTimezones}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-emerald-300/70">Validation:</span>
+                          <span className={cn(
+                            "font-mono",
+                            validation.invalid === 0 ? "text-green-400" : "text-yellow-400"
+                          )}>
+                            {validation.valid} valid / {validation.invalid} invalid
+                          </span>
+                        </div>
+                        
+                        {/* Pattern Distribution */}
+                        <div className="pt-2 mt-2 border-t border-emerald-500/20">
+                          <span className="text-emerald-400/60 text-xs">Distribution:</span>
+                          <div className="grid grid-cols-2 gap-1 mt-1">
+                            {Object.entries(stats.byPattern).map(([pattern, data]) => (
+                              <div key={pattern} className="flex justify-between text-xs">
+                                <span className="text-emerald-300/60 capitalize">{pattern.replace('_', ' ')}:</span>
+                                <span className="text-emerald-400/80 font-mono">{data.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                  {/* Export Button */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => exportToJSON(syntheticData)}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors"
+                    >
+                      <FileJson className="w-3 h-3" />
+                      Download JSON
+                    </button>
+                    <button
+                      onClick={() => setSyntheticData(null)}
+                      className="px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-emerald-400/60 text-xs mb-3">
+                    Generate 1000+ synthetic training examples with realistic language-timezone combinations.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsGenerating(true);
+                      setTimeout(() => {
+                        const data = generateSyntheticData(1000);
+                        setSyntheticData(data);
+                        setIsGenerating(false);
+                      }, 100);
+                    }}
+                    disabled={isGenerating}
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <RotateCcw className="w-3 h-3 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-3 h-3" />
+                        Generate Training Data
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Quick Links */}
