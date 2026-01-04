@@ -1,9 +1,18 @@
 // Orientation data interface
 export interface OrientationData {
   type: 'portrait' | 'landscape';
-  angle: 0 | 90 | 180 | 270 | number;
+  angle: number;
+  isPortrait: boolean;
+  isLandscape: boolean;
   width: number;
   height: number;
+}
+
+// Motion data interface
+export interface MotionData {
+  alpha: number | null;  // Z-axis rotation (compass direction)
+  beta: number | null;   // X-axis tilt (front-to-back)
+  gamma: number | null;  // Y-axis tilt (left-to-right)
 }
 
 // Sensor availability interface
@@ -47,7 +56,7 @@ export interface DeviceData {
     doNotTrack: boolean;
     cookiesEnabled: boolean;
   };
-  // New language analysis fields
+  // Language analysis fields
   language: {
     languages: string[];
     primaryLanguage: string;
@@ -56,9 +65,10 @@ export interface DeviceData {
     hasLocationMismatch: boolean;
     mismatchDetails: string | null;
   };
-  // Orientation and sensor data
-  orientation?: OrientationData;
-  sensors?: SensorData;
+  // Orientation and motion data
+  orientation: OrientationData;
+  motion: MotionData | null;
+  sensors: SensorData;
 }
 
 export interface HexagonData {
@@ -317,6 +327,10 @@ export async function captureDeviceData(): Promise<DeviceData> {
       cookiesEnabled: navigator.cookieEnabled,
     },
     language: analyzeLanguageSettings(timezone),
+    // Orientation, motion, and sensor data
+    orientation: detectOrientation(),
+    motion: null, // Motion data is populated real-time via useDeviceMotion hook
+    sensors: detectSensors(),
   };
 }
 
@@ -579,9 +593,14 @@ export function detectOrientation(): OrientationData {
     angle = type === 'landscape' ? 90 : 0;
   }
 
+  const isPortrait = type === 'portrait';
+  const isLandscape = type === 'landscape';
+
   return {
     type,
     angle,
+    isPortrait,
+    isLandscape,
     width: window.innerWidth,
     height: window.innerHeight,
   };
