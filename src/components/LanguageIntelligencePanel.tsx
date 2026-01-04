@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Brain, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, 
   Globe, User, Lightbulb, Sparkles, Shield, AlertTriangle,
-  TrendingUp, Award, Info
+  TrendingUp, Award, Info, HelpCircle, Lock
 } from 'lucide-react';
 import { 
   LanguageAnalysis, 
@@ -41,6 +41,16 @@ export default function LanguageIntelligencePanel({
   const [accuracyStats, setAccuracyStats] = useState({ total: 0, correct: 0, accuracy: 85, profileBreakdown: {} as Record<string, { correct: number; total: number }> });
   const [contributionCount, setContributionCount] = useState(0);
   const [showThankYou, setShowThankYou] = useState(false);
+  const [showWhyInfo, setShowWhyInfo] = useState(false);
+  const [feedbackHiddenThisSession, setFeedbackHiddenThisSession] = useState(false);
+
+  // Check if feedback was already given this session
+  useEffect(() => {
+    const sessionFeedback = sessionStorage.getItem('language_feedback_given');
+    if (sessionFeedback) {
+      setFeedbackHiddenThisSession(true);
+    }
+  }, []);
 
   useEffect(() => {
     setAccuracyStats(getAccuracyStats());
@@ -57,11 +67,16 @@ export default function LanguageIntelligencePanel({
     setFeedbackGiven(isCorrect);
     setShowThankYou(true);
     
+    // Mark as given in session storage (only show once per session)
+    sessionStorage.setItem('language_feedback_given', 'true');
+    
     saveFeedback({
       predictionCorrect: isCorrect,
       actualLanguage: isCorrect ? prediction?.preferredLanguage || null : null,
       userProfile: prediction?.userProfile || null,
       timestamp: Date.now(),
+      confidenceScore: prediction?.preferredLanguageConfidence || 0,
+      predictionShown: prediction?.preferredLanguage || null,
     });
     
     // Track feedback
@@ -382,63 +397,122 @@ export default function LanguageIntelligencePanel({
 
         {/* Feedback Section */}
         <div className="border-t border-green-500/20 pt-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-center sm:text-left">
-              <span className="text-sm text-green-400/70 block">
-                We prioritized {prediction.preferredLanguage} based on your browser.
-              </span>
-              <span className="text-sm text-green-400/70">Was this helpful?</span>
-            </div>
-            
-            {feedbackGiven === null ? (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleFeedback(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm hover:bg-green-500/20 transition-all hover:scale-105"
-                >
-                  <ThumbsUp className="w-4 h-4" />
-                  Yes, correct
-                </button>
-                <button
-                  onClick={() => handleFeedback(false)}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm hover:bg-red-500/20 transition-all hover:scale-105"
-                >
-                  <ThumbsDown className="w-4 h-4" />
-                  Not quite
-                </button>
+          {/* Only show feedback prompt once per session */}
+          {!feedbackHiddenThisSession && (
+            <>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  <span className="text-sm text-green-400/70 block">
+                    We detected <span className="text-white font-medium">{prediction.preferredLanguage}</span> as your preferred language.
+                  </span>
+                  <span className="text-sm text-green-400/70">Was this helpful?</span>
+                </div>
+                
+                {feedbackGiven === null ? (
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    <button
+                      onClick={() => handleFeedback(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg text-green-400 text-sm hover:bg-green-500/20 transition-all hover:scale-105"
+                    >
+                      <ThumbsUp className="w-4 h-4" />
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => handleFeedback(false)}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm hover:bg-red-500/20 transition-all hover:scale-105"
+                    >
+                      <ThumbsDown className="w-4 h-4" />
+                      No
+                    </button>
+                    <button
+                      onClick={() => setShowWhyInfo(!showWhyInfo)}
+                      className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg text-purple-400 text-sm hover:bg-purple-500/20 transition-all"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      Why we asked
+                    </button>
+                  </div>
+                ) : (
+                  <div className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all",
+                    feedbackGiven ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400",
+                    showThankYou && "animate-scale-in"
+                  )}>
+                    {feedbackGiven ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}
+                    <span>
+                      {showThankYou 
+                        ? "Thanks! This helps us improve" 
+                        : feedbackGiven 
+                          ? 'Thanks for confirming!' 
+                          : 'Thanks for the feedback!'}
+                    </span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all",
-                feedbackGiven ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400",
-                showThankYou && "animate-scale-in"
-              )}>
-                {feedbackGiven ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}
-                <span>
-                  {showThankYou 
-                    ? "Thanks! This helps us improve 🎉" 
-                    : feedbackGiven 
-                      ? 'Thanks for confirming!' 
-                      : 'Thanks for the feedback!'}
-                </span>
-              </div>
-            )}
+
+              {/* Why we asked info panel */}
+              {showWhyInfo && (
+                <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <HelpCircle className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div className="space-y-2">
+                      <h5 className="font-medium text-purple-300">Why do we ask for feedback?</h5>
+                      <p className="text-sm text-purple-400/80">
+                        Your feedback helps improve our language detection model. By confirming whether our prediction was correct, 
+                        you help us understand patterns and edge cases that improve accuracy for everyone.
+                      </p>
+                      <p className="text-sm text-purple-400/80">
+                        This is especially helpful for detecting expatriate and multilingual users whose browser settings 
+                        may not match their actual preferences.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Privacy Notice */}
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-green-400/50">
+            <Lock className="w-3 h-3" />
+            <span>Feedback stored locally only – never sent to servers</span>
           </div>
           
-          {/* Contribution Stats */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs">
-            {contributionCount > 0 && (
-              <div className="flex items-center gap-1.5 text-green-400/70">
-                <Award className="w-3.5 h-3.5" />
-                <span>You've helped improve {contributionCount} prediction{contributionCount > 1 ? 's' : ''}</span>
+          {/* Dev Mode: Aggregate Stats */}
+          {import.meta.env.DEV && accuracyStats.total > 0 && (
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <div className="flex items-center gap-2 text-yellow-400 text-xs font-medium mb-2">
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Dev Mode: Model Accuracy Stats</span>
               </div>
-            )}
-            {accuracyStats.total > 0 && (
-              <div className="text-green-400/50">
-                Community accuracy: {accuracyStats.accuracy}% ({accuracyStats.correct}/{accuracyStats.total})
+              <div className="text-yellow-400/80 text-sm">
+                Model accuracy: <span className="font-bold text-yellow-300">{accuracyStats.accuracy}%</span> based on your {accuracyStats.total} confirmation{accuracyStats.total > 1 ? 's' : ''}
               </div>
-            )}
-          </div>
+              {Object.entries(accuracyStats.profileBreakdown).some(([_, data]) => data.total > 0) && (
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-yellow-400/60">
+                  {Object.entries(accuracyStats.profileBreakdown).map(([profile, data]) => (
+                    data.total > 0 && (
+                      <div key={profile} className="capitalize">
+                        {profile}: {data.correct}/{data.total} ({Math.round((data.correct / data.total) * 100)}%)
+                      </div>
+                    )
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Contribution Stats (shown after feedback or if previously contributed) */}
+          {(feedbackGiven !== null || contributionCount > 0) && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-xs">
+              {contributionCount > 0 && (
+                <div className="flex items-center gap-1.5 text-green-400/70">
+                  <Award className="w-3.5 h-3.5" />
+                  <span>You've helped improve {contributionCount} prediction{contributionCount > 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
