@@ -142,6 +142,49 @@ export const SmartphoneIllustration: React.FC<DeviceProps> = ({ className = '', 
   </svg>
 );
 
+// Smartphone Landscape
+export const SmartphoneLandscapeIllustration: React.FC<DeviceProps> = ({ className = '', style }) => (
+  <svg 
+    viewBox="0 0 200 100" 
+    className={`w-full max-w-[200px] ${className}`}
+    style={style}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <linearGradient id="phone-body-l" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#1e293b" />
+        <stop offset="100%" stopColor="#0f172a" />
+      </linearGradient>
+      <linearGradient id="phone-screen-l" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#f1f5f9" />
+        <stop offset="100%" stopColor="#e2e8f0" />
+      </linearGradient>
+      <filter id="phone-shadow-l" x="-5%" y="-10%" width="115%" height="120%">
+        <feDropShadow dx="0" dy="4" stdDeviation="5" floodOpacity="0.2" />
+      </filter>
+    </defs>
+    
+    <g filter="url(#phone-shadow-l)">
+      {/* Phone body */}
+      <rect x="5" y="5" width="190" height="90" rx="18" fill="url(#phone-body-l)" />
+      
+      {/* Screen */}
+      <rect x="12" y="9" width="176" height="82" rx="14" fill="url(#phone-screen-l)" />
+      
+      {/* Dynamic Island */}
+      <rect x="18" y="37" width="12" height="26" rx="6" fill="#0f172a" />
+      
+      {/* Side buttons */}
+      <rect x="50" y="0" width="20" height="5" rx="2" fill="#334155" />
+      <rect x="80" y="0" width="35" height="5" rx="2" fill="#334155" />
+      <rect x="65" y="95" width="40" height="5" rx="2" fill="#334155" />
+      
+      {/* Home indicator */}
+      <rect x="180" y="35" width="4" height="30" rx="2" fill="#475569" />
+    </g>
+  </svg>
+);
+
 // Tablet (iPad style)
 export const TabletIllustration: React.FC<DeviceProps> = ({ className = '', style }) => (
   <svg 
@@ -176,6 +219,44 @@ export const TabletIllustration: React.FC<DeviceProps> = ({ className = '', styl
       
       {/* Home indicator */}
       <rect x="55" y="190" width="50" height="4" rx="2" fill="#475569" />
+    </g>
+  </svg>
+);
+
+// Tablet Landscape
+export const TabletLandscapeIllustration: React.FC<DeviceProps> = ({ className = '', style }) => (
+  <svg 
+    viewBox="0 0 210 160" 
+    className={`w-full max-w-[210px] ${className}`}
+    style={style}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <linearGradient id="tablet-body-l" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#1e293b" />
+        <stop offset="100%" stopColor="#0f172a" />
+      </linearGradient>
+      <linearGradient id="tablet-screen-l" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#f8fafc" />
+        <stop offset="100%" stopColor="#e2e8f0" />
+      </linearGradient>
+      <filter id="tablet-shadow-l" x="-5%" y="-8%" width="112%" height="116%">
+        <feDropShadow dx="0" dy="4" stdDeviation="5" floodOpacity="0.18" />
+      </filter>
+    </defs>
+    
+    <g filter="url(#tablet-shadow-l)">
+      {/* Tablet body */}
+      <rect x="5" y="5" width="200" height="150" rx="14" fill="url(#tablet-body-l)" />
+      
+      {/* Screen */}
+      <rect x="15" y="10" width="180" height="140" rx="8" fill="url(#tablet-screen-l)" />
+      
+      {/* Camera */}
+      <circle cx="10" cy="80" r="3" fill="#334155" />
+      
+      {/* Home indicator */}
+      <rect x="190" y="55" width="4" height="50" rx="2" fill="#475569" />
     </g>
   </svg>
 );
@@ -335,14 +416,24 @@ export const DeviceIllustrations = {
   Desktop: DesktopIllustration,
   Laptop: LaptopIllustration,
   Smartphone: SmartphoneIllustration,
+  SmartphoneLandscape: SmartphoneLandscapeIllustration,
   Mobile: SmartphoneIllustration,
+  MobileLandscape: SmartphoneLandscapeIllustration,
   Tablet: TabletIllustration,
+  TabletLandscape: TabletLandscapeIllustration,
   'Smart Watch': SmartWatchIllustration,
   'Smart TV': SmartTVIllustration,
   'Gaming Console': GamingConsoleIllustration,
 };
 
 // Helper to get the right illustration component
-export function getDeviceIllustration(deviceType: string): React.FC<DeviceProps> {
+export function getDeviceIllustration(deviceType: string, isLandscape: boolean = false): React.FC<DeviceProps> {
+  // Check if landscape variant exists for this device
+  if (isLandscape) {
+    const landscapeKey = `${deviceType}Landscape` as keyof typeof DeviceIllustrations;
+    if (DeviceIllustrations[landscapeKey]) {
+      return DeviceIllustrations[landscapeKey];
+    }
+  }
   return DeviceIllustrations[deviceType as keyof typeof DeviceIllustrations] || SmartphoneIllustration;
 }
