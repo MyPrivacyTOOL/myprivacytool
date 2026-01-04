@@ -79,7 +79,7 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
-  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile';
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation';
 }
 
 // Language code to name mapping
@@ -491,6 +491,64 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'language' as const,
     }] : []),
+    // ORIENTATION HEXAGONS
+    // Device Orientation
+    {
+      id: 'orientation',
+      label: 'Orientation',
+      value: data.orientation?.isPortrait ? 'Portrait' : 'Landscape',
+      icon: '🔄',
+      confidence: 100,
+      risk: 'Screen orientation reveals how you hold your device and your usage patterns.',
+      confirmed: false,
+      category: 'orientation' as const,
+    },
+    // Rotation Angle
+    {
+      id: 'rotation-angle',
+      label: 'Rotation',
+      value: `${data.orientation?.angle ?? 0}°`,
+      icon: '↻',
+      confidence: 100,
+      risk: 'Rotation angle can be used for device fingerprinting and behavioral analysis.',
+      confirmed: false,
+      category: 'orientation' as const,
+    },
+    // Tilt X-Axis (Beta)
+    {
+      id: 'tilt-beta',
+      label: 'Tilt Forward/Back',
+      value: data.motion?.beta !== null ? `${Math.round(data.motion?.beta ?? 0)}°` : 'N/A',
+      icon: '⬆️',
+      confidence: data.motion ? 95 : 0,
+      risk: 'Forward/back tilt reveals your posture and device handling habits.',
+      confirmed: false,
+      category: 'orientation' as const,
+    },
+    // Tilt Y-Axis (Gamma)
+    {
+      id: 'tilt-gamma',
+      label: 'Tilt Left/Right',
+      value: data.motion?.gamma !== null ? `${Math.round(data.motion?.gamma ?? 0)}°` : 'N/A',
+      icon: '⬅️',
+      confidence: data.motion ? 95 : 0,
+      risk: 'Left/right tilt can indicate dominant hand and typing patterns.',
+      confirmed: false,
+      category: 'orientation' as const,
+    },
+    // Motion Tracking
+    {
+      id: 'motion-sensors',
+      label: 'Motion Sensors',
+      value: data.sensors?.gyroscope ? 'Active' : 'Inactive',
+      icon: '📊',
+      confidence: 100,
+      risk: data.sensors?.gyroscope 
+        ? 'Motion sensors can track your movements and physical activity patterns.'
+        : 'Motion sensors unavailable - limited behavioral tracking.',
+      confirmed: false,
+      category: 'orientation' as const,
+    },
   ];
 }
 
