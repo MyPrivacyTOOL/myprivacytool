@@ -1,3 +1,19 @@
+// Orientation data interface
+export interface OrientationData {
+  type: 'portrait' | 'landscape';
+  angle: 0 | 90 | 180 | 270 | number;
+  width: number;
+  height: number;
+}
+
+// Sensor availability interface
+export interface SensorData {
+  accelerometer: boolean;
+  gyroscope: boolean;
+  gps: boolean;
+  touch: boolean;
+}
+
 export interface DeviceData {
   ip: string;
   location: {
@@ -40,6 +56,9 @@ export interface DeviceData {
     hasLocationMismatch: boolean;
     mismatchDetails: string | null;
   };
+  // Orientation and sensor data
+  orientation?: OrientationData;
+  sensors?: SensorData;
 }
 
 export interface HexagonData {
@@ -542,4 +561,77 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   });
   
   return baseHexagons;
+}
+
+// Detect current device orientation
+export function detectOrientation(): OrientationData {
+  const screenOrientation = screen.orientation;
+  let angle: OrientationData['angle'] = 0;
+  let type: OrientationData['type'] = 'portrait';
+
+  if (screenOrientation) {
+    // Use Screen Orientation API if available
+    angle = screenOrientation.angle as OrientationData['angle'];
+    type = screenOrientation.type.includes('portrait') ? 'portrait' : 'landscape';
+  } else {
+    // Fallback to window dimensions
+    type = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    angle = type === 'landscape' ? 90 : 0;
+  }
+
+  return {
+    type,
+    angle,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+// Detect available sensors
+export function detectSensors(): SensorData {
+  const nav = navigator as Navigator & {
+    permissions?: {
+      query: (descriptor: { name: string }) => Promise<{ state: string }>;
+    };
+  };
+
+  // Check for touch support
+  const hasTouch = 'ontouchstart' in window || 
+    navigator.maxTouchPoints > 0 ||
+    (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+
+  // Check for DeviceMotionEvent (accelerometer/gyroscope)
+  const hasMotionSensors = 'DeviceMotionEvent' in window;
+  
+  // Check for DeviceOrientationEvent (gyroscope)
+  const hasOrientationSensor = 'DeviceOrientationEvent' in window;
+
+  // Check for Geolocation API (GPS)
+  const hasGPS = 'geolocation' in navigator;
+
+  return {
+    accelerometer: hasMotionSensors,
+    gyroscope: hasOrientationSensor,
+    gps: hasGPS,
+    touch: hasTouch,
+  };
+}
+
+// Request iOS motion sensor permissions (needed for iOS 13+)
+export async function requestMotionPermission(): Promise<boolean> {
+  const DeviceMotionEventWithPermission = DeviceMotionEvent as typeof DeviceMotionEvent & {
+    requestPermission?: () => Promise<'granted' | 'denied'>;
+  };
+
+  if (typeof DeviceMotionEventWithPermission.requestPermission === 'function') {
+    try {
+      const permission = await DeviceMotionEventWithPermission.requestPermission();
+      return permission === 'granted';
+    } catch {
+      return false;
+    }
+  }
+  
+  // No permission needed (non-iOS or older iOS)
+  return true;
 }
