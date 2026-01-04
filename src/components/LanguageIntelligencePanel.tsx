@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Brain, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown, 
   Globe, User, Lightbulb, Sparkles, Shield, AlertTriangle,
@@ -24,6 +24,12 @@ import {
   trackLanguageFeedback,
   trackLanguageProfileDetected 
 } from '@/lib/analytics';
+import { 
+  DwellTimeTracker, 
+  ScrollDepthTracker, 
+  trackExplicitFeedback,
+  trackReturnVisit 
+} from '@/lib/rewardTracking';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import {
@@ -52,6 +58,10 @@ export default function LanguageIntelligencePanel({
   const [showWhyModal, setShowWhyModal] = useState(false);
   const [feedbackHiddenThisSession, setFeedbackHiddenThisSession] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  
+  // Reward tracking refs
+  const dwellTrackerRef = useRef<DwellTimeTracker | null>(null);
+  const scrollTrackerRef = useRef<ScrollDepthTracker | null>(null);
 
   // Check if feedback was already given or dismissed this session
   useEffect(() => {
@@ -70,7 +80,36 @@ export default function LanguageIntelligencePanel({
     if (prediction) {
       trackLanguagePredictionViewed(prediction.userProfile, prediction.userProfileConfidence);
       trackLanguageProfileDetected(prediction.userProfile, prediction.userProfileConfidence);
+      
+      // Check for return visit reward
+      trackReturnVisit(
+        prediction.preferredLanguage,
+        prediction.userProfile,
+        prediction.userProfileConfidence
+      );
+      
+      // Start dwell time tracking
+      dwellTrackerRef.current = new DwellTimeTracker(
+        prediction.preferredLanguage,
+        prediction.userProfile,
+        prediction.userProfileConfidence
+      );
+      dwellTrackerRef.current.start();
+      
+      // Start scroll depth tracking
+      scrollTrackerRef.current = new ScrollDepthTracker(
+        prediction.preferredLanguage,
+        prediction.userProfile,
+        prediction.userProfileConfidence
+      );
+      scrollTrackerRef.current.start();
     }
+    
+    // Cleanup trackers on unmount
+    return () => {
+      dwellTrackerRef.current?.stop();
+      scrollTrackerRef.current?.stop();
+    };
   }, [prediction]);
 
   const handleFeedback = (isCorrect: boolean) => {
@@ -95,6 +134,16 @@ export default function LanguageIntelligencePanel({
     
     // Track feedback
     trackLanguageFeedback(isCorrect, prediction?.userProfile || 'unknown');
+    
+    // Track implicit reward for explicit feedback
+    if (prediction) {
+      trackExplicitFeedback(
+        isCorrect,
+        prediction.preferredLanguage,
+        prediction.userProfile,
+        prediction.preferredLanguageConfidence
+      );
+    }
     
     // Update stats
     setTimeout(() => {

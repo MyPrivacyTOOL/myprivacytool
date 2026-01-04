@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2 } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -11,6 +11,7 @@ import {
   type LanguagePrediction,
   type LanguageAnalysis,
 } from '@/lib/languagePredictor';
+import { getRewardStats, clearRewards, type RewardStats } from '@/lib/rewardTracking';
 import { testScenarios, createMockAnalysis } from '@/lib/testScenarios';
 
 interface VoiceDebugPanelProps {
@@ -380,6 +381,107 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   );
                 })}
               </div>
+            </div>
+
+            {/* Implicit Reward Stats */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-amber-400" />
+                  <h4 className="text-amber-400 text-xs font-medium">Implicit Reward Tracking</h4>
+                </div>
+                <button
+                  onClick={() => {
+                    clearRewards();
+                    // Force re-render
+                    setData(getVoiceData());
+                  }}
+                  className="p-1 text-amber-400/40 hover:text-amber-400 transition-colors"
+                  title="Clear all rewards"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+              
+              {(() => {
+                const rewardStats = getRewardStats();
+                
+                if (rewardStats.totalEvents === 0) {
+                  return (
+                    <p className="text-amber-400/50 text-xs italic">No reward events tracked yet</p>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-amber-300/70">Total Events:</span>
+                      <span className="text-amber-400 font-mono">{rewardStats.totalEvents}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-amber-300/70">Average Reward:</span>
+                      <span className={cn(
+                        "font-mono font-bold",
+                        rewardStats.averageReward >= 0.5 ? "text-green-400" :
+                        rewardStats.averageReward >= 0 ? "text-yellow-400" : "text-red-400"
+                      )}>
+                        {rewardStats.averageReward >= 0 ? '+' : ''}{rewardStats.averageReward.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-amber-300/70">Positive / Negative:</span>
+                      <span className="font-mono">
+                        <span className="text-green-400">{rewardStats.positiveCount}</span>
+                        <span className="text-amber-400/40"> / </span>
+                        <span className="text-red-400">{rewardStats.negativeCount}</span>
+                      </span>
+                    </div>
+                    
+                    {/* Reward by Reason */}
+                    {Object.keys(rewardStats.rewardByReason).length > 0 && (
+                      <div className="pt-2 mt-2 border-t border-amber-500/20">
+                        <span className="text-amber-400/60 text-xs">By Reason:</span>
+                        <div className="mt-1 grid grid-cols-2 gap-1">
+                          {Object.entries(rewardStats.rewardByReason).slice(0, 6).map(([reason, data]) => (
+                            <div key={reason} className="text-xs text-amber-300/50 truncate" title={reason}>
+                              {reason.replace(/_/g, ' ')}: {data.count}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Trend (last few days) */}
+                    {rewardStats.rewardTrend.length > 1 && (
+                      <div className="pt-2 mt-2 border-t border-amber-500/20">
+                        <span className="text-amber-400/60 text-xs">Daily Trend:</span>
+                        <div className="mt-1 flex gap-1 h-8">
+                          {rewardStats.rewardTrend.map((day, i) => {
+                            const maxAvg = Math.max(...rewardStats.rewardTrend.map(d => Math.abs(d.avgReward)), 1);
+                            const height = Math.max((Math.abs(day.avgReward) / maxAvg) * 100, 10);
+                            const isPositive = day.avgReward >= 0;
+                            return (
+                              <div
+                                key={day.date}
+                                className="flex-1 flex flex-col justify-end"
+                                title={`${day.date}: ${day.avgReward.toFixed(2)} avg (${day.count} events)`}
+                              >
+                                <div
+                                  className={cn(
+                                    "w-full rounded-t transition-all",
+                                    isPositive ? "bg-green-500/60" : "bg-red-500/60"
+                                  )}
+                                  style={{ height: `${height}%` }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Quick Links */}
