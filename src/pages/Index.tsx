@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
-import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link } from 'lucide-react';
+import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
@@ -139,7 +140,7 @@ const Index = () => {
       <div className="relative z-10">
         {/* Navbar */}
         <nav className="bg-white" role="navigation" aria-label="Main navigation">
-          <div className="container mx-auto px-4 flex items-center justify-center">
+          <div className="container mx-auto px-4 flex items-center justify-between">
             <div className="flex items-center -my-10">
               <img 
                 src={logoHeader} 
@@ -148,6 +149,18 @@ const Index = () => {
                 width="200"
                 height="192"
               />
+            </div>
+            
+            {/* Navigation Links */}
+            <div className="flex items-center gap-2">
+              <Link 
+                to="/device-orientation"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium text-sm hover:opacity-90 transition-opacity shadow-md"
+              >
+                <Smartphone className="w-4 h-4" />
+                <span className="hidden sm:inline">Device Tracking</span>
+                <span className="sm:hidden">📱</span>
+              </Link>
             </div>
           </div>
         </nav>
@@ -242,7 +255,7 @@ const Index = () => {
                 className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
                 aria-label="Visit our Linktree"
               >
-                <Link className="w-4 h-4 text-gray-600" aria-hidden="true" />
+                <LinkIcon className="w-4 h-4 text-gray-600" aria-hidden="true" />
               </a>
             </nav>
             
