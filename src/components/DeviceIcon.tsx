@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { getDeviceIllustration } from '@/components/DeviceIllustrations';
 
 interface DeviceIconProps {
@@ -13,17 +14,28 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[DeviceIcon] Rendering with:', {
+      deviceType,
+      rotationAngle,
+      beta: betaVal,
+      gamma: gammaVal,
+      illustrationExists: !!DeviceIllustration,
+    });
+  }, [deviceType, rotationAngle, betaVal, gammaVal, DeviceIllustration]);
+
   return (
     <div className="w-full max-w-xs mx-auto">
       <div 
-        className="relative rounded-2xl p-8 shadow-lg border border-border overflow-hidden"
+        className="relative rounded-2xl p-8 shadow-lg border border-border overflow-visible"
         style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           perspective: '1000px',
         }}
       >
         {/* Decorative background elements */}
-        <div className="absolute inset-0 opacity-20">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
           <div className="absolute top-0 left-0 w-32 h-32 bg-white/20 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
         </div>
@@ -40,20 +52,24 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
             className="relative flex items-center justify-center"
             style={{
               transformStyle: 'preserve-3d',
-              width: '150px',
-              height: '150px',
+              width: '180px',
+              height: '180px',
+              minWidth: '180px',
+              minHeight: '180px',
             }}
           >
             {/* Glow effect */}
             <div 
-              className="absolute inset-0 blur-xl opacity-30 flex items-center justify-center"
+              className="absolute inset-0 blur-xl opacity-30 flex items-center justify-center pointer-events-none"
               style={{
                 transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
               }}
             >
-              <DeviceIllustration />
+              <div className="w-[150px] h-[150px] flex items-center justify-center">
+                <DeviceIllustration className="w-full h-full" />
+              </div>
             </div>
 
             {/* Main illustration with 3D rotation */}
@@ -63,9 +79,11 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
                 transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
+                width: '150px',
+                height: '150px',
               }}
             >
-              <DeviceIllustration />
+              <DeviceIllustration className="w-full h-full" />
             </div>
           </div>
 
