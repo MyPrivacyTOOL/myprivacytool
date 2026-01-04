@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
   predictLanguagePreference, 
   initializeModel,
+  getAccuracyStats,
+  getContributionCount,
+  getTotalPredictions,
   type LanguagePrediction,
   type LanguageAnalysis,
 } from '@/lib/languagePredictor';
@@ -268,6 +271,60 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           </>
         ) : (
           <>
+            {/* Feedback Stats Section */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4 text-purple-400" />
+                <h4 className="text-purple-400 text-xs font-medium">Language Feedback Stats</h4>
+              </div>
+              
+              {(() => {
+                const stats = getAccuracyStats();
+                const contributions = getContributionCount();
+                const totalPredictions = getTotalPredictions();
+                
+                return (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-purple-300/70">Model Accuracy:</span>
+                      <span className={cn(
+                        "font-mono font-bold",
+                        stats.accuracy >= 80 ? "text-green-400" :
+                        stats.accuracy >= 60 ? "text-yellow-400" : "text-red-400"
+                      )}>
+                        {stats.correct}/{stats.total} ({stats.accuracy}%)
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-purple-300/70">Total Predictions:</span>
+                      <span className="text-purple-400 font-mono">{totalPredictions}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-purple-300/70">User Contributions:</span>
+                      <span className="text-purple-400 font-mono">{contributions}</span>
+                    </div>
+                    
+                    {/* Profile Distribution */}
+                    {Object.entries(stats.profileBreakdown).some(([_, d]) => d.total > 0) && (
+                      <div className="pt-2 mt-2 border-t border-purple-500/20">
+                        <div className="flex items-center gap-1 mb-2">
+                          <Users className="w-3 h-3 text-purple-400/60" />
+                          <span className="text-purple-400/60 text-xs">Profile Distribution</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {Object.entries(stats.profileBreakdown).map(([profile, data]) => (
+                            <div key={profile} className="text-xs text-purple-300/60 capitalize">
+                              {profile}: {data.total > 0 ? `${data.correct}/${data.total}` : '-'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Locale Test Mode */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-3">

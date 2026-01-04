@@ -9,8 +9,16 @@ import {
   LanguagePrediction, 
   saveFeedback, 
   getAccuracyStats,
-  getContributionCount 
+  getContributionCount,
+  getSessionId
 } from '@/lib/languagePredictor';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { 
   trackLanguagePredictionViewed,
   trackLanguageFeedback,
@@ -41,13 +49,15 @@ export default function LanguageIntelligencePanel({
   const [accuracyStats, setAccuracyStats] = useState({ total: 0, correct: 0, accuracy: 85, profileBreakdown: {} as Record<string, { correct: number; total: number }> });
   const [contributionCount, setContributionCount] = useState(0);
   const [showThankYou, setShowThankYou] = useState(false);
-  const [showWhyInfo, setShowWhyInfo] = useState(false);
+  const [showWhyModal, setShowWhyModal] = useState(false);
   const [feedbackHiddenThisSession, setFeedbackHiddenThisSession] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
-  // Check if feedback was already given this session
+  // Check if feedback was already given or dismissed this session
   useEffect(() => {
     const sessionFeedback = sessionStorage.getItem('language_feedback_given');
-    if (sessionFeedback) {
+    const sessionDismissed = sessionStorage.getItem('language_feedback_dismissed');
+    if (sessionFeedback || sessionDismissed) {
       setFeedbackHiddenThisSession(true);
     }
   }, []);
@@ -70,13 +80,17 @@ export default function LanguageIntelligencePanel({
     // Mark as given in session storage (only show once per session)
     sessionStorage.setItem('language_feedback_given', 'true');
     
+    // Build the prediction string shown to user
+    const predictionString = `${prediction?.preferredLanguage || 'Unknown'}, ${prediction?.userProfile || 'Unknown'} ${prediction?.userProfileConfidence || 0}%`;
+    
     saveFeedback({
       predictionCorrect: isCorrect,
       actualLanguage: isCorrect ? prediction?.preferredLanguage || null : null,
       userProfile: prediction?.userProfile || null,
       timestamp: Date.now(),
       confidenceScore: prediction?.preferredLanguageConfidence || 0,
-      predictionShown: prediction?.preferredLanguage || null,
+      predictionShown: predictionString,
+      sessionId: getSessionId(),
     });
     
     // Track feedback
@@ -425,11 +439,22 @@ export default function LanguageIntelligencePanel({
                       No
                     </button>
                     <button
-                      onClick={() => setShowWhyInfo(!showWhyInfo)}
-                      className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/30 rounded-lg text-purple-400 text-sm hover:bg-purple-500/20 transition-all"
+                      onClick={() => setShowWhyModal(true)}
+                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg text-purple-400 text-sm hover:from-purple-500/20 hover:to-purple-600/20 transition-all"
                     >
                       <HelpCircle className="w-4 h-4" />
-                      Why we asked
+                      Tell me more
+                    </button>
+                    <button
+                      onClick={() => {
+                        sessionStorage.setItem('language_feedback_dismissed', 'true');
+                        setIsDismissed(true);
+                        setFeedbackHiddenThisSession(true);
+                      }}
+                      className="px-2 py-2 text-green-400/40 hover:text-green-400/60 transition-colors text-xs"
+                      title="Dismiss feedback prompt"
+                    >
+                      ✕
                     </button>
                   </div>
                 ) : (
@@ -449,28 +474,66 @@ export default function LanguageIntelligencePanel({
                   </div>
                 )}
               </div>
-
-              {/* Why we asked info panel */}
-              {showWhyInfo && (
-                <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg animate-fade-in">
-                  <div className="flex items-start gap-3">
-                    <HelpCircle className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
-                    <div className="space-y-2">
-                      <h5 className="font-medium text-purple-300">Why do we ask for feedback?</h5>
-                      <p className="text-sm text-purple-400/80">
-                        Your feedback helps improve our language detection model. By confirming whether our prediction was correct, 
-                        you help us understand patterns and edge cases that improve accuracy for everyone.
-                      </p>
-                      <p className="text-sm text-purple-400/80">
-                        This is especially helpful for detecting expatriate and multilingual users whose browser settings 
-                        may not match their actual preferences.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </>
           )}
+
+          {/* Why We Asked Modal */}
+          <Dialog open={showWhyModal} onOpenChange={setShowWhyModal}>
+            <DialogContent className="bg-gradient-to-br from-purple-950/95 to-black/95 border-purple-500/30 text-white max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-purple-300">
+                  <Brain className="w-5 h-5" />
+                  How We Detected Your Language
+                </DialogTitle>
+                <DialogDescription className="text-purple-400/70">
+                  Understanding our AI-powered language prediction
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 mt-4">
+                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <h4 className="text-sm font-medium text-purple-300 mb-2 flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Browser Language Settings
+                  </h4>
+                  <p className="text-xs text-purple-400/80">
+                    We analyze your browser's configured languages ({analysis?.languages.slice(0, 3).join(', ')}) 
+                    to understand your language preferences and their priority order.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <h4 className="text-sm font-medium text-purple-300 mb-2 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Timezone Analysis
+                  </h4>
+                  <p className="text-xs text-purple-400/80">
+                    Your timezone ({analysis?.timezone}) helps us detect if you might be an expatriate 
+                    or traveler using their native language abroad.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <h4 className="text-sm font-medium text-purple-300 mb-2 flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    User Profile Classification
+                  </h4>
+                  <p className="text-xs text-purple-400/80">
+                    Our TensorFlow.js model classifies you as a {prediction?.userProfile || 'user'} with 
+                    {prediction?.userProfileConfidence || 0}% confidence based on pattern analysis.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <Lock className="w-4 h-4 text-green-400" />
+                  <p className="text-xs text-green-400/80">
+                    <strong>Privacy Guarantee:</strong> All analysis runs locally in your browser. 
+                    No data is ever sent to our servers.
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Privacy Notice */}
           <div className="mt-4 flex items-center justify-center gap-2 text-xs text-green-400/50">
