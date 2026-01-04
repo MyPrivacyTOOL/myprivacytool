@@ -48,6 +48,8 @@ export interface FeedbackData {
   actualLanguage: string | null;
   userProfile: string | null;
   timestamp: number;
+  confidenceScore?: number;
+  predictionShown?: string;
 }
 
 // Language code to name mapping
