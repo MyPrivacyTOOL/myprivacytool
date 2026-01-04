@@ -3,10 +3,16 @@ import { getDeviceIcon } from '@/lib/deviceIcons';
 interface DeviceIconProps {
   deviceType: string;
   rotationAngle: number;
+  beta?: number | null;  // X-axis tilt (-180 to 180)
+  gamma?: number | null; // Y-axis tilt (-90 to 90)
 }
 
-export default function DeviceIcon({ deviceType, rotationAngle }: DeviceIconProps) {
+export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: DeviceIconProps) {
   const emoji = getDeviceIcon(deviceType);
+  
+  // Clamp values for smoother display
+  const betaVal = beta ?? 0;
+  const gammaVal = gamma ?? 0;
 
   return (
     <div className="w-full max-w-xs mx-auto">
@@ -14,6 +20,7 @@ export default function DeviceIcon({ deviceType, rotationAngle }: DeviceIconProp
         className="relative rounded-2xl p-8 shadow-lg border border-border overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          perspective: '1000px',
         }}
       >
         {/* Decorative background elements */}
@@ -29,25 +36,32 @@ export default function DeviceIcon({ deviceType, rotationAngle }: DeviceIconProp
             Your Device
           </div>
 
-          {/* Rotating icon container */}
-          <div className="relative">
+          {/* 3D Rotating icon container */}
+          <div 
+            className="relative"
+            style={{
+              transformStyle: 'preserve-3d',
+            }}
+          >
             {/* Glow effect */}
             <div 
               className="absolute inset-0 blur-xl opacity-50"
               style={{
-                transform: `rotate(${rotationAngle}deg)`,
-                transition: 'transform 0.3s ease-out',
+                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.5}deg) rotateY(${gammaVal * 0.5}deg)`,
+                transition: 'transform 0.1s ease-out',
+                transformStyle: 'preserve-3d',
               }}
             >
               <span className="text-8xl">{emoji}</span>
             </div>
 
-            {/* Main icon */}
+            {/* Main icon with 3D rotation */}
             <div
               className="relative"
               style={{
-                transform: `rotate(${rotationAngle}deg)`,
-                transition: 'transform 0.3s ease-out',
+                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.5}deg) rotateY(${gammaVal * 0.5}deg)`,
+                transition: 'transform 0.1s ease-out',
+                transformStyle: 'preserve-3d',
                 fontSize: '120px',
                 lineHeight: 1,
               }}
@@ -61,12 +75,20 @@ export default function DeviceIcon({ deviceType, rotationAngle }: DeviceIconProp
             {deviceType}
           </div>
 
-          {/* Rotation indicator */}
-          <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-            <span className="text-white/70 text-sm">Rotation:</span>
-            <span className="text-white font-bold text-lg">
-              {rotationAngle}°
-            </span>
+          {/* 3D Rotation indicators */}
+          <div className="grid grid-cols-3 gap-2 w-full">
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center">
+              <span className="text-white/60 text-xs block">Z</span>
+              <span className="text-white font-bold text-sm">{rotationAngle}°</span>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center">
+              <span className="text-white/60 text-xs block">X</span>
+              <span className="text-white font-bold text-sm">{betaVal.toFixed(0)}°</span>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-2 py-1.5 text-center">
+              <span className="text-white/60 text-xs block">Y</span>
+              <span className="text-white font-bold text-sm">{gammaVal.toFixed(0)}°</span>
+            </div>
           </div>
 
           {/* Live indicator */}
@@ -75,7 +97,7 @@ export default function DeviceIcon({ deviceType, rotationAngle }: DeviceIconProp
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
             </span>
-            <span>Tracking rotation</span>
+            <span>3D Motion Tracking</span>
           </div>
         </div>
       </div>
