@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap, BarChart3, Settings2 } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -12,10 +12,19 @@ import {
   getModelMetadata,
   resetToDefaultModel,
   hasTrainedModel,
+  getPredictionMode,
+  setPredictionMode,
+  getPerformanceStats,
+  getPredictionComparisons,
+  exportPerformanceReport,
+  clearComparisonData,
   type LanguagePrediction,
   type LanguageAnalysis,
   type TrainingProgress,
   type ModelMetadata,
+  type PredictionMode,
+  type PredictionComparison,
+  type PerformanceStats,
 } from '@/lib/languagePredictor';
 import { getRewardStats, clearRewards, getAllRewards, type RewardStats, type RewardEvent } from '@/lib/rewardTracking';
 import { generateSyntheticData, exportToJSON, getDataStats, validateExamples, type SyntheticExample } from '@/lib/syntheticDataGenerator';
@@ -71,7 +80,7 @@ const formatTime = (timestamp: number): string => {
 export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }: VoiceDebugPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState(getVoiceData());
-  const [activeTab, setActiveTab] = useState<'voice' | 'locale' | 'rewards'>('voice');
+  const [activeTab, setActiveTab] = useState<'voice' | 'locale' | 'rewards' | 'compare'>('voice');
   const [testResults, setTestResults] = useState<Map<string, { prediction: LanguagePrediction | null; passed: boolean }>>(new Map());
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
@@ -81,6 +90,9 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
   const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
   const [modelMetadata, setModelMetadata] = useState<ModelMetadata | null>(null);
   const [trainingResult, setTrainingResult] = useState<{ accuracy: number; validationAccuracy: number } | null>(null);
+  const [predictionMode, setPredictionModeState] = useState<PredictionMode>(getPredictionMode());
+  const [performanceStats, setPerformanceStats] = useState<PerformanceStats | null>(null);
+  const [comparisons, setComparisons] = useState<PredictionComparison[]>([]);
 
   // Refresh data
   const refreshData = useCallback(() => {
@@ -303,6 +315,22 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
         >
           <Gift className="w-3 h-3" />
           Rewards
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('compare');
+            setPerformanceStats(getPerformanceStats());
+            setComparisons(getPredictionComparisons().slice(-10).reverse());
+          }}
+          className={cn(
+            "flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
+            activeTab === 'compare' 
+              ? "text-pink-400 bg-pink-500/20 border-b-2 border-pink-400" 
+              : "text-pink-400/60 hover:text-pink-400"
+          )}
+        >
+          <BarChart3 className="w-3 h-3" />
+          Compare
         </button>
       </div>
 
@@ -995,6 +1023,266 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 </div>
               );
             })()}
+          </>
+        ) : activeTab === 'compare' ? (
+          <>
+            {/* Model Performance Comparison Tab */}
+            <div className="space-y-4">
+              {/* A/B Testing Mode */}
+              <div className="p-3 bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/30 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Settings2 className="w-4 h-4 text-pink-400" />
+                    <h4 className="text-pink-400 text-xs font-medium">A/B Testing Mode</h4>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-1">
+                  {(['trained', 'heuristic', 'best'] as PredictionMode[]).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => {
+                        setPredictionMode(mode);
+                        setPredictionModeState(mode);
+                      }}
+                      className={cn(
+                        "px-2 py-1.5 text-xs rounded border transition-colors capitalize",
+                        predictionMode === mode
+                          ? "bg-pink-500/30 border-pink-500 text-pink-400"
+                          : "bg-black/20 border-pink-500/30 text-pink-400/60 hover:text-pink-400"
+                      )}
+                    >
+                      {mode === 'best' ? 'Best of Both' : mode}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-pink-400/50 mt-2">
+                  {predictionMode === 'trained' && 'Using trained TensorFlow model only'}
+                  {predictionMode === 'heuristic' && 'Using heuristic rules only'}
+                  {predictionMode === 'best' && 'Using whichever has higher confidence'}
+                </p>
+              </div>
+              
+              {/* Performance Stats */}
+              {performanceStats && (
+                <div className="p-3 bg-black/30 border border-pink-500/20 rounded-lg">
+                  <h4 className="text-pink-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                    <BarChart3 className="w-3 h-3" />
+                    Model Performance Comparison
+                  </h4>
+                  
+                  {performanceStats.totalComparisons === 0 ? (
+                    <p className="text-pink-400/50 text-xs italic">No comparisons yet. Make predictions to see data.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-pink-300/70">Total Comparisons:</span>
+                        <span className="text-pink-400 font-mono">{performanceStats.totalComparisons}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-pink-300/70">Agreement Rate:</span>
+                        <span className={cn(
+                          "font-mono",
+                          performanceStats.agreementRate >= 80 ? "text-green-400" :
+                          performanceStats.agreementRate >= 60 ? "text-yellow-400" : "text-red-400"
+                        )}>
+                          {performanceStats.agreementRate}%
+                        </span>
+                      </div>
+                      
+                      <div className="pt-2 mt-2 border-t border-pink-500/20">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-pink-300/70">Trained Model Confidence:</span>
+                          <span className="text-pink-400 font-mono">{performanceStats.trainedModelAvgConfidence}%</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-pink-300/70">Heuristic Confidence:</span>
+                          <span className="text-pink-400 font-mono">{performanceStats.heuristicAvgConfidence}%</span>
+                        </div>
+                      </div>
+                      
+                      {(performanceStats.trainedModelAccuracy > 0 || performanceStats.heuristicAccuracy > 0) && (
+                        <div className="pt-2 mt-2 border-t border-pink-500/20">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-pink-300/70">Trained Model Accuracy:</span>
+                            <span className={cn(
+                              "font-mono font-bold",
+                              performanceStats.trainedModelAccuracy >= performanceStats.heuristicAccuracy ? "text-green-400" : "text-pink-400"
+                            )}>
+                              {performanceStats.trainedModelAccuracy}%
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-pink-300/70">Heuristic Accuracy:</span>
+                            <span className={cn(
+                              "font-mono font-bold",
+                              performanceStats.heuristicAccuracy > performanceStats.trainedModelAccuracy ? "text-green-400" : "text-pink-400"
+                            )}>
+                              {performanceStats.heuristicAccuracy}%
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Wins breakdown */}
+                      <div className="pt-2 mt-2 border-t border-pink-500/20">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-pink-300/70">Confidence Wins:</span>
+                          <div className="font-mono text-[10px]">
+                            <span className="text-green-400">{performanceStats.trainedModelWins} trained</span>
+                            <span className="text-pink-400/40"> / </span>
+                            <span className="text-yellow-400">{performanceStats.heuristicWins} heuristic</span>
+                            <span className="text-pink-400/40"> / </span>
+                            <span className="text-gray-400">{performanceStats.ties} ties</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Improvement indicator */}
+                      {performanceStats.improvement !== 0 && (
+                        <div className={cn(
+                          "mt-2 p-2 rounded text-xs flex items-center gap-2",
+                          performanceStats.improvement > 0 
+                            ? "bg-green-500/10 border border-green-500/30" 
+                            : "bg-red-500/10 border border-red-500/30"
+                        )}>
+                          {performanceStats.improvement > 0 ? (
+                            <>
+                              <TrendingUp className="w-3.5 h-3.5 text-green-400" />
+                              <span className="text-green-400">
+                                Trained model is {Math.abs(performanceStats.improvement)}% more accurate
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                              <span className="text-red-400">
+                                Heuristics are {Math.abs(performanceStats.improvement)}% more accurate
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Recommendation */}
+                      <div className="mt-2 p-2 bg-pink-500/10 rounded text-[10px] text-pink-400/70">
+                        💡 {performanceStats.recommendation}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Recent Comparisons */}
+              {comparisons.length > 0 && (
+                <div className="p-3 bg-black/30 border border-pink-500/20 rounded-lg">
+                  <h4 className="text-pink-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                    <Clock className="w-3 h-3" />
+                    Recent Comparisons (Last 10)
+                  </h4>
+                  
+                  <div className="max-h-48 overflow-y-auto space-y-1.5">
+                    {comparisons.map((comp) => (
+                      <div 
+                        key={comp.id} 
+                        className="p-2 bg-black/20 rounded text-[10px]"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-pink-400/40 font-mono">
+                            {new Date(comp.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {comp.agree ? (
+                            <span className="text-green-400/70 flex items-center gap-1">
+                              <Check className="w-2.5 h-2.5" /> Agree
+                            </span>
+                          ) : (
+                            <span className="text-yellow-400/70 flex items-center gap-1">
+                              <AlertTriangle className="w-2.5 h-2.5" /> Differ
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                          <div>
+                            <span className="text-pink-300/50">Trained: </span>
+                            <span className="text-pink-400 capitalize">
+                              {comp.trainedModelProfile} {comp.trainedModelConfidence}%
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-pink-300/50">Heuristic: </span>
+                            <span className="text-pink-400 capitalize">
+                              {comp.heuristicProfile} {comp.heuristicConfidence}%
+                            </span>
+                          </div>
+                        </div>
+                        {comp.reward !== undefined && (
+                          <div className="mt-1 flex items-center justify-between">
+                            <span className="text-pink-300/50">Reward:</span>
+                            <span className={cn(
+                              "font-mono font-bold",
+                              comp.reward > 0 ? "text-green-400" : "text-red-400"
+                            )}>
+                              {comp.reward > 0 ? '+' : ''}{comp.reward.toFixed(1)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => exportPerformanceReport()}
+                  disabled={!performanceStats || performanceStats.totalComparisons === 0}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-pink-500/20 border border-pink-500/50 rounded-lg text-pink-400 text-xs font-medium hover:bg-pink-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-3 h-3" />
+                  Export Report
+                </button>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      disabled={!performanceStats || performanceStats.totalComparisons === 0}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear Data
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-black/95 border-red-500/30">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-red-400">Clear Comparison Data?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-pink-400/70">
+                        This will delete all {performanceStats?.totalComparisons || 0} comparison records. This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-transparent border-pink-500/30 text-pink-400 hover:bg-pink-500/10">Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          clearComparisonData();
+                          setPerformanceStats(getPerformanceStats());
+                          setComparisons([]);
+                        }}
+                        className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                      >
+                        Clear All
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+              
+              {/* Privacy notice */}
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-pink-400/40">
+                <Lock className="w-2.5 h-2.5" />
+                <span>All comparisons stored locally only</span>
+              </div>
+            </div>
           </>
         ) : null}
       </div>

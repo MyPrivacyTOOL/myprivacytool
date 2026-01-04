@@ -71,11 +71,44 @@ export interface TrainingProgress {
   phase: 'preparing' | 'training' | 'validating' | 'complete';
 }
 
+export interface PredictionComparison {
+  id: string;
+  timestamp: number;
+  trainedModelProfile: 'local' | 'expatriate' | 'traveler' | 'multilingual';
+  trainedModelConfidence: number;
+  heuristicProfile: 'local' | 'expatriate' | 'traveler' | 'multilingual';
+  heuristicConfidence: number;
+  finalProfile: 'local' | 'expatriate' | 'traveler' | 'multilingual';
+  finalConfidence: number;
+  method: 'trained' | 'heuristic' | 'best';
+  agree: boolean;
+  reward?: number;
+  rewardReason?: string;
+}
+
+export interface PerformanceStats {
+  totalComparisons: number;
+  agreementRate: number;
+  trainedModelAvgConfidence: number;
+  heuristicAvgConfidence: number;
+  trainedModelAccuracy: number;
+  heuristicAccuracy: number;
+  trainedModelWins: number;
+  heuristicWins: number;
+  ties: number;
+  improvement: number;
+  recommendation: string;
+}
+
+export type PredictionMode = 'trained' | 'heuristic' | 'best';
+
 // Model versioning
 const MODEL_VERSION = 'v1.0';
 const MODEL_STORAGE_KEY = 'mpt_trained_model_v1';
 const MODEL_WEIGHTS_KEY = 'mpt_model_weights_v1';
 const MODEL_METADATA_KEY = 'mpt_model_metadata_v1';
+const COMPARISON_STORAGE_KEY = 'mpt_prediction_comparisons';
+const PREDICTION_MODE_KEY = 'mpt_prediction_mode';
 
 // Generate or get session ID
 export function getSessionId(): string {
@@ -102,6 +135,199 @@ export function getTotalPredictions(): number {
   } catch {
     return 0;
   }
+}
+
+// Prediction mode management
+export function getPredictionMode(): PredictionMode {
+  try {
+    const mode = localStorage.getItem(PREDICTION_MODE_KEY);
+    if (mode === 'trained' || mode === 'heuristic' || mode === 'best') {
+      return mode;
+    }
+  } catch {}
+  return 'best'; // Default to best of both
+}
+
+export function setPredictionMode(mode: PredictionMode): void {
+  localStorage.setItem(PREDICTION_MODE_KEY, mode);
+}
+
+// Store prediction comparison
+function storePredictionComparison(comparison: PredictionComparison): void {
+  try {
+    const existing = localStorage.getItem(COMPARISON_STORAGE_KEY);
+    const comparisons: PredictionComparison[] = existing ? JSON.parse(existing) : [];
+    comparisons.push(comparison);
+    // Keep last 100 comparisons
+    const trimmed = comparisons.slice(-100);
+    localStorage.setItem(COMPARISON_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch (error) {
+    console.warn('Failed to store prediction comparison:', error);
+  }
+}
+
+// Get all prediction comparisons
+export function getPredictionComparisons(): PredictionComparison[] {
+  try {
+    const stored = localStorage.getItem(COMPARISON_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {}
+  return [];
+}
+
+// Update comparison with reward
+export function updateComparisonReward(timestamp: number, reward: number, reason: string): void {
+  try {
+    const comparisons = getPredictionComparisons();
+    // Find closest comparison by timestamp (within 1 minute)
+    const comparison = comparisons.find(c => Math.abs(c.timestamp - timestamp) < 60000);
+    if (comparison) {
+      comparison.reward = reward;
+      comparison.rewardReason = reason;
+      localStorage.setItem(COMPARISON_STORAGE_KEY, JSON.stringify(comparisons));
+    }
+  } catch (error) {
+    console.warn('Failed to update comparison reward:', error);
+  }
+}
+
+// Calculate performance statistics
+export function getPerformanceStats(): PerformanceStats {
+  const comparisons = getPredictionComparisons();
+  const withRewards = comparisons.filter(c => c.reward !== undefined);
+  
+  if (comparisons.length === 0) {
+    return {
+      totalComparisons: 0,
+      agreementRate: 0,
+      trainedModelAvgConfidence: 0,
+      heuristicAvgConfidence: 0,
+      trainedModelAccuracy: 0,
+      heuristicAccuracy: 0,
+      trainedModelWins: 0,
+      heuristicWins: 0,
+      ties: 0,
+      improvement: 0,
+      recommendation: 'Generate predictions to see comparison data',
+    };
+  }
+  
+  const agreementCount = comparisons.filter(c => c.agree).length;
+  const agreementRate = Math.round((agreementCount / comparisons.length) * 100);
+  
+  const trainedConfidences = comparisons.map(c => c.trainedModelConfidence);
+  const heuristicConfidences = comparisons.map(c => c.heuristicConfidence);
+  
+  const trainedModelAvgConfidence = Math.round(
+    trainedConfidences.reduce((a, b) => a + b, 0) / trainedConfidences.length
+  );
+  const heuristicAvgConfidence = Math.round(
+    heuristicConfidences.reduce((a, b) => a + b, 0) / heuristicConfidences.length
+  );
+  
+  // Calculate accuracy based on positive rewards
+  let trainedCorrect = 0;
+  let heuristicCorrect = 0;
+  let trainedTotal = 0;
+  let heuristicTotal = 0;
+  
+  withRewards.forEach(c => {
+    const isPositive = (c.reward ?? 0) > 0;
+    if (c.method === 'trained') {
+      trainedTotal++;
+      if (isPositive) trainedCorrect++;
+    } else if (c.method === 'heuristic') {
+      heuristicTotal++;
+      if (isPositive) heuristicCorrect++;
+    } else {
+      // For 'best' mode, credit the winner
+      if (c.trainedModelConfidence >= c.heuristicConfidence) {
+        trainedTotal++;
+        if (isPositive) trainedCorrect++;
+      } else {
+        heuristicTotal++;
+        if (isPositive) heuristicCorrect++;
+      }
+    }
+  });
+  
+  const trainedModelAccuracy = trainedTotal > 0 ? Math.round((trainedCorrect / trainedTotal) * 100) : 0;
+  const heuristicAccuracy = heuristicTotal > 0 ? Math.round((heuristicCorrect / heuristicTotal) * 100) : 0;
+  
+  // Count wins based on confidence
+  let trainedWins = 0;
+  let heuristicWins = 0;
+  let ties = 0;
+  
+  comparisons.forEach(c => {
+    if (c.trainedModelConfidence > c.heuristicConfidence) {
+      trainedWins++;
+    } else if (c.heuristicConfidence > c.trainedModelConfidence) {
+      heuristicWins++;
+    } else {
+      ties++;
+    }
+  });
+  
+  const improvement = trainedModelAccuracy - heuristicAccuracy;
+  
+  let recommendation: string;
+  if (withRewards.length < 10) {
+    recommendation = 'Need more data for reliable comparison (10+ predictions with rewards)';
+  } else if (improvement > 10) {
+    recommendation = 'Trained model is performing significantly better!';
+  } else if (improvement > 0) {
+    recommendation = 'Trained model is slightly better. Keep training with more data.';
+  } else if (improvement < -10) {
+    recommendation = 'Heuristics outperform trained model. Consider retraining.';
+  } else {
+    recommendation = 'Both methods perform similarly. Model is stable.';
+  }
+  
+  return {
+    totalComparisons: comparisons.length,
+    agreementRate,
+    trainedModelAvgConfidence,
+    heuristicAvgConfidence,
+    trainedModelAccuracy,
+    heuristicAccuracy,
+    trainedModelWins: trainedWins,
+    heuristicWins: heuristicWins,
+    ties,
+    improvement,
+    recommendation,
+  };
+}
+
+// Export performance report
+export function exportPerformanceReport(): void {
+  const comparisons = getPredictionComparisons();
+  const stats = getPerformanceStats();
+  const metadata = getModelMetadata();
+  
+  const report = {
+    exportedAt: new Date().toISOString(),
+    modelMetadata: metadata,
+    performanceStats: stats,
+    comparisons,
+  };
+  
+  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mpt-performance-report-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Clear comparison data
+export function clearComparisonData(): void {
+  localStorage.removeItem(COMPARISON_STORAGE_KEY);
 }
 
 // Get model metadata
@@ -791,7 +1017,7 @@ function generateSignalAnalysis(analysis: LanguageAnalysis): SignalAnalysis[] {
   return signals;
 }
 
-// Enhanced prediction with TensorFlow.js
+// Enhanced prediction with TensorFlow.js and comparison tracking
 export async function predictLanguagePreference(analysis: LanguageAnalysis): Promise<LanguagePrediction> {
   const reasoning: string[] = [];
   const recommendations: string[] = [];
@@ -853,9 +1079,63 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
     }
   }
   
-  // Generate all profile probabilities
-  const allProfiles = generateProfileProbabilities(analysis, tfProbabilities);
+  // Get trained model profiles (if available)
+  const trainedProfiles = tfProbabilities 
+    ? generateProfileProbabilities(analysis, tfProbabilities)
+    : null;
+  
+  // Get heuristic profiles (always calculate for comparison)
+  const heuristicProfiles = generateProfileProbabilities(analysis, undefined);
+  
+  // Determine which prediction to use based on mode
+  const mode = getPredictionMode();
+  let allProfiles: ProfileProbability[];
+  let method: 'trained' | 'heuristic' | 'best' = mode;
+  
+  if (mode === 'trained' && trainedProfiles) {
+    allProfiles = trainedProfiles;
+  } else if (mode === 'heuristic') {
+    allProfiles = heuristicProfiles;
+    method = 'heuristic';
+  } else if (mode === 'best' && trainedProfiles) {
+    // Use whichever has higher confidence
+    const trainedTop = trainedProfiles[0];
+    const heuristicTop = heuristicProfiles[0];
+    if (trainedTop.probability >= heuristicTop.probability) {
+      allProfiles = trainedProfiles;
+    } else {
+      allProfiles = heuristicProfiles;
+    }
+  } else {
+    allProfiles = heuristicProfiles;
+    method = 'heuristic';
+  }
+  
   const topProfile = allProfiles[0];
+  
+  // Store comparison if we have both predictions
+  if (trainedProfiles) {
+    const trainedTop = trainedProfiles[0];
+    const heuristicTop = heuristicProfiles[0];
+    
+    const comparison: PredictionComparison = {
+      id: `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      trainedModelProfile: trainedTop.profile,
+      trainedModelConfidence: trainedTop.probability,
+      heuristicProfile: heuristicTop.profile,
+      heuristicConfidence: heuristicTop.probability,
+      finalProfile: topProfile.profile,
+      finalConfidence: topProfile.probability,
+      method,
+      agree: trainedTop.profile === heuristicTop.profile,
+    };
+    
+    storePredictionComparison(comparison);
+    
+    // Log comparison for debugging
+    console.log(`Prediction comparison: Trained=${trainedTop.profile}(${trainedTop.probability}%) vs Heuristic=${heuristicTop.profile}(${heuristicTop.probability}%) -> Using ${method}`);
+  }
   
   // Build reasoning based on signals
   if (analysis.hasLanguageLocationMismatch) {
@@ -874,10 +1154,10 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
     reasoning.push(`🌐 Multiple language families detected: ${familyNames}`);
   }
   
-  if (languageCount === 1) {
+  if (analysis.languages.length === 1) {
     reasoning.push(`✓ Single language configured indicates clear preference`);
   } else {
-    reasoning.push(`📝 ${languageCount} languages configured in browser preferences`);
+    reasoning.push(`📝 ${analysis.languages.length} languages configured in browser preferences`);
   }
   
   reasoning.push(`🎯 Primary browser language: ${analysis.primaryLanguage} (${analysis.languageFamily} family)`);
@@ -917,7 +1197,7 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
   
   if (analysis.hasLanguageLocationMismatch) {
     preferredLanguageConfidence = 78;
-  } else if (languageCount === 1) {
+  } else if (analysis.languages.length === 1) {
     preferredLanguageConfidence = 96;
   } else if (analysis.vpnProbability > 0.5) {
     preferredLanguageConfidence = 72;
