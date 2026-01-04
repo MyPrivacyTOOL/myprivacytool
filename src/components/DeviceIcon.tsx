@@ -1,21 +1,12 @@
+import { getDeviceIcon } from '@/lib/deviceIcons';
+
 interface DeviceIconProps {
   deviceType: string;
   rotationAngle: number;
 }
 
-const deviceEmojiMap: Record<string, string> = {
-  'Smartphone': '📱',
-  'Mobile': '📱',
-  'Tablet': '📲',
-  'Desktop': '🖥️',
-  'Laptop': '💻',
-  'Smart TV': '📺',
-  'Gaming Console': '🎮',
-  'Smart Watch': '⌚',
-};
-
 export default function DeviceIcon({ deviceType, rotationAngle }: DeviceIconProps) {
-  const emoji = deviceEmojiMap[deviceType] || '📱';
+  const emoji = getDeviceIcon(deviceType);
 
   return (
     <div className="w-full max-w-xs mx-auto">
