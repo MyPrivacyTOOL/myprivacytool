@@ -19,11 +19,19 @@ interface DeviceIconProps {
 }
 
 export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: DeviceIconProps) {
-  const DeviceIllustration = getDeviceIllustration(deviceType);
-  
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
   const fallbackEmoji = deviceEmojis[deviceType] || '📱';
+
+  // Detect landscape orientation based on gamma (Y-axis tilt)
+  // If absolute gamma > 45°, device is in landscape mode
+  const isLandscape = Math.abs(gammaVal) > 45;
+  
+  // Get the appropriate illustration (portrait or landscape variant)
+  const DeviceIllustration = getDeviceIllustration(deviceType, isLandscape);
+  
+  // Determine orientation label
+  const orientationLabel = isLandscape ? 'Landscape' : 'Portrait';
 
   useEffect(() => {
     console.log('[DeviceIcon] Rendering with:', {
@@ -31,9 +39,10 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
       rotationAngle,
       beta: betaVal,
       gamma: gammaVal,
+      isLandscape,
       illustrationExists: !!DeviceIllustration,
     });
-  }, [deviceType, rotationAngle, betaVal, gammaVal, DeviceIllustration]);
+  }, [deviceType, rotationAngle, betaVal, gammaVal, isLandscape, DeviceIllustration]);
 
   return (
     <div className="w-full max-w-xs mx-auto">
@@ -104,6 +113,15 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
           {/* Device type label */}
           <div className="text-white font-semibold text-lg">
             {deviceType}
+          </div>
+          
+          {/* Orientation indicator */}
+          <div className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
+            isLandscape 
+              ? 'bg-amber-500/30 text-amber-200' 
+              : 'bg-emerald-500/30 text-emerald-200'
+          }`}>
+            {orientationLabel}
           </div>
 
           {/* 3D Rotation indicators */}
