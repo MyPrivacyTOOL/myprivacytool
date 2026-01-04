@@ -13,6 +13,19 @@ export default function DeviceOrientation() {
   const [deviceData, setDeviceData] = useState<DeviceData | null>(null);
   const [sensors, setSensors] = useState<SensorData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [motionRequesting, setMotionRequesting] = useState(false);
+
+  // Auto-request motion permission on mount
+  useEffect(() => {
+    async function requestMotion() {
+      if (isSupported && permission === 'unknown') {
+        setMotionRequesting(true);
+        await requestPermission();
+        setMotionRequesting(false);
+      }
+    }
+    requestMotion();
+  }, [isSupported, permission, requestPermission]);
 
   useEffect(() => {
     async function loadData() {
@@ -147,29 +160,22 @@ export default function DeviceOrientation() {
             3D Motion Data
           </h2>
           
-          {!isSupported ? (
+        {!isSupported ? (
             <div className="text-center py-4 text-muted-foreground">
               Motion sensors not available on this device
             </div>
-          ) : permission === 'denied' ? (
-            <div className="text-center py-4">
-              <p className="text-muted-foreground mb-3">Permission denied for motion sensors</p>
-              <button
-                onClick={requestPermission}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-              >
-                Request Permission
-              </button>
+          ) : motionRequesting ? (
+            <div className="text-center py-6">
+              <div className="inline-flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-muted-foreground">Requesting motion access...</span>
+              </div>
             </div>
-          ) : permission === 'unknown' ? (
-            <div className="text-center py-4">
-              <p className="text-muted-foreground mb-3">iOS requires permission for motion sensors</p>
-              <button
-                onClick={requestPermission}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors"
-              >
-                Enable Motion Tracking
-              </button>
+          ) : permission === 'denied' ? (
+            <div className="text-center py-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm text-muted-foreground">
+                ⚠️ Motion tracking unavailable - check browser settings
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3">
