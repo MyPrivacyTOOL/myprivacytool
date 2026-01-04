@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2 } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -11,8 +11,19 @@ import {
   type LanguagePrediction,
   type LanguageAnalysis,
 } from '@/lib/languagePredictor';
-import { getRewardStats, clearRewards, type RewardStats } from '@/lib/rewardTracking';
+import { getRewardStats, clearRewards, getAllRewards, type RewardStats, type RewardEvent } from '@/lib/rewardTracking';
 import { testScenarios, createMockAnalysis } from '@/lib/testScenarios';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface VoiceDebugPanelProps {
   currentRiskScore: number;
@@ -28,16 +39,61 @@ const languageScenarios = [
   { id: 'local', name: 'Local User', icon: '🏠', languages: ['en-GB'], timezone: 'Europe/London' },
 ];
 
+// Format reason for display
+const formatReason = (reason: string): string => {
+  const reasonLabels: Record<string, string> = {
+    'dwell_30s': '30s dwell time',
+    'dwell_60s': '60s dwell time',
+    'dwell_bonus': 'High confidence bonus',
+    'scroll_engaged': 'Scroll engagement',
+    'language_switch': 'Manual switch',
+    'explicit_positive': 'Thumbs up',
+    'explicit_negative': 'Thumbs down',
+    'return_visit': 'Return visit',
+    'high_confidence_bonus': 'Confidence bonus',
+  };
+  return reasonLabels[reason] || reason.replace(/_/g, ' ');
+};
+
+// Format timestamp
+const formatTime = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }: VoiceDebugPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState(getVoiceData());
-  const [activeTab, setActiveTab] = useState<'voice' | 'locale'>('voice');
+  const [activeTab, setActiveTab] = useState<'voice' | 'locale' | 'rewards'>('voice');
   const [testResults, setTestResults] = useState<Map<string, { prediction: LanguagePrediction | null; passed: boolean }>>(new Map());
   const [isRunningTest, setIsRunningTest] = useState(false);
+  const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
 
   // Refresh data
   const refreshData = useCallback(() => {
     setData(getVoiceData());
+    setRewardEvents(getAllRewards().slice(-10).reverse());
+  }, []);
+
+  // Export rewards as JSON
+  const exportRewardsAsJson = useCallback(() => {
+    const rewards = getAllRewards();
+    const stats = getRewardStats();
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      stats,
+      events: rewards,
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mpt-rewards-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, []);
 
   // Listen for Shift+Alt+V to toggle panel
@@ -165,25 +221,40 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
         <button
           onClick={() => setActiveTab('voice')}
           className={cn(
-            "flex-1 px-4 py-2 text-xs font-medium transition-colors",
+            "flex-1 px-3 py-2 text-xs font-medium transition-colors",
             activeTab === 'voice' 
               ? "text-yellow-400 bg-yellow-500/20 border-b-2 border-yellow-400" 
               : "text-yellow-400/60 hover:text-yellow-400"
           )}
         >
-          Voice Stats
+          Voice
         </button>
         <button
           onClick={() => setActiveTab('locale')}
           className={cn(
-            "flex-1 px-4 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
+            "flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'locale' 
               ? "text-cyan-400 bg-cyan-500/20 border-b-2 border-cyan-400" 
               : "text-cyan-400/60 hover:text-cyan-400"
           )}
         >
           <Globe className="w-3 h-3" />
-          Locale Tests
+          Locale
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('rewards');
+            setRewardEvents(getAllRewards().slice(-10).reverse());
+          }}
+          className={cn(
+            "flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
+            activeTab === 'rewards' 
+              ? "text-amber-400 bg-amber-500/20 border-b-2 border-amber-400" 
+              : "text-amber-400/60 hover:text-amber-400"
+          )}
+        >
+          <Gift className="w-3 h-3" />
+          Rewards
         </button>
       </div>
 
@@ -270,7 +341,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               Reset All Data
             </button>
           </>
-        ) : (
+        ) : activeTab === 'locale' ? (
           <>
             {/* Feedback Stats Section */}
             <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg">
@@ -383,107 +454,6 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               </div>
             </div>
 
-            {/* Implicit Reward Stats */}
-            <div className="mb-4 p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Gift className="w-4 h-4 text-amber-400" />
-                  <h4 className="text-amber-400 text-xs font-medium">Implicit Reward Tracking</h4>
-                </div>
-                <button
-                  onClick={() => {
-                    clearRewards();
-                    // Force re-render
-                    setData(getVoiceData());
-                  }}
-                  className="p-1 text-amber-400/40 hover:text-amber-400 transition-colors"
-                  title="Clear all rewards"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-              
-              {(() => {
-                const rewardStats = getRewardStats();
-                
-                if (rewardStats.totalEvents === 0) {
-                  return (
-                    <p className="text-amber-400/50 text-xs italic">No reward events tracked yet</p>
-                  );
-                }
-                
-                return (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-amber-300/70">Total Events:</span>
-                      <span className="text-amber-400 font-mono">{rewardStats.totalEvents}</span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-amber-300/70">Average Reward:</span>
-                      <span className={cn(
-                        "font-mono font-bold",
-                        rewardStats.averageReward >= 0.5 ? "text-green-400" :
-                        rewardStats.averageReward >= 0 ? "text-yellow-400" : "text-red-400"
-                      )}>
-                        {rewardStats.averageReward >= 0 ? '+' : ''}{rewardStats.averageReward.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-amber-300/70">Positive / Negative:</span>
-                      <span className="font-mono">
-                        <span className="text-green-400">{rewardStats.positiveCount}</span>
-                        <span className="text-amber-400/40"> / </span>
-                        <span className="text-red-400">{rewardStats.negativeCount}</span>
-                      </span>
-                    </div>
-                    
-                    {/* Reward by Reason */}
-                    {Object.keys(rewardStats.rewardByReason).length > 0 && (
-                      <div className="pt-2 mt-2 border-t border-amber-500/20">
-                        <span className="text-amber-400/60 text-xs">By Reason:</span>
-                        <div className="mt-1 grid grid-cols-2 gap-1">
-                          {Object.entries(rewardStats.rewardByReason).slice(0, 6).map(([reason, data]) => (
-                            <div key={reason} className="text-xs text-amber-300/50 truncate" title={reason}>
-                              {reason.replace(/_/g, ' ')}: {data.count}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Trend (last few days) */}
-                    {rewardStats.rewardTrend.length > 1 && (
-                      <div className="pt-2 mt-2 border-t border-amber-500/20">
-                        <span className="text-amber-400/60 text-xs">Daily Trend:</span>
-                        <div className="mt-1 flex gap-1 h-8">
-                          {rewardStats.rewardTrend.map((day, i) => {
-                            const maxAvg = Math.max(...rewardStats.rewardTrend.map(d => Math.abs(d.avgReward)), 1);
-                            const height = Math.max((Math.abs(day.avgReward) / maxAvg) * 100, 10);
-                            const isPositive = day.avgReward >= 0;
-                            return (
-                              <div
-                                key={day.date}
-                                className="flex-1 flex flex-col justify-end"
-                                title={`${day.date}: ${day.avgReward.toFixed(2)} avg (${day.count} events)`}
-                              >
-                                <div
-                                  className={cn(
-                                    "w-full rounded-t transition-all",
-                                    isPositive ? "bg-green-500/60" : "bg-red-500/60"
-                                  )}
-                                  style={{ height: `${height}%` }}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
             {/* Quick Links */}
             <div className="pt-3 border-t border-cyan-500/30">
               <a
@@ -496,7 +466,253 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               </a>
             </div>
           </>
-        )}
+        ) : activeTab === 'rewards' ? (
+          <>
+            {/* Language Model Rewards Tab */}
+            {(() => {
+              const rewardStats = getRewardStats();
+              const totalPositive = rewardStats.positiveCount;
+              const totalNegative = rewardStats.negativeCount;
+              const positiveRatio = rewardStats.totalEvents > 0 
+                ? Math.round((totalPositive / rewardStats.totalEvents) * 100) 
+                : 0;
+              
+              // Find best and worst performing profiles
+              const profilePerformance = Object.entries(rewardStats.rewardByProfile)
+                .filter(([_, data]) => data.count > 0)
+                .map(([profile, data]) => ({
+                  profile,
+                  positiveRate: data.average > 0 ? Math.round((data.average + 2) / 4 * 100) : 0,
+                  average: data.average,
+                  count: data.count,
+                }))
+                .sort((a, b) => b.average - a.average);
+              
+              const bestProfile = profilePerformance[0];
+              const worstProfile = profilePerformance[profilePerformance.length - 1];
+              
+              return (
+                <div className="space-y-4">
+                  {/* Overview Stats */}
+                  <div className="p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg">
+                    <h4 className="text-amber-400 text-xs font-medium mb-3 flex items-center gap-2">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      Language Model Rewards
+                    </h4>
+                    
+                    {rewardStats.totalEvents === 0 ? (
+                      <p className="text-amber-400/50 text-xs italic">No reward events tracked yet. Use the app to generate data.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-amber-300/70">Total Predictions:</span>
+                          <span className="text-amber-400 font-mono">{rewardStats.totalEvents}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-amber-300/70">Average Reward:</span>
+                          <span className={cn(
+                            "font-mono font-bold",
+                            rewardStats.averageReward >= 0.5 ? "text-green-400" :
+                            rewardStats.averageReward >= 0 ? "text-yellow-400" : "text-red-400"
+                          )}>
+                            {rewardStats.averageReward >= 0 ? '+' : ''}{rewardStats.averageReward.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-amber-300/70">Positive / Negative:</span>
+                          <span className="font-mono">
+                            <span className="text-green-400">{totalPositive}</span>
+                            <span className="text-amber-400/40"> / </span>
+                            <span className="text-red-400">{totalNegative}</span>
+                          </span>
+                        </div>
+                        
+                        {/* Accuracy indicator */}
+                        <div className="mt-2 p-2 bg-black/30 rounded">
+                          <div className="flex items-center gap-2 text-xs">
+                            {positiveRatio >= 70 ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                            ) : positiveRatio >= 50 ? (
+                              <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+                            ) : (
+                              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                            )}
+                            <span className={cn(
+                              positiveRatio >= 70 ? "text-green-400" :
+                              positiveRatio >= 50 ? "text-yellow-400" : "text-red-400"
+                            )}>
+                              Model seems {positiveRatio >= 70 ? 'accurate' : positiveRatio >= 50 ? 'moderate' : 'needs work'}: {positiveRatio}% positive signals
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Reward Distribution */}
+                  {rewardStats.totalEvents > 0 && (
+                    <div className="p-3 bg-black/30 border border-amber-500/20 rounded-lg">
+                      <h4 className="text-amber-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                        <ArrowUpDown className="w-3 h-3" />
+                        Reward Distribution
+                      </h4>
+                      
+                      <div className="space-y-2">
+                        {Object.entries(rewardStats.rewardByReason).map(([reason, data]) => {
+                          const isPositive = data.total >= 0;
+                          const maxCount = Math.max(...Object.values(rewardStats.rewardByReason).map(d => d.count));
+                          const barWidth = (data.count / maxCount) * 100;
+                          
+                          return (
+                            <div key={reason} className="space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-amber-300/60 capitalize">{formatReason(reason)}</span>
+                                <span className={cn(
+                                  "font-mono",
+                                  isPositive ? "text-green-400/70" : "text-red-400/70"
+                                )}>
+                                  {data.count} events
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-black/40 rounded-full overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full transition-all",
+                                    isPositive ? "bg-green-500/60" : "bg-red-500/60"
+                                  )}
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Profile Performance */}
+                  {profilePerformance.length > 0 && (
+                    <div className="p-3 bg-black/30 border border-amber-500/20 rounded-lg">
+                      <h4 className="text-amber-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                        <Users className="w-3 h-3" />
+                        Profile Performance
+                      </h4>
+                      
+                      <div className="space-y-2">
+                        {bestProfile && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <ThumbsUp className="w-3 h-3 text-green-400" />
+                            <span className="text-green-400/80">
+                              Best: <span className="capitalize font-medium">{bestProfile.profile}</span> (avg: {bestProfile.average.toFixed(2)})
+                            </span>
+                          </div>
+                        )}
+                        {worstProfile && worstProfile !== bestProfile && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <ThumbsDown className="w-3 h-3 text-red-400" />
+                            <span className="text-red-400/80">
+                              Needs work: <span className="capitalize font-medium">{worstProfile.profile}</span> (avg: {worstProfile.average.toFixed(2)})
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Recent Reward History */}
+                  {rewardEvents.length > 0 && (
+                    <div className="p-3 bg-black/30 border border-amber-500/20 rounded-lg">
+                      <h4 className="text-amber-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                        <Clock className="w-3 h-3" />
+                        Recent Events (Last 10)
+                      </h4>
+                      
+                      <div className="max-h-40 overflow-y-auto space-y-1.5">
+                        {rewardEvents.map((event) => (
+                          <div 
+                            key={event.id} 
+                            className="flex items-center justify-between text-xs p-1.5 bg-black/20 rounded"
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <span className="text-amber-400/40 font-mono text-[10px]">
+                                {formatTime(event.timestamp)}
+                              </span>
+                              <span className="text-amber-300/60 truncate" title={event.prediction}>
+                                {event.prediction.slice(0, 12)}...
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-amber-400/50 text-[10px] truncate max-w-16" title={formatReason(event.reason)}>
+                                {formatReason(event.reason)}
+                              </span>
+                              <span className={cn(
+                                "font-mono font-bold min-w-8 text-right",
+                                event.reward > 0 ? "text-green-400" : "text-red-400"
+                              )}>
+                                {event.reward > 0 ? '+' : ''}{event.reward.toFixed(1)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={exportRewardsAsJson}
+                      disabled={rewardStats.totalEvents === 0}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="w-3 h-3" />
+                      Export JSON
+                    </button>
+                    
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button
+                          disabled={rewardStats.totalEvents === 0}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Reset History
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-black/95 border-red-500/30">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-red-400">Reset Reward History?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-amber-400/70">
+                            This will permanently delete all {rewardStats.totalEvents} reward events from your local storage. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-transparent border-amber-500/30 text-amber-400 hover:bg-amber-500/10">Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              clearRewards();
+                              setRewardEvents([]);
+                              refreshData();
+                            }}
+                            className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                          >
+                            Reset All
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                  
+                  {/* Privacy notice */}
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-amber-400/40">
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>Data never leaves your device</span>
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        ) : null}
       </div>
 
       {/* Hotkey hint */}
