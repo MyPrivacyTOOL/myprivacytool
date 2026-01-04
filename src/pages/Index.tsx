@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
+import DeviceIcon from '@/components/DeviceIcon';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -221,6 +222,18 @@ const Index = () => {
           <p className="text-lg text-white">
             Click the ones that are correct.
           </p>
+        </section>
+
+        {/* Live Device Tracking Hero */}
+        <section className="py-8 px-4" aria-label="Real-time device tracking">
+          <div className="max-w-sm mx-auto">
+            <DeviceIcon 
+              deviceType={liveDeviceData?.device?.type || 'Smartphone'}
+              rotationAngle={orientation.angle}
+              beta={motion.beta}
+              gamma={motion.gamma}
+            />
+          </div>
         </section>
 
         {/* Hexagon Grid Section */}
