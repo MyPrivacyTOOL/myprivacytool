@@ -87,10 +87,12 @@ export default function DeviceOrientation() {
           </p>
         </div>
 
-        {/* Device Icon with rotation */}
+        {/* Device Icon with 3D rotation */}
         <DeviceIcon 
           deviceType={deviceData?.device.type || 'Mobile'} 
-          rotationAngle={orientation.angle} 
+          rotationAngle={orientation.angle}
+          beta={motion.beta}
+          gamma={motion.gamma}
         />
 
         {/* Orientation Display (Compass) */}
