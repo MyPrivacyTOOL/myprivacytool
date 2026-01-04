@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface MotionData {
   alpha: number | null; // Z-axis rotation (0-360)
@@ -15,6 +15,14 @@ interface UseDeviceMotionReturn {
   isSupported: boolean;
 }
 
+const MOTION_THRESHOLD = 2; // Only update if beta/gamma changed by more than 2 degrees
+const TILT_BOUNDARY = 60; // Cap tilt at ±60 degrees
+
+function clampTilt(value: number | null): number | null {
+  if (value === null) return null;
+  return Math.max(-TILT_BOUNDARY, Math.min(TILT_BOUNDARY, value));
+}
+
 export function useDeviceMotion(): UseDeviceMotionReturn {
   const [motion, setMotion] = useState<MotionData>({
     alpha: null,
@@ -23,13 +31,39 @@ export function useDeviceMotion(): UseDeviceMotionReturn {
   });
   const [permission, setPermission] = useState<PermissionStatus>('unknown');
   const [isSupported] = useState(() => 'DeviceOrientationEvent' in window);
+  
+  const lastMotionRef = useRef<MotionData>({
+    alpha: null,
+    beta: null,
+    gamma: null,
+  });
 
   const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
-    setMotion({
-      alpha: event.alpha,
-      beta: event.beta,
-      gamma: event.gamma,
-    });
+    const newBeta = event.beta;
+    const newGamma = event.gamma;
+    const lastBeta = lastMotionRef.current.beta;
+    const lastGamma = lastMotionRef.current.gamma;
+    
+    // Check if motion changed significantly (threshold filtering)
+    const betaDiff = lastBeta !== null && newBeta !== null ? Math.abs(newBeta - lastBeta) : Infinity;
+    const gammaDiff = lastGamma !== null && newGamma !== null ? Math.abs(newGamma - lastGamma) : Infinity;
+    
+    if (betaDiff >= MOTION_THRESHOLD || gammaDiff >= MOTION_THRESHOLD) {
+      // Apply tilt boundaries to prevent extreme rotations
+      const clampedMotion: MotionData = {
+        alpha: event.alpha,
+        beta: clampTilt(newBeta),
+        gamma: clampTilt(newGamma),
+      };
+      
+      lastMotionRef.current = {
+        alpha: event.alpha,
+        beta: newBeta,
+        gamma: newGamma,
+      };
+      
+      setMotion(clampedMotion);
+    }
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
