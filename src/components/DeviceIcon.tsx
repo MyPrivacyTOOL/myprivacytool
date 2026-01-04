@@ -1,16 +1,15 @@
-import { getDeviceIcon } from '@/lib/deviceIcons';
+import { getDeviceIllustration } from '@/components/DeviceIllustrations';
 
 interface DeviceIconProps {
   deviceType: string;
   rotationAngle: number;
-  beta?: number | null;  // X-axis tilt (-180 to 180)
-  gamma?: number | null; // Y-axis tilt (-90 to 90)
+  beta?: number | null;
+  gamma?: number | null;
 }
 
 export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: DeviceIconProps) {
-  const emoji = getDeviceIcon(deviceType);
+  const DeviceIllustration = getDeviceIllustration(deviceType);
   
-  // Clamp values for smoother display
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
 
@@ -36,37 +35,37 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
             Your Device
           </div>
 
-          {/* 3D Rotating icon container */}
+          {/* 3D Rotating illustration container */}
           <div 
-            className="relative"
+            className="relative flex items-center justify-center"
             style={{
               transformStyle: 'preserve-3d',
+              width: '150px',
+              height: '150px',
             }}
           >
             {/* Glow effect */}
             <div 
-              className="absolute inset-0 blur-xl opacity-50"
+              className="absolute inset-0 blur-xl opacity-30 flex items-center justify-center"
               style={{
-                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.5}deg) rotateY(${gammaVal * 0.5}deg)`,
+                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
               }}
             >
-              <span className="text-8xl">{emoji}</span>
+              <DeviceIllustration />
             </div>
 
-            {/* Main icon with 3D rotation */}
+            {/* Main illustration with 3D rotation */}
             <div
-              className="relative"
+              className="relative flex items-center justify-center"
               style={{
-                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.5}deg) rotateY(${gammaVal * 0.5}deg)`,
+                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
-                fontSize: '120px',
-                lineHeight: 1,
               }}
             >
-              {emoji}
+              <DeviceIllustration />
             </div>
           </div>
 
