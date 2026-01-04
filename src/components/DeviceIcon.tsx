@@ -1,6 +1,16 @@
 import { useEffect } from 'react';
 import { getDeviceIllustration } from '@/components/DeviceIllustrations';
 
+const deviceEmojis: Record<string, string> = {
+  'Desktop': '🖥️',
+  'Laptop': '💻',
+  'Smartphone': '📱',
+  'Tablet': '📱',
+  'Smart Watch': '⌚',
+  'Smart TV': '📺',
+  'Gaming Console': '🎮',
+};
+
 interface DeviceIconProps {
   deviceType: string;
   rotationAngle: number;
@@ -13,8 +23,8 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
   
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
+  const fallbackEmoji = deviceEmojis[deviceType] || '📱';
 
-  // Debug logging
   useEffect(() => {
     console.log('[DeviceIcon] Rendering with:', {
       deviceType,
@@ -83,7 +93,11 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
                 height: '150px',
               }}
             >
-              <DeviceIllustration className="w-full h-full" />
+              {!DeviceIllustration ? (
+                <span className="text-7xl select-none">{fallbackEmoji}</span>
+              ) : (
+                <DeviceIllustration className="w-full h-full" />
+              )}
             </div>
           </div>
 
