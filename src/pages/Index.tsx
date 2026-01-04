@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
@@ -18,6 +18,8 @@ import {
   trackError,
   trackScrollToFooter
 } from '@/lib/analytics';
+import { useOrientation } from '@/hooks/useOrientation';
+import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -26,6 +28,39 @@ const Index = () => {
   const [error, setError] = useState<string | null>(null);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
+
+  // Real-time orientation and motion hooks
+  const orientation = useOrientation();
+  const { motion } = useDeviceMotion();
+
+  // Merge live orientation/motion data into deviceData
+  const liveDeviceData = useMemo(() => {
+    if (!deviceData) return null;
+    
+    return {
+      ...deviceData,
+      orientation: {
+        type: orientation.isPortrait ? 'portrait' as const : 'landscape' as const,
+        angle: orientation.angle,
+        isPortrait: orientation.isPortrait,
+        isLandscape: !orientation.isPortrait,
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      motion: {
+        alpha: motion.alpha,
+        beta: motion.beta,
+        gamma: motion.gamma,
+      },
+    };
+  }, [deviceData, orientation.angle, orientation.isPortrait, motion.alpha, motion.beta, motion.gamma]);
+
+  // Regenerate hexagons when orientation/motion changes significantly
+  useEffect(() => {
+    if (liveDeviceData && !loading) {
+      generateHexagonsAsync(liveDeviceData).then(setHexagons);
+    }
+  }, [liveDeviceData, loading]);
 
   useEffect(() => {
     // Start session timer on mount
