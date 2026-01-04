@@ -2,6 +2,7 @@
 // Client-side language preference prediction with improved accuracy
 
 import * as tf from '@tensorflow/tfjs';
+import { type SyntheticExample } from './syntheticDataGenerator';
 
 export interface LanguageAnalysis {
   languages: string[];
@@ -53,6 +54,29 @@ export interface FeedbackData {
   sessionId?: string;
 }
 
+export interface ModelMetadata {
+  version: string;
+  trainedAt: number;
+  trainingAccuracy: number;
+  validationAccuracy: number;
+  epochs: number;
+  examplesUsed: number;
+}
+
+export interface TrainingProgress {
+  epoch: number;
+  totalEpochs: number;
+  loss: number;
+  accuracy: number;
+  phase: 'preparing' | 'training' | 'validating' | 'complete';
+}
+
+// Model versioning
+const MODEL_VERSION = 'v1.0';
+const MODEL_STORAGE_KEY = 'mpt_trained_model_v1';
+const MODEL_WEIGHTS_KEY = 'mpt_model_weights_v1';
+const MODEL_METADATA_KEY = 'mpt_model_metadata_v1';
+
 // Generate or get session ID
 export function getSessionId(): string {
   let sessionId = sessionStorage.getItem('language_session_id');
@@ -77,6 +101,28 @@ export function getTotalPredictions(): number {
     return count;
   } catch {
     return 0;
+  }
+}
+
+// Get model metadata
+export function getModelMetadata(): ModelMetadata | null {
+  try {
+    const stored = localStorage.getItem(MODEL_METADATA_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.warn('Failed to get model metadata:', error);
+  }
+  return null;
+}
+
+// Save model metadata
+function saveModelMetadata(metadata: ModelMetadata): void {
+  try {
+    localStorage.setItem(MODEL_METADATA_KEY, JSON.stringify(metadata));
+  } catch (error) {
+    console.warn('Failed to save model metadata:', error);
   }
 }
 
@@ -159,6 +205,12 @@ const timezoneLanguages: Record<string, string[]> = {
   'Africa/Lagos': ['en'], 'Africa/Nairobi': ['en', 'sw'],
 };
 
+// Timezone region encoding for features
+const timezoneRegions: Record<string, number> = {
+  'America': 0.1, 'Europe': 0.3, 'Asia': 0.5, 'Australia': 0.7, 
+  'Pacific': 0.8, 'Africa': 0.9,
+};
+
 // VPN detection patterns (unusual timezone/language combinations)
 const vpnIndicators: Array<{ lang: string; timezone: string; probability: number }> = [
   // US VPN servers commonly used by non-English speakers
@@ -175,37 +227,320 @@ const vpnIndicators: Array<{ lang: string; timezone: string; probability: number
 // TensorFlow model instance
 let model: tf.LayersModel | null = null;
 let modelLoaded = false;
+let isTrainedModel = false;
+
+// Create the model architecture (10 inputs -> [16, 8] hidden -> 4 outputs)
+function createModel(): tf.LayersModel {
+  const newModel = tf.sequential({
+    layers: [
+      // Input layer: 10 features
+      tf.layers.dense({ inputShape: [10], units: 16, activation: 'relu', name: 'hidden1' }),
+      tf.layers.batchNormalization(),
+      tf.layers.dropout({ rate: 0.2 }),
+      // Second hidden layer
+      tf.layers.dense({ units: 8, activation: 'relu', name: 'hidden2' }),
+      tf.layers.batchNormalization(),
+      tf.layers.dropout({ rate: 0.1 }),
+      // Output layer: 4 profiles (local, expatriate, traveler, multilingual)
+      tf.layers.dense({ units: 4, activation: 'softmax', name: 'output' }),
+    ],
+  });
+  
+  newModel.compile({
+    optimizer: tf.train.adam(0.01),
+    loss: 'categoricalCrossentropy',
+    metrics: ['accuracy'],
+  });
+  
+  return newModel;
+}
+
+// Extract features from a synthetic example (10 features)
+function extractFeaturesFromExample(example: SyntheticExample): number[] {
+  const languages = example.languages;
+  const timezone = example.timezone;
+  
+  // 1. Language count (normalized)
+  const languageCount = Math.min(languages.length, 5) / 5;
+  
+  // 2. Has language mismatch (0/1)
+  const primaryLang = languages[0]?.split('-')[0]?.toLowerCase() || 'en';
+  const expectedLangs = timezoneLanguages[timezone] || [];
+  const hasMismatch = expectedLangs.length > 0 && !expectedLangs.includes(primaryLang) ? 1 : 0;
+  
+  // 3. Timezone region encoded
+  const region = timezone.split('/')[0];
+  const timezoneEncoded = timezoneRegions[region] || 0.5;
+  
+  // 4. Is multilingual (3+ languages)
+  const isMultilingual = languages.length >= 3 ? 1 : 0;
+  
+  // 5. Has fallback languages
+  const hasFallbacks = languages.length > 1 ? 1 : 0;
+  
+  // 6. Unique language families count (normalized)
+  const families = new Set(languages.map(l => {
+    const base = l.split('-')[0].toLowerCase();
+    return languageFamilies[base] || 'Unknown';
+  }));
+  const familyCount = Math.min(families.size, 4) / 4;
+  
+  // 7. Primary language frequency score (common languages score higher)
+  const commonLanguages = ['en', 'es', 'zh', 'fr', 'de', 'pt', 'ar', 'hi', 'ja', 'ko'];
+  const primaryFrequencyScore = commonLanguages.includes(primaryLang) ? 0.8 : 0.3;
+  
+  // 8. Secondary language presence (different family than primary)
+  const primaryFamily = languageFamilies[primaryLang] || 'Unknown';
+  const hasSecondaryDifferentFamily = languages.slice(1).some(l => {
+    const base = l.split('-')[0].toLowerCase();
+    return (languageFamilies[base] || 'Unknown') !== primaryFamily;
+  }) ? 1 : 0;
+  
+  // 9. Timezone-language match score
+  let matchScore = 0;
+  if (expectedLangs.length > 0) {
+    const matchCount = languages.filter(l => expectedLangs.includes(l.split('-')[0].toLowerCase())).length;
+    matchScore = matchCount / Math.max(languages.length, 1);
+  } else {
+    matchScore = 0.5; // Neutral if no expected languages
+  }
+  
+  // 10. Total languages normalized (0-1)
+  const totalLangsNormalized = Math.min(languages.length, 10) / 10;
+  
+  return [
+    languageCount,
+    hasMismatch,
+    timezoneEncoded,
+    isMultilingual,
+    hasFallbacks,
+    familyCount,
+    primaryFrequencyScore,
+    hasSecondaryDifferentFamily,
+    matchScore,
+    totalLangsNormalized,
+  ];
+}
+
+// Extract labels from synthetic example
+function extractLabelsFromExample(example: SyntheticExample): number[] {
+  return [
+    example.labels.local,
+    example.labels.expatriate,
+    example.labels.traveler,
+    example.labels.multilingual,
+  ];
+}
+
+// Train model on synthetic data
+export async function trainModel(
+  trainingData: SyntheticExample[],
+  onProgress?: (progress: TrainingProgress) => void
+): Promise<{ accuracy: number; validationAccuracy: number; loss: number }> {
+  console.log(`Starting model training with ${trainingData.length} examples...`);
+  
+  onProgress?.({ epoch: 0, totalEpochs: 50, loss: 0, accuracy: 0, phase: 'preparing' });
+  
+  // Dispose existing model if any
+  if (model) {
+    model.dispose();
+  }
+  
+  // Create fresh model
+  model = createModel();
+  
+  // Shuffle data
+  const shuffled = [...trainingData].sort(() => Math.random() - 0.5);
+  
+  // Split 80/20 train/validation
+  const splitIndex = Math.floor(shuffled.length * 0.8);
+  const trainData = shuffled.slice(0, splitIndex);
+  const valData = shuffled.slice(splitIndex);
+  
+  console.log(`Training set: ${trainData.length}, Validation set: ${valData.length}`);
+  
+  // Prepare training tensors
+  const trainFeatures = trainData.map(extractFeaturesFromExample);
+  const trainLabels = trainData.map(extractLabelsFromExample);
+  const valFeatures = valData.map(extractFeaturesFromExample);
+  const valLabels = valData.map(extractLabelsFromExample);
+  
+  const xTrain = tf.tensor2d(trainFeatures);
+  const yTrain = tf.tensor2d(trainLabels);
+  const xVal = tf.tensor2d(valFeatures);
+  const yVal = tf.tensor2d(valLabels);
+  
+  let finalLoss = 0;
+  let finalAccuracy = 0;
+  let finalValAccuracy = 0;
+  
+  try {
+    // Train for 50 epochs with batch size 32
+    await model.fit(xTrain, yTrain, {
+      epochs: 50,
+      batchSize: 32,
+      validationData: [xVal, yVal],
+      shuffle: true,
+      callbacks: {
+        onEpochEnd: async (epoch, logs) => {
+          const loss = logs?.loss ?? 0;
+          const accuracy = logs?.acc ?? 0;
+          const valAccuracy = logs?.val_acc ?? 0;
+          
+          finalLoss = loss;
+          finalAccuracy = accuracy;
+          finalValAccuracy = valAccuracy;
+          
+          console.log(`Epoch ${epoch + 1}/50 - loss: ${loss.toFixed(4)} - acc: ${(accuracy * 100).toFixed(1)}% - val_acc: ${(valAccuracy * 100).toFixed(1)}%`);
+          
+          onProgress?.({
+            epoch: epoch + 1,
+            totalEpochs: 50,
+            loss,
+            accuracy: accuracy * 100,
+            phase: 'training',
+          });
+        },
+      },
+    });
+    
+    onProgress?.({ epoch: 50, totalEpochs: 50, loss: finalLoss, accuracy: finalAccuracy * 100, phase: 'validating' });
+    
+    // Save model weights to localStorage
+    await saveModelToStorage();
+    
+    // Save metadata
+    const metadata: ModelMetadata = {
+      version: MODEL_VERSION,
+      trainedAt: Date.now(),
+      trainingAccuracy: Math.round(finalAccuracy * 100),
+      validationAccuracy: Math.round(finalValAccuracy * 100),
+      epochs: 50,
+      examplesUsed: trainingData.length,
+    };
+    saveModelMetadata(metadata);
+    
+    modelLoaded = true;
+    isTrainedModel = true;
+    
+    onProgress?.({ epoch: 50, totalEpochs: 50, loss: finalLoss, accuracy: finalAccuracy * 100, phase: 'complete' });
+    
+    console.log(`Training complete! Final accuracy: ${(finalAccuracy * 100).toFixed(1)}%, Validation: ${(finalValAccuracy * 100).toFixed(1)}%`);
+    
+    return {
+      accuracy: Math.round(finalAccuracy * 100),
+      validationAccuracy: Math.round(finalValAccuracy * 100),
+      loss: finalLoss,
+    };
+  } finally {
+    // Cleanup tensors
+    xTrain.dispose();
+    yTrain.dispose();
+    xVal.dispose();
+    yVal.dispose();
+  }
+}
+
+// Save model weights to localStorage
+async function saveModelToStorage(): Promise<void> {
+  if (!model) return;
+  
+  try {
+    // Use tf.io.withSaveHandler to save to memory, then store in localStorage
+    await model.save(tf.io.withSaveHandler(async (artifacts) => {
+      // weightData is already an ArrayBuffer in the artifacts
+      const weightDataArray = artifacts.weightData 
+        ? Array.from(new Uint8Array(artifacts.weightData as ArrayBuffer))
+        : [];
+      
+      localStorage.setItem(MODEL_WEIGHTS_KEY, JSON.stringify({
+        modelTopology: artifacts.modelTopology,
+        weightSpecs: artifacts.weightSpecs,
+        weightData: weightDataArray,
+      }));
+      
+      return { modelArtifactsInfo: { dateSaved: new Date(), modelTopologyType: 'JSON' } };
+    }));
+    
+    console.log('Model saved to localStorage');
+  } catch (error) {
+    console.warn('Failed to save model to localStorage:', error);
+  }
+}
+
+// Load model weights from localStorage
+async function loadModelFromStorage(): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem(MODEL_WEIGHTS_KEY);
+    if (!stored) return false;
+    
+    const parsed = JSON.parse(stored);
+    const weightData = new Uint8Array(parsed.weightData).buffer;
+    
+    model = await tf.loadLayersModel(tf.io.fromMemory(
+      parsed.modelTopology,
+      parsed.weightSpecs,
+      weightData
+    ));
+    
+    model.compile({
+      optimizer: tf.train.adam(0.01),
+      loss: 'categoricalCrossentropy',
+      metrics: ['accuracy'],
+    });
+    
+    console.log('Loaded trained model from localStorage');
+    return true;
+  } catch (error) {
+    console.warn('Failed to load model from localStorage:', error);
+    return false;
+  }
+}
+
+// Reset to default (untrained) model
+export async function resetToDefaultModel(): Promise<void> {
+  if (model) {
+    model.dispose();
+  }
+  
+  localStorage.removeItem(MODEL_WEIGHTS_KEY);
+  localStorage.removeItem(MODEL_METADATA_KEY);
+  
+  model = null;
+  modelLoaded = false;
+  isTrainedModel = false;
+  
+  await initializeModel();
+  console.log('Reset to default heuristic model');
+}
+
+// Check if a trained model exists
+export function hasTrainedModel(): boolean {
+  return localStorage.getItem(MODEL_WEIGHTS_KEY) !== null;
+}
 
 // Initialize enhanced TensorFlow.js model
 export async function initializeModel(): Promise<boolean> {
   if (modelLoaded) return true;
   
   try {
-    // Enhanced MLP with more features and layers
-    model = tf.sequential({
-      layers: [
-        tf.layers.dense({ inputShape: [12], units: 32, activation: 'relu' }),
-        tf.layers.batchNormalization(),
-        tf.layers.dropout({ rate: 0.3 }),
-        tf.layers.dense({ units: 16, activation: 'relu' }),
-        tf.layers.batchNormalization(),
-        tf.layers.dropout({ rate: 0.2 }),
-        tf.layers.dense({ units: 8, activation: 'relu' }),
-        tf.layers.dense({ units: 4, activation: 'softmax' }), // 4 user profiles
-      ],
-    });
+    // Try to load trained model from localStorage first
+    if (await loadModelFromStorage()) {
+      modelLoaded = true;
+      isTrainedModel = true;
+      console.log('Enhanced language prediction model initialized (trained)');
+      return true;
+    }
     
-    model.compile({
-      optimizer: tf.train.adam(0.001),
-      loss: 'categoricalCrossentropy',
-      metrics: ['accuracy'],
-    });
+    // Fall back to creating a new model with heuristic weights
+    model = createModel();
     
-    // Pre-set weights based on heuristic patterns (simulated training)
+    // Pre-set weights based on heuristic patterns
     await initializeWeightsWithHeuristics();
     
     modelLoaded = true;
-    console.log('Enhanced language prediction model initialized');
+    isTrainedModel = false;
+    console.log('Enhanced language prediction model initialized (heuristic)');
     return true;
   } catch (error) {
     console.error('Failed to initialize language model:', error);
@@ -217,16 +552,16 @@ export async function initializeModel(): Promise<boolean> {
 async function initializeWeightsWithHeuristics(): Promise<void> {
   if (!model) return;
   
-  // Warm up the model with representative examples
+  // Warm up the model with representative examples (10 features)
   const trainingExamples = tf.tensor2d([
     // Local user: 1 lang, no mismatch, local timezone, same family
-    [0.1, 0, 0.5, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+    [0.2, 0, 0.3, 0, 0, 0.25, 0.8, 0, 0.9, 0.1],
     // Expatriate: mismatch, different timezone than expected
-    [0.2, 1, 0.3, 1, 1, 0, 1, 0, 0.7, 0, 0, 0],
+    [0.4, 1, 0.3, 0, 1, 0.5, 0.8, 1, 0.1, 0.2],
     // Traveler: multiple langs, some mismatch signals
-    [0.4, 0.5, 0.6, 1, 1, 0, 0, 1, 0.3, 0, 0, 0],
+    [0.6, 0.5, 0.5, 0, 1, 0.5, 0.6, 0, 0.5, 0.3],
     // Multilingual: many languages, multiple families
-    [0.6, 0, 0.5, 1, 1, 0, 0, 0, 0, 1, 0, 0],
+    [0.8, 0, 0.5, 1, 1, 0.75, 0.7, 1, 0.6, 0.5],
   ]);
   
   const labels = tf.tensor2d([
@@ -237,7 +572,7 @@ async function initializeWeightsWithHeuristics(): Promise<void> {
   ]);
   
   // Quick training pass
-  await model.fit(trainingExamples, labels, { epochs: 50, verbose: 0 });
+  await model.fit(trainingExamples, labels, { epochs: 100, verbose: 0 });
   
   trainingExamples.dispose();
   labels.dispose();
@@ -466,21 +801,29 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
     await initializeModel();
   }
   
-  // Enhanced feature engineering (12 features)
-  const languageCount = analysis.languages.length;
-  const uniqueFamilies = new Set(analysis.languages.map(l => getLanguageFamily(l)));
+  // Extract 10 features matching training format
+  const languageCount = Math.min(analysis.languages.length, 5) / 5;
   const hasMismatch = analysis.hasLanguageLocationMismatch ? 1 : 0;
-  const timezoneNormalized = (analysis.timezoneOffset + 720) / 1440;
-  const isMultilingual = uniqueFamilies.size > 1 ? 1 : 0;
+  const region = analysis.timezone.split('/')[0];
+  const timezoneEncoded = timezoneRegions[region] || 0.5;
+  const isMultilingual = analysis.languages.length >= 3 ? 1 : 0;
   const hasFallbacks = analysis.fallbackLanguages.length > 0 ? 1 : 0;
-  const familyCount = uniqueFamilies.size / 5;
-  const expatriatePattern = analysis.expatriatePatternDetected ? 1 : 0;
-  const vpnProb = analysis.vpnProbability;
-  
-  // Family type encoding (one-hot simplified)
-  const isRomance = analysis.languageFamily === 'Romance' ? 1 : 0;
-  const isGermanic = analysis.languageFamily === 'Germanic' ? 1 : 0;
-  const isAsian = ['Sino-Tibetan', 'Japonic', 'Koreanic'].includes(analysis.languageFamily) ? 1 : 0;
+  const uniqueFamilies = new Set(analysis.languages.map(l => getLanguageFamily(l)));
+  const familyCount = Math.min(uniqueFamilies.size, 4) / 4;
+  const primaryLang = analysis.primaryLanguage.split('-')[0].toLowerCase();
+  const commonLanguages = ['en', 'es', 'zh', 'fr', 'de', 'pt', 'ar', 'hi', 'ja', 'ko'];
+  const primaryFrequencyScore = commonLanguages.includes(primaryLang) ? 0.8 : 0.3;
+  const primaryFamily = getLanguageFamily(analysis.primaryLanguage);
+  const hasSecondaryDifferentFamily = analysis.fallbackLanguages.some(l => 
+    getLanguageFamily(l) !== primaryFamily
+  ) ? 1 : 0;
+  const expectedLangs = timezoneLanguages[analysis.timezone] || [];
+  let matchScore = 0.5;
+  if (expectedLangs.length > 0) {
+    const matchCount = analysis.languages.filter(l => expectedLangs.includes(l.split('-')[0].toLowerCase())).length;
+    matchScore = matchCount / Math.max(analysis.languages.length, 1);
+  }
+  const totalLangsNormalized = Math.min(analysis.languages.length, 10) / 10;
   
   let tfProbabilities: Float32Array | Int32Array | Uint8Array | undefined;
   
@@ -488,18 +831,16 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
   if (model) {
     try {
       const inputTensor = tf.tensor2d([[
-        languageCount / 10,
+        languageCount,
         hasMismatch,
-        timezoneNormalized,
+        timezoneEncoded,
         isMultilingual,
         hasFallbacks,
         familyCount,
-        expatriatePattern,
-        vpnProb,
-        isRomance,
-        isGermanic,
-        isAsian,
-        analysis.fallbackLanguages.length / 5,
+        primaryFrequencyScore,
+        hasSecondaryDifferentFamily,
+        matchScore,
+        totalLangsNormalized,
       ]]);
       
       const prediction = model.predict(inputTensor) as tf.Tensor;
