@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 import { captureDeviceData, detectSensors, DeviceData, SensorData } from '@/lib/deviceDetection';
 import DeviceIcon from '@/components/DeviceIcon';
 import OrientationDisplay from '@/components/OrientationDisplay';
-import { ArrowLeft, Smartphone, Monitor, Wifi, Shield } from 'lucide-react';
+import { ArrowLeft, Smartphone, Monitor, Wifi, Shield, X } from 'lucide-react';
 
 export default function DeviceOrientation() {
   const orientation = useOrientation();
@@ -14,6 +14,28 @@ export default function DeviceOrientation() {
   const [sensors, setSensors] = useState<SensorData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [motionRequesting, setMotionRequesting] = useState(false);
+  const [rotationLocked, setRotationLocked] = useState(false);
+  const [lockWarningDismissed, setLockWarningDismissed] = useState(false);
+
+  // Detect rotation lock by checking if angle stays 0 when dimensions suggest rotation
+  const detectRotationLock = useCallback(() => {
+    const isLandscapeDimensions = window.innerWidth > window.innerHeight;
+    const angleIsPortrait = orientation.angle === 0 || orientation.angle === 180;
+    
+    // If dimensions say landscape but angle says portrait, rotation is likely locked
+    if (isLandscapeDimensions && angleIsPortrait && orientation.angle === 0) {
+      setRotationLocked(true);
+    } else {
+      setRotationLocked(false);
+    }
+  }, [orientation.angle]);
+
+  // Check for rotation lock on resize
+  useEffect(() => {
+    detectRotationLock();
+    window.addEventListener('resize', detectRotationLock);
+    return () => window.removeEventListener('resize', detectRotationLock);
+  }, [detectRotationLock]);
 
   // Auto-request motion permission on mount
   useEffect(() => {
@@ -79,6 +101,23 @@ export default function DeviceOrientation() {
       {/* Main content */}
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         
+        {/* Rotation Lock Warning */}
+        {rotationLocked && !lockWarningDismissed && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between gap-3 animate-fade-in">
+            <p className="text-yellow-800 text-sm font-medium flex items-center gap-2">
+              <span className="text-lg">🔒</span>
+              Screen rotation is locked. Unlock it to see real-time orientation changes.
+            </p>
+            <button
+              onClick={() => setLockWarningDismissed(true)}
+              className="p-1.5 rounded-lg hover:bg-yellow-100 transition-colors text-yellow-600"
+              aria-label="Dismiss warning"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Call to action */}
         <div className="bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 rounded-xl p-4 text-center">
           <p className="text-foreground font-medium flex items-center justify-center gap-2">
