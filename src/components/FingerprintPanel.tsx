@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Shield, AlertTriangle, Download, Share2 } from 'lucide-react';
+import { ChevronDown, Shield, AlertTriangle, Download, Share2, CheckCircle, XCircle } from 'lucide-react';
 import {
   calculateFingerprintUniqueness,
   CompositeFingerprint,
+  ProtectionStatus,
 } from '@/lib/fingerprintDetection';
 
 interface FingerprintBreakdown {
@@ -235,6 +236,105 @@ export default function FingerprintPanel() {
             {uniquenessInfo.level} ({uniquenessScore}% unique)
           </p>
         </div>
+
+        {/* Protection Status */}
+        {fingerprint.protection && (
+          <div className={`p-4 rounded-xl border ${
+            fingerprint.protection.effectiveness === 'high' 
+              ? 'bg-green-950/30 border-green-500/30' 
+              : fingerprint.protection.effectiveness === 'medium'
+              ? 'bg-yellow-950/30 border-yellow-500/30'
+              : fingerprint.protection.effectiveness === 'low'
+              ? 'bg-orange-950/30 border-orange-500/30'
+              : 'bg-red-950/30 border-red-500/30'
+          }`}>
+            <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
+              fingerprint.protection.effectiveness === 'high' ? 'text-green-400' :
+              fingerprint.protection.effectiveness === 'medium' ? 'text-yellow-400' :
+              fingerprint.protection.effectiveness === 'low' ? 'text-orange-400' :
+              'text-red-400'
+            }`}>
+              <Shield className="w-4 h-4" />
+              Protection Status: {fingerprint.protection.effectiveness.charAt(0).toUpperCase() + fingerprint.protection.effectiveness.slice(1)}
+              <span className="ml-auto text-xs opacity-70">Score: {fingerprint.protection.score}/100</span>
+            </h4>
+            
+            {/* Protection Indicators */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                fingerprint.protection.brave.isBrave ? 'bg-green-500/10' : 'bg-red-500/5'
+              }`}>
+                {fingerprint.protection.brave.isBrave ? (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-400/50" />
+                )}
+                <span className="text-xs">
+                  {fingerprint.protection.brave.isBrave 
+                    ? `Brave${fingerprint.protection.brave.shieldsUp ? ' Shields' : ''}` 
+                    : 'No Brave'}
+                </span>
+              </div>
+              
+              <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                fingerprint.protection.firefox.resistFingerprinting ? 'bg-green-500/10' : 'bg-red-500/5'
+              }`}>
+                {fingerprint.protection.firefox.resistFingerprinting ? (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-400/50" />
+                )}
+                <span className="text-xs">
+                  {fingerprint.protection.firefox.resistFingerprinting 
+                    ? 'Firefox RFP' 
+                    : fingerprint.protection.firefox.isFirefox 
+                      ? 'Firefox (basic)'
+                      : 'No Firefox RFP'}
+                </span>
+              </div>
+              
+              <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                fingerprint.protection.tor.isTor ? 'bg-green-500/10' : 'bg-red-500/5'
+              }`}>
+                {fingerprint.protection.tor.isTor ? (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-400/50" />
+                )}
+                <span className="text-xs">
+                  {fingerprint.protection.tor.isTor 
+                    ? `Tor (${fingerprint.protection.tor.protectionLevel})` 
+                    : 'No Tor'}
+                </span>
+              </div>
+              
+              <div className={`flex items-center gap-2 p-2 rounded-lg ${
+                fingerprint.protection.extensions.blocking ? 'bg-green-500/10' : 'bg-red-500/5'
+              }`}>
+                {fingerprint.protection.extensions.blocking ? (
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-400/50" />
+                )}
+                <span className="text-xs">
+                  {fingerprint.protection.extensions.blocking 
+                    ? `${fingerprint.protection.extensions.extensions.length} extension${fingerprint.protection.extensions.extensions.length !== 1 ? 's' : ''}` 
+                    : 'No extensions'}
+                </span>
+              </div>
+            </div>
+            
+            {/* Recommendation */}
+            <p className={`text-xs leading-relaxed ${
+              fingerprint.protection.effectiveness === 'high' ? 'text-green-200/80' :
+              fingerprint.protection.effectiveness === 'medium' ? 'text-yellow-200/80' :
+              fingerprint.protection.effectiveness === 'low' ? 'text-orange-200/80' :
+              'text-red-200/80'
+            }`}>
+              {fingerprint.protection.recommendation}
+            </p>
+          </div>
+        )}
 
         {/* Fingerprint Breakdown */}
         <div className="space-y-3">

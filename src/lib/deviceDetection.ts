@@ -4,6 +4,7 @@ import {
   detectAudioFingerprint,
   detectInstalledFonts,
   detectPlugins,
+  calculateProtectionScore,
 } from './fingerprintDetection';
 
 // Orientation data interface
@@ -649,13 +650,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     category: 'profile',
   });
   
-  // Run fingerprint detection in parallel
-  const [canvasResult, webglResult, audioResult, fontsResult, pluginsResult] = await Promise.all([
+  // Run fingerprint detection in parallel (including protection)
+  const [canvasResult, webglResult, audioResult, fontsResult, pluginsResult, protectionResult] = await Promise.all([
     detectCanvasFingerprint().catch(() => null),
     detectWebGLFingerprint().catch(() => null),
     detectAudioFingerprint().catch(() => null),
     detectInstalledFonts().catch(() => ({ count: 0, uniqueFonts: [], risk: 'low' as const, technique: 'Fonts' as const })),
     detectPlugins().catch(() => ({ pluginCount: 0, plugins: [], adBlocker: false, risk: 'low' as const, technique: 'Plugins' as const })),
+    calculateProtectionScore().catch(() => null),
   ]);
   
   // Add fingerprint hexagons
@@ -736,6 +738,47 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       icon: '🧩',
       confidence: 85,
       risk: 'Plugins and extensions. Browser extensions and plugins add to your unique fingerprint.',
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // Fingerprint Protection hexagon
+  if (protectionResult) {
+    let protectionValue = 'None Detected';
+    let protectionRisk = 'Your browser has no fingerprint protection. You are fully trackable across websites.';
+    let riskLevel = 'high';
+    
+    if (protectionResult.tor.isTor) {
+      protectionValue = 'Tor Browser';
+      protectionRisk = 'Excellent! Tor Browser provides strong fingerprint protection. Your identity is well-masked.';
+      riskLevel = 'low';
+    } else if (protectionResult.brave.isBrave && protectionResult.brave.shieldsUp) {
+      protectionValue = 'Brave Shields';
+      protectionRisk = 'Good protection! Brave Shields randomize your fingerprint, making tracking harder.';
+      riskLevel = 'low';
+    } else if (protectionResult.firefox.resistFingerprinting) {
+      protectionValue = 'Firefox RFP';
+      protectionRisk = 'Excellent! Firefox resistFingerprinting standardizes your browser identity.';
+      riskLevel = 'low';
+    } else if (protectionResult.extensions.blocking) {
+      const extNames = protectionResult.extensions.extensions.slice(0, 2).join(', ');
+      protectionValue = extNames || 'Extensions Active';
+      protectionRisk = 'Some protection from extensions. Consider enabling browser-level protection for better coverage.';
+      riskLevel = 'medium';
+    } else if (protectionResult.brave.isBrave) {
+      protectionValue = 'Brave (Basic)';
+      protectionRisk = 'Brave detected but Shields may be down. Enable Shields for better protection.';
+      riskLevel = 'medium';
+    }
+    
+    fingerprintHexagons.push({
+      id: 'fingerprint-protection',
+      label: 'Fingerprint Protection',
+      value: protectionValue,
+      icon: '🛡️',
+      confidence: 100,
+      risk: protectionRisk,
       confirmed: false,
       category: 'fingerprint',
     });

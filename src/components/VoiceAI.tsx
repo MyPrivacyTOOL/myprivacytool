@@ -117,6 +117,27 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     return "Your browser extensions add to your unique fingerprint signature.";
   }
   
+  // FINGERPRINT PROTECTION
+  if (label.includes('fingerprint protection') || label.includes('protection')) {
+    const value = hexagonData.value?.toLowerCase() || '';
+    if (value.includes('tor')) {
+      return "Excellent! You're using Tor Browser, which provides the strongest fingerprint protection available. Your identity is well-masked across websites.";
+    }
+    if (value.includes('brave') && value.includes('shields')) {
+      return "Good news! Brave Shields is actively protecting you. Your fingerprint is being randomized, making it harder for trackers to identify you.";
+    }
+    if (value.includes('firefox') || value.includes('rfp')) {
+      return "Firefox with resistFingerprinting is protecting you. Your browser identity is being standardized to blend in with other privacy-conscious users.";
+    }
+    if (value.includes('extension') || value.includes('blocker')) {
+      return "Your privacy extensions are providing some protection, but browser-level protection would be more effective. Consider using Brave or enabling Firefox privacy settings.";
+    }
+    if (value.includes('none')) {
+      return "Warning: No fingerprint protection detected. Your browser's unique characteristics make you fully trackable. I recommend using Brave browser or Firefox with privacy settings enabled.";
+    }
+    return "To reduce fingerprinting, consider using Brave browser or Firefox with privacy.resistFingerprinting enabled. However, be aware—being too unique in your privacy protection can also make you identifiable.";
+  }
+  
   // STANDARD HEXAGONS
   if (label.includes('browser')) {
     return "I found multiple third-party cookies tracking you across websites.";
@@ -410,6 +431,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           newMessage = `${hexagonData.value}. Your installed fonts reveal your OS and software preferences. Click to confirm.`;
         } else if (label.includes('extension')) {
           newMessage = `Extensions: ${hexagonData.value}. Browser add-ons make you more identifiable. Click to confirm.`;
+        } else if (label.includes('protection')) {
+          const value = hexagonData.value?.toLowerCase() || '';
+          if (value.includes('none')) {
+            newMessage = `⚠️ No fingerprint protection detected! You're fully trackable. Click to learn how to protect yourself.`;
+          } else {
+            newMessage = `🛡️ ${hexagonData.value} detected! You have some fingerprint protection. Click to verify.`;
+          }
         } else {
           newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
         }
@@ -453,6 +481,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           newMessage = `Font detection confirmed! Your installed fonts reveal your system configuration.`;
         } else if (label.includes('extension')) {
           newMessage = `Extensions confirmed! Ironically, privacy tools can make you more unique and trackable.`;
+        } else if (label.includes('protection')) {
+          const value = hexagonData.value?.toLowerCase() || '';
+          if (value.includes('none')) {
+            newMessage = `Protection status confirmed. You're vulnerable to fingerprint tracking. Consider using Brave or Firefox with privacy settings.`;
+          } else {
+            newMessage = `Protection confirmed! Your ${hexagonData.value} is helping reduce your fingerprint trackability.`;
+          }
         } else {
           newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
         }
