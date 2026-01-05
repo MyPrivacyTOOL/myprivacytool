@@ -101,7 +101,7 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
-  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social';
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social' | 'security';
 }
 
 // Fingerprint data interface
@@ -1193,6 +1193,163 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   
   // Add social hexagons
   baseHexagons.push(...socialHexagons);
+  
+  // ========== SECURITY VULNERABILITY DETECTION ==========
+  const {
+    detectHTTPSStatus,
+    detectMixedContent,
+    detectSecurityHeaders,
+    detectBrowserSecurity,
+    detectTLSConfig,
+    detectDNSLeak,
+  } = await import('./securityDetection');
+  
+  const securityHexagons: HexagonData[] = [];
+  
+  // Sync security checks (immediate)
+  const httpsResult = detectHTTPSStatus();
+  const mixedContentResult = detectMixedContent();
+  const securityHeadersResult = detectSecurityHeaders();
+  const browserSecurityResult = detectBrowserSecurity();
+  const tlsResult = detectTLSConfig();
+  
+  // 1. DNS Leak Detection (async - placeholder first)
+  securityHexagons.push({
+    id: 'dns-leak',
+    label: 'DNS Leak',
+    value: 'Checking...',
+    icon: '🔓',
+    confidence: 100,
+    risk: 'Checking for DNS leaks that could expose your real location...',
+    confirmed: false,
+    category: 'security',
+  });
+  
+  // 2. HTTPS/Connection Security
+  const httpsValue = httpsResult.isSecure 
+    ? `Secure (HTTPS)${httpsResult.hstsEnabled ? ' + HSTS' : ''}` 
+    : '⚠️ Insecure (HTTP)';
+  
+  securityHexagons.push({
+    id: 'https-status',
+    label: 'Connection Security',
+    value: httpsValue,
+    icon: '🔒',
+    confidence: 100,
+    risk: httpsResult.isSecure 
+      ? 'Connection is encrypted. Your data is protected in transit.'
+      : 'CRITICAL: Connection is NOT encrypted! Anyone on your network can read your data.',
+    confirmed: false,
+    category: 'security',
+  });
+  
+  // 3. Mixed Content
+  const mixedValue = mixedContentResult.hasMixedContent 
+    ? `${mixedContentResult.insecureResources} insecure` 
+    : 'None';
+  
+  securityHexagons.push({
+    id: 'mixed-content',
+    label: 'Mixed Content',
+    value: mixedValue,
+    icon: '⚠️',
+    confidence: 100,
+    risk: mixedContentResult.hasMixedContent 
+      ? `WARNING: ${mixedContentResult.insecureResources} insecure resources (${mixedContentResult.types.join(', ')}) loaded over HTTP. These can be intercepted.`
+      : 'No mixed content detected. All resources are loaded securely.',
+    confirmed: false,
+    category: 'security',
+  });
+  
+  // 4. Security Headers
+  const headersValue = securityHeadersResult.score >= 80 
+    ? 'Strong' 
+    : securityHeadersResult.score >= 50 
+      ? `${securityHeadersResult.presentHeaders.length}/5 present` 
+      : 'Weak';
+  
+  securityHexagons.push({
+    id: 'security-headers',
+    label: 'Security Headers',
+    value: headersValue,
+    icon: '🛡️',
+    confidence: 90,
+    risk: securityHeadersResult.missingHeaders.length > 0 
+      ? `Missing: ${securityHeadersResult.missingHeaders.join(', ')}. These headers protect against common attacks.`
+      : 'All security headers present. Good protection against XSS and clickjacking.',
+    confirmed: false,
+    category: 'security',
+  });
+  
+  // 5. Browser Security
+  const browserValue = browserSecurityResult.knownVulnerabilities 
+    ? '⚠️ Vulnerable' 
+    : browserSecurityResult.isUpdated 
+      ? 'Up to date' 
+      : '⚠️ Outdated';
+  
+  securityHexagons.push({
+    id: 'browser-security',
+    label: 'Browser Status',
+    value: browserValue,
+    icon: '🌐',
+    confidence: 95,
+    risk: browserSecurityResult.knownVulnerabilities 
+      ? `CRITICAL: ${browserSecurityResult.version} has known vulnerabilities. Update immediately!`
+      : browserSecurityResult.isUpdated 
+        ? `${browserSecurityResult.version} is current. Security features: ${browserSecurityResult.securityFeatures.slice(0, 3).join(', ')}.`
+        : `${browserSecurityResult.version} may be outdated. Consider updating for latest security patches.`,
+    confirmed: false,
+    category: 'security',
+  });
+  
+  // 6. TLS Configuration
+  const tlsValue = tlsResult.isSecure 
+    ? tlsResult.tlsVersion 
+    : '⚠️ No Encryption';
+  
+  securityHexagons.push({
+    id: 'tls-config',
+    label: 'Encryption',
+    value: tlsValue,
+    icon: '🔐',
+    confidence: 100,
+    risk: tlsResult.isSecure 
+      ? `Using ${tlsResult.tlsVersion}. Modern encryption protecting your connection.`
+      : 'CRITICAL: No TLS encryption. All data is transmitted in plain text.',
+    confirmed: false,
+    category: 'security',
+  });
+  
+  // Add security hexagons
+  baseHexagons.push(...securityHexagons);
+  
+  // Start async DNS leak detection and update the hexagon
+  detectDNSLeak().then(dnsResult => {
+    // Find and update the DNS leak hexagon in the array
+    const dnsHexagon = baseHexagons.find(h => h.id === 'dns-leak');
+    if (dnsHexagon) {
+      if (dnsResult.isLeaking) {
+        dnsHexagon.value = `Leaking (${dnsResult.actualLocation.substring(0, 12)}...)`;
+        dnsHexagon.icon = '🔓';
+        dnsHexagon.risk = `CRITICAL: DNS leak detected! Your real location (${dnsResult.actualLocation}) is exposed. ${dnsResult.vpnDetected ? 'VPN is not protecting your DNS queries.' : 'ISP can see all your browsing.'}`;
+      } else if (dnsResult.vpnDetected) {
+        dnsHexagon.value = 'VPN Protected';
+        dnsHexagon.icon = '🔒';
+        dnsHexagon.risk = 'DNS is routed through VPN. Your real location is hidden.';
+      } else {
+        dnsHexagon.value = 'No Leak Detected';
+        dnsHexagon.icon = '✅';
+        dnsHexagon.risk = 'No DNS leak detected. Your DNS queries are not exposing your location.';
+      }
+    }
+  }).catch(() => {
+    const dnsHexagon = baseHexagons.find(h => h.id === 'dns-leak');
+    if (dnsHexagon) {
+      dnsHexagon.value = 'Check Failed';
+      dnsHexagon.risk = 'Could not complete DNS leak test. This may indicate network restrictions.';
+    }
+  });
   
   return baseHexagons;
 }
