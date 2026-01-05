@@ -3,6 +3,7 @@ import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import LanguageIntelligencePanel from './LanguageIntelligencePanel';
+import FingerprintPanel from './FingerprintPanel';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile } from '@/lib/deviceDetection';
 import { 
   initializeModel as initLanguageModel,
@@ -40,6 +41,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const [languagePrediction, setLanguagePrediction] = useState<LanguagePrediction | null>(null);
   const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
   const [showLanguagePanel, setShowLanguagePanel] = useState(false);
+  
+  // Fingerprint panel state
+  const [showFingerprintPanel, setShowFingerprintPanel] = useState(false);
+  const [fingerprintConfirmedCount, setFingerprintConfirmedCount] = useState(0);
 
   // Get visible hexagons based on count
   const visibleHexagons = allHexagons.slice(0, visibleCount);
@@ -146,6 +151,18 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
       
       setConfirmedCount(c => c + 1);
+      
+      // Track fingerprint confirmations separately
+      if (hex.category === 'fingerprint') {
+        setFingerprintConfirmedCount(c => {
+          const newCount = c + 1;
+          // Show fingerprint panel after confirming 3+ fingerprint hexagons
+          if (newCount >= 3 && !showFingerprintPanel) {
+            setShowFingerprintPanel(true);
+          }
+          return newCount;
+        });
+      }
       
       // Update the hexagon's confirmed state
       hex.confirmed = true;
@@ -286,6 +303,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         confirmed={confirmedCount} 
         total={Math.max(visibleCount, 8)} 
       />
+
+      {/* Fingerprint Panel - shown after confirming 3+ fingerprint hexagons */}
+      {showFingerprintPanel && (
+        <div className="mt-8 animate-fade-in">
+          <FingerprintPanel />
+        </div>
+      )}
 
       {/* Language Intelligence Panel - shown after 8 confirmations */}
       {showLanguagePanel && (
