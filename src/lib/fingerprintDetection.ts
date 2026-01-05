@@ -56,6 +56,64 @@ export interface CompositeFingerprint {
   protection?: ProtectionStatus;
 }
 
+// Advanced fingerprinting result interfaces
+export interface WebRTCLeakResult {
+  localIPs: string[];
+  publicIPs: string[];
+  isLeaking: boolean;
+  vpnDetected: boolean;
+  risk: 'critical' | 'high' | 'low';
+  technique: 'WebRTC';
+}
+
+export interface HardwareConcurrencyResult {
+  cores: number;
+  memory: number | null;
+  hardwareClass: 'low' | 'medium' | 'high' | 'very-high';
+  risk: 'low';
+  technique: 'Hardware';
+}
+
+export interface ScreenPropertiesResult {
+  resolution: string;
+  colorDepth: number;
+  pixelRatio: number;
+  availableResolution: string;
+  uniqueness: number;
+  risk: 'medium';
+  technique: 'Screen';
+}
+
+export interface TimezoneLocaleResult {
+  timezone: string;
+  offset: number;
+  dateFormat: string;
+  numberFormat: string;
+  mismatch: boolean;
+  risk: 'medium';
+  technique: 'Timezone';
+}
+
+export interface BatteryStatusResult {
+  level: number | null;
+  charging: boolean | null;
+  available: boolean;
+  chargingTime: number | null;
+  dischargingTime: number | null;
+  risk: 'low';
+  technique: 'Battery';
+}
+
+export interface MediaDevicesResult {
+  videoInputs: number;
+  audioInputs: number;
+  audioOutputs: number;
+  deviceLabels: string[];
+  permissionGranted: boolean;
+  risk: 'medium';
+  technique: 'MediaDevices';
+}
+
 // Protection detection result interfaces
 export interface BraveProtectionResult {
   isBrave: boolean;
@@ -959,5 +1017,404 @@ export async function calculateProtectionScore(): Promise<ProtectionStatus> {
     score,
     effectiveness,
     recommendation,
+  };
+}
+
+// ============================================
+// ADVANCED FINGERPRINTING DETECTION
+// ============================================
+
+/**
+ * Detect WebRTC IP leaks that can expose real IP even behind VPN
+ * ⚠️ PRIVACY WARNING: This API can reveal your real IP address
+ */
+export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
+  const localIPs: string[] = [];
+  const publicIPs: string[] = [];
+  
+  try {
+    // Check if RTCPeerConnection is available
+    if (typeof RTCPeerConnection === 'undefined') {
+      console.log('[FingerprintDetection] WebRTC disabled - good for privacy!');
+      return {
+        localIPs: [],
+        publicIPs: [],
+        isLeaking: false,
+        vpnDetected: false,
+        risk: 'low',
+        technique: 'WebRTC',
+      };
+    }
+
+    // Create peer connection with STUN servers
+    const config: RTCConfiguration = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    };
+
+    const pc = new RTCPeerConnection(config);
+    
+    // Create a data channel to trigger ICE gathering
+    pc.createDataChannel('');
+
+    // Promise to collect ICE candidates
+    const ipPromise = new Promise<void>((resolve) => {
+      const timeout = setTimeout(() => {
+        pc.close();
+        resolve();
+      }, 3000);
+
+      pc.onicecandidate = (event) => {
+        if (!event || !event.candidate) {
+          clearTimeout(timeout);
+          pc.close();
+          resolve();
+          return;
+        }
+
+        const candidate = event.candidate.candidate;
+        
+        // Extract IP addresses from ICE candidate
+        const ipRegex = /(\d{1,3}\.){3}\d{1,3}|([a-fA-F0-9:]+:+)+[a-fA-F0-9]+/g;
+        const matches = candidate.match(ipRegex);
+        
+        if (matches) {
+          matches.forEach((ip) => {
+            // Classify as local or public
+            if (ip.startsWith('192.168.') || 
+                ip.startsWith('10.') || 
+                ip.startsWith('172.') ||
+                ip.startsWith('169.254.') ||
+                ip === '0.0.0.0' ||
+                ip.startsWith('::') ||
+                ip.startsWith('fe80:')) {
+              if (!localIPs.includes(ip)) localIPs.push(ip);
+            } else {
+              if (!publicIPs.includes(ip)) publicIPs.push(ip);
+            }
+          });
+        }
+      };
+    });
+
+    // Create offer to start ICE gathering
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    
+    // Wait for ICE candidates
+    await ipPromise;
+
+    // Determine if leaking and VPN status
+    const isLeaking = publicIPs.length > 0;
+    const vpnDetected = localIPs.length > 0 && publicIPs.length === 0;
+    
+    let risk: WebRTCLeakResult['risk'] = 'low';
+    if (publicIPs.length > 1) {
+      risk = 'critical'; // Multiple public IPs = VPN leak
+    } else if (isLeaking) {
+      risk = 'high';
+    }
+
+    return {
+      localIPs,
+      publicIPs,
+      isLeaking,
+      vpnDetected,
+      risk,
+      technique: 'WebRTC',
+    };
+
+  } catch (error) {
+    console.error('[FingerprintDetection] WebRTC detection failed:', error);
+    return {
+      localIPs: [],
+      publicIPs: [],
+      isLeaking: false,
+      vpnDetected: false,
+      risk: 'low',
+      technique: 'WebRTC',
+    };
+  }
+}
+
+/**
+ * Detect hardware concurrency (CPU cores) and device memory
+ */
+export function detectHardwareConcurrency(): HardwareConcurrencyResult {
+  const cores = navigator.hardwareConcurrency || 0;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || null;
+  
+  // Classify hardware
+  let hardwareClass: HardwareConcurrencyResult['hardwareClass'] = 'medium';
+  
+  if (cores >= 16 || (memory && memory >= 16)) {
+    hardwareClass = 'very-high';
+  } else if (cores >= 8 || (memory && memory >= 8)) {
+    hardwareClass = 'high';
+  } else if (cores <= 2 || (memory && memory <= 2)) {
+    hardwareClass = 'low';
+  }
+
+  return {
+    cores,
+    memory,
+    hardwareClass,
+    risk: 'low',
+    technique: 'Hardware',
+  };
+}
+
+/**
+ * Detect screen properties for fingerprinting
+ */
+export function detectScreenProperties(): ScreenPropertiesResult {
+  const width = screen.width;
+  const height = screen.height;
+  const colorDepth = screen.colorDepth;
+  const pixelRatio = window.devicePixelRatio || 1;
+  const availWidth = screen.availWidth;
+  const availHeight = screen.availHeight;
+  
+  // Calculate uniqueness score (0-100)
+  // Common resolutions are less unique
+  const commonResolutions = [
+    '1920x1080', '1366x768', '1536x864', '1440x900', 
+    '1280x720', '2560x1440', '3840x2160', '1280x800'
+  ];
+  
+  const resolution = `${width}x${height}`;
+  let uniqueness = 50;
+  
+  if (commonResolutions.includes(resolution)) {
+    uniqueness = 20;
+  } else {
+    uniqueness = 70;
+  }
+  
+  // Unusual pixel ratio increases uniqueness
+  if (pixelRatio !== 1 && pixelRatio !== 2) {
+    uniqueness += 15;
+  }
+  
+  // Unusual color depth
+  if (colorDepth !== 24 && colorDepth !== 32) {
+    uniqueness += 10;
+  }
+
+  return {
+    resolution,
+    colorDepth,
+    pixelRatio,
+    availableResolution: `${availWidth}x${availHeight}`,
+    uniqueness: Math.min(uniqueness, 100),
+    risk: 'medium',
+    technique: 'Screen',
+  };
+}
+
+/**
+ * Detect timezone and locale information for geographic fingerprinting
+ */
+export function detectTimezoneLocale(): TimezoneLocaleResult {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  
+  // Get timezone string
+  let timezone = 'Unknown';
+  try {
+    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    // Intl not available
+  }
+  
+  // Get date format preference
+  let dateFormat = 'Unknown';
+  try {
+    const dateFormatter = new Intl.DateTimeFormat();
+    const parts = dateFormatter.formatToParts(now);
+    const order = parts
+      .filter(p => ['day', 'month', 'year'].includes(p.type))
+      .map(p => p.type[0].toUpperCase())
+      .join('/');
+    dateFormat = order || 'Unknown';
+  } catch {
+    // Intl not available
+  }
+  
+  // Get number format preference
+  let numberFormat = 'Unknown';
+  try {
+    const formatted = new Intl.NumberFormat().format(1234567.89);
+    // Detect decimal and thousand separators
+    const hasCommaDecimal = formatted.includes(',89') || formatted.includes(',9');
+    numberFormat = hasCommaDecimal ? 'European (1.234.567,89)' : 'US/UK (1,234,567.89)';
+  } catch {
+    // Intl not available
+  }
+  
+  // Detect mismatch (timezone vs locale settings)
+  let mismatch = false;
+  try {
+    const locale = navigator.language || 'en';
+    const localeRegion = locale.split('-')[1]?.toUpperCase();
+    
+    // Check if timezone matches expected locale region
+    if (localeRegion && timezone !== 'Unknown') {
+      const tzRegionMap: Record<string, string[]> = {
+        'US': ['America/'],
+        'GB': ['Europe/London'],
+        'DE': ['Europe/Berlin'],
+        'FR': ['Europe/Paris'],
+        'JP': ['Asia/Tokyo'],
+        'CN': ['Asia/Shanghai'],
+      };
+      
+      const expectedPrefixes = tzRegionMap[localeRegion];
+      if (expectedPrefixes && !expectedPrefixes.some(p => timezone.startsWith(p))) {
+        mismatch = true;
+      }
+    }
+  } catch {
+    // Error checking mismatch
+  }
+
+  return {
+    timezone,
+    offset,
+    dateFormat,
+    numberFormat,
+    mismatch,
+    risk: 'medium',
+    technique: 'Timezone',
+  };
+}
+
+/**
+ * Detect battery status (if available)
+ * ⚠️ PRIVACY WARNING: Battery API can be used for fingerprinting
+ */
+export async function detectBatteryStatus(): Promise<BatteryStatusResult> {
+  const result: BatteryStatusResult = {
+    level: null,
+    charging: null,
+    available: false,
+    chargingTime: null,
+    dischargingTime: null,
+    risk: 'low',
+    technique: 'Battery',
+  };
+
+  try {
+    // getBattery is not available on all browsers (deprecated in Firefox)
+    const nav = navigator as Navigator & { 
+      getBattery?: () => Promise<{
+        level: number;
+        charging: boolean;
+        chargingTime: number;
+        dischargingTime: number;
+      }>;
+    };
+
+    if (!nav.getBattery) {
+      console.log('[FingerprintDetection] Battery API not available');
+      return result;
+    }
+
+    const battery = await nav.getBattery();
+    
+    result.available = true;
+    result.level = Math.round(battery.level * 100);
+    result.charging = battery.charging;
+    result.chargingTime = battery.chargingTime === Infinity ? null : battery.chargingTime;
+    result.dischargingTime = battery.dischargingTime === Infinity ? null : battery.dischargingTime;
+
+  } catch (error) {
+    console.error('[FingerprintDetection] Battery detection failed:', error);
+  }
+
+  return result;
+}
+
+/**
+ * Enumerate media devices (cameras, microphones, speakers)
+ * ⚠️ PRIVACY WARNING: Requires user permission for full labels
+ */
+export async function detectMediaDevices(): Promise<MediaDevicesResult> {
+  const result: MediaDevicesResult = {
+    videoInputs: 0,
+    audioInputs: 0,
+    audioOutputs: 0,
+    deviceLabels: [],
+    permissionGranted: false,
+    risk: 'medium',
+    technique: 'MediaDevices',
+  };
+
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      console.log('[FingerprintDetection] MediaDevices API not available');
+      return result;
+    }
+
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    
+    devices.forEach((device) => {
+      switch (device.kind) {
+        case 'videoinput':
+          result.videoInputs++;
+          break;
+        case 'audioinput':
+          result.audioInputs++;
+          break;
+        case 'audiooutput':
+          result.audioOutputs++;
+          break;
+      }
+      
+      // Check if we have permission (labels are only available with permission)
+      if (device.label && device.label.length > 0) {
+        result.permissionGranted = true;
+        result.deviceLabels.push(device.label);
+      }
+    });
+
+  } catch (error) {
+    console.error('[FingerprintDetection] Media devices detection failed:', error);
+  }
+
+  return result;
+}
+
+/**
+ * Run all advanced fingerprint detections
+ */
+export async function detectAdvancedFingerprints(): Promise<{
+  webrtc: WebRTCLeakResult;
+  hardware: HardwareConcurrencyResult;
+  screen: ScreenPropertiesResult;
+  timezone: TimezoneLocaleResult;
+  battery: BatteryStatusResult;
+  mediaDevices: MediaDevicesResult;
+}> {
+  const [webrtc, battery, mediaDevices] = await Promise.all([
+    detectWebRTCLeak(),
+    detectBatteryStatus(),
+    detectMediaDevices(),
+  ]);
+
+  // Synchronous detections
+  const hardware = detectHardwareConcurrency();
+  const screen = detectScreenProperties();
+  const timezone = detectTimezoneLocale();
+
+  return {
+    webrtc,
+    hardware,
+    screen,
+    timezone,
+    battery,
+    mediaDevices,
   };
 }
