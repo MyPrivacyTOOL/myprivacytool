@@ -172,16 +172,16 @@ const Index = () => {
       {/* Full-page Matrix Rain Background */}
       <MatrixRain fadeBottom={true} />
       
-      {/* Content Layer */}
-      <div className="relative z-10">
+      {/* Content Layer - with safe area insets for iPhone */}
+      <div className="relative z-10" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Navbar */}
         <nav className="bg-white" role="navigation" aria-label="Main navigation">
-          <div className="container mx-auto px-4 flex items-center justify-between">
-            <div className="flex items-center -my-10">
+          <div className="container mx-auto px-3 sm:px-4 flex items-center justify-between">
+            <div className="flex items-center -my-8 sm:-my-10">
               <img 
                 src={logoHeader} 
                 alt="MyPrivacyTOOL.IO header logo - Digital privacy protection" 
-                className="h-40 md:h-48 object-contain"
+                className="h-28 sm:h-40 md:h-48 object-contain"
                 width="200"
                 height="192"
               />
@@ -191,23 +191,23 @@ const Index = () => {
             <div className="flex items-center gap-2">
               <Link 
                 to="/device-orientation"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium text-sm hover:opacity-90 transition-opacity shadow-md"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium text-xs sm:text-sm hover:opacity-90 transition-opacity shadow-md"
               >
                 <Smartphone className="w-4 h-4" />
                 <span className="hidden sm:inline">Device Tracking</span>
-                <span className="sm:hidden">📱</span>
+                <span className="sm:hidden">Track</span>
               </Link>
             </div>
           </div>
         </nav>
 
         {/* Hero Section with Shadow Hands */}
-        <section className="relative h-[400px] md:h-[500px]" aria-labelledby="hero-heading">
+        <section className="relative h-[280px] sm:h-[350px] md:h-[500px]" aria-labelledby="hero-heading">
           <ShadowHands />
           <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10">
             <h1 
               id="hero-heading"
-              className="text-4xl md:text-6xl font-bold mb-6 text-center leading-tight text-white drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]"
+              className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-white drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]"
             >
               What is your Digital Shadow?
             </h1>
@@ -215,18 +215,18 @@ const Index = () => {
         </section>
 
         {/* Description Text */}
-        <section className="text-center pb-6 px-4" aria-label="Introduction">
-          <p className="text-lg text-white">
+        <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
+          <p className="text-sm sm:text-lg text-white">
             The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">6+ data points</span> about you without asking.
           </p>
-          <p className="text-lg text-white">
+          <p className="text-sm sm:text-lg text-white">
             Click the ones that are correct.
           </p>
         </section>
 
         {/* Live Device Tracking Hero */}
-        <section className="py-8 px-4" aria-label="Real-time device tracking">
-          <div className="max-w-sm mx-auto">
+        <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
+          <div className="max-w-[280px] sm:max-w-sm mx-auto">
             <DeviceIcon 
               deviceType={liveDeviceData?.device?.type || 'Smartphone'}
               rotationAngle={orientation.angle}

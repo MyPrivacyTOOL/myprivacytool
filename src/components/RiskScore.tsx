@@ -19,11 +19,11 @@ export default function RiskScore({ confirmed, total }: RiskScoreProps) {
   const risk = getRiskLevel(percentage);
 
   return (
-    <div className="bg-black/40 border border-green-500/30 rounded-xl p-6 mx-auto mb-4 shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+    <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 sm:p-6 mx-2 sm:mx-auto mb-4 shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm max-w-[460px]">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6">
         {/* Score Circle */}
-        <div className="relative">
-          <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+        <div className="relative flex-shrink-0">
+          <svg className="w-20 h-20 sm:w-28 sm:h-28 -rotate-90" viewBox="0 0 100 100">
             {/* Background circle */}
             <circle
               cx="50"
@@ -48,31 +48,31 @@ export default function RiskScore({ confirmed, total }: RiskScoreProps) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={cn("text-2xl font-bold", percentage >= 80 ? 'text-red-500' : percentage >= 50 ? 'text-yellow-500' : 'text-green-400')} style={{ textShadow: '0 0 10px currentColor' }}>
+            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-red-500' : percentage >= 50 ? 'text-yellow-500' : 'text-green-400')} style={{ textShadow: '0 0 10px currentColor' }}>
               {percentage}%
             </span>
           </div>
         </div>
 
         {/* Risk Info */}
-        <div className="flex-1 text-center md:text-left">
+        <div className="flex-1 text-center sm:text-left">
           <div className={cn(
-            "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold mb-2 border",
+            "inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-2 border",
             percentage >= 80 ? "bg-red-500/10 text-red-400 border-red-500/30" : 
             percentage >= 50 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" : 
             "bg-green-500/10 text-green-400 border-green-500/30"
           )}>
-            <risk.Icon className="w-4 h-4" />
+            <risk.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {risk.label}
           </div>
 
-          <div className="text-green-300/70">
+          <div className="text-green-300/70 text-sm sm:text-base">
             <span className="font-medium text-green-400">{confirmed}</span> of{' '}
             <span className="font-medium text-green-400">{total}</span> data points confirmed
           </div>
 
           {/* Progress bar */}
-          <div className="mt-3 h-2 bg-green-900/30 rounded-full overflow-hidden max-w-xs mx-auto md:mx-0 border border-green-500/20">
+          <div className="mt-2 sm:mt-3 h-1.5 sm:h-2 bg-green-900/30 rounded-full overflow-hidden max-w-xs mx-auto sm:mx-0 border border-green-500/20">
             <div 
               className={cn(
                 "h-full rounded-full transition-all duration-500 ease-out",

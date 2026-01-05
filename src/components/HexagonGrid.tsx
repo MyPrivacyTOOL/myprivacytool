@@ -157,15 +157,16 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     setHoveredHexagon(data);
   };
 
-  // Hexagon size for calculations
-  const hexWidth = 170;
-  const hexHeight = 170;
-  const gap = 12;
+  // Responsive hexagon sizing
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+  const hexWidth = isMobile ? 130 : 170;
+  const hexHeight = isMobile ? 130 : 170;
+  const gap = isMobile ? 8 : 12;
   const hSpacing = hexWidth * 0.87 + gap;
   const vSpacing = hexHeight * 0.75 + gap;
 
-  // Generate positions dynamically for 3-2-3-2 honeycomb pattern (3 on top)
-  const topPadding = 20;
+  // Generate positions dynamically for mobile-friendly pattern
+  const topPadding = 10;
   
   const generatePositions = (count: number) => {
     const positions: { x: number; y: number }[] = [];
@@ -173,15 +174,23 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     let row = 0;
     
     while (currentIndex < count) {
+      // On mobile: 2-2-2 pattern, on desktop: 3-2-3-2
       const isEvenRow = row % 2 === 0;
-      const hexagonsInRow = isEvenRow ? 3 : 2;
+      const hexagonsInRow = isMobile ? 2 : (isEvenRow ? 3 : 2);
       
       for (let col = 0; col < hexagonsInRow && currentIndex < count; col++) {
         let x: number;
-        if (isEvenRow) {
-          x = hSpacing * col;
+        if (isMobile) {
+          // Mobile: centered 2-column layout with offset rows
+          const offset = isEvenRow ? 0 : hSpacing * 0.5;
+          x = offset + hSpacing * col;
         } else {
-          x = hSpacing * (0.5 + col);
+          // Desktop: 3-2-3-2 pattern
+          if (isEvenRow) {
+            x = hSpacing * col;
+          } else {
+            x = hSpacing * (0.5 + col);
+          }
         }
         const y = topPadding + vSpacing * row;
         positions.push({ x, y });
@@ -199,17 +208,17 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   // Calculate container size based on visible hexagons
   const visiblePositions = positions.slice(0, visibleCount);
   const maxY = visiblePositions.length > 0 ? Math.max(...visiblePositions.map(p => p.y)) : 0;
-  const containerWidth = hSpacing * 2 + hexWidth;
+  const containerWidth = isMobile ? (hSpacing * 1.5 + hexWidth) : (hSpacing * 2 + hexWidth);
   const containerHeight = maxY + hexHeight;
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-8">
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
       {/* Title Section */}
-      <div className="text-center mb-8">
-        <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+      <div className="text-center mb-4 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2">
           YOUR DIGITAL SHADOW
         </h2>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           We found {visibleCount} data points about you without asking.
           {confirmedCount >= 5 && visibleCount < 8 && ' Deeper scan unlocked...'}
         </p>

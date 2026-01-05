@@ -252,7 +252,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           setIsOpen(true);
           refreshData();
         }}
-        className="fixed bottom-4 right-4 z-50 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 hover:bg-yellow-500/30 transition-colors"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-2 sm:right-4 z-50 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 hover:bg-yellow-500/30 transition-colors"
         title="Open Voice Debug Panel (Shift+Alt+V)"
       >
         <Bug className="w-5 h-5" />
@@ -261,7 +261,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 bg-black/95 border border-yellow-500/50 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] right-2 sm:right-4 left-2 sm:left-auto z-50 sm:w-96 bg-black/95 border border-yellow-500/50 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] max-h-[70vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-yellow-500/30">
         <div className="flex items-center gap-2">
