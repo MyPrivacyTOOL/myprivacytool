@@ -461,6 +461,70 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     return "TLS encryption protects your data in transit. I'm checking what encryption protocol this site uses.";
   }
   
+  // BEHAVIOR TRACKING HEXAGONS
+  if (label.includes('mouse tracking') || label.includes('mouse movement')) {
+    const movementMatch = value.match(/(\d+)\s*movements?/i);
+    const speedMatch = value.match(/([\d.]+)\s*px\/s/i);
+    const movements = movementMatch ? movementMatch[1] : 'many';
+    const speed = speedMatch ? speedMatch[1] : 'unknown';
+    const patternMatch = value.toLowerCase().includes('human') ? 'human' : value.toLowerCase().includes('bot') ? 'bot' : 'unknown';
+    
+    if (value.toLowerCase().includes('collecting')) {
+      return "I'm currently tracking your mouse movements. Every cursor position, speed change, and acceleration pattern creates a behavioral signature that's 97% unique. Keep moving your mouse and watch the data accumulate.";
+    }
+    return `I've been tracking your mouse movements. In just a few seconds, I recorded ${movements} movements averaging ${speed} pixels per second. Your pattern was classified as ${patternMatch}. The way you move your mouse—the speed, acceleration, and even micro-corrections—creates a behavioral signature that's 97% unique. This can identify you across different websites even without cookies.`;
+  }
+  
+  if (label.includes('keystroke') || label.includes('typing pattern')) {
+    const keystrokeMatch = value.match(/(\d+)\s*keystrokes?/i);
+    const wpmMatch = value.match(/(\d+)\s*WPM/i);
+    const keystrokes = keystrokeMatch ? parseInt(keystrokeMatch[1]) : 0;
+    const wpm = wpmMatch ? wpmMatch[1] : 'unknown';
+    
+    if (keystrokes === 0 || value.toLowerCase().includes('no input')) {
+      return "You haven't typed anything yet, but if you had, I would have captured your keystroke timing—not what you typed, just the rhythm and cadence. This creates a behavioral biometric profile as unique as a fingerprint. Every person types differently, and this can be used to identify you across sites.";
+    }
+    return `You've typed ${keystrokes} keystrokes while on this site. I didn't record what you typed—just the rhythm and timing. Your typing speed is ${wpm} words per minute with a unique cadence. Keystroke dynamics are so distinctive they're used as a form of biometric authentication. Your typing pattern is like a fingerprint—it can identify you even if you change your name or use a VPN.`;
+  }
+  
+  if (label.includes('click pattern') || label.includes('click behavior')) {
+    const clickMatch = value.match(/(\d+)\s*clicks?/i);
+    const rateMatch = value.match(/([\d.]+)\/min/i);
+    const clicks = clickMatch ? clickMatch[1] : '0';
+    const rate = rateMatch ? rateMatch[1] : 'unknown';
+    
+    return `I tracked ${clicks} clicks with an average rate of ${rate} clicks per minute. Your click patterns—where you click, how quickly you double-click, and your hesitation times—reveal your decision-making style and create another unique identifier. Combined with mouse movement, this forms a behavioral fingerprint.`;
+  }
+  
+  if (label.includes('scroll behavior') || label.includes('scroll tracking')) {
+    const depthMatch = value.match(/(\d+)%/i);
+    const scrollsMatch = value.match(/(\d+)\s*scrolls?/i);
+    const depth = depthMatch ? depthMatch[1] : '0';
+    const scrolls = scrollsMatch ? scrollsMatch[1] : '0';
+    const engagement = value.toLowerCase().includes('high') ? 'high' : value.toLowerCase().includes('medium') ? 'medium' : 'low';
+    
+    return `Your scrolling behavior shows ${depth}% page depth with ${scrolls} total scrolls. Your engagement level appears to be ${engagement}. Companies use this to measure content effectiveness and identify individual users. Your scroll patterns—how fast you scroll, where you pause, how you read—can track you across sessions and websites.`;
+  }
+  
+  if (label.includes('session duration') || label.includes('time on site')) {
+    const timeMatch = value.match(/(\d+)s?/i);
+    const time = timeMatch ? timeMatch[1] : '0';
+    const tabMatch = value.match(/(\d+)\s*tabs?/i);
+    const tabs = tabMatch ? tabMatch[1] : '0';
+    
+    return `You've been on this site for ${time} seconds. I detected ${tabs} tab switches. Session duration combined with interaction patterns helps build a comprehensive profile of your browsing behavior and engagement level. This data reveals when you're most active, how long you spend reading, and your attention patterns.`;
+  }
+  
+  if (label.includes('engagement map') || label.includes('interaction heatmap')) {
+    const hotspotMatch = value.match(/(\d+)\s*hotspots?/i);
+    const hotspots = hotspotMatch ? hotspotMatch[1] : '0';
+    
+    if (value.toLowerCase().includes('building')) {
+      return "I'm building your interaction heatmap. As you click, scroll, and move your mouse, I'm mapping where your attention focuses on the page. This reveals what interests you, how you read content, and your visual attention patterns.";
+    }
+    return `Your interaction heatmap shows ${hotspots} hotspots of high activity. These engagement zones reveal what interests you, how you read content, and your visual attention patterns. This data is valuable for both user tracking and interface optimization. Every zone of high activity tells a story about your interests and behavior.`;
+  }
+  
   return `${hexagonData.label} is part of your digital shadow.`;
 };
 
@@ -608,6 +672,26 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
     return "your encryption is strong. Continue using modern browsers that enforce secure connections";
   }
   
+  // Behavior tracking recommendations
+  if (label.includes('mouse tracking') || label.includes('mouse movement')) {
+    return "use mouse movement randomizers like MouseJail, though they have limited effectiveness. Behavioral patterns are nearly impossible to fully mask. The best defense is awareness";
+  }
+  if (label.includes('keystroke') || label.includes('typing pattern')) {
+    return "vary your typing speed and patterns consciously. Use autofill instead of typing passwords and sensitive data. However, be aware that true protection against keystroke dynamics is nearly impossible";
+  }
+  if (label.includes('click pattern') || label.includes('click behavior')) {
+    return "vary your clicking behavior and use keyboard navigation when possible. Tab and Enter keys are harder to profile than mouse clicks";
+  }
+  if (label.includes('scroll behavior') || label.includes('scroll tracking')) {
+    return "use keyboard shortcuts like Page Up/Down and arrow keys instead of scrolling. This makes your scrolling patterns less predictable, though not invisible";
+  }
+  if (label.includes('session duration') || label.includes('time on site')) {
+    return "close tabs you're not actively using. Session tracking is legitimate for most purposes, but be aware that your browsing duration patterns are being recorded";
+  }
+  if (label.includes('engagement map') || label.includes('interaction heatmap')) {
+    return "understand that your interaction patterns are being mapped on most websites. There's no way to prevent this without completely avoiding mouse and touch interactions. Awareness is your best defense";
+  }
+  
   if (riskLevel === 'high') {
     if (label.includes('location')) return "use a VPN to mask your real location";
     if (label.includes('browser')) return "clear your cookies and enable tracking protection";
@@ -646,6 +730,52 @@ const getProgressFeedback = (confirmedCount: number, totalCount: number, previou
   }
   
   return "";
+};
+
+// Generate overall behavior assessment message
+const generateBehaviorAssessmentMessage = (
+  mouseMovements: number,
+  keystrokes: number,
+  clicks: number,
+  scrollDepth: number,
+  timeOnSite: number
+): string => {
+  const dataPoints = [
+    mouseMovements > 0,
+    keystrokes > 0,
+    clicks > 0,
+    scrollDepth > 0,
+    timeOnSite > 0
+  ].filter(Boolean).length;
+  
+  const uniquenessPercentage = Math.min(95, 60 + (dataPoints * 7));
+  
+  return `Behavioral tracking is perhaps the most insidious form of surveillance because it works without cookies or storage, can't be blocked by privacy tools, continues even in incognito mode, is completely invisible to users, and is highly accurate for identification. Your combined behavioral signature—mouse, keyboard, clicks, scrolls, and timing—is approximately ${uniquenessPercentage}% unique. This means you can be tracked and identified across websites even if you use a VPN, block cookies, randomize your fingerprint, and browse in private mode. I need to be honest: protecting against behavioral tracking is nearly impossible. The only real defense is awareness. Know that every movement, every click, every scroll is being recorded, analyzed, and used to build a profile of you.`;
+};
+
+// Generate final comprehensive summary
+const generateFinalSummary = (
+  confirmedCount: number,
+  totalCount: number,
+  riskScore: number,
+  fingerprintUniqueness?: number
+): string => {
+  const riskLevel = riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low';
+  const uniquenessText = fingerprintUniqueness ? `${fingerprintUniqueness}% unique` : 'highly trackable';
+  
+  let summary = `I've now analyzed all ${confirmedCount} aspects of your digital shadow across 7 categories: your device and network, your language and location, your physical device orientation, your browser fingerprint which is ${uniquenessText}, your stored data, your connected accounts, your security vulnerabilities, and your behavioral patterns. `;
+  
+  summary += `Your overall privacy risk score is ${riskScore} out of 100. `;
+  
+  if (riskLevel === 'high') {
+    summary += `This is concerning. You're leaving a significant digital trail that can be used to track and identify you across the web. I recommend taking immediate action on the critical issues I've identified.`;
+  } else if (riskLevel === 'medium') {
+    summary += `You have moderate exposure. While you're taking some privacy precautions, there are still gaps that could be exploited. Focus on the high-risk items I've flagged.`;
+  } else {
+    summary += `Impressive! You're doing better than most users at protecting your privacy. Keep up the good habits and stay vigilant about new tracking methods.`;
+  }
+  
+  return summary;
 };
 
 // Generate Alice's 4-part structured response
@@ -869,6 +999,23 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else {
           newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
         }
+      // BEHAVIOR HEXAGONS - Unconfirmed messages
+      } else if (category === 'behavior') {
+        if (label.includes('mouse tracking') || label.includes('mouse movement')) {
+          newMessage = `🖱️ Mouse Tracking: ${hexagonData.value}. Your movement patterns are 97% unique. I'm recording speed, acceleration, and micro-corrections. Click to confirm.`;
+        } else if (label.includes('keystroke') || label.includes('typing')) {
+          newMessage = `⌨️ Keystroke Dynamics: ${hexagonData.value}. I'm capturing your typing rhythm—not content. This biometric can identify you. Click to confirm.`;
+        } else if (label.includes('click')) {
+          newMessage = `👆 Click Patterns: ${hexagonData.value}. Your click frequency, targets, and timing reveal decision-making style. Click to confirm.`;
+        } else if (label.includes('scroll')) {
+          newMessage = `📜 Scroll Behavior: ${hexagonData.value}. Your scrolling patterns reveal reading habits and engagement. Click to confirm.`;
+        } else if (label.includes('session') || label.includes('time')) {
+          newMessage = `⏱️ Session Duration: ${hexagonData.value}. Time on site plus activity patterns build your behavioral profile. Click to confirm.`;
+        } else if (label.includes('engagement') || label.includes('heatmap')) {
+          newMessage = `🔥 Engagement Map: ${hexagonData.value}. Your interaction hotspots reveal attention patterns and interests. Click to confirm.`;
+        } else {
+          newMessage = `${hexagonData.label}: ${hexagonData.value}. Behavioral tracking creates a unique signature. Click to confirm.`;
+        }
       } else {
         newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
       }
@@ -896,10 +1043,20 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       // Advanced fingerprinting wave
       newMessage = `Advanced fingerprinting scan active! I'm now detecting WebRTC leaks, hardware profiles, and geographic indicators. These are the most invasive tracking methods.`;
       trackVoiceAIMessage('advanced_fingerprint_wave');
-    } else if (confirmedCount >= 23 && confirmedCount < totalCount) {
+    } else if (confirmedCount >= 23 && confirmedCount < 40) {
       newMessage = `Deep fingerprint analysis complete! I've mapped 12 fingerprinting methods. Your complete technical profile reveals how uniquely trackable you are.`;
-    } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0) {
+    } else if (confirmedCount >= 40 && confirmedCount < 46) {
+      // Behavior tracking wave
+      newMessage = `🖱️ Behavioral tracking active! I'm now analyzing your mouse movements, typing patterns, clicks, and scrolls. This is the most insidious form of tracking—it cannot be blocked.`;
+      trackVoiceAIMessage('behavior_wave');
+    } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= 46) {
+      newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that's approximately 90% unique. This can identify you even in incognito mode.`;
+    } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < 46) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow. This is what attackers can find about you with just $50.`;
+    } else if (confirmedCount === totalCount && totalCount >= 46) {
+      // Final comprehensive summary for full 46 hexagons
+      newMessage = `COMPLETE! I've analyzed all 46 aspects of your digital shadow across 7 categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
+      trackVoiceAIMessage('full_scan_complete');
     } else if (confirmedCount === totalCount && totalCount > 0) {
       newMessage = `Complete! Your digital shadow is fully mapped. This data is being sold by 100+ data brokers right now. Ready to take back control?`;
     } else if (hexagonData?.confirmed) {
@@ -947,6 +1104,24 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
         }
         trackVoiceAIMessage('fingerprint_confirmed');
+      // BEHAVIOR HEXAGONS - Confirmed messages
+      } else if (category === 'behavior') {
+        if (label.includes('mouse tracking') || label.includes('mouse movement')) {
+          newMessage = `🖱️ Mouse tracking confirmed! Your movement patterns—speed, acceleration, micro-corrections—create a 97% unique behavioral signature. This can identify you across websites even without cookies.`;
+        } else if (label.includes('keystroke') || label.includes('typing')) {
+          newMessage = `⌨️ Keystroke dynamics confirmed! Your typing rhythm is like a fingerprint. Websites use this for biometric authentication and cross-site tracking.`;
+        } else if (label.includes('click')) {
+          newMessage = `👆 Click patterns confirmed! Your click frequency, hesitation times, and target preferences reveal your decision-making style.`;
+        } else if (label.includes('scroll')) {
+          newMessage = `📜 Scroll behavior confirmed! Your scrolling patterns—depth, speed, pauses—reveal reading habits and can track you across sessions.`;
+        } else if (label.includes('session') || label.includes('time')) {
+          newMessage = `⏱️ Session duration confirmed! Your time patterns combined with interaction data build a comprehensive behavioral profile.`;
+        } else if (label.includes('engagement') || label.includes('heatmap')) {
+          newMessage = `🔥 Engagement map confirmed! Your attention hotspots reveal interests and visual patterns. This is the most insidious form of tracking—invisible and unblockable.`;
+        } else {
+          newMessage = `${hexagonData.label} confirmed! Behavioral tracking cannot be blocked by privacy tools. Awareness is your only defense.`;
+        }
+        trackVoiceAIMessage('behavior_confirmed');
       } else {
         newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
       }
