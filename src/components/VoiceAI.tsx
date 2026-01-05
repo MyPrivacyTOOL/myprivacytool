@@ -249,6 +249,51 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     return "Your device orientation and motion data creates a behavioral signature unique to how you hold your device.";
   }
   
+  // SOCIAL & ACCOUNTS HEXAGONS
+  if (label.includes('google account') || label.includes('google services')) {
+    if (value.toLowerCase().includes('not detected') || value === '0 services') {
+      return "You're not logged into Google, which limits their ability to track you across the web. This is excellent for privacy. Google cannot link your browsing behavior to your advertising profile.";
+    }
+    const serviceMatch = value.match(/(\d+)\s*services?/i);
+    const serviceCount = serviceMatch ? parseInt(serviceMatch[1]) : 1;
+    return `I detected you're logged into Google services. This is significant because Google can now track you across approximately 80% of websites through Google Analytics, even when you're not using Google products directly. Every YouTube video, every search, every Gmail you read—it's all connected to build your advertising profile. With ${serviceCount > 1 ? serviceCount + ' services' : 'your account'} active, Google has deep visibility into your online behavior.`;
+  }
+  
+  if (label.includes('meta services') || label.includes('facebook')) {
+    if (value.toLowerCase().includes('not detected') || value === '0 services') {
+      return "No Meta login detected, which significantly reduces cross-site tracking. Facebook cannot link your browsing behavior to your social profile.";
+    }
+    const serviceMatch = value.match(/(\d+)\s*services?/i);
+    const serviceCount = serviceMatch ? parseInt(serviceMatch[1]) : 1;
+    return `You're logged into Meta services. Facebook can track you on any site with a Like button, Share button, or Facebook Pixel—that's millions of sites. Even if you never click these buttons, simply being logged in allows Facebook to see every page you visit that has their tracking code. With ${serviceCount > 1 ? serviceCount + ' connected services' : 'your account active'}, Meta is building a comprehensive profile of your interests and social connections.`;
+  }
+  
+  if (label.includes('microsoft account') || label.includes('microsoft services')) {
+    if (value.toLowerCase().includes('not detected') || value === '0 services') {
+      return "No Microsoft login detected on this browser. This limits Microsoft's ability to link your browsing to your professional identity.";
+    }
+    return "Microsoft account detected. While less invasive than Google or Facebook, they still track your Office 365 usage, Outlook emails, and LinkedIn activity if connected. Your professional identity is being monitored across their ecosystem.";
+  }
+  
+  if (label.includes('social platforms') || label.includes('social media')) {
+    const platformMatch = value.match(/(\d+)\s*platforms?/i);
+    const platformCount = platformMatch ? parseInt(platformMatch[1]) : 0;
+    
+    if (platformCount === 0 || value.toLowerCase().includes('no platforms')) {
+      return "No social media logins detected. This is excellent for privacy—social platforms cannot link your browsing to your accounts.";
+    }
+    return `You're logged into ${platformCount} social platform${platformCount > 1 ? 's' : ''}. Each of these can track your activity on third-party sites. For example, Twitter's tracking pixel appears on news sites, LinkedIn tracks you on job boards, and Reddit tracks you across countless forums. Combined, these platforms are building profiles of your interests, political views, and social connections.`;
+  }
+  
+  if (label.includes('cross-site identity') || label.includes('account linking') || label.includes('cross-site')) {
+    if (value.toLowerCase().includes('not linked') || value === '0 connections') {
+      return "Good news—I didn't detect cross-site Single Sign-On usage. This limits how services can link your identity across different websites. Your accounts appear isolated from each other.";
+    }
+    const connectionMatch = value.match(/(\d+)\s*connections?/i);
+    const connections = connectionMatch ? parseInt(connectionMatch[1]) : 1;
+    return `CRITICAL: I detected Single Sign-On usage with ${connections > 1 ? connections + ' connections' : 'active linking'}. You're using a major provider to log into other websites. This is extremely privacy-invasive because the SSO provider receives a notification every time you visit any site using their login—giving them your complete browsing history across all connected sites. This is one of the most comprehensive tracking methods I can detect.`;
+  }
+  
   // STORAGE HEXAGONS
   if (label.includes('cookies') || label === 'cookies') {
     // Parse cookie info from value
@@ -394,6 +439,40 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
       return "be cautious about which sites you allow offline features. You can unregister service workers in browser DevTools under Application";
     }
     return "cache storage improves website speed. Clear it periodically if you want to free up space";
+  }
+  
+  // Social & Accounts recommendations
+  if (label.includes('google account') || label.includes('google services')) {
+    if (!value.toLowerCase().includes('not detected') && value !== '0 services') {
+      return "log out of Google when not actively using their services. Use Firefox Multi-Account Containers to isolate Google from your other browsing. Consider using DuckDuckGo for searches instead";
+    }
+    return "continue keeping Google logged out for better privacy across the web";
+  }
+  if (label.includes('meta services') || label.includes('facebook')) {
+    if (!value.toLowerCase().includes('not detected') && value !== '0 services') {
+      return "log out of Facebook immediately when done. Use a separate browser just for social media to prevent cross-site tracking. Install Facebook Container extension in Firefox";
+    }
+    return "keep Meta services logged out to prevent their pixel from tracking you across the web";
+  }
+  if (label.includes('microsoft account') || label.includes('microsoft services')) {
+    if (!value.toLowerCase().includes('not detected') && value !== '0 services') {
+      return "consider separating work and personal browsing. Use different browsers or profiles for Microsoft services versus personal browsing";
+    }
+    return "maintain your current separation from Microsoft services";
+  }
+  if (label.includes('social platforms') || label.includes('social media')) {
+    const platformMatch = value.match(/(\d+)\s*platforms?/i);
+    const platformCount = platformMatch ? parseInt(platformMatch[1]) : 0;
+    if (platformCount > 0) {
+      return "log out of social platforms when not using them. Each logged-in platform adds to your cross-site tracking exposure. Use dedicated apps instead of web versions when possible";
+    }
+    return "continue keeping social media isolated from your regular browsing";
+  }
+  if (label.includes('cross-site identity') || label.includes('account linking') || label.includes('cross-site')) {
+    if (!value.toLowerCase().includes('not linked') && value !== '0 connections') {
+      return "URGENTLY stop using Sign in with Google or Facebook. Create unique passwords for each site using a password manager. SSO gives tech giants your complete browsing history";
+    }
+    return "excellent choice avoiding SSO. Continue using unique passwords for each service";
   }
   
   if (riskLevel === 'high') {
