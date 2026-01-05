@@ -37,7 +37,7 @@ interface HexagonGridProps {
   deviceData?: DeviceData;
 }
 
-// Define progressive reveal thresholds - Total 40 hexagons
+// Define progressive reveal thresholds - Total 46 hexagons
 const REVEAL_THRESHOLDS = {
   initial: 5,           // Location, Device, Browser, ISP, Time Pattern
   secondWave: 5,        // After 5 confirmations: Screen, Privacy, Connection, Battery
@@ -48,6 +48,7 @@ const REVEAL_THRESHOLDS = {
   storageWave: 29,      // After 29 confirmations: Storage hexagons (5)
   socialWave: 34,       // After 34 confirmations: Social hexagons (5)
   securityWave: 39,     // After 39 confirmations: Security hexagons (6)
+  behaviorWave: 45,     // After 45 confirmations: Behavior hexagons (6)
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
@@ -92,6 +93,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   // Final summary state
   const [showFinalSummary, setShowFinalSummary] = useState(false);
   
+  // Behavior state
+  const [showBehaviorPanel, setShowBehaviorPanel] = useState(false);
+  const [behaviorConfirmedCount, setBehaviorConfirmedCount] = useState(0);
+  
   // Track which reveal waves have been triggered
   const [revealWaves, setRevealWaves] = useState({
     second: false,
@@ -102,12 +107,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     storage: false,
     social: false,
     security: false,
+    behavior: false,
   });
 
   // Get visible hexagons based on count, with proper ordering
   const getOrderedHexagons = useCallback(() => {
-    // Define category order for progressive reveal - security is last
-    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage', 'social', 'security'];
+    // Define category order for progressive reveal - behavior is last
+    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage', 'social', 'security', 'behavior'];
     
     // Sort hexagons by category order
     const sorted = [...allHexagons].sort((a, b) => {
@@ -201,7 +207,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       setRevealWaves(prev => ({ ...prev, security: true }));
       // Check for DNS leak and show critical alert if needed
       checkForCriticalSecurityIssues();
-      revealNextWave(40, Math.min(46, orderedHexagons.length));
+      revealNextWave(40, 46);
+    }
+    
+    // Behavior wave: After 45 confirmations (security complete)
+    if (confirmedCount >= REVEAL_THRESHOLDS.securityWave + 6 && !revealWaves.behavior) {
+      trackFunnelStep('behavior_scan_triggered');
+      setRevealWaves(prev => ({ ...prev, behavior: true }));
+      revealNextWave(46, Math.min(52, orderedHexagons.length));
     }
     
     // Show Language panel after language hexagons confirmed
@@ -209,8 +222,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       setShowLanguagePanel(true);
     }
     
-    // Check for final summary (all 40+ hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= 40 && !showFinalSummary) {
+    // Check for final summary (all 46+ hexagons confirmed)
+    if (confirmedCount >= visibleCount && visibleCount >= 46 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       setShowFinalSummary(true);
     }
@@ -361,6 +374,17 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         });
       }
       
+      // Track behavior confirmations
+      if (hex.category === 'behavior') {
+        setBehaviorConfirmedCount(c => {
+          const newCount = c + 1;
+          if (newCount >= 3 && !showBehaviorPanel) {
+            setShowBehaviorPanel(true);
+          }
+          return newCount;
+        });
+      }
+      
       hex.confirmed = true;
       hex.confidence = Math.min(hex.confidence + 5, 99);
     }
@@ -415,7 +439,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     return positions;
   };
 
-  const positions = generatePositions(46); // Support up to 46 hexagons (40 + 6 security)
+  const positions = generatePositions(52); // Support up to 52 hexagons (46 + 6 behavior)
   const visiblePositions = positions.slice(0, visibleCount);
   const maxY = visiblePositions.length > 0 ? Math.max(...visiblePositions.map(p => p.y)) : 0;
   const containerWidth = isMobile ? (hSpacing * 1.5 + hexWidth) : (hSpacing * 2 + hexWidth);
@@ -432,6 +456,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (visibleCount <= 35) return 'Storage analysis running...';
     if (visibleCount <= 40) return 'Social tracking scan...';
     if (visibleCount <= 46) return 'Security vulnerability check...';
+    if (visibleCount <= 52) return 'Behavior analysis active...';
     return 'Complete analysis';
   };
 
@@ -591,7 +616,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         </div>
       )}
 
-      {/* Final Summary Panel - shown after all 40 hexagons confirmed */}
+      {/* Final Summary Panel - shown after all 46 hexagons confirmed */}
       {showFinalSummary && (
         <div className="mt-8 animate-fade-in">
           <FinalSummaryPanel
