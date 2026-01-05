@@ -14,13 +14,14 @@ interface RiskScoreProps {
 export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
   // Calculate weighted risk score
   const riskData = useMemo(() => {
-    // Category weights: fingerprint is heavily weighted
+    // Category weights: fingerprint is heavily weighted, storage adds 10%
     const weights = {
-      device: 0.20,     // 20%
-      network: 0.20,    // 20%
+      device: 0.15,     // 15%
+      network: 0.15,    // 15%
       language: 0.15,   // 15%
       orientation: 0.15, // 15%
       fingerprint: 0.30, // 30%
+      storage: 0.10,    // 10%
     };
 
     let weightedScore = 0;
@@ -87,6 +88,15 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         
         weightedScore += fpRisk * weights.fingerprint;
         totalWeight += weights.fingerprint;
+      }
+
+      // Storage risk (based on tracking detection)
+      const storageCat = categoryRates['storage'];
+      if (storageCat && storageCat.total > 0) {
+        // Storage risk is based on confirmation rate and inherent tracking risk
+        const storageRisk = (storageCat.confirmed / storageCat.total) * 100;
+        weightedScore += storageRisk * weights.storage;
+        totalWeight += weights.storage;
       }
     }
 
