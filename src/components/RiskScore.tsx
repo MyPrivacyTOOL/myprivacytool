@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert } from 'lucide-react';
+import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert, Activity } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 
@@ -12,24 +12,26 @@ interface RiskScoreProps {
 }
 
 export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
-  // Calculate weighted risk score with all categories including security
+  // Calculate weighted risk score with all categories including security and behavior
   const riskData = useMemo(() => {
     // FINAL CATEGORY WEIGHTS - Total 100%
     const weights = {
-      device: 0.08,      // 8% (device + network combined)
-      privacy: 0.07,     // 7%
-      language: 0.05,    // 5%
-      orientation: 0.05, // 5%
-      fingerprint: 0.25, // 25%
-      storage: 0.10,     // 10%
-      social: 0.20,      // 20%
-      security: 0.20,    // 20% - critical weight for vulnerabilities
+      device: 0.07,      // 7% (device + network combined)
+      privacy: 0.06,     // 6%
+      language: 0.04,    // 4%
+      orientation: 0.04, // 4%
+      fingerprint: 0.22, // 22%
+      storage: 0.09,     // 9%
+      social: 0.18,      // 18%
+      security: 0.18,    // 18% - critical weight for vulnerabilities
+      behavior: 0.12,    // 12% - NEW behavior tracking
     };
 
     let weightedScore = 0;
     let totalWeight = 0;
     let socialRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
     let securityRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
+    let behaviorRiskLevel: 'low' | 'medium' | 'high' | null = null;
     let loggedInServices = 0;
     let hasGoogle = false;
     let hasFacebook = false;
@@ -39,6 +41,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
     let hasHTTPOnly = false;
     let hasOutdatedBrowser = false;
     let securityIssuesCount = 0;
+    let behaviorDataPoints = 0;
 
     if (hexagons && hexagons.length > 0) {
       // Calculate confirmation rates by category
@@ -243,6 +246,42 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         weightedScore += securityRisk * weights.security;
         totalWeight += weights.security;
       }
+
+      // Behavior risk (12%) - tracking through user interactions
+      const behaviorCat = categoryRates['behavior'];
+      if (behaviorCat && behaviorCat.total > 0) {
+        let behaviorRisk = 0;
+        
+        // Base risk from confirmation rate
+        behaviorRisk = (behaviorCat.confirmed / behaviorCat.total) * 50;
+        
+        // Track behavior data points
+        behaviorDataPoints = behaviorCat.confirmed;
+        
+        // More data points = higher risk
+        if (behaviorDataPoints >= 5) {
+          behaviorRisk += 40; // 5+ data points: +40
+        } else if (behaviorDataPoints >= 3) {
+          behaviorRisk += 25; // 3-4 data points: +25
+        } else if (behaviorDataPoints >= 1) {
+          behaviorRisk += 15; // 1-2 data points: +15
+        }
+        
+        // Cap at 100
+        behaviorRisk = Math.min(behaviorRisk, 100);
+        
+        // Determine behavior risk level
+        if (behaviorDataPoints >= 5) {
+          behaviorRiskLevel = 'high';
+        } else if (behaviorDataPoints >= 3) {
+          behaviorRiskLevel = 'medium';
+        } else {
+          behaviorRiskLevel = 'low';
+        }
+        
+        weightedScore += behaviorRisk * weights.behavior;
+        totalWeight += weights.behavior;
+      }
     }
 
     // Fallback to simple percentage if no detailed data
@@ -263,6 +302,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
       securityRiskLevel,
       securityIssuesCount,
       hasCriticalSecurity: hasDNSLeak || hasWebRTCLeak,
+      hasBehavior: hexagons?.some((h) => h.category === 'behavior' && h.confirmed) || false,
+      behaviorRiskLevel,
+      behaviorDataPoints,
     };
   }, [confirmed, total, hexagons, fingerprint]);
 
@@ -277,6 +319,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
     securityRiskLevel,
     securityIssuesCount,
     hasCriticalSecurity,
+    hasBehavior,
+    behaviorRiskLevel,
+    behaviorDataPoints,
   } = riskData;
   
   const getRiskLevel = (pct: number) => {
@@ -381,6 +426,19 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
               )}>
                 <ShieldAlert className="w-3 h-3" />
                 Security: {securityRiskLevel === 'critical' ? '🚨 Critical' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
+              </div>
+            )}
+
+            {/* Behavior tracking indicator */}
+            {hasBehavior && behaviorRiskLevel && (
+              <div className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
+                behaviorRiskLevel === 'high' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                behaviorRiskLevel === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                "bg-green-500/10 text-green-400 border-green-500/20"
+              )}>
+                <Activity className="w-3 h-3" />
+                Behavior: {behaviorDataPoints > 0 ? `${behaviorDataPoints} tracked` : 'Safe'}
               </div>
             )}
           </div>

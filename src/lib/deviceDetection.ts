@@ -101,7 +101,7 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
-  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social' | 'security';
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social' | 'security' | 'behavior';
 }
 
 // Fingerprint data interface
@@ -1350,6 +1350,138 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       dnsHexagon.risk = 'Could not complete DNS leak test. This may indicate network restrictions.';
     }
   });
+  
+  // ========== BEHAVIOR TRACKING DETECTION ==========
+  const {
+    trackMouseMovement,
+    trackTypingPatterns,
+    trackClickBehavior,
+    trackScrollBehavior,
+    trackTimeOnSite,
+    generateInteractionHeatmap,
+    isTrackingActive,
+  } = await import('./behaviorDetection');
+  
+  const behaviorHexagons: HexagonData[] = [];
+  
+  // Get current behavior data
+  const mouseData = trackMouseMovement();
+  const typingData = trackTypingPatterns();
+  const clickData = trackClickBehavior();
+  const scrollData = trackScrollBehavior();
+  const timeData = trackTimeOnSite();
+  const heatmapData = generateInteractionHeatmap();
+  
+  // 1. Mouse Movement Tracking
+  const mouseValue = !isTrackingActive() 
+    ? 'Collecting...' 
+    : mouseData.totalMovements === 0 
+      ? 'Collecting data...'
+      : `${mouseData.totalMovements} movements`;
+  
+  behaviorHexagons.push({
+    id: 'mouse-tracking',
+    label: 'Mouse Tracking',
+    value: mouseValue,
+    icon: '🖱️',
+    confidence: Math.min(Math.floor(mouseData.totalMovements / 10), 100),
+    risk: mouseData.tracked 
+      ? `Pattern: ${mouseData.pattern}. Avg speed: ${mouseData.averageSpeed.toFixed(0)} px/s. Mouse patterns can uniquely identify you - websites track movement speed, acceleration, and patterns.`
+      : 'Mouse movements are being recorded. This data reveals if you\'re human or a bot and creates a unique behavioral fingerprint.',
+    confirmed: false,
+    category: 'behavior',
+  });
+  
+  // 2. Typing Patterns
+  const typingValue = typingData.keystrokeCount === 0 
+    ? 'No input yet'
+    : `${typingData.keystrokeCount} keystrokes`;
+  
+  behaviorHexagons.push({
+    id: 'typing-patterns',
+    label: 'Keystroke Dynamics',
+    value: typingValue,
+    icon: '⌨️',
+    confidence: Math.min(typingData.keystrokeCount * 5, 100),
+    risk: typingData.hasPattern 
+      ? `Typing speed: ~${typingData.averageSpeed} WPM. Pattern detected! Your unique typing rhythm can identify you across websites - like a fingerprint.`
+      : typingData.keystrokeCount > 0 
+        ? `Timing recorded for ${typingData.keystrokeCount} keystrokes. Note: actual key content is NOT recorded, only timing.`
+        : 'Keystroke timing is recorded (not content). Your typing rhythm creates a unique signature.',
+    confirmed: false,
+    category: 'behavior',
+  });
+  
+  // 3. Click Behavior
+  const clickValue = clickData.totalClicks === 0 
+    ? 'No clicks yet'
+    : `${clickData.totalClicks} clicks`;
+  
+  behaviorHexagons.push({
+    id: 'click-patterns',
+    label: 'Click Patterns',
+    value: clickValue,
+    icon: '👆',
+    confidence: Math.min(clickData.totalClicks * 10, 100),
+    risk: clickData.totalClicks > 0 
+      ? `Pattern: ${clickData.pattern}. Rate: ${clickData.clickRate.toFixed(1)}/min. Click patterns reveal your interests and decision-making behavior.`
+      : 'Click patterns are being tracked. This reveals what you\'re interested in and how you make decisions.',
+    confirmed: false,
+    category: 'behavior',
+  });
+  
+  // 4. Scroll Tracking
+  const scrollValue = scrollData.scrollDepth === 0 
+    ? 'No scrolling yet'
+    : `${scrollData.scrollDepth}% depth`;
+  
+  behaviorHexagons.push({
+    id: 'scroll-behavior',
+    label: 'Scroll Behavior',
+    value: scrollValue,
+    icon: '📜',
+    confidence: 100,
+    risk: `Engagement: ${scrollData.engagement}. ${scrollData.totalScrolls} scrolls. Scroll patterns reveal reading habits, attention span, and content preferences.`,
+    confirmed: false,
+    category: 'behavior',
+  });
+  
+  // 5. Time on Site
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  };
+  
+  behaviorHexagons.push({
+    id: 'session-duration',
+    label: 'Session Duration',
+    value: formatTime(timeData.totalTime),
+    icon: '⏱️',
+    confidence: 100,
+    risk: `Active: ${formatTime(timeData.activeTime)}, Idle: ${formatTime(timeData.idleTime)}, Tab switches: ${timeData.tabSwitches}. Session tracking reveals your attention patterns and daily routine.`,
+    confirmed: false,
+    category: 'behavior',
+  });
+  
+  // 6. Interaction Heatmap
+  const heatmapValue = heatmapData.hotspots.length === 0 
+    ? 'Building...'
+    : `${heatmapData.hotspots.length} hotspots`;
+  
+  behaviorHexagons.push({
+    id: 'engagement-map',
+    label: 'Engagement Map',
+    value: heatmapValue,
+    icon: '🔥',
+    confidence: Math.min(heatmapData.engagementScore, 100),
+    risk: `Engagement score: ${heatmapData.engagementScore}/100. Heatmaps show exactly where you focus attention - used to optimize manipulation and track behavior.`,
+    confirmed: false,
+    category: 'behavior',
+  });
+  
+  // Add behavior hexagons
+  baseHexagons.push(...behaviorHexagons);
   
   return baseHexagons;
 }

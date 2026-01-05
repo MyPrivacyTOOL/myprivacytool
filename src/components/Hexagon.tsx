@@ -71,6 +71,12 @@ const categoryColors = {
     gradient: ['rgba(220,38,38,0.4)', 'rgba(239,68,68,0.2)'],
     bg: ['rgba(60,5,5,0.95)', 'rgba(40,0,0,0.98)'],
   },
+  behavior: {
+    primary: '#F59E0B',      // Yellow/Gold for behavior tracking
+    glow: '#FBBF24',
+    gradient: ['rgba(245,158,11,0.35)', 'rgba(251,191,36,0.15)'],
+    bg: ['rgba(45,30,5,0.95)', 'rgba(35,20,0,0.98)'],
+  },
   default: {
     primary: '#00ff41',      // Matrix green
     glow: '#00ff41',
