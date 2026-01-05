@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users } from 'lucide-react';
+import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 
@@ -12,27 +12,33 @@ interface RiskScoreProps {
 }
 
 export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
-  // Calculate weighted risk score
+  // Calculate weighted risk score with all categories including security
   const riskData = useMemo(() => {
-    // Updated category weights: social is heavily weighted (25%)
+    // FINAL CATEGORY WEIGHTS - Total 100%
     const weights = {
-      device: 0.10,      // 10% (device + network combined)
-      privacy: 0.10,     // 10%
+      device: 0.08,      // 8% (device + network combined)
+      privacy: 0.07,     // 7%
       language: 0.05,    // 5%
       orientation: 0.05, // 5%
-      fingerprint: 0.30, // 30%
+      fingerprint: 0.25, // 25%
       storage: 0.10,     // 10%
-      social: 0.25,      // 25% (highest single category)
-      other: 0.05,       // 5%
+      social: 0.20,      // 20%
+      security: 0.20,    // 20% - critical weight for vulnerabilities
     };
 
     let weightedScore = 0;
     let totalWeight = 0;
     let socialRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
+    let securityRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
     let loggedInServices = 0;
     let hasGoogle = false;
     let hasFacebook = false;
     let hasSSO = false;
+    let hasDNSLeak = false;
+    let hasWebRTCLeak = false;
+    let hasHTTPOnly = false;
+    let hasOutdatedBrowser = false;
+    let securityIssuesCount = 0;
 
     if (hexagons && hexagons.length > 0) {
       // Calculate confirmation rates by category
@@ -70,9 +76,41 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             }
           }
         }
+        
+        // Track security vulnerabilities for risk calculation
+        if (cat === 'security' && hex.confirmed) {
+          const value = hex.value?.toLowerCase() || '';
+          const label = hex.label?.toLowerCase() || '';
+          
+          if (label.includes('dns') && (value.includes('leak') || value.includes('leaking'))) {
+            hasDNSLeak = true;
+            securityIssuesCount++;
+          }
+          if (label.includes('webrtc') && value.includes('leak')) {
+            hasWebRTCLeak = true;
+            securityIssuesCount++;
+          }
+          if ((label.includes('connection') || label.includes('https')) && value.includes('insecure')) {
+            hasHTTPOnly = true;
+            securityIssuesCount++;
+          }
+          if (label.includes('browser') && (value.includes('outdated') || value.includes('vulnerable'))) {
+            hasOutdatedBrowser = true;
+            securityIssuesCount++;
+          }
+          if (label.includes('mixed') && !value.includes('none')) {
+            securityIssuesCount++;
+          }
+          if (label.includes('headers') && value.includes('weak')) {
+            securityIssuesCount++;
+          }
+          if (label.includes('encryption') && value.includes('weak')) {
+            securityIssuesCount++;
+          }
+        }
       });
 
-      // Device/network risk (combined 10%)
+      // Device/network risk (8%)
       const deviceCats = ['device', 'network'];
       const deviceTotal = deviceCats.reduce((acc, c) => acc + (categoryRates[c]?.total || 0), 0);
       const deviceConfirmed = deviceCats.reduce((acc, c) => acc + (categoryRates[c]?.confirmed || 0), 0);
@@ -81,7 +119,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         totalWeight += weights.device;
       }
 
-      // Privacy risk (10%)
+      // Privacy risk (7%)
       const privacyCats = ['privacy', 'profile'];
       const privacyTotal = privacyCats.reduce((acc, c) => acc + (categoryRates[c]?.total || 0), 0);
       const privacyConfirmed = privacyCats.reduce((acc, c) => acc + (categoryRates[c]?.confirmed || 0), 0);
@@ -104,7 +142,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         totalWeight += weights.orientation;
       }
 
-      // Fingerprint risk (30%)
+      // Fingerprint risk (25%)
       const fpCat = categoryRates['fingerprint'];
       if (fpCat && fpCat.total > 0) {
         let fpRisk = (fpCat.confirmed / fpCat.total) * 100;
@@ -131,7 +169,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         totalWeight += weights.storage;
       }
 
-      // Social risk (25%) - heavily weighted based on logged-in services
+      // Social risk (20%) - heavily weighted based on logged-in services
       const socialCat = categoryRates['social'];
       if (socialCat && socialCat.total > 0) {
         let socialRisk = 0;
@@ -170,6 +208,41 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         weightedScore += socialRisk * weights.social;
         totalWeight += weights.social;
       }
+
+      // Security risk (20%) - CRITICAL weight for vulnerabilities
+      const securityCat = categoryRates['security'];
+      if (securityCat && securityCat.total > 0) {
+        let securityRisk = 0;
+        
+        // Base risk from confirmation rate
+        securityRisk = (securityCat.confirmed / securityCat.total) * 20;
+        
+        // Critical vulnerabilities add massive risk
+        if (hasDNSLeak) securityRisk += 40;      // DNS leak: +40 (critical)
+        if (hasWebRTCLeak) securityRisk += 30;   // WebRTC leak: +30 (critical)
+        if (hasHTTPOnly) securityRisk += 20;     // HTTP only: +20
+        if (hasOutdatedBrowser) securityRisk += 25; // Outdated browser: +25
+        
+        // Additional issues
+        securityRisk += Math.min(securityIssuesCount * 10, 30);
+        
+        // Cap at 100
+        securityRisk = Math.min(securityRisk, 100);
+        
+        // Determine security risk level
+        if (hasDNSLeak || hasWebRTCLeak) {
+          securityRiskLevel = 'critical';
+        } else if (hasHTTPOnly || hasOutdatedBrowser) {
+          securityRiskLevel = 'high';
+        } else if (securityIssuesCount >= 2) {
+          securityRiskLevel = 'medium';
+        } else {
+          securityRiskLevel = 'low';
+        }
+        
+        weightedScore += securityRisk * weights.security;
+        totalWeight += weights.security;
+      }
     }
 
     // Fallback to simple percentage if no detailed data
@@ -186,10 +259,25 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
       hasSocial: hexagons?.some((h) => h.category === 'social' && h.confirmed) || false,
       socialRiskLevel,
       loggedInServices,
+      hasSecurity: hexagons?.some((h) => h.category === 'security' && h.confirmed) || false,
+      securityRiskLevel,
+      securityIssuesCount,
+      hasCriticalSecurity: hasDNSLeak || hasWebRTCLeak,
     };
   }, [confirmed, total, hexagons, fingerprint]);
 
-  const { percentage, hasFingerprint, fingerprintRisk, hasSocial, socialRiskLevel, loggedInServices } = riskData;
+  const { 
+    percentage, 
+    hasFingerprint, 
+    fingerprintRisk, 
+    hasSocial, 
+    socialRiskLevel, 
+    loggedInServices,
+    hasSecurity,
+    securityRiskLevel,
+    securityIssuesCount,
+    hasCriticalSecurity,
+  } = riskData;
   
   const getRiskLevel = (pct: number) => {
     if (pct >= 80) return { label: 'High Risk', Icon: AlertCircle };
@@ -279,6 +367,20 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
               )}>
                 <Users className="w-3 h-3" />
                 Social: {socialRiskLevel === 'critical' ? 'Critical' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
+              </div>
+            )}
+
+            {/* Security vulnerability indicator */}
+            {hasSecurity && securityRiskLevel && (
+              <div className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
+                securityRiskLevel === 'critical' ? "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse" :
+                securityRiskLevel === 'high' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                securityRiskLevel === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                "bg-green-500/10 text-green-400 border-green-500/20"
+              )}>
+                <ShieldAlert className="w-3 h-3" />
+                Security: {securityRiskLevel === 'critical' ? '🚨 Critical' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
               </div>
             )}
           </div>

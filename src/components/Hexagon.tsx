@@ -65,6 +65,12 @@ const categoryColors = {
     gradient: ['rgba(168,85,247,0.35)', 'rgba(217,70,239,0.15)'],
     bg: ['rgba(35,10,45,0.95)', 'rgba(25,5,35,0.98)'],
   },
+  security: {
+    primary: '#DC2626',      // Red for security vulnerabilities
+    glow: '#EF4444',
+    gradient: ['rgba(220,38,38,0.4)', 'rgba(239,68,68,0.2)'],
+    bg: ['rgba(60,5,5,0.95)', 'rgba(40,0,0,0.98)'],
+  },
   default: {
     primary: '#00ff41',      // Matrix green
     glow: '#00ff41',
