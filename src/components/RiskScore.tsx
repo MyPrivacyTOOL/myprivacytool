@@ -1,13 +1,110 @@
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { Shield, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Shield, AlertTriangle, AlertCircle, Fingerprint } from 'lucide-react';
+import { HexagonData } from '@/lib/deviceDetection';
+import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 
 interface RiskScoreProps {
   confirmed: number;
   total: number;
+  hexagons?: HexagonData[];
+  fingerprint?: CompositeFingerprint | null;
 }
 
-export default function RiskScore({ confirmed, total }: RiskScoreProps) {
-  const percentage = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
+  // Calculate weighted risk score
+  const riskData = useMemo(() => {
+    // Category weights: fingerprint is heavily weighted
+    const weights = {
+      device: 0.20,     // 20%
+      network: 0.20,    // 20%
+      language: 0.15,   // 15%
+      orientation: 0.15, // 15%
+      fingerprint: 0.30, // 30%
+    };
+
+    let weightedScore = 0;
+    let totalWeight = 0;
+
+    if (hexagons && hexagons.length > 0) {
+      // Calculate confirmation rates by category
+      const categoryRates: Record<string, { confirmed: number; total: number }> = {};
+      
+      hexagons.forEach((hex) => {
+        const cat = hex.category || 'device';
+        if (!categoryRates[cat]) {
+          categoryRates[cat] = { confirmed: 0, total: 0 };
+        }
+        categoryRates[cat].total++;
+        if (hex.confirmed) categoryRates[cat].confirmed++;
+      });
+
+      // Device/network risk
+      const deviceCats = ['device', 'network', 'privacy', 'profile'];
+      const deviceTotal = deviceCats.reduce(
+        (acc, c) => acc + (categoryRates[c]?.total || 0),
+        0
+      );
+      const deviceConfirmed = deviceCats.reduce(
+        (acc, c) => acc + (categoryRates[c]?.confirmed || 0),
+        0
+      );
+      if (deviceTotal > 0) {
+        weightedScore += (deviceConfirmed / deviceTotal) * 100 * (weights.device + weights.network);
+        totalWeight += weights.device + weights.network;
+      }
+
+      // Language risk
+      const langCat = categoryRates['language'];
+      if (langCat && langCat.total > 0) {
+        weightedScore += (langCat.confirmed / langCat.total) * 100 * weights.language;
+        totalWeight += weights.language;
+      }
+
+      // Orientation risk
+      const orientCat = categoryRates['orientation'];
+      if (orientCat && orientCat.total > 0) {
+        weightedScore += (orientCat.confirmed / orientCat.total) * 100 * weights.orientation;
+        totalWeight += weights.orientation;
+      }
+
+      // Fingerprint risk (heavily weighted based on uniqueness)
+      const fpCat = categoryRates['fingerprint'];
+      if (fpCat && fpCat.total > 0) {
+        let fpRisk = (fpCat.confirmed / fpCat.total) * 100;
+        
+        // Increase risk based on fingerprint uniqueness
+        if (fingerprint) {
+          const fpRiskMap = { high: 95, medium: 70, low: 40 };
+          fpRisk = Math.max(fpRisk, fpRiskMap[fingerprint.totalRisk] || fpRisk);
+          
+          // Reduce by protection effectiveness
+          if (fingerprint.protection) {
+            const reductionMap = { high: 0.4, medium: 0.25, low: 0.1, none: 0 };
+            fpRisk *= 1 - (reductionMap[fingerprint.protection.effectiveness] || 0);
+          }
+        }
+        
+        weightedScore += fpRisk * weights.fingerprint;
+        totalWeight += weights.fingerprint;
+      }
+    }
+
+    // Fallback to simple percentage if no detailed data
+    const percentage = totalWeight > 0 
+      ? Math.round(weightedScore / totalWeight)
+      : total > 0 
+        ? Math.round((confirmed / total) * 100)
+        : 0;
+
+    return {
+      percentage: Math.min(percentage, 100),
+      hasFingerprint: hexagons?.some((h) => h.category === 'fingerprint' && h.confirmed) || false,
+      fingerprintRisk: fingerprint?.totalRisk || null,
+    };
+  }, [confirmed, total, hexagons, fingerprint]);
+
+  const { percentage, hasFingerprint, fingerprintRisk } = riskData;
   
   const getRiskLevel = (pct: number) => {
     if (pct >= 80) return { label: 'High Risk', Icon: AlertCircle };
@@ -70,6 +167,19 @@ export default function RiskScore({ confirmed, total }: RiskScoreProps) {
             <span className="font-medium text-green-400">{confirmed}</span> of{' '}
             <span className="font-medium text-green-400">{total}</span> data points confirmed
           </div>
+
+          {/* Fingerprint indicator */}
+          {hasFingerprint && fingerprintRisk && (
+            <div className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs mt-2 border",
+              fingerprintRisk === 'high' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+              fingerprintRisk === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+              "bg-green-500/10 text-green-400 border-green-500/20"
+            )}>
+              <Fingerprint className="w-3 h-3" />
+              Fingerprint: {fingerprintRisk.charAt(0).toUpperCase() + fingerprintRisk.slice(1)} risk
+            </div>
+          )}
 
           {/* Progress bar */}
           <div className="mt-2 sm:mt-3 h-1.5 sm:h-2 bg-green-900/30 rounded-full overflow-hidden max-w-xs mx-auto sm:mx-0 border border-green-500/20">

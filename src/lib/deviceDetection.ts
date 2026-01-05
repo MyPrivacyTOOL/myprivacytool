@@ -352,9 +352,10 @@ export async function captureDeviceData(): Promise<DeviceData> {
   };
 }
 
-// Convert device data to hexagons (initial 5)
+// Convert device data to hexagons with proper ordering for progressive reveal
 export function generateHexagons(data: DeviceData): HexagonData[] {
-  return [
+  // Initial 5 hexagons: Location, Device, Browser, ISP, Time Pattern
+  const initialHexagons: HexagonData[] = [
     {
       id: 'location',
       label: 'Location',
@@ -411,26 +412,10 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'device',
     },
-    {
-      id: 'referrer',
-      label: 'How You Found Us',
-      value: data.session.referrer.includes('google') 
-        ? 'Google Search' 
-        : data.session.referrer.includes('facebook')
-        ? 'Facebook'
-        : data.session.referrer.includes('twitter') || data.session.referrer.includes('x.com')
-        ? 'Twitter/X'
-        : data.session.referrer.includes('linkedin')
-        ? 'LinkedIn'
-        : data.session.referrer === 'Direct'
-        ? 'Direct Visit'
-        : 'External Link',
-      icon: '🔍',
-      confidence: 100,
-      risk: 'Your browsing patterns and interests are tracked across websites.',
-      confirmed: false,
-      category: 'privacy',
-    },
+  ];
+
+  // Second wave: Screen, Privacy, Connection, Referrer (after 5 confirmations)
+  const secondWaveHexagons: HexagonData[] = [
     {
       id: 'screen',
       label: 'Screen Resolution',
@@ -453,7 +438,6 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'privacy',
     },
-    // Connection Type
     {
       id: 'connection',
       label: 'Connection Type',
@@ -464,19 +448,30 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'network',
     },
-    // Estimated Demographic
     {
-      id: 'demographic',
-      label: 'Estimated Profile',
-      value: estimateDemographic(data),
-      icon: '👤',
-      confidence: 60,
-      risk: 'Age-targeted scams (retirement fraud, health scams) are tailored to your demographic.',
+      id: 'referrer',
+      label: 'How You Found Us',
+      value: data.session.referrer.includes('google') 
+        ? 'Google Search' 
+        : data.session.referrer.includes('facebook')
+        ? 'Facebook'
+        : data.session.referrer.includes('twitter') || data.session.referrer.includes('x.com')
+        ? 'Twitter/X'
+        : data.session.referrer.includes('linkedin')
+        ? 'LinkedIn'
+        : data.session.referrer === 'Direct'
+        ? 'Direct Visit'
+        : 'External Link',
+      icon: '🔍',
+      confidence: 100,
+      risk: 'Your browsing patterns and interests are tracked across websites.',
       confirmed: false,
-      category: 'profile',
+      category: 'privacy',
     },
-    // NEW: Language hexagons for LocaleIntent integration
-    // Primary Language
+  ];
+
+  // Language wave: After 8 confirmations
+  const languageHexagons: HexagonData[] = [
     {
       id: 'primary-language',
       label: 'Primary Language',
@@ -487,7 +482,6 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'language',
     },
-    // Language Fallbacks (if multiple)
     ...(data.language.fallbackLanguages.length > 0 ? [{
       id: 'language-fallbacks',
       label: 'Language Fallbacks',
@@ -498,7 +492,6 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'language' as const,
     }] : []),
-    // Language-Location Mismatch (if detected)
     ...(data.language.hasLocationMismatch ? [{
       id: 'language-mismatch',
       label: 'Locale Mismatch',
@@ -509,8 +502,20 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confirmed: false,
       category: 'language' as const,
     }] : []),
-    // ORIENTATION HEXAGONS
-    // Device Orientation
+    {
+      id: 'demographic',
+      label: 'Estimated Profile',
+      value: estimateDemographic(data),
+      icon: '👤',
+      confidence: 60,
+      risk: 'Age-targeted scams (retirement fraud, health scams) are tailored to your demographic.',
+      confirmed: false,
+      category: 'profile',
+    },
+  ];
+
+  // Orientation wave: After 12 confirmations
+  const orientationHexagons: HexagonData[] = [
     {
       id: 'orientation',
       label: 'Orientation',
@@ -519,9 +524,8 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 100,
       risk: 'Screen orientation reveals how you hold your device and your usage patterns.',
       confirmed: false,
-      category: 'orientation' as const,
+      category: 'orientation',
     },
-    // Rotation Angle
     {
       id: 'rotation-angle',
       label: 'Rotation',
@@ -530,9 +534,8 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: 100,
       risk: 'Rotation angle can be used for device fingerprinting and behavioral analysis.',
       confirmed: false,
-      category: 'orientation' as const,
+      category: 'orientation',
     },
-    // Tilt X-Axis (Beta)
     {
       id: 'tilt-beta',
       label: 'Tilt Forward/Back',
@@ -541,9 +544,8 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: data.motion ? 95 : 0,
       risk: 'Forward/back tilt reveals your posture and device handling habits.',
       confirmed: false,
-      category: 'orientation' as const,
+      category: 'orientation',
     },
-    // Tilt Y-Axis (Gamma)
     {
       id: 'tilt-gamma',
       label: 'Tilt Left/Right',
@@ -552,9 +554,8 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
       confidence: data.motion ? 95 : 0,
       risk: 'Left/right tilt can indicate dominant hand and typing patterns.',
       confirmed: false,
-      category: 'orientation' as const,
+      category: 'orientation',
     },
-    // Motion Tracking
     {
       id: 'motion-sensors',
       label: 'Motion Sensors',
@@ -565,8 +566,16 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
         ? 'Motion sensors can track your movements and physical activity patterns.'
         : 'Motion sensors unavailable - limited behavioral tracking.',
       confirmed: false,
-      category: 'orientation' as const,
+      category: 'orientation',
     },
+  ];
+
+  // Combine all hexagons in order
+  return [
+    ...initialHexagons,
+    ...secondWaveHexagons,
+    ...languageHexagons,
+    ...orientationHexagons,
   ];
 }
 
