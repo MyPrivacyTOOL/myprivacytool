@@ -1,3 +1,11 @@
+import {
+  detectCanvasFingerprint,
+  detectWebGLFingerprint,
+  detectAudioFingerprint,
+  detectInstalledFonts,
+  detectPlugins,
+} from './fingerprintDetection';
+
 // Orientation data interface
 export interface OrientationData {
   type: 'portrait' | 'landscape';
@@ -79,7 +87,16 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
-  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation';
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint';
+}
+
+// Fingerprint data interface
+export interface FingerprintData {
+  canvas: { hash: string } | null;
+  webgl: { hash: string; renderer: string; vendor: string } | null;
+  audio: { hash: string; sampleRate: number } | null;
+  fonts: { count: number; uniqueFonts: string[] } | null;
+  plugins: { pluginCount: number; adBlocker: boolean } | null;
 }
 
 // Language code to name mapping
@@ -592,7 +609,7 @@ export function determineUserProfile(data: DeviceData): {
   };
 }
 
-// Async version that includes battery info and user profile hexagon
+// Async version that includes battery info, user profile, and fingerprint hexagons
 export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonData[]> {
   const baseHexagons = generateHexagons(data);
   
@@ -631,6 +648,101 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confirmed: false,
     category: 'profile',
   });
+  
+  // Run fingerprint detection in parallel
+  const [canvasResult, webglResult, audioResult, fontsResult, pluginsResult] = await Promise.all([
+    detectCanvasFingerprint().catch(() => null),
+    detectWebGLFingerprint().catch(() => null),
+    detectAudioFingerprint().catch(() => null),
+    detectInstalledFonts().catch(() => ({ count: 0, uniqueFonts: [], risk: 'low' as const, technique: 'Fonts' as const })),
+    detectPlugins().catch(() => ({ pluginCount: 0, plugins: [], adBlocker: false, risk: 'low' as const, technique: 'Plugins' as const })),
+  ]);
+  
+  // Add fingerprint hexagons
+  const fingerprintHexagons: HexagonData[] = [];
+  
+  // Canvas Fingerprint
+  if (canvasResult) {
+    fingerprintHexagons.push({
+      id: 'canvas-fingerprint',
+      label: 'Canvas Fingerprint',
+      value: canvasResult.hash.substring(0, 8) + '...',
+      icon: '🎨',
+      confidence: 100,
+      risk: 'Unique image rendering signature. Canvas fingerprinting creates a unique identifier based on how your browser renders graphics.',
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // WebGL Fingerprint
+  if (webglResult) {
+    const webglValue = webglResult.renderer.length > 12 
+      ? webglResult.renderer.substring(0, 12) + '...' 
+      : webglResult.renderer !== 'Unknown' 
+        ? webglResult.renderer 
+        : 'Detected';
+    fingerprintHexagons.push({
+      id: 'webgl-fingerprint',
+      label: 'WebGL Signature',
+      value: webglValue,
+      icon: '🎮',
+      confidence: 100,
+      risk: 'Graphics card identification. Your GPU model and driver can uniquely identify your device across websites.',
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // Audio Fingerprint
+  if (audioResult) {
+    fingerprintHexagons.push({
+      id: 'audio-fingerprint',
+      label: 'Audio Signature',
+      value: audioResult.hash.substring(0, 8) + '...',
+      icon: '🔊',
+      confidence: 95,
+      risk: 'Audio processing signature. The way your device processes audio creates a unique identifier.',
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // Font Detection
+  if (fontsResult && fontsResult.count > 0) {
+    fingerprintHexagons.push({
+      id: 'font-detection',
+      label: 'Installed Fonts',
+      value: `${fontsResult.count} fonts`,
+      icon: '🔤',
+      confidence: 90,
+      risk: 'System fonts reveal OS/setup. Your installed fonts create a unique profile that reveals your operating system and installed software.',
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // Plugin/Extension Detection
+  if (pluginsResult) {
+    const extensionValue = pluginsResult.adBlocker 
+      ? 'Ad Blocker: Yes' 
+      : pluginsResult.pluginCount > 0 
+        ? `${pluginsResult.pluginCount} detected` 
+        : 'None detected';
+    fingerprintHexagons.push({
+      id: 'extension-detection',
+      label: 'Extensions',
+      value: extensionValue,
+      icon: '🧩',
+      confidence: 85,
+      risk: 'Plugins and extensions. Browser extensions and plugins add to your unique fingerprint.',
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // Add fingerprint hexagons to the end
+  baseHexagons.push(...fingerprintHexagons);
   
   return baseHexagons;
 }
