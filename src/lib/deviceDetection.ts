@@ -12,6 +12,13 @@ import {
   detectBatteryStatus,
   detectMediaDevices,
 } from './fingerprintDetection';
+import {
+  detectCookies,
+  detectLocalStorage,
+  detectSessionStorage,
+  detectIndexedDB,
+  detectCacheStorage,
+} from './storageDetection';
 
 // Orientation data interface
 export interface OrientationData {
@@ -94,7 +101,7 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
-  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint';
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage';
 }
 
 // Fingerprint data interface
@@ -931,6 +938,140 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   
   // Add fingerprint hexagons to the end
   baseHexagons.push(...fingerprintHexagons);
+  
+  // ==================== STORAGE HEXAGONS ====================
+  
+  // Run storage detection in parallel
+  const [cookiesResult, localStorageResult, sessionStorageResult, indexedDBResult, cacheResult] = await Promise.all([
+    Promise.resolve(detectCookies()),
+    Promise.resolve(detectLocalStorage()),
+    Promise.resolve(detectSessionStorage()),
+    detectIndexedDB().catch(() => null),
+    detectCacheStorage().catch(() => null),
+  ]);
+  
+  const storageHexagons: HexagonData[] = [];
+  
+  // Filter out our own storage keys from tracking detection
+  const ownStorageKeys = ['fingerprint-test-history', 'fingerprint-monitoring', 'language-prediction-cache'];
+  
+  // 1. Cookies Status
+  const cookiesValue = !cookiesResult.enabled 
+    ? 'Disabled' 
+    : cookiesResult.count === 0 
+      ? 'Empty' 
+      : `${cookiesResult.count} cookies${cookiesResult.thirdParty > 0 ? ` (${cookiesResult.thirdParty} tracking)` : ''}`;
+  
+  storageHexagons.push({
+    id: 'cookies-status',
+    label: 'Cookies',
+    value: cookiesValue,
+    icon: '🍪',
+    confidence: 100,
+    risk: !cookiesResult.enabled 
+      ? 'Cookies disabled. Some websites may not function correctly.'
+      : cookiesResult.thirdParty > 0 
+        ? `${cookiesResult.thirdParty} tracking cookies detected. These can follow you across websites.`
+        : cookiesResult.count > 10
+          ? 'Many cookies stored. Consider clearing regularly for better privacy.'
+          : 'Cookies are being used for session management.',
+    confirmed: false,
+    category: 'storage',
+  });
+  
+  // 2. LocalStorage
+  const filteredLocalKeys = localStorageResult.keys.filter(k => !ownStorageKeys.includes(k));
+  const filteredTrackingKeys = localStorageResult.trackingKeys.filter(k => !ownStorageKeys.includes(k));
+  const localStorageValue = !localStorageResult.available 
+    ? 'Blocked'
+    : filteredLocalKeys.length === 0 
+      ? 'Empty'
+      : `${filteredLocalKeys.length} items (${localStorageResult.sizeKB} KB)`;
+  
+  storageHexagons.push({
+    id: 'localstorage-status',
+    label: 'Local Storage',
+    value: localStorageValue,
+    icon: '💾',
+    confidence: 100,
+    risk: !localStorageResult.available 
+      ? 'LocalStorage blocked. Good for privacy but may break some sites.'
+      : filteredTrackingKeys.length > 0 
+        ? `${filteredTrackingKeys.length} tracking keys detected: ${filteredTrackingKeys.slice(0, 3).join(', ')}. This data persists even after closing browser.`
+        : 'LocalStorage is used for site preferences and data caching.',
+    confirmed: false,
+    category: 'storage',
+  });
+  
+  // 3. SessionStorage
+  const sessionStorageValue = !sessionStorageResult.available 
+    ? 'Blocked'
+    : sessionStorageResult.itemCount === 0 
+      ? 'Empty'
+      : `${sessionStorageResult.itemCount} items (${sessionStorageResult.sizeKB} KB)`;
+  
+  storageHexagons.push({
+    id: 'sessionstorage-status',
+    label: 'Session Storage',
+    value: sessionStorageValue,
+    icon: '⏱️',
+    confidence: 100,
+    risk: 'Session storage is cleared when you close the tab. Lower tracking risk than localStorage.',
+    confirmed: false,
+    category: 'storage',
+  });
+  
+  // 4. IndexedDB
+  if (indexedDBResult) {
+    const indexedDBValue = !indexedDBResult.available 
+      ? 'Blocked'
+      : indexedDBResult.databases.length === 0 
+        ? 'Not Used'
+        : `${indexedDBResult.databases.length} database${indexedDBResult.databases.length > 1 ? 's' : ''} (${indexedDBResult.estimatedSizeMB} MB)`;
+    
+    storageHexagons.push({
+      id: 'indexeddb-status',
+      label: 'IndexedDB',
+      value: indexedDBValue,
+      icon: '🗄️',
+      confidence: 95,
+      risk: !indexedDBResult.available 
+        ? 'IndexedDB blocked. Some web apps may not work correctly.'
+        : indexedDBResult.hasTracking 
+          ? `Tracking databases detected: ${indexedDBResult.trackingDatabases.join(', ')}. These can store large amounts of persistent data.`
+          : 'IndexedDB stores complex data locally. Check which apps are using it.',
+      confirmed: false,
+      category: 'storage',
+    });
+  }
+  
+  // 5. Cache Storage & Service Worker
+  if (cacheResult) {
+    let cacheValue = 'Not Active';
+    if (cacheResult.serviceWorkerActive) {
+      cacheValue = cacheResult.cacheNames.length > 0 
+        ? `Active (${cacheResult.cacheNames.length} cache${cacheResult.cacheNames.length > 1 ? 's' : ''})`
+        : 'Active';
+    } else if (cacheResult.cacheNames.length > 0) {
+      cacheValue = `${cacheResult.cacheNames.length} cache${cacheResult.cacheNames.length > 1 ? 's' : ''}`;
+    }
+    
+    storageHexagons.push({
+      id: 'cache-status',
+      label: 'Cache & SW',
+      value: cacheValue,
+      icon: '📦',
+      confidence: 100,
+      risk: cacheResult.serviceWorkerActive 
+        ? 'Service Worker active. Can intercept network requests and run in background. Check which sites have registered workers.'
+        : 'Cache API stores offline resources. Clear periodically for privacy.',
+      confirmed: false,
+      category: 'storage',
+    });
+  }
+  
+  // Add storage hexagons
+  baseHexagons.push(...storageHexagons);
   
   return baseHexagons;
 }

@@ -38,6 +38,7 @@ const REVEAL_THRESHOLDS = {
   orientationWave: 12,  // After 12 confirmations: Orientation hexagons (5)
   fingerprintWave: 17,  // After 17 confirmations: Core fingerprint hexagons (6)
   advancedFingerprintWave: 23, // After 23 confirmations: Advanced fingerprint hexagons (6)
+  storageWave: 29,      // After 29 confirmations: Storage hexagons (5)
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
@@ -71,12 +72,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     orientation: false,
     fingerprint: false,
     advancedFingerprint: false,
+    storage: false,
   });
 
   // Get visible hexagons based on count, with proper ordering
   const getOrderedHexagons = useCallback(() => {
     // Define category order for progressive reveal
-    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint'];
+    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage'];
     
     // Sort hexagons by category order
     const sorted = [...allHexagons].sort((a, b) => {
@@ -147,7 +149,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (confirmedCount >= REVEAL_THRESHOLDS.fingerprintWave + 6 && !revealWaves.advancedFingerprint) {
       trackFunnelStep('advanced_fingerprint_scan_triggered');
       setRevealWaves(prev => ({ ...prev, advancedFingerprint: true }));
-      revealNextWave(24, Math.min(30, orderedHexagons.length));
+      revealNextWave(24, 30);
+    }
+    
+    // Storage wave: After 29 confirmations
+    if (confirmedCount >= REVEAL_THRESHOLDS.advancedFingerprintWave + 6 && !revealWaves.storage) {
+      trackFunnelStep('storage_scan_triggered');
+      setRevealWaves(prev => ({ ...prev, storage: true }));
+      revealNextWave(30, Math.min(35, orderedHexagons.length));
     }
     
     // Show Language panel after language hexagons confirmed
@@ -156,7 +165,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Check for final summary (all visible hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= 24 && !showFinalSummary) {
+    if (confirmedCount >= visibleCount && visibleCount >= 30 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       setShowFinalSummary(true);
     }
@@ -300,7 +309,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     return positions;
   };
 
-  const positions = generatePositions(30);
+  const positions = generatePositions(35);
   const visiblePositions = positions.slice(0, visibleCount);
   const maxY = visiblePositions.length > 0 ? Math.max(...visiblePositions.map(p => p.y)) : 0;
   const containerWidth = isMobile ? (hSpacing * 1.5 + hexWidth) : (hSpacing * 2 + hexWidth);
@@ -314,6 +323,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (visibleCount <= 18) return 'Motion tracking enabled...';
     if (visibleCount <= 24) return 'Fingerprint detection running...';
     if (visibleCount <= 30) return 'Advanced fingerprinting active...';
+    if (visibleCount <= 35) return 'Storage analysis running...';
     return 'Complete analysis';
   };
 

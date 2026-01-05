@@ -53,6 +53,12 @@ const categoryColors = {
     gradient: ['rgba(220,38,38,0.35)', 'rgba(220,38,38,0.15)'],
     bg: ['rgba(50,5,5,0.95)', 'rgba(35,0,0,0.98)'],
   },
+  storage: {
+    primary: '#06B6D4',      // Cyan
+    glow: '#22D3EE',
+    gradient: ['rgba(6,182,212,0.3)', 'rgba(6,182,212,0.1)'],
+    bg: ['rgba(5,25,35,0.9)', 'rgba(0,15,25,0.95)'],
+  },
   default: {
     primary: '#00ff41',      // Matrix green
     glow: '#00ff41',
