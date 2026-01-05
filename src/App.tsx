@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import LocaleIntent from "./pages/LocaleIntent";
 import TestLocale from "./pages/TestLocale";
 import DeviceOrientation from "./pages/DeviceOrientation";
+import ModelPerformance from "./pages/ModelPerformance";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/locale-intent" element={<LocaleIntent />} />
           <Route path="/test-locale" element={<TestLocale />} />
           <Route path="/device-orientation" element={<DeviceOrientation />} />
+          <Route path="/model-performance" element={<ModelPerformance />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
