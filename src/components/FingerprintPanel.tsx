@@ -3,12 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Shield, AlertTriangle, Download, Share2, CheckCircle, XCircle } from 'lucide-react';
+import { ChevronDown, Shield, AlertTriangle, Download, BarChart3, CheckCircle, XCircle } from 'lucide-react';
 import {
   calculateFingerprintUniqueness,
   CompositeFingerprint,
   ProtectionStatus,
 } from '@/lib/fingerprintDetection';
+import FingerprintComparison from './FingerprintComparison';
 
 interface FingerprintBreakdown {
   name: string;
@@ -522,25 +523,38 @@ export default function FingerprintPanel() {
           </CollapsibleContent>
         </Collapsible>
 
+        {/* Comparison Section */}
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="w-full justify-between border-red-500/30 text-red-300 hover:bg-red-950/30"
+            >
+              <span className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Compare With Others
+              </span>
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-4">
+            <FingerprintComparison 
+              fingerprint={fingerprint} 
+              uniquenessScore={uniquenessScore} 
+            />
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Export Options */}
         <div className="flex flex-wrap gap-2">
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleExportReport}
-            className="flex-1 sm:flex-none border-red-500/30 text-red-300 hover:bg-red-950/30"
+            className="flex-1 border-red-500/30 text-red-300 hover:bg-red-950/30"
           >
             <Download className="w-4 h-4 mr-2" />
             Export Report (JSON)
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            disabled
-            className="flex-1 sm:flex-none border-red-500/30 text-red-300/50"
-          >
-            <Share2 className="w-4 h-4 mr-2" />
-            Compare With Others
           </Button>
         </div>
 
