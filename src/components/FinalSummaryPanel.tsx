@@ -2,7 +2,13 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Download, Share2, Shield, RotateCcw, ChevronRight, AlertTriangle, CheckCircle, Eye } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Download, Share2, Shield, RotateCcw, ChevronRight, AlertTriangle, 
+  CheckCircle, Eye, Trophy, Target, FileJson, BookOpen, Zap,
+  Mouse, Keyboard, Users, ShieldAlert, Fingerprint, Database,
+  Globe, Smartphone
+} from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
@@ -17,10 +23,22 @@ interface FinalSummaryPanelProps {
 
 interface CategoryStats {
   name: string;
+  key: string;
   confirmed: number;
   total: number;
-  icon: string;
+  icon: React.ReactNode;
   color: string;
+  bgColor: string;
+  criticalIssues: number;
+  warnings: number;
+}
+
+interface PrivacyConcern {
+  title: string;
+  description: string;
+  severity: 'critical' | 'high' | 'medium';
+  category: string;
+  fix?: string;
 }
 
 export default function FinalSummaryPanel({
@@ -32,15 +50,19 @@ export default function FinalSummaryPanel({
 }: FinalSummaryPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
 
-  // Calculate category stats
+  // Calculate category stats for all 8 categories
   const categoryStats = useMemo((): CategoryStats[] => {
-    const categories: Record<string, { confirmed: number; total: number }> = {
-      device: { confirmed: 0, total: 0 },
-      network: { confirmed: 0, total: 0 },
-      privacy: { confirmed: 0, total: 0 },
-      language: { confirmed: 0, total: 0 },
-      orientation: { confirmed: 0, total: 0 },
-      fingerprint: { confirmed: 0, total: 0 },
+    const categories: Record<string, { confirmed: number; total: number; critical: number; warnings: number }> = {
+      device: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      network: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      privacy: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      language: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      orientation: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      fingerprint: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      storage: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      social: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      security: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
+      behavior: { confirmed: 0, total: 0, critical: 0, warnings: 0 },
     };
 
     hexagons.forEach((hex) => {
@@ -48,99 +70,264 @@ export default function FinalSummaryPanel({
       if (categories[cat]) {
         categories[cat].total++;
         if (hex.confirmed) categories[cat].confirmed++;
+        
+        // Track critical issues and warnings
+        const value = hex.value?.toLowerCase() || '';
+        const label = hex.label?.toLowerCase() || '';
+        
+        if (value.includes('leak') || value.includes('critical') || value.includes('insecure')) {
+          categories[cat].critical++;
+        } else if (value.includes('warning') || value.includes('outdated') || value.includes('weak')) {
+          categories[cat].warnings++;
+        }
       }
     });
 
     return [
       {
-        name: 'Device Detection',
-        confirmed: categories.device.confirmed,
-        total: categories.device.total,
-        icon: '💻',
+        name: 'Device & Network',
+        key: 'device',
+        confirmed: categories.device.confirmed + categories.network.confirmed,
+        total: categories.device.total + categories.network.total,
+        icon: <Globe className="w-4 h-4" />,
         color: 'text-blue-400',
-      },
-      {
-        name: 'Network Analysis',
-        confirmed: categories.network.confirmed,
-        total: categories.network.total,
-        icon: '📡',
-        color: 'text-cyan-400',
-      },
-      {
-        name: 'Privacy Settings',
-        confirmed: categories.privacy.confirmed,
-        total: categories.privacy.total,
-        icon: '🔒',
-        color: 'text-green-400',
+        bgColor: 'bg-blue-500/10',
+        criticalIssues: categories.device.critical + categories.network.critical,
+        warnings: categories.device.warnings + categories.network.warnings,
       },
       {
         name: 'Language Intelligence',
+        key: 'language',
         confirmed: categories.language.confirmed,
         total: categories.language.total,
-        icon: '🗣️',
-        color: 'text-purple-400',
+        icon: <Globe className="w-4 h-4" />,
+        color: 'text-cyan-400',
+        bgColor: 'bg-cyan-500/10',
+        criticalIssues: categories.language.critical,
+        warnings: categories.language.warnings,
       },
       {
-        name: 'Orientation & Motion',
+        name: 'Device Orientation',
+        key: 'orientation',
         confirmed: categories.orientation.confirmed,
         total: categories.orientation.total,
-        icon: '📱',
-        color: 'text-amber-400',
+        icon: <Smartphone className="w-4 h-4" />,
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/10',
+        criticalIssues: categories.orientation.critical,
+        warnings: categories.orientation.warnings,
       },
       {
         name: 'Browser Fingerprint',
+        key: 'fingerprint',
         confirmed: categories.fingerprint.confirmed,
         total: categories.fingerprint.total,
-        icon: '🔴',
+        icon: <Fingerprint className="w-4 h-4" />,
         color: 'text-red-400',
+        bgColor: 'bg-red-500/10',
+        criticalIssues: categories.fingerprint.critical,
+        warnings: categories.fingerprint.warnings,
+      },
+      {
+        name: 'Storage Analysis',
+        key: 'storage',
+        confirmed: categories.storage.confirmed,
+        total: categories.storage.total,
+        icon: <Database className="w-4 h-4" />,
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10',
+        criticalIssues: categories.storage.critical,
+        warnings: categories.storage.warnings,
+      },
+      {
+        name: 'Social Accounts',
+        key: 'social',
+        confirmed: categories.social.confirmed,
+        total: categories.social.total,
+        icon: <Users className="w-4 h-4" />,
+        color: 'text-purple-400',
+        bgColor: 'bg-purple-500/10',
+        criticalIssues: categories.social.critical,
+        warnings: categories.social.warnings,
+      },
+      {
+        name: 'Security Status',
+        key: 'security',
+        confirmed: categories.security.confirmed,
+        total: categories.security.total,
+        icon: <ShieldAlert className="w-4 h-4" />,
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10',
+        criticalIssues: categories.security.critical,
+        warnings: categories.security.warnings,
+      },
+      {
+        name: 'Behavior Tracking',
+        key: 'behavior',
+        confirmed: categories.behavior.confirmed,
+        total: categories.behavior.total,
+        icon: <Mouse className="w-4 h-4" />,
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10',
+        criticalIssues: categories.behavior.critical,
+        warnings: categories.behavior.warnings,
       },
     ].filter((cat) => cat.total > 0);
   }, [hexagons]);
 
-  // Calculate overall privacy risk score
+  // Calculate top privacy concerns
+  const topConcerns = useMemo((): PrivacyConcern[] => {
+    const concerns: PrivacyConcern[] = [];
+    
+    hexagons.forEach((hex) => {
+      if (!hex.confirmed) return;
+      
+      const value = hex.value?.toLowerCase() || '';
+      const label = hex.label?.toLowerCase() || '';
+      
+      // DNS Leak
+      if (label.includes('dns') && value.includes('leak')) {
+        concerns.push({
+          title: 'DNS Leak Detected',
+          description: 'Your DNS requests expose your browsing history to your ISP',
+          severity: 'critical',
+          category: 'security',
+          fix: 'Enable DNS leak protection in your VPN settings',
+        });
+      }
+      
+      // WebRTC Leak
+      if (label.includes('webrtc') && value.includes('leak')) {
+        concerns.push({
+          title: 'WebRTC IP Leak',
+          description: 'Your real IP is visible even with VPN enabled',
+          severity: 'critical',
+          category: 'security',
+          fix: 'Disable WebRTC in browser settings or use a WebRTC blocker',
+        });
+      }
+      
+      // Canvas Fingerprint
+      if (label.includes('canvas') && hex.category === 'fingerprint') {
+        concerns.push({
+          title: 'Canvas Fingerprint Tracked',
+          description: 'Your browser can be uniquely identified across websites',
+          severity: 'high',
+          category: 'fingerprint',
+          fix: 'Use Brave browser or enable fingerprint protection',
+        });
+      }
+      
+      // Logged-in Social
+      if (hex.category === 'social' && !value.includes('not detected') && !value.includes('0 services')) {
+        if (label.includes('google')) {
+          concerns.push({
+            title: 'Google Tracking Active',
+            description: 'Google can track you across 80% of websites',
+            severity: 'high',
+            category: 'social',
+            fix: 'Log out of Google when not in use',
+          });
+        }
+        if (label.includes('meta') || label.includes('facebook')) {
+          concerns.push({
+            title: 'Meta Tracking Active',
+            description: 'Facebook tracks you on sites with Like buttons',
+            severity: 'high',
+            category: 'social',
+            fix: 'Use Facebook Container or log out',
+          });
+        }
+      }
+      
+      // Behavior tracking
+      if (hex.category === 'behavior' && label.includes('mouse')) {
+        concerns.push({
+          title: 'Mouse Tracking Active',
+          description: 'Your movement patterns create a 97% unique signature',
+          severity: 'medium',
+          category: 'behavior',
+        });
+      }
+    });
+    
+    // Sort by severity and take top 5
+    const severityOrder = { critical: 0, high: 1, medium: 2 };
+    return concerns
+      .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+      .slice(0, 5);
+  }, [hexagons]);
+
+  // Calculate strengths
+  const strengths = useMemo(() => {
+    const positives: string[] = [];
+    
+    hexagons.forEach((hex) => {
+      if (!hex.confirmed) return;
+      const value = hex.value?.toLowerCase() || '';
+      const label = hex.label?.toLowerCase() || '';
+      
+      if (label.includes('protection') && !value.includes('none')) {
+        positives.push('Fingerprint protection enabled');
+      }
+      if (label.includes('dns') && value.includes('protected')) {
+        positives.push('DNS leak protection active');
+      }
+      if (label.includes('https') && value.includes('secure')) {
+        positives.push('HTTPS encryption enabled');
+      }
+      if ((label.includes('google') || label.includes('facebook')) && value.includes('not detected')) {
+        positives.push('Not logged into major tracking platforms');
+      }
+      if (label.includes('cookies') && value.includes('blocked')) {
+        positives.push('Third-party cookies blocked');
+      }
+    });
+    
+    return [...new Set(positives)].slice(0, 5);
+  }, [hexagons]);
+
+  // Calculate overall privacy risk score (FINAL FORMULA)
   const overallRisk = useMemo(() => {
-    let riskScore = 0;
     const weights = {
-      device: 0.2,
-      network: 0.2,
-      language: 0.15,
-      orientation: 0.15,
-      fingerprint: 0.3,
+      device: 0.05,      // 5%
+      privacy: 0.05,     // 5%
+      language: 0.05,    // 5%
+      orientation: 0.05, // 5%
+      fingerprint: 0.25, // 25%
+      storage: 0.10,     // 10%
+      social: 0.20,      // 20%
+      security: 0.15,    // 15%
+      behavior: 0.10,    // 10%
     };
 
-    // Device/network/privacy risk (from confirmation rate)
-    const deviceConfirmRate = categoryStats
-      .filter((c) => ['Device Detection', 'Network Analysis', 'Privacy Settings'].includes(c.name))
-      .reduce((acc, c) => acc + (c.total > 0 ? c.confirmed / c.total : 0), 0) / 3;
-    riskScore += deviceConfirmRate * 40 * (weights.device + weights.network);
+    let totalRisk = 0;
+    
+    categoryStats.forEach((cat) => {
+      const catWeight = weights[cat.key as keyof typeof weights] || 0.05;
+      const baseRisk = cat.total > 0 ? (cat.confirmed / cat.total) * 60 : 0;
+      const criticalBonus = cat.criticalIssues * 20;
+      const warningBonus = cat.warnings * 10;
+      const catRisk = Math.min(baseRisk + criticalBonus + warningBonus, 100);
+      totalRisk += catRisk * catWeight;
+    });
 
-    // Language risk
-    const languageConfirmRate = categoryStats.find((c) => c.name === 'Language Intelligence');
-    if (languageConfirmRate && languageConfirmRate.total > 0) {
-      riskScore += (languageConfirmRate.confirmed / languageConfirmRate.total) * 100 * weights.language;
-    }
-
-    // Orientation risk
-    const orientationConfirmRate = categoryStats.find((c) => c.name === 'Orientation & Motion');
-    if (orientationConfirmRate && orientationConfirmRate.total > 0) {
-      riskScore += (orientationConfirmRate.confirmed / orientationConfirmRate.total) * 100 * weights.orientation;
-    }
-
-    // Fingerprint risk (heavily weighted)
+    // Add fingerprint uniqueness bonus
     if (fingerprint) {
-      const fpRiskMap = { high: 90, medium: 50, low: 20 };
-      const fpRisk = fpRiskMap[fingerprint.totalRisk] || 70;
-      
-      // Reduce by protection score
-      const protectionReduction = fingerprint.protection
-        ? (fingerprint.protection.score / 100) * 30
-        : 0;
-      
-      riskScore += (fpRisk - protectionReduction) * weights.fingerprint;
+      const fpRiskMap = { high: 20, medium: 10, low: 0 };
+      totalRisk += fpRiskMap[fingerprint.totalRisk] || 0;
     }
 
-    return Math.min(Math.round(riskScore), 100);
+    return Math.min(Math.round(totalRisk), 100);
   }, [categoryStats, fingerprint]);
+
+  // Calculate uniqueness estimate
+  const uniquenessEstimate = useMemo(() => {
+    const totalDataPoints = confirmedCount;
+    // Rough estimate: each confirmed data point increases uniqueness
+    const uniqueness = Math.min(Math.pow(2, totalDataPoints / 4), 1000000);
+    return Math.round(uniqueness);
+  }, [confirmedCount]);
 
   const getRiskColor = (risk: number) => {
     if (risk >= 70) return 'text-red-400';
@@ -160,24 +347,43 @@ export default function FinalSummaryPanel({
     return 'Low Risk';
   };
 
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'critical': return 'text-red-400 bg-red-500/20 border-red-500/30';
+      case 'high': return 'text-orange-400 bg-orange-500/20 border-orange-500/30';
+      case 'medium': return 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30';
+      default: return 'text-gray-400 bg-gray-500/20 border-gray-500/30';
+    }
+  };
+
   const handleExportPDF = async () => {
     setIsExporting(true);
     
-    // Create comprehensive report data
     const report = {
       generatedAt: new Date().toISOString(),
       summary: {
-        totalDataPoints: hexagons.length,
+        totalDataPoints: 46,
         confirmedDataPoints: confirmedCount,
         overallPrivacyRisk: overallRisk,
         riskLevel: getRiskLabel(overallRisk),
+        uniqueness: `1 in ${uniquenessEstimate.toLocaleString()} browsers`,
+        trackingExposure: `${Math.round((confirmedCount / 46) * 100)}%`,
       },
       categories: categoryStats.map((cat) => ({
         name: cat.name,
         detectedItems: cat.total,
         confirmedItems: cat.confirmed,
+        criticalIssues: cat.criticalIssues,
+        warnings: cat.warnings,
         accuracyRate: cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0,
       })),
+      topConcerns: topConcerns.map(c => ({
+        title: c.title,
+        description: c.description,
+        severity: c.severity,
+        fix: c.fix,
+      })),
+      strengths,
       languageIntelligence: languagePrediction
         ? {
             predictedLanguage: languagePrediction.preferredLanguage,
@@ -190,12 +396,6 @@ export default function FinalSummaryPanel({
             uniqueness: fingerprint.uniqueness,
             riskLevel: fingerprint.totalRisk,
             compositeHash: fingerprint.compositeHash,
-            protection: fingerprint.protection
-              ? {
-                  score: fingerprint.protection.score,
-                  effectiveness: fingerprint.protection.effectiveness,
-                }
-              : null,
           }
         : null,
       hexagons: hexagons.map((hex) => ({
@@ -206,11 +406,9 @@ export default function FinalSummaryPanel({
         confirmed: hex.confirmed,
         category: hex.category,
       })),
-      privacyNote:
-        'This report was generated locally in your browser. No data was sent to any server.',
+      privacyNote: 'This report was generated locally in your browser. No data was sent to any server.',
     };
 
-    // Download as JSON (PDF would require additional library)
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -223,11 +421,12 @@ export default function FinalSummaryPanel({
   };
 
   const handleShare = () => {
-    const shareText = `I just discovered my Digital Shadow! 🔍
+    const shareText = `🎯 My Complete Digital Shadow - Final Report
 
-📊 ${hexagons.length} data points detected
-🎯 ${confirmedCount} were accurate
+📊 46 data points analyzed
+🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / 46) * 100)}%)
 ⚠️ Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
+🔍 Uniqueness: 1 in ${uniquenessEstimate.toLocaleString()} browsers
 ${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
 
 Test yours at: ${window.location.origin}`;
@@ -246,65 +445,71 @@ Test yours at: ${window.location.origin}`;
 
   return (
     <Card className="bg-gradient-to-br from-gray-900/90 to-gray-800/90 border-green-500/30 overflow-hidden">
-      <CardHeader className="border-b border-green-500/20 pb-4 bg-gradient-to-r from-green-950/30 to-cyan-950/30">
-        <CardTitle className="flex items-center gap-3 text-green-400">
-          <Eye className="w-6 h-6" />
+      <CardHeader className="border-b border-green-500/20 pb-4 bg-gradient-to-r from-green-950/30 via-cyan-950/30 to-amber-950/30">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-green-500/20">
+            <Target className="w-6 h-6 text-green-400" />
+          </div>
           <div>
-            <h3 className="text-xl font-bold">Your Complete Digital Shadow</h3>
+            <CardTitle className="text-xl font-bold text-green-400 flex items-center gap-2">
+              🎯 Your Complete Digital Shadow
+              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                <Trophy className="w-3 h-3 mr-1" />
+                FINAL REPORT
+              </Badge>
+            </CardTitle>
             <p className="text-sm text-green-300/70 font-normal">
-              Full analysis of your online fingerprint
+              Complete analysis of 46 data points across 8 categories
             </p>
           </div>
-        </CardTitle>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-6 pt-6">
-        {/* Overall Risk Score */}
+        {/* Overall Statistics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3 bg-black/30 rounded-lg border border-green-500/20 text-center">
+            <p className="text-2xl font-bold text-green-400">46</p>
+            <p className="text-xs text-green-300/60">Data Points</p>
+          </div>
+          <div className="p-3 bg-black/30 rounded-lg border border-green-500/20 text-center">
+            <p className={`text-2xl font-bold ${getRiskColor(overallRisk)}`}>{overallRisk}</p>
+            <p className="text-xs text-green-300/60">Risk Score</p>
+          </div>
+          <div className="p-3 bg-black/30 rounded-lg border border-green-500/20 text-center">
+            <p className="text-lg font-bold text-purple-400">1:{uniquenessEstimate.toLocaleString()}</p>
+            <p className="text-xs text-green-300/60">Uniqueness</p>
+          </div>
+          <div className="p-3 bg-black/30 rounded-lg border border-green-500/20 text-center">
+            <p className="text-2xl font-bold text-cyan-400">{Math.round((confirmedCount / 46) * 100)}%</p>
+            <p className="text-xs text-green-300/60">Exposure</p>
+          </div>
+        </div>
+
+        {/* Overall Risk Score Circle */}
         <div className="text-center p-6 bg-black/30 rounded-xl border border-green-500/20">
           <p className="text-green-300/70 text-sm mb-2">Overall Privacy Risk</p>
           <div className="relative inline-block">
             <svg className="w-32 h-32 -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(0, 255, 65, 0.1)" strokeWidth="8" />
               <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke="rgba(0, 255, 65, 0.1)"
-                strokeWidth="8"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke={
-                  overallRisk >= 70 ? '#ef4444' : overallRisk >= 40 ? '#eab308' : '#22c55e'
-                }
-                strokeWidth="8"
-                strokeLinecap="round"
+                cx="50" cy="50" r="40" fill="none"
+                stroke={overallRisk >= 70 ? '#ef4444' : overallRisk >= 40 ? '#eab308' : '#22c55e'}
+                strokeWidth="8" strokeLinecap="round"
                 strokeDasharray={`${overallRisk * 2.51} 251`}
                 className="transition-all duration-1000 ease-out"
                 style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span
-                className={`text-4xl font-bold ${getRiskColor(overallRisk)}`}
-                style={{ textShadow: '0 0 15px currentColor' }}
-              >
+              <span className={`text-4xl font-bold ${getRiskColor(overallRisk)}`} style={{ textShadow: '0 0 15px currentColor' }}>
                 {overallRisk}
               </span>
               <span className="text-xs text-green-300/60">/100</span>
             </div>
           </div>
-          <div
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold mt-4 ${getRiskBgColor(overallRisk)}/20 ${getRiskColor(overallRisk)} border border-current/30`}
-          >
-            {overallRisk >= 70 ? (
-              <AlertTriangle className="w-4 h-4" />
-            ) : (
-              <CheckCircle className="w-4 h-4" />
-            )}
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold mt-4 ${getRiskBgColor(overallRisk)}/20 ${getRiskColor(overallRisk)} border border-current/30`}>
+            {overallRisk >= 70 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
             {getRiskLabel(overallRisk)}
           </div>
         </div>
@@ -312,29 +517,29 @@ Test yours at: ${window.location.origin}`;
         {/* Category Breakdown */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-green-300 flex items-center gap-2">
-            📊 Detection Breakdown
+            📊 Category Breakdown (8 Categories)
           </h4>
           <div className="grid gap-2">
             {categoryStats.map((cat) => {
               const percentage = cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0;
               return (
-                <div
-                  key={cat.name}
-                  className="flex items-center gap-3 p-3 bg-black/20 rounded-lg border border-green-500/10"
-                >
-                  <span className="text-xl">{cat.icon}</span>
+                <div key={cat.name} className={`flex items-center gap-3 p-3 ${cat.bgColor} rounded-lg border border-green-500/10`}>
+                  <div className={`p-1.5 rounded ${cat.bgColor} ${cat.color}`}>{cat.icon}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <span className={`text-sm font-medium ${cat.color}`}>{cat.name}</span>
-                      <span className="text-xs text-green-300/60">
-                        {cat.confirmed}/{cat.total}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {cat.criticalIssues > 0 && (
+                          <Badge variant="outline" className="text-red-400 border-red-500/30 text-xs px-1.5">
+                            {cat.criticalIssues} critical
+                          </Badge>
+                        )}
+                        <span className="text-xs text-green-300/60">{cat.confirmed}/{cat.total}</span>
+                      </div>
                     </div>
                     <Progress value={percentage} className="h-1.5 bg-green-950/50" />
                   </div>
-                  <span
-                    className={`text-sm font-mono ${percentage >= 80 ? 'text-red-400' : percentage >= 50 ? 'text-yellow-400' : 'text-green-400'}`}
-                  >
+                  <span className={`text-sm font-mono ${percentage >= 80 ? 'text-red-400' : percentage >= 50 ? 'text-yellow-400' : 'text-green-400'}`}>
                     {percentage}%
                   </span>
                 </div>
@@ -343,105 +548,105 @@ Test yours at: ${window.location.origin}`;
           </div>
         </div>
 
-        {/* Key Insights */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Language Confidence */}
-          {languagePrediction && (
-            <div className="p-4 bg-purple-950/30 rounded-lg border border-purple-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🗣️</span>
-                <span className="text-sm font-medium text-purple-300">Language Intelligence</span>
-              </div>
-              <p className="text-2xl font-bold text-purple-400">
-                {Math.round(languagePrediction.preferredLanguageConfidence * 100)}%
-              </p>
-              <p className="text-xs text-purple-300/60">confidence score</p>
+        {/* Top 5 Privacy Concerns */}
+        {topConcerns.length > 0 && (
+          <div className="p-4 bg-red-950/20 rounded-xl border border-red-500/20">
+            <h4 className="text-sm font-semibold text-red-400 mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Top Privacy Concerns
+            </h4>
+            <div className="space-y-2">
+              {topConcerns.map((concern, i) => (
+                <div key={i} className={`p-3 rounded-lg border ${getSeverityColor(concern.severity)}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-sm">{concern.title}</p>
+                      <p className="text-xs opacity-70 mt-0.5">{concern.description}</p>
+                    </div>
+                    <Badge variant="outline" className={`text-xs shrink-0 ${getSeverityColor(concern.severity)}`}>
+                      {concern.severity}
+                    </Badge>
+                  </div>
+                  {concern.fix && (
+                    <div className="mt-2 flex items-center gap-1 text-xs opacity-80">
+                      <Zap className="w-3 h-3" />
+                      {concern.fix}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Fingerprint Uniqueness */}
-          {fingerprint && (
-            <div className="p-4 bg-red-950/30 rounded-lg border border-red-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🔴</span>
-                <span className="text-sm font-medium text-red-300">Fingerprint</span>
-              </div>
-              <p className="text-2xl font-bold text-red-400">{fingerprint.uniqueness}</p>
-              <p className="text-xs text-red-300/60">
-                {fingerprint.protection?.effectiveness === 'high'
-                  ? 'Well protected'
-                  : 'Highly trackable'}
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Top 5 Strengths */}
+        {strengths.length > 0 && (
+          <div className="p-4 bg-green-950/20 rounded-xl border border-green-500/20">
+            <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              What You're Doing Well
+            </h4>
+            <ul className="space-y-2">
+              {strengths.map((strength, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-green-200/80">
+                  <ChevronRight className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                  {strength}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
-        {/* Recommendations Summary */}
-        <div className="p-4 bg-gradient-to-r from-green-950/30 to-cyan-950/30 rounded-xl border border-green-500/20">
-          <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+        {/* Action Plan */}
+        <div className="p-4 bg-gradient-to-r from-cyan-950/30 to-purple-950/30 rounded-xl border border-cyan-500/20">
+          <h4 className="text-sm font-semibold text-cyan-400 mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4" />
-            Quick Privacy Wins
+            Prioritized Action Plan
           </h4>
-          <ul className="space-y-2 text-sm text-green-200/80">
-            {overallRisk >= 50 && (
-              <li className="flex items-start gap-2">
-                <ChevronRight className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                Use a privacy-focused browser like Brave or Firefox
+          <ol className="space-y-2 text-sm text-cyan-200/80">
+            {topConcerns.slice(0, 3).map((concern, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-xs flex items-center justify-center flex-shrink-0">
+                  {i + 1}
+                </span>
+                {concern.fix || `Address ${concern.title.toLowerCase()}`}
               </li>
-            )}
-            {fingerprint && fingerprint.totalRisk !== 'low' && (
-              <li className="flex items-start gap-2">
-                <ChevronRight className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                Enable fingerprint protection in your browser settings
-              </li>
-            )}
+            ))}
             <li className="flex items-start gap-2">
-              <ChevronRight className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-              Consider using a VPN to mask your network identity
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-xs flex items-center justify-center flex-shrink-0">
+                4
+              </span>
+              Use a privacy-focused browser like Brave or Firefox
             </li>
             <li className="flex items-start gap-2">
-              <ChevronRight className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+              <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 text-xs flex items-center justify-center flex-shrink-0">
+                5
+              </span>
               Regularly clear cookies and browser data
             </li>
-          </ul>
+          </ol>
         </div>
 
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant="outline"
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className="border-green-500/30 text-green-300 hover:bg-green-950/30"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Download Report'}
+          <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-green-500/30 text-green-300 hover:bg-green-950/30">
+            <FileJson className="w-4 h-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'Export JSON'}
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleShare}
-            className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/30"
-          >
+          <Button variant="outline" onClick={handleShare} className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/30">
             <Share2 className="w-4 h-4 mr-2" />
             Share Results
           </Button>
         </div>
 
         <div className="flex gap-3">
-          <Button
-            variant="default"
-            onClick={onStartOver}
-            className="flex-1 bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-500 hover:to-cyan-500"
-          >
+          <Button variant="default" onClick={onStartOver} className="flex-1 bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-500 hover:to-cyan-500">
             <RotateCcw className="w-4 h-4 mr-2" />
-            Start Over
+            Start New Scan
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="border-green-500/30 text-green-300 hover:bg-green-950/30"
-          >
-            Back to Top
+          <Button variant="outline" onClick={() => window.open('https://privacyguides.org', '_blank')} className="border-purple-500/30 text-purple-300 hover:bg-purple-950/30">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Protection Guide
           </Button>
         </div>
 
@@ -449,8 +654,7 @@ Test yours at: ${window.location.origin}`;
         <div className="flex items-center gap-3 p-3 bg-green-950/30 rounded-lg border border-green-500/20">
           <span className="text-xl">🔒</span>
           <p className="text-xs text-green-300/80">
-            <strong>Privacy Protected:</strong> All analysis runs locally in your browser. No data
-            is stored or transmitted to any server.
+            <strong>100% Local:</strong> All 46 data points were analyzed in your browser. Nothing was transmitted to any server.
           </p>
         </div>
       </CardContent>

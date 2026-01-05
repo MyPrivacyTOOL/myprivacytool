@@ -7,11 +7,13 @@ import FingerprintPanel from './FingerprintPanel';
 import StoragePanel from './StoragePanel';
 import SocialAccountsPanel from './SocialAccountsPanel';
 import SecurityPanel from './SecurityPanel';
+import BehaviorPanel from './BehaviorPanel';
 import FinalSummaryPanel from './FinalSummaryPanel';
 import DNSLeakFixGuide from './DNSLeakFixGuide';
-import { HexagonData, DeviceData, getLanguageName, determineUserProfile } from '@/lib/deviceDetection';
+import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
+import { startBehaviorTracking, stopBehaviorTracking, getAllBehaviorData } from '@/lib/behaviorDetection';
 import {
   initializeModel as initLanguageModel,
   analyzeLanguages,
@@ -29,8 +31,9 @@ import {
   trackTimeToFirstConfirmation,
   trackActivity
 } from '@/lib/analytics';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import confetti from 'canvas-confetti';
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
@@ -92,10 +95,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   
   // Final summary state
   const [showFinalSummary, setShowFinalSummary] = useState(false);
+  const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   
   // Behavior state
   const [showBehaviorPanel, setShowBehaviorPanel] = useState(false);
   const [behaviorConfirmedCount, setBehaviorConfirmedCount] = useState(0);
+  
+  // Real-time behavior updates
+  const [behaviorUpdateTrigger, setBehaviorUpdateTrigger] = useState(0);
   
   // Track which reveal waves have been triggered
   const [revealWaves, setRevealWaves] = useState({
@@ -226,8 +233,60 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (confirmedCount >= visibleCount && visibleCount >= 46 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       setShowFinalSummary(true);
+      // Trigger celebration confetti
+      triggerCompletionCelebration();
     }
   }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData]);
+
+  // Start behavior tracking on mount
+  useEffect(() => {
+    startBehaviorTracking();
+    
+    // Update behavior hexagons every 2 seconds
+    const behaviorInterval = setInterval(() => {
+      setBehaviorUpdateTrigger(prev => prev + 1);
+    }, 2000);
+    
+    return () => {
+      stopBehaviorTracking();
+      clearInterval(behaviorInterval);
+    };
+  }, []);
+
+  // Trigger completion celebration with confetti
+  const triggerCompletionCelebration = useCallback(() => {
+    setShowCompletionCelebration(true);
+    
+    // Fire confetti
+    const duration = 3000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        setTimeout(() => setShowCompletionCelebration(false), 2000);
+        return;
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+        colors: ['#00ff41', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+      });
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+        colors: ['#00ff41', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+      });
+    }, 250);
+  }, []);
 
   // Check for critical security issues (DNS leak, WebRTC leak)
   const checkForCriticalSecurityIssues = async () => {
@@ -613,6 +672,41 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {showSecurityPanel && (
         <div className="mt-8 animate-fade-in">
           <SecurityPanel onClose={() => setShowSecurityPanel(false)} />
+        </div>
+      )}
+
+      {/* Behavior Panel - shown after confirming 3+ behavior hexagons */}
+      {showBehaviorPanel && (
+        <div className="mt-8 animate-fade-in">
+          <BehaviorPanel onClose={() => setShowBehaviorPanel(false)} />
+        </div>
+      )}
+
+      {/* Completion Celebration Banner */}
+      {showCompletionCelebration && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="bg-gradient-to-r from-green-600/90 to-cyan-600/90 backdrop-blur-sm px-8 py-6 rounded-2xl border-2 border-white/30 shadow-2xl animate-scale-in text-center pointer-events-auto">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <PartyPopper className="w-8 h-8 text-yellow-300 animate-bounce" />
+              <h2 className="text-2xl font-bold text-white">Complete Digital Shadow Revealed!</h2>
+              <PartyPopper className="w-8 h-8 text-yellow-300 animate-bounce" />
+            </div>
+            <p className="text-white/80 text-sm">All 46 hexagons analyzed across 8 categories</p>
+            <div className="flex items-center justify-center gap-4 mt-4">
+              <div className="text-center">
+                <p className="text-3xl font-bold text-yellow-300">46</p>
+                <p className="text-xs text-white/60">Data Points</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-yellow-300">8</p>
+                <p className="text-xs text-white/60">Categories</p>
+              </div>
+              <div className="text-center">
+                <p className="text-3xl font-bold text-yellow-300">100%</p>
+                <p className="text-xs text-white/60">Complete</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
