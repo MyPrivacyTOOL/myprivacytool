@@ -90,7 +90,73 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   const label = hexagonData.label?.toLowerCase() || '';
   const value = hexagonData.value || '';
   
-  // FINGERPRINTING HEXAGONS
+  // ADVANCED FINGERPRINTING HEXAGONS
+  if (label.includes('webrtc leak')) {
+    if (value.toLowerCase().includes('leaking') || value.toLowerCase().includes('leak')) {
+      const ipMatch = value.match(/(\d+\.\d+\.\d+\.\d+)/);
+      const leakedIP = ipMatch ? ipMatch[1] : 'your real IP';
+      return `CRITICAL ALERT: I detected a WebRTC leak. Your VPN might be showing a different IP, but WebRTC is broadcasting your real IP address: ${leakedIP}. This means websites can see through your VPN and know your actual location. You need to disable WebRTC or use a leak prevention extension immediately. This is one of the most serious privacy vulnerabilities I can detect.`;
+    }
+    if (value.toLowerCase().includes('blocked') || value.toLowerCase().includes('no leak')) {
+      return "Good news - I checked for WebRTC leaks and found none. Your real IP address is properly hidden. This is crucial for VPN privacy.";
+    }
+    if (value.toLowerCase().includes('vpn protected')) {
+      return "Your VPN appears to be working correctly. WebRTC is showing only local IP addresses, not your real public IP. This is exactly what you want for privacy.";
+    }
+    return "WebRTC can leak your real IP address even when using a VPN. I'm checking if you're protected.";
+  }
+  
+  if (label.includes('cpu cores') || label.includes('hardware profile')) {
+    const coreMatch = value.match(/(\d+)\s*cores/);
+    const cores = coreMatch ? coreMatch[1] : 'multiple';
+    const isHighEnd = value.toLowerCase().includes('high') || (parseInt(cores) >= 8);
+    const percentage = isHighEnd ? '15' : '35';
+    return `I detected your hardware configuration: ${cores} CPU cores with ${isHighEnd ? 'high-end' : 'standard'} specifications. Combined with your GPU from WebGL, this creates a unique hardware fingerprint. About ${percentage}% of users share your exact hardware profile. ${isHighEnd ? 'High-end hardware actually makes you MORE trackable because it\'s less common.' : ''}`;
+  }
+  
+  if (label.includes('display profile') || label.includes('screen fingerprint')) {
+    const resMatch = value.match(/(\d+x\d+)/);
+    const ratioMatch = value.match(/@(\d+\.?\d*)x/);
+    const resolution = resMatch ? resMatch[1] : 'your resolution';
+    const ratio = ratioMatch ? ratioMatch[1] : '1';
+    const isUnusual = ratio !== '1' && ratio !== '2';
+    return `Your display configuration is ${resolution} at ${ratio}x pixel density. ${isUnusual ? 'This unusual combination makes you highly identifiable.' : 'This is a common configuration.'} Unusual screen resolutions—like ultrawide monitors or 4K displays—make you more identifiable. Even your taskbar height can be detected through available screen space.`;
+  }
+  
+  if (label.includes('timezone') || label.includes('locale')) {
+    const hasMismatch = value.toLowerCase().includes('mismatch') || hexagonData.risk?.toLowerCase().includes('mismatch');
+    if (hasMismatch) {
+      return "Interesting - your timezone and locale settings don't match your IP location. This mismatch reveals you're likely using a VPN. While the VPN hides your IP, your timezone and language settings give away your actual location. This is how websites detect VPN users.";
+    }
+    return "Your timezone and locale settings match your IP location. This adds another layer to your fingerprint. These settings reveal your geographic location with high accuracy.";
+  }
+  
+  if (label.includes('battery status') || label.includes('battery fingerprint')) {
+    if (value.toLowerCase().includes('not available') || value.toLowerCase().includes('blocked')) {
+      return "Good - your battery status API is blocked. This prevents a subtle tracking method that uses battery drain patterns as a fingerprint.";
+    }
+    const levelMatch = value.match(/(\d+)%/);
+    const level = levelMatch ? levelMatch[1] : 'your current';
+    const isCharging = value.toLowerCase().includes('charging');
+    return `I can see your battery status: ${level}% and ${isCharging ? 'charging' : 'discharging'}. While this seems harmless, battery level can be used for cross-device tracking. If you visit the same site on your phone and laptop at the same time, matching battery levels can link your devices together.`;
+  }
+  
+  if (label.includes('connected devices') || label.includes('media devices')) {
+    if (value.toLowerCase().includes('permission')) {
+      return "I cannot enumerate your media devices without permission - which is actually good for privacy. Granting this permission would expose another fingerprinting vector.";
+    }
+    const camMatch = value.match(/(\d+)\s*cam/);
+    const micMatch = value.match(/(\d+)\s*mic/);
+    const spkMatch = value.match(/(\d+)\s*spk/);
+    const cameras = camMatch ? camMatch[1] : '0';
+    const mics = micMatch ? micMatch[1] : '0';
+    const speakers = spkMatch ? spkMatch[1] : '0';
+    const totalDevices = parseInt(cameras) + parseInt(mics) + parseInt(speakers);
+    const percentage = totalDevices > 3 ? '65' : '28';
+    return `You have ${cameras} cameras, ${mics} microphones, and ${speakers} speakers connected. The specific combination of media devices is ${percentage}% unique. ${totalDevices > 3 ? 'Professional setups with multiple devices are especially identifying.' : ''} Even the order in which devices are enumerated creates a fingerprint.`;
+  }
+  
+  // CORE FINGERPRINTING HEXAGONS
   if (label.includes('canvas fingerprint')) {
     return "I detected your canvas fingerprint. This is a unique signature created by how your browser renders images. Even tiny differences in graphics hardware and software create a distinct pattern. This makes you 99% trackable across websites, even without cookies.";
   }
@@ -119,20 +185,20 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   
   // FINGERPRINT PROTECTION
   if (label.includes('fingerprint protection') || label.includes('protection')) {
-    const value = hexagonData.value?.toLowerCase() || '';
-    if (value.includes('tor')) {
+    const lowerValue = hexagonData.value?.toLowerCase() || '';
+    if (lowerValue.includes('tor')) {
       return "Excellent! You're using Tor Browser, which provides the strongest fingerprint protection available. Your identity is well-masked across websites.";
     }
-    if (value.includes('brave') && value.includes('shields')) {
+    if (lowerValue.includes('brave') && lowerValue.includes('shields')) {
       return "Good news! Brave Shields is actively protecting you. Your fingerprint is being randomized, making it harder for trackers to identify you.";
     }
-    if (value.includes('firefox') || value.includes('rfp')) {
+    if (lowerValue.includes('firefox') || lowerValue.includes('rfp')) {
       return "Firefox with resistFingerprinting is protecting you. Your browser identity is being standardized to blend in with other privacy-conscious users.";
     }
-    if (value.includes('extension') || value.includes('blocker')) {
+    if (lowerValue.includes('extension') || lowerValue.includes('blocker')) {
       return "Your privacy extensions are providing some protection, but browser-level protection would be more effective. Consider using Brave or enabling Firefox privacy settings.";
     }
-    if (value.includes('none')) {
+    if (lowerValue.includes('none')) {
       return "Warning: No fingerprint protection detected. Your browser's unique characteristics make you fully trackable. I recommend using Brave browser or Firefox with privacy settings enabled.";
     }
     return "To reduce fingerprinting, consider using Brave browser or Firefox with privacy.resistFingerprinting enabled. However, be aware—being too unique in your privacy protection can also make you identifiable.";
@@ -189,8 +255,31 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
 // Get top recommendation based on current state
 const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | null): string => {
   const label = hexagonData?.label?.toLowerCase() || '';
+  const value = hexagonData?.value?.toLowerCase() || '';
   
-  // Fingerprint-specific recommendations
+  // Priority 1: WebRTC leak is the most critical
+  if (label.includes('webrtc') && (value.includes('leaking') || value.includes('leak'))) {
+    return "URGENTLY disable WebRTC in your browser settings. In Firefox, go to about:config and set media.peerconnection.enabled to false. In Chrome, use the WebRTC Leak Prevent extension. This is your top priority";
+  }
+  
+  // Advanced fingerprint-specific recommendations
+  if (label.includes('timezone') && (value.includes('mismatch') || hexagonData?.risk?.toLowerCase().includes('mismatch'))) {
+    return "use timezone spoofing extensions or Tor Browser to mask your real location from timezone detection";
+  }
+  if (label.includes('display') || label.includes('screen fingerprint')) {
+    return "use browser in fullscreen mode to hide taskbar size, or use common resolutions like 1920x1080 for less uniqueness";
+  }
+  if (label.includes('battery')) {
+    return "use Firefox which blocks the Battery Status API by default, or use privacy extensions that block this API";
+  }
+  if (label.includes('media devices') || label.includes('connected devices')) {
+    return "deny media device permissions to websites unless absolutely necessary for video calls";
+  }
+  if (label.includes('cpu') || label.includes('hardware')) {
+    return "use browsers that mask hardware information like Tor or Brave with aggressive fingerprinting protection";
+  }
+  
+  // Core fingerprint-specific recommendations
   if (label.includes('canvas') || label.includes('webgl') || label.includes('audio')) {
     return "use Brave browser or Firefox with privacy.resistFingerprinting enabled to reduce your fingerprint exposure";
   }
@@ -432,12 +521,33 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('extension')) {
           newMessage = `Extensions: ${hexagonData.value}. Browser add-ons make you more identifiable. Click to confirm.`;
         } else if (label.includes('protection')) {
-          const value = hexagonData.value?.toLowerCase() || '';
-          if (value.includes('none')) {
+          const protValue = hexagonData.value?.toLowerCase() || '';
+          if (protValue.includes('none')) {
             newMessage = `⚠️ No fingerprint protection detected! You're fully trackable. Click to learn how to protect yourself.`;
           } else {
             newMessage = `🛡️ ${hexagonData.value} detected! You have some fingerprint protection. Click to verify.`;
           }
+        // ADVANCED FINGERPRINTING HEXAGONS
+        } else if (label.includes('webrtc')) {
+          const hasLeak = hexagonData.value?.toLowerCase().includes('leaking') || hexagonData.value?.toLowerCase().includes('leak');
+          if (hasLeak) {
+            newMessage = `🚨 CRITICAL: WebRTC is leaking your real IP! ${hexagonData.value}. This bypasses your VPN. Click to confirm and learn how to fix.`;
+          } else {
+            newMessage = `WebRTC Status: ${hexagonData.value}. Click to confirm your IP leak status.`;
+          }
+        } else if (label.includes('cpu') || label.includes('hardware')) {
+          newMessage = `Hardware Profile: ${hexagonData.value}. Your CPU and RAM create a unique fingerprint. Click to confirm.`;
+        } else if (label.includes('display') || label.includes('screen fingerprint')) {
+          newMessage = `Display Profile: ${hexagonData.value}. Your screen config is ${hexagonData.confidence}% identifiable. Click to confirm.`;
+        } else if (label.includes('timezone')) {
+          const hasMismatch = hexagonData.risk?.toLowerCase().includes('mismatch');
+          newMessage = hasMismatch 
+            ? `⚠️ Timezone/Locale: ${hexagonData.value}. MISMATCH DETECTED - VPN usage revealed! Click to confirm.`
+            : `Timezone/Locale: ${hexagonData.value}. Geographic fingerprint detected. Click to confirm.`;
+        } else if (label.includes('battery')) {
+          newMessage = `Battery Status: ${hexagonData.value}. This API can track your device patterns. Click to confirm.`;
+        } else if (label.includes('connected devices') || label.includes('media devices')) {
+          newMessage = `Media Devices: ${hexagonData.value}. Your device combo is a fingerprint. Click to confirm.`;
         } else {
           newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
         }
@@ -464,6 +574,12 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       trackVoiceAIMessage('new_hexagons_revealed');
     } else if (confirmedCount === 6) {
       newMessage = `The more you confirm, the more I understand about your exposure. Attackers can find this information with just a few dollars.`;
+    } else if (confirmedCount >= 17 && confirmedCount < 24) {
+      // Advanced fingerprinting wave
+      newMessage = `Advanced fingerprinting scan active! I'm now detecting WebRTC leaks, hardware profiles, and geographic indicators. These are the most invasive tracking methods.`;
+      trackVoiceAIMessage('advanced_fingerprint_wave');
+    } else if (confirmedCount >= 23 && confirmedCount < totalCount) {
+      newMessage = `Deep fingerprint analysis complete! I've mapped 12 fingerprinting methods. Your complete technical profile reveals how uniquely trackable you are.`;
     } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow. This is what attackers can find about you with just $50.`;
     } else if (confirmedCount === totalCount && totalCount > 0) {
@@ -473,7 +589,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       if (category === 'fingerprint') {
         if (label.includes('canvas')) {
           newMessage = `Canvas fingerprint confirmed! This signature makes you 99% identifiable across websites, even in private browsing mode.`;
-        } else if (label.includes('webgl')) {
+        } else if (label.includes('webgl') && !label.includes('webrtc')) {
           newMessage = `WebGL signature confirmed! Your graphics card is now part of your verified digital shadow.`;
         } else if (label.includes('audio')) {
           newMessage = `Audio fingerprint confirmed! This subtle identifier adds to your overall trackability.`;
@@ -482,12 +598,33 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('extension')) {
           newMessage = `Extensions confirmed! Ironically, privacy tools can make you more unique and trackable.`;
         } else if (label.includes('protection')) {
-          const value = hexagonData.value?.toLowerCase() || '';
-          if (value.includes('none')) {
+          const protValue = hexagonData.value?.toLowerCase() || '';
+          if (protValue.includes('none')) {
             newMessage = `Protection status confirmed. You're vulnerable to fingerprint tracking. Consider using Brave or Firefox with privacy settings.`;
           } else {
             newMessage = `Protection confirmed! Your ${hexagonData.value} is helping reduce your fingerprint trackability.`;
           }
+        // Advanced fingerprint confirmed messages
+        } else if (label.includes('webrtc')) {
+          const hasLeak = hexagonData.value?.toLowerCase().includes('leaking') || hexagonData.value?.toLowerCase().includes('leak');
+          if (hasLeak) {
+            newMessage = `🚨 WebRTC leak CONFIRMED! This is critical - your real IP is exposed. Fix this immediately by disabling WebRTC in browser settings.`;
+          } else {
+            newMessage = `WebRTC status confirmed! Your real IP is protected from WebRTC leaks.`;
+          }
+        } else if (label.includes('cpu') || label.includes('hardware')) {
+          newMessage = `Hardware profile confirmed! Your CPU and RAM specifications are now part of your trackable fingerprint.`;
+        } else if (label.includes('display') || label.includes('screen fingerprint')) {
+          newMessage = `Display profile confirmed! Your screen configuration adds to your unique digital signature.`;
+        } else if (label.includes('timezone')) {
+          const hasMismatch = hexagonData.risk?.toLowerCase().includes('mismatch');
+          newMessage = hasMismatch
+            ? `Timezone mismatch confirmed! Websites can detect you're using a VPN based on this inconsistency.`
+            : `Timezone/locale confirmed! Your geographic fingerprint is now verified.`;
+        } else if (label.includes('battery')) {
+          newMessage = `Battery status confirmed! This API exposes your device state for tracking.`;
+        } else if (label.includes('connected devices') || label.includes('media devices')) {
+          newMessage = `Media devices confirmed! Your camera/microphone/speaker combo creates a unique identifier.`;
         } else {
           newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
         }
