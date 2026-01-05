@@ -5,6 +5,12 @@ import {
   detectInstalledFonts,
   detectPlugins,
   calculateProtectionScore,
+  detectWebRTCLeak,
+  detectHardwareConcurrency,
+  detectScreenProperties,
+  detectTimezoneLocale,
+  detectBatteryStatus,
+  detectMediaDevices,
 } from './fingerprintDetection';
 
 // Orientation data interface
@@ -788,6 +794,136 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       icon: '🛡️',
       confidence: 100,
       risk: protectionRisk,
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // Run advanced fingerprint detection in parallel
+  const [webrtcResult, batteryResult, mediaResult] = await Promise.all([
+    detectWebRTCLeak().catch(() => null),
+    detectBatteryStatus().catch(() => null),
+    detectMediaDevices().catch(() => null),
+  ]);
+  
+  // Get synchronous advanced fingerprint data
+  const hardwareResult = detectHardwareConcurrency();
+  const screenResult = detectScreenProperties();
+  const timezoneResult = detectTimezoneLocale();
+  
+  // Advanced Fingerprint Hexagons
+  
+  // 1. WebRTC Leak Detection
+  if (webrtcResult) {
+    let webrtcValue = 'Blocked';
+    let webrtcRisk = 'WebRTC is blocked. Your real IP is protected.';
+    let webrtcConfidence = 100;
+    
+    if (webrtcResult.localIPs.length === 0 && webrtcResult.publicIPs.length === 0) {
+      webrtcValue = 'No Leak Detected';
+      webrtcRisk = 'WebRTC is not leaking your IP address. Good for privacy!';
+    } else if (webrtcResult.isLeaking) {
+      const leakedIPs = webrtcResult.publicIPs.slice(0, 2).join(', ');
+      webrtcValue = `Leaking: ${leakedIPs.substring(0, 15)}${leakedIPs.length > 15 ? '...' : ''}`;
+      webrtcRisk = `CRITICAL: Your real IP (${webrtcResult.publicIPs[0]}) is exposed! ${webrtcResult.vpnDetected ? 'VPN detected but IP still leaking.' : 'Attackers can see your real location.'}`;
+    } else if (webrtcResult.vpnDetected) {
+      webrtcValue = 'VPN Protected';
+      webrtcRisk = 'VPN detected and working. Only local IPs visible.';
+    }
+    
+    fingerprintHexagons.push({
+      id: 'webrtc-leak',
+      label: 'WebRTC Leak',
+      value: webrtcValue,
+      icon: '🌐',
+      confidence: webrtcConfidence,
+      risk: webrtcRisk,
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // 2. Hardware Profile
+  fingerprintHexagons.push({
+    id: 'hardware-profile',
+    label: 'CPU Cores',
+    value: `${hardwareResult.cores} cores${hardwareResult.memory ? ` / ${hardwareResult.memory}GB` : ''}`,
+    icon: '🖥️',
+    confidence: 100,
+    risk: `Hardware class: ${hardwareResult.hardwareClass === 'very-high' ? 'High-end' : hardwareResult.hardwareClass === 'high' ? 'Mid-high' : hardwareResult.hardwareClass === 'medium' ? 'Mid-range' : 'Low-end'}. Device specs help identify you uniquely.`,
+    confirmed: false,
+    category: 'fingerprint',
+  });
+  
+  // 3. Screen Fingerprint
+  fingerprintHexagons.push({
+    id: 'screen-fingerprint',
+    label: 'Display Profile',
+    value: `${screenResult.resolution} @${screenResult.pixelRatio}x`,
+    icon: '📺',
+    confidence: 100,
+    risk: `Screen: ${screenResult.resolution}, ${screenResult.colorDepth}-bit color, ${screenResult.pixelRatio}x pixel ratio. ${screenResult.uniqueness > 50 ? 'Unusual display config makes you more trackable.' : 'Common display configuration.'}`,
+    confirmed: false,
+    category: 'fingerprint',
+  });
+  
+  // 4. Geographic Fingerprint (Timezone/Locale)
+  fingerprintHexagons.push({
+    id: 'timezone-locale',
+    label: 'Timezone/Locale',
+    value: `${timezoneResult.timezone.split('/').pop()} (${navigator.language})`,
+    icon: '🌍',
+    confidence: 100,
+    risk: `Timezone: ${timezoneResult.timezone}, Date: ${timezoneResult.dateFormat}, Numbers: ${timezoneResult.numberFormat}. ${timezoneResult.mismatch ? '⚠️ MISMATCH: Timezone doesn\'t match locale - possible VPN/travel detected!' : 'Location consistent with settings.'}`,
+    confirmed: false,
+    category: 'fingerprint',
+  });
+  
+  // 5. Battery Fingerprint
+  if (batteryResult) {
+    let batteryValue = 'API Blocked';
+    let batteryRisk = 'Battery API not available. Good for privacy - this API is used for fingerprinting.';
+    let batteryConfidence = 90;
+    
+    if (batteryResult.available) {
+      batteryValue = `${batteryResult.level}% ${batteryResult.charging ? 'Charging' : 'Discharging'}`;
+      batteryRisk = `Battery level ${batteryResult.level}%, ${batteryResult.charging ? 'charging' : 'discharging'}. Battery API reveals device state used for fingerprinting and tracking your daily patterns.`;
+    } else {
+      batteryValue = 'Not Available';
+    }
+    
+    fingerprintHexagons.push({
+      id: 'battery-fingerprint',
+      label: 'Battery Status',
+      value: batteryValue,
+      icon: '🔋',
+      confidence: batteryConfidence,
+      risk: batteryRisk,
+      confirmed: false,
+      category: 'fingerprint',
+    });
+  }
+  
+  // 6. Media Devices
+  if (mediaResult) {
+    let mediaValue = 'Permission Required';
+    let mediaRisk = 'Media device info requires permission. Device counts can still be used for fingerprinting.';
+    
+    if (mediaResult.videoInputs > 0 || mediaResult.audioInputs > 0 || mediaResult.audioOutputs > 0) {
+      mediaValue = `${mediaResult.videoInputs} cam, ${mediaResult.audioInputs} mic, ${mediaResult.audioOutputs} spk`;
+      mediaRisk = `Detected ${mediaResult.videoInputs} camera(s), ${mediaResult.audioInputs} microphone(s), ${mediaResult.audioOutputs} speaker(s). ${mediaResult.permissionGranted ? 'Labels visible - device names exposed!' : 'Device counts visible but labels hidden.'}`;
+    } else {
+      mediaValue = 'No Devices';
+      mediaRisk = 'No media devices detected or access blocked.';
+    }
+    
+    fingerprintHexagons.push({
+      id: 'media-devices',
+      label: 'Connected Devices',
+      value: mediaValue,
+      icon: '🎥',
+      confidence: 85,
+      risk: mediaRisk,
       confirmed: false,
       category: 'fingerprint',
     });
