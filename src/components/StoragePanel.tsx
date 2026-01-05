@@ -119,7 +119,26 @@ export default function StoragePanel() {
     setIsClearing(true);
     try {
       const result = await clearAllStorage();
-      toast.success(`Cleared ${result.clearedCookies} cookies, ${result.clearedLocalStorage} localStorage items, ${result.clearedSessionStorage} sessionStorage items`);
+      
+      const clearedItems = [
+        result.clearedCookies > 0 && `${result.clearedCookies} cookies`,
+        result.clearedLocalStorage > 0 && `${result.clearedLocalStorage} localStorage items`,
+        result.clearedSessionStorage > 0 && `${result.clearedSessionStorage} sessionStorage items`,
+        result.clearedIndexedDBs > 0 && `${result.clearedIndexedDBs} IndexedDB databases`,
+        result.clearedCaches > 0 && `${result.clearedCaches} caches`,
+        result.unregisteredServiceWorkers > 0 && `${result.unregisteredServiceWorkers} service workers`,
+      ].filter(Boolean);
+      
+      if (clearedItems.length > 0) {
+        toast.success(`Storage cleared successfully! Removed: ${clearedItems.join(', ')}`);
+      } else {
+        toast.info('No storage to clear');
+      }
+      
+      if (result.errors.length > 0) {
+        toast.warning(`Some items could not be cleared: ${result.errors.join(', ')}`);
+      }
+      
       await loadStorageData();
     } catch (error) {
       toast.error('Failed to clear storage');
