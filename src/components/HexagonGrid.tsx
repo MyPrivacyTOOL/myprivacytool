@@ -6,9 +6,12 @@ import LanguageIntelligencePanel from './LanguageIntelligencePanel';
 import FingerprintPanel from './FingerprintPanel';
 import StoragePanel from './StoragePanel';
 import SocialAccountsPanel from './SocialAccountsPanel';
+import SecurityPanel from './SecurityPanel';
 import FinalSummaryPanel from './FinalSummaryPanel';
+import DNSLeakFixGuide from './DNSLeakFixGuide';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile } from '@/lib/deviceDetection';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
+import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
 import {
   initializeModel as initLanguageModel,
   analyzeLanguages,
@@ -26,13 +29,15 @@ import {
   trackTimeToFirstConfirmation,
   trackActivity
 } from '@/lib/analytics';
+import { AlertTriangle, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
   deviceData?: DeviceData;
 }
 
-// Define progressive reveal thresholds
+// Define progressive reveal thresholds - Total 40 hexagons
 const REVEAL_THRESHOLDS = {
   initial: 5,           // Location, Device, Browser, ISP, Time Pattern
   secondWave: 5,        // After 5 confirmations: Screen, Privacy, Connection, Battery
@@ -42,6 +47,7 @@ const REVEAL_THRESHOLDS = {
   advancedFingerprintWave: 23, // After 23 confirmations: Advanced fingerprint hexagons (6)
   storageWave: 29,      // After 29 confirmations: Storage hexagons (5)
   socialWave: 34,       // After 34 confirmations: Social hexagons (5)
+  securityWave: 39,     // After 39 confirmations: Security hexagons (6)
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
@@ -73,6 +79,16 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const [showSocialPanel, setShowSocialPanel] = useState(false);
   const [socialConfirmedCount, setSocialConfirmedCount] = useState(0);
   
+  // Security state
+  const [showSecurityPanel, setShowSecurityPanel] = useState(false);
+  const [securityConfirmedCount, setSecurityConfirmedCount] = useState(0);
+  const [showDNSFixGuide, setShowDNSFixGuide] = useState(false);
+  const [criticalSecurityAlert, setCriticalSecurityAlert] = useState<{
+    type: 'dns' | 'webrtc' | null;
+    message: string;
+  } | null>(null);
+  const [dnsLeakData, setDnsLeakData] = useState<DNSLeakResult | null>(null);
+  
   // Final summary state
   const [showFinalSummary, setShowFinalSummary] = useState(false);
   
@@ -85,12 +101,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     advancedFingerprint: false,
     storage: false,
     social: false,
+    security: false,
   });
 
   // Get visible hexagons based on count, with proper ordering
   const getOrderedHexagons = useCallback(() => {
-    // Define category order for progressive reveal
-    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage', 'social'];
+    // Define category order for progressive reveal - security is last
+    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage', 'social', 'security'];
     
     // Sort hexagons by category order
     const sorted = [...allHexagons].sort((a, b) => {
@@ -175,7 +192,16 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (confirmedCount >= REVEAL_THRESHOLDS.storageWave + 5 && !revealWaves.social) {
       trackFunnelStep('social_scan_triggered');
       setRevealWaves(prev => ({ ...prev, social: true }));
-      revealNextWave(35, Math.min(40, orderedHexagons.length));
+      revealNextWave(35, 40);
+    }
+    
+    // Security wave: After 39 confirmations (social complete)
+    if (confirmedCount >= REVEAL_THRESHOLDS.socialWave + 5 && !revealWaves.security) {
+      trackFunnelStep('security_scan_triggered');
+      setRevealWaves(prev => ({ ...prev, security: true }));
+      // Check for DNS leak and show critical alert if needed
+      checkForCriticalSecurityIssues();
+      revealNextWave(40, Math.min(46, orderedHexagons.length));
     }
     
     // Show Language panel after language hexagons confirmed
@@ -183,12 +209,31 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       setShowLanguagePanel(true);
     }
     
-    // Check for final summary (all visible hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= 35 && !showFinalSummary) {
+    // Check for final summary (all 40+ hexagons confirmed)
+    if (confirmedCount >= visibleCount && visibleCount >= 40 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       setShowFinalSummary(true);
     }
   }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData]);
+
+  // Check for critical security issues (DNS leak, WebRTC leak)
+  const checkForCriticalSecurityIssues = async () => {
+    try {
+      const dnsResult = await detectDNSLeak();
+      setDnsLeakData(dnsResult);
+      
+      if (dnsResult.isLeaking) {
+        setCriticalSecurityAlert({
+          type: 'dns',
+          message: `Your DNS is leaking to your ISP! Location exposed: ${dnsResult.actualLocation}`,
+        });
+        // Auto-show the fix guide after a short delay
+        setTimeout(() => setShowDNSFixGuide(true), 2000);
+      }
+    } catch (error) {
+      console.error('Security check failed:', error);
+    }
+  };
 
   // Reveal next wave of hexagons with animation
   const revealNextWave = (startIndex: number, endIndex: number) => {
@@ -296,6 +341,26 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         });
       }
       
+      // Track security confirmations
+      if (hex.category === 'security') {
+        setSecurityConfirmedCount(c => {
+          const newCount = c + 1;
+          if (newCount >= 3 && !showSecurityPanel) {
+            setShowSecurityPanel(true);
+          }
+          // Check for critical issues (DNS leak, HTTP)
+          const value = hex.value?.toLowerCase() || '';
+          const label = hex.label?.toLowerCase() || '';
+          if (label.includes('dns') && value.includes('leak')) {
+            setCriticalSecurityAlert({
+              type: 'dns',
+              message: 'Critical: DNS leak detected! Your browsing history is exposed.',
+            });
+          }
+          return newCount;
+        });
+      }
+      
       hex.confirmed = true;
       hex.confidence = Math.min(hex.confidence + 5, 99);
     }
@@ -350,7 +415,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     return positions;
   };
 
-  const positions = generatePositions(35);
+  const positions = generatePositions(46); // Support up to 46 hexagons (40 + 6 security)
   const visiblePositions = positions.slice(0, visibleCount);
   const maxY = visiblePositions.length > 0 ? Math.max(...visiblePositions.map(p => p.y)) : 0;
   const containerWidth = isMobile ? (hSpacing * 1.5 + hexWidth) : (hSpacing * 2 + hexWidth);
@@ -365,13 +430,51 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (visibleCount <= 24) return 'Fingerprint detection running...';
     if (visibleCount <= 30) return 'Advanced fingerprinting active...';
     if (visibleCount <= 35) return 'Storage analysis running...';
+    if (visibleCount <= 40) return 'Social tracking scan...';
+    if (visibleCount <= 46) return 'Security vulnerability check...';
     return 'Complete analysis';
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
+      {/* Critical Security Alert Banner */}
+      {criticalSecurityAlert && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white py-3 px-4 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6" />
+            <span className="font-bold">🚨 CRITICAL SECURITY ISSUE</span>
+            <span className="hidden sm:inline">- {criticalSecurityAlert.message}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowDNSFixGuide(true)}
+              className="bg-white text-red-600 hover:bg-gray-100"
+            >
+              Fix Now
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setCriticalSecurityAlert(null)}
+              className="text-white hover:bg-red-700"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* DNS Leak Fix Guide Modal */}
+      <DNSLeakFixGuide
+        open={showDNSFixGuide}
+        onOpenChange={setShowDNSFixGuide}
+        currentLeak={dnsLeakData}
+      />
+
       {/* Title Section */}
-      <div className="text-center mb-4 sm:mb-8">
+      <div className={`text-center mb-4 sm:mb-8 ${criticalSecurityAlert ? 'mt-14' : ''}`}>
         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2">
           YOUR DIGITAL SHADOW
         </h2>
@@ -481,7 +584,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         </div>
       )}
 
-      {/* Final Summary Panel - shown after all hexagons confirmed */}
+      {/* Security Panel - shown after confirming 3+ security hexagons */}
+      {showSecurityPanel && (
+        <div className="mt-8 animate-fade-in">
+          <SecurityPanel onClose={() => setShowSecurityPanel(false)} />
+        </div>
+      )}
+
+      {/* Final Summary Panel - shown after all 40 hexagons confirmed */}
       {showFinalSummary && (
         <div className="mt-8 animate-fade-in">
           <FinalSummaryPanel
