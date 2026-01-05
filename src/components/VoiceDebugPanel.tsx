@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap, BarChart3, Settings2, Shield, Eye, Share2, History, RefreshCw } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
@@ -1710,6 +1711,15 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               </div>
             </div>
 
+            {/* View Dashboard Link */}
+            <Link
+              to="/model-performance"
+              className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 text-xs font-medium hover:bg-purple-500/30 transition-colors"
+            >
+              <BarChart3 className="w-3 h-3" />
+              View Performance Dashboard
+            </Link>
+
             {/* Clear Data Button */}
             {federatedStatus.hasGradients && (
               <button
@@ -1718,7 +1728,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   setFederatedStatus(getFederatedStatus());
                   setGradientSummary(null);
                 }}
-                className="w-full mt-3 text-red-400/60 text-xs hover:text-red-400 transition-colors"
+                className="w-full mt-2 text-red-400/60 text-xs hover:text-red-400 transition-colors"
               >
                 Clear Local Gradient Data
               </button>
