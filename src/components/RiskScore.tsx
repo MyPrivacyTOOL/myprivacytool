@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { Shield, AlertTriangle, AlertCircle, Fingerprint } from 'lucide-react';
+import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 
@@ -14,18 +14,25 @@ interface RiskScoreProps {
 export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
   // Calculate weighted risk score
   const riskData = useMemo(() => {
-    // Category weights: fingerprint is heavily weighted, storage adds 10%
+    // Updated category weights: social is heavily weighted (25%)
     const weights = {
-      device: 0.15,     // 15%
-      network: 0.15,    // 15%
-      language: 0.15,   // 15%
-      orientation: 0.15, // 15%
+      device: 0.10,      // 10% (device + network combined)
+      privacy: 0.10,     // 10%
+      language: 0.05,    // 5%
+      orientation: 0.05, // 5%
       fingerprint: 0.30, // 30%
-      storage: 0.10,    // 10%
+      storage: 0.10,     // 10%
+      social: 0.25,      // 25% (highest single category)
+      other: 0.05,       // 5%
     };
 
     let weightedScore = 0;
     let totalWeight = 0;
+    let socialRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
+    let loggedInServices = 0;
+    let hasGoogle = false;
+    let hasFacebook = false;
+    let hasSSO = false;
 
     if (hexagons && hexagons.length > 0) {
       // Calculate confirmation rates by category
@@ -38,48 +45,74 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         }
         categoryRates[cat].total++;
         if (hex.confirmed) categoryRates[cat].confirmed++;
+        
+        // Track social service logins for risk calculation
+        if (cat === 'social' && hex.confirmed) {
+          const value = hex.value?.toLowerCase() || '';
+          const label = hex.label?.toLowerCase() || '';
+          
+          if (!value.includes('not detected') && !value.includes('no platform') && !value.includes('not linked')) {
+            if (label.includes('google')) {
+              hasGoogle = true;
+              loggedInServices++;
+            } else if (label.includes('meta') || label.includes('facebook')) {
+              hasFacebook = true;
+              loggedInServices++;
+            } else if (label.includes('microsoft')) {
+              loggedInServices++;
+            } else if (label.includes('social platform')) {
+              const match = value.match(/(\d+)/);
+              loggedInServices += match ? parseInt(match[1]) : 1;
+            } else if (label.includes('cross-site') || label.includes('identity')) {
+              if (value.includes('linked') || value.includes('connection')) {
+                hasSSO = true;
+              }
+            }
+          }
+        }
       });
 
-      // Device/network risk
-      const deviceCats = ['device', 'network', 'privacy', 'profile'];
-      const deviceTotal = deviceCats.reduce(
-        (acc, c) => acc + (categoryRates[c]?.total || 0),
-        0
-      );
-      const deviceConfirmed = deviceCats.reduce(
-        (acc, c) => acc + (categoryRates[c]?.confirmed || 0),
-        0
-      );
+      // Device/network risk (combined 10%)
+      const deviceCats = ['device', 'network'];
+      const deviceTotal = deviceCats.reduce((acc, c) => acc + (categoryRates[c]?.total || 0), 0);
+      const deviceConfirmed = deviceCats.reduce((acc, c) => acc + (categoryRates[c]?.confirmed || 0), 0);
       if (deviceTotal > 0) {
-        weightedScore += (deviceConfirmed / deviceTotal) * 100 * (weights.device + weights.network);
-        totalWeight += weights.device + weights.network;
+        weightedScore += (deviceConfirmed / deviceTotal) * 100 * weights.device;
+        totalWeight += weights.device;
       }
 
-      // Language risk
+      // Privacy risk (10%)
+      const privacyCats = ['privacy', 'profile'];
+      const privacyTotal = privacyCats.reduce((acc, c) => acc + (categoryRates[c]?.total || 0), 0);
+      const privacyConfirmed = privacyCats.reduce((acc, c) => acc + (categoryRates[c]?.confirmed || 0), 0);
+      if (privacyTotal > 0) {
+        weightedScore += (privacyConfirmed / privacyTotal) * 100 * weights.privacy;
+        totalWeight += weights.privacy;
+      }
+
+      // Language risk (5%)
       const langCat = categoryRates['language'];
       if (langCat && langCat.total > 0) {
         weightedScore += (langCat.confirmed / langCat.total) * 100 * weights.language;
         totalWeight += weights.language;
       }
 
-      // Orientation risk
+      // Orientation risk (5%)
       const orientCat = categoryRates['orientation'];
       if (orientCat && orientCat.total > 0) {
         weightedScore += (orientCat.confirmed / orientCat.total) * 100 * weights.orientation;
         totalWeight += weights.orientation;
       }
 
-      // Fingerprint risk (heavily weighted based on uniqueness)
+      // Fingerprint risk (30%)
       const fpCat = categoryRates['fingerprint'];
       if (fpCat && fpCat.total > 0) {
         let fpRisk = (fpCat.confirmed / fpCat.total) * 100;
         
-        // Increase risk based on fingerprint uniqueness
         if (fingerprint) {
           const fpRiskMap = { high: 95, medium: 70, low: 40 };
           fpRisk = Math.max(fpRisk, fpRiskMap[fingerprint.totalRisk] || fpRisk);
           
-          // Reduce by protection effectiveness
           if (fingerprint.protection) {
             const reductionMap = { high: 0.4, medium: 0.25, low: 0.1, none: 0 };
             fpRisk *= 1 - (reductionMap[fingerprint.protection.effectiveness] || 0);
@@ -90,13 +123,52 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         totalWeight += weights.fingerprint;
       }
 
-      // Storage risk (based on tracking detection)
+      // Storage risk (10%)
       const storageCat = categoryRates['storage'];
       if (storageCat && storageCat.total > 0) {
-        // Storage risk is based on confirmation rate and inherent tracking risk
         const storageRisk = (storageCat.confirmed / storageCat.total) * 100;
         weightedScore += storageRisk * weights.storage;
         totalWeight += weights.storage;
+      }
+
+      // Social risk (25%) - heavily weighted based on logged-in services
+      const socialCat = categoryRates['social'];
+      if (socialCat && socialCat.total > 0) {
+        let socialRisk = 0;
+        
+        // Base risk from confirmation rate
+        socialRisk = (socialCat.confirmed / socialCat.total) * 30;
+        
+        // Add risk based on logged-in services
+        if (loggedInServices >= 3) {
+          socialRisk += 60; // 3+ services: +60 points
+        } else if (loggedInServices >= 1) {
+          socialRisk += 30; // 1-2 services: +30 points
+        }
+        
+        // Google or Facebook: +20 each
+        if (hasGoogle) socialRisk += 20;
+        if (hasFacebook) socialRisk += 20;
+        
+        // SSO detected: +40 (critical)
+        if (hasSSO) socialRisk += 40;
+        
+        // Cap at 100
+        socialRisk = Math.min(socialRisk, 100);
+        
+        // Determine social risk level
+        if (hasSSO || (hasGoogle && hasFacebook) || loggedInServices >= 4) {
+          socialRiskLevel = 'critical';
+        } else if (loggedInServices >= 2 || hasGoogle || hasFacebook) {
+          socialRiskLevel = 'high';
+        } else if (loggedInServices >= 1) {
+          socialRiskLevel = 'medium';
+        } else {
+          socialRiskLevel = 'low';
+        }
+        
+        weightedScore += socialRisk * weights.social;
+        totalWeight += weights.social;
       }
     }
 
@@ -111,10 +183,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
       percentage: Math.min(percentage, 100),
       hasFingerprint: hexagons?.some((h) => h.category === 'fingerprint' && h.confirmed) || false,
       fingerprintRisk: fingerprint?.totalRisk || null,
+      hasSocial: hexagons?.some((h) => h.category === 'social' && h.confirmed) || false,
+      socialRiskLevel,
+      loggedInServices,
     };
   }, [confirmed, total, hexagons, fingerprint]);
 
-  const { percentage, hasFingerprint, fingerprintRisk } = riskData;
+  const { percentage, hasFingerprint, fingerprintRisk, hasSocial, socialRiskLevel, loggedInServices } = riskData;
   
   const getRiskLevel = (pct: number) => {
     if (pct >= 80) return { label: 'High Risk', Icon: AlertCircle };
@@ -178,18 +253,35 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             <span className="font-medium text-green-400">{total}</span> data points confirmed
           </div>
 
-          {/* Fingerprint indicator */}
-          {hasFingerprint && fingerprintRisk && (
-            <div className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs mt-2 border",
-              fingerprintRisk === 'high' ? "bg-red-500/10 text-red-400 border-red-500/20" :
-              fingerprintRisk === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-              "bg-green-500/10 text-green-400 border-green-500/20"
-            )}>
-              <Fingerprint className="w-3 h-3" />
-              Fingerprint: {fingerprintRisk.charAt(0).toUpperCase() + fingerprintRisk.slice(1)} risk
-            </div>
-          )}
+          {/* Risk indicators row */}
+          <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
+            {/* Fingerprint indicator */}
+            {hasFingerprint && fingerprintRisk && (
+              <div className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
+                fingerprintRisk === 'high' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                fingerprintRisk === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                "bg-green-500/10 text-green-400 border-green-500/20"
+              )}>
+                <Fingerprint className="w-3 h-3" />
+                FP: {fingerprintRisk.charAt(0).toUpperCase() + fingerprintRisk.slice(1)}
+              </div>
+            )}
+
+            {/* Social tracking indicator */}
+            {hasSocial && socialRiskLevel && (
+              <div className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
+                socialRiskLevel === 'critical' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                socialRiskLevel === 'high' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                socialRiskLevel === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                "bg-green-500/10 text-green-400 border-green-500/20"
+              )}>
+                <Users className="w-3 h-3" />
+                Social: {socialRiskLevel === 'critical' ? 'Critical' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
+              </div>
+            )}
+          </div>
 
           {/* Progress bar */}
           <div className="mt-2 sm:mt-3 h-1.5 sm:h-2 bg-green-900/30 rounded-full overflow-hidden max-w-xs mx-auto sm:mx-0 border border-green-500/20">
