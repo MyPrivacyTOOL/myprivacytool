@@ -5,6 +5,7 @@ import RiskScore from './RiskScore';
 import LanguageIntelligencePanel from './LanguageIntelligencePanel';
 import FingerprintPanel from './FingerprintPanel';
 import StoragePanel from './StoragePanel';
+import SocialAccountsPanel from './SocialAccountsPanel';
 import FinalSummaryPanel from './FinalSummaryPanel';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile } from '@/lib/deviceDetection';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
@@ -40,6 +41,7 @@ const REVEAL_THRESHOLDS = {
   fingerprintWave: 17,  // After 17 confirmations: Core fingerprint hexagons (6)
   advancedFingerprintWave: 23, // After 23 confirmations: Advanced fingerprint hexagons (6)
   storageWave: 29,      // After 29 confirmations: Storage hexagons (5)
+  socialWave: 34,       // After 34 confirmations: Social hexagons (5)
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
@@ -67,6 +69,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const [showStoragePanel, setShowStoragePanel] = useState(false);
   const [storageConfirmedCount, setStorageConfirmedCount] = useState(0);
   
+  // Social accounts state
+  const [showSocialPanel, setShowSocialPanel] = useState(false);
+  const [socialConfirmedCount, setSocialConfirmedCount] = useState(0);
+  
   // Final summary state
   const [showFinalSummary, setShowFinalSummary] = useState(false);
   
@@ -78,12 +84,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     fingerprint: false,
     advancedFingerprint: false,
     storage: false,
+    social: false,
   });
 
   // Get visible hexagons based on count, with proper ordering
   const getOrderedHexagons = useCallback(() => {
     // Define category order for progressive reveal
-    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage'];
+    const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage', 'social'];
     
     // Sort hexagons by category order
     const sorted = [...allHexagons].sort((a, b) => {
@@ -161,7 +168,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (confirmedCount >= REVEAL_THRESHOLDS.advancedFingerprintWave + 6 && !revealWaves.storage) {
       trackFunnelStep('storage_scan_triggered');
       setRevealWaves(prev => ({ ...prev, storage: true }));
-      revealNextWave(30, Math.min(35, orderedHexagons.length));
+      revealNextWave(30, 35);
+    }
+    
+    // Social wave: After 34 confirmations (storage complete)
+    if (confirmedCount >= REVEAL_THRESHOLDS.storageWave + 5 && !revealWaves.social) {
+      trackFunnelStep('social_scan_triggered');
+      setRevealWaves(prev => ({ ...prev, social: true }));
+      revealNextWave(35, Math.min(40, orderedHexagons.length));
     }
     
     // Show Language panel after language hexagons confirmed
@@ -170,7 +184,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Check for final summary (all visible hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= 30 && !showFinalSummary) {
+    if (confirmedCount >= visibleCount && visibleCount >= 35 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       setShowFinalSummary(true);
     }
@@ -266,6 +280,17 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           const newCount = c + 1;
           if (newCount >= 3 && !showStoragePanel) {
             setShowStoragePanel(true);
+          }
+          return newCount;
+        });
+      }
+      
+      // Track social confirmations
+      if (hex.category === 'social') {
+        setSocialConfirmedCount(c => {
+          const newCount = c + 1;
+          if (newCount >= 3 && !showSocialPanel) {
+            setShowSocialPanel(true);
           }
           return newCount;
         });
@@ -446,6 +471,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {showStoragePanel && (
         <div className="mt-8 animate-fade-in">
           <StoragePanel />
+        </div>
+      )}
+
+      {/* Social Accounts Panel - shown after confirming 3+ social hexagons */}
+      {showSocialPanel && (
+        <div className="mt-8 animate-fade-in">
+          <SocialAccountsPanel />
         </div>
       )}
 
