@@ -371,6 +371,96 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     return `Cache storage has ${cacheCount} caches using ${sizeMB.toFixed(1)} MB. This stores website assets for faster loading and offline access.`;
   }
   
+  // SECURITY VULNERABILITY HEXAGONS
+  if (label.includes('dns leak') || label === 'dns leak') {
+    if (value.toLowerCase().includes('leaking') || value.toLowerCase().includes('leak')) {
+      const locationMatch = value.match(/\(([^)]+)\)/);
+      const location = locationMatch ? locationMatch[1] : 'your real location';
+      return `URGENT SECURITY ALERT: I detected a DNS leak. Your DNS requests are going to your ISP's servers instead of your VPN's DNS. This is catastrophic for privacy—your ISP can see every website you visit, and websites can determine your real location at ${location}. Your VPN is essentially useless with this leak. You must fix this immediately by enabling DNS leak protection in your VPN settings.`;
+    }
+    if (value.toLowerCase().includes('vpn protected') || value.toLowerCase().includes('protected')) {
+      return "Excellent—your VPN is properly protecting your DNS requests. No leak detected. Your DNS queries are being routed through secure servers, keeping your browsing history hidden from your ISP.";
+    }
+    if (value.toLowerCase().includes('no leak') || value.toLowerCase().includes('none')) {
+      return "No DNS leak detected. Your DNS requests are properly routed through secure servers, protecting your browsing history from surveillance.";
+    }
+    if (value.toLowerCase().includes('checking') || value.toLowerCase().includes('...')) {
+      return "I'm checking for DNS leaks—this is one of the most critical privacy vulnerabilities that can expose your real location even when using a VPN.";
+    }
+    return "DNS leaks can expose every website you visit to your ISP and network administrators. I'm analyzing your DNS configuration.";
+  }
+  
+  if (label.includes('connection security') || label.includes('https status') || label === 'https-status') {
+    if (value.toLowerCase().includes('insecure') || value.toLowerCase().includes('http') && !value.toLowerCase().includes('https')) {
+      return "WARNING: This site uses HTTP, not HTTPS. Everything you do here—including passwords, credit cards, and personal information—is transmitted in plain text. Anyone on your WiFi network, your ISP, or network administrators can intercept this data. Never enter sensitive information on HTTP sites. Look for the padlock icon before entering any personal data.";
+    }
+    if (value.toLowerCase().includes('hsts')) {
+      return "This site uses HTTPS with HSTS enforcement, which is excellent. HSTS ensures your browser always uses an encrypted connection and prevents downgrade attacks. Your connection is secure and encrypted.";
+    }
+    if (value.toLowerCase().includes('secure') || value.toLowerCase().includes('https')) {
+      return "This site uses HTTPS encryption. Your connection is secure and encrypted, protecting your data from eavesdroppers on your network.";
+    }
+    return "I'm checking your connection security. HTTPS encryption is essential for protecting your data in transit.";
+  }
+  
+  if (label.includes('mixed content')) {
+    if (value.toLowerCase().includes('none') || value === '0' || value.toLowerCase().includes('0 insecure')) {
+      return "No mixed content detected. All resources on this page are loaded securely over HTTPS. This means the entire page is protected from tampering and eavesdropping.";
+    }
+    const countMatch = value.match(/(\d+)\s*insecure/i);
+    const insecureCount = countMatch ? parseInt(countMatch[1]) : 1;
+    return `I found ${insecureCount} insecure resource${insecureCount > 1 ? 's' : ''} loading on this HTTPS page. This creates security holes—attackers could inject malicious code through these HTTP resources. While your main connection is encrypted, these insecure elements compromise the page's security and could be used for man-in-the-middle attacks.`;
+  }
+  
+  if (label.includes('security headers')) {
+    const scoreMatch = value.match(/(\d+)%/);
+    const countMatch = value.match(/(\d+)\/(\d+)/);
+    
+    if (value.toLowerCase().includes('strong') || (scoreMatch && parseInt(scoreMatch[1]) >= 80)) {
+      return "This site has strong security headers configured. Headers like Content-Security-Policy and X-Frame-Options are protecting you from cross-site scripting and clickjacking attacks.";
+    }
+    if (value.toLowerCase().includes('weak') || (scoreMatch && parseInt(scoreMatch[1]) < 50)) {
+      return "This site is missing critical security headers. Without proper Content-Security-Policy, X-Frame-Options, and other protections, you're more vulnerable to cross-site scripting and content injection attacks when visiting this site. While this is the site owner's responsibility, it affects your security.";
+    }
+    if (countMatch) {
+      const present = parseInt(countMatch[1]);
+      const total = parseInt(countMatch[2]);
+      return `This site has ${present} of ${total} security headers configured. Missing headers can leave you vulnerable to certain web attacks. Security headers are the site's responsibility but they protect you from XSS and clickjacking.`;
+    }
+    return "Security headers protect you from common web attacks like cross-site scripting. I'm checking what protections this site has in place.";
+  }
+  
+  if (label.includes('browser status') || label.includes('browser security')) {
+    if (value.toLowerCase().includes('vulnerable')) {
+      const versionMatch = value.match(/\d+/);
+      const version = versionMatch ? versionMatch[0] : 'current';
+      return `CRITICAL: Your browser version ${version} has known security vulnerabilities that attackers actively exploit. Outdated browsers are one of the easiest ways for malware to infect your system. You should update immediately—not just for privacy, but for basic security. Go to your browser's About page to check for updates.`;
+    }
+    if (value.toLowerCase().includes('outdated')) {
+      return "Your browser version is outdated. Outdated browsers have known security vulnerabilities that attackers actively exploit. You should update immediately—not just for privacy, but for basic security.";
+    }
+    if (value.toLowerCase().includes('up to date') || value.toLowerCase().includes('current')) {
+      return "Your browser is up-to-date with the latest security patches. This is excellent—you're protected against known vulnerabilities.";
+    }
+    return "I'm checking if your browser has the latest security updates. Outdated browsers are a common attack vector.";
+  }
+  
+  if (label.includes('encryption') || label.includes('tls config') || label.includes('tls-config')) {
+    if (value.toLowerCase().includes('no encryption') || value.toLowerCase().includes('none')) {
+      return "CRITICAL: There is no TLS encryption on this connection. All your data is transmitted in plain text and can be read by anyone on your network. Do not enter any personal information on this site.";
+    }
+    if (value.toLowerCase().includes('1.3') || value.toLowerCase().includes('tls 1.3')) {
+      return "Excellent! This site uses TLS 1.3, the most modern and secure encryption protocol available. Your data is protected with state-of-the-art encryption that's resistant to known attacks.";
+    }
+    if (value.toLowerCase().includes('1.2') || value.toLowerCase().includes('tls 1.2')) {
+      return "This site uses TLS 1.2 encryption, which is still considered secure. While TLS 1.3 is newer, TLS 1.2 with proper configuration provides strong protection for your data.";
+    }
+    if (value.toLowerCase().includes('weak') || value.toLowerCase().includes('old')) {
+      return "Warning: This site may be using outdated TLS encryption. Older TLS versions have known vulnerabilities. Modern browsers should refuse weak encryption, but be cautious with sensitive data.";
+    }
+    return "TLS encryption protects your data in transit. I'm checking what encryption protocol this site uses.";
+  }
+  
   return `${hexagonData.label} is part of your digital shadow.`;
 };
 
@@ -473,6 +563,49 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
       return "URGENTLY stop using Sign in with Google or Facebook. Create unique passwords for each site using a password manager. SSO gives tech giants your complete browsing history";
     }
     return "excellent choice avoiding SSO. Continue using unique passwords for each service";
+  }
+  
+  // SECURITY VULNERABILITY RECOMMENDATIONS
+  if (label.includes('dns leak') || label === 'dns leak') {
+    if (value.toLowerCase().includes('leaking') || value.toLowerCase().includes('leak')) {
+      return "IMMEDIATELY enable DNS leak protection in your VPN settings. In most VPNs, this is under Settings then Connection then DNS Leak Protection. You should also manually set your DNS to your VPN provider's servers or use 1.1.1.1 or 9.9.9.9. This is your top priority";
+    }
+    return "maintain your current DNS protection. Consider using DNS-over-HTTPS for additional privacy";
+  }
+  
+  if (label.includes('connection security') || label.includes('https status') || label === 'https-status') {
+    if (value.toLowerCase().includes('insecure') || (value.toLowerCase().includes('http') && !value.toLowerCase().includes('https'))) {
+      return "install the HTTPS Everywhere extension and enable HTTPS-Only Mode in your browser settings. Never enter passwords or personal information on HTTP sites. Consider leaving this site immediately if you need to enter sensitive data";
+    }
+    return "continue using HTTPS-only mode. Consider browser extensions that enforce encrypted connections";
+  }
+  
+  if (label.includes('mixed content')) {
+    if (!value.toLowerCase().includes('none') && value !== '0') {
+      return "avoid entering sensitive data on pages with mixed content. The site owner needs to fix this, but you should be cautious. Report this to the website administrator if possible";
+    }
+    return "this site properly loads all resources securely. No action needed";
+  }
+  
+  if (label.includes('security headers')) {
+    if (value.toLowerCase().includes('weak') || value.includes('1/') || value.includes('2/')) {
+      return "be extra cautious on sites with weak security headers. They're more vulnerable to XSS attacks. Avoid clicking suspicious links and consider using NoScript extension for protection";
+    }
+    return "this site has good security configuration. Continue normal browsing";
+  }
+  
+  if (label.includes('browser status') || label.includes('browser security')) {
+    if (value.toLowerCase().includes('vulnerable') || value.toLowerCase().includes('outdated')) {
+      return "UPDATE YOUR BROWSER IMMEDIATELY. Go to your browser menu, then Help, then About to check for updates. Outdated browsers are actively exploited by malware. This is critical for your security";
+    }
+    return "keep auto-updates enabled to maintain security. Consider using a privacy-focused browser like Firefox or Brave";
+  }
+  
+  if (label.includes('encryption') || label.includes('tls config') || label.includes('tls-config')) {
+    if (value.toLowerCase().includes('no encryption') || value.toLowerCase().includes('none') || value.toLowerCase().includes('weak')) {
+      return "avoid this site for any sensitive activities. Modern browsers should block weak encryption, but be vigilant. Use a VPN for additional encryption layer";
+    }
+    return "your encryption is strong. Continue using modern browsers that enforce secure connections";
   }
   
   if (riskLevel === 'high') {
