@@ -16,15 +16,15 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
   const riskData = useMemo(() => {
     // FINAL CATEGORY WEIGHTS - Total 100%
     const weights = {
-      device: 0.07,      // 7% (device + network combined)
-      privacy: 0.06,     // 6%
-      language: 0.04,    // 4%
-      orientation: 0.04, // 4%
-      fingerprint: 0.22, // 22%
-      storage: 0.09,     // 9%
-      social: 0.18,      // 18%
-      security: 0.18,    // 18% - critical weight for vulnerabilities
-      behavior: 0.12,    // 12% - NEW behavior tracking
+      device: 0.05,      // 5% (device + network combined)
+      privacy: 0.05,     // 5%
+      language: 0.05,    // 5%
+      orientation: 0.05, // 5%
+      fingerprint: 0.25, // 25%
+      storage: 0.10,     // 10%
+      social: 0.20,      // 20%
+      security: 0.15,    // 15%
+      behavior: 0.10,    // 10%
     };
 
     let weightedScore = 0;
