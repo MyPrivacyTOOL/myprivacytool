@@ -47,6 +47,12 @@ const categoryColors = {
     gradient: ['rgba(245,158,11,0.3)', 'rgba(245,158,11,0.1)'],
     bg: ['rgba(40,25,5,0.9)', 'rgba(30,18,0,0.95)'],
   },
+  fingerprint: {
+    primary: '#DC2626',      // Deep Red
+    glow: '#EF4444',
+    gradient: ['rgba(220,38,38,0.35)', 'rgba(220,38,38,0.15)'],
+    bg: ['rgba(50,5,5,0.95)', 'rgba(35,0,0,0.98)'],
+  },
   default: {
     primary: '#00ff41',      // Matrix green
     glow: '#00ff41',
