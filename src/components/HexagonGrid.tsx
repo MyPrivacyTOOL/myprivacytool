@@ -36,7 +36,8 @@ const REVEAL_THRESHOLDS = {
   secondWave: 5,        // After 5 confirmations: Screen, Privacy, Connection, Battery
   languageWave: 8,      // After 8 confirmations: Language hexagons (4)
   orientationWave: 12,  // After 12 confirmations: Orientation hexagons (5)
-  fingerprintWave: 17,  // After 17 confirmations: Fingerprint hexagons (6)
+  fingerprintWave: 17,  // After 17 confirmations: Core fingerprint hexagons (6)
+  advancedFingerprintWave: 23, // After 23 confirmations: Advanced fingerprint hexagons (6)
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
@@ -69,6 +70,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     language: false,
     orientation: false,
     fingerprint: false,
+    advancedFingerprint: false,
   });
 
   // Get visible hexagons based on count, with proper ordering
@@ -138,7 +140,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackFunnelStep('fingerprint_scan_triggered');
       setRevealWaves(prev => ({ ...prev, fingerprint: true }));
       loadFingerprintData();
-      revealNextWave(18, Math.min(24, orderedHexagons.length));
+      revealNextWave(18, 24);
+    }
+    
+    // Advanced fingerprint wave: After 23 confirmations
+    if (confirmedCount >= REVEAL_THRESHOLDS.fingerprintWave + 6 && !revealWaves.advancedFingerprint) {
+      trackFunnelStep('advanced_fingerprint_scan_triggered');
+      setRevealWaves(prev => ({ ...prev, advancedFingerprint: true }));
+      revealNextWave(24, Math.min(30, orderedHexagons.length));
     }
     
     // Show Language panel after language hexagons confirmed
@@ -147,7 +156,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Check for final summary (all visible hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= 18 && !showFinalSummary) {
+    if (confirmedCount >= visibleCount && visibleCount >= 24 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       setShowFinalSummary(true);
     }
@@ -304,6 +313,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     if (visibleCount <= 13) return 'Language analysis active...';
     if (visibleCount <= 18) return 'Motion tracking enabled...';
     if (visibleCount <= 24) return 'Fingerprint detection running...';
+    if (visibleCount <= 30) return 'Advanced fingerprinting active...';
     return 'Complete analysis';
   };
 
