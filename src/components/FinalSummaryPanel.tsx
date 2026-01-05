@@ -7,8 +7,10 @@ import {
   Download, Share2, Shield, RotateCcw, ChevronRight, AlertTriangle, 
   CheckCircle, Eye, Trophy, Target, FileJson, BookOpen, Zap,
   Mouse, Keyboard, Users, ShieldAlert, Fingerprint, Database,
-  Globe, Smartphone
+  Globe, Smartphone, FileText
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
@@ -359,6 +361,320 @@ export default function FinalSummaryPanel({
   const handleExportPDF = async () => {
     setIsExporting(true);
     
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      let yPos = margin;
+
+      // Helper function to add new page if needed
+      const checkNewPage = (neededHeight: number) => {
+        if (yPos + neededHeight > pageHeight - margin) {
+          pdf.addPage();
+          yPos = margin;
+          return true;
+        }
+        return false;
+      };
+
+      // Header with gradient-like background
+      pdf.setFillColor(15, 23, 42); // Dark blue-gray
+      pdf.rect(0, 0, pageWidth, 45, 'F');
+      
+      // Title
+      pdf.setTextColor(74, 222, 128); // Green
+      pdf.setFontSize(24);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Digital Shadow Report', margin, 20);
+      
+      // Subtitle
+      pdf.setTextColor(148, 163, 184); // Gray
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('Complete Privacy Analysis - 46 Data Points', margin, 28);
+      pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 35);
+      
+      yPos = 55;
+
+      // Overall Statistics Box
+      pdf.setFillColor(30, 41, 59);
+      pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 35, 3, 3, 'F');
+      
+      // Stats grid
+      const statsY = yPos + 12;
+      const colWidth = (pageWidth - 2 * margin) / 4;
+      
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      
+      // Data Points
+      pdf.setTextColor(74, 222, 128);
+      pdf.text('46', margin + colWidth * 0 + 10, statsY);
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('Data Points', margin + colWidth * 0 + 10, statsY + 8);
+      
+      // Risk Score
+      pdf.setFontSize(18);
+      pdf.setTextColor(overallRisk >= 70 ? 239 : overallRisk >= 40 ? 234 : 34, overallRisk >= 70 ? 68 : overallRisk >= 40 ? 179 : 197, overallRisk >= 70 ? 68 : overallRisk >= 40 ? 8 : 94);
+      pdf.text(String(overallRisk), margin + colWidth * 1 + 10, statsY);
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('Risk Score', margin + colWidth * 1 + 10, statsY + 8);
+      
+      // Uniqueness
+      pdf.setFontSize(14);
+      pdf.setTextColor(168, 85, 247);
+      pdf.text(`1:${uniquenessEstimate.toLocaleString()}`, margin + colWidth * 2 + 10, statsY);
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('Uniqueness', margin + colWidth * 2 + 10, statsY + 8);
+      
+      // Exposure
+      pdf.setFontSize(18);
+      pdf.setTextColor(34, 211, 238);
+      pdf.text(`${Math.round((confirmedCount / 46) * 100)}%`, margin + colWidth * 3 + 10, statsY);
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('Exposure', margin + colWidth * 3 + 10, statsY + 8);
+      
+      yPos += 45;
+
+      // Risk Level Badge
+      pdf.setFillColor(overallRisk >= 70 ? 127 : overallRisk >= 40 ? 113 : 22, overallRisk >= 70 ? 29 : overallRisk >= 40 ? 63 : 101, overallRisk >= 70 ? 29 : overallRisk >= 40 ? 18 : 52);
+      pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
+      pdf.setFontSize(9);
+      pdf.setTextColor(overallRisk >= 70 ? 252 : overallRisk >= 40 ? 253 : 134, overallRisk >= 70 ? 165 : overallRisk >= 40 ? 224 : 239, overallRisk >= 70 ? 165 : overallRisk >= 40 ? 71 : 172);
+      pdf.text(`⚠ ${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
+      
+      yPos += 20;
+
+      // Category Breakdown Section
+      pdf.setTextColor(74, 222, 128);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Category Breakdown', margin, yPos);
+      yPos += 8;
+
+      // Category table
+      const categoryData = categoryStats.map(cat => {
+        const percentage = cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0;
+        return [
+          cat.name,
+          `${cat.confirmed}/${cat.total}`,
+          `${percentage}%`,
+          cat.criticalIssues > 0 ? `${cat.criticalIssues} critical` : '-',
+          cat.warnings > 0 ? `${cat.warnings} warnings` : '-'
+        ];
+      });
+
+      autoTable(pdf, {
+        startY: yPos,
+        head: [['Category', 'Detected', 'Accuracy', 'Critical', 'Warnings']],
+        body: categoryData,
+        theme: 'plain',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [74, 222, 128],
+          fontStyle: 'bold',
+          fontSize: 9
+        },
+        bodyStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [226, 232, 240],
+          fontSize: 8
+        },
+        alternateRowStyles: {
+          fillColor: [30, 41, 59]
+        },
+        margin: { left: margin, right: margin },
+        columnStyles: {
+          0: { cellWidth: 45 },
+          1: { cellWidth: 25, halign: 'center' },
+          2: { cellWidth: 25, halign: 'center' },
+          3: { cellWidth: 30, halign: 'center' },
+          4: { cellWidth: 30, halign: 'center' }
+        }
+      });
+
+      yPos = (pdf as any).lastAutoTable.finalY + 15;
+
+      // Draw a simple bar chart for categories
+      checkNewPage(60);
+      
+      pdf.setTextColor(74, 222, 128);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Category Risk Visualization', margin, yPos);
+      yPos += 10;
+
+      const chartHeight = 8;
+      const chartWidth = pageWidth - 2 * margin - 50;
+      
+      categoryStats.forEach((cat, i) => {
+        const percentage = cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0;
+        
+        // Category name
+        pdf.setFontSize(8);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(cat.name.substring(0, 15), margin, yPos + 5);
+        
+        // Background bar
+        pdf.setFillColor(30, 41, 59);
+        pdf.roundedRect(margin + 50, yPos, chartWidth, chartHeight, 1, 1, 'F');
+        
+        // Progress bar
+        const barColor = percentage >= 80 ? [239, 68, 68] : percentage >= 50 ? [234, 179, 8] : [34, 197, 94];
+        pdf.setFillColor(barColor[0], barColor[1], barColor[2]);
+        if (percentage > 0) {
+          pdf.roundedRect(margin + 50, yPos, (chartWidth * percentage) / 100, chartHeight, 1, 1, 'F');
+        }
+        
+        // Percentage text
+        pdf.setTextColor(barColor[0], barColor[1], barColor[2]);
+        pdf.text(`${percentage}%`, margin + 50 + chartWidth + 5, yPos + 5);
+        
+        yPos += chartHeight + 4;
+      });
+
+      yPos += 10;
+
+      // Top Privacy Concerns
+      if (topConcerns.length > 0) {
+        checkNewPage(50);
+        
+        pdf.setTextColor(239, 68, 68);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('⚠ Top Privacy Concerns', margin, yPos);
+        yPos += 8;
+
+        topConcerns.forEach((concern, i) => {
+          checkNewPage(25);
+          
+          // Severity badge
+          const severityColors: Record<string, number[]> = {
+            critical: [239, 68, 68],
+            high: [249, 115, 22],
+            medium: [234, 179, 8]
+          };
+          const color = severityColors[concern.severity] || [148, 163, 184];
+          
+          pdf.setFillColor(color[0], color[1], color[2]);
+          pdf.setTextColor(255, 255, 255);
+          pdf.roundedRect(margin, yPos, 20, 5, 1, 1, 'F');
+          pdf.setFontSize(6);
+          pdf.text(concern.severity.toUpperCase(), margin + 2, yPos + 3.5);
+          
+          // Title
+          pdf.setTextColor(226, 232, 240);
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(concern.title, margin + 25, yPos + 4);
+          yPos += 7;
+          
+          // Description
+          pdf.setTextColor(148, 163, 184);
+          pdf.setFontSize(8);
+          pdf.setFont('helvetica', 'normal');
+          const descLines = pdf.splitTextToSize(concern.description, pageWidth - 2 * margin - 25);
+          pdf.text(descLines, margin + 25, yPos);
+          yPos += descLines.length * 4;
+          
+          // Fix recommendation
+          if (concern.fix) {
+            pdf.setTextColor(34, 211, 238);
+            pdf.setFontSize(7);
+            pdf.text(`💡 ${concern.fix}`, margin + 25, yPos + 2);
+            yPos += 6;
+          }
+          
+          yPos += 5;
+        });
+      }
+
+      // Strengths
+      if (strengths.length > 0) {
+        checkNewPage(40);
+        
+        pdf.setTextColor(34, 197, 94);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('✓ What You\'re Doing Well', margin, yPos);
+        yPos += 8;
+
+        strengths.forEach((strength) => {
+          pdf.setTextColor(134, 239, 172);
+          pdf.setFontSize(9);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`• ${strength}`, margin + 5, yPos);
+          yPos += 6;
+        });
+        
+        yPos += 10;
+      }
+
+      // Action Plan
+      checkNewPage(50);
+      
+      pdf.setTextColor(34, 211, 238);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Prioritized Action Plan', margin, yPos);
+      yPos += 8;
+
+      const actionItems = [
+        ...topConcerns.slice(0, 3).map(c => c.fix || `Address ${c.title.toLowerCase()}`),
+        'Use a privacy-focused browser like Brave or Firefox',
+        'Regularly clear cookies and browser data'
+      ];
+
+      actionItems.forEach((item, i) => {
+        pdf.setFillColor(34, 211, 238);
+        pdf.circle(margin + 3, yPos - 1.5, 3, 'F');
+        pdf.setTextColor(15, 23, 42);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(String(i + 1), margin + 1.5, yPos);
+        
+        pdf.setTextColor(186, 230, 253);
+        pdf.setFontSize(9);
+        pdf.setFont('helvetica', 'normal');
+        const actionLines = pdf.splitTextToSize(item, pageWidth - 2 * margin - 15);
+        pdf.text(actionLines, margin + 10, yPos);
+        yPos += actionLines.length * 5 + 3;
+      });
+
+      // Footer
+      checkNewPage(25);
+      yPos = pageHeight - 25;
+      
+      pdf.setFillColor(15, 23, 42);
+      pdf.rect(0, yPos - 5, pageWidth, 30, 'F');
+      
+      pdf.setTextColor(74, 222, 128);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('🔒 100% Local Analysis', margin, yPos + 5);
+      
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('All 46 data points were analyzed in your browser. Nothing was transmitted to any server.', margin, yPos + 12);
+      pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
+
+      // Save the PDF
+      pdf.save(`digital-shadow-report-${Date.now()}.pdf`);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      alert('Failed to generate PDF. Please try the JSON export instead.');
+    }
+    
+    setIsExporting(false);
+  };
+
+  const handleExportJSON = () => {
     const report = {
       generatedAt: new Date().toISOString(),
       summary: {
@@ -416,8 +732,6 @@ export default function FinalSummaryPanel({
     a.download = `digital-shadow-report-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
-
-    setIsExporting(false);
   };
 
   const handleShare = () => {
@@ -628,14 +942,18 @@ Test yours at: ${window.location.origin}`;
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-green-500/30 text-green-300 hover:bg-green-950/30">
+            <FileText className="w-4 h-4 mr-2" />
+            {isExporting ? 'Generating...' : 'Export PDF'}
+          </Button>
+          <Button variant="outline" onClick={handleExportJSON} className="border-blue-500/30 text-blue-300 hover:bg-blue-950/30">
             <FileJson className="w-4 h-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Export JSON'}
+            Export JSON
           </Button>
           <Button variant="outline" onClick={handleShare} className="border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/30">
             <Share2 className="w-4 h-4 mr-2" />
-            Share Results
+            Share
           </Button>
         </div>
 
