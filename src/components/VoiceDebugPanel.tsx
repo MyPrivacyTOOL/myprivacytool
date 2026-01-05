@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap, BarChart3, Settings2 } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap, BarChart3, Settings2, Shield, Eye, Share2 } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -29,6 +29,21 @@ import {
 import { getRewardStats, clearRewards, getAllRewards, type RewardStats, type RewardEvent } from '@/lib/rewardTracking';
 import { generateSyntheticData, exportToJSON, getDataStats, validateExamples, type SyntheticExample } from '@/lib/syntheticDataGenerator';
 import { testScenarios, createMockAnalysis } from '@/lib/testScenarios';
+import {
+  getUserFederatedConsent,
+  getConsentStatus,
+  setFederatedConsent,
+  revokeFederatedConsent,
+  computeLocalGradients,
+  updateLocalModel,
+  exportGradientsForAggregation,
+  getFederatedStatus,
+  getGradientSummary,
+  clearFederatedData,
+  PRIVACY_EXPLANATION,
+  type FederatedStatus,
+  type GradientData,
+} from '@/lib/federatedLearning';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,7 +95,11 @@ const formatTime = (timestamp: number): string => {
 export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }: VoiceDebugPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [data, setData] = useState(getVoiceData());
-  const [activeTab, setActiveTab] = useState<'voice' | 'locale' | 'rewards' | 'compare'>('voice');
+  const [activeTab, setActiveTab] = useState<'voice' | 'locale' | 'rewards' | 'compare' | 'federated'>('voice');
+  const [federatedStatus, setFederatedStatus] = useState<FederatedStatus>(getFederatedStatus());
+  const [gradientSummary, setGradientSummary] = useState(getGradientSummary());
+  const [isComputingGradients, setIsComputingGradients] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [testResults, setTestResults] = useState<Map<string, { prediction: LanguagePrediction | null; passed: boolean }>>(new Map());
   const [isRunningTest, setIsRunningTest] = useState(false);
   const [rewardEvents, setRewardEvents] = useState<RewardEvent[]>([]);
@@ -331,6 +350,23 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
         >
           <BarChart3 className="w-3 h-3" />
           Compare
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('federated');
+            setFederatedStatus(getFederatedStatus());
+            setGradientSummary(getGradientSummary());
+          }}
+          className={cn(
+            "flex-1 px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
+            activeTab === 'federated' 
+              ? "text-emerald-400 bg-emerald-500/20 border-b-2 border-emerald-400" 
+              : "text-emerald-400/60 hover:text-emerald-400"
+          )}
+        >
+          <Share2 className="w-3 h-3" />
+          <span className="hidden sm:inline">Federated</span>
+          <span className="sm:hidden">Fed</span>
         </button>
       </div>
 
@@ -1283,6 +1319,240 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 <span>All comparisons stored locally only</span>
               </div>
             </div>
+          </>
+        ) : activeTab === 'federated' ? (
+          <>
+            {/* Federated Learning Status */}
+            <div className="mb-4 p-3 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border border-emerald-500/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Share2 className="w-4 h-4 text-emerald-400" />
+                <h4 className="text-emerald-400 text-xs font-medium">Federated Learning (Beta)</h4>
+              </div>
+              
+              {/* Consent Status */}
+              <div className="space-y-2 mb-4">
+                <div className="flex justify-between text-xs">
+                  <span className="text-emerald-300/70">Status:</span>
+                  <span className={cn(
+                    "font-mono font-bold",
+                    federatedStatus.consent === true ? "text-green-400" :
+                    federatedStatus.consent === false ? "text-red-400" : "text-yellow-400"
+                  )}>
+                    {federatedStatus.consent === true ? 'Enabled' :
+                     federatedStatus.consent === false ? 'Disabled' : 'Not Asked'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-emerald-300/70">Has Gradients:</span>
+                  <span className={cn(
+                    "font-mono",
+                    federatedStatus.hasGradients ? "text-green-400" : "text-gray-400"
+                  )}>
+                    {federatedStatus.hasGradients ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                {federatedStatus.lastUpdate && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-emerald-300/70">Last Update:</span>
+                    <span className="text-emerald-400 font-mono">
+                      {new Date(federatedStatus.lastUpdate).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs">
+                  <span className="text-emerald-300/70">Model Version:</span>
+                  <span className="text-emerald-400 font-mono">
+                    {federatedStatus.modelVersion || 'N/A'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Consent Actions */}
+              {federatedStatus.consent === null ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors">
+                      <Shield className="w-3 h-3" />
+                      Enable Federated Learning
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-black/95 border-emerald-500/30 max-h-[80vh] overflow-y-auto">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-emerald-400 flex items-center gap-2">
+                        <Shield className="w-5 h-5" />
+                        Privacy-First Federated Learning
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-emerald-400/70 text-left whitespace-pre-wrap text-xs">
+                        {PRIVACY_EXPLANATION}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-transparent border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+                        Not Now
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => {
+                          setFederatedConsent(true);
+                          setFederatedStatus(getFederatedStatus());
+                        }}
+                        className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30"
+                      >
+                        Enable & Help Improve
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : federatedStatus.consent ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setIsComputingGradients(true);
+                      const rewards = getAllRewards();
+                      const gradients = await computeLocalGradients(rewards, []);
+                      if (gradients) {
+                        await updateLocalModel(gradients);
+                        setFederatedStatus(getFederatedStatus());
+                        setGradientSummary(getGradientSummary());
+                      }
+                      setIsComputingGradients(false);
+                    }}
+                    disabled={isComputingGradients}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {isComputingGradients ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                        Computing...
+                      </>
+                    ) : (
+                      <>
+                        <Cpu className="w-3 h-3" />
+                        Compute Gradients
+                      </>
+                    )}
+                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button className="px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-black/95 border-red-500/30">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-400">Revoke Consent?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-red-400/70">
+                          This will disable federated learning and delete all stored gradients. You can re-enable anytime.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-transparent border-red-500/30 text-red-400 hover:bg-red-500/10">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => {
+                            revokeFederatedConsent();
+                            setFederatedStatus(getFederatedStatus());
+                            setGradientSummary(null);
+                          }}
+                          className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                        >
+                          Revoke & Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setFederatedConsent(true);
+                    setFederatedStatus(getFederatedStatus());
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors"
+                >
+                  <Shield className="w-3 h-3" />
+                  Re-enable Federated Learning
+                </button>
+              )}
+            </div>
+
+            {/* Gradient Summary */}
+            {gradientSummary && (
+              <div className="mb-4 p-3 bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Eye className="w-4 h-4 text-blue-400" />
+                  <h4 className="text-blue-400 text-xs font-medium">Your Gradient Summary</h4>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-300/70">Layers:</span>
+                    <span className="text-blue-400 font-mono">{gradientSummary.layerCount}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-300/70">Parameters:</span>
+                    <span className="text-blue-400 font-mono">{gradientSummary.totalParameters.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-300/70">Avg Magnitude:</span>
+                    <span className="text-blue-400 font-mono">{gradientSummary.averageMagnitude.toFixed(6)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-300/70">Based on Rewards:</span>
+                    <span className="text-blue-400 font-mono">{gradientSummary.rewardBasis}</span>
+                  </div>
+                </div>
+
+                {/* Export Gradients Button */}
+                <button
+                  onClick={() => {
+                    const data = exportGradientsForAggregation();
+                    if (data) {
+                      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `mpt-gradients-${Date.now()}.json`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }
+                  }}
+                  className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-colors"
+                >
+                  <Download className="w-3 h-3" />
+                  Export Gradients (View What's Shared)
+                </button>
+              </div>
+            )}
+
+            {/* Privacy Notice */}
+            <div className="p-3 bg-gradient-to-r from-gray-500/10 to-gray-600/10 border border-gray-500/30 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Lock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h5 className="text-gray-400 text-xs font-medium mb-1">Privacy Guarantees</h5>
+                  <ul className="text-[10px] text-gray-400/70 space-y-1">
+                    <li>✓ Only gradients computed, never raw data</li>
+                    <li>✓ No browser languages shared</li>
+                    <li>✓ No timezone or location data</li>
+                    <li>✓ All computation happens locally</li>
+                    <li>✓ Revoke consent anytime</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Clear Data Button */}
+            {federatedStatus.hasGradients && (
+              <button
+                onClick={() => {
+                  clearFederatedData();
+                  setFederatedStatus(getFederatedStatus());
+                  setGradientSummary(null);
+                }}
+                className="w-full mt-3 text-red-400/60 text-xs hover:text-red-400 transition-colors"
+              >
+                Clear Local Gradient Data
+              </button>
+            )}
           </>
         ) : null}
       </div>
