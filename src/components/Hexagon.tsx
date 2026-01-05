@@ -111,13 +111,15 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
         <svg
           viewBox="0 0 100 100"
           className={cn(
-            "w-[150px] h-[150px] md:w-[170px] md:h-[170px] transition-transform duration-300",
-            !isRevealing && "cursor-pointer hover:scale-105"
+            "w-[110px] h-[110px] sm:w-[150px] sm:h-[150px] md:w-[170px] md:h-[170px] transition-transform duration-300",
+            !isRevealing && "cursor-pointer hover:scale-105 active:scale-95"
           )}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
-          aria-label={`${data.label}: ${data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Click to confirm'}`}
+          onTouchStart={() => setIsHovered(true)}
+          onTouchEnd={() => { setIsHovered(false); onHover(null); }}
+          aria-label={`${data.label}: ${data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Tap to confirm'}`}
         >
           <defs>
             <filter id={`glow-${data.id}`} x="-50%" y="-50%" width="200%" height="200%">
