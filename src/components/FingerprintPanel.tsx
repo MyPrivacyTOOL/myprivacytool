@@ -22,6 +22,7 @@ import {
   MediaDevicesResult,
 } from '@/lib/fingerprintDetection';
 import FingerprintComparison from './FingerprintComparison';
+import FingerprintVerification from './FingerprintVerification';
 
 interface FingerprintBreakdown {
   name: string;
@@ -873,6 +874,13 @@ export default function FingerprintPanel() {
             />
           </CollapsibleContent>
         </Collapsible>
+
+        {/* Verification Section */}
+        <FingerprintVerification
+          currentFingerprint={fingerprint}
+          currentAdvancedFP={advancedFP}
+          onRetest={loadFingerprintData}
+        />
 
         {/* Export Options */}
         <div className="flex flex-wrap gap-2">
