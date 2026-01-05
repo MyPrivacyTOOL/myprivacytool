@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap, BarChart3, Settings2, Shield, Eye, Share2 } from 'lucide-react';
+import { X, RotateCcw, CheckCircle2, Bug, Globe, Play, Check, TrendingUp, Users, Gift, Trash2, Download, AlertTriangle, Clock, ThumbsUp, ThumbsDown, ArrowUpDown, Lock, Database, FileJson, Cpu, Zap, BarChart3, Settings2, Shield, Eye, Share2, History, RefreshCw } from 'lucide-react';
 import { getVoiceData, resetDailyCounter, resetAllVoiceData } from '@/lib/voiceStorage';
 import { cn } from '@/lib/utils';
 import { 
@@ -40,9 +40,14 @@ import {
   getFederatedStatus,
   getGradientSummary,
   clearFederatedData,
+  runLocalRLUpdate,
+  rollbackToVersion,
+  getLocalLearningStatus,
   PRIVACY_EXPLANATION,
   type FederatedStatus,
   type GradientData,
+  type LocalLearningStatus,
+  type ModelVersion,
 } from '@/lib/federatedLearning';
 import {
   AlertDialog,
@@ -112,6 +117,9 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
   const [predictionMode, setPredictionModeState] = useState<PredictionMode>(getPredictionMode());
   const [performanceStats, setPerformanceStats] = useState<PerformanceStats | null>(null);
   const [comparisons, setComparisons] = useState<PredictionComparison[]>([]);
+  const [localLearningStatus, setLocalLearningStatus] = useState<LocalLearningStatus | null>(null);
+  const [isRunningRLUpdate, setIsRunningRLUpdate] = useState(false);
+  const [rlUpdateResult, setRlUpdateResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Refresh data
   const refreshData = useCallback(() => {
@@ -356,6 +364,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             setActiveTab('federated');
             setFederatedStatus(getFederatedStatus());
             setGradientSummary(getGradientSummary());
+            setLocalLearningStatus(getLocalLearningStatus());
+            setRlUpdateResult(null);
           }}
           className={cn(
             "flex-1 px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
@@ -1520,6 +1530,166 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <Download className="w-3 h-3" />
                   Export Gradients (View What's Shared)
                 </button>
+              </div>
+            )}
+
+            {/* Local Learning Progress */}
+            {federatedStatus.consent && localLearningStatus && (
+              <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-purple-400" />
+                  <h4 className="text-purple-400 text-xs font-medium">Local Learning Progress</h4>
+                </div>
+                
+                {/* Stats */}
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-purple-300/70">Model Updates:</span>
+                    <span className="text-purple-400 font-mono">
+                      {localLearningStatus.successfulUpdates} / {localLearningStatus.totalUpdates}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-purple-300/70">Current Accuracy:</span>
+                    <span className="text-purple-400 font-mono">
+                      {localLearningStatus.currentAccuracy.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-purple-300/70">Best Accuracy:</span>
+                    <span className="text-green-400 font-mono">
+                      {localLearningStatus.bestAccuracy.toFixed(1)}%
+                    </span>
+                  </div>
+                  {localLearningStatus.lastUpdateTime && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-purple-300/70">Last Update:</span>
+                      <span className="text-purple-400 font-mono">
+                        {new Date(localLearningStatus.lastUpdateTime).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Accuracy Trend Chart (Simple) */}
+                {localLearningStatus.improvementHistory.length > 0 && (
+                  <div className="mb-4">
+                    <h5 className="text-purple-400/70 text-[10px] font-medium mb-2">Accuracy Trend</h5>
+                    <div className="h-16 flex items-end gap-1">
+                      {localLearningStatus.improvementHistory.slice(-10).map((imp, idx) => (
+                        <div 
+                          key={idx}
+                          className="flex-1 flex flex-col items-center gap-0.5"
+                        >
+                          <div 
+                            className={cn(
+                              "w-full rounded-t transition-all",
+                              imp.improved ? "bg-green-500/60" : "bg-red-500/40"
+                            )}
+                            style={{ 
+                              height: `${Math.max(4, (imp.accuracyAfter / 100) * 48)}px` 
+                            }}
+                          />
+                          <span className="text-[8px] text-purple-400/50">
+                            {imp.accuracyAfter.toFixed(0)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* RL Update Result */}
+                {rlUpdateResult && (
+                  <div className={cn(
+                    "mb-3 p-2 rounded text-[10px]",
+                    rlUpdateResult.success 
+                      ? "bg-green-500/20 text-green-400" 
+                      : "bg-red-500/20 text-red-400"
+                  )}>
+                    {rlUpdateResult.message}
+                  </div>
+                )}
+                
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setIsRunningRLUpdate(true);
+                      setRlUpdateResult(null);
+                      const result = await runLocalRLUpdate(true); // Force update
+                      setRlUpdateResult({ success: result.success, message: result.message });
+                      setLocalLearningStatus(getLocalLearningStatus());
+                      setFederatedStatus(getFederatedStatus());
+                      setGradientSummary(getGradientSummary());
+                      setIsRunningRLUpdate(false);
+                    }}
+                    disabled={isRunningRLUpdate}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 text-xs font-medium hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+                  >
+                    {isRunningRLUpdate ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                        Learning...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3 h-3" />
+                        Force Update
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {/* Update Status */}
+                {!localLearningStatus.canRunUpdate && localLearningStatus.reasonCannotRun && (
+                  <div className="mt-2 text-[10px] text-purple-400/50 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {localLearningStatus.reasonCannotRun}
+                  </div>
+                )}
+                
+                {/* Version History */}
+                {localLearningStatus.versionHistory.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="text-purple-400/70 text-[10px] font-medium mb-2 flex items-center gap-1">
+                      <History className="w-3 h-3" />
+                      Version History (Last 3)
+                    </h5>
+                    <div className="space-y-1.5">
+                      {localLearningStatus.versionHistory.slice(-3).reverse().map((version: ModelVersion, idx: number) => (
+                        <div 
+                          key={version.id}
+                          className="flex items-center justify-between p-1.5 bg-black/20 rounded text-[10px]"
+                        >
+                          <div>
+                            <span className="text-purple-400 font-mono">{version.id.slice(0, 12)}...</span>
+                            <span className="text-purple-400/50 ml-2">
+                              {version.accuracy.toFixed(1)}%
+                            </span>
+                          </div>
+                          {idx > 0 && (
+                            <button
+                              onClick={() => {
+                                rollbackToVersion(version.id);
+                                setLocalLearningStatus(getLocalLearningStatus());
+                                setFederatedStatus(getFederatedStatus());
+                                setGradientSummary(getGradientSummary());
+                              }}
+                              className="px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400 hover:bg-yellow-500/30 transition-colors flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-2.5 h-2.5" />
+                              Rollback
+                            </button>
+                          )}
+                          {idx === 0 && (
+                            <span className="text-green-400/70 text-[9px]">Current</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
