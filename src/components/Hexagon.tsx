@@ -59,6 +59,12 @@ const categoryColors = {
     gradient: ['rgba(6,182,212,0.3)', 'rgba(6,182,212,0.1)'],
     bg: ['rgba(5,25,35,0.9)', 'rgba(0,15,25,0.95)'],
   },
+  social: {
+    primary: '#A855F7',      // Purple/Magenta
+    glow: '#D946EF',
+    gradient: ['rgba(168,85,247,0.35)', 'rgba(217,70,239,0.15)'],
+    bg: ['rgba(35,10,45,0.95)', 'rgba(25,5,35,0.98)'],
+  },
   default: {
     primary: '#00ff41',      // Matrix green
     glow: '#00ff41',

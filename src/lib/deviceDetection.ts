@@ -101,7 +101,7 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
-  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage';
+  category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social';
 }
 
 // Fingerprint data interface
@@ -1072,6 +1072,127 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   
   // Add storage hexagons
   baseHexagons.push(...storageHexagons);
+  
+  // ========== SOCIAL & ACCOUNTS DETECTION ==========
+  const { 
+    detectGoogleServices, 
+    detectMetaServices, 
+    detectMicrosoftServices, 
+    detectSocialMedia, 
+    detectCrossSiteTracking 
+  } = await import('./socialDetection');
+  
+  const [googleResult, metaResult, microsoftResult, socialResult, crossSiteResult] = await Promise.all([
+    detectGoogleServices(),
+    detectMetaServices(),
+    detectMicrosoftServices(),
+    detectSocialMedia(),
+    detectCrossSiteTracking(),
+  ]);
+  
+  const socialHexagons: HexagonData[] = [];
+  
+  // 1. Google Services
+  const googleValue = !googleResult.isLoggedIn 
+    ? 'Not Detected' 
+    : googleResult.services.length > 0 
+      ? `${googleResult.services.length} services` 
+      : 'Logged In';
+  
+  socialHexagons.push({
+    id: 'google-services',
+    label: 'Google Account',
+    value: googleValue,
+    icon: '🔍',
+    confidence: 100,
+    risk: googleResult.isLoggedIn 
+      ? `Logged into Google: ${googleResult.services.join(', ')}. Google tracks your searches, location, and activity across the web.`
+      : 'No Google login detected. Your searches and browsing are not linked to a Google profile on this browser.',
+    confirmed: false,
+    category: 'social',
+  });
+  
+  // 2. Meta/Facebook Services
+  const metaValue = !metaResult.isLoggedIn 
+    ? 'Not Detected' 
+    : metaResult.services.length > 0 
+      ? `${metaResult.services.length} services` 
+      : 'Logged In';
+  
+  socialHexagons.push({
+    id: 'meta-services',
+    label: 'Meta Services',
+    value: metaValue,
+    icon: '📘',
+    confidence: 100,
+    risk: metaResult.isLoggedIn 
+      ? `Logged into Meta: ${metaResult.services.join(', ')}. Facebook Pixel tracks you on millions of websites.`
+      : 'No Meta login detected. Facebook cannot directly link your browsing to your social profile.',
+    confirmed: false,
+    category: 'social',
+  });
+  
+  // 3. Microsoft Services
+  const microsoftValue = !microsoftResult.isLoggedIn 
+    ? 'Not Detected' 
+    : microsoftResult.services.length > 0 
+      ? `${microsoftResult.services.length} services` 
+      : 'Logged In';
+  
+  socialHexagons.push({
+    id: 'microsoft-services',
+    label: 'Microsoft Account',
+    value: microsoftValue,
+    icon: '🪟',
+    confidence: 100,
+    risk: microsoftResult.isLoggedIn 
+      ? `Logged into Microsoft: ${microsoftResult.services.join(', ')}. Your Office 365 activity and Bing searches may be linked.`
+      : 'No Microsoft login detected on this browser.',
+    confirmed: false,
+    category: 'social',
+  });
+  
+  // 4. Social Media Platforms
+  const connectedPlatforms = socialResult.platforms.filter(p => p.loggedIn);
+  const socialValue = connectedPlatforms.length === 0 
+    ? 'No Platforms' 
+    : `${connectedPlatforms.length} platform${connectedPlatforms.length > 1 ? 's' : ''}`;
+  
+  socialHexagons.push({
+    id: 'social-platforms',
+    label: 'Social Platforms',
+    value: socialValue,
+    icon: '📱',
+    confidence: 95,
+    risk: connectedPlatforms.length > 0 
+      ? `Connected to: ${connectedPlatforms.map(p => p.name).slice(0, 3).join(', ')}${connectedPlatforms.length > 3 ? '...' : ''}. Each platform builds a profile of your interests and connections.`
+      : 'No social media logins detected. Social platforms cannot link your browsing to your accounts.',
+    confirmed: false,
+    category: 'social',
+  });
+  
+  // 5. Cross-Site Identity / Account Linking
+  const crossSiteValue = !crossSiteResult.ssoDetected 
+    ? 'Not Linked' 
+    : crossSiteResult.linkedAccounts > 0 
+      ? `${crossSiteResult.linkedAccounts} connections` 
+      : 'Linked';
+  
+  socialHexagons.push({
+    id: 'cross-site-identity',
+    label: 'Cross-Site Identity',
+    value: crossSiteValue,
+    icon: '🔗',
+    confidence: 90,
+    risk: crossSiteResult.ssoDetected 
+      ? `CRITICAL: SSO detected! ${crossSiteResult.trackingNetwork.join(', ')} can link your identity across websites. Your browsing creates a unified profile.`
+      : 'No cross-site identity linking detected. Your accounts appear isolated.',
+    confirmed: false,
+    category: 'social',
+  });
+  
+  // Add social hexagons
+  baseHexagons.push(...socialHexagons);
   
   return baseHexagons;
 }
