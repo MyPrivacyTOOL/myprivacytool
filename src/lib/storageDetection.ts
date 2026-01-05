@@ -535,6 +535,8 @@ export async function clearAllStorage(): Promise<{
   clearedLocalStorage: number;
   clearedSessionStorage: number;
   clearedCaches: number;
+  clearedIndexedDBs: number;
+  unregisteredServiceWorkers: number;
   errors: string[];
 }> {
   const result = {
@@ -542,6 +544,8 @@ export async function clearAllStorage(): Promise<{
     clearedLocalStorage: 0,
     clearedSessionStorage: 0,
     clearedCaches: 0,
+    clearedIndexedDBs: 0,
+    unregisteredServiceWorkers: 0,
     errors: [] as string[],
   };
 
@@ -588,6 +592,47 @@ export async function clearAllStorage(): Promise<{
     }
   } catch (e) {
     result.errors.push('Failed to clear cache storage');
+  }
+
+  // Clear IndexedDB databases
+  try {
+    if ('indexedDB' in window && indexedDB.databases) {
+      const databases = await indexedDB.databases();
+      for (const db of databases) {
+        if (db.name) {
+          await new Promise<void>((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(db.name!);
+            request.onsuccess = () => {
+              result.clearedIndexedDBs++;
+              resolve();
+            };
+            request.onerror = () => reject(request.error);
+            request.onblocked = () => {
+              // Database is in use, still count as attempted
+              result.errors.push(`IndexedDB "${db.name}" is blocked`);
+              resolve();
+            };
+          });
+        }
+      }
+    }
+  } catch (e) {
+    result.errors.push('Failed to clear IndexedDB');
+  }
+
+  // Unregister service workers
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        const success = await registration.unregister();
+        if (success) {
+          result.unregisteredServiceWorkers++;
+        }
+      }
+    }
+  } catch (e) {
+    result.errors.push('Failed to unregister service workers');
   }
 
   return result;
