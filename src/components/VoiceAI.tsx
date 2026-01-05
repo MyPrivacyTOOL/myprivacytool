@@ -249,6 +249,83 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     return "Your device orientation and motion data creates a behavioral signature unique to how you hold your device.";
   }
   
+  // STORAGE HEXAGONS
+  if (label.includes('cookies') || label === 'cookies') {
+    // Parse cookie info from value
+    const countMatch = value.match(/(\d+)\s*cookies?/i);
+    const trackingMatch = value.match(/(\d+)\s*tracking/i);
+    const cookieCount = countMatch ? parseInt(countMatch[1]) : 0;
+    const trackingCount = trackingMatch ? parseInt(trackingMatch[1]) : 0;
+    
+    if (value.toLowerCase().includes('blocked') || value.toLowerCase().includes('disabled')) {
+      return "Excellent! Cookies are completely blocked on this site. This prevents the most common form of web tracking, though websites can still use other storage methods like LocalStorage and IndexedDB.";
+    }
+    if (cookieCount === 0) {
+      return "Good news—you have no cookies stored on this site. This suggests you're blocking cookies effectively or browse in a privacy-focused way.";
+    }
+    if (trackingCount > 0 || cookieCount > 10) {
+      return `I found ${cookieCount} cookies stored on your device, including ${trackingCount} third-party tracking cookies. These are small files that websites use to remember you and track your behavior. Third-party cookies from ad networks like Google and Facebook are particularly invasive—they follow you across different websites. Even in incognito mode, new cookies are created. The only way to truly prevent cookie tracking is to block them entirely or clear them regularly.`;
+    }
+    return `Good news—you only have ${cookieCount} cookies stored, with no third-party tracking cookies detected. This suggests you're blocking cookies effectively or browse in a privacy-focused way.`;
+  }
+  
+  if (label.includes('local storage') || label === 'localstorage') {
+    const itemMatch = value.match(/(\d+)\s*items?/i);
+    const sizeMatch = value.match(/([\d.]+)\s*KB/i);
+    const itemCount = itemMatch ? parseInt(itemMatch[1]) : 0;
+    const sizeKB = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+    
+    if (value.toLowerCase().includes('blocked')) {
+      return "LocalStorage is blocked on this site. This prevents websites from storing persistent data that could be used to track you across visits.";
+    }
+    if (itemCount === 0 || value.toLowerCase().includes('empty')) {
+      return "Your LocalStorage is completely empty. This is excellent for privacy, though some websites may not function properly without it.";
+    }
+    if (hexagonData.risk === 'high' || hexagonData.risk === 'medium') {
+      return `I detected ${itemCount} items in your LocalStorage totaling ${sizeKB.toFixed(1)} KB. I found tracking keys in this storage. LocalStorage is more persistent than cookies—it never expires until manually cleared. Analytics companies love this because their tracking IDs survive even after you clear your browsing history and cookies.`;
+    }
+    return `Your LocalStorage has ${itemCount} items using ${sizeKB.toFixed(1)} KB. I didn't detect any tracking keys, which is good. This storage is likely just for legitimate website functionality.`;
+  }
+  
+  if (label.includes('session storage') || label === 'sessionstorage') {
+    const itemMatch = value.match(/(\d+)\s*items?/i);
+    const sizeMatch = value.match(/([\d.]+)\s*KB/i);
+    const itemCount = itemMatch ? parseInt(itemMatch[1]) : 0;
+    const sizeKB = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+    
+    return `Session storage has ${itemCount} items using ${sizeKB.toFixed(1)} KB. This is the least privacy-invasive storage type because it's automatically cleared when you close the tab. It's temporary by design and can't be used for long-term tracking across browsing sessions.`;
+  }
+  
+  if (label.includes('indexeddb') || label === 'indexeddb') {
+    const dbMatch = value.match(/(\d+)\s*database/i);
+    const sizeMatch = value.match(/([\d.]+)\s*MB/i);
+    const dbCount = dbMatch ? parseInt(dbMatch[1]) : 0;
+    const sizeMB = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+    
+    if (dbCount === 0 || value.toLowerCase().includes('not used') || value.toLowerCase().includes('none')) {
+      return "No IndexedDB databases detected. This means websites haven't stored any complex data structures on your device.";
+    }
+    if (hexagonData.risk === 'high' || hexagonData.risk === 'medium') {
+      return `I found ${dbCount} databases in IndexedDB using approximately ${sizeMB.toFixed(1)} MB. This is a powerful client-side database that can store large amounts of structured data. I detected what appears to be tracking databases. These can store detailed logs of your behavior and interactions. IndexedDB persists indefinitely and survives browser restarts.`;
+    }
+    return `I found ${dbCount} databases in IndexedDB using approximately ${sizeMB.toFixed(1)} MB. This is a powerful client-side database that can store large amounts of structured data. IndexedDB persists indefinitely and survives browser restarts.`;
+  }
+  
+  if (label.includes('cache') || label.includes('service worker') || label.includes('cache & sw')) {
+    const cacheMatch = value.match(/(\d+)\s*caches?/i);
+    const sizeMatch = value.match(/([\d.]+)\s*MB/i);
+    const cacheCount = cacheMatch ? parseInt(cacheMatch[1]) : 0;
+    const sizeMB = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
+    
+    if (value.toLowerCase().includes('active') || value.toLowerCase().includes('service worker')) {
+      return `I detected an active Service Worker with ${cacheCount} caches using ${sizeMB.toFixed(1)} MB. Service Workers enable websites to work offline, but they can also track your behavior and persist data even without cookies. They run in the background and can intercept network requests, giving websites deep control over what you see.`;
+    }
+    if (value.toLowerCase().includes('inactive') || value.toLowerCase().includes('none') || cacheCount === 0) {
+      return "No Service Worker or cache storage detected. While this limits offline functionality, it also means this site can't use these advanced features to track you.";
+    }
+    return `Cache storage has ${cacheCount} caches using ${sizeMB.toFixed(1)} MB. This stores website assets for faster loading and offline access.`;
+  }
+  
   return `${hexagonData.label} is part of your digital shadow.`;
 };
 
@@ -288,6 +365,35 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
   }
   if (label.includes('extensions') || label.includes('plugin')) {
     return "be selective with browser extensions—each one makes you more unique";
+  }
+  
+  // Storage-specific recommendations
+  if (label.includes('cookies')) {
+    if (value.toLowerCase().includes('tracking') || hexagonData?.risk === 'high') {
+      return "block third-party cookies in your browser settings immediately. In Chrome, go to Settings, Privacy, then Block third-party cookies";
+    }
+    return "clear your cookies regularly or use extensions like Cookie AutoDelete to automatically remove tracking cookies";
+  }
+  if (label.includes('local storage') || label.includes('localstorage')) {
+    if (hexagonData?.risk === 'high' || hexagonData?.risk === 'medium') {
+      return "use extensions like Cookie AutoDelete which can also clear LocalStorage. Unlike cookies, LocalStorage never expires on its own";
+    }
+    return "periodically clear your browser's storage through Settings, then Privacy, then Clear browsing data";
+  }
+  if (label.includes('session storage')) {
+    return "session storage is automatically cleared when you close the tab—no action needed. It's privacy-friendly by design";
+  }
+  if (label.includes('indexeddb')) {
+    if (hexagonData?.risk === 'high' || hexagonData?.risk === 'medium') {
+      return "clear IndexedDB periodically via browser settings under Clear browsing data, make sure to select Site Settings or All time";
+    }
+    return "IndexedDB is used by web apps for legitimate purposes. Clear it if you want to reset app data";
+  }
+  if (label.includes('cache') || label.includes('service worker')) {
+    if (value.toLowerCase().includes('active')) {
+      return "be cautious about which sites you allow offline features. You can unregister service workers in browser DevTools under Application";
+    }
+    return "cache storage improves website speed. Clear it periodically if you want to free up space";
   }
   
   if (riskLevel === 'high') {
