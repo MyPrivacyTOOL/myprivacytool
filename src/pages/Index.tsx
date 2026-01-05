@@ -4,6 +4,7 @@ import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
+import FederatedLearningModal, { shouldShowFederatedModal, ContributorBadge } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,8 @@ const Index = () => {
   const [deviceData, setDeviceData] = useState<DeviceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFederatedModal, setShowFederatedModal] = useState(false);
+  const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
 
@@ -127,6 +130,20 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Check if should show federated learning modal (after 5+ predictions)
+  useEffect(() => {
+    if (!loading && !federatedCheckDone.current) {
+      federatedCheckDone.current = true;
+      // Delay check to not interrupt initial experience
+      const timeout = setTimeout(() => {
+        if (shouldShowFederatedModal()) {
+          setShowFederatedModal(true);
+        }
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [loading]);
+
   const handleRetry = () => {
     setLoading(true);
     setError(null);
@@ -189,6 +206,9 @@ const Index = () => {
             
             {/* Navigation Links */}
             <div className="flex items-center gap-2">
+              {/* Contributor Badge */}
+              <ContributorBadge className="hidden sm:flex" />
+              
               <Link 
                 to="/device-orientation"
                 className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium text-xs sm:text-sm hover:opacity-90 transition-opacity shadow-md"
@@ -316,6 +336,13 @@ const Index = () => {
           </div>
         </footer>
       </div>
+
+      {/* Federated Learning Modal */}
+      <FederatedLearningModal
+        isOpen={showFederatedModal}
+        onClose={() => setShowFederatedModal(false)}
+        trigger="auto"
+      />
     </div>
   );
 };
