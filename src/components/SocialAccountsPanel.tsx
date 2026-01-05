@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, ExternalLink, LogOut, Link2, Eye, Lock, Users, Globe } from 'lucide-react';
+import { Shield, AlertTriangle, ExternalLink, LogOut, Link2, Eye, Lock, Users, Globe, AlertCircle, Radio, User, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   detectGoogleServices,
@@ -27,9 +28,27 @@ interface ServiceCardProps {
   isLoggedIn: boolean;
   services?: string[];
   risk: 'low' | 'medium' | 'high' | 'critical';
+  tooltipText?: string;
 }
 
-const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, services, risk }) => {
+// Service-specific tracking explanations
+const serviceTooltips: Record<string, string> = {
+  'Google': 'Can track you on 80%+ of websites via Analytics, AdSense, reCAPTCHA, YouTube embeds, and Google Fonts',
+  'Meta/Facebook': 'Tracks you via Like buttons, Share buttons, and Facebook Pixel installed on millions of sites',
+  'Microsoft': 'Tracks your Office 365 documents, Outlook emails, LinkedIn activity, and Bing searches',
+  'Twitter': 'Tracks you on news sites, blogs, and any site with embedded tweets or Twitter cards',
+  'LinkedIn': 'Tracks you on job boards, professional sites, and any page with LinkedIn insights',
+  'Reddit': 'Tracks your activity on sites using Reddit embeds and discussion widgets',
+  'TikTok': 'Tracks you on sites with TikTok embeds and their advertising pixel',
+  'Discord': 'Tracks your activity on gaming sites and communities with Discord widgets',
+  'Twitch': 'Tracks you on gaming and streaming sites with embedded Twitch players',
+  'Spotify': 'Tracks your music preferences across sites with embedded players',
+  'Netflix': 'Tracks your viewing habits and recommendations across devices',
+  'Amazon': 'Tracks your shopping behavior across millions of affiliate sites',
+  'PayPal': 'Tracks your payment patterns across e-commerce sites',
+};
+
+const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, services, risk, tooltipText }) => {
   const riskColors = {
     low: 'text-green-400 border-green-500/30',
     medium: 'text-yellow-400 border-yellow-500/30',
@@ -44,8 +63,8 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, servi
     critical: 'bg-red-500/10',
   };
 
-  return (
-    <div className={`p-4 rounded-lg border ${isLoggedIn ? riskColors[risk] : 'border-muted/30 text-muted-foreground'} ${isLoggedIn ? riskBg[risk] : 'bg-muted/5'} transition-all hover:scale-105`}>
+  const cardContent = (
+    <div className={`p-4 rounded-lg border ${isLoggedIn ? riskColors[risk] : 'border-muted/30 text-muted-foreground'} ${isLoggedIn ? riskBg[risk] : 'bg-muted/5'} transition-all hover:scale-105 cursor-help`}>
       <div className="flex items-center gap-3 mb-2">
         <span className="text-2xl">{icon}</span>
         <div className="flex-1">
@@ -67,6 +86,21 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, servi
       )}
     </div>
   );
+
+  if (tooltipText && isLoggedIn) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {cardContent}
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs bg-background/95 border-purple-500/30">
+          <p className="text-sm">{tooltipText}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return cardContent;
 };
 
 const TrackingTree: React.FC<{ name: string; icon: string; services: string[]; color: string }> = ({ name, icon, services, color }) => (
@@ -124,15 +158,25 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
     if (socialData) loggedInCount += socialData.totalLoggedIn;
 
     if (crossSiteData?.ssoDetected && crossSiteData.linkedAccounts > 2) {
-      return { level: 'critical', label: 'Critical', description: 'Complete browsing history exposed via SSO' };
+      return { level: 'critical', label: 'Critical', description: 'Complete browsing history exposed via SSO', loggedInCount };
     }
     if (loggedInCount >= 3) {
-      return { level: 'high', label: 'High Risk', description: 'Extensive tracking network active' };
+      return { level: 'high', label: 'High Risk', description: 'Extensive tracking network active', loggedInCount };
     }
     if (loggedInCount >= 1) {
-      return { level: 'medium', label: 'Moderate', description: 'Some cross-site tracking possible' };
+      return { level: 'medium', label: 'Moderate', description: 'Some cross-site tracking possible', loggedInCount };
     }
-    return { level: 'low', label: 'Excellent', description: 'Minimal cross-site tracking' };
+    return { level: 'low', label: 'Excellent', description: 'Minimal cross-site tracking', loggedInCount };
+  };
+
+  // Calculate web coverage percentage based on logged-in services
+  const calculateWebCoverage = () => {
+    let coverage = 0;
+    if (googleData?.isLoggedIn) coverage += 80; // Google Analytics is on 80%+ of sites
+    if (metaData?.isLoggedIn) coverage += 30; // Facebook Pixel on 30%+ of sites
+    if (microsoftData?.isLoggedIn) coverage += 10;
+    // Cap at 95% since some overlap exists
+    return Math.min(coverage, 95);
   };
 
   const privacyScore = calculatePrivacyScore();
@@ -161,78 +205,179 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
   }
 
   const connectedPlatforms = socialData?.platforms.filter(p => p.loggedIn) || [];
+  const webCoverage = calculateWebCoverage();
+  const ssoProvider = crossSiteData?.ssoDetected ? crossSiteData.trackingNetwork[0] || 'a major provider' : null;
 
   return (
-    <div className="bg-gradient-to-br from-purple-950/40 via-background to-fuchsia-950/30 rounded-xl border border-purple-500/30 p-6 space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="text-center border-b border-purple-500/20 pb-4">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent flex items-center justify-center gap-2">
-          <Link2 className="w-6 h-6 text-purple-400" />
-          Your Connected Identity
-        </h2>
-        <p className="text-muted-foreground text-sm mt-1">Services tracking you across the web</p>
-      </div>
+    <TooltipProvider>
+      <div className="bg-gradient-to-br from-purple-950/40 via-background to-fuchsia-950/30 rounded-xl border border-purple-500/30 p-6 space-y-6 animate-fade-in">
+        
+        {/* SSO CRITICAL ALERT - Pulsing red banner */}
+        {crossSiteData?.ssoDetected && (
+          <div className="relative overflow-hidden rounded-lg border-2 border-red-500 bg-gradient-to-r from-red-950/80 via-red-900/60 to-red-950/80 p-4 animate-pulse">
+            <div className="absolute inset-0 bg-red-500/10 animate-pulse" />
+            <div className="relative flex items-start gap-3">
+              <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0 animate-bounce" />
+              <div>
+                <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                  🚨 CRITICAL: Single Sign-On Detected
+                </h3>
+                <p className="text-sm text-red-300 mt-1">
+                  <span className="font-semibold">{ssoProvider}</span> sees <span className="font-bold uppercase">every site</span> you visit using their login. 
+                  Your complete browsing history is being shared with this provider.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Privacy Impact Score */}
-      <div className={`p-4 rounded-lg border ${
-        privacyScore.level === 'critical' ? 'border-red-500/50 bg-red-500/10' :
-        privacyScore.level === 'high' ? 'border-orange-500/50 bg-orange-500/10' :
-        privacyScore.level === 'medium' ? 'border-yellow-500/50 bg-yellow-500/10' :
-        'border-green-500/50 bg-green-500/10'
-      }`}>
-        <div className="flex items-center gap-3">
-          <Shield className={`w-8 h-8 ${
-            privacyScore.level === 'critical' ? 'text-red-400' :
-            privacyScore.level === 'high' ? 'text-orange-400' :
-            privacyScore.level === 'medium' ? 'text-yellow-400' :
-            'text-green-400'
-          }`} />
-          <div>
-            <h3 className="font-bold text-lg">{privacyScore.label}</h3>
-            <p className="text-sm text-muted-foreground">{privacyScore.description}</p>
+        {/* HIGH TRACKING EXPOSURE BANNER - Orange/red gradient */}
+        {privacyScore.loggedInCount >= 2 && !crossSiteData?.ssoDetected && (
+          <div className="rounded-lg border border-orange-500/50 bg-gradient-to-r from-orange-950/60 via-red-950/40 to-orange-950/60 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-7 h-7 text-orange-400 flex-shrink-0" />
+              <div>
+                <h3 className="text-base font-bold text-orange-400">
+                  ⚠️ HIGH TRACKING EXPOSURE
+                </h3>
+                <p className="text-sm text-orange-300/90 mt-1">
+                  You're logged into <span className="font-bold">{privacyScore.loggedInCount} services</span> that can track you across 
+                  <span className="font-bold"> ~{webCoverage}%</span> of websites you visit.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REAL-TIME TRACKING DEMO */}
+        {(googleData?.isLoggedIn || metaData?.isLoggedIn) && (
+          <div className="rounded-lg border border-purple-500/40 bg-purple-950/30 p-4">
+            <div className="flex items-start gap-3">
+              <Radio className="w-5 h-5 text-purple-400 flex-shrink-0 animate-pulse" />
+              <div>
+                <h4 className="text-sm font-semibold text-purple-300">Live Tracking Active</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Right now, because you're logged into{' '}
+                  {[
+                    googleData?.isLoggedIn && 'Google',
+                    metaData?.isLoggedIn && 'Facebook',
+                    microsoftData?.isLoggedIn && 'Microsoft',
+                  ].filter(Boolean).join(', ')}
+                  , these companies are tracking this very page visit and adding it to your profile.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="text-center border-b border-purple-500/20 pb-4">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent flex items-center justify-center gap-2">
+            <Link2 className="w-6 h-6 text-purple-400" />
+            Your Connected Identity
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">Services tracking you across the web</p>
+        </div>
+
+        {/* COMPARISON GRAPHIC - With vs Without Login */}
+        {(googleData?.isLoggedIn || metaData?.isLoggedIn) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-lg border border-green-500/30 bg-green-950/20 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserX className="w-5 h-5 text-green-400" />
+                <h4 className="font-semibold text-green-400 text-sm">Without Login</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Websites see: <span className="text-green-300">"Anonymous visitor from {navigator.language?.split('-')[1] || 'your region'}"</span>
+              </p>
+              <ul className="text-xs text-muted-foreground mt-2 space-y-1">
+                <li>• IP-based location only</li>
+                <li>• No personal identity</li>
+                <li>• Limited tracking across sites</li>
+              </ul>
+            </div>
+            <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <User className="w-5 h-5 text-red-400" />
+                <h4 className="font-semibold text-red-400 text-sm">With Your Logins</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Websites see: <span className="text-red-300">"Your full identity"</span>
+              </p>
+              <ul className="text-xs text-muted-foreground mt-2 space-y-1">
+                <li>• Your name & email</li>
+                <li>• Complete browsing history</li>
+                <li>• Interests, friends, purchases</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* Privacy Impact Score */}
+        <div className={`p-4 rounded-lg border ${
+          privacyScore.level === 'critical' ? 'border-red-500/50 bg-red-500/10' :
+          privacyScore.level === 'high' ? 'border-orange-500/50 bg-orange-500/10' :
+          privacyScore.level === 'medium' ? 'border-yellow-500/50 bg-yellow-500/10' :
+          'border-green-500/50 bg-green-500/10'
+        }`}>
+          <div className="flex items-center gap-3">
+            <Shield className={`w-8 h-8 ${
+              privacyScore.level === 'critical' ? 'text-red-400' :
+              privacyScore.level === 'high' ? 'text-orange-400' :
+              privacyScore.level === 'medium' ? 'text-yellow-400' :
+              'text-green-400'
+            }`} />
+            <div>
+              <h3 className="font-bold text-lg">{privacyScore.label}</h3>
+              <p className="text-sm text-muted-foreground">{privacyScore.description}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Logged-in Services Grid */}
-      <div>
-        <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
-          <Users className="w-5 h-5" />
-          Detected Services
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <ServiceCard
-            name="Google"
-            icon="🔍"
-            isLoggedIn={googleData?.isLoggedIn || false}
-            services={googleData?.services}
-            risk="high"
-          />
-          <ServiceCard
-            name="Meta/Facebook"
-            icon="📘"
-            isLoggedIn={metaData?.isLoggedIn || false}
-            services={metaData?.services}
-            risk="high"
-          />
-          <ServiceCard
-            name="Microsoft"
-            icon="🪟"
-            isLoggedIn={microsoftData?.isLoggedIn || false}
-            services={microsoftData?.services}
-            risk="medium"
-          />
-          {connectedPlatforms.slice(0, 6).map((platform) => (
+        {/* Logged-in Services Grid with Tooltips */}
+        <div>
+          <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Detected Services
+            <span className="text-xs text-muted-foreground font-normal">(hover for tracking details)</span>
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <ServiceCard
-              key={platform.name}
-              name={platform.name}
-              icon="📱"
-              isLoggedIn={platform.loggedIn}
-              risk="medium"
+              name="Google"
+              icon="🔍"
+              isLoggedIn={googleData?.isLoggedIn || false}
+              services={googleData?.services}
+              risk="high"
+              tooltipText={serviceTooltips['Google']}
             />
-          ))}
+            <ServiceCard
+              name="Meta/Facebook"
+              icon="📘"
+              isLoggedIn={metaData?.isLoggedIn || false}
+              services={metaData?.services}
+              risk="high"
+              tooltipText={serviceTooltips['Meta/Facebook']}
+            />
+            <ServiceCard
+              name="Microsoft"
+              icon="🪟"
+              isLoggedIn={microsoftData?.isLoggedIn || false}
+              services={microsoftData?.services}
+              risk="medium"
+              tooltipText={serviceTooltips['Microsoft']}
+            />
+            {connectedPlatforms.slice(0, 6).map((platform) => (
+              <ServiceCard
+                key={platform.name}
+                name={platform.name}
+                icon="📱"
+                isLoggedIn={platform.loggedIn}
+                risk="medium"
+                tooltipText={serviceTooltips[platform.name]}
+              />
+            ))}
+          </div>
         </div>
-      </div>
 
       {/* Cross-Site Tracking Map */}
       {(googleData?.isLoggedIn || metaData?.isLoggedIn || microsoftData?.isLoggedIn) && (
@@ -441,7 +586,8 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };
 
