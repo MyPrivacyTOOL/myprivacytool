@@ -88,7 +88,36 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   if (!hexagonData) return "";
   
   const label = hexagonData.label?.toLowerCase() || '';
+  const value = hexagonData.value || '';
   
+  // FINGERPRINTING HEXAGONS
+  if (label.includes('canvas fingerprint')) {
+    return "I detected your canvas fingerprint. This is a unique signature created by how your browser renders images. Even tiny differences in graphics hardware and software create a distinct pattern. This makes you 99% trackable across websites, even without cookies.";
+  }
+  if (label.includes('webgl')) {
+    const gpuName = value.length > 3 ? value.replace('...', '') : 'your graphics card';
+    return `Your WebGL signature reveals your graphics card: ${gpuName}. This is one of the most powerful fingerprinting methods because GPU configurations are highly unique. Combined with other factors, this makes you extremely identifiable.`;
+  }
+  if (label.includes('audio signature') || label.includes('audio fingerprint')) {
+    return "I found your audio fingerprint. Your browser's audio processing creates tiny variations that are unique to your device. While less reliable than canvas or WebGL, it still contributes to your overall trackability.";
+  }
+  if (label.includes('installed fonts') || label.includes('font')) {
+    const fontMatch = value.match(/(\d+)/);
+    const fontCount = fontMatch ? fontMatch[1] : 'many';
+    return `You have ${fontCount} fonts installed. Your specific combination of fonts reveals your operating system, installed software, and personal preferences. This adds another layer to your browser fingerprint.`;
+  }
+  if (label.includes('extensions') || label.includes('plugin')) {
+    if (value.toLowerCase().includes('ad blocker: yes')) {
+      return "I can see you're using an ad blocker. While this protects your privacy from ads, it also makes you more unique—only about 30% of users have ad blockers. This paradoxically makes you more trackable through fingerprinting.";
+    }
+    const pluginMatch = value.match(/(\d+)/);
+    if (pluginMatch) {
+      return `You have ${pluginMatch[1]} browser extensions. These modify how websites appear and can be detected, making your browser more unique.`;
+    }
+    return "Your browser extensions add to your unique fingerprint signature.";
+  }
+  
+  // STANDARD HEXAGONS
   if (label.includes('browser')) {
     return "I found multiple third-party cookies tracking you across websites.";
   }
@@ -128,6 +157,10 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   if (label.includes('user profile')) {
     return `You appear to be ${hexagonData.value.toLowerCase()}. This lifestyle pattern is valuable for targeted attacks.`;
   }
+  // Orientation hexagons
+  if (label.includes('orientation') || label.includes('rotation') || label.includes('tilt') || label.includes('motion')) {
+    return "Your device orientation and motion data creates a behavioral signature unique to how you hold your device.";
+  }
   
   return `${hexagonData.label} is part of your digital shadow.`;
 };
@@ -135,6 +168,17 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
 // Get top recommendation based on current state
 const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | null): string => {
   const label = hexagonData?.label?.toLowerCase() || '';
+  
+  // Fingerprint-specific recommendations
+  if (label.includes('canvas') || label.includes('webgl') || label.includes('audio')) {
+    return "use Brave browser or Firefox with privacy.resistFingerprinting enabled to reduce your fingerprint exposure";
+  }
+  if (label.includes('font')) {
+    return "limit installed fonts or use a browser that standardizes font rendering";
+  }
+  if (label.includes('extensions') || label.includes('plugin')) {
+    return "be selective with browser extensions—each one makes you more unique";
+  }
   
   if (riskLevel === 'high') {
     if (label.includes('location')) return "use a VPN to mask your real location";
@@ -349,10 +393,29 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
   useEffect(() => {
     let newMessage = '';
+    const label = hexagonData?.label?.toLowerCase() || '';
+    const category = hexagonData?.category || '';
 
     // Determine the message based on state
     if (hexagonData && !hexagonData.confirmed) {
-      newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
+      // Special messages for fingerprint hexagons
+      if (category === 'fingerprint') {
+        if (label.includes('canvas')) {
+          newMessage = `Canvas Fingerprint detected: ${hexagonData.value}. This unique signature is created by how your browser renders graphics. You're 99% trackable with this alone. Click to confirm.`;
+        } else if (label.includes('webgl')) {
+          newMessage = `WebGL Signature found: ${hexagonData.value}. Your GPU creates one of the most powerful identifiers. Click to confirm if this is your graphics card.`;
+        } else if (label.includes('audio')) {
+          newMessage = `Audio Fingerprint: ${hexagonData.value}. Your browser's audio processing has unique variations. This adds to your trackability. Click to confirm.`;
+        } else if (label.includes('font')) {
+          newMessage = `${hexagonData.value}. Your installed fonts reveal your OS and software preferences. Click to confirm.`;
+        } else if (label.includes('extension')) {
+          newMessage = `Extensions: ${hexagonData.value}. Browser add-ons make you more identifiable. Click to confirm.`;
+        } else {
+          newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
+        }
+      } else {
+        newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
+      }
     } else if (confirmedCount === 0 && totalCount > 0) {
       newMessage = `Hi, I'm Alice, your privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points without asking. Hover over any hexagon to see what I found, then click to confirm if it's correct.`;
     } else if (confirmedCount === 1) {
@@ -378,7 +441,25 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
     } else if (confirmedCount === totalCount && totalCount > 0) {
       newMessage = `Complete! Your digital shadow is fully mapped. This data is being sold by 100+ data brokers right now. Ready to take back control?`;
     } else if (hexagonData?.confirmed) {
-      newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
+      // Special confirmed messages for fingerprint hexagons
+      if (category === 'fingerprint') {
+        if (label.includes('canvas')) {
+          newMessage = `Canvas fingerprint confirmed! This signature makes you 99% identifiable across websites, even in private browsing mode.`;
+        } else if (label.includes('webgl')) {
+          newMessage = `WebGL signature confirmed! Your graphics card is now part of your verified digital shadow.`;
+        } else if (label.includes('audio')) {
+          newMessage = `Audio fingerprint confirmed! This subtle identifier adds to your overall trackability.`;
+        } else if (label.includes('font')) {
+          newMessage = `Font detection confirmed! Your installed fonts reveal your system configuration.`;
+        } else if (label.includes('extension')) {
+          newMessage = `Extensions confirmed! Ironically, privacy tools can make you more unique and trackable.`;
+        } else {
+          newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
+        }
+        trackVoiceAIMessage('fingerprint_confirmed');
+      } else {
+        newMessage = `${hexagonData.label} confirmed! This data point is now verified in your digital shadow profile.`;
+      }
     }
 
     if (newMessage && newMessage !== message) {
