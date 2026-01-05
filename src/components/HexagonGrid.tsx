@@ -4,10 +4,11 @@ import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import LanguageIntelligencePanel from './LanguageIntelligencePanel';
 import FingerprintPanel from './FingerprintPanel';
+import StoragePanel from './StoragePanel';
 import FinalSummaryPanel from './FinalSummaryPanel';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile } from '@/lib/deviceDetection';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
-import { 
+import {
   initializeModel as initLanguageModel,
   analyzeLanguages,
   predictLanguagePreference,
@@ -61,6 +62,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const [fingerprintConfirmedCount, setFingerprintConfirmedCount] = useState(0);
   const [fingerprintData, setFingerprintData] = useState<CompositeFingerprint | null>(null);
   const [isFingerprintLoading, setIsFingerprintLoading] = useState(false);
+  
+  // Storage state
+  const [showStoragePanel, setShowStoragePanel] = useState(false);
+  const [storageConfirmedCount, setStorageConfirmedCount] = useState(0);
   
   // Final summary state
   const [showFinalSummary, setShowFinalSummary] = useState(false);
@@ -255,6 +260,17 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         });
       }
       
+      // Track storage confirmations
+      if (hex.category === 'storage') {
+        setStorageConfirmedCount(c => {
+          const newCount = c + 1;
+          if (newCount >= 3 && !showStoragePanel) {
+            setShowStoragePanel(true);
+          }
+          return newCount;
+        });
+      }
+      
       hex.confirmed = true;
       hex.confidence = Math.min(hex.confidence + 5, 99);
     }
@@ -423,6 +439,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {showFingerprintPanel && (
         <div className="mt-8 animate-fade-in">
           <FingerprintPanel />
+        </div>
+      )}
+
+      {/* Storage Panel - shown after confirming 3+ storage hexagons */}
+      {showStoragePanel && (
+        <div className="mt-8 animate-fade-in">
+          <StoragePanel />
         </div>
       )}
 
