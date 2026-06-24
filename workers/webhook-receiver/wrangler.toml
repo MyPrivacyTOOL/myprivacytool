@@ -1,0 +1,33 @@
+name = "myprivacytool-webhook-receiver"
+main = "index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ─── ROUTES ──────────────────────────────────────────────────────────────────
+# Uncomment and set your domain once Cloudflare Pages is live
+# routes = [
+#   { pattern = "myprivacytool.io/webhook/*", zone_name = "myprivacytool.io" }
+# ]
+
+# ─── SECRETS (set via `wrangler secret put VARNAME`) ─────────────────────────
+# DO NOT hardcode secrets here. Use:
+#   wrangler secret put TELEGRAM_BOT_TOKEN
+#   wrangler secret put META_VERIFY_TOKEN
+#   wrangler secret put META_PAGE_ACCESS_TOKEN
+#   wrangler secret put META_WHATSAPP_TOKEN
+#   wrangler secret put WHATSAPP_PHONE_NUMBER_ID
+#   wrangler secret put TWILIO_AUTH_TOKEN
+#   wrangler secret put GCP_PROJECT_ID
+#   wrangler secret put FIRESTORE_SA_TOKEN
+#   wrangler secret put HUBSPOT_API_KEY
+
+# ─── OBSERVABILITY ───────────────────────────────────────────────────────────
+[observability]
+enabled = true
+
+# ─── ENVIRONMENTS ────────────────────────────────────────────────────────────
+[env.production]
+name = "myprivacytool-webhook-receiver"
+
+[env.staging]
+name = "myprivacytool-webhook-receiver-staging"
