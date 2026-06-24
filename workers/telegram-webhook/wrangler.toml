@@ -1,0 +1,17 @@
+name = "mpt-telegram-webhook"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace — create with: wrangler kv:namespace create "MPT_KV"
+# Then paste the resulting id below
+[[kv_namespaces]]
+binding = "MPT_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Environment variables — set in Cloudflare Dashboard (not committed to git)
+# TELEGRAM_BOT_TOKEN
+# HUBSPOT_API_KEY
+# WEBHOOK_SECRET
+
+[env.production]
+name = "mpt-telegram-webhook-prod"
