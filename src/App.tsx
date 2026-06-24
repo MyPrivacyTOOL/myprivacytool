@@ -9,6 +9,9 @@ import TestLocale from "./pages/TestLocale";
 import DeviceOrientation from "./pages/DeviceOrientation";
 import ModelPerformance from "./pages/ModelPerformance";
 import TheEncyclical from "./pages/TheEncyclical";
+import Scan from "./pages/Scan";
+import Report from "./pages/Report";
+import Business from "./pages/Business";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +30,10 @@ const App = () => (
           <Route path="/model-performance" element={<ModelPerformance />} />
           <Route path="/the-encyclical" element={<TheEncyclical />} />
           <Route path="/thepope" element={<Navigate to="/the-encyclical" replace />} />
+          {/* Marketing landing pages */}
+          <Route path="/scan" element={<Scan />} />
+          <Route path="/report" element={<Report />} />
+          <Route path="/business" element={<Business />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
