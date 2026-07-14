@@ -1,9 +1,9 @@
 /**
  * MyPrivacyTOOL — HubSpot Contact Client
- * 
+ *
  * Creates a contact in HubSpot when a user first reaches out on any platform.
  * Uses HubSpot CRM API v3.
- * 
+ *
  * Env secrets required:
  *   HUBSPOT_API_KEY — private app token from HubSpot
  */
@@ -11,7 +11,45 @@
 const HUBSPOT_CONTACTS_URL = 'https://api.hubapi.com/crm/v3/objects/contacts';
 
 /**
- * Create or update a contact in HubSpot
+ * Maps internal platform source names to valid HubSpot dropdown values
+ * for the lead_source_platform custom contact property.
+ *
+ * HubSpot accepted values (as of 2026-07):
+ *   website_form | federated_learning | direct_signup | api_import
+ *
+ * Platform-to-value mapping:
+ *   telegram    → direct_signup   (user initiated direct messaging contact)
+ *   whatsapp    → direct_signup
+ *   sms         → direct_signup
+ *   messenger   → direct_signup
+ *   instagram   → direct_signup
+ *   email       → website_form    (email contact treated as inbound form)
+ *   website     → website_form
+ *   api         → api_import
+ *   federated   → federated_learning
+ *
+ * If source is unrecognised, falls back to 'direct_signup'.
+ */
+function mapSourceToHubSpotValue(source) {
+  const mapping = {
+    telegram: 'direct_signup',
+    whatsapp: 'direct_signup',
+    sms: 'direct_signup',
+    messenger: 'direct_signup',
+    instagram: 'direct_signup',
+    email: 'website_form',
+    website: 'website_form',
+    website_form: 'website_form',
+    api: 'api_import',
+    api_import: 'api_import',
+    federated: 'federated_learning',
+    federated_learning: 'federated_learning',
+  };
+  return mapping[source] || 'direct_signup';
+}
+
+/**
+ * Create a contact in HubSpot
  * @param {Object} env - CF Worker env bindings
  * @param {Object} params
  * @param {string} params.source - platform name (telegram, sms, email, etc.)
@@ -30,8 +68,7 @@ export async function createHubSpotContact(env, { source, name, handle, phone, e
   const properties = {
     hs_lead_status: 'NEW',
     lifecyclestage: 'lead',
-    // Custom source field — create this in HubSpot as a contact property
-    lead_source_platform: source,
+    lead_source_platform: mapSourceToHubSpotValue(source),
   };
 
   // Map available identifiers
@@ -45,7 +82,7 @@ export async function createHubSpotContact(env, { source, name, handle, phone, e
   if (handle) properties.twitter_handle = handle;
   if (userId) properties.platform_user_id = userId;
 
-  // Add note about acquisition source
+  // Acquisition note
   properties.message = `First contact via MyPrivacyTOOL ${source} channel. First Hexagon sent.`;
 
   try {
