@@ -9,17 +9,10 @@ compatibility_flags = ["nodejs_compat"]
 #   { pattern = "myprivacytool.io/webhook/*", zone_name = "myprivacytool.io" }
 # ]
 
-# ─── SECRETS (set via `wrangler secret put VARNAME`) ─────────────────────────
-# DO NOT hardcode secrets here. Use:
-#   wrangler secret put TELEGRAM_BOT_TOKEN
-#   wrangler secret put META_VERIFY_TOKEN
-#   wrangler secret put META_PAGE_ACCESS_TOKEN
-#   wrangler secret put META_WHATSAPP_TOKEN
-#   wrangler secret put WHATSAPP_PHONE_NUMBER_ID
-#   wrangler secret put TWILIO_AUTH_TOKEN
-#   wrangler secret put GCP_PROJECT_ID
-#   wrangler secret put FIRESTORE_SA_TOKEN
-#   wrangler secret put HUBSPOT_API_KEY
+# ─── SECRETS ─────────────────────────────────────────────────────────────────
+# All secrets are set via `wrangler secret put VARNAME`.
+# See DEPLOYMENT.md for the full list and descriptions.
+# Never hardcode values in this file.
 
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
