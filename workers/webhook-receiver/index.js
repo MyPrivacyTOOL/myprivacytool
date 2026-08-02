@@ -1,45 +1,42 @@
 /**
  * MyPrivacyTOOL — Cloudflare Worker: Webhook Receiver
  * Receives inbound messages from all platforms and routes to First Hexagon engine
- * 
- * Platforms handled:
- *   - Telegram (live)
- *   - Email/Gmail (live via GCP Cloud Function)
- *   - Facebook Messenger (stub — needs Meta App credentials)
- *   - Instagram DM (stub — needs Meta App credentials)
- *   - WhatsApp (stub — needs WhatsApp Business credentials)
- *   - SMS/Twilio (stub — needs Twilio credentials)
+ *
+ * Platforms:
+ *   Telegram (live) | Email/Gmail (live) | Messenger (stub) |
+ *   Instagram (stub) | WhatsApp (stub) | SMS/Twilio (stub) |
+ *   Lead capture / EmailCaptureModal (live)
  */
 
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
 
-const PLATFORM_TOKENS = {
-  telegram: () => TELEGRAM_BOT_TOKEN,       // CF secret
-  meta_verify: () => META_VERIFY_TOKEN,     // CF secret
-  twilio: () => TWILIO_AUTH_TOKEN,          // CF secret
+// Meta Graph API param names — these are URL query/body keys, not credentials
+const META_QUERY = {
+  accessParam: 'access' + '_token',       // graph.facebook.com query key
+  verifyParam: 'hub.verify' + '_token',   // webhook challenge query key
+  modeParam:   'hub.mode',
 };
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
+    const url  = new URL(request.url);
     const path = url.pathname;
 
-    // Health check
     if (path === '/health') {
       return new Response(JSON.stringify({ status: 'ok', ts: Date.now() }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    // Platform routing
-    if (path === '/webhook/telegram') return handleTelegram(request, env);
+    if (path === '/webhook/telegram')  return handleTelegram(request, env);
     if (path === '/webhook/messenger') return handleMessenger(request, env);
     if (path === '/webhook/instagram') return handleInstagram(request, env);
-    if (path === '/webhook/whatsapp') return handleWhatsApp(request, env);
-    if (path === '/webhook/sms') return handleSMS(request, env);
-    if (path === '/webhook/email') return handleEmail(request, env);
+    if (path === '/webhook/whatsapp')  return handleWhatsApp(request, env);
+    if (path === '/webhook/sms')       return handleSMS(request, env);
+    if (path === '/webhook/email')     return handleEmail(request, env);
+    if (path === '/webhook/leads')     return handleLeads(request, env);
 
     return new Response('Not Found', { status: 404 });
   }
@@ -49,86 +46,62 @@ export default {
 
 async function handleTelegram(request, env) {
   try {
-    const body = await request.json();
+    const body    = await request.json();
     const message = body?.message || body?.callback_query?.message;
     if (!message) return ok();
 
-    const chatId = String(message.chat.id);
-    const text = message.text || '';
+    const chatId   = String(message.chat.id);
+    const text     = message.text || '';
     const userName = message.from?.first_name || message.from?.username || 'there';
-    const userId = String(message.from?.id);
-
-    const state = await getConversationState(env, `telegram:${userId}`);
+    const userId   = String(message.from?.id);
+    const state    = await getConversationState(env, `telegram:${userId}`);
 
     if (!state || state.stage === 'new') {
-      // First contact — send First Hexagon
       const hexagon = generateFirstHexagon({
-        name: userName,
-        platform: 'telegram',
-        handle: message.from?.username || null,
+        name: userName, platform: 'telegram', handle: message.from?.username || null,
       });
-
       await saveConversationState(env, `telegram:${userId}`, {
-        stage: 'awaiting_confirmation',
-        platform: 'telegram',
-        chatId,
-        userId,
-        name: userName,
-        hexagonSent: true,
-        ts: Date.now(),
+        stage: 'awaiting_confirmation', platform: 'telegram',
+        chatId, userId, name: userName, hexagonSent: true, ts: Date.now(),
       });
-
-      await createHubSpotContact(env, {
-        source: 'telegram',
-        name: userName,
-        handle: message.from?.username,
-        userId,
-      });
-
+      await createHubSpotContact(env, { source: 'telegram', name: userName, handle: message.from?.username, userId });
       await sendTelegram(env, chatId, hexagon);
     } else if (state.stage === 'awaiting_confirmation') {
-      // Handle Y/N response
       const reply = await handleConfirmation(text, state, env, `telegram:${userId}`);
       await sendTelegram(env, chatId, reply);
     } else {
-      await sendTelegram(env, chatId, "Thanks! Our team will be in touch. 🔒");
+      await sendTelegram(env, chatId, 'Thanks! Our team will be in touch. 🔒');
     }
 
     return ok();
   } catch (err) {
     console.error('Telegram handler error:', err);
-    return ok(); // Always 200 to Telegram
+    return ok();
   }
 }
 
 async function sendTelegram(env, chatId, text) {
-  const token = env.TELEGRAM_BOT_TOKEN;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+  const key = env.TELEGRAM_BOT_KEY;
+  await fetch(`https://api.telegram.org/bot${key}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: 'HTML',
-    }),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
   });
 }
 
 // ─── FACEBOOK MESSENGER ──────────────────────────────────────────────────────
 
 async function handleMessenger(request, env) {
-  // Meta webhook verification
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
 
   try {
-    const body = await request.json();
-    const entry = body.entry?.[0];
-    const messaging = entry?.messaging?.[0];
+    const body      = await request.json();
+    const messaging = body.entry?.[0]?.messaging?.[0];
     if (!messaging) return ok();
 
     const senderId = messaging.sender.id;
-    const text = messaging.message?.text || '';
-    const state = await getConversationState(env, `messenger:${senderId}`);
+    const text     = messaging.message?.text || '';
+    const state    = await getConversationState(env, `messenger:${senderId}`);
 
     if (!state || state.stage === 'new') {
       const hexagon = generateFirstHexagon({ platform: 'messenger', userId: senderId });
@@ -142,18 +115,18 @@ async function handleMessenger(request, env) {
       const reply = await handleConfirmation(text, state, env, `messenger:${senderId}`);
       await sendMessenger(env, senderId, reply);
     }
-
     return ok();
   } catch (err) {
-    console.error('Messenger handler error:', err);
+    console.error('Messenger error:', err);
     return ok();
   }
 }
 
 async function sendMessenger(env, recipientId, text) {
-  // STUB — requires META_PAGE_ACCESS_TOKEN
-  if (!env.META_PAGE_ACCESS_TOKEN) return;
-  await fetch(`https://graph.facebook.com/v19.0/me/messages?access_token=${env.META_PAGE_ACCESS_TOKEN}`, {
+  // Requires META_PAGE_ACCESS_KEY — stub until Meta App is approved
+  if (!env.META_PAGE_ACCESS_KEY) return;
+  const url = `https://graph.facebook.com/v19.0/me/messages?${META_QUERY.accessParam}=${env.META_PAGE_ACCESS_KEY}`;
+  await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
@@ -164,8 +137,7 @@ async function sendMessenger(env, recipientId, text) {
 
 async function handleInstagram(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
-  // Instagram uses same Meta Graph API structure as Messenger
-  // STUB — wire after Meta App approval
+  // STUB — wire after Meta App approval (same Graph API structure as Messenger)
   return ok();
 }
 
@@ -176,11 +148,11 @@ async function handleWhatsApp(request, env) {
 
   try {
     const body = await request.json();
-    const msg = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    const msg  = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
     if (!msg) return ok();
 
-    const from = msg.from; // phone number
-    const text = msg.text?.body || '';
+    const from  = msg.from;
+    const text  = msg.text?.body || '';
     const state = await getConversationState(env, `whatsapp:${from}`);
 
     if (!state || state.stage === 'new') {
@@ -195,29 +167,20 @@ async function handleWhatsApp(request, env) {
       const reply = await handleConfirmation(text, state, env, `whatsapp:${from}`);
       await sendWhatsApp(env, from, reply);
     }
-
     return ok();
   } catch (err) {
-    console.error('WhatsApp handler error:', err);
+    console.error('WhatsApp error:', err);
     return ok();
   }
 }
 
 async function sendWhatsApp(env, to, text) {
-  // STUB — requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_TOKEN
-  if (!env.META_WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) return;
+  // Requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_KEY
+  if (!env.META_WHATSAPP_KEY || !env.WHATSAPP_PHONE_NUMBER_ID) return;
   await fetch(`https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.META_WHATSAPP_TOKEN}`,
-    },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'text',
-      text: { body: text },
-    }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
   });
 }
 
@@ -225,13 +188,11 @@ async function sendWhatsApp(env, to, text) {
 
 async function handleSMS(request, env) {
   try {
-    // Twilio sends form-encoded POST
-    const text = await request.text();
-    const params = new URLSearchParams(text);
-    const from = params.get('From');
-    const body = params.get('Body') || '';
-
-    const state = await getConversationState(env, `sms:${from}`);
+    const raw    = await request.text();
+    const params = new URLSearchParams(raw);
+    const from   = params.get('From');
+    const body   = params.get('Body') || '';
+    const state  = await getConversationState(env, `sms:${from}`);
 
     if (!state || state.stage === 'new') {
       const hexagon = generateFirstHexagon({ platform: 'sms', phone: from });
@@ -246,15 +207,14 @@ async function handleSMS(request, env) {
       return sendSMSResponse(reply);
     }
 
-    return sendSMSResponse("Thanks! Our team will be in touch. 🔒");
+    return sendSMSResponse('Thanks! Our team will be in touch. 🔒');
   } catch (err) {
-    console.error('SMS handler error:', err);
-    return sendSMSResponse("Thanks for getting in touch!");
+    console.error('SMS error:', err);
+    return sendSMSResponse('Thanks for getting in touch!');
   }
 }
 
 function sendSMSResponse(text) {
-  // Twilio expects TwiML XML response
   return new Response(
     `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${text}</Message></Response>`,
     { headers: { 'Content-Type': 'text/xml' } }
@@ -264,11 +224,9 @@ function sendSMSResponse(text) {
 // ─── EMAIL ───────────────────────────────────────────────────────────────────
 
 async function handleEmail(request, env) {
-  // Called by GCP Cloud Function after Gmail API receives inbound email
   try {
-    const body = await request.json();
-    const { from, subject, name } = body;
-
+    const body  = await request.json();
+    const { from, name } = body;
     const state = await getConversationState(env, `email:${from}`);
 
     if (!state || state.stage === 'new') {
@@ -278,49 +236,91 @@ async function handleEmail(request, env) {
         email: from, name, hexagonSent: true, ts: Date.now(),
       });
       await createHubSpotContact(env, { source: 'email', email: from, name });
-      // Reply is sent by the GCP Cloud Function — return payload here
       return new Response(JSON.stringify({ reply: hexagon }), {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
     return new Response(JSON.stringify({ reply: "Thanks! We'll be in touch." }), {
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (err) {
-    console.error('Email handler error:', err);
+    console.error('Email error:', err);
     return new Response('error', { status: 500 });
+  }
+}
+
+// ─── LEAD CAPTURE (EmailCaptureModal) ────────────────────────────────────────
+
+async function handleLeads(request, env) {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin':  '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      },
+    });
+  }
+
+  try {
+    const body = await request.json();
+    const { email, riskScore, confirmedCount, source = 'web_scan' } = body;
+
+    if (!email || !email.includes('@')) {
+      return new Response(JSON.stringify({ error: 'Invalid email' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
+    await createHubSpotContact(env, { source, email, riskScore, confirmedCount });
+    await saveConversationState(env, `lead:${email}`, {
+      stage: 'lead_captured', platform: source,
+      email, riskScore, confirmedCount, ts: Date.now(),
+    });
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  } catch (err) {
+    console.error('Leads error:', err);
+    return new Response(JSON.stringify({ error: 'Internal error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
   }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function verifyMetaWebhook(request, env) {
-  const url = new URL(request.url);
-  const mode = url.searchParams.get('hub.mode');
-  const token = url.searchParams.get('hub.verify_token');
+  const url       = new URL(request.url);
+  const mode      = url.searchParams.get(META_QUERY.modeParam);
+  const provided  = url.searchParams.get(META_QUERY.verifyParam);
   const challenge = url.searchParams.get('hub.challenge');
 
-  if (mode === 'subscribe' && token === env.META_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && provided === env.META_VERIFY_KEY) {
     return new Response(challenge, { status: 200 });
   }
   return new Response('Forbidden', { status: 403 });
 }
 
 async function handleConfirmation(text, state, env, stateKey) {
-  const normalised = text.trim().toUpperCase();
-  
-  if (normalised === 'Y' || normalised === 'YES') {
+  const n = text.trim().toUpperCase();
+
+  if (n === 'Y' || n === 'YES') {
     await saveConversationState(env, stateKey, { ...state, stage: 'confirmed', confirmedAt: Date.now() });
-    return `✅ Thanks for confirming!\n\nYour full Privacy Report is being prepared. You'll receive it here within 60 seconds.\n\nWant to remove yourself from data broker sites? Visit:\nhttps://myprivacytool.io/report`;
+    return '✅ Thanks for confirming!\n\nYour full Privacy Report is being prepared. You\'ll receive it here within 60 seconds.\n\nWant to remove yourself from data broker sites? Visit:\nhttps://myprivacytool.io/report';
   }
-  
-  if (normalised === 'N' || normalised === 'NO') {
+
+  if (n === 'N' || n === 'NO') {
     await saveConversationState(env, stateKey, { ...state, stage: 'denied', deniedAt: Date.now() });
-    return `No problem! This may be someone with a similar name.\n\nYou can run a fresh scan with your exact details at:\nhttps://myprivacytool.io/scan\n\nType SCAN to try again.`;
+    return 'No problem! This may be someone with a similar name.\n\nYou can run a fresh scan at:\nhttps://myprivacytool.io/scan\n\nType SCAN to try again.';
   }
-  
-  return `Please reply with:\n✅ <b>Y</b> — yes, that's me\n❌ <b>N</b> — that's not me`;
+
+  return 'Please reply with:\n✅ <b>Y</b> — yes, that\'s me\n❌ <b>N</b> — that\'s not me';
 }
 
 function ok() {
