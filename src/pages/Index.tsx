@@ -130,6 +130,21 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Load HubSpot embed script dynamically
+  useEffect(() => {
+    const scriptId = 'hs-forms-embed';
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
+    script.defer = true;
+    document.body.appendChild(script);
+    return () => {
+      const existing = document.getElementById(scriptId);
+      if (existing) existing.remove();
+    };
+  }, []);
+
   // Check if should show federated learning modal (after 5+ predictions)
   useEffect(() => {
     if (!loading && !federatedCheckDone.current) {
@@ -272,6 +287,19 @@ const Index = () => {
               height="80"
               loading="lazy"
             />
+
+            {/* HubSpot Newsletter Sign-Up Form */}
+            <div className="max-w-md mx-auto mb-6">
+              <p className="text-gray-700 text-sm font-medium mb-3">
+                Get weekly privacy tips — no spam, unsubscribe anytime.
+              </p>
+              <div
+                className="hs-form-frame"
+                data-region="na2"
+                data-form-id="0861b7ed-ff70-47a9-a45a-b29be082153d"
+                data-portal-id="246502821"
+              />
+            </div>
             
             {/* Social Media Icons */}
             <nav className="flex justify-center gap-3 mb-4" aria-label="Social media links">
