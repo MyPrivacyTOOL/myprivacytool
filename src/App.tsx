@@ -12,6 +12,7 @@ import TheEncyclical from "./pages/TheEncyclical";
 import Scan from "./pages/Scan";
 import Report from "./pages/Report";
 import Business from "./pages/Business";
+import Start from "./pages/Start";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,8 @@ const App = () => (
           <Route path="/scan" element={<Scan />} />
           <Route path="/report" element={<Report />} />
           <Route path="/business" element={<Business />} />
+          {/* Messaging / First Hexagon entry point */}
+          <Route path="/start" element={<Start />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
