@@ -13,6 +13,7 @@ import Scan from "./pages/Scan";
 import Report from "./pages/Report";
 import Business from "./pages/Business";
 import Start from "./pages/Start";
+import Newsletter from "./pages/Newsletter";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,8 @@ const App = () => (
           <Route path="/business" element={<Business />} />
           {/* Messaging / First Hexagon entry point */}
           <Route path="/start" element={<Start />} />
+          {/* Lead capture */}
+          <Route path="/newsletter" element={<Newsletter />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
