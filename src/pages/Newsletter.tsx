@@ -50,9 +50,9 @@ export default function Newsletter() {
   return (
     <div className="min-h-screen bg-black text-white font-mono">
       {/* Header */}
-      <div className="border-b border-red-900/40 px-6 py-4 flex items-center gap-3">
-        <Shield className="text-red-500" size={20} />
-        <span className="text-red-500 text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
+      <div className="border-b border-[#27AE60]/30 px-6 py-4 flex items-center gap-3">
+        <Shield className="text-[#27AE60]" size={20} />
+        <span className="text-[#27AE60] text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
         <span className="text-gray-600 text-xs ml-auto">Privacy Intelligence — Weekly Briefing</span>
       </div>
 
@@ -60,8 +60,8 @@ export default function Newsletter() {
 
         {/* Icon */}
         <div className="flex justify-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-red-950 border border-red-800 flex items-center justify-center">
-            <Mail className="text-red-400" size={28} />
+          <div className="w-16 h-16 rounded-full bg-[#1A1A1A] border border-[#27AE60]/40 flex items-center justify-center">
+            <Mail className="text-[#27AE60]" size={28} />
           </div>
         </div>
 
@@ -69,7 +69,7 @@ export default function Newsletter() {
         <div className="text-center mb-10">
           <h1 className="text-2xl font-bold text-white mb-3 leading-tight">
             Your data is out there.<br />
-            <span className="text-red-500">Stay ahead of it.</span>
+            <span className="text-[#27AE60]">Stay ahead of it.</span>
           </h1>
           <p className="text-gray-400 text-sm leading-relaxed">
             Weekly privacy intelligence — what's changed in the data broker landscape, new removal tactics, and what you need to know to protect your digital footprint.
@@ -77,7 +77,7 @@ export default function Newsletter() {
         </div>
 
         {/* What you get */}
-        <div className="bg-gray-950 border border-gray-800 rounded-xl p-5 mb-8">
+        <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl p-5 mb-8">
           <p className="text-xs text-gray-500 uppercase tracking-widest mb-4">What you'll get</p>
           <div className="space-y-3">
             {[
@@ -87,7 +87,7 @@ export default function Newsletter() {
               "Your personal exposure score updates",
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3">
-                <Check size={14} className="text-red-500 mt-0.5 shrink-0" />
+                <Check size={14} className="text-[#27AE60] mt-0.5 shrink-0" />
                 <span className="text-sm text-gray-300">{item}</span>
               </div>
             ))}
@@ -105,7 +105,7 @@ export default function Newsletter() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 disabled={status === "loading"}
-                className="w-full bg-black border border-gray-700 rounded-lg px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500 disabled:opacity-50 transition-colors"
+                className="w-full bg-black border border-[#2A2A2A] rounded-lg px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#27AE60] disabled:opacity-50 transition-colors"
               />
             </div>
 
@@ -116,7 +116,7 @@ export default function Newsletter() {
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-[#27AE60] hover:bg-[#1E8449] disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
             >
               {status === "loading" ? (
                 <span className="animate-pulse">Subscribing...</span>
@@ -136,11 +136,11 @@ export default function Newsletter() {
           </form>
         ) : (
           /* Success state */
-          <div className="bg-gray-950 border border-green-900/50 rounded-xl p-6 text-center animate-fade-in">
-            <div className="w-12 h-12 rounded-full bg-green-950 border border-green-800 flex items-center justify-center mx-auto mb-4">
-              <Check className="text-green-400" size={22} />
+          <div className="bg-[#1A1A1A] border border-[#27AE60]/40 rounded-xl p-6 text-center animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-black border border-[#27AE60] flex items-center justify-center mx-auto mb-4">
+              <Check className="text-[#27AE60]" size={22} />
             </div>
-            <p className="text-green-400 font-semibold mb-2">You're in.</p>
+            <p className="text-[#27AE60] font-semibold mb-2">You're in.</p>
             <p className="text-gray-400 text-sm">
               Check your inbox — your first privacy briefing is on its way.
             </p>
