@@ -123,7 +123,7 @@ export default function Newsletter() {
               ) : (
                 <>
                   <ArrowRight size={16} />
-                  Get Weekly Privacy Tips
+                  Get Weekly Privacy Intelligence
                 </>
               )}
             </button>
