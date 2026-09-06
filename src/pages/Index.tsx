@@ -6,7 +6,7 @@ import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal, ContributorBadge } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
-import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone } from 'lucide-react';
+import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
@@ -223,6 +223,14 @@ const Index = () => {
             <div className="flex items-center gap-2">
               {/* Contributor Badge */}
               <ContributorBadge className="hidden sm:flex" />
+              
+              <Link 
+                to="/blog"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium text-xs sm:text-sm hover:opacity-90 transition-opacity shadow-md"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">Blog</span>
+              </Link>
               
               <Link 
                 to="/device-orientation"
