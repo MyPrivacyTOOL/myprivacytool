@@ -14,6 +14,8 @@ import Report from "./pages/Report";
 import Business from "./pages/Business";
 import Start from "./pages/Start";
 import Newsletter from "./pages/Newsletter";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,9 @@ const App = () => (
           <Route path="/start" element={<Start />} />
           {/* Lead capture */}
           <Route path="/newsletter" element={<Newsletter />} />
+          {/* Blog section */}
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
