@@ -43,7 +43,7 @@ const blogPosts: BlogPost[] = [
     title: "AI Is Training on Your Data — Here's How to Opt Out",
     slug: "ai-training-data-opt-out",
     excerpt: "Your data is being used to train LLMs. We break down the opt-out options for ChatGPT, Gemini, Claude, and emerging AI platforms.",
-    date: "Coming Soon",
+    date: "September 17, 2026",
     author: "MyPrivacyTOOL",
     category: "AI & Emerging Threats",
     readTime: 7
