@@ -6,7 +6,7 @@ import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal, ContributorBadge } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
-import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone, BookOpen } from 'lucide-react';
+import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone, BookOpen, Linkedin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import logoHeader from '@/assets/logo-header.png';
@@ -340,6 +340,16 @@ const Index = () => {
                 aria-label="Follow us on Instagram"
               >
                 <Instagram className="w-4 h-4 text-gray-600" aria-hidden="true" />
+              </a>
+              <a 
+                href="https://www.linkedin.com/in/myprivacytool/" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/in/myprivacytool/')} 
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                aria-label="Follow us on LinkedIn"
+              >
+                <Linkedin className="w-4 h-4 text-gray-600" aria-hidden="true" />
               </a>
               <a 
                 href="https://myprivacytool.business.site/" 
