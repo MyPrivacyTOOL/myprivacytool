@@ -23,7 +23,7 @@ const blogContent: { [key: string]: Post } = {
     date: "August 30, 2026",
     category: "Privacy Awareness",
     readTime: 8,
-    image: "/blog/exposure-guide.jpg",
+    image: "/placeholder.svg",
     content: (
       <div className="prose prose-slate max-w-none">
         <p>Your digital footprint is larger than you think. Every day, your personal data is being collected, packaged, sold, and used in ways you never authorized.</p>
@@ -115,7 +115,7 @@ const blogContent: { [key: string]: Post } = {
     date: "August 29, 2026",
     category: "Social Media",
     readTime: 6,
-    image: "/blog/linkedin-privacy.jpg",
+    image: "/placeholder.svg",
     content: (
       <div className="prose prose-slate max-w-none">
         <p>LinkedIn says your profile is yours to control. But behind the scenes, companies like Apollo, ZoomInfo, Lusha, and Clearbit are legally scraping your entire profile — every job, school, skill, and connection — and reselling it to thousands of sales teams and recruiters.</p>
@@ -179,7 +179,7 @@ const blogContent: { [key: string]: Post } = {
     date: "September 17, 2026",
     category: "AI & Emerging Threats",
     readTime: 7,
-    image: "/blog/ai-training-privacy.jpg",
+    image: "/placeholder.svg",
     content: (
       <div className="prose prose-slate max-w-none">
         <p>Every tweet, Reddit comment, blog post, and public profile you've ever published is now part of an AI training dataset. OpenAI, Google, Meta, and dozens of startups have already ingested billions of lines of your data into their models. The question is no longer "is my data in AI?" — it's "where can I opt out?"</p>
