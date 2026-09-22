@@ -46,7 +46,8 @@ const blogPosts: BlogPost[] = [
     date: "September 17, 2026",
     author: "MyPrivacyTOOL",
     category: "AI & Emerging Threats",
-    readTime: 7
+    readTime: 7,
+    image: "/blog/ai-training-data.jpg"
   }
 ];
 
