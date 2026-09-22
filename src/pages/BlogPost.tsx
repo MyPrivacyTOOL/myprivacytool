@@ -3,28 +3,10 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
+import blogPosts from '@/data/blogPosts.json';
 
-interface Post {
-  slug: string;
-  title: string;
-  author: string;
-  date: string;
-  category: string;
-  readTime: number;
-  image?: string;
-  content: React.ReactNode;
-}
-
-const blogContent: { [key: string]: Post } = {
-  "how-exposed-are-you": {
-    slug: "how-exposed-are-you",
-    title: "How Exposed Are You? The 46 Things Tracking You Online",
-    author: "MyPrivacyTOOL",
-    date: "August 30, 2026",
-    category: "Privacy Awareness",
-    readTime: 8,
-    image: "/placeholder.svg",
-    content: (
+const blogContent: { [key: string]: React.ReactNode } = {
+  "how-exposed-are-you": (
       <div className="prose prose-slate max-w-none">
         <p>Your digital footprint is larger than you think. Every day, your personal data is being collected, packaged, sold, and used in ways you never authorized.</p>
         
@@ -106,17 +88,8 @@ const blogContent: { [key: string]: Post } = {
         
         <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough — you need ongoing monitoring and regular removal cycles.</p>
       </div>
-    )
-  },
-  "linkedin-data-brokers": {
-    slug: "linkedin-data-brokers",
-    title: "Your LinkedIn Profile Is a Data Broker's Best Friend",
-    author: "MyPrivacyTOOL",
-    date: "August 29, 2026",
-    category: "Social Media",
-    readTime: 6,
-    image: "/placeholder.svg",
-    content: (
+  ),
+  "linkedin-data-brokers": (
       <div className="prose prose-slate max-w-none">
         <p>LinkedIn says your profile is yours to control. But behind the scenes, companies like Apollo, ZoomInfo, Lusha, and Clearbit are legally scraping your entire profile — every job, school, skill, and connection — and reselling it to thousands of sales teams and recruiters.</p>
         
@@ -170,17 +143,8 @@ const blogContent: { [key: string]: Post } = {
         <h2>The Bigger Picture</h2>
         <p>LinkedIn is a privacy trade-off: you gain network visibility in exchange for your data being commodified. That's the deal. But knowing the scope of that deal — and taking active steps to limit it — is the only protection available.</p>
       </div>
-    )
-  },
-  "ai-training-data-opt-out": {
-    slug: "ai-training-data-opt-out",
-    title: "AI Is Training on Your Data — Here's How to Opt Out",
-    author: "MyPrivacyTOOL",
-    date: "September 17, 2026",
-    category: "AI & Emerging Threats",
-    readTime: 7,
-    image: "/placeholder.svg",
-    content: (
+  ),
+  "ai-training-data-opt-out": (
       <div className="prose prose-slate max-w-none">
         <p>Every tweet, Reddit comment, blog post, and public profile you've ever published is now part of an AI training dataset. OpenAI, Google, Meta, and dozens of startups have already ingested billions of lines of your data into their models. The question is no longer "is my data in AI?" — it's "where can I opt out?"</p>
         
@@ -275,15 +239,15 @@ Disallow: /</code></pre>
         
         <p>If you care about privacy, supporting open models and pushing for transparency laws is as important as opting out today.</p>
       </div>
-    )
-  }
+  ),
 };
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const meta = slug ? blogPosts.find((p) => p.slug === slug) : undefined;
 
-  if (!slug || !blogContent[slug]) {
+  if (!slug || !meta || !blogContent[slug]) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -296,7 +260,7 @@ export default function BlogPost() {
     );
   }
 
-  const post = blogContent[slug];
+  const post = { ...meta, content: blogContent[slug] };
 
   const handleShare = async () => {
     const url = `${window.location.origin}/blog/${slug}`;

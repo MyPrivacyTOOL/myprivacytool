@@ -1,21 +1,17 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import HexagonGrid from '@/components/HexagonGrid';
 import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
-import FederatedLearningModal, { shouldShowFederatedModal, ContributorBadge } from '@/components/FederatedLearningModal';
+import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
-import { RefreshCw, Facebook, Twitter, Instagram, Globe, Link as LinkIcon, Smartphone, BookOpen, Linkedin } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
-import logoHeader from '@/assets/logo-header.png';
-import logoFooter from '@/assets/logo-footer.png';
-import { 
-  trackSocialClick, 
-  trackFunnelStep, 
-  trackDeviceProfile, 
-  startSessionTimer, 
+import {
+  trackFunnelStep,
+  trackDeviceProfile,
+  startSessionTimer,
   trackSessionDuration,
   trackError,
   trackScrollToFooter
@@ -205,45 +201,7 @@ const Index = () => {
       <MatrixRain fadeBottom={true} />
       
       {/* Content Layer - with safe area insets for iPhone */}
-      <div className="relative z-10" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {/* Navbar */}
-        <nav className="bg-white" role="navigation" aria-label="Main navigation">
-          <div className="container mx-auto px-3 sm:px-4 flex items-center justify-between">
-            <div className="flex items-center -my-8 sm:-my-10">
-              <img 
-                src={logoHeader} 
-                alt="MyPrivacyTOOL.IO header logo - Digital privacy protection" 
-                className="h-28 sm:h-40 md:h-48 object-contain"
-                width="200"
-                height="192"
-              />
-            </div>
-            
-            {/* Navigation Links */}
-            <div className="flex items-center gap-2">
-              {/* Contributor Badge */}
-              <ContributorBadge className="hidden sm:flex" />
-              
-              <Link 
-                to="/blog"
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium text-xs sm:text-sm hover:opacity-90 transition-opacity shadow-md"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span className="hidden sm:inline">Blog</span>
-              </Link>
-              
-              <Link 
-                to="/device-orientation"
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-[#667eea] to-[#764ba2] text-white font-medium text-xs sm:text-sm hover:opacity-90 transition-opacity shadow-md"
-              >
-                <Smartphone className="w-4 h-4" />
-                <span className="hidden sm:inline">Device Tracking</span>
-                <span className="sm:hidden">Track</span>
-              </Link>
-            </div>
-          </div>
-        </nav>
-
+      <div className="relative z-10" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Hero Section with Shadow Hands */}
         <section className="relative h-[280px] sm:h-[350px] md:h-[500px]" aria-labelledby="hero-heading">
           <ShadowHands />
@@ -280,24 +238,15 @@ const Index = () => {
         </section>
 
         {/* Hexagon Grid Section */}
-        <section className="pb-12" aria-label="Your detected data points">
+        <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
           <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
         </section>
 
-        {/* Footer */}
-        <footer ref={footerRef} className="py-4 mt-12 bg-white" role="contentinfo">
+        {/* Newsletter Sign-Up */}
+        <section ref={footerRef} className="py-4 mt-12 bg-white" aria-label="Newsletter sign-up">
           <div className="container mx-auto px-4 text-center">
-            <img 
-              src={logoFooter} 
-              alt="MyPrivacyTOOL.IO footer logo - Protecting your digital privacy" 
-              className="h-20 object-contain mx-auto mb-3"
-              width="150"
-              height="80"
-              loading="lazy"
-            />
-
             {/* HubSpot Newsletter Sign-Up Form */}
-            <div className="max-w-md mx-auto mb-6">
+            <div className="max-w-md mx-auto mb-2">
               <p className="text-gray-700 text-sm font-medium mb-3">
                 Get weekly privacy tips — no spam, unsubscribe anytime.
               </p>
@@ -308,79 +257,12 @@ const Index = () => {
                 data-portal-id="246502821"
               />
             </div>
-            
-            {/* Social Media Icons */}
-            <nav className="flex justify-center gap-3 mb-4" aria-label="Social media links">
-              <a 
-                href="https://www.facebook.com/MyPrivacyTOOL.IO" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                onClick={() => trackSocialClick('facebook', 'https://www.facebook.com/MyPrivacyTOOL.IO')} 
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                aria-label="Follow us on Facebook"
-              >
-                <Facebook className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              </a>
-              <a 
-                href="https://twitter.com/myprivacytool" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                onClick={() => trackSocialClick('twitter', 'https://twitter.com/myprivacytool')} 
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                aria-label="Follow us on Twitter"
-              >
-                <Twitter className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              </a>
-              <a 
-                href="https://www.instagram.com/myprivacytool.io/" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                onClick={() => trackSocialClick('instagram', 'https://www.instagram.com/myprivacytool.io/')} 
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                aria-label="Follow us on Instagram"
-              >
-                <Instagram className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              </a>
-              <a 
-                href="https://www.linkedin.com/in/myprivacytool/" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                onClick={() => trackSocialClick('linkedin', 'https://www.linkedin.com/in/myprivacytool/')} 
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                aria-label="Follow us on LinkedIn"
-              >
-                <Linkedin className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              </a>
-              <a 
-                href="https://myprivacytool.business.site/" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                onClick={() => trackSocialClick('google_business', 'https://myprivacytool.business.site/')} 
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                aria-label="Visit our Google Business page"
-              >
-                <Globe className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              </a>
-              <a 
-                href="https://linktr.ee/MyPrivacyTOOL" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                onClick={() => trackSocialClick('linktree', 'https://linktr.ee/MyPrivacyTOOL')} 
-                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                aria-label="Visit our Linktree"
-              >
-                <LinkIcon className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              </a>
-            </nav>
-            
-            <p className="text-gray-600 text-xs">
-              © 2025 MyPrivacyTOOL.IO • Protecting Your Digital Privacy
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
+
+            <p className="text-xs text-gray-400 mt-4">
               No data is stored. All detection happens in your browser.
             </p>
           </div>
-        </footer>
+        </section>
       </div>
 
       {/* Federated Learning Modal */}
