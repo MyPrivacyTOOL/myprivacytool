@@ -17,18 +17,7 @@ interface BlogPost {
 
 const blogPosts: BlogPost[] = [
   {
-    id: 1,
-    title: "25 Years of Mass Surveillance Is Enough",
-    slug: "25-years-mass-surveillance",
-    excerpt: "A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to demand a different future.",
-    date: "September 22, 2026",
-    author: "MyPrivacyTOOL",
-    category: "Privacy Advocacy",
-    readTime: 9,
-    image: "/blog/mass-surveillance.jpg"
-  },
-  {
-    id: 2,
+    id: "1",
     title: "How Exposed Are You? The 46 Things Tracking You Online",
     slug: "how-exposed-are-you",
     excerpt: "Your digital footprint is larger than you think. Discover the 46 privacy vectors exposing your personal data right now — from data brokers to AI training datasets.",
@@ -39,7 +28,18 @@ const blogPosts: BlogPost[] = [
     image: "/blog/exposure-guide.jpg"
   },
   {
-    id: 3,
+    id: "2",
+    title: "25 Years of Mass Surveillance Is Enough",
+    slug: "25-years-mass-surveillance",
+    excerpt: "A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to demand a different future.",
+    date: "September 22, 2026",
+    author: "MyPrivacyTOOL",
+    category: "Privacy Advocacy",
+    readTime: 9,
+    image: "/blog/mass-surveillance.jpg"
+  },
+  {
+    id: "3",
     title: "Your LinkedIn Profile Is a Data Broker's Best Friend",
     slug: "linkedin-data-brokers",
     excerpt: "LinkedIn data is scraped legally. Apollo, ZoomInfo, Lusha, and Clearbit all use your profile. Here's how to protect yourself.",
@@ -50,7 +50,7 @@ const blogPosts: BlogPost[] = [
     image: "/blog/linkedin-privacy.jpg"
   },
   {
-    id: 4,
+    id: "4",
     title: "AI Is Training on Your Data — Here's How to Opt Out",
     slug: "ai-training-data-opt-out",
     excerpt: "Your data is being used to train LLMs. We break down the opt-out options for ChatGPT, Gemini, Claude, and emerging AI platforms.",
