@@ -89,6 +89,105 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough — you need ongoing monitoring and regular removal cycles.</p>
       </div>
   ),
+  "25-years-mass-surveillance": (
+      <div className="prose prose-slate max-w-none">
+        <p>A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to demand a different future.</p>
+        
+        <h2>The Timeline: How We Got Here</h2>
+        
+        <h3>2001 — The PATRIOT Act & The Beginning</h3>
+        <p>Post-9/11 panic gave governments unprecedented surveillance powers. The PATRIOT Act authorized bulk data collection without individual warrants. What was supposed to be temporary became permanent infrastructure.</p>
+        
+        <h3>2007 — The Smartphone Era</h3>
+        <p>The iPhone launched, and with it, a new vector: location tracking. Every smartphone became a tracking device, with Apple, Google, and app developers collecting your movement history. GPS, cellular, and WiFi triangulation made it impossible to move without leaving a digital trail.</p>
+        
+        <h3>2013 — The Snowden Revelations</h3>
+        <p>Edward Snowden revealed the scope: the NSA was collecting billions of phone records daily, the GCHQ was tapping undersea cables, and Silicon Valley tech companies were forwarding user data to intelligence agencies under secret court orders.</p>
+        
+        <p>The response? Shock. Then... nothing. Surveillance continued, now with public knowledge.</p>
+        
+        <h3>2015–2020 — The Data Broker Boom</h3>
+        <p>Private companies realized the gold mine: sell what governments collected for free. ZoomInfo, Apollo, Hunter, Clearbit, and hundreds of smaller brokers scraped the web and resold profiles to sales teams, marketers, and private investigators.</p>
+        
+        <h3>2020–2024 — AI Training & Weaponization</h3>
+        <p>All of your collected data — public profiles, deleted tweets, medical records, shopping history, location data, chat logs — was fed into AI models. Now, AI can predict your behavior, preferences, and vulnerabilities better than you can yourself.</p>
+        
+        <h2>What We've Normalized</h2>
+        
+        <p>Ask a teenager today if they'd accept this deal: "Let us watch everywhere you go, everything you buy, everyone you talk to, and everything you read. In exchange, a free app and personalized ads."</p>
+        
+        <p>They would say no.</p>
+        
+        <p>But ask a 35-year-old who grew up before smartphones, and they'll tell you: this is the trade-off of modern life. No alternatives exist.</p>
+        
+        <p>Except they do. And we've normalized away the fact that they do.</p>
+        
+        <h3>Surveillance Technologies We Accept Without Question:</h3>
+        <ul>
+          <li><strong>Location tracking:</strong> Our phones report our location to governments, tech companies, and advertisers in real-time</li>
+          <li><strong>Facial recognition:</strong> Deployed at airports, borders, and increasingly on streets without consent or oversight</li>
+          <li><strong>Cell-site simulators (Stingrays):</strong> Law enforcement uses fake cell towers to intercept calls and track location, often without warrants</li>
+          <li><strong>Financial surveillance:</strong> Every bank transaction, crypto transaction, and credit card purchase is logged, analyzed, and shared</li>
+          <li><strong>Digital forensics on your devices:</strong> Police can extract all data from your phone if you're stopped</li>
+          <li><strong>Email & chat interception:</strong> End-to-end encryption is still not the default; most messages pass through unencrypted servers</li>
+          <li><strong>DNA databases:</strong> Police build genetic profiles without consent, using family members' data</li>
+          <li><strong>Workplace surveillance:</strong> Employers track mouse movement, keystroke activity, camera feeds, and location</li>
+        </ul>
+        
+        <h2>The Cost We Haven't Paid Yet</h2>
+        
+        <p>The real danger of 25 years of surveillance is not what's being collected — it's what happens when that data is misused by actors with bad intent:</p>
+        
+        <ul>
+          <li><strong>Political manipulation:</strong> Detailed profiles of voters used to target propaganda with surgical precision (we're seeing this now)</li>
+          <li><strong>Discrimination:</strong> Employers, landlords, and insurance companies using algorithmic profiles to deny opportunities</li>
+          <li><strong>Blackmail & extortion:</strong> Access to intimate data being weaponized against individuals</li>
+          <li><strong>Authoritarian control:</strong> In countries with repressive regimes, this data becomes a tool of oppression</li>
+          <li><strong>Systemic oppression:</strong> Minority communities are disproportionately surveilled and tracked by law enforcement</li>
+        </ul>
+        
+        <h2>Why Opting Out Isn't the Answer</h2>
+        
+        <p>Privacy advocates will tell you: delete your apps, use a VPN, encrypt your messages. True. These are necessary. But they're not sufficient.</p>
+        
+        <p>Why? Because you're surrounded by 8 billion other people who didn't opt out. The data brokers don't need your phone — they can buy your profile from someone who sold their phone.</p>
+        
+        <p>The issue isn't personal. It's systemic.</p>
+        
+        <h2>What Real Change Looks Like</h2>
+        
+        <h3>1. Regulate Surveillance Tech, Not Just Use</h3>
+        <p>Cell-site simulators, facial recognition, and predictive policing should require warrants, not departmental oversight. GDPR-style regulations should apply to governments, not just companies.</p>
+        
+        <h3>2. Require Consent For Data Brokers</h3>
+        <p>The FTC should ban the sale of personal profiles without explicit opt-in. Europe's GDPR requires this. The US should too.</p>
+        
+        <h3>3. Sunset Mass Surveillance Programs</h3>
+        <p>Programs like bulk phone metadata collection were authorized under emergency powers. Those emergencies are 25 years old. Sunsets are necessary.</p>
+        
+        <h3>4. Default Encryption Everywhere</h3>
+        <p>All messages, emails, and cloud storage should be end-to-end encrypted by default. No backdoors for governments.</p>
+        
+        <h3>5. Right to Deletion & Audit</h3>
+        <p>You should have the right to know what data is held about you, who holds it, and how to delete it. GDPR's CCPA's model works.</p>
+        
+        <h2>The Generation That Doesn't Know What Privacy Is</h2>
+        
+        <p>Kids born after 2007 have never lived in a world without persistent location tracking. They've never had a meaningful conversation without considering that it might be recorded or analyzed. They've never made a choice without knowing it's being profiled.</p>
+        
+        <p>This is not normal. It's not inevitable. And it doesn't have to continue.</p>
+        
+        <h2>What You Can Do</h2>
+        
+        <ul>
+          <li><strong>Vote for privacy:</strong> Support politicians who prioritize data protection and surveillance limits</li>
+          <li><strong>Join privacy organizations:</strong> EFF, Access Now, Privacy International are building the movement</li>
+          <li><strong>Opt out individually:</strong> While systemic change happens, reduce your own exposure</li>
+          <li><strong>Demand transparency:</strong> Companies and governments should disclose what data they hold and how it's used</li>
+          <li><strong>Educate others:</strong> Most people don't know the scope of surveillance. Awareness is the first step</li>
+        </ul>
+      </div>
+  ),
   "linkedin-data-brokers": (
       <div className="prose prose-slate max-w-none">
         <p>LinkedIn says your profile is yours to control. But behind the scenes, companies like Apollo, ZoomInfo, Lusha, and Clearbit are legally scraping your entire profile — every job, school, skill, and connection — and reselling it to thousands of sales teams and recruiters.</p>

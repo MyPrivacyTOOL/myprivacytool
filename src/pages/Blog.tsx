@@ -6,6 +6,7 @@ import blogPosts from '@/data/blogPosts.json';
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-blue-100 text-blue-800",
+  "Privacy Advocacy": "bg-red-100 text-red-800",
   "Social Media": "bg-purple-100 text-purple-800",
   "Data Brokers": "bg-red-100 text-red-800",
   "AI & Emerging Threats": "bg-orange-100 text-orange-800",

@@ -10,6 +10,16 @@
     "image": "/blog/exposure-guide.jpg"
   },
   {
+    "slug": "25-years-mass-surveillance",
+    "title": "25 Years of Mass Surveillance Is Enough",
+    "excerpt": "A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to demand a different future.",
+    "date": "September 22, 2026",
+    "author": "MyPrivacyTOOL",
+    "category": "Privacy Advocacy",
+    "readTime": 9,
+    "image": "/blog/mass-surveillance.jpg"
+  },
+  {
     "slug": "linkedin-data-brokers",
     "title": "Your LinkedIn Profile Is a Data Broker's Best Friend",
     "excerpt": "LinkedIn data is scraped legally. Apollo, ZoomInfo, Lusha, and Clearbit all use your profile. Here's how to protect yourself.",

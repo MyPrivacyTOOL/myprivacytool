@@ -115,7 +115,7 @@ const Footer = () => {
             <img src={logoFooter} alt="MyPrivacyTOOL.IO" className="h-8 object-contain" loading="lazy" />
           </Link>
           <p className="text-xs text-muted-foreground text-center">
-            © {year} MyPrivacyTOOL, {"{LEGAL_ENTITY_NAME}"}, Hong Kong
+            © {year} MyPrivacyTOOL, MyPrivacyTOOL Ltd., Hong Kong
           </p>
           <p className="text-xs text-muted-foreground">We never sell your data.</p>
         </div>
