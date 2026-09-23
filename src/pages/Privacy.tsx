@@ -1,10 +1,6 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
-import { useTranslation } from "react-i18next";
+import { Helmet } from "react-helmet";
 
 const Privacy = () => {
-  const { t } = useTranslation();
 
   return (
     <>
@@ -15,7 +11,6 @@ const Privacy = () => {
           content="Our Privacy Policy explains how we collect, use, and protect your personal data in compliance with GDPR, CCPA, PDPO, and PDPA."
         />
       </Helmet>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
@@ -513,7 +508,6 @@ const Privacy = () => {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 };

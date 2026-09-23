@@ -1,6 +1,4 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
+import { Helmet } from "react-helmet";
 
 const Terms = () => {
   return (
@@ -12,7 +10,6 @@ const Terms = () => {
           content="Terms of Service for MyPrivacyTOOL. Review our service terms, limitations, and user responsibilities."
         />
       </Helmet>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
@@ -463,7 +460,6 @@ const Terms = () => {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 };

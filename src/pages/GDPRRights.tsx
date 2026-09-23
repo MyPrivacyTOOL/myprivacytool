@@ -1,6 +1,4 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
+import { Helmet } from "react-helmet";
 
 const GDPRRights = () => {
   return (
@@ -12,7 +10,6 @@ const GDPRRights = () => {
           content="Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data."
         />
       </Helmet>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
@@ -408,7 +405,6 @@ const GDPRRights = () => {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 };

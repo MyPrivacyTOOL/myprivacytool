@@ -1,6 +1,4 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
+import { Helmet } from "react-helmet";
 
 const Accessibility = () => {
   return (
@@ -12,7 +10,6 @@ const Accessibility = () => {
           content="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance."
         />
       </Helmet>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
@@ -440,7 +437,6 @@ const Accessibility = () => {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 };

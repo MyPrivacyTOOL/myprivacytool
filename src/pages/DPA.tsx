@@ -1,6 +1,4 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
+import { Helmet } from "react-helmet";
 
 const DPA = () => {
   return (
@@ -12,7 +10,6 @@ const DPA = () => {
           content="MyPrivacyTOOL Data Processing Agreement (DPA) for organizations and B2B customers."
         />
       </Helmet>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
@@ -488,7 +485,6 @@ const DPA = () => {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 };

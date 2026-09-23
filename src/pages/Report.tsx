@@ -53,16 +53,6 @@ const Report = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-sans">
-      {/* Nav */}
-      <nav className="px-6 py-4 flex items-center justify-between border-b border-white/10">
-        <a href="/" className="text-white font-bold text-lg tracking-tight">
-          MyPrivacyTOOL
-        </a>
-        <a href="/scan" className="text-white/50 text-sm hover:text-white transition-colors">
-          ← Free Scan
-        </a>
-      </nav>
-
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-12 text-center">
         <div className="inline-block bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
@@ -188,10 +178,6 @@ const Report = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 py-8 text-center text-white/20 text-xs px-6">
-        <p>© 2026 MyPrivacyTOOL · <a href="/scan" className="hover:text-white/50 transition-colors">Free Scan</a> · <a href="/business" className="hover:text-white/50 transition-colors">For Business</a> · <a href="/the-encyclical" className="hover:text-white/50 transition-colors">Why This Matters</a></p>
-      </footer>
     </div>
   );
 };

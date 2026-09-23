@@ -2,65 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
-interface BlogPost {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string;
-  date: string;
-  author: string;
-  category: string;
-  readTime: number;
-  image?: string;
-}
-
-const blogPosts: BlogPost[] = [
-  {
-    id: "1",
-    title: "How Exposed Are You? The 46 Things Tracking You Online",
-    slug: "how-exposed-are-you",
-    excerpt: "Your digital footprint is larger than you think. Discover the 46 privacy vectors exposing your personal data right now — from data brokers to AI training datasets.",
-    date: "August 30, 2026",
-    author: "MyPrivacyTOOL",
-    category: "Privacy Awareness",
-    readTime: 8,
-    image: "/blog/exposure-guide.jpg"
-  },
-  {
-    id: "2",
-    title: "25 Years of Mass Surveillance Is Enough",
-    slug: "25-years-mass-surveillance",
-    excerpt: "A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to demand a different future.",
-    date: "September 22, 2026",
-    author: "MyPrivacyTOOL",
-    category: "Privacy Advocacy",
-    readTime: 9,
-    image: "/blog/mass-surveillance.jpg"
-  },
-  {
-    id: "3",
-    title: "Your LinkedIn Profile Is a Data Broker's Best Friend",
-    slug: "linkedin-data-brokers",
-    excerpt: "LinkedIn data is scraped legally. Apollo, ZoomInfo, Lusha, and Clearbit all use your profile. Here's how to protect yourself.",
-    date: "August 29, 2026",
-    author: "MyPrivacyTOOL",
-    category: "Social Media",
-    readTime: 6,
-    image: "/blog/linkedin-privacy.jpg"
-  },
-  {
-    id: "4",
-    title: "AI Is Training on Your Data — Here's How to Opt Out",
-    slug: "ai-training-data-opt-out",
-    excerpt: "Your data is being used to train LLMs. We break down the opt-out options for ChatGPT, Gemini, Claude, and emerging AI platforms.",
-    date: "September 17, 2026",
-    author: "MyPrivacyTOOL",
-    category: "AI & Emerging Threats",
-    readTime: 7,
-    image: "/blog/ai-training-data.jpg"
-  }
-];
+import blogPosts from '@/data/blogPosts.json';
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-blue-100 text-blue-800",
@@ -129,7 +71,7 @@ export default function Blog() {
         {/* Blog Posts Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredPosts.map(post => (
-            <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <Card key={post.slug} className="overflow-hidden hover:shadow-lg transition-shadow">
               {post.image && (
                 <div className="h-48 bg-slate-200 overflow-hidden">
                   <img

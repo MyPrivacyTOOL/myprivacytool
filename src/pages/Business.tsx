@@ -13,17 +13,6 @@ const Business = () => {
 
   return (
     <div className="min-h-screen bg-[#06060a] text-white font-sans">
-      {/* Nav */}
-      <nav className="px-6 py-4 flex items-center justify-between border-b border-white/10">
-        <a href="/" className="text-white font-bold text-lg tracking-tight">
-          MyPrivacyTOOL
-        </a>
-        <div className="flex items-center gap-6 text-sm">
-          <a href="/scan" className="text-white/50 hover:text-white transition-colors">Individual →</a>
-          <a href="/report" className="text-white/50 hover:text-white transition-colors">Pricing</a>
-        </div>
-      </nav>
-
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -242,10 +231,6 @@ const Business = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 py-8 text-center text-white/20 text-xs px-6">
-        <p>© 2026 MyPrivacyTOOL · <a href="/scan" className="hover:text-white/50 transition-colors">Individual Scan</a> · <a href="/report" className="hover:text-white/50 transition-colors">Pricing</a> · <a href="/the-encyclical" className="hover:text-white/50 transition-colors">Why This Matters</a></p>
-      </footer>
     </div>
   );
 };

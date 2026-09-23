@@ -1,6 +1,4 @@
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { Helmet } from "react-helmet-async";
+import { Helmet } from "react-helmet";
 
 const Cookies = () => {
   return (
@@ -12,7 +10,6 @@ const Cookies = () => {
           content="Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
         />
       </Helmet>
-      <Header />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
@@ -397,7 +394,6 @@ const Cookies = () => {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 };
