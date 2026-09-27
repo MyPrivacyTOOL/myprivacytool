@@ -1,14 +1,48 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://myprivacytool-webhook-receiver.workers.dev';
 
 const Scan = () => {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) setSubmitted(true);
+    const trimmed = email.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setStatus('error');
+      setErrorMsg('Please enter a valid email address.');
+      return;
+    }
+
+    setStatus('loading');
+    setErrorMsg('');
+
+    try {
+      const res = await fetch(`${WORKER_ENDPOINT}/webhook/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: trimmed,
+          source: 'scan_page',
+          ts: Date.now(),
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+      setStatus('idle');
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Scan submission error:', err);
+      setStatus('error');
+      setErrorMsg('Something went wrong. Please try again.');
+    }
   };
 
   return (
@@ -35,33 +69,40 @@ const Scan = () => {
         </p>
 
         {!submitted ? (
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="bg-white/5 border-white/20 text-white placeholder:text-white/30 focus:border-red-400 focus:ring-red-400/20 h-12 text-base"
-            />
-            <Button
-              type="submit"
-              className="bg-red-500 hover:bg-red-400 text-white font-bold h-12 px-8 text-base whitespace-nowrap transition-all duration-200"
-            >
-              Start Free Scan →
-            </Button>
-          </form>
+          <>
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrorMsg(''); }}
+                disabled={status === 'loading'}
+                required
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/30 focus:border-red-400 focus:ring-red-400/20 h-12 text-base disabled:opacity-50"
+              />
+              <Button
+                type="submit"
+                disabled={status === 'loading'}
+                className="bg-red-500 hover:bg-red-400 text-white font-bold h-12 px-8 text-base whitespace-nowrap transition-all duration-200 disabled:opacity-60"
+              >
+                {status === 'loading' ? 'Starting…' : 'Start Free Scan →'}
+              </Button>
+            </form>
+            {status === 'error' && (
+              <p className="text-red-400 text-xs mt-3 max-w-md mx-auto">{errorMsg}</p>
+            )}
+            <p className="text-white/25 text-xs mt-4 max-w-md mx-auto">
+              By submitting, you agree to a one-time privacy exposure scan of this email address, per our{' '}
+              <Link to="/privacy" className="underline hover:text-white/50">Privacy Policy</Link>. We never sell your data. Unsubscribe any time.
+            </p>
+          </>
         ) : (
           <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-8 py-6 max-w-md mx-auto">
             <div className="text-green-400 text-2xl mb-2">✓</div>
             <p className="text-white font-semibold mb-1">You're on the list.</p>
-            <p className="text-white/50 text-sm">We'll send your privacy scan results to <span className="text-white/80">{email}</span></p>
+            <p className="text-white/50 text-sm">We'll send your privacy scan results to <span className="text-white/80">{email}</span> within 48 hours.</p>
           </div>
         )}
-
-        <p className="text-white/25 text-xs mt-4">
-          We never sell your data. Unsubscribe any time.
-        </p>
       </section>
 
       {/* Stats Bar */}
@@ -128,23 +169,36 @@ const Scan = () => {
         <p className="text-white/50 mb-8 max-w-md mx-auto">
           The only question is whether you know about it. Run your free scan now.
         </p>
-        {!submitted && (
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="bg-white/5 border-white/20 text-white placeholder:text-white/30 focus:border-red-400 h-12 text-base"
-            />
-            <Button
-              type="submit"
-              className="bg-red-500 hover:bg-red-400 text-white font-bold h-12 px-8 whitespace-nowrap"
-            >
-              Start Free Scan →
-            </Button>
-          </form>
+        {!submitted ? (
+          <>
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrorMsg(''); }}
+                disabled={status === 'loading'}
+                required
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/30 focus:border-red-400 h-12 text-base disabled:opacity-50"
+              />
+              <Button
+                type="submit"
+                disabled={status === 'loading'}
+                className="bg-red-500 hover:bg-red-400 text-white font-bold h-12 px-8 whitespace-nowrap disabled:opacity-60"
+              >
+                {status === 'loading' ? 'Starting…' : 'Start Free Scan →'}
+              </Button>
+            </form>
+            {status === 'error' && (
+              <p className="text-red-400 text-xs mt-3 max-w-md mx-auto">{errorMsg}</p>
+            )}
+          </>
+        ) : (
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-8 py-6 max-w-md mx-auto">
+            <div className="text-green-400 text-2xl mb-2">✓</div>
+            <p className="text-white font-semibold mb-1">You're on the list.</p>
+            <p className="text-white/50 text-sm">We'll send your privacy scan results to <span className="text-white/80">{email}</span> within 48 hours.</p>
+          </div>
         )}
       </section>
 
