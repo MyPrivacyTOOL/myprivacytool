@@ -94,6 +94,13 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
   const handleMouseEnter = () => {
     setIsHovered(true);
     if (!isRevealing && data.id !== 'revealing') {
@@ -142,8 +149,16 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
           viewBox="0 0 100 100"
           className={cn(
             "w-[110px] h-[110px] sm:w-[150px] sm:h-[150px] md:w-[170px] md:h-[170px] transition-transform duration-300",
-            !isRevealing && "cursor-pointer hover:scale-105 active:scale-95"
+            !isRevealing && "cursor-pointer hover:scale-105 active:scale-95",
+            "outline-none focus-visible:drop-shadow-[0_0_6px_#00ff41]",
+            data.confirmed && !isRevealing && "animate-hexagon-confirm"
           )}
+          role={isRevealing ? undefined : 'button'}
+          tabIndex={isRevealing ? -1 : 0}
+          aria-pressed={isRevealing ? undefined : !!data.confirmed}
+          onKeyDown={handleKeyDown}
+          onFocus={() => !isRevealing && onHover(data)}
+          onBlur={() => onHover(null)}
           onClick={handleClick}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
