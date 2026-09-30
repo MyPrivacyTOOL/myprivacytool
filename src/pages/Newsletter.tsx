@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { trackNewsletterSignup } from "@/lib/analytics";
 import { Shield, Mail, ArrowRight, Check, Lock } from "lucide-react";
 
 const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
@@ -31,6 +32,7 @@ export default function Newsletter() {
       });
 
       if (res.ok || res.status === 201) {
+        trackNewsletterSignup({ source: "newsletter_page" });
         setStatus("success");
       } else {
         const data = await res.json().catch(() => ({}));

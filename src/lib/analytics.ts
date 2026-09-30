@@ -406,3 +406,12 @@ export const trackAIAccessCheckSignup = (params?: Record<string, string>) => {
   // GA4 recommended event so the signup can be marked as a key event
   trackEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
 };
+
+// ---------------------------------------------------------------------------
+// Newsletter signup (MPC-6977 tracking audit)
+// ---------------------------------------------------------------------------
+export const trackNewsletterSignup = (params?: Record<string, string>) => {
+  trackEvent('newsletter_signup', { form: 'newsletter', ...params });
+  // GA4 recommended event so the signup can be marked as a key event
+  trackEvent('generate_lead', { method: 'newsletter', ...params });
+};
