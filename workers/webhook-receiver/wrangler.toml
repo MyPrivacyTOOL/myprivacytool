@@ -9,6 +9,12 @@ compatibility_flags = ["nodejs_compat"]
 #   { pattern = "myprivacytool.io/webhook/*", zone_name = "myprivacytool.io" }
 # ]
 
+# ─── SCHEDULED JOBS ──────────────────────────────────────────────────────────
+# Daily purge of expired OSINT scan results (MPC-6957), 03:15 UTC.
+# Retention defaults to 730 days; override with SCAN_RETENTION_DAYS (var).
+[triggers]
+crons = ["15 3 * * *"]
+
 # ─── SECRETS ─────────────────────────────────────────────────────────────────
 # All secrets are set via `wrangler secret put VARNAME`.
 # See DEPLOYMENT.md for the full list and descriptions.
