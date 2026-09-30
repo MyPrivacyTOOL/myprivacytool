@@ -14,6 +14,11 @@ import {
 const FORM_ID =
   import.meta.env.VITE_HUBSPOT_AI_CHECK_FORM_ID || "0861b7ed-ff70-47a9-a45a-b29be082153d";
 
+// The source tag only goes out with a dedicated form (which must define a hidden
+// "source_tag" field); the shared newsletter form would reject unknown fields.
+const HAS_DEDICATED_FORM = Boolean(import.meta.env.VITE_HUBSPOT_AI_CHECK_FORM_ID);
+const SOURCE_TAG = "ai-access-check";
+
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
 
 const CHECKS = [
@@ -55,7 +60,7 @@ export default function AIAccessCheck() {
     try {
       await submitHubSpotForm({
         formId: FORM_ID,
-        fields: { email },
+        fields: HAS_DEDICATED_FORM ? { email, source_tag: SOURCE_TAG } : { email },
         pageName: "AI Access Check waitlist",
       });
       trackAIAccessCheckSignup(utm);
@@ -73,12 +78,12 @@ export default function AIAccessCheck() {
           <ScanLine size={14} /> Free · No sign-up to scan
         </div>
         <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-5">
-          Can AI reach you?<br />
-          <span className="text-[#27AE60]">Run the free AI Access Check.</span>
+          Are your AI tools<br />
+          <span className="text-[#27AE60]">reading your email?</span>
         </h1>
         <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
-          In about three minutes, see what AI systems and data brokers can learn about you from
-          your browser alone — no account, no personal details.
+          Run the free AI Access Check: in about three minutes, see what AI systems and data brokers
+          can learn about you from your browser alone — no account, no personal details.
         </p>
         <Link
           to={scanHref}

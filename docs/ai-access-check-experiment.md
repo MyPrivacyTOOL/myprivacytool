@@ -19,6 +19,8 @@ GA4 property G-1BWMDBJSPL. Events only fire after the consent manager allows ana
 
 ## Setup checklist (needs HubSpot / GA4 admin)
 - [ ] Create a dedicated HubSpot form "AI Access Check waitlist" and set `VITE_HUBSPOT_AI_CHECK_FORM_ID` (page currently falls back to the newsletter form GUID).
+- [ ] The dedicated form needs a hidden field `source_tag` (page sends `ai-access-check`).
+- [ ] Chris approves copy before publish (Notion boundary).
 - [ ] Add a HubSpot list/workflow filtering on that form so signups are segmentable.
 - [ ] Mark `generate_lead` as a key event in GA4.
 - [ ] Use `?utm_source=…&utm_medium=…&utm_campaign=mpc-6961` on every promoted link.
