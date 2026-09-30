@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
+import MatrixRain from "@/components/MatrixRain";
 
 const SITE_URL = "https://www.myprivacytool.io";
 const DEFAULT_DESCRIPTION =
@@ -28,17 +29,20 @@ const Layout = () => {
   const canonicalPath = location.pathname.replace(/\/+$/, "");
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col overflow-x-clip">
       <Helmet>
         <link rel="canonical" href={`${SITE_URL}${canonicalPath}`} />
         <meta name="description" content={DEFAULT_DESCRIPTION} />
         <meta name="robots" content="index, follow" />
       </Helmet>
-      <Header />
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <Footer />
+      <MatrixRain />
+      <div className="relative z-10 flex min-h-screen flex-1 flex-col">
+        <Header />
+        <main className="flex-1">
+          <Outlet />
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 };

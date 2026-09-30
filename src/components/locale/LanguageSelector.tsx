@@ -32,7 +32,7 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
   const currentLang = languages.find(l => currentLanguage.startsWith(l.code)) || languages[0];
 
   return (
-    <div className="flex flex-col items-center gap-3 p-4 bg-muted/30 rounded-xl border border-border">
+    <div className="flex flex-col items-center gap-3 p-4 bg-muted/30 rounded-xl border border-surface-border">
       <span className="text-sm text-muted-foreground">
         Test with different languages
       </span>
@@ -52,7 +52,7 @@ export default function LanguageSelector({ currentLanguage, onLanguageChange }: 
               key={lang.code}
               onClick={() => onLanguageChange(lang.code)}
               className={`gap-2 cursor-pointer ${
-                currentLanguage.startsWith(lang.code) ? 'bg-primary/10' : ''
+                currentLanguage.startsWith(lang.code) ? 'bg-brand-soft' : ''
               }`}
             >
               <span className="text-lg">{lang.flag}</span>

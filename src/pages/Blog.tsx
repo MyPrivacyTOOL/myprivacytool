@@ -11,7 +11,8 @@ const categoryColors: { [key: string]: string } = {
   "Social Media": "bg-purple-100 text-purple-800",
   "Data Brokers": "bg-red-100 text-red-800",
   "AI & Emerging Threats": "bg-orange-100 text-orange-800",
-  "Regulatory": "bg-green-100 text-green-800"
+  "Regulatory": "bg-green-100 text-green-800",
+  "Privacy Guides": "bg-emerald-100 text-emerald-800"
 };
 
 export default function Blog() {

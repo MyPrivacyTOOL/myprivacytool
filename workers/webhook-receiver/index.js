@@ -11,6 +11,7 @@
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
+import { purgeExpiredScanResults } from './purge-expired.js';
 import { recordEngagement } from './supabase-client.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
@@ -40,7 +41,12 @@ export default {
     if (path === '/webhook/leads')     return handleLeads(request, env);
 
     return new Response('Not Found', { status: 404 });
-  }
+  },
+
+  // Cron Trigger (see wrangler.toml) — purge expired scan results
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeExpiredScanResults(env));
+  },
 };
 
 // ─── TELEGRAM ────────────────────────────────────────────────────────────────
