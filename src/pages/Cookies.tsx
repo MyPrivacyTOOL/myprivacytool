@@ -319,7 +319,7 @@ const Cookies = () => {
                 9. Consent for Minors
               </h2>
               <p className="text-gray-700">
-                Our Services are not intended for individuals under 18 years old.
+                Our Services are not intended for individuals under 16 years old.
                 We do not knowingly collect cookies from minors without parental
                 consent. If we discover a child's data, we will delete it
                 immediately.

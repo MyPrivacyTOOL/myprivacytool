@@ -38,7 +38,7 @@ const Terms = () => {
                 2. Eligibility
               </h2>
               <p className="text-gray-700">
-                You must be at least 18 years old and have the legal capacity to
+                You must be at least 16 years old and have the legal capacity to
                 enter into a binding agreement to use the Services. If you are
                 using the Services on behalf of an organization, you represent and
                 warrant that you have authority to bind that organization to these

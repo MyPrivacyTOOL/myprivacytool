@@ -101,6 +101,18 @@ const Privacy = () => {
                   conversation stage so we can continue the conversation
                 </li>
                 <li>
+                  <strong>Optional Contact Details:</strong> Where you choose to
+                  provide them, your first and last name and mobile number (for
+                  example to receive scan results by SMS, WhatsApp or Telegram),
+                  stored in our CRM together with a record of the consent you gave,
+                  when, and which version of our wording you saw
+                </li>
+                <li>
+                  <strong>Age Confirmation:</strong> We ask you to confirm you are
+                  16 or older with a checkbox. We do not collect or store your date
+                  of birth
+                </li>
+                <li>
                   <strong>Handles You Ask Us to Scan:</strong> Social media handles
                   and platform names you submit, and the number of data points and
                   confidence score found for them
@@ -155,6 +167,18 @@ const Privacy = () => {
                 </li>
                 <li>Marketing partners (for audience insights)</li>
               </ul>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">
+                2A. Information We Do Not Collect
+              </h2>
+              <p className="text-gray-700">
+                We do not collect your date of birth or your street address for our
+                free scan or waitlist. If a paid feature later requires a billing
+                address, we will tell you at the point of collection and keep it
+                only as long as tax and accounting law requires.
+              </p>
             </section>
 
             <section className="mb-8">
@@ -285,7 +309,8 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Newsletter, Waitlist & Lead Records:</strong> Retained
-                  until you unsubscribe or request deletion
+                  for 24 months after your last engagement with us, or until you
+                  unsubscribe or ask us to delete them, whichever is earlier
                 </li>
                 <li>
                   <strong>Engagement Records:</strong> Retained for as long as
@@ -507,7 +532,7 @@ const Privacy = () => {
                 12. Children's Privacy
               </h2>
               <p className="text-gray-700">
-                Our services are not intended for individuals under 18 years old.
+                Our services are not intended for individuals under 16 years old.
                 We do not knowingly collect personal data from children. If we
                 become aware of such collection, we will delete the data
                 immediately.
