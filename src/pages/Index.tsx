@@ -254,8 +254,13 @@ const Index = () => {
               />
             </div>
 
-            <p className="text-xs text-muted-foreground mt-4">
-              No data is stored. All detection happens in your browser.
+            <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
+              The scan runs in your browser and its results aren't stored on our
+              servers. We only store what you choose to submit, such as your email
+              address, and we use analytics only with your consent.{" "}
+              <a href="/privacy" className="underline hover:text-foreground">
+                Privacy Policy
+              </a>
             </p>
           </div>
         </section>

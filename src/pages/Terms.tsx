@@ -17,7 +17,7 @@ const Terms = () => {
               Terms of Service
             </h1>
             <p className="mb-8 text-lg text-gray-600">
-              Last updated: September 2026
+              Last updated: 30 September 2026
             </p>
 
             <section className="mb-8">
@@ -38,7 +38,7 @@ const Terms = () => {
                 2. Eligibility
               </h2>
               <p className="text-gray-700">
-                You must be at least 18 years old and have the legal capacity to
+                You must be at least 16 years old and have the legal capacity to
                 enter into a binding agreement to use the Services. If you are
                 using the Services on behalf of an organization, you represent and
                 warrant that you have authority to bind that organization to these
@@ -99,7 +99,20 @@ const Terms = () => {
                 </li>
                 <li>Privacy education and guidance resources</li>
                 <li>Account monitoring and alerts (premium tier)</li>
+                <li>
+                  Newsletter, waitlist and messaging channels (such as Telegram)
+                  for scan follow-up
+                </li>
               </ul>
+              <p className="mt-4 text-gray-700">
+                The free homepage scan runs in your browser. Information is only
+                sent to us and stored if you choose to submit it (for example your
+                email address, a message, or a handle to scan), as described in our{" "}
+                <a href="/privacy" className="text-blue-600 hover:text-blue-700">
+                  Privacy Policy
+                </a>
+                .
+              </p>
             </section>
 
             <section className="mb-8">
@@ -328,8 +341,12 @@ const Terms = () => {
                 practices as described in our Privacy Policy.
               </p>
               <p className="mt-4 text-gray-700">
-                You are responsible for protecting any personal data you input into
-                the Services. We use industry-standard security measures, but cannot
+                You may only submit your own personal data, or data of others you
+                are authorised to act for, such as social handles, email addresses
+                and phone numbers. Submitted data is stored and processed as
+                described in the Privacy Policy and Cookie Policy. You are
+                responsible for protecting any personal data you input into the
+                Services. We use industry-standard security measures, but cannot
                 guarantee absolute security.
               </p>
             </section>
