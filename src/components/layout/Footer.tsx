@@ -18,6 +18,7 @@ const GUIDES_LINKS = [
   { label: "Remove my info from Google", to: "/blog/remove-your-name-and-info-from-google" },
   { label: "Stop spam calls & emails", to: "/blog/stop-spam-calls-texts-and-emails" },
   { label: "Opt-out guides", to: "/opt-out-guides" },
+  { label: "Am I exposed?", to: "/am-i-exposed" },
 ];
 
 const LEGAL_LINKS = [

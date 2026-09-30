@@ -9,6 +9,7 @@ import Scan from "./pages/Scan";
 import Report from "./pages/Report";
 import Business from "./pages/Business";
 import Start from "./pages/Start";
+import AIAccessCheck from "./pages/AIAccessCheck";
 import Newsletter from "./pages/Newsletter";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -20,6 +21,8 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Cookies from "./pages/Cookies";
 import OptOutGuides from "./pages/OptOutGuides";
+import OptOutGuide from "./pages/OptOutGuide";
+import AmIExposed from "./pages/AmIExposed";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +44,7 @@ const App = () => (
             <Route path="/start" element={<Start />} />
             {/* Lead capture */}
             <Route path="/newsletter" element={<Newsletter />} />
+            <Route path="/ai-access-check" element={<AIAccessCheck />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
@@ -54,6 +58,8 @@ const App = () => (
             <Route path="/cookies" element={<Cookies />} />
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />
+            <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />
+            <Route path="/am-i-exposed" element={<AmIExposed />} />
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
             <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />
             <Route path="/guides/stop-spam" element={<Navigate to="/blog/stop-spam-calls-texts-and-emails" replace />} />
