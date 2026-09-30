@@ -14,9 +14,9 @@ const COMPANY_LINKS = [
 ];
 
 const GUIDES_LINKS = [
-  { label: "Remove my info from the internet", to: "/guides/remove-my-info-from-internet" },
-  { label: "Remove my info from Google", to: "/guides/remove-from-google" },
-  { label: "Stop spam calls & emails", to: "/guides/stop-spam" },
+  { label: "Remove my info from the internet", to: "/blog/remove-personal-information-from-internet" },
+  { label: "Remove my info from Google", to: "/blog/remove-your-name-and-info-from-google" },
+  { label: "Stop spam calls & emails", to: "/blog/stop-spam-calls-texts-and-emails" },
   { label: "Opt-out guides", to: "/opt-out-guides" },
 ];
 

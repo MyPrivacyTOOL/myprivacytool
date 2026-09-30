@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Index from "./pages/Index";
 import Scan from "./pages/Scan";
@@ -20,9 +20,6 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Cookies from "./pages/Cookies";
 import OptOutGuides from "./pages/OptOutGuides";
-import RemoveFromInternet from "./pages/guides/RemoveFromInternet";
-import RemoveFromGoogle from "./pages/guides/RemoveFromGoogle";
-import StopSpam from "./pages/guides/StopSpam";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,9 +54,9 @@ const App = () => (
             <Route path="/cookies" element={<Cookies />} />
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />
-            <Route path="/guides/remove-my-info-from-internet" element={<RemoveFromInternet />} />
-            <Route path="/guides/remove-from-google" element={<RemoveFromGoogle />} />
-            <Route path="/guides/stop-spam" element={<StopSpam />} />
+            <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
+            <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />
+            <Route path="/guides/stop-spam" element={<Navigate to="/blog/stop-spam-calls-texts-and-emails" replace />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Route>
