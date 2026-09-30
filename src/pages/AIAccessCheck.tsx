@@ -72,14 +72,14 @@ export default function AIAccessCheck() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono">
+    <div className="min-h-screen bg-black text-white font-sans">
       <section className="max-w-3xl mx-auto px-6 pt-16 pb-10 text-center">
-        <div className="inline-flex items-center gap-2 border border-[#27AE60]/40 text-[#27AE60] text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+        <div className="inline-flex items-center gap-2 border border-[#00A03C]/40 text-[#00A03C] text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
           <ScanLine size={14} /> Free · No sign-up to scan
         </div>
         <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-5">
           Are your AI tools<br />
-          <span className="text-[#27AE60]">reading your email?</span>
+          <span className="text-[#00A03C]">reading your email?</span>
         </h1>
         <p className="text-gray-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
           Run the free AI Access Check: in about three minutes, see what AI systems and data brokers
@@ -88,7 +88,7 @@ export default function AIAccessCheck() {
         <Link
           to={scanHref}
           onClick={() => trackAIAccessCheckCta("hero")}
-          className="inline-flex items-center justify-center gap-2 bg-[#27AE60] hover:bg-[#1E8449] text-white text-sm font-bold py-3.5 px-8 rounded-lg transition-colors"
+          className="inline-flex items-center justify-center gap-2 bg-[#00A03C] hover:bg-[#007A2E] text-white text-sm font-bold py-3.5 px-8 rounded-lg transition-colors"
         >
           <ArrowRight size={16} /> Run the free scan
         </Link>
@@ -96,8 +96,8 @@ export default function AIAccessCheck() {
 
       <section className="max-w-4xl mx-auto px-6 pb-14 grid gap-4 md:grid-cols-3" aria-label="What the check covers">
         {CHECKS.map(({ icon: Icon, title, body }) => (
-          <div key={title} className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl p-5">
-            <Icon className="text-[#27AE60] mb-3" size={22} />
+          <div key={title} className="bg-[#1A1A1A] border border-[#2A2A2A] border-t-2 border-t-[#0056B3] rounded-xl p-5">
+            <Icon className="text-[#00A03C] mb-3" size={22} />
             <h2 className="text-sm font-bold mb-2">{title}</h2>
             <p className="text-xs text-gray-400 leading-relaxed">{body}</p>
           </div>
@@ -105,7 +105,7 @@ export default function AIAccessCheck() {
       </section>
 
       <section id="waitlist" className="max-w-lg mx-auto px-6 pb-20" aria-label="Join the waitlist">
-        <div className="bg-[#1A1A1A] border border-[#27AE60]/30 rounded-xl p-6">
+        <div className="bg-[#1A1A1A] border border-[#00A03C]/30 rounded-xl p-6">
           <h2 className="text-xl font-bold mb-2">Get the full AI Access report first</h2>
           <p className="text-sm text-gray-400 mb-5 leading-relaxed">
             We're building a deeper report on top of the free scan. Join the waitlist for early access.
@@ -123,13 +123,13 @@ export default function AIAccessCheck() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 disabled={status === "loading"}
-                className="w-full bg-black border border-[#2A2A2A] rounded-lg px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#27AE60] disabled:opacity-50 transition-colors"
+                className="w-full bg-black border border-[#2A2A2A] rounded-lg px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#00A03C] disabled:opacity-50 transition-colors"
               />
               {status === "error" && <p role="alert" className="text-red-400 text-xs">{errorMsg}</p>}
               <button
                 type="submit"
                 disabled={status === "loading"}
-                className="w-full flex items-center justify-center gap-2 bg-[#27AE60] hover:bg-[#1E8449] disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-[#00A03C] hover:bg-[#007A2E] disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
               >
                 {status === "loading" ? <span className="animate-pulse">Joining...</span> : <><ArrowRight size={16} /> Join the waitlist</>}
               </button>
@@ -143,15 +143,15 @@ export default function AIAccessCheck() {
             </form>
           ) : (
             <div className="text-center animate-fade-in">
-              <div className="w-12 h-12 rounded-full bg-black border border-[#27AE60] flex items-center justify-center mx-auto mb-4">
-                <Check className="text-[#27AE60]" size={22} />
+              <div className="w-12 h-12 rounded-full bg-black border border-[#00A03C] flex items-center justify-center mx-auto mb-4">
+                <Check className="text-[#00A03C]" size={22} />
               </div>
-              <p className="text-[#27AE60] font-semibold mb-2">You're on the list.</p>
+              <p className="text-[#00A03C] font-semibold mb-2">You're on the list.</p>
               <p className="text-gray-400 text-sm mb-5">While you wait, run the free scan now.</p>
               <Link
                 to={scanHref}
                 onClick={() => trackAIAccessCheckCta("post_signup")}
-                className="inline-flex items-center gap-2 text-sm text-[#27AE60] hover:text-white transition-colors"
+                className="inline-flex items-center gap-2 text-sm text-[#00A03C] hover:text-white transition-colors"
               >
                 Run the free scan <ArrowRight size={14} />
               </Link>
