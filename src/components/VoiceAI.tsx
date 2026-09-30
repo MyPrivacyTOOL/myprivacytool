@@ -1148,26 +1148,26 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
   return (
     <>
-      <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 mx-auto shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
+      <div className="bg-surface/95 border border-surface-border rounded-xl p-4 mx-auto shadow-card backdrop-blur-sm" style={{ width: '460px', maxWidth: '100%' }}>
         <div className="flex flex-col items-center gap-4">
           {/* Header with Alice HD badge */}
           <div className="w-full">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg text-green-400 font-semibold" style={{ textShadow: '0 0 8px rgba(0, 255, 65, 0.5)' }}>
+              <h2 className="text-lg text-risk-low font-semibold">
                 Hi, I'm Alice, your AI Privacy TOOL
               </h2>
               <AliceHDBadge />
             </div>
-            <p className="text-green-300/90 text-sm leading-relaxed text-center">
+            <p className="text-muted-foreground text-sm leading-relaxed text-center">
               Let's peek behind the digital curtain to find out what information is available about you!
             </p>
           </div>
 
           {/* Alice Video */}
           <div className={cn(
-            "w-full aspect-square rounded-lg overflow-hidden border border-green-500/30 cursor-pointer hover:border-green-400 transition-colors",
+            "w-full aspect-square rounded-lg overflow-hidden border border-risk-low/30 cursor-pointer hover:border-risk-low transition-colors",
             isTyping && "animate-pulse"
-          )} style={{ boxShadow: '0 0 15px rgba(0, 255, 65, 0.3)', borderTopWidth: '6px', borderTopColor: 'white' }}>
+          )} style={{ boxShadow: 'var(--shadow-card)', borderTopWidth: '6px', borderTopColor: 'hsl(var(--surface))' }}>
             <video 
               src={aliceVideo} 
               autoPlay
@@ -1180,7 +1180,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
 
           {/* Voice AI Button */}
           <div className="w-full text-center">
-            <p className="text-green-300/90 text-sm leading-relaxed mb-2">
+            <p className="text-muted-foreground text-sm leading-relaxed mb-2">
               Hover over any hexagon to see what I found, then click to confirm if it's correct.
             </p>
             
@@ -1189,16 +1189,16 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
               <FreeVoiceBadge />
             </div>
             {/* Remaining sessions indicator */}
-            <p className="text-green-500/70 text-xs mb-2">
+            <p className="text-muted-foreground text-xs mb-2">
               {remainingSessions} / {MAX_SESSIONS_PER_DAY} free voice sessions remaining today
             </p>
             <div className="relative flex items-center justify-center">
               {/* Sound wave rings */}
               {isVoiceActive && (
                 <>
-                  <span className="absolute w-full h-full rounded-xl border-2 border-green-400/60 animate-ping" style={{ animationDuration: '1.5s' }} />
-                  <span className="absolute w-full h-full rounded-xl border-2 border-green-400/40 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
-                  <span className="absolute w-full h-full rounded-xl border-2 border-green-400/20 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
+                  <span className="absolute w-full h-full rounded-xl border-2 border-risk-low/50 animate-ping" style={{ animationDuration: '1.5s' }} />
+                  <span className="absolute w-full h-full rounded-xl border-2 border-risk-low/30 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.3s' }} />
+                  <span className="absolute w-full h-full rounded-xl border-2 border-risk-low/30 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.6s' }} />
                 </>
               )}
               <button 
@@ -1206,10 +1206,10 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
                 className={cn(
                   "relative z-10 flex items-center justify-center gap-3 px-8 py-4 border-2 rounded-xl font-bold text-lg transition-all cursor-pointer",
                   isVoiceActive 
-                    ? "bg-green-500/40 border-green-400 text-green-300" 
-                    : "bg-green-500/20 border-green-500/50 text-green-400 animate-pulse hover:bg-green-500/30 hover:border-green-400"
+                    ? "bg-risk-low-soft border-risk-low text-risk-low" 
+                    : "bg-risk-low-soft border-risk-low/50 text-risk-low animate-pulse hover:brightness-95 hover:border-risk-low"
                 )} 
-                style={{ boxShadow: isVoiceActive ? '0 0 30px rgba(0, 255, 65, 0.6), 0 0 60px rgba(0, 255, 65, 0.3)' : '0 0 20px rgba(0, 255, 65, 0.4), 0 0 40px rgba(0, 255, 65, 0.2)' }}
+                style={{ boxShadow: 'var(--shadow-card)' }}
               >
                 {isSpeaking ? (
                   <VolumeX className="w-7 h-7 animate-pulse" />

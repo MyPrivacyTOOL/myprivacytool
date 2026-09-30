@@ -61,7 +61,7 @@ const Footer = () => {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-border bg-background" role="contentinfo">
+    <footer className="border-t border-border bg-background/85" role="contentinfo">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <FooterLinkList title="Company" links={COMPANY_LINKS} />
