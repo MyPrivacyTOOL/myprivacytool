@@ -14,6 +14,11 @@ compatibility_flags = ["nodejs_compat"]
 # See DEPLOYMENT.md for the full list and descriptions.
 # Never hardcode values in this file.
 
+# ─── CRON ────────────────────────────────────────────────────────────────────
+# Hourly purge of expired mpt_osint_scan_results rows (24h TTL, MPC-6977)
+[triggers]
+crons = ["0 * * * *"]
+
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
 enabled = true

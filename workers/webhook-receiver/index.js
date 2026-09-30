@@ -11,7 +11,7 @@
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
-import { recordEngagement } from './supabase-client.js';
+import { recordEngagement, purgeExpiredScanResults } from './supabase-client.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
 const META_QUERY = {
@@ -40,6 +40,11 @@ export default {
     if (path === '/webhook/leads')     return handleLeads(request, env);
 
     return new Response('Not Found', { status: 404 });
+  },
+
+  // Cron trigger (see wrangler.toml): purge expired OSINT scan results (MPC-6977)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeExpiredScanResults(env));
   }
 };
 
