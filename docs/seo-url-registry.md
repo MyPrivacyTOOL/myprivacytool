@@ -77,6 +77,13 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | GA4 — `/start` form | Submit is a `TODO` (no POST). Same issue. | **Open** |
 | Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost uses the post title and excerpt). |
 
+### Local browser verification (2026-09-30, production build served locally, headless Chromium)
+| Check | Result |
+|---|---|
+| Head tags | Initially every page had **two** canonicals (static `index.html` + Helmet), a stale generic description, and a duplicate robots tag: Helmet does not replace static tags. Fixed by marking the static canonical/description/robots in `index.html` with `data-react-helmet="true"` and giving `Layout` default description + robots. Re-run: exactly one canonical, description and robots per page on `/`, `/scan`, `/privacy`, `/blog`, `/blog/how-exposed-are-you`, `/opt-out-guides/spokeo`, `/pricing` (noindex), 404 (noindex), `/newsletter`, `/ai-access-check`. |
+| GA4 events (client side) | Newsletter submit fires `newsletter_signup` + `generate_lead {method: newsletter}`; AI Access Check submit fires `ai_access_check_waitlist_submit` + `generate_lead {method: ai_access_check_waitlist}`. Verified by intercepting `window.gtag` with Supabase/HubSpot responses stubbed. |
+| Not verified | Whether GA4 **ingests** them and marks `generate_lead` a key event, and consent-manager gating: the cloud environment's network policy blocks `www.myprivacytool.io` (HTTP 403 on CONNECT), `googletagmanager.com` and `google-analytics.com`, and GA4 DebugView needs a signed-in Google session. Still Follow-up A. |
+
 ## 4. Manual verification still required (needs a live browser / GA4 access)
 
 1. GA4 DebugView on production: submit the AI Access Check and Newsletter forms; confirm `generate_lead` with `method` param and that it is marked as a key event.

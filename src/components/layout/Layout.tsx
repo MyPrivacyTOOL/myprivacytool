@@ -5,6 +5,8 @@ import Header from "./Header";
 import Footer from "./Footer";
 
 const SITE_URL = "https://www.myprivacytool.io";
+const DEFAULT_DESCRIPTION =
+  "Discover what data brokers know about you in 3 minutes. See your location, device, ISP, and 8+ data points detected without asking. Free privacy scan.";
 
 const Layout = () => {
   const location = useLocation();
@@ -18,6 +20,8 @@ const Layout = () => {
     return () => clearTimeout(timeout);
   }, [location.pathname, location.hash]);
 
+  // index.html's canonical/description/robots carry data-react-helmet so Helmet replaces them
+  // instead of duplicating them. Defaults below; deeper <Helmet>/<Seo> instances override.
   // Default self-referencing canonical (no query/hash, no trailing slash). Pages that
   // render their own <Helmet> canonical override this because react-helmet keeps the
   // deepest instance. Without it every route inherits the homepage canonical from index.html.
@@ -27,6 +31,8 @@ const Layout = () => {
     <div className="flex min-h-screen flex-col">
       <Helmet>
         <link rel="canonical" href={`${SITE_URL}${canonicalPath}`} />
+        <meta name="description" content={DEFAULT_DESCRIPTION} />
+        <meta name="robots" content="index, follow" />
       </Helmet>
       <Header />
       <main className="flex-1">

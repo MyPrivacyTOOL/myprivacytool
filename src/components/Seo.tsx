@@ -14,8 +14,6 @@ const Seo = ({ title, description, path }: SeoProps) => (
   <Helmet>
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta property="og:title" content={title} />
-    <meta property="og:description" content={description} />
     {path && <link rel="canonical" href={`${SITE_URL}${path}`} />}
   </Helmet>
 );
