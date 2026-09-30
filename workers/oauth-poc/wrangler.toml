@@ -1,0 +1,11 @@
+name = "myprivacytool-oauth-poc"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# MPC-6971 Phase 5 proof of concept: Google OAuth 2.0 (auth code + PKCE).
+# Secrets are set with `wrangler secret put`, never in this file:
+#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, STATE_SIGNING_KEY
+# Vars: REDIRECT_URI (must match the OAuth client's authorised redirect URI)
+
+[observability]
+enabled = true

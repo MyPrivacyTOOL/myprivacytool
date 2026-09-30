@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
-import MatrixRain from '@/components/MatrixRain';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
@@ -163,20 +162,20 @@ const Index = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-black">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
         <div className="relative mb-6">
           <div className="w-20 h-20 border-4 border-primary/30 border-t-primary rounded-full animate-spin-slow" />
         </div>
-        <p className="text-lg text-white font-medium mb-2">Scanning your digital shadow...</p>
-        <p className="text-sm text-green-400/70">This only takes a few seconds</p>
+        <p className="text-lg text-foreground font-medium mb-2">Scanning your digital shadow...</p>
+        <p className="text-sm text-muted-foreground">This only takes a few seconds</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-black">
-        <div className="glass-card rounded-xl p-8 text-center max-w-md bg-black/50 border border-green-500/20">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
+        <div className="glass-card rounded-xl p-8 text-center max-w-md border border-surface-border shadow-card">
           <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <img 
               src={logoFull} 
@@ -184,8 +183,8 @@ const Index = () => {
               className="h-8 object-contain" 
             />
           </div>
-          <h2 className="text-xl font-bold text-white mb-2">Scan Failed</h2>
-          <p className="text-green-300/70 mb-6">{error}</p>
+          <h2 className="text-xl font-bold text-foreground mb-2">Scan Failed</h2>
+          <p className="text-muted-foreground mb-6">{error}</p>
           <Button onClick={handleRetry} className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Try Again
@@ -197,18 +196,15 @@ const Index = () => {
 
   return (
     <div className="min-h-screen relative">
-      {/* Full-page Matrix Rain Background */}
-      <MatrixRain fadeBottom={true} />
-      
-      {/* Content Layer - with safe area insets for iPhone */}
-      <div className="relative z-10" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      {/* Matrix rain is mounted once in <Layout> and runs behind this whole page */}
+      <div className="relative" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Hero Section with Shadow Hands */}
         <section className="relative h-[280px] sm:h-[350px] md:h-[500px]" aria-labelledby="hero-heading">
           <ShadowHands />
           <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10">
             <h1 
               id="hero-heading"
-              className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-white drop-shadow-[0_0_10px_rgba(0,255,65,0.5)]"
+              className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-foreground"
             >
               What is your Digital Shadow?
             </h1>
@@ -217,10 +213,10 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
-          <p className="text-sm sm:text-lg text-white">
-            The <span className="text-green-400" style={{ textShadow: '0 0 10px rgba(0, 255, 65, 0.6)' }}>Privacy<span className="font-bold">TOOL</span></span> found <span className="text-green-400 font-semibold">6+ data points</span> about you without asking.
+          <p className="text-sm sm:text-lg text-foreground">
+            The <span className="text-brand">Privacy<span className="font-bold">TOOL</span></span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
           </p>
-          <p className="text-sm sm:text-lg text-white">
+          <p className="text-sm sm:text-lg text-foreground">
             Click the ones that are correct.
           </p>
         </section>
@@ -243,11 +239,11 @@ const Index = () => {
         </section>
 
         {/* Newsletter Sign-Up */}
-        <section ref={footerRef} className="py-4 mt-12 bg-white" aria-label="Newsletter sign-up">
+        <section ref={footerRef} className="py-4 mt-12" aria-label="Newsletter sign-up">
           <div className="container mx-auto px-4 text-center">
             {/* HubSpot Newsletter Sign-Up Form */}
             <div className="max-w-md mx-auto mb-2">
-              <p className="text-gray-700 text-sm font-medium mb-3">
+              <p className="text-foreground/80 text-sm font-medium mb-3">
                 Get weekly privacy tips — no spam, unsubscribe anytime.
               </p>
               <div
@@ -258,11 +254,11 @@ const Index = () => {
               />
             </div>
 
-            <p className="text-xs text-gray-400 mt-4 max-w-md mx-auto">
+            <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
               The scan runs in your browser and its results aren't stored on our
               servers. We only store what you choose to submit, such as your email
               address, and we use analytics only with your consent.{" "}
-              <a href="/privacy" className="underline hover:text-gray-600">
+              <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>
             </p>
