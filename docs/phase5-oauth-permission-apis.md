@@ -3,7 +3,7 @@
 **Status:** Tech stack defined; Google proof of concept built and unit-tested; **live run pending** (no test OAuth client or `myprivacytool@gmail.com` credentials in the build session).
 Builds on MPC-6959 (landscape) and MPC-6960 (Google feasibility spike, `docs/phase5-google-access-spike.md`).
 
-> Provider API claims below come from public documentation and prior knowledge, not calls made in this task. Items marked **[verify]** need confirming on the test account or with the provider.
+> Provider API claims below come from public documentation and prior knowledge, not calls made in this task. Items marked **Pending Live Verification** (future sprint) need confirming on the test account or with the provider.
 
 ## 1. Tech stack
 
@@ -35,9 +35,9 @@ Code: `workers/oauth-poc/` (`google.js` helpers, `index.js` routes, `oauth.test.
 |---|---|---|---|
 | Google, consumer | None. UI only (`myaccount.google.com/connections`) | Only tokens MPT holds | Guided audit (MPC-6960) |
 | Google Workspace | Admin SDK `tokens.list` (admin scope, needs verification + CASA) | `tokens.delete` | Conditional, only with a committed customer |
-| Microsoft (Entra / Graph) | `oauth2PermissionGrants` and `appRoleAssignments` on the signed-in user (`DelegatedPermissionGrant.Read.All` needs admin consent for org-wide; user-level grants readable via `/me/oauth2PermissionGrants`) **[verify]** | `DELETE /oauth2PermissionGrants/{id}` **[verify]** | Best candidate for a true list-and-revoke PoC #2 |
-| GitHub | Authorised OAuth Apps / GitHub Apps of a user: no public REST endpoint for a user's own list; OAuth Apps can revoke their own grant (`DELETE /applications/{client_id}/grant`) **[verify]** | Own grant only | Guided audit (`github.com/settings/applications`) |
-| Slack | Workspace admin `admin.apps.*` (Enterprise Grid) **[verify]**; no member-level list | Admin only | Guided audit / conditional |
+| Microsoft (Entra / Graph) | `oauth2PermissionGrants` and `appRoleAssignments` on the signed-in user (`DelegatedPermissionGrant.Read.All` needs admin consent for org-wide; user-level grants readable via `/me/oauth2PermissionGrants`) **Pending Live Verification** | `DELETE /oauth2PermissionGrants/{id}` **Pending Live Verification** | Best candidate for a true list-and-revoke PoC #2 |
+| GitHub | Authorised OAuth Apps / GitHub Apps of a user: no public REST endpoint for a user's own list; OAuth Apps can revoke their own grant (`DELETE /applications/{client_id}/grant`) **Pending Live Verification** | Own grant only | Guided audit (`github.com/settings/applications`) |
+| Slack | Workspace admin `admin.apps.*` (Enterprise Grid) **Pending Live Verification**; no member-level list | Admin only | Guided audit / conditional |
 
 Pattern: the only provider with a member-level list-and-revoke API is likely Microsoft. Everyone else needs an admin or the user's own settings page.
 
@@ -61,10 +61,10 @@ Pattern: the only provider with a member-level list-and-revoke API is likely Mic
 | MPT holding OAuth access is itself a trust risk | Online access, no storage, revoke on completion, clear consent copy; fix secret rotation before launch |
 | Client secret exposure | Worker secrets only; rotate before go-live |
 | Provider verification or policy changes | Keep scopes non-sensitive; provider adapters behind one interface |
-| Unverified API claims in this doc | Run the **[verify]** checks on test accounts before committing to Microsoft PoC #2 |
+| Unverified API claims in this doc | Run the **Pending Live Verification** checks on test accounts before committing to Microsoft PoC #2 |
 | Focus risk against the Phase 2 KPI | Experiments only (Strategy 2D guardrail) |
 
 ## 5. Next steps
-1. Live-run the Google PoC on the test account; mark MPC-6960 **[verify]** items confirmed or refuted.
+1. Live-run the Google PoC on the test account; mark the MPC-6960 [verify] items confirmed or refuted.
 2. Microsoft Graph PoC #2 to confirm user-level list and revoke.
 3. Product sign-off on guided-audit scope; then create implementation tickets.
