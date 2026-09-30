@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trackNewsletterSignup } from "@/lib/analytics";
 import { Shield, Mail, ArrowRight, Check, Lock } from "lucide-react";
+import Seo from "@/components/Seo";
 
 const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV";
@@ -51,6 +52,7 @@ export default function Newsletter() {
 
   return (
     <div className="min-h-screen bg-black text-white font-mono">
+      <Seo title="Privacy Newsletter | MyPrivacyTOOL" description="Plain-English privacy tips, data broker opt-out guides and new exposure research, delivered to your inbox. Unsubscribe anytime." path="/newsletter" />
       {/* Header */}
       <div className="border-b border-[#27AE60]/30 px-6 py-4 flex items-center gap-3">
         <Shield className="text-[#27AE60]" size={20} />

@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
 import blogPosts from '@/data/blogPosts.json';
+import Seo from "@/components/Seo";
 
 const blogContent: { [key: string]: React.ReactNode } = {
   "how-exposed-are-you": (
@@ -376,6 +377,7 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Seo title={`${post.title} | MyPrivacyTOOL`} description={post.excerpt} path={`/blog/${post.slug}`} />
       {/* Article Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
