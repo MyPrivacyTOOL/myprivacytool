@@ -33,10 +33,7 @@ export async function saveConversationState(env, key, state) {
   const docId = encodeURIComponent(key);
   const url = `${FIRESTORE_BASE(env.GCP_PROJECT_ID)}/conversations/${docId}`;
 
-  // Every saved record carries an explicit expiry so the scheduled purge
-  // (see purge-expired.js) can find it. Callers may override via state.expiresAt.
-  const withExpiry = { expiresAt: Date.now() + retentionMs(env), ...state };
-  const fields = toFirestoreFields(withExpiry);
+  const fields = toFirestoreFields(state);
 
   await fetch(url, {
     method: 'PATCH',
@@ -74,53 +71,6 @@ export async function getConversationState(env, key) {
 
   const data = await res.json();
   return fromFirestoreFields(data.fields || {});
-}
-
-/** Retention window in ms. Default 730 days (2 years) per the Privacy Policy. */
-export function retentionMs(env) {
-  const days = Number(env.SCAN_RETENTION_DAYS);
-  return (Number.isFinite(days) && days > 0 ? days : 730) * 86400000;
-}
-
-/**
- * Find up to `limit` conversation docs whose `field` is <= `cutoff` (epoch ms).
- * @returns {Promise<string[]>} full Firestore document resource names
- */
-export async function queryExpiredDocs(env, field, cutoff, limit = 300) {
-  const res = await fetch(`${FIRESTORE_BASE(env.GCP_PROJECT_ID)}:runQuery`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.FIRESTORE_SA_TOKEN}`,
-    },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'conversations' }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: field },
-            op: 'LESS_THAN_OR_EQUAL',
-            value: { integerValue: String(Math.floor(cutoff)) },
-          },
-        },
-        limit,
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`Firestore query ${res.status}: ${await res.text()}`);
-  const rows = await res.json();
-  return rows.filter((r) => r.document).map((r) => r.document.name);
-}
-
-/** Delete a document by its full resource name. 404 counts as already deleted. */
-export async function deleteDoc(env, name) {
-  const res = await fetch(`https://firestore.googleapis.com/v1/${name}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${env.FIRESTORE_SA_TOKEN}` },
-  });
-  if (!res.ok && res.status !== 404) {
-    throw new Error(`Firestore delete ${res.status}: ${await res.text()}`);
-  }
 }
 
 // ─── FIRESTORE FIELD SERIALISATION ───────────────────────────────────────────

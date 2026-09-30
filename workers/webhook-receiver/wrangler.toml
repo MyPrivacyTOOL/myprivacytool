@@ -10,8 +10,8 @@ compatibility_flags = ["nodejs_compat"]
 # ]
 
 # ─── SCHEDULED JOBS ──────────────────────────────────────────────────────────
-# Daily purge of expired OSINT scan results (MPC-6957), 03:15 UTC.
-# Retention defaults to 730 days; override with SCAN_RETENTION_DAYS (var).
+# Daily purge of expired OSINT scan results in Notion (MPC-6957), 03:15 UTC.
+# See docs/osint-scan-results-purge.md.
 [triggers]
 crons = ["15 3 * * *"]
 
