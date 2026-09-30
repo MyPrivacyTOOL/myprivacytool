@@ -1,6 +1,6 @@
 # MPT — Agent Identity Landscape (MPC-6959)
 
-Scan date: 2026-09-30 (first scan, MPC-6959). Re-scanned 2026-09-30 under MPC-6972 (Quarterly Standards Re-scan & Unsourced Item Check); see section 6 for the recurring process and change log. Supports Phases 5–7 of the proposed MPT phase map (Perplexity MPT Strategy, section 2D):
+Scan date: 2026-09-30 (first scan, MPC-6959). Re-scanned 2026-09-30 under MPC-6972 (Quarterly Standards Re-scan & Unsourced Item Check); see section 8 for the recurring process and change log. Supports Phases 5–7 of the proposed MPT phase map (Perplexity MPT Strategy, section 2D):
 Phase 5 = Agent Footprint, Phase 6 = Agent Passport (credentials), Phase 7 = Agent Trust Network (verification API, revocation feeds, log anchoring).
 
 Method and limits: findings come from web search result summaries, not full-page reads of each vendor site. Many summaries are from secondary sources (blogs, aggregators). Where pricing or stage was not in the results it is marked "not found". Items marked *(background knowledge, unsourced)* were not confirmed by a source in this scan and should be checked before anyone relies on them.
@@ -70,12 +70,102 @@ Still open: "log anchoring design to be confirmed" in section 4 (Phase 7) is a d
 ## 5. Open items
 
 - Pricing was found only for Microsoft; every other row needs a vendor call or pricing-page check.
-- Check `docs/agent-identity-landscape.md` section 6 change log at each quarterly re-scan and confirm the items flagged "secondary source" there against primary pages once egress allows.
+- Check `docs/agent-identity-landscape.md` section 8 change log at each quarterly re-scan and confirm the items flagged "secondary source" there against primary pages once egress allows.
 - Verify Astrix ownership, Skyfire funding total and Persona funding against primary sources.
 - Liability framing ("attestation, not guarantee") is a legal question this scan does not answer.
-- A Notion output page and a link from Strategy section 3 are still owed under the task's Output spec.
+- The Notion output page and the Strategy section 3 link are done.
 
-## 6. Quarterly re-scan (MPC-6972)
+## 6. Phase 5 technical details (MPC-6971)
+
+Full write-up: `docs/phase5-oauth-permission-apis.md`. Google PoC: `workers/oauth-poc/`.
+
+- **Stack:** Cloudflare Worker, OAuth 2.0 authorization code + PKCE (S256), non-sensitive scopes (`openid email profile`), online access, HMAC-signed state cookie, no stored tokens, MPT's own token revoked before responding.
+- **Refinement of the Phase 5 recommendation:** OAuth authenticates the user and lets MPT revoke tokens it holds. Listing and revoking *other* apps' grants depends on the provider: no consumer API at Google (MPC-6960); Workspace `tokens.list` needs verification and CASA; Microsoft Graph `oauth2PermissionGrants` is the likeliest member-level list-and-revoke API **Pending Live Verification**; GitHub and Slack are likely guided-audit only **Pending Live Verification**.
+- **Status:** PoC unit-tested with mocked provider calls; live run pending test-account credentials.
+- **Risks:** provider APIs may not expose grants; MPT holding OAuth access is a trust risk (mitigated by no storage and revoke-on-finish); focus risk against the Phase 2 KPI.
+
+## 6. Phase deep-dives (proposals for decision)
+
+Sections 1–5 are sourced research. This section is a proposal built on that research and on the Notion strategy page (sections 2A–2D). Figures, timings and scores are design assumptions, not sourced facts. Written 2026-09-30.
+
+### Phase 5 — Agent Footprint: build, adopting OAuth and provider permission APIs
+
+**Objectives**
+- Show a user which AI apps and agents can reach their Google, Microsoft, Slack and GitHub accounts, what they can do, and let them revoke.
+- Add an "Your AI Agents" hexagon with a per-agent exposure score.
+- Feed the scan funnel (lead magnet: MPC-6961).
+
+**Tech stack (proposed)**
+- Google, Microsoft, Slack and GitHub OAuth with read-only scopes to list third-party app grants; user-initiated revoke through each provider's own revoke endpoint.
+- Detection of MCP servers and A2A Agent Cards where a user connects them.
+- Existing MPT scoring engine and 46-hexagon model; new tables: agents linked to user, grants, dated snapshots (fits MPC-6811).
+- Feasibility spike first: MPC-6960 (Google).
+
+**Outcomes**
+- "These N AI tools can read your email" report; one-click revoke; before/after score.
+- Agent inventory linked to the user's Clean Baseline.
+
+**Benefits**
+- Uses standards already in place; no new format to invent.
+- Consumer gap: no consumer see-and-revoke product found (section 3).
+- Bridges today's product to Phases 6–7 and builds the data model early.
+
+**Risks and mitigations**
+- Provider APIs may not expose every grant, and scopes may need app review. Mitigation: spike one provider first.
+- MPT holding OAuth access is itself a trust risk. Mitigation: read-only scopes, no token storage beyond the session, clear consent copy; fix the open secret-rotation item first.
+- Focus risk against the Phase 2 KPI (10K scans, 1K paid, $120K ARR by 2027-08-01). Mitigation: experiments only until the KPI is on track.
+
+### Phase 6 — Agent Passport: adopt standards, partner for KYC
+
+**Value**
+- Recurring revenue per verified identity and per credential issued, rather than per transaction.
+- Differentiator: proves "a verified, low-risk person stands behind this agent" with minimum disclosure, rooted in the Phase 4 Clean Baseline.
+- Recognition by payment networks if credentials map to Web Bot Auth key directories (Visa TAP, Mastercard Agent Pay).
+
+**ROI (how to model it; no numbers yet)**
+- Cost side: KYC per-check fees (pricing not yet found), credential issuance and key management, legal and compliance.
+- Revenue side: per-credential or per-agent subscription add-on to the Phase 4 subscription.
+- Build-versus-partner saving: not building KYC or a credential format avoids the two largest engineering and compliance costs.
+- Decision input needed: KYC vendor pricing before any ROI figure is quoted.
+
+**Risks**
+- Liability if MPT vouches for an agent that commits fraud. Mitigation: "attestation, not guarantee" wording, legal review.
+- Standards churn (W3C VC governance and revocation still open; IETF AIMS is a draft). Mitigation: thin adapter layer.
+- KYC vendor lock-in and privacy terms. Mitigation: two vendors behind one interface.
+- Depends on Phases 3–4 shipping; no clean human baseline means no root of trust.
+
+### Phase 7 — Agent Trust Network: partner and interoperate; build only issuer, trust score and revocation feed
+
+**Explanation.** Visa, Mastercard, Cloudflare, Microsoft, Okta and Skyfire already run or define registries. MPT does not compete on the transaction path. It acts as issuer and reputation authority, like a certificate authority plus a credit bureau.
+
+**Strategy**
+1. Interoperate first: publish credentials others can verify locally (W3C VC, Web Bot Auth key directory, OAuth/SPIFFE for enterprise).
+2. Run three services only: credential issuance, revocation feed, trust-score API.
+3. Integrate with existing registries rather than replace them (Cloudflare, Visa, Mastercard, Skyfire, Keycard as candidates).
+
+**Decision**
+- Build: issuer, trust score, revocation feed. Partner: merchant recognition, KYC, payments. Do not build: a competing network, a new standard, a hot-path verifier.
+- Revisit at Phase 6 exit, once real integration demand is measured.
+
+**Objectives**
+- Answer "can I trust this agent and who stands behind it" in milliseconds through cached feeds, without MPT in the hot path.
+- Keep private, tamper-evident logs with periodic public hash anchoring (log design still to confirm).
+
+**Trust score mechanism (proposed)**
+- Inputs by layer: A identity (key bound, builder credential); B principal and liability (verified human or company, signed delegation, Clean Baseline score); C compute and incentives (declared, attested where possible); D track record (co-signed receipts, incident history).
+- Output: a signed score credential plus reason codes and an expiry, so the checker verifies locally and only asks MPT on revocation or dispute.
+- Score changes only through logged events; every change is explainable; subjects can appeal.
+- Incentives (layer C) are declared and monitored, not proven; the score must say so.
+- Weights and thresholds are set after Phase 5 data exists; none are fixed here.
+
+**Change management**
+- Versioned scoring model with a public changelog and a notice period before weights change.
+- Staged rollout: shadow scoring, then advisory, then relied upon.
+- Appeals and correction process for agent owners; revocation runbook with response-time targets.
+- Quarterly standards watch (IETF AIMS/WIMSE, NIST NCCoE, Visa/Mastercard specs); adapter layer so a standards change does not force a rebuild.
+- Governance: legal framing and a named owner for scoring decisions before Phase 7 launch.
+
+## 8. Quarterly re-scan (MPC-6972)
 
 **Cadence:** every quarter (1 Jan, Apr, Jul, Oct), driven by `.github/workflows/quarterly-standards-rescan.yml`, which opens a tracking issue with this checklist.
 

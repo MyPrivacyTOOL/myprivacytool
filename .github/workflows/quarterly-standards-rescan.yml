@@ -18,7 +18,7 @@ jobs:
         run: |
           gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "Quarterly Standards Re-scan ($(date -u +%Y-%m-%d))" \
-            --body "Recurring task from MPC-6972. Follow section 6 of docs/agent-identity-landscape.md.
+            --body "Recurring task from MPC-6972. Follow section 8 of docs/agent-identity-landscape.md.
 
           - [ ] W3C Verifiable Credentials (VCDM, Bitstring Status List, new drafts)
           - [ ] Google AP2 (releases, FIDO Alliance status)

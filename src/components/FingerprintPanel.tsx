@@ -263,15 +263,15 @@ export default function FingerprintPanel() {
   };
 
   const getUniquenessColor = (percentage: number) => {
-    if (percentage < 50) return 'text-green-400';
-    if (percentage < 80) return 'text-yellow-400';
-    return 'text-red-400';
+    if (percentage < 50) return 'text-risk-low';
+    if (percentage < 80) return 'text-risk-mid';
+    return 'text-risk-high';
   };
 
   const getUniquenessLabel = (percentage: number) => {
-    if (percentage < 50) return { level: 'Common', risk: 'low', color: 'bg-green-500' };
-    if (percentage < 80) return { level: 'Somewhat Unique', risk: 'medium', color: 'bg-yellow-500' };
-    return { level: 'Very Unique', risk: 'high', color: 'bg-red-500' };
+    if (percentage < 50) return { level: 'Common', risk: 'low', color: 'bg-risk-low' };
+    if (percentage < 80) return { level: 'Somewhat Unique', risk: 'medium', color: 'bg-risk-mid' };
+    return { level: 'Very Unique', risk: 'high', color: 'bg-risk-high' };
   };
 
   const getEstimatedUniqueness = () => {
@@ -345,13 +345,13 @@ export default function FingerprintPanel() {
 
   if (isLoading) {
     return (
-      <Card className="bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/30">
+      <Card className="bg-risk-high-soft border-risk-high/30">
         <CardContent className="py-8 text-center">
           <div className="animate-pulse flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-risk-high/15 flex items-center justify-center">
               <span className="text-2xl animate-spin-slow">🔴</span>
             </div>
-            <p className="text-red-300">Analyzing your browser fingerprint...</p>
+            <p className="text-risk-high">Analyzing your browser fingerprint...</p>
           </div>
         </CardContent>
       </Card>
@@ -366,30 +366,30 @@ export default function FingerprintPanel() {
   const advancedBreakdown = breakdown.filter(b => b.category === 'advanced');
 
   return (
-    <Card className="bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/30 overflow-hidden">
+    <Card className="bg-risk-high-soft border-risk-high/30 overflow-hidden">
       {/* CRITICAL: WebRTC Leak Warning Banner */}
       {advancedFP.webrtc?.isLeaking && (
-        <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 border-b border-red-500 animate-pulse">
+        <div className="bg-risk-high p-4 border-b border-risk-high animate-pulse">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-6 h-6 text-white flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h3 className="text-white font-bold text-lg flex items-center gap-2">
                 ⚠️ CRITICAL: Your VPN is Leaking Your Real IP!
               </h3>
-              <p className="text-red-100 text-sm mt-1">
+              <p className="text-foreground text-sm mt-1">
                 Even though you may be using a VPN, WebRTC is revealing your actual IP address. 
                 Websites can see both your VPN IP and your real IP.
               </p>
-              <div className="mt-2 p-2 bg-red-800/50 rounded-lg">
-                <p className="text-red-100 text-xs font-mono">
-                  <span className="text-red-300">Leaked IPs:</span> {advancedFP.webrtc.publicIPs.join(', ') || advancedFP.webrtc.localIPs.join(', ')}
+              <div className="mt-2 p-2 bg-risk-high/50 rounded-lg">
+                <p className="text-foreground text-xs font-mono">
+                  <span className="text-risk-high">Leaked IPs:</span> {advancedFP.webrtc.publicIPs.join(', ') || advancedFP.webrtc.localIPs.join(', ')}
                 </p>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="secondary"
-                  className="bg-white/20 hover:bg-white/30 text-white border-0"
+                  className="bg-surface text-risk-high hover:bg-secondary border-0"
                   onClick={() => window.open('https://browserleaks.com/webrtc', '_blank')}
                 >
                   How to Fix WebRTC Leaks
@@ -401,29 +401,29 @@ export default function FingerprintPanel() {
       )}
 
       {/* Header */}
-      <CardHeader className="border-b border-red-500/20 pb-4">
-        <CardTitle className="flex items-center gap-3 text-red-400">
+      <CardHeader className="border-b border-risk-high/20 pb-4">
+        <CardTitle className="flex items-center gap-3 text-risk-high">
           <span className="text-2xl">🔴</span>
           <div>
             <h3 className="text-lg sm:text-xl font-bold">Your Browser Fingerprint</h3>
-            <p className="text-sm text-red-300/70 font-normal">12 fingerprinting methods analyzed</p>
+            <p className="text-sm text-muted-foreground font-normal">12 fingerprinting methods analyzed</p>
           </div>
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-6 pt-6">
         {/* Uniqueness Score */}
-        <div className="text-center py-4 bg-red-950/30 rounded-xl border border-red-500/20">
-          <p className="text-red-300/70 text-sm mb-2">Your browser is</p>
+        <div className="text-center py-4 bg-risk-high-soft rounded-xl border border-risk-high/20">
+          <p className="text-muted-foreground text-sm mb-2">Your browser is</p>
           <p className={`text-3xl sm:text-4xl font-bold ${getUniquenessColor(uniquenessScore)}`}>
             {getEstimatedUniqueness()}
           </p>
           <div className="mt-4 px-4">
-            <div className="flex items-center justify-between text-xs text-red-300/60 mb-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
               <span>Common</span>
               <span>Unique</span>
             </div>
-            <div className="relative h-3 bg-red-950/50 rounded-full overflow-hidden">
+            <div className="relative h-3 bg-risk-high-soft rounded-full overflow-hidden">
               <div 
                 className={`absolute inset-y-0 left-0 ${uniquenessInfo.color} transition-all duration-1000 rounded-full`}
                 style={{ width: `${uniquenessScore}%` }}
@@ -436,75 +436,75 @@ export default function FingerprintPanel() {
         </div>
 
         {/* Privacy Score with Advanced Metrics */}
-        <div className="p-4 rounded-xl border bg-gradient-to-br from-slate-900/50 to-slate-800/30 border-slate-600/30">
-          <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+        <div className="p-4 rounded-xl border bg-secondary border-surface-border">
+          <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Advanced Protection Status
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
-              !advancedFP.webrtc?.isLeaking ? 'bg-green-500/10' : 'bg-red-500/20'
+              !advancedFP.webrtc?.isLeaking ? 'bg-risk-low-soft' : 'bg-risk-high/15'
             }`}>
               {!advancedFP.webrtc?.isLeaking ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
+                <CheckCircle className="w-4 h-4 text-risk-low" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-400" />
+                <XCircle className="w-4 h-4 text-risk-high" />
               )}
               <span className="text-xs">WebRTC Protection</span>
             </div>
             
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
-              fingerprint.protection?.effectiveness === 'high' ? 'bg-green-500/10' : 'bg-red-500/10'
+              fingerprint.protection?.effectiveness === 'high' ? 'bg-risk-low-soft' : 'bg-risk-high-soft'
             }`}>
               {fingerprint.protection?.effectiveness === 'high' ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
+                <CheckCircle className="w-4 h-4 text-risk-low" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-400/50" />
+                <XCircle className="w-4 h-4 text-muted-foreground" />
               )}
               <span className="text-xs">Hardware Anonymization</span>
             </div>
             
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
-              !advancedFP.timezone?.mismatch ? 'bg-green-500/10' : 'bg-yellow-500/10'
+              !advancedFP.timezone?.mismatch ? 'bg-risk-low-soft' : 'bg-risk-mid-soft'
             }`}>
               {!advancedFP.timezone?.mismatch ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
+                <CheckCircle className="w-4 h-4 text-risk-low" />
               ) : (
-                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <AlertTriangle className="w-4 h-4 text-risk-mid" />
               )}
               <span className="text-xs">Timezone Masking</span>
             </div>
             
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
               fingerprint.protection?.brave.shieldsUp || fingerprint.protection?.firefox.resistFingerprinting 
-                ? 'bg-green-500/10' : 'bg-red-500/10'
+                ? 'bg-risk-low-soft' : 'bg-risk-high-soft'
             }`}>
               {fingerprint.protection?.brave.shieldsUp || fingerprint.protection?.firefox.resistFingerprinting ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
+                <CheckCircle className="w-4 h-4 text-risk-low" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-400/50" />
+                <XCircle className="w-4 h-4 text-muted-foreground" />
               )}
               <span className="text-xs">Canvas Protection</span>
             </div>
             
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
-              !advancedFP.battery?.available ? 'bg-green-500/10' : 'bg-yellow-500/10'
+              !advancedFP.battery?.available ? 'bg-risk-low-soft' : 'bg-risk-mid-soft'
             }`}>
               {!advancedFP.battery?.available ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
+                <CheckCircle className="w-4 h-4 text-risk-low" />
               ) : (
-                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <AlertTriangle className="w-4 h-4 text-risk-mid" />
               )}
               <span className="text-xs">Battery API Blocked</span>
             </div>
             
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
-              !advancedFP.mediaDevices?.permissionGranted ? 'bg-green-500/10' : 'bg-yellow-500/10'
+              !advancedFP.mediaDevices?.permissionGranted ? 'bg-risk-low-soft' : 'bg-risk-mid-soft'
             }`}>
               {!advancedFP.mediaDevices?.permissionGranted ? (
-                <CheckCircle className="w-4 h-4 text-green-400" />
+                <CheckCircle className="w-4 h-4 text-risk-low" />
               ) : (
-                <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                <AlertTriangle className="w-4 h-4 text-risk-mid" />
               )}
               <span className="text-xs">Device Labels Hidden</span>
             </div>
@@ -513,35 +513,35 @@ export default function FingerprintPanel() {
 
         {/* Core Fingerprinting Breakdown */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-red-300 flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-risk-high flex items-center gap-2">
             <span>📊</span> Core Fingerprinting Methods
           </h4>
           <div className="space-y-2">
             {coreBreakdown.map((item) => (
               <div 
                 key={item.name}
-                className="flex items-center gap-3 p-3 bg-red-950/20 rounded-lg border border-red-500/10"
+                className="flex items-center gap-3 p-3 bg-risk-high-soft rounded-lg border border-risk-high/20"
               >
                 <span className="text-xl">{item.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-foreground">{item.name}</span>
                     <span className={`text-xs font-medium ${
-                      item.impact === 'high' || item.impact === 'critical' ? 'text-red-400' : 
-                      item.impact === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                      item.impact === 'high' || item.impact === 'critical' ? 'text-risk-high' : 
+                      item.impact === 'medium' ? 'text-risk-mid' : 'text-risk-low'
                     }`}>
                       {item.uniqueness.toFixed(1)}% unique
                     </span>
                   </div>
                   <Progress 
                     value={item.uniqueness} 
-                    className="h-1.5 bg-red-950/50"
+                    className="h-1.5 bg-risk-high-soft"
                   />
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'high' || item.impact === 'critical' ? 'bg-red-500/20 text-red-400' : 
-                  item.impact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 
-                  'bg-green-500/20 text-green-400'
+                  item.impact === 'high' || item.impact === 'critical' ? 'bg-risk-high/15 text-risk-high' : 
+                  item.impact === 'medium' ? 'bg-risk-mid/15 text-risk-mid' : 
+                  'bg-risk-low/15 text-risk-low'
                 }`}>
                   {item.impact}
                 </span>
@@ -552,7 +552,7 @@ export default function FingerprintPanel() {
 
         {/* Advanced Fingerprinting Breakdown */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-orange-300 flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-risk-orange flex items-center gap-2">
             <span>🔬</span> Advanced Fingerprinting Methods
           </h4>
           <div className="space-y-2">
@@ -561,8 +561,8 @@ export default function FingerprintPanel() {
                 key={item.name}
                 className={`flex items-center gap-3 p-3 rounded-lg border ${
                   item.impact === 'critical' 
-                    ? 'bg-red-600/20 border-red-500/40 animate-pulse' 
-                    : 'bg-orange-950/20 border-orange-500/10'
+                    ? 'bg-risk-high/15 border-risk-high/40 animate-pulse' 
+                    : 'bg-risk-orange-soft border-risk-orange/20'
                 }`}
               >
                 <span className="text-xl">{item.icon}</span>
@@ -570,23 +570,23 @@ export default function FingerprintPanel() {
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-foreground">{item.name}</span>
                     <span className={`text-xs font-medium ${
-                      item.impact === 'critical' ? 'text-red-400 font-bold' :
-                      item.impact === 'high' ? 'text-red-400' : 
-                      item.impact === 'medium' ? 'text-yellow-400' : 'text-green-400'
+                      item.impact === 'critical' ? 'text-risk-high font-bold' :
+                      item.impact === 'high' ? 'text-risk-high' : 
+                      item.impact === 'medium' ? 'text-risk-mid' : 'text-risk-low'
                     }`}>
                       {item.impact === 'critical' ? 'CRITICAL' : `${item.uniqueness.toFixed(1)}% unique`}
                     </span>
                   </div>
                   <Progress 
                     value={item.uniqueness} 
-                    className="h-1.5 bg-orange-950/50"
+                    className="h-1.5 bg-risk-orange-soft"
                   />
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'critical' ? 'bg-red-600/30 text-red-300 animate-pulse' :
-                  item.impact === 'high' ? 'bg-red-500/20 text-red-400' : 
-                  item.impact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 
-                  'bg-green-500/20 text-green-400'
+                  item.impact === 'critical' ? 'bg-risk-high/15 text-risk-high animate-pulse' :
+                  item.impact === 'high' ? 'bg-risk-high/15 text-risk-high' : 
+                  item.impact === 'medium' ? 'bg-risk-mid/15 text-risk-mid' : 
+                  'bg-risk-low/15 text-risk-low'
                 }`}>
                   {item.impact}
                 </span>
@@ -600,7 +600,7 @@ export default function FingerprintPanel() {
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
-              className="w-full justify-between text-blue-300/70 hover:text-blue-300 hover:bg-blue-950/30"
+              className="w-full justify-between text-muted-foreground hover:text-[hsl(var(--cat-language))] hover:bg-[hsl(var(--cat-language-tint))]"
             >
               <span className="flex items-center gap-2">
                 <Cpu className="w-4 h-4" />
@@ -610,37 +610,37 @@ export default function FingerprintPanel() {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-3">
-            <div className="p-4 bg-blue-950/30 rounded-xl border border-blue-500/20">
+            <div className="p-4 bg-[hsl(var(--cat-language-tint))] rounded-xl border border-[hsl(var(--cat-language)/0.2)]">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <Monitor className="w-6 h-6 text-blue-400" />
+                <div className="w-12 h-12 rounded-lg bg-[hsl(var(--cat-language)/0.15)] flex items-center justify-center">
+                  <Monitor className="w-6 h-6 text-[hsl(var(--cat-language))]" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-blue-300">{getHardwareClassification()}</p>
-                  <p className="text-xs text-blue-300/60">Estimated device classification</p>
+                  <p className="text-sm font-semibold text-[hsl(var(--cat-language))]">{getHardwareClassification()}</p>
+                  <p className="text-xs text-muted-foreground">Estimated device classification</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-2 bg-blue-950/40 rounded-lg">
-                  <p className="text-blue-400 text-xs">CPU Cores</p>
-                  <p className="text-blue-100 font-medium">{advancedFP.hardware?.cores || 'Unknown'}</p>
+                <div className="p-2 bg-[hsl(var(--cat-language-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-language))] text-xs">CPU Cores</p>
+                  <p className="text-foreground font-medium">{advancedFP.hardware?.cores || 'Unknown'}</p>
                 </div>
-                <div className="p-2 bg-blue-950/40 rounded-lg">
-                  <p className="text-blue-400 text-xs">RAM</p>
-                  <p className="text-blue-100 font-medium">{advancedFP.hardware?.memory ? `${advancedFP.hardware.memory} GB` : 'Hidden'}</p>
+                <div className="p-2 bg-[hsl(var(--cat-language-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-language))] text-xs">RAM</p>
+                  <p className="text-foreground font-medium">{advancedFP.hardware?.memory ? `${advancedFP.hardware.memory} GB` : 'Hidden'}</p>
                 </div>
-                <div className="p-2 bg-blue-950/40 rounded-lg">
-                  <p className="text-blue-400 text-xs">Screen</p>
-                  <p className="text-blue-100 font-medium">{advancedFP.screen?.resolution} @{advancedFP.screen?.pixelRatio}x</p>
+                <div className="p-2 bg-[hsl(var(--cat-language-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-language))] text-xs">Screen</p>
+                  <p className="text-foreground font-medium">{advancedFP.screen?.resolution} @{advancedFP.screen?.pixelRatio}x</p>
                 </div>
-                <div className="p-2 bg-blue-950/40 rounded-lg">
-                  <p className="text-blue-400 text-xs">GPU</p>
-                  <p className="text-blue-100 font-medium truncate text-xs">{fingerprint.webgl?.renderer?.substring(0, 20) || 'Hidden'}...</p>
+                <div className="p-2 bg-[hsl(var(--cat-language-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-language))] text-xs">GPU</p>
+                  <p className="text-foreground font-medium truncate text-xs">{fingerprint.webgl?.renderer?.substring(0, 20) || 'Hidden'}...</p>
                 </div>
               </div>
               
-              <p className="text-xs text-blue-200/60 mt-3 leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                 This combination of hardware specs reveals your device type and can be used to track you 
                 even after clearing cookies. High-end devices are more unique and trackable.
               </p>
@@ -653,15 +653,15 @@ export default function FingerprintPanel() {
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
-              className={`w-full justify-between hover:bg-purple-950/30 ${
-                advancedFP.timezone?.mismatch ? 'text-yellow-400' : 'text-purple-300/70 hover:text-purple-300'
+              className={`w-full justify-between hover:bg-[hsl(var(--cat-social-tint))] ${
+                advancedFP.timezone?.mismatch ? 'text-risk-mid' : 'text-muted-foreground hover:text-[hsl(var(--cat-social))]'
               }`}
             >
               <span className="flex items-center gap-2">
                 <Globe className="w-4 h-4" />
                 Geographic Indicators
                 {advancedFP.timezone?.mismatch && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-risk-mid/15 text-risk-mid">
                     Mismatch Detected
                   </span>
                 )}
@@ -672,13 +672,13 @@ export default function FingerprintPanel() {
           <CollapsibleContent className="space-y-3 pt-3">
             <div className={`p-4 rounded-xl border ${
               advancedFP.timezone?.mismatch 
-                ? 'bg-yellow-950/30 border-yellow-500/30'
-                : 'bg-purple-950/30 border-purple-500/20'
+                ? 'bg-risk-mid-soft border-risk-mid/30'
+                : 'bg-[hsl(var(--cat-social-tint))] border-[hsl(var(--cat-social)/0.2)]'
             }`}>
               {advancedFP.timezone?.mismatch && (
-                <div className="flex items-start gap-2 p-3 bg-yellow-500/10 rounded-lg mb-4">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-yellow-200">
+                <div className="flex items-start gap-2 p-3 bg-risk-mid-soft rounded-lg mb-4">
+                  <AlertTriangle className="w-4 h-4 text-risk-mid flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-foreground">
                     <strong>VPN/Travel Detected:</strong> Your timezone doesn't match your locale settings. 
                     This is a common way websites detect VPN usage.
                   </p>
@@ -686,29 +686,29 @@ export default function FingerprintPanel() {
               )}
               
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="p-2 bg-purple-950/40 rounded-lg">
-                  <p className="text-purple-400 text-xs">Timezone</p>
-                  <p className="text-purple-100 font-medium text-xs">{advancedFP.timezone?.timezone}</p>
+                <div className="p-2 bg-[hsl(var(--cat-social-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-social))] text-xs">Timezone</p>
+                  <p className="text-foreground font-medium text-xs">{advancedFP.timezone?.timezone}</p>
                 </div>
-                <div className="p-2 bg-purple-950/40 rounded-lg">
-                  <p className="text-purple-400 text-xs">UTC Offset</p>
-                  <p className="text-purple-100 font-medium">{advancedFP.timezone?.offset ? `${advancedFP.timezone.offset > 0 ? '-' : '+'}${Math.abs(advancedFP.timezone.offset / 60)}h` : 'Unknown'}</p>
+                <div className="p-2 bg-[hsl(var(--cat-social-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-social))] text-xs">UTC Offset</p>
+                  <p className="text-foreground font-medium">{advancedFP.timezone?.offset ? `${advancedFP.timezone.offset > 0 ? '-' : '+'}${Math.abs(advancedFP.timezone.offset / 60)}h` : 'Unknown'}</p>
                 </div>
-                <div className="p-2 bg-purple-950/40 rounded-lg">
-                  <p className="text-purple-400 text-xs">Locale</p>
-                  <p className="text-purple-100 font-medium">{navigator.language}</p>
+                <div className="p-2 bg-[hsl(var(--cat-social-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-social))] text-xs">Locale</p>
+                  <p className="text-foreground font-medium">{navigator.language}</p>
                 </div>
-                <div className="p-2 bg-purple-950/40 rounded-lg">
-                  <p className="text-purple-400 text-xs">Date Format</p>
-                  <p className="text-purple-100 font-medium">{advancedFP.timezone?.dateFormat}</p>
+                <div className="p-2 bg-[hsl(var(--cat-social-tint))] rounded-lg">
+                  <p className="text-[hsl(var(--cat-social))] text-xs">Date Format</p>
+                  <p className="text-foreground font-medium">{advancedFP.timezone?.dateFormat}</p>
                 </div>
-                <div className="p-2 bg-purple-950/40 rounded-lg col-span-2">
-                  <p className="text-purple-400 text-xs">Number Format</p>
-                  <p className="text-purple-100 font-medium">{advancedFP.timezone?.numberFormat}</p>
+                <div className="p-2 bg-[hsl(var(--cat-social-tint))] rounded-lg col-span-2">
+                  <p className="text-[hsl(var(--cat-social))] text-xs">Number Format</p>
+                  <p className="text-foreground font-medium">{advancedFP.timezone?.numberFormat}</p>
                 </div>
               </div>
               
-              <p className="text-xs text-purple-200/60 mt-3 leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                 Your timezone and locale settings reveal your actual location, even when using a VPN. 
                 This is a common way to detect VPN usage and determine your real geographic location.
               </p>
@@ -720,18 +720,18 @@ export default function FingerprintPanel() {
         {fingerprint.protection && (
           <div className={`p-4 rounded-xl border ${
             fingerprint.protection.effectiveness === 'high' 
-              ? 'bg-green-950/30 border-green-500/30' 
+              ? 'bg-risk-low-soft border-risk-low/30' 
               : fingerprint.protection.effectiveness === 'medium'
-              ? 'bg-yellow-950/30 border-yellow-500/30'
+              ? 'bg-risk-mid-soft border-risk-mid/30'
               : fingerprint.protection.effectiveness === 'low'
-              ? 'bg-orange-950/30 border-orange-500/30'
-              : 'bg-red-950/30 border-red-500/30'
+              ? 'bg-risk-orange-soft border-risk-orange/30'
+              : 'bg-risk-high-soft border-risk-high/30'
           }`}>
             <h4 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
-              fingerprint.protection.effectiveness === 'high' ? 'text-green-400' :
-              fingerprint.protection.effectiveness === 'medium' ? 'text-yellow-400' :
-              fingerprint.protection.effectiveness === 'low' ? 'text-orange-400' :
-              'text-red-400'
+              fingerprint.protection.effectiveness === 'high' ? 'text-risk-low' :
+              fingerprint.protection.effectiveness === 'medium' ? 'text-risk-mid' :
+              fingerprint.protection.effectiveness === 'low' ? 'text-risk-orange' :
+              'text-risk-high'
             }`}>
               <Shield className="w-4 h-4" />
               Browser Protection: {fingerprint.protection.effectiveness.charAt(0).toUpperCase() + fingerprint.protection.effectiveness.slice(1)}
@@ -739,10 +739,10 @@ export default function FingerprintPanel() {
             </h4>
             
             <p className={`text-xs leading-relaxed ${
-              fingerprint.protection.effectiveness === 'high' ? 'text-green-200/80' :
-              fingerprint.protection.effectiveness === 'medium' ? 'text-yellow-200/80' :
-              fingerprint.protection.effectiveness === 'low' ? 'text-orange-200/80' :
-              'text-red-200/80'
+              fingerprint.protection.effectiveness === 'high' ? 'text-foreground' :
+              fingerprint.protection.effectiveness === 'medium' ? 'text-foreground' :
+              fingerprint.protection.effectiveness === 'low' ? 'text-foreground' :
+              'text-foreground'
             }`}>
               {fingerprint.protection.recommendation}
             </p>
@@ -750,46 +750,46 @@ export default function FingerprintPanel() {
         )}
 
         {/* Enhanced Recommendations */}
-        <div className="p-4 bg-gradient-to-r from-green-950/30 to-green-900/20 rounded-xl border border-green-500/20">
-          <h4 className="text-sm font-semibold text-green-400 mb-3 flex items-center gap-2">
+        <div className="p-4 bg-risk-low-soft rounded-xl border border-risk-low/20">
+          <h4 className="text-sm font-semibold text-risk-low mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Personalized Recommendations
           </h4>
-          <ul className="space-y-2 text-sm text-green-200/80">
+          <ul className="space-y-2 text-sm text-foreground">
             {advancedFP.webrtc?.isLeaking && (
               <>
-                <li className="flex items-start gap-2 text-red-300">
-                  <span className="text-red-400">⚠️</span>
+                <li className="flex items-start gap-2 text-risk-high">
+                  <span className="text-risk-high">⚠️</span>
                   <strong>URGENT:</strong> Disable WebRTC in browser settings or use an extension like "WebRTC Leak Prevent"
                 </li>
-                <li className="flex items-start gap-2 text-red-300">
-                  <span className="text-red-400">•</span>
+                <li className="flex items-start gap-2 text-risk-high">
+                  <span className="text-risk-high">•</span>
                   Firefox: Set media.peerconnection.enabled to false in about:config
                 </li>
               </>
             )}
             {advancedFP.timezone?.mismatch && (
-              <li className="flex items-start gap-2 text-yellow-300">
-                <span className="text-yellow-400">•</span>
+              <li className="flex items-start gap-2 text-risk-mid">
+                <span className="text-risk-mid">•</span>
                 Use timezone spoofing extensions to match your VPN location
               </li>
             )}
             {advancedFP.screen && advancedFP.screen.uniqueness > 60 && (
               <li className="flex items-start gap-2">
-                <span className="text-green-400">•</span>
+                <span className="text-risk-low">•</span>
                 Use browser in fullscreen to hide taskbar size (reduces screen fingerprint)
               </li>
             )}
             <li className="flex items-start gap-2">
-              <span className="text-green-400">•</span>
+              <span className="text-risk-low">•</span>
               Use privacy-focused browsers (Brave, Firefox with privacy settings)
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-green-400">•</span>
+              <span className="text-risk-low">•</span>
               Enable fingerprint protection in browser settings
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-green-400">•</span>
+              <span className="text-risk-low">•</span>
               Consider Tor Browser for maximum privacy and timezone anonymization
             </li>
           </ul>
@@ -800,7 +800,7 @@ export default function FingerprintPanel() {
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
-              className="w-full justify-between text-red-300/70 hover:text-red-300 hover:bg-red-950/30"
+              className="w-full justify-between text-muted-foreground hover:text-risk-high hover:bg-risk-high-soft"
             >
               <span className="flex items-center gap-2">
                 <span>🔧</span>
@@ -810,44 +810,44 @@ export default function FingerprintPanel() {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-3 pt-3">
-            <div className="p-3 bg-red-950/30 rounded-lg font-mono text-xs space-y-2 overflow-x-auto">
+            <div className="p-3 bg-risk-high-soft rounded-lg font-mono text-xs space-y-2 overflow-x-auto">
               {fingerprint.canvas && (
                 <div>
-                  <span className="text-red-400">Canvas Hash:</span>
-                  <span className="text-red-200/70 ml-2 break-all">{fingerprint.canvas.hash}</span>
+                  <span className="text-risk-high">Canvas Hash:</span>
+                  <span className="text-muted-foreground ml-2 break-all">{fingerprint.canvas.hash}</span>
                 </div>
               )}
               {fingerprint.webgl && (
                 <>
                   <div>
-                    <span className="text-red-400">WebGL Renderer:</span>
-                    <span className="text-red-200/70 ml-2 break-all">{fingerprint.webgl.renderer}</span>
+                    <span className="text-risk-high">WebGL Renderer:</span>
+                    <span className="text-muted-foreground ml-2 break-all">{fingerprint.webgl.renderer}</span>
                   </div>
                   <div>
-                    <span className="text-red-400">WebGL Vendor:</span>
-                    <span className="text-red-200/70 ml-2 break-all">{fingerprint.webgl.vendor}</span>
+                    <span className="text-risk-high">WebGL Vendor:</span>
+                    <span className="text-muted-foreground ml-2 break-all">{fingerprint.webgl.vendor}</span>
                   </div>
                 </>
               )}
               {advancedFP.webrtc && (
                 <div>
-                  <span className="text-red-400">WebRTC Status:</span>
-                  <span className={`ml-2 ${advancedFP.webrtc.isLeaking ? 'text-red-400' : 'text-green-400'}`}>
+                  <span className="text-risk-high">WebRTC Status:</span>
+                  <span className={`ml-2 ${advancedFP.webrtc.isLeaking ? 'text-risk-high' : 'text-risk-low'}`}>
                     {advancedFP.webrtc.isLeaking ? `LEAKING (${advancedFP.webrtc.publicIPs.join(', ')})` : 'Protected'}
                   </span>
                 </div>
               )}
               {advancedFP.hardware && (
                 <div>
-                  <span className="text-red-400">Hardware:</span>
-                  <span className="text-red-200/70 ml-2">
+                  <span className="text-risk-high">Hardware:</span>
+                  <span className="text-muted-foreground ml-2">
                     {advancedFP.hardware.cores} cores, {advancedFP.hardware.memory || 'unknown'} GB RAM
                   </span>
                 </div>
               )}
-              <div className="pt-2 border-t border-red-500/20">
-                <span className="text-red-400">Composite Hash:</span>
-                <span className="text-red-200/70 ml-2 break-all">{fingerprint.compositeHash}</span>
+              <div className="pt-2 border-t border-risk-high/20">
+                <span className="text-risk-high">Composite Hash:</span>
+                <span className="text-muted-foreground ml-2 break-all">{fingerprint.compositeHash}</span>
               </div>
             </div>
           </CollapsibleContent>
@@ -858,7 +858,7 @@ export default function FingerprintPanel() {
           <CollapsibleTrigger asChild>
             <Button 
               variant="outline" 
-              className="w-full justify-between border-red-500/30 text-red-300 hover:bg-red-950/30"
+              className="w-full justify-between border-risk-high/30 text-risk-high hover:bg-risk-high-soft"
             >
               <span className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4" />
@@ -888,7 +888,7 @@ export default function FingerprintPanel() {
             variant="outline" 
             size="sm" 
             onClick={handleExportReport}
-            className="flex-1 border-red-500/30 text-red-300 hover:bg-red-950/30"
+            className="flex-1 border-risk-high/30 text-risk-high hover:bg-risk-high-soft"
           >
             <Download className="w-4 h-4 mr-2" />
             Export Full Report (JSON)
@@ -896,9 +896,9 @@ export default function FingerprintPanel() {
         </div>
 
         {/* Privacy Reminder */}
-        <div className="flex items-center gap-3 p-3 bg-green-950/30 rounded-lg border border-green-500/20">
+        <div className="flex items-center gap-3 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
           <span className="text-xl">🔒</span>
-          <p className="text-xs text-green-300/80">
+          <p className="text-xs text-risk-low">
             <strong>Privacy Protected:</strong> All data shown is local to your device only. 
             No fingerprint data is sent to any server.
           </p>

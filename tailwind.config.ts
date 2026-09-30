@@ -59,12 +59,33 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        brand: {
+          DEFAULT: "hsl(var(--brand-ink))",
+          soft: "hsl(var(--brand-soft))",
+        },
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          border: "hsl(var(--surface-border))",
+        },
+        risk: {
+          low: "hsl(var(--risk-low))",
+          "low-soft": "hsl(var(--risk-low-soft))",
+          mid: "hsl(var(--risk-mid))",
+          "mid-soft": "hsl(var(--risk-mid-soft))",
+          orange: "hsl(var(--risk-orange))",
+          "orange-soft": "hsl(var(--risk-orange-soft))",
+          high: "hsl(var(--risk-high))",
+          "high-soft": "hsl(var(--risk-high-soft))",
+        },
         hexagon: {
           bg: "hsl(var(--hexagon-bg))",
           glow: "hsl(var(--hexagon-glow))",
           confirmed: "hsl(var(--hexagon-confirmed))",
           border: "hsl(var(--hexagon-border))",
         },
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
       },
       borderRadius: {
         lg: "var(--radius)",

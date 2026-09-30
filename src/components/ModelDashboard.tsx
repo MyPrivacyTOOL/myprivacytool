@@ -56,14 +56,14 @@ import {
 
 // Chart colors
 const COLORS = {
-  purple: 'hsl(280, 70%, 60%)',
-  blue: 'hsl(210, 80%, 60%)',
-  green: 'hsl(150, 70%, 50%)',
-  red: 'hsl(0, 70%, 60%)',
-  yellow: 'hsl(45, 90%, 55%)',
-  cyan: 'hsl(180, 70%, 50%)',
-  orange: 'hsl(30, 80%, 55%)',
-  pink: 'hsl(330, 70%, 60%)',
+  purple: 'hsl(var(--cat-device))',
+  blue: 'hsl(var(--cat-language))',
+  green: 'hsl(var(--risk-low))',
+  red: 'hsl(var(--risk-high))',
+  yellow: 'hsl(var(--risk-mid))',
+  cyan: 'hsl(var(--cat-storage))',
+  orange: 'hsl(var(--risk-orange))',
+  pink: 'hsl(var(--cat-profile))',
 };
 
 const PROFILE_COLORS = {
@@ -79,8 +79,8 @@ const REWARD_COLORS = {
   dwell_bonus: COLORS.cyan,
   scroll_engaged: COLORS.blue,
   language_switch: COLORS.red,
-  explicit_positive: '#22c55e',
-  explicit_negative: '#ef4444',
+  explicit_positive: COLORS.green,
+  explicit_negative: COLORS.red,
   return_visit: COLORS.purple,
   high_confidence_bonus: COLORS.yellow,
 };
@@ -177,32 +177,32 @@ export default function ModelDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950 text-foreground">
+    <div className="min-h-screen bg-gradient-to-br from-secondary via-[hsl(var(--cat-device-tint))] to-secondary text-foreground">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-lg border-b border-purple-500/20">
+      <header className="sticky top-0 z-40 bg-secondary backdrop-blur-lg border-b border-[hsl(var(--cat-device)/0.3)]">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link 
               to="/"
-              className="flex items-center gap-2 text-purple-400/70 hover:text-purple-400 transition-colors"
+              className="flex items-center gap-2 text-muted-foreground hover:text-[hsl(var(--cat-device))] transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               <span className="text-sm">Back</span>
             </Link>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <Brain className="w-6 h-6 text-purple-400" />
+              <div className="p-2 bg-[hsl(var(--cat-device-tint))] rounded-lg">
+                <Brain className="w-6 h-6 text-[hsl(var(--cat-device))]" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-purple-200">Model Performance Dashboard</h1>
-                <p className="text-xs text-purple-400/60">Complete AI Learning System Analytics</p>
+                <h1 className="text-xl font-bold text-[hsl(var(--cat-device))]">Model Performance Dashboard</h1>
+                <p className="text-xs text-muted-foreground">Complete AI Learning System Analytics</p>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportReport}
-              className="flex items-center gap-2 px-3 py-2 bg-purple-500/20 border border-purple-500/30 rounded-lg text-purple-400 text-sm hover:bg-purple-500/30 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg text-[hsl(var(--cat-device))] text-sm hover:brightness-95 transition-colors"
             >
               <Download className="w-4 h-4" />
               Export Report
@@ -249,26 +249,26 @@ export default function ModelDashboard() {
             {accuracyTrendData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={accuracyTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.1)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--surface-border))" />
                   <XAxis 
                     dataKey="day" 
-                    stroke="rgba(139, 92, 246, 0.5)" 
+                    stroke="hsl(var(--muted-foreground))" 
                     fontSize={10}
                     tickFormatter={(v) => `Day ${v}`}
                   />
                   <YAxis 
-                    stroke="rgba(139, 92, 246, 0.5)" 
+                    stroke="hsl(var(--muted-foreground))" 
                     fontSize={10}
                     domain={[0, 100]}
                     tickFormatter={(v) => `${v}%`}
                   />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(15, 10, 30, 0.95)', 
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      backgroundColor: 'hsl(var(--surface))', 
+                      border: '1px solid hsl(var(--surface-border))',
                       borderRadius: '8px',
                     }}
-                    labelStyle={{ color: 'rgba(139, 92, 246, 0.8)' }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
                   />
                   <Legend />
                   <Line 
@@ -309,7 +309,7 @@ export default function ModelDashboard() {
                     paddingAngle={2}
                     dataKey="value"
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    labelLine={{ stroke: 'rgba(139, 92, 246, 0.3)' }}
+                    labelLine={{ stroke: 'hsl(var(--surface-border))' }}
                   >
                     {profileDistribution.map((entry, index) => (
                       <Cell 
@@ -320,8 +320,8 @@ export default function ModelDashboard() {
                   </Pie>
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(15, 10, 30, 0.95)', 
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      backgroundColor: 'hsl(var(--surface))', 
+                      border: '1px solid hsl(var(--surface-border))',
                       borderRadius: '8px',
                     }}
                     formatter={(value: number, name: string, props: any) => [
@@ -340,10 +340,10 @@ export default function ModelDashboard() {
         {/* Reward Signals Breakdown */}
         <ChartCard title="Reward Signals Breakdown" icon={<BarChart3 className="w-4 h-4" />} fullWidth>
           <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-purple-400/70">
+            <div className="text-sm text-muted-foreground">
               Total Reward Score: <span className={cn(
                 "font-bold ml-1",
-                totalRewardScore >= 0 ? "text-green-400" : "text-red-400"
+                totalRewardScore >= 0 ? "text-risk-low" : "text-risk-high"
               )}>
                 {totalRewardScore >= 0 ? '+' : ''}{totalRewardScore.toFixed(1)}
               </span>
@@ -352,19 +352,19 @@ export default function ModelDashboard() {
           {rewardBreakdown.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={rewardBreakdown} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.1)" />
-                <XAxis type="number" stroke="rgba(139, 92, 246, 0.5)" fontSize={10} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--surface-border))" />
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
-                  stroke="rgba(139, 92, 246, 0.5)" 
+                  stroke="hsl(var(--muted-foreground))" 
                   fontSize={10}
                   width={100}
                 />
                 <Tooltip 
                   contentStyle={{ 
-                    backgroundColor: 'rgba(15, 10, 30, 0.95)', 
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    backgroundColor: 'hsl(var(--surface))', 
+                    border: '1px solid hsl(var(--surface-border))',
                     borderRadius: '8px',
                   }}
                   formatter={(value: number, name: string) => [
@@ -396,24 +396,24 @@ export default function ModelDashboard() {
                     className={cn(
                       "flex items-center justify-between p-2 rounded-lg text-xs",
                       imp.improved 
-                        ? "bg-green-500/10 border border-green-500/20" 
-                        : "bg-red-500/10 border border-red-500/20"
+                        ? "bg-risk-low-soft border border-risk-low/30" 
+                        : "bg-risk-high-soft border border-risk-high/30"
                     )}
                   >
                     <div className="flex items-center gap-2">
                       {imp.improved ? (
-                        <TrendingUp className="w-3 h-3 text-green-400" />
+                        <TrendingUp className="w-3 h-3 text-risk-low" />
                       ) : (
-                        <RefreshCw className="w-3 h-3 text-red-400" />
+                        <RefreshCw className="w-3 h-3 text-risk-high" />
                       )}
-                      <span className="text-purple-300/70">
+                      <span className="text-muted-foreground">
                         {new Date(imp.timestamp).toLocaleDateString()}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-purple-400/50">{imp.accuracyBefore.toFixed(1)}%</span>
-                      <span className="text-purple-300">→</span>
-                      <span className={imp.improved ? "text-green-400" : "text-red-400"}>
+                      <span className="text-muted-foreground">{imp.accuracyBefore.toFixed(1)}%</span>
+                      <span className="text-[hsl(var(--cat-device))]">→</span>
+                      <span className={imp.improved ? "text-risk-low" : "text-risk-high"}>
                         {imp.accuracyAfter.toFixed(1)}%
                       </span>
                     </div>
@@ -430,13 +430,13 @@ export default function ModelDashboard() {
             {confidenceCalibration.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <ScatterChart>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(139, 92, 246, 0.1)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--surface-border))" />
                   <XAxis 
                     type="number" 
                     dataKey="confidence" 
                     name="Confidence" 
                     domain={[0, 100]}
-                    stroke="rgba(139, 92, 246, 0.5)" 
+                    stroke="hsl(var(--muted-foreground))" 
                     fontSize={10}
                     tickFormatter={(v) => `${v}%`}
                   />
@@ -444,18 +444,18 @@ export default function ModelDashboard() {
                     type="number" 
                     dataKey="reward" 
                     name="Reward" 
-                    stroke="rgba(139, 92, 246, 0.5)" 
+                    stroke="hsl(var(--muted-foreground))" 
                     fontSize={10}
                   />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(15, 10, 30, 0.95)', 
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      backgroundColor: 'hsl(var(--surface))', 
+                      border: '1px solid hsl(var(--surface-border))',
                       borderRadius: '8px',
                     }}
                     formatter={(value: number, name: string) => [value, name]}
                   />
-                  <ReferenceLine y={0} stroke="rgba(139, 92, 246, 0.3)" />
+                  <ReferenceLine y={0} stroke="hsl(var(--surface-border))" />
                   <Scatter 
                     data={confidenceCalibration} 
                     fill={COLORS.purple}
@@ -472,7 +472,7 @@ export default function ModelDashboard() {
             ) : (
               <EmptyState message="Need more reward data for calibration analysis." />
             )}
-            <p className="text-[10px] text-purple-400/50 mt-2 text-center">
+            <p className="text-[10px] text-muted-foreground mt-2 text-center">
               Ideal: High confidence predictions should yield high rewards
             </p>
           </ChartCard>
@@ -484,12 +484,12 @@ export default function ModelDashboard() {
             {featureImportance.map((feature, idx) => (
               <div key={idx} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-purple-300/70">{feature.name}</span>
-                  <span className="text-purple-400 font-mono">{feature.importance}%</span>
+                  <span className="text-muted-foreground">{feature.name}</span>
+                  <span className="text-[hsl(var(--cat-device))] font-mono">{feature.importance}%</span>
                 </div>
-                <div className="h-2 bg-purple-500/10 rounded-full overflow-hidden">
+                <div className="h-2 bg-[hsl(var(--cat-device-tint))] rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all"
+                    className="h-full bg-gradient-to-r from-[hsl(var(--cat-device))] to-[hsl(var(--cat-device))] rounded-full transition-all"
                     style={{ width: `${feature.importance}%` }}
                   />
                 </div>
@@ -502,7 +502,7 @@ export default function ModelDashboard() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={handleExportReport}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-lg text-purple-400 text-sm hover:bg-purple-500/30 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg text-[hsl(var(--cat-device))] text-sm hover:brightness-95 transition-colors"
           >
             <Download className="w-4 h-4" />
             Export Full Report (JSON)
@@ -512,7 +512,7 @@ export default function ModelDashboard() {
               // Would use html2canvas in production
               alert('Chart export would use html2canvas library');
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg text-blue-400 text-sm hover:bg-blue-500/30 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-[hsl(var(--cat-language-tint))] border border-[hsl(var(--cat-language)/0.3)] rounded-lg text-[hsl(var(--cat-language))] text-sm hover:brightness-95 transition-colors"
           >
             <Image className="w-4 h-4" />
             Export Chart as Image
@@ -531,7 +531,7 @@ export default function ModelDashboard() {
                   URL.revokeObjectURL(url);
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-500/30 rounded-lg text-cyan-400 text-sm hover:bg-cyan-500/30 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-[hsl(var(--cat-storage-tint))] border border-[hsl(var(--cat-storage)/0.3)] rounded-lg text-[hsl(var(--cat-storage))] text-sm hover:brightness-95 transition-colors"
             >
               <Share2 className="w-4 h-4" />
               Share Anonymous Stats
@@ -540,10 +540,10 @@ export default function ModelDashboard() {
         </div>
         
         {/* Privacy Banner */}
-        <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-xl p-4 flex items-center justify-center gap-3">
-          <Lock className="w-5 h-5 text-purple-400" />
-          <p className="text-sm text-purple-300/80">
-            All data shown is <strong className="text-purple-300">local to your device only</strong>. Your privacy is protected.
+        <div className="bg-gradient-to-r from-[hsl(var(--cat-device-tint))] to-[hsl(var(--cat-language-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-xl p-4 flex items-center justify-center gap-3">
+          <Lock className="w-5 h-5 text-[hsl(var(--cat-device))]" />
+          <p className="text-sm text-muted-foreground">
+            All data shown is <strong className="text-[hsl(var(--cat-device))]">local to your device only</strong>. Your privacy is protected.
           </p>
           <span className="text-lg">🔒</span>
         </div>
@@ -570,11 +570,11 @@ function OverviewCard({
   trend?: 'up' | 'down';
 }) {
   const colorClasses: Record<string, string> = {
-    purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30 text-purple-400',
-    green: 'from-green-500/20 to-green-600/10 border-green-500/30 text-green-400',
-    blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30 text-blue-400',
-    cyan: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/30 text-cyan-400',
-    gray: 'from-gray-500/20 to-gray-600/10 border-gray-500/30 text-gray-400',
+    purple: 'from-[hsl(var(--cat-device-tint))] to-[hsl(var(--cat-device-tint))] border-[hsl(var(--cat-device)/0.3)] text-[hsl(var(--cat-device))]',
+    green: 'from-risk-low-soft to-risk-low-soft border-risk-low/30 text-risk-low',
+    blue: 'from-[hsl(var(--cat-language-tint))] to-[hsl(var(--cat-language-tint))] border-[hsl(var(--cat-language)/0.3)] text-[hsl(var(--cat-language))]',
+    cyan: 'from-[hsl(var(--cat-storage-tint))] to-[hsl(var(--cat-storage-tint))] border-[hsl(var(--cat-storage)/0.3)] text-[hsl(var(--cat-storage))]',
+    gray: 'from-secondary to-secondary border-surface-border text-muted-foreground',
   };
   
   return (
@@ -589,7 +589,7 @@ function OverviewCard({
       <div className="flex items-baseline gap-1">
         <span className="text-2xl font-bold">{value}</span>
         {subValue && <span className="text-xs opacity-50">{subValue}</span>}
-        {trend === 'up' && <TrendingUp className="w-4 h-4 text-green-400 ml-1" />}
+        {trend === 'up' && <TrendingUp className="w-4 h-4 text-risk-low ml-1" />}
       </div>
     </div>
   );
@@ -608,10 +608,10 @@ function ChartCard({
 }) {
   return (
     <div className={cn(
-      "bg-gradient-to-br from-purple-500/5 to-indigo-500/5 border border-purple-500/20 rounded-xl p-4",
+      "bg-gradient-to-br from-[hsl(var(--cat-device-tint))] to-[hsl(var(--cat-language-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-xl p-4",
       fullWidth && "col-span-full"
     )}>
-      <div className="flex items-center gap-2 mb-4 text-purple-400">
+      <div className="flex items-center gap-2 mb-4 text-[hsl(var(--cat-device))]">
         {icon}
         <h3 className="text-sm font-medium">{title}</h3>
       </div>
@@ -623,7 +623,7 @@ function ChartCard({
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="h-48 flex items-center justify-center">
-      <p className="text-sm text-purple-400/40 text-center">{message}</p>
+      <p className="text-sm text-muted-foreground text-center">{message}</p>
     </div>
   );
 }
