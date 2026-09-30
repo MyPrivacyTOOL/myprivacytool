@@ -1,0 +1,27 @@
+name: Quarterly standards re-scan
+
+on:
+  schedule:
+    - cron: "17 9 1 1,4,7,10 *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  open-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open re-scan tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Quarterly Standards Re-scan ($(date -u +%Y-%m-%d))" \
+            --body "Recurring task from MPC-6972. Follow section 6 of docs/agent-identity-landscape.md.
+
+          - [ ] W3C Verifiable Credentials (VCDM, Bitstring Status List, new drafts)
+          - [ ] Google AP2 (releases, FIDO Alliance status)
+          - [ ] Web Bot Auth (IETF webbotauth drafts and RFCs)
+          - [ ] Update sections 1-2 and the change log
+          - [ ] Re-check any claim still marked unsourced"
