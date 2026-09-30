@@ -8,15 +8,11 @@ import {
   trackAIAccessCheckView,
 } from "@/lib/analytics";
 
-// HubSpot form GUID for the waitlist. Override per environment with
-// VITE_HUBSPOT_AI_CHECK_FORM_ID once a dedicated form exists; until then it
-// falls back to the existing newsletter form (portal 246502821).
+// HubSpot form "AI Access Check waitlist" (portal 246502821). Form GUIDs are public
+// (they ship in every embed). Override per environment with VITE_HUBSPOT_AI_CHECK_FORM_ID.
+// The form defines a hidden "source_tag" field, which we populate below.
 const FORM_ID =
-  import.meta.env.VITE_HUBSPOT_AI_CHECK_FORM_ID || "0861b7ed-ff70-47a9-a45a-b29be082153d";
-
-// The source tag only goes out with a dedicated form (which must define a hidden
-// "source_tag" field); the shared newsletter form would reject unknown fields.
-const HAS_DEDICATED_FORM = Boolean(import.meta.env.VITE_HUBSPOT_AI_CHECK_FORM_ID);
+  import.meta.env.VITE_HUBSPOT_AI_CHECK_FORM_ID || "61deaf96-7b03-474d-8285-5d0bf2da13e8";
 const SOURCE_TAG = "ai-access-check";
 
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
@@ -60,7 +56,7 @@ export default function AIAccessCheck() {
     try {
       await submitHubSpotForm({
         formId: FORM_ID,
-        fields: HAS_DEDICATED_FORM ? { email, source_tag: SOURCE_TAG } : { email },
+        fields: { email, source_tag: SOURCE_TAG },
         pageName: "AI Access Check waitlist",
       });
       trackAIAccessCheckSignup(utm);
