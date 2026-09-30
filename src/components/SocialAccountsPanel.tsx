@@ -50,17 +50,17 @@ const serviceTooltips: Record<string, string> = {
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, services, risk, tooltipText }) => {
   const riskColors = {
-    low: 'text-green-400 border-green-500/30',
-    medium: 'text-yellow-400 border-yellow-500/30',
-    high: 'text-orange-400 border-orange-500/30',
-    critical: 'text-red-400 border-red-500/30',
+    low: 'text-risk-low border-risk-low/30',
+    medium: 'text-risk-mid border-risk-mid/30',
+    high: 'text-risk-orange border-risk-orange/30',
+    critical: 'text-risk-high border-risk-high/30',
   };
 
   const riskBg = {
-    low: 'bg-green-500/10',
-    medium: 'bg-yellow-500/10',
-    high: 'bg-orange-500/10',
-    critical: 'bg-red-500/10',
+    low: 'bg-risk-low-soft',
+    medium: 'bg-risk-mid-soft',
+    high: 'bg-risk-orange-soft',
+    critical: 'bg-risk-high-soft',
   };
 
   const cardContent = (
@@ -93,7 +93,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, servi
         <TooltipTrigger asChild>
           {cardContent}
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs bg-background/95 border-purple-500/30">
+        <TooltipContent side="top" className="max-w-xs bg-surface/95 border-[hsl(var(--cat-social)/0.3)]">
           <p className="text-sm">{tooltipText}</p>
         </TooltipContent>
       </Tooltip>
@@ -197,9 +197,9 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
   if (isLoading) {
     return (
-      <div className="bg-gradient-to-br from-purple-950/40 via-background to-fuchsia-950/30 rounded-xl border border-purple-500/30 p-6 animate-pulse">
-        <div className="h-8 bg-purple-500/20 rounded w-2/3 mb-4" />
-        <div className="h-4 bg-purple-500/10 rounded w-1/2" />
+      <div className="bg-gradient-to-br from-[hsl(var(--cat-social-tint))] via-background to-[hsl(var(--cat-profile-tint))] rounded-xl border border-[hsl(var(--cat-social)/0.3)] p-6 animate-pulse">
+        <div className="h-8 bg-[hsl(var(--cat-social-tint))] rounded w-2/3 mb-4" />
+        <div className="h-4 bg-[hsl(var(--cat-social-tint))] rounded w-1/2" />
       </div>
     );
   }
@@ -210,19 +210,19 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
   return (
     <TooltipProvider>
-      <div className="bg-gradient-to-br from-purple-950/40 via-background to-fuchsia-950/30 rounded-xl border border-purple-500/30 p-6 space-y-6 animate-fade-in">
+      <div className="bg-gradient-to-br from-[hsl(var(--cat-social-tint))] via-background to-[hsl(var(--cat-profile-tint))] rounded-xl border border-[hsl(var(--cat-social)/0.3)] p-6 space-y-6 animate-fade-in">
         
         {/* SSO CRITICAL ALERT - Pulsing red banner */}
         {crossSiteData?.ssoDetected && (
-          <div className="relative overflow-hidden rounded-lg border-2 border-red-500 bg-gradient-to-r from-red-950/80 via-red-900/60 to-red-950/80 p-4 animate-pulse">
-            <div className="absolute inset-0 bg-red-500/10 animate-pulse" />
+          <div className="relative overflow-hidden rounded-lg border-2 border-risk-high bg-gradient-to-r from-risk-high-soft via-risk-high-soft to-risk-high-soft p-4 animate-pulse">
+            <div className="absolute inset-0 bg-risk-high-soft animate-pulse" />
             <div className="relative flex items-start gap-3">
-              <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0 animate-bounce" />
+              <AlertCircle className="w-8 h-8 text-risk-high flex-shrink-0 animate-bounce" />
               <div>
-                <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-risk-high flex items-center gap-2">
                   🚨 CRITICAL: Single Sign-On Detected
                 </h3>
-                <p className="text-sm text-red-300 mt-1">
+                <p className="text-sm text-risk-high mt-1">
                   <span className="font-semibold">{ssoProvider}</span> sees <span className="font-bold uppercase">every site</span> you visit using their login. 
                   Your complete browsing history is being shared with this provider.
                 </p>
@@ -233,14 +233,14 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
         {/* HIGH TRACKING EXPOSURE BANNER - Orange/red gradient */}
         {privacyScore.loggedInCount >= 2 && !crossSiteData?.ssoDetected && (
-          <div className="rounded-lg border border-orange-500/50 bg-gradient-to-r from-orange-950/60 via-red-950/40 to-orange-950/60 p-4">
+          <div className="rounded-lg border border-risk-orange/30 bg-gradient-to-r from-risk-orange-soft via-risk-high-soft to-risk-orange-soft p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-7 h-7 text-orange-400 flex-shrink-0" />
+              <AlertTriangle className="w-7 h-7 text-risk-orange flex-shrink-0" />
               <div>
-                <h3 className="text-base font-bold text-orange-400">
+                <h3 className="text-base font-bold text-risk-orange">
                   ⚠️ HIGH TRACKING EXPOSURE
                 </h3>
-                <p className="text-sm text-orange-300/90 mt-1">
+                <p className="text-sm text-risk-orange mt-1">
                   You're logged into <span className="font-bold">{privacyScore.loggedInCount} services</span> that can track you across 
                   <span className="font-bold"> ~{webCoverage}%</span> of websites you visit.
                 </p>
@@ -251,11 +251,11 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
         {/* REAL-TIME TRACKING DEMO */}
         {(googleData?.isLoggedIn || metaData?.isLoggedIn) && (
-          <div className="rounded-lg border border-purple-500/40 bg-purple-950/30 p-4">
+          <div className="rounded-lg border border-[hsl(var(--cat-social)/0.3)] bg-[hsl(var(--cat-social-tint))] p-4">
             <div className="flex items-start gap-3">
-              <Radio className="w-5 h-5 text-purple-400 flex-shrink-0 animate-pulse" />
+              <Radio className="w-5 h-5 text-[hsl(var(--cat-social))] flex-shrink-0 animate-pulse" />
               <div>
-                <h4 className="text-sm font-semibold text-purple-300">Live Tracking Active</h4>
+                <h4 className="text-sm font-semibold text-[hsl(var(--cat-social))]">Live Tracking Active</h4>
                 <p className="text-xs text-muted-foreground mt-1">
                   Right now, because you're logged into{' '}
                   {[
@@ -271,9 +271,9 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
         )}
 
         {/* Header */}
-        <div className="text-center border-b border-purple-500/20 pb-4">
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-400 via-fuchsia-400 to-pink-400 bg-clip-text text-transparent flex items-center justify-center gap-2">
-            <Link2 className="w-6 h-6 text-purple-400" />
+        <div className="text-center border-b border-[hsl(var(--cat-social)/0.3)] pb-4">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-[hsl(var(--cat-social))] via-[hsl(var(--cat-profile))] to-[hsl(var(--cat-profile))] bg-clip-text text-transparent flex items-center justify-center gap-2">
+            <Link2 className="w-6 h-6 text-[hsl(var(--cat-social))]" />
             Your Connected Identity
           </h2>
           <p className="text-muted-foreground text-sm mt-1">Services tracking you across the web</p>
@@ -282,13 +282,13 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
         {/* COMPARISON GRAPHIC - With vs Without Login */}
         {(googleData?.isLoggedIn || metaData?.isLoggedIn) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-green-500/30 bg-green-950/20 p-4">
+            <div className="rounded-lg border border-risk-low/30 bg-risk-low-soft p-4">
               <div className="flex items-center gap-2 mb-3">
-                <UserX className="w-5 h-5 text-green-400" />
-                <h4 className="font-semibold text-green-400 text-sm">Without Login</h4>
+                <UserX className="w-5 h-5 text-risk-low" />
+                <h4 className="font-semibold text-risk-low text-sm">Without Login</h4>
               </div>
               <p className="text-xs text-muted-foreground">
-                Websites see: <span className="text-green-300">"Anonymous visitor from {navigator.language?.split('-')[1] || 'your region'}"</span>
+                Websites see: <span className="text-risk-low">"Anonymous visitor from {navigator.language?.split('-')[1] || 'your region'}"</span>
               </p>
               <ul className="text-xs text-muted-foreground mt-2 space-y-1">
                 <li>• IP-based location only</li>
@@ -296,13 +296,13 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
                 <li>• Limited tracking across sites</li>
               </ul>
             </div>
-            <div className="rounded-lg border border-red-500/30 bg-red-950/20 p-4">
+            <div className="rounded-lg border border-risk-high/30 bg-risk-high-soft p-4">
               <div className="flex items-center gap-2 mb-3">
-                <User className="w-5 h-5 text-red-400" />
-                <h4 className="font-semibold text-red-400 text-sm">With Your Logins</h4>
+                <User className="w-5 h-5 text-risk-high" />
+                <h4 className="font-semibold text-risk-high text-sm">With Your Logins</h4>
               </div>
               <p className="text-xs text-muted-foreground">
-                Websites see: <span className="text-red-300">"Your full identity"</span>
+                Websites see: <span className="text-risk-high">"Your full identity"</span>
               </p>
               <ul className="text-xs text-muted-foreground mt-2 space-y-1">
                 <li>• Your name & email</li>
@@ -315,17 +315,17 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
         {/* Privacy Impact Score */}
         <div className={`p-4 rounded-lg border ${
-          privacyScore.level === 'critical' ? 'border-red-500/50 bg-red-500/10' :
-          privacyScore.level === 'high' ? 'border-orange-500/50 bg-orange-500/10' :
-          privacyScore.level === 'medium' ? 'border-yellow-500/50 bg-yellow-500/10' :
-          'border-green-500/50 bg-green-500/10'
+          privacyScore.level === 'critical' ? 'border-risk-high/30 bg-risk-high-soft' :
+          privacyScore.level === 'high' ? 'border-risk-orange/30 bg-risk-orange-soft' :
+          privacyScore.level === 'medium' ? 'border-risk-mid/30 bg-risk-mid-soft' :
+          'border-risk-low/30 bg-risk-low-soft'
         }`}>
           <div className="flex items-center gap-3">
             <Shield className={`w-8 h-8 ${
-              privacyScore.level === 'critical' ? 'text-red-400' :
-              privacyScore.level === 'high' ? 'text-orange-400' :
-              privacyScore.level === 'medium' ? 'text-yellow-400' :
-              'text-green-400'
+              privacyScore.level === 'critical' ? 'text-risk-high' :
+              privacyScore.level === 'high' ? 'text-risk-orange' :
+              privacyScore.level === 'medium' ? 'text-risk-mid' :
+              'text-risk-low'
             }`} />
             <div>
               <h3 className="font-bold text-lg">{privacyScore.label}</h3>
@@ -336,7 +336,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
         {/* Logged-in Services Grid with Tooltips */}
         <div>
-          <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-[hsl(var(--cat-social))] mb-3 flex items-center gap-2">
             <Users className="w-5 h-5" />
             Detected Services
             <span className="text-xs text-muted-foreground font-normal">(hover for tracking details)</span>
@@ -381,8 +381,8 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
       {/* Cross-Site Tracking Map */}
       {(googleData?.isLoggedIn || metaData?.isLoggedIn || microsoftData?.isLoggedIn) && (
-        <div className="bg-background/50 rounded-lg p-4 border border-purple-500/20">
-          <h3 className="text-lg font-semibold text-purple-300 mb-4 flex items-center gap-2">
+        <div className="bg-surface/95 rounded-lg p-4 border border-[hsl(var(--cat-social)/0.3)]">
+          <h3 className="text-lg font-semibold text-[hsl(var(--cat-social))] mb-4 flex items-center gap-2">
             <Globe className="w-5 h-5" />
             Cross-Site Tracking Map
           </h3>
@@ -392,7 +392,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               name="Google Account"
               icon="🔍"
               services={[...googleData.services, "Third-party sites using 'Sign in with Google'", "Sites with Google Analytics (80%+ of web)"]}
-              color="text-blue-400"
+              color="text-[hsl(var(--cat-language))]"
             />
           )}
           
@@ -401,7 +401,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               name="Meta Account"
               icon="📘"
               services={[...metaData.services, "Sites with Facebook Pixel", "Sites with Like/Share buttons"]}
-              color="text-indigo-400"
+              color="text-[hsl(var(--cat-device))]"
             />
           )}
           
@@ -410,35 +410,35 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               name="Microsoft Account"
               icon="🪟"
               services={[...microsoftData.services, "LinkedIn network connections"]}
-              color="text-cyan-400"
+              color="text-[hsl(var(--cat-storage))]"
             />
           )}
         </div>
       )}
 
       {/* The Tracking Network - Educational */}
-      <div className="bg-purple-900/20 rounded-lg p-4 border border-purple-500/20">
-        <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+      <div className="bg-[hsl(var(--cat-social-tint))] rounded-lg p-4 border border-[hsl(var(--cat-social)/0.3)]">
+        <h3 className="text-lg font-semibold text-[hsl(var(--cat-social))] mb-3 flex items-center gap-2">
           <Eye className="w-5 h-5" />
           The Tracking Network
         </h3>
         <p className="text-sm text-muted-foreground leading-relaxed">
           When you're logged into Google, Facebook, or other major platforms, they can track your activity 
-          across <span className="text-purple-300 font-semibold">millions of websites</span>—even sites you think are unrelated. 
+          across <span className="text-[hsl(var(--cat-social))] font-semibold">millions of websites</span>—even sites you think are unrelated. 
           Every site with a 'Like' button, Google Analytics, or social login shares your activity with these companies.
         </p>
       </div>
 
       {/* What They Know */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-purple-300 flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-[hsl(var(--cat-social))] flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" />
           What They Know About You
         </h3>
         
         {googleData?.isLoggedIn && (
-          <div className="bg-blue-950/30 rounded-lg p-4 border border-blue-500/20">
-            <h4 className="font-semibold text-blue-400 mb-2">🔍 Google (Logged In)</h4>
+          <div className="bg-[hsl(var(--cat-language-tint))] rounded-lg p-4 border border-[hsl(var(--cat-language)/0.3)]">
+            <h4 className="font-semibold text-[hsl(var(--cat-language))] mb-2">🔍 Google (Logged In)</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>• Every YouTube video you watch</li>
               <li>• Every search you make</li>
@@ -450,8 +450,8 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
         )}
         
         {metaData?.isLoggedIn && (
-          <div className="bg-indigo-950/30 rounded-lg p-4 border border-indigo-500/20">
-            <h4 className="font-semibold text-indigo-400 mb-2">📘 Facebook/Meta (Logged In)</h4>
+          <div className="bg-[hsl(var(--cat-device-tint))] rounded-lg p-4 border border-[hsl(var(--cat-device)/0.3)]">
+            <h4 className="font-semibold text-[hsl(var(--cat-device))] mb-2">📘 Facebook/Meta (Logged In)</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>• Every site with Facebook Pixel</li>
               <li>• Every site with Like/Share buttons</li>
@@ -462,8 +462,8 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
         )}
         
         {microsoftData?.isLoggedIn && (
-          <div className="bg-cyan-950/30 rounded-lg p-4 border border-cyan-500/20">
-            <h4 className="font-semibold text-cyan-400 mb-2">🪟 Microsoft (Logged In)</h4>
+          <div className="bg-[hsl(var(--cat-storage-tint))] rounded-lg p-4 border border-[hsl(var(--cat-storage)/0.3)]">
+            <h4 className="font-semibold text-[hsl(var(--cat-storage))] mb-2">🪟 Microsoft (Logged In)</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>• Office 365 documents</li>
               <li>• Outlook emails</li>
@@ -476,17 +476,17 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
       {/* SSO Warning */}
       {crossSiteData?.ssoDetected && (
-        <div className="bg-red-950/40 rounded-lg p-4 border border-red-500/40">
-          <h3 className="text-lg font-semibold text-red-400 mb-2 flex items-center gap-2">
+        <div className="bg-risk-high-soft rounded-lg p-4 border border-risk-high/30">
+          <h3 className="text-lg font-semibold text-risk-high mb-2 flex items-center gap-2">
             <AlertTriangle className="w-5 h-5" />
             Single Sign-On (SSO) Detected
           </h3>
           <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-            You're using <span className="text-red-300 font-semibold">"Sign in with Google/Facebook"</span> on various sites. 
-            While convenient, this means the provider knows <span className="text-red-300">every site you visit</span> that 
+            You're using <span className="text-risk-high font-semibold">"Sign in with Google/Facebook"</span> on various sites. 
+            While convenient, this means the provider knows <span className="text-risk-high">every site you visit</span> that 
             uses their login. They can track your complete browsing history across all connected sites.
           </p>
-          <p className="text-xs text-red-400/80 flex items-center gap-1">
+          <p className="text-xs text-risk-high flex items-center gap-1">
             <Lock className="w-3 h-3" />
             Consider using separate passwords for each site instead
           </p>
@@ -494,46 +494,46 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
       )}
 
       {/* Incognito Warning */}
-      <div className="bg-yellow-950/30 rounded-lg p-4 border border-yellow-500/30">
-        <h4 className="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+      <div className="bg-risk-mid-soft rounded-lg p-4 border border-risk-mid/30">
+        <h4 className="font-semibold text-risk-mid mb-2 flex items-center gap-2">
           <Eye className="w-4 h-4" />
           Incognito Mode Warning
         </h4>
         <p className="text-sm text-muted-foreground">
-          Being logged into these services <span className="text-yellow-300 font-semibold">defeats the purpose of incognito/private browsing</span>. 
+          Being logged into these services <span className="text-risk-mid font-semibold">defeats the purpose of incognito/private browsing</span>. 
           You're still tracked through your account, even if cookies are blocked.
         </p>
       </div>
 
       {/* Protection Recommendations */}
-      <div className="bg-green-950/20 rounded-lg p-4 border border-green-500/20">
-        <h3 className="text-lg font-semibold text-green-400 mb-3 flex items-center gap-2">
+      <div className="bg-risk-low-soft rounded-lg p-4 border border-risk-low/30">
+        <h3 className="text-lg font-semibold text-risk-low mb-3 flex items-center gap-2">
           <Shield className="w-5 h-5" />
           Protection Recommendations
         </h3>
         <ul className="text-sm text-muted-foreground space-y-2">
           <li className="flex items-start gap-2">
-            <span className="text-green-400">•</span>
+            <span className="text-risk-low">•</span>
             Log out of services when not actively using them
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-green-400">•</span>
+            <span className="text-risk-low">•</span>
             Use Multi-Account Containers (Firefox) to isolate services
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-green-400">•</span>
+            <span className="text-risk-low">•</span>
             Use separate browsers for different activities
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-green-400">•</span>
+            <span className="text-risk-low">•</span>
             Avoid SSO - use unique passwords instead
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-green-400">•</span>
+            <span className="text-risk-low">•</span>
             Use temporary email services for signups
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-green-400">•</span>
+            <span className="text-risk-low">•</span>
             Consider privacy-focused alternatives (ProtonMail, DuckDuckGo)
           </li>
         </ul>
@@ -541,8 +541,8 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
       {/* Logout Buttons */}
       {(googleData?.isLoggedIn || metaData?.isLoggedIn || microsoftData?.isLoggedIn) && (
-        <div className="border-t border-purple-500/20 pt-4">
-          <h3 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+        <div className="border-t border-[hsl(var(--cat-social)/0.3)] pt-4">
+          <h3 className="text-lg font-semibold text-[hsl(var(--cat-social))] mb-3 flex items-center gap-2">
             <LogOut className="w-5 h-5" />
             Quick Logout Options
           </h3>
@@ -554,7 +554,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               <Button
                 variant="outline"
                 size="sm"
-                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                className="border-[hsl(var(--cat-language)/0.3)] text-[hsl(var(--cat-language))] hover:bg-[hsl(var(--cat-language-tint))]"
                 onClick={() => handleLogout('google')}
               >
                 <ExternalLink className="w-3 h-3 mr-1" />
@@ -565,7 +565,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               <Button
                 variant="outline"
                 size="sm"
-                className="border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10"
+                className="border-[hsl(var(--cat-device)/0.3)] text-[hsl(var(--cat-device))] hover:bg-[hsl(var(--cat-device-tint))]"
                 onClick={() => handleLogout('facebook')}
               >
                 <ExternalLink className="w-3 h-3 mr-1" />
@@ -576,7 +576,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               <Button
                 variant="outline"
                 size="sm"
-                className="border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10"
+                className="border-[hsl(var(--cat-storage)/0.3)] text-[hsl(var(--cat-storage))] hover:bg-[hsl(var(--cat-storage-tint))]"
                 onClick={() => handleLogout('microsoft')}
               >
                 <ExternalLink className="w-3 h-3 mr-1" />

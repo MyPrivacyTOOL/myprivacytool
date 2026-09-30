@@ -5,26 +5,26 @@
 /* Revealing hexagon glow and pulse */
 .hexagon.revealing .hexagon-inner {
   background: linear-gradient(135deg, 
-    rgba(0, 255, 65, 0.2), 
-    rgba(0, 255, 65, 0.4));
-  border: 2px solid #00ff41;
+    hsl(var(--brand-ink) / 0.06), 
+    hsl(var(--brand-ink) / 0.14));
+  border: 2px solid hsl(var(--brand-ink));
   animation: revealPulse 2s ease-in-out infinite;
   box-shadow: 
-    0 0 30px rgba(0, 255, 65, 0.6),
-    inset 0 0 30px rgba(0, 255, 65, 0.3);
+    0 0 18px hsl(var(--brand-ink) / 0.3),
+    inset 0 0 18px hsl(var(--brand-ink) / 0.12);
 }
 
 @keyframes revealPulse {
   0%, 100% {
     box-shadow: 
-      0 0 20px rgba(0, 255, 65, 0.4),
-      inset 0 0 20px rgba(0, 255, 65, 0.2);
+      0 0 12px hsl(var(--brand-ink) / 0.2),
+      inset 0 0 12px hsl(var(--brand-ink) / 0.08);
     transform: scale(1);
   }
   50% {
     box-shadow: 
-      0 0 40px rgba(0, 255, 65, 0.8),
-      inset 0 0 40px rgba(0, 255, 65, 0.4);
+      0 0 22px hsl(var(--brand-ink) / 0.4),
+      inset 0 0 22px hsl(var(--brand-ink) / 0.16);
     transform: scale(1.05);
   }
 }
@@ -71,7 +71,7 @@
   bottom: 0;
   background: linear-gradient(0deg, 
     transparent 0%, 
-    rgba(0, 255, 65, 0.1) 50%, 
+    hsl(var(--brand-ink) / 0.08) 50%, 
     transparent 100%);
   animation: matrixFlow 1s linear infinite;
   pointer-events: none;
@@ -89,7 +89,7 @@
 
 /* Revealing hexagon text styling */
 .hexagon.revealing .hexagon-label {
-  color: #00ff41;
+  color: hsl(var(--brand-ink));
   font-weight: 700;
   letter-spacing: 2px;
   animation: textGlow 1.5s ease-in-out infinite;
@@ -97,14 +97,14 @@
 
 @keyframes textGlow {
   0%, 100% {
-    text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+    text-shadow: 0 0 6px hsl(var(--brand-ink) / 0.25);
   }
   50% {
-    text-shadow: 0 0 20px rgba(0, 255, 65, 1);
+    text-shadow: 0 0 10px hsl(var(--brand-ink) / 0.4);
   }
 }
 
 .hexagon.revealing .hexagon-value {
-  color: rgba(255, 255, 255, 0.8);
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
