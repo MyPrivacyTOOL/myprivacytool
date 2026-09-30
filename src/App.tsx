@@ -9,6 +9,7 @@ import Scan from "./pages/Scan";
 import Report from "./pages/Report";
 import Business from "./pages/Business";
 import Start from "./pages/Start";
+import AIAccessCheck from "./pages/AIAccessCheck";
 import Newsletter from "./pages/Newsletter";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/start" element={<Start />} />
             {/* Lead capture */}
             <Route path="/newsletter" element={<Newsletter />} />
+            <Route path="/ai-access-check" element={<AIAccessCheck />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />

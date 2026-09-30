@@ -385,3 +385,24 @@ export const trackPredictionAccuracyStats = (
     event_category: 'language_intelligence',
   });
 };
+
+// ---------------------------------------------------------------------------
+// AI Access Check lead-magnet experiment (MPC-6961)
+// Funnel: view -> cta_click (free scan) / waitlist_submit (HubSpot lead)
+// ---------------------------------------------------------------------------
+export const trackAIAccessCheckView = (params?: Record<string, string>) => {
+  trackEvent('ai_access_check_view', params);
+};
+
+export const trackAIAccessCheckCta = (
+  ctaLocation: string,
+  params?: Record<string, string>
+) => {
+  trackEvent('ai_access_check_cta_click', { cta_location: ctaLocation, ...params });
+};
+
+export const trackAIAccessCheckSignup = (params?: Record<string, string>) => {
+  trackEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
+  // GA4 recommended event so the signup can be marked as a key event
+  trackEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
+};
