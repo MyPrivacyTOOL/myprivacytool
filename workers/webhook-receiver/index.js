@@ -11,7 +11,7 @@
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
-import { purgeExpiredScanResults } from './purge-expired.js';
+import { purgeExpiredScanResults } from './purge-notion-scans.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
 const META_QUERY = {

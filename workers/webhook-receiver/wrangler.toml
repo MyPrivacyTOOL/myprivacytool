@@ -10,13 +10,15 @@ compatibility_flags = ["nodejs_compat"]
 # ]
 
 # ─── SCHEDULED JOBS ──────────────────────────────────────────────────────────
-# Daily purge of expired OSINT scan results (MPC-6957), 03:15 UTC.
-# Retention defaults to 730 days; override with SCAN_RETENTION_DAYS (var).
+# Purge of expired rows in the Notion "MPT OSINT Scan Results" DB (MPC-6957).
+# Rows carry a 24h TTL via `Expires At`; Notion cannot expire rows itself.
+# Runs hourly so rows are archived within ~1h of expiry. See docs/osint-scan-purge.md
 [triggers]
-crons = ["15 3 * * *"]
+crons = ["0 * * * *"]
 
 # ─── SECRETS ─────────────────────────────────────────────────────────────────
 # All secrets are set via `wrangler secret put VARNAME`.
+# Purge job also needs: NOTION_TOKEN, TELEGRAM_BOT_KEY, TELEGRAM_ALERT_CHAT_ID
 # See DEPLOYMENT.md for the full list and descriptions.
 # Never hardcode values in this file.
 
