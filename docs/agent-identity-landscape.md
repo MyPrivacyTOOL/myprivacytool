@@ -66,3 +66,12 @@ Not covered by a source in this scan, so verify before use: W3C Bitstring Status
 - Verify Astrix ownership, Skyfire funding total and Persona funding against primary sources.
 - Liability framing ("attestation, not guarantee") is a legal question this scan does not answer.
 - A Notion output page and a link from Strategy section 3 are still owed under the task's Output spec.
+
+## 6. Phase 5 technical details (MPC-6971)
+
+Full write-up: `docs/phase5-oauth-permission-apis.md`. Google PoC: `workers/oauth-poc/`.
+
+- **Stack:** Cloudflare Worker, OAuth 2.0 authorization code + PKCE (S256), non-sensitive scopes (`openid email profile`), online access, HMAC-signed state cookie, no stored tokens, MPT's own token revoked before responding.
+- **Refinement of the Phase 5 recommendation:** OAuth authenticates the user and lets MPT revoke tokens it holds. Listing and revoking *other* apps' grants depends on the provider: no consumer API at Google (MPC-6960); Workspace `tokens.list` needs verification and CASA; Microsoft Graph `oauth2PermissionGrants` is the likeliest member-level list-and-revoke API **[verify]**; GitHub and Slack are likely guided-audit only **[verify]**.
+- **Status:** PoC unit-tested with mocked provider calls; live run pending test-account credentials.
+- **Risks:** provider APIs may not expose grants; MPT holding OAuth access is a trust risk (mitigated by no storage and revoke-on-finish); focus risk against the Phase 2 KPI.
