@@ -17,7 +17,7 @@ const Cookies = () => {
               Cookie Policy
             </h1>
             <p className="mb-8 text-lg text-gray-600">
-              Last updated: September 2026
+              Last updated: 30 September 2026
             </p>
 
             <section className="mb-8">
@@ -59,6 +59,11 @@ const Cookies = () => {
                   forgery attacks
                 </li>
                 <li>
+                  <strong>Consent Choice:</strong> Records your cookie choices via
+                  our consent manager (Consentmanager) so we do not ask again on
+                  every visit
+                </li>
+                <li>
                   <strong>User Preferences:</strong> Remembers your language and
                   theme settings
                 </li>
@@ -82,13 +87,27 @@ const Cookies = () => {
                   usage statistics
                 </li>
                 <li>
+                  <strong>HubSpot Tracking Cookie (hubspotutk):</strong> Set when
+                  HubSpot tracking is allowed. When you submit a sign-up or
+                  waitlist form, it links that submission to your earlier visits
+                  to our site so we can see which pages and campaigns led to it
+                </li>
+                <li>
+                  <strong>Campaign Parameters:</strong> UTM parameters in the
+                  links you arrive from are attached to sign-up and analytics
+                  events
+                </li>
+                <li>
                   <strong>Session Recording:</strong> May record anonymized user
                   interactions to improve UX
                 </li>
               </ul>
               <p className="mt-4 text-gray-700">
-                These cookies do not personally identify you. Google Analytics
-                implements IP anonymization to protect user privacy.
+                Google Analytics 4 and HubSpot tracking only run after you
+                allow analytics in our consent banner. Google Analytics 4 does not
+                store full IP addresses. HubSpot tracking can identify you once
+                you submit a form with your email address; you can withdraw
+                consent at any time through the Cookie Management Center.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-gray-800">
@@ -263,8 +282,10 @@ const Cookies = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
                 <li>
-                  <strong>Local Storage:</strong> Stores application data such as
-                  your theme preference
+                  <strong>Local Storage:</strong> Stores application data on your
+                  device such as your theme preference and results and settings for
+                  our on-device analysis tools. This stays in your browser and is
+                  not sent to us unless you submit it
                 </li>
                 <li>
                   <strong>IndexedDB:</strong> Stores larger amounts of data for

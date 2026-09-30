@@ -18,7 +18,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-gray-600">
-              Last updated: September 2026
+              Last updated: 30 September 2026
             </p>
 
             <section className="mb-8">
@@ -52,6 +52,18 @@ const Privacy = () => {
               </h2>
 
               <h3 className="mt-6 text-xl font-semibold text-gray-800">
+                2.0 What Stays in Your Browser
+              </h3>
+              <p className="text-gray-700">
+                The free scan on our homepage detects device, browser and network
+                characteristics directly in your browser. Those results are shown to
+                you and are not sent to or stored on our servers. We only receive
+                and store information when you take an action that submits it, as
+                described below (for example, entering your email address, messaging
+                our bot, or requesting a scan of a social handle).
+              </p>
+
+              <h3 className="mt-6 text-xl font-semibold text-gray-800">
                 2.1 Information You Provide Directly
               </h3>
               <ul className="list-inside list-disc space-y-2 text-gray-700">
@@ -70,6 +82,28 @@ const Privacy = () => {
                 <li>
                   <strong>Communications:</strong> Feedback, support requests,
                   inquiries sent to our customer support team
+                </li>
+                <li>
+                  <strong>Newsletter & Waitlist Sign-ups:</strong> Email address
+                  and the page or campaign you signed up from, stored in our CRM
+                  (HubSpot)
+                </li>
+                <li>
+                  <strong>Scan Summary Submitted with Your Email:</strong> If you
+                  enter your email to receive or save your scan summary, we store
+                  the email address together with your risk score and the number of
+                  data points you confirmed
+                </li>
+                <li>
+                  <strong>Messaging Channel Data:</strong> If you contact us through
+                  a messaging channel (currently Telegram and the web start page),
+                  we store your channel ID, display name, your replies, and your
+                  conversation stage so we can continue the conversation
+                </li>
+                <li>
+                  <strong>Handles You Ask Us to Scan:</strong> Social media handles
+                  and platform names you submit, and the number of data points and
+                  confidence score found for them
                 </li>
                 <li>
                   <strong>Survey & Questionnaire Data:</strong> Information you
@@ -92,6 +126,11 @@ const Privacy = () => {
                 <li>
                   <strong>Cookies & Similar Technologies:</strong> Session IDs,
                   preference settings, security tokens
+                </li>
+                <li>
+                  <strong>Engagement Records:</strong> For users of our scan
+                  workflow, whether you clicked through, confirmed an email or
+                  mobile number, and completed a full scan
                 </li>
                 <li>
                   <strong>Location Information:</strong> General geolocation
@@ -147,6 +186,11 @@ const Privacy = () => {
                   our services are used to improve product features
                 </li>
                 <li>
+                  <strong>Follow-up Communications:</strong> Contacting you about
+                  your scan, waitlist or conversation, and measuring which
+                  campaigns bring people to our site
+                </li>
+                <li>
                   <strong>Legal Compliance:</strong> Complying with laws,
                   regulations, and legal requests
                 </li>
@@ -195,7 +239,10 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-gray-700">
                 <li>
                   <strong>Service Providers:</strong> Payment processors (Stripe),
-                  hosting providers (AWS), analytics tools
+                  hosting and edge infrastructure (Cloudflare), databases (Supabase,
+                  Google Cloud), CRM and email (HubSpot), messaging platforms
+                  (Telegram), consent management (Consentmanager), and analytics
+                  (Google Analytics 4)
                 </li>
                 <li>
                   <strong>Legal Authorities:</strong> When required by law or to
@@ -226,8 +273,24 @@ const Privacy = () => {
                   your subscription plus 30 days
                 </li>
                 <li>
-                  <strong>Scan Results:</strong> Retained for 2 years for
+                  <strong>Scan Results:</strong> Per-session scan results for
+                  submitted handles are deleted automatically after 24 hours.
+                  Results saved to an account are retained for 2 years for
                   historical comparison and reporting
+                </li>
+                <li>
+                  <strong>Messaging Conversation State:</strong> Retained for 7
+                  days of inactivity in our messaging system; the CRM record
+                  remains until you ask us to delete it or unsubscribe
+                </li>
+                <li>
+                  <strong>Newsletter, Waitlist & Lead Records:</strong> Retained
+                  until you unsubscribe or request deletion
+                </li>
+                <li>
+                  <strong>Engagement Records:</strong> Retained for as long as
+                  needed to measure how our scan workflow performs, then deleted
+                  or anonymised
                 </li>
                 <li>
                   <strong>Billing Records:</strong> Retained for 7 years
@@ -414,7 +477,8 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Analytics Cookies:</strong> Track usage patterns (Google
-                  Analytics 4)
+                  Analytics 4). Analytics events are only sent after you allow
+                  analytics in our consent manager
                 </li>
                 <li>
                   <strong>Marketing Cookies:</strong> Support targeted advertising
