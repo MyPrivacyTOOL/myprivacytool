@@ -41,7 +41,7 @@ const OptOutGuide = () => {
           <div><dt className="text-muted-foreground">Region</dt><dd className="font-medium">{guide.countryName}</dd></div>
           <div><dt className="text-muted-foreground">Time needed</dt><dd className="font-medium">{guide.timeNeeded}</dd></div>
           <div><dt className="text-muted-foreground">Difficulty</dt><dd className="font-medium">{guide.difficulty}</dd></div>
-          <div><dt className="text-muted-foreground">Last verified</dt><dd className="font-medium">{guide.lastVerified}</dd></div>
+          <div><dt className="text-muted-foreground">Last reviewed</dt><dd className="font-medium">{guide.lastVerified}</dd></div>
         </dl>
 
         <Button asChild size="lg" className="mb-8">

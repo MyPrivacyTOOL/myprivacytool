@@ -27,7 +27,7 @@ const AmIExposed = () => (
         {[
           ["1. Scan", "Enter your email to start a free exposure check. No credit card needed."],
           ["2. Review", "See the kinds of sources that may hold your name, contact details and address."],
-          ["3. Remove", "Follow our verified opt-out guides to get yourself removed."],
+          ["3. Remove", "Follow our step-by-step opt-out guides to get yourself removed."],
         ].map(([t, d]) => (
           <div key={t} className="rounded-lg border border-border p-5">
             <h2 className="font-semibold text-foreground mb-1">{t}</h2>
