@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Seo from "@/components/Seo";
 
 const Business = () => {
   const [form, setForm] = useState({ name: "", email: "", company: "", size: "" });
@@ -13,6 +14,7 @@ const Business = () => {
 
   return (
     <div className="min-h-screen bg-[#06060a] text-white font-sans">
+      <Seo title="Employee Privacy Protection for Business | MyPrivacyTOOL" description="Protect your team from data broker exposure and social engineering. Request a business privacy assessment from MyPrivacyTOOL." path="/business" />
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">

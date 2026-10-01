@@ -165,9 +165,9 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
 
   if (loading) {
     return (
-      <Card className="border-2 border-red-500/30 bg-gradient-to-br from-background via-background to-red-950/10">
+      <Card className="border-2 border-risk-high/30 bg-gradient-to-br from-background via-background to-risk-high-soft">
         <CardContent className="py-12 text-center">
-          <Shield className="w-12 h-12 mx-auto mb-4 text-red-400 animate-pulse" />
+          <Shield className="w-12 h-12 mx-auto mb-4 text-risk-high animate-pulse" />
           <p className="text-muted-foreground">Running security scan...</p>
         </CardContent>
       </Card>
@@ -176,9 +176,9 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
 
   if (!securityData) {
     return (
-      <Card className="border-2 border-red-500/30">
+      <Card className="border-2 border-risk-high/30">
         <CardContent className="py-12 text-center">
-          <ShieldX className="w-12 h-12 mx-auto mb-4 text-red-400" />
+          <ShieldX className="w-12 h-12 mx-auto mb-4 text-risk-high" />
           <p className="text-muted-foreground">Security scan failed</p>
           <Button variant="outline" onClick={handleRetest} className="mt-4">
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -195,15 +195,15 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
     securityData.overallRisk === 'critical';
 
   return (
-    <Card className="border-2 border-red-500/30 bg-gradient-to-br from-background via-background to-red-950/10 overflow-hidden">
-      <CardHeader className="border-b border-red-500/20 bg-red-950/20">
+    <Card className="border-2 border-risk-high/30 bg-gradient-to-br from-background via-background to-risk-high-soft overflow-hidden">
+      <CardHeader className="border-b border-risk-high/30 bg-risk-high-soft">
         <CardTitle className="flex items-center gap-3">
           {hasCriticalIssues ? (
-            <ShieldAlert className="w-6 h-6 text-red-400" />
+            <ShieldAlert className="w-6 h-6 text-risk-high" />
           ) : securityScore.percentage >= 80 ? (
-            <ShieldCheck className="w-6 h-6 text-green-400" />
+            <ShieldCheck className="w-6 h-6 text-risk-low" />
           ) : (
-            <Shield className="w-6 h-6 text-yellow-400" />
+            <Shield className="w-6 h-6 text-risk-mid" />
           )}
           <div>
             <span className="text-lg">Security & Privacy Vulnerabilities</span>
@@ -217,19 +217,19 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
       <CardContent className="p-4 space-y-6">
         {/* CRITICAL ALERTS */}
         {securityData.dnsLeak?.isLeaking && (
-          <div className="bg-red-500/20 border-2 border-red-500 rounded-lg p-4 animate-pulse">
+          <div className="bg-risk-high-soft border-2 border-risk-high rounded-lg p-4 animate-pulse">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-6 h-6 text-risk-high flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-red-400 font-bold text-lg mb-2">
+                <h3 className="text-risk-high font-bold text-lg mb-2">
                   🚨 CRITICAL: DNS LEAK DETECTED
                 </h3>
-                <p className="text-sm text-red-200 mb-3">
+                <p className="text-sm text-risk-high mb-3">
                   Your DNS requests are being sent to your ISP instead of your VPN's DNS. 
                   This completely defeats your VPN—websites can see your real location 
                   and your ISP can log every website you visit.
                 </p>
-                <p className="text-xs text-red-300/80 mb-3">
+                <p className="text-xs text-risk-high mb-3">
                   Detected location: {securityData.dnsLeak.actualLocation}
                 </p>
                 <Button 
@@ -245,21 +245,21 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         )}
 
         {!securityData.httpsStatus.isSecure && (
-          <div className="bg-orange-500/20 border-2 border-orange-500 rounded-lg p-4">
+          <div className="bg-risk-orange-soft border-2 border-risk-orange rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Unlock className="w-6 h-6 text-orange-400 flex-shrink-0 mt-0.5" />
+              <Unlock className="w-6 h-6 text-risk-orange flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-orange-400 font-bold text-lg mb-2">
+                <h3 className="text-risk-orange font-bold text-lg mb-2">
                   ⚠️ WARNING: Insecure Connection
                 </h3>
-                <p className="text-sm text-orange-200 mb-3">
+                <p className="text-sm text-risk-orange mb-3">
                   This site uses HTTP instead of HTTPS. Your data is transmitted in plain text 
                   and can be intercepted by anyone on your network, including passwords and personal info.
                 </p>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  className="border-orange-500 text-orange-400 hover:bg-orange-500/20"
+                  className="border-risk-orange text-risk-orange hover:bg-risk-orange-soft"
                   onClick={() => setExpandedGuide(expandedGuide === 'https' ? null : 'https')}
                 >
                   {expandedGuide === 'https' ? 'Hide' : 'How to Stay Safe'}
@@ -270,14 +270,14 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         )}
 
         {securityData.mixedContent.hasMixedContent && (
-          <div className="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4">
+          <div className="bg-risk-mid-soft border border-risk-mid/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-risk-mid flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-yellow-400 font-semibold mb-1">
+                <h3 className="text-risk-mid font-semibold mb-1">
                   Mixed Content Detected
                 </h3>
-                <p className="text-sm text-yellow-200/80">
+                <p className="text-sm text-risk-mid">
                   {securityData.mixedContent.insecureResources} insecure resources 
                   ({securityData.mixedContent.types.join(', ')}) loaded over HTTP, 
                   creating security vulnerabilities.
@@ -288,16 +288,16 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         )}
 
         {/* SECURITY SCORECARD */}
-        <div className="bg-background/50 rounded-lg p-4 border border-border">
+        <div className="bg-surface/95 rounded-lg p-4 border border-surface-border">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-primary" />
+              <ShieldCheck className="w-5 h-5 text-brand" />
               Security Scorecard
             </h3>
             <div className="flex items-center gap-2">
               <span className={`text-2xl font-bold ${
-                securityScore.percentage >= 80 ? 'text-green-400' :
-                securityScore.percentage >= 50 ? 'text-yellow-400' : 'text-red-400'
+                securityScore.percentage >= 80 ? 'text-risk-low' :
+                securityScore.percentage >= 50 ? 'text-risk-mid' : 'text-risk-high'
               }`}>
                 {securityScore.score}/{securityScore.total}
               </span>
@@ -352,9 +352,9 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
 
         {/* VPN EFFECTIVENESS ANALYSIS */}
         {vpnAnalysis?.detected && (
-          <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/30">
+          <div className="bg-[hsl(var(--cat-language-tint))] rounded-lg p-4 border border-[hsl(var(--cat-language)/0.3)]">
             <h3 className="font-semibold flex items-center gap-2 mb-3">
-              <Wifi className="w-5 h-5 text-blue-400" />
+              <Wifi className="w-5 h-5 text-[hsl(var(--cat-language))]" />
               VPN Effectiveness Analysis
             </h3>
             
@@ -364,8 +364,8 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
                 <Progress value={vpnAnalysis.effectiveness} className="h-2" />
               </div>
               <span className={`text-xl font-bold ${
-                vpnAnalysis.effectiveness >= 80 ? 'text-green-400' :
-                vpnAnalysis.effectiveness >= 50 ? 'text-yellow-400' : 'text-red-400'
+                vpnAnalysis.effectiveness >= 80 ? 'text-risk-low' :
+                vpnAnalysis.effectiveness >= 50 ? 'text-risk-mid' : 'text-risk-high'
               }`}>
                 {vpnAnalysis.effectiveness}%
               </span>
@@ -376,16 +376,16 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
                 <span className="flex items-center gap-2">
                   <Eye className="w-4 h-4" /> IP Hidden
                 </span>
-                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                <CheckCircle2 className="w-4 h-4 text-risk-low" />
               </div>
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Server className="w-4 h-4" /> DNS Protected
                 </span>
                 {vpnAnalysis.dnsProtected ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  <CheckCircle2 className="w-4 h-4 text-risk-low" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
+                  <XCircle className="w-4 h-4 text-risk-high" />
                 )}
               </div>
               <div className="flex items-center justify-between">
@@ -393,9 +393,9 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
                   <Globe className="w-4 h-4" /> WebRTC Protected
                 </span>
                 {vpnAnalysis.webrtcProtected ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                  <CheckCircle2 className="w-4 h-4 text-risk-low" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
+                  <XCircle className="w-4 h-4 text-risk-high" />
                 )}
               </div>
             </div>
@@ -457,7 +457,7 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
               onOpenChange={() => setExpandedGuide(expandedGuide === key ? null : key)}
             >
               <CollapsibleTrigger className="w-full">
-                <div className="flex items-center justify-between p-3 bg-background/50 rounded-lg border border-border hover:border-primary/50 transition-colors">
+                <div className="flex items-center justify-between p-3 bg-surface/95 rounded-lg border border-surface-border hover:border-surface-border transition-colors">
                   <span className="font-medium text-sm">{guide.title}</span>
                   {expandedGuide === key ? (
                     <ChevronUp className="w-4 h-4" />
@@ -467,24 +467,24 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="p-3 bg-muted/30 rounded-b-lg border-x border-b border-border mt-[-1px]">
+                <div className="p-3 bg-muted/30 rounded-b-lg border-x border-b border-surface-border mt-[-1px]">
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     {guide.steps.map((step, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <span className="text-primary">•</span>
+                        <span className="text-brand">•</span>
                         {step}
                       </li>
                     ))}
                   </ul>
                   {guide.links && (
-                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border">
+                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-surface-border">
                       {guide.links.map((link, i) => (
                         <a
                           key={i}
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1"
+                          className="text-xs text-brand hover:underline flex items-center gap-1"
                         >
                           {link.text}
                           <ExternalLink className="w-3 h-3" />
@@ -499,46 +499,46 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         </div>
 
         {/* BROWSER RECOMMENDATIONS */}
-        <div className="bg-background/50 rounded-lg p-4 border border-border">
+        <div className="bg-surface/95 rounded-lg p-4 border border-surface-border">
           <h3 className="font-semibold flex items-center gap-2 mb-3">
-            <Globe className="w-5 h-5 text-primary" />
+            <Globe className="w-5 h-5 text-brand" />
             Browser Security Recommendations
           </h3>
           <div className="text-sm space-y-2 text-muted-foreground">
             <p>Based on {securityData.browserSecurity.version}:</p>
             <ul className="space-y-1.5 ml-4">
               {!securityData.browserSecurity.isUpdated && (
-                <li className="flex items-center gap-2 text-yellow-400">
+                <li className="flex items-center gap-2 text-risk-mid">
                   <AlertTriangle className="w-3 h-3" />
                   Update to the latest version for security patches
                 </li>
               )}
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                <CheckCircle2 className="w-3 h-3 text-risk-low" />
                 Enable "HTTPS-Only Mode" in browser settings
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                <CheckCircle2 className="w-3 h-3 text-risk-low" />
                 Install uBlock Origin for ad/tracker blocking
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                <CheckCircle2 className="w-3 h-3 text-risk-low" />
                 Consider using DNS-over-HTTPS (DoH)
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-3 h-3 text-green-400" />
+                <CheckCircle2 className="w-3 h-3 text-risk-low" />
                 Disable WebRTC if you use a VPN
               </li>
             </ul>
             <div className="pt-2 text-xs">
-              <span className="text-green-400">Detected features: </span>
+              <span className="text-risk-low">Detected features: </span>
               {securityData.browserSecurity.securityFeatures.slice(0, 4).join(', ')}
             </div>
           </div>
         </div>
 
         {/* RETEST BUTTONS */}
-        <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-surface-border">
           <Button 
             onClick={handleRetest} 
             disabled={retesting}
@@ -588,15 +588,15 @@ const SecurityCheckItem = ({
   critical?: boolean;
 }) => (
   <div className={`flex items-center justify-between p-2 rounded ${
-    critical ? 'bg-red-500/20' : passed ? 'bg-green-500/10' : 'bg-yellow-500/10'
+    critical ? 'bg-risk-high-soft' : passed ? 'bg-risk-low-soft' : 'bg-risk-mid-soft'
   }`}>
     <span className="flex items-center gap-2">
       {passed ? (
-        <CheckCircle2 className="w-4 h-4 text-green-400" />
+        <CheckCircle2 className="w-4 h-4 text-risk-low" />
       ) : critical ? (
-        <XCircle className="w-4 h-4 text-red-400" />
+        <XCircle className="w-4 h-4 text-risk-high" />
       ) : (
-        <XCircle className="w-4 h-4 text-yellow-400" />
+        <XCircle className="w-4 h-4 text-risk-mid" />
       )}
       {label}
     </span>
@@ -618,21 +618,21 @@ const VulnerabilityExplainer = ({
   severity: 'critical' | 'warning' | 'info' | 'secure';
 }) => {
   const borderColor = {
-    critical: 'border-red-500/30',
-    warning: 'border-yellow-500/30',
-    info: 'border-border',
-    secure: 'border-green-500/30',
+    critical: 'border-risk-high/30',
+    warning: 'border-risk-mid/30',
+    info: 'border-surface-border',
+    secure: 'border-risk-low/30',
   }[severity];
 
   const iconBg = {
-    critical: 'bg-red-500/20 text-red-400',
-    warning: 'bg-yellow-500/20 text-yellow-400',
+    critical: 'bg-risk-high-soft text-risk-high',
+    warning: 'bg-risk-mid-soft text-risk-mid',
     info: 'bg-muted text-muted-foreground',
-    secure: 'bg-green-500/20 text-green-400',
+    secure: 'bg-risk-low-soft text-risk-low',
   }[severity];
 
   return (
-    <div className={`p-3 rounded-lg border ${borderColor} bg-background/30`}>
+    <div className={`p-3 rounded-lg border ${borderColor} bg-surface/95`}>
       <div className="flex items-start gap-3">
         <div className={`p-2 rounded ${iconBg}`}>
           {icon}

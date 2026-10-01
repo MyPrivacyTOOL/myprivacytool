@@ -113,7 +113,7 @@ export function recordChannelMetrics(env, platform, metricDate, metrics = {}) {
  * 24h expiry purge: delete mpt_osint_scan_results rows past expires_at.
  * Returns the number of rows deleted, or -1 on failure/skip.
  */
-export async function purgeExpiredScanResults(env) {
+export async function purgeExpiredSupabaseScanResults(env) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('Supabase not configured — skipping purge');
     return -1;

@@ -35,10 +35,10 @@ export default function StatsDashboard({ feedbackStats }: StatsDashboardProps) {
   };
 
   return (
-    <Card className="glass-card border-primary/20">
-      <CardHeader className="border-b border-border">
+    <Card className="glass-card border-surface-border">
+      <CardHeader className="border-b border-surface-border">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <BarChart3 className="w-5 h-5 text-primary" />
+          <BarChart3 className="w-5 h-5 text-brand" />
           Analytics Dashboard
           <span className="text-xs font-normal text-muted-foreground ml-2">(Simulated)</span>
         </CardTitle>
@@ -48,19 +48,19 @@ export default function StatsDashboard({ feedbackStats }: StatsDashboardProps) {
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <div className="text-2xl font-bold text-primary">{stats.totalPredictions.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-brand">{stats.totalPredictions.toLocaleString()}</div>
             <div className="text-xs text-muted-foreground">Total Predictions</div>
           </div>
           <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <div className="text-2xl font-bold text-green-500">{stats.accuracy}%</div>
+            <div className="text-2xl font-bold text-risk-low">{stats.accuracy}%</div>
             <div className="text-xs text-muted-foreground">Accuracy Rate</div>
           </div>
           <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <div className="text-2xl font-bold text-blue-500">6</div>
+            <div className="text-2xl font-bold text-[hsl(var(--cat-language))]">6</div>
             <div className="text-xs text-muted-foreground">Signals Detected</div>
           </div>
           <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <div className="text-2xl font-bold text-purple-500">4</div>
+            <div className="text-2xl font-bold text-[hsl(var(--cat-social))]">4</div>
             <div className="text-xs text-muted-foreground">Profile Types</div>
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function StatsDashboard({ feedbackStats }: StatsDashboardProps) {
           {/* Language Distribution */}
           <div>
             <h4 className="flex items-center gap-2 font-medium mb-4">
-              <Globe className="w-4 h-4 text-primary" />
+              <Globe className="w-4 h-4 text-brand" />
               Common Languages
             </h4>
             <div className="space-y-3">
@@ -88,7 +88,7 @@ export default function StatsDashboard({ feedbackStats }: StatsDashboardProps) {
           {/* User Profile Distribution */}
           <div>
             <h4 className="flex items-center gap-2 font-medium mb-4">
-              <Users className="w-4 h-4 text-primary" />
+              <Users className="w-4 h-4 text-brand" />
               User Profiles
             </h4>
             <div className="space-y-3">
@@ -106,9 +106,9 @@ export default function StatsDashboard({ feedbackStats }: StatsDashboardProps) {
         </div>
 
         {/* Trending Insight */}
-        <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/10">
+        <div className="mt-6 p-4 bg-brand-soft rounded-lg border border-surface-border">
           <div className="flex items-start gap-3">
-            <TrendingUp className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+            <TrendingUp className="w-5 h-5 text-brand flex-shrink-0 mt-0.5" />
             <div>
               <h5 className="font-medium text-sm mb-1">Trending Pattern</h5>
               <p className="text-sm text-muted-foreground">

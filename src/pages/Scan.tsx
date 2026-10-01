@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Seo from "@/components/Seo";
 
 const Scan = () => {
   const [email, setEmail] = useState("");
@@ -13,6 +14,7 @@ const Scan = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-sans">
+      <Seo title="Free Data Exposure Scan | MyPrivacyTOOL" description="Run a free 60-second scan to see what data brokers and the open internet know about you, then get step-by-step guides to remove it." path="/scan" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 text-center">
         <div className="inline-block bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">

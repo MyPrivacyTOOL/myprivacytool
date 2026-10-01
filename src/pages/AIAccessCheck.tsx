@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Bot, Check, Eye, Lock, ScanLine, ShieldCheck } from "lucide-react";
 import { submitHubSpotForm } from "@/lib/hubspot";
+import Seo from "@/components/Seo";
 import {
   trackAIAccessCheckCta,
   trackAIAccessCheckSignup,
@@ -39,7 +40,6 @@ export default function AIAccessCheck() {
   }, []);
 
   useEffect(() => {
-    document.title = "Free AI Access Check — MyPrivacyTOOL.IO";
     trackAIAccessCheckView(utm);
   }, [utm]);
 
@@ -69,6 +69,7 @@ export default function AIAccessCheck() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
+      <Seo title="Free AI Access Check | MyPrivacyTOOL" description="Find out which AI tools and agents can access your accounts and data, and how to revoke that access. Join the waitlist." path="/ai-access-check" />
       <section className="max-w-3xl mx-auto px-6 pt-16 pb-10 text-center">
         <div className="inline-flex items-center gap-2 border border-[#00A03C]/40 text-[#00A03C] text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
           <ScanLine size={14} /> Free · No sign-up to scan

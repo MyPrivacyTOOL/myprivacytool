@@ -21,9 +21,9 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 80) return 'text-green-500';
-    if (confidence >= 60) return 'text-yellow-500';
-    return 'text-red-500';
+    if (confidence >= 80) return 'text-risk-low';
+    if (confidence >= 60) return 'text-risk-mid';
+    return 'text-risk-high';
   };
 
   const getProfileIcon = (profile: string) => {
@@ -46,10 +46,10 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
 
   if (isLoading) {
     return (
-      <Card className="glass-card border-primary/20">
+      <Card className="glass-card border-surface-border">
         <CardContent className="flex items-center justify-center py-12">
           <div className="flex flex-col items-center gap-4">
-            <Brain className="w-12 h-12 text-primary animate-pulse" />
+            <Brain className="w-12 h-12 text-brand animate-pulse" />
             <div className="text-lg font-medium">Running TensorFlow.js model...</div>
             <div className="text-sm text-muted-foreground">Processing your locale signals</div>
           </div>
@@ -63,10 +63,10 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
   }
 
   return (
-    <Card className="glass-card border-primary/20 overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-primary/10">
+    <Card className="glass-card border-surface-border overflow-hidden">
+      <CardHeader className="bg-gradient-to-r from-brand-soft via-brand-soft to-brand-soft border-b border-surface-border">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Brain className="w-5 h-5 text-primary" />
+          <Brain className="w-5 h-5 text-brand" />
           AI Prediction Results
         </CardTitle>
       </CardHeader>
@@ -75,9 +75,9 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
         {/* Main Predictions */}
         <div className="grid md:grid-cols-3 gap-4">
           {/* Preferred Language */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+          <div className="p-4 rounded-lg bg-muted/50 border border-surface-border">
             <div className="flex items-center gap-2 mb-3">
-              <Globe className="w-4 h-4 text-primary" />
+              <Globe className="w-4 h-4 text-brand" />
               <span className="text-sm font-medium text-muted-foreground">Preferred Language</span>
             </div>
             <div className="text-xl font-bold mb-2">{prediction.preferredLanguage}</div>
@@ -90,9 +90,9 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
           </div>
 
           {/* User Profile */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+          <div className="p-4 rounded-lg bg-muted/50 border border-surface-border">
             <div className="flex items-center gap-2 mb-3">
-              <User className="w-4 h-4 text-primary" />
+              <User className="w-4 h-4 text-brand" />
               <span className="text-sm font-medium text-muted-foreground">User Profile</span>
             </div>
             <div className="text-xl font-bold mb-1 capitalize flex items-center gap-2">
@@ -111,9 +111,9 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
           </div>
 
           {/* Recommended UI */}
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+          <div className="p-4 rounded-lg bg-muted/50 border border-surface-border">
             <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="w-4 h-4 text-primary" />
+              <Lightbulb className="w-4 h-4 text-brand" />
               <span className="text-sm font-medium text-muted-foreground">Recommended UI</span>
             </div>
             <div className="text-xl font-bold mb-2">{prediction.recommendedUILanguage}</div>
@@ -127,7 +127,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
         </div>
 
         {/* Reasoning Section */}
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-surface-border pt-4">
           <button
             onClick={() => setShowReasoning(!showReasoning)}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -141,7 +141,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
               <ul className="space-y-2">
                 {prediction.reasoning.map((reason, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">
-                    <span className="text-primary mt-0.5">•</span>
+                    <span className="text-brand mt-0.5">•</span>
                     <span>{reason}</span>
                   </li>
                 ))}
@@ -151,7 +151,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
         </div>
 
         {/* Feedback Section */}
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-surface-border pt-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <span className="text-sm text-muted-foreground">Was this prediction correct?</span>
             
@@ -161,7 +161,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
                   variant="outline"
                   size="sm"
                   onClick={() => handleFeedback(true)}
-                  className="gap-2 hover:bg-green-500/10 hover:text-green-500 hover:border-green-500"
+                  className="gap-2 hover:bg-risk-low-soft hover:text-risk-low hover:border-risk-low"
                 >
                   <ThumbsUp className="w-4 h-4" />
                   Yes, correct
@@ -170,7 +170,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
                   variant="outline"
                   size="sm"
                   onClick={() => handleFeedback(false)}
-                  className="gap-2 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500"
+                  className="gap-2 hover:bg-risk-high-soft hover:text-risk-high hover:border-risk-high"
                 >
                   <ThumbsDown className="w-4 h-4" />
                   Not quite
@@ -178,7 +178,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
               </div>
             ) : (
               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                feedbackGiven ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                feedbackGiven ? 'bg-risk-low-soft text-risk-low' : 'bg-risk-high-soft text-risk-high'
               }`}>
                 {feedbackGiven ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}
                 <span className="text-sm font-medium">
