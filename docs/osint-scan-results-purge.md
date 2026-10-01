@@ -33,3 +33,6 @@ wrangler deploy
 
 ## Future
 When agents switch to Supabase `mpt_osint_scan_results` (MPC-6956), add a matching purge (`delete where expires_at < now()`), e.g. via pg_cron.
+
+## Supabase purge (MPC-6977)
+The same daily cron also calls `purgeExpiredSupabaseScanResults` (`workers/webhook-receiver/supabase-client.js`), which deletes `mpt_osint_scan_results` rows where `expires_at < now()` via the service_role key. It is a no-op (warning logged, returns -1) until `SUPABASE_SERVICE_ROLE_KEY` is set: `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`. Logs the deleted row count only.
