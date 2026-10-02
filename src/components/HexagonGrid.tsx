@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
@@ -62,6 +62,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const [revealingHexagons, setRevealingHexagons] = useState<Set<string>>(new Set());
   const gridRef = useRef<HTMLDivElement>(null);
   const isFirstConfirmation = useRef(true);
+  // Synchronous guard so rapid double-clicks on one hexagon count once
+  const confirmedIdsRef = useRef<Set<string>>(new Set());
   
   // Language Intelligence state
   const [languageAnalysis, setLanguageAnalysis] = useState<LanguageAnalysis | null>(null);
@@ -132,7 +134,16 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     return sorted;
   }, [allHexagons]);
 
-  const orderedHexagons = getOrderedHexagons();
+  // Confirmation is derived from React state, not stored on the hexagon objects,
+  // so it survives the parent regenerating `allHexagons` (orientation/motion updates).
+  const orderedHexagons = useMemo(
+    () => getOrderedHexagons().map(h =>
+      confirmedHexagons.has(h.id)
+        ? { ...h, confirmed: true, confidence: Math.min(h.confidence + 5, 99) }
+        : { ...h, confirmed: false }
+    ),
+    [getOrderedHexagons, confirmedHexagons]
+  );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
 
   // Lazy load fingerprint data when about to be revealed
@@ -362,10 +373,11 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
 
   const handleConfirm = (id: string) => {
     if (revealingHexagons.has(id)) return;
-    if (confirmedHexagons.has(id)) return;
+    if (confirmedIdsRef.current.has(id)) return;
     
     const hex = visibleHexagons.find(h => h.id === id);
     if (hex && !hex.confirmed) {
+      confirmedIdsRef.current.add(id);
       trackActivity();
       
       if (isFirstConfirmation.current) {
@@ -443,9 +455,6 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           return newCount;
         });
       }
-      
-      hex.confirmed = true;
-      hex.confidence = Math.min(hex.confidence + 5, 99);
     }
   };
 
@@ -568,6 +577,29 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
         </p>
+      </div>
+
+      {/* Confirmation progress */}
+      <div className="max-w-md mx-auto mb-4 px-4" data-testid="confirmation-progress">
+        <div className="flex items-center justify-between text-sm mb-1">
+          <span className="text-muted-foreground">Confirmed</span>
+          <span className="font-mono font-semibold text-green-400" aria-live="polite" aria-atomic="true" data-testid="confirmation-counter">{confirmedCount}/{visibleCount}</span>
+        </div>
+        <div
+          role="progressbar"
+          aria-label="Confirmed data points"
+          aria-valuemin={0}
+          aria-valuemax={visibleCount}
+          aria-valuenow={confirmedCount}
+          aria-valuetext={`${confirmedCount} of ${visibleCount} data points confirmed`}
+          className="h-2 bg-green-900/30 rounded-full overflow-hidden border border-green-500/20"
+        >
+          <div
+            className="h-full rounded-full bg-green-500 transition-all duration-500 ease-out"
+            style={{ width: `${visibleCount > 0 ? Math.min(100, (confirmedCount / visibleCount) * 100) : 0}%` }}
+            data-testid="confirmation-progress-fill"
+          />
+        </div>
       </div>
 
       {/* Voice AI */}
