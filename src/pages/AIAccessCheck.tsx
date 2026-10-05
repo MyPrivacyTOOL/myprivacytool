@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Bot, Check, Eye, Lock, ScanLine, ShieldCheck } from "lucide-react";
-import { submitHubSpotForm } from "@/lib/hubspot";
+import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
+import ConsentCheckbox from "@/components/ConsentCheckbox";
 import Seo from "@/components/Seo";
 import {
   trackAIAccessCheckCta,
@@ -26,6 +27,7 @@ const CHECKS = [
 
 export default function AIAccessCheck() {
   const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -51,12 +53,13 @@ export default function AIAccessCheck() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!consent) return;
     setStatus("loading");
     setErrorMsg("");
     try {
       await submitHubSpotForm({
         formId: FORM_ID,
-        fields: { email, source_tag: SOURCE_TAG },
+        fields: { email, source_tag: SOURCE_TAG, ...consentFields("ai_access_check") },
         pageName: "AI Access Check waitlist",
       });
       trackAIAccessCheckSignup(utm);
@@ -122,6 +125,7 @@ export default function AIAccessCheck() {
                 disabled={status === "loading"}
                 className="w-full bg-black border border-[#2A2A2A] rounded-lg px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#00A03C] disabled:opacity-50 transition-colors"
               />
+              <ConsentCheckbox id="ai-check-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-gray-500" />
               {status === "error" && <p role="alert" className="text-red-400 text-xs">{errorMsg}</p>}
               <button
                 type="submit"
