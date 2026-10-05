@@ -1,5 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
+import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -419,14 +420,14 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Seo
+        title={`${post.title} | MyPrivacyTOOL`}
+        description={post.excerpt}
+        path={`/blog/${slug}`}
+        type="article"
+        image={post.image ? `${SITE_URL}${post.image}` : undefined}
+      />
       <Helmet>
-        <title>{post.title} | MyPrivacyTOOL</title>
-        <meta name="description" content={post.excerpt} />
-        <link rel="canonical" href={canonical} />
-        <meta property="og:type" content="article" />
-        <meta property="og:title" content={post.title} />
-        <meta property="og:description" content={post.excerpt} />
-        <meta property="og:url" content={canonical} />
         {jsonLd.map((block, i) => (
           <script key={i} type="application/ld+json">{JSON.stringify(block)}</script>
         ))}

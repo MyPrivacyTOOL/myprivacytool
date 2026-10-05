@@ -1,9 +1,10 @@
+import pageMeta from "@/data/pageMeta.json";
 import ComingSoonPage from "@/components/ComingSoonPage";
 
 const Faq = () => (
   <ComingSoonPage
-    title="Frequently Asked Questions"
-    description="Answers to common questions about scans, removals, and pricing."
+    title={pageMeta["/faq"].title}
+    description={pageMeta["/faq"].description}
   />
 );
 

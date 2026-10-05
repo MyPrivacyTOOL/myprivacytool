@@ -1,15 +1,9 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
 
 const Accessibility = () => {
   return (
     <>
-      <Helmet>
-        <title>Accessibility Statement - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance."
-        />
-      </Helmet>
+      <Seo title="Accessibility Statement | MyPrivacyTOOL" description="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance." />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
