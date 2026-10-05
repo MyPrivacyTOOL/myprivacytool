@@ -13,7 +13,7 @@ Site origin: `https://www.myprivacytool.io` (www, https, no trailing slash).
 | Plural hub, singular-by-slug children: `/opt-out-guides` → `/opt-out-guides/<broker-or-registry>` | One hub page collects links and topical authority; each child targets one long-tail query (`spokeo opt out`). |
 | Slugs name the entity, not the action, for opt-out children (`spokeo`, `singapore-do-not-call-registry`) | Stable if the procedure changes; entity name is the search term. |
 | Region words live in slugs only when the registry is region-specific (`hong-kong-…`, `australia-…`, `singapore-…`) | Disambiguates similarly named registries and captures geo-modified queries. |
-| Evergreen how-to guides live under `/guides/<verb-phrase>` (`/guides/remove-from-google`) | Separates task-oriented guides from the broker/registry directory. Currently placeholder (noindex). |
+| Evergreen how-to guides live under `/guides/<verb-phrase>` (`/guides/remove-from-google`) | Separates task-oriented guides from the broker/registry directory. **Update 2026-10-01:** the three `/guides/*` routes are now client-side redirects (`<Navigate>`) to long-form posts under `/blog/`; the canonical URL for that content is the `/blog/` URL. |
 | Editorial content under `/blog/<slug>`; slug = short keyword phrase, no dates | Dates in URLs make refreshed posts look stale. |
 | Tool/funnel pages get one short noun or verb phrase (`/scan`, `/am-i-exposed`, `/ai-access-check`) | Memorable, directly linkable from ads and social. |
 | Never rename a live URL without a 301 and a registry update | Preserves link equity; the registry is the change log. |
@@ -44,6 +44,9 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | `/scan` | Product: free scan | privacy exposure score (#4) | free data exposure scan | 0.8 |
 | `/business` | B2B lead form | employee privacy protection | data broker removal for business | 0.8 |
 | `/blog` | Blog index | privacy blog | data privacy tips | 0.7 |
+| `/blog/remove-personal-information-from-internet` | How-to pillar (redirect target of `/guides/remove-my-info-from-internet`) | how to remove personal information from internet free (#1) | how to delete yourself from the internet (#10) | 0.6 |
+| `/blog/remove-your-name-and-info-from-google` | How-to (target of `/guides/remove-from-google`) | remove my name from Google search results (#14) | | 0.6 |
+| `/blog/stop-spam-calls-texts-and-emails` | How-to (target of `/guides/stop-spam`) | stop spam calls texts and emails (not in MPC-005) | | 0.6 |
 | `/blog/how-exposed-are-you` | Pillar post | what information do data brokers have on me (#9) | how exposed are you online | 0.6 |
 | `/blog/25-years-mass-surveillance` | Editorial | mass surveillance history | | 0.6 |
 | `/blog/linkedin-data-brokers` | Editorial | linkedin data brokers | linkedin privacy settings | 0.6 |
@@ -54,14 +57,16 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 ### MPC-005 keywords with no live page yet (content gaps)
 | MPC-005 keyword | Intended URL |
 |---|---|
-| #1 how to remove personal information from internet free, #10 how to delete yourself from the internet | `/guides/remove-my-info-from-internet` (placeholder) |
-| #14 remove my name from Google search results | `/guides/remove-from-google` (placeholder) |
+| #1 how to remove personal information from internet free, #10 how to delete yourself from the internet | **Covered** by `/blog/remove-personal-information-from-internet` (2026-09-30); validate ranking once indexed |
+| #14 remove my name from Google search results | **Covered** by `/blog/remove-your-name-and-info-from-google` (2026-09-30) |
 | #5 what is a data broker, #8 digital privacy checklist, #16 how to protect your privacy online | new blog / pillar posts (not yet in `blogPosts.json`) |
 | #11–13, #15 comparison / alternative keywords | comparison page (not built) |
 | #17 data broker removal Hong Kong Singapore | landing page (currently only covered by the registry guides) |
 
-### Intentionally excluded (noindex placeholders, `ComingSoonPage`)
-`/pricing`, `/about`, `/contact`, `/faq`, `/guides/remove-my-info-from-internet`, `/guides/remove-from-google`, `/guides/stop-spam`. Add each to `STATIC_ROUTES` and remove `ComingSoonPage` when the real page ships. `NotFound` is noindex.
+### Intentionally excluded
+- Noindex placeholders (`ComingSoonPage`): `/pricing`, `/about`, `/contact`, `/faq`. Add each to `STATIC_ROUTES` and remove `ComingSoonPage` when the real page ships.
+- Redirect-only routes (not in the sitemap, correctly): `/guides/remove-my-info-from-internet`, `/guides/remove-from-google`, `/guides/stop-spam`. **Caveat:** these are client-side redirects, not HTTP 301s; search engines may not treat them as permanent. Prefer host-level 301s if the host supports them.
+- `NotFound` is noindex.
 
 ## 3. Audit results (2026-09-30)
 
@@ -69,13 +74,13 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 |---|---|---|
 | Canonical | Only `index.html` (homepage), the opt-out hub/children and `/am-i-exposed` had canonicals. Because `index.html` is served for every SPA route, all other pages inherited the **homepage** canonical. | **Fixed:** `Layout.tsx` now emits a self-referencing canonical per route; pages with their own `<Helmet>` canonical still override it. |
 | 404 | `NotFound` had no robots directive. | **Fixed:** `noindex`. |
-| Sitemap | `/privacy`, `/terms`, `/cookies` (indexable) were missing. Blog posts (4), opt-out guides (12) and 10 static routes already present. | **Fixed:** added; sitemap now 29 URLs. |
+| Sitemap | `/privacy`, `/terms`, `/cookies` (indexable) were missing. Blog posts (4), opt-out guides (12) and 10 static routes already present. | **Fixed:** added; sitemap was 29 URLs after this change and is 32 after merging `main` (three new blog posts). |
 | GA4 base tag | `G-1BWMDBJSPL` in `index.html`; `trackEvent` no-ops when `gtag` absent. | OK |
 | GA4 `generate_lead` — AI Access Check | Fires via `trackAIAccessCheckSignup`. | OK (verify live, below) |
 | GA4 `generate_lead` — Newsletter | No event fired on signup. | **Fixed:** `trackNewsletterSignup` fires `newsletter_signup` + `generate_lead` on success. |
 | GA4 — `/business` form | Form only sets local state; **nothing is submitted or tracked.** | **Open (tracked in Notion follow-up task):** needs HubSpot wiring per `docs/form-wiring-playbook.md`, then a `generate_lead` event. Not instrumented on purpose: firing a conversion for a form that captures no lead would corrupt data. |
 | GA4 — `/start` form | Submit is a `TODO` (no POST). Same issue. | **Open** |
-| Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost uses the post title and excerpt). |
+| Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost: `main` shipped its own Helmet with canonical, og tags and JSON-LD, which replaced this component on blog posts). **Open:** blog posts may now have both their og tags and the static `index.html` og tags; check in a browser. |
 
 ### Local browser verification (2026-09-30, production build served locally, headless Chromium)
 | Check | Result |
