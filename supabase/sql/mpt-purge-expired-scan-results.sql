@@ -32,3 +32,10 @@ as $$
 $$;
 revoke all on function public.mpt_purge_health() from public, anon, authenticated;
 grant execute on function public.mpt_purge_health() to service_role;
+
+-- Alerting (migration `mpc_6957_purge_alert_telegram`): pg_net + Vault. Secrets are NOT in this file.
+-- create extension if not exists pg_net with schema extensions;
+-- function public.mpt_purge_alert(p_test boolean default false) — SECURITY DEFINER, service_role only:
+--   reads vault.decrypted_secrets (telegram_alert_token, telegram_alert_chat_id), and when
+--   mpt_purge_health().healthy is false (or p_test) POSTs a message to Telegram sendMessage via net.http_post.
+-- select cron.schedule('mpt-purge-alert', '30 * * * *', $$select public.mpt_purge_alert(false)$$);

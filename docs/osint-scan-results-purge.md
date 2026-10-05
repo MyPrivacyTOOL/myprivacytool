@@ -12,7 +12,7 @@ Scan results carry a 24-hour retention promise (`expires_at`). Expired rows are 
 ## Monitoring
 `select * from public.mpt_purge_health();` (service_role only) returns `healthy`, `last_success`, `failed_runs_24h`, `expired_rows`. `healthy = false` when the last success is >2h old, any run failed in 24h, or rows are >2h past expiry.
 
-**Not yet automated:** pushing an alert on `healthy = false`. This needs an outbound channel secret (e.g. a Telegram bot token + chat id) held outside this repo — tracked as a follow-up.
+**Alerting (live):** pg_cron job `mpt-purge-alert` runs at `:30` every hour and calls `public.mpt_purge_alert(false)`. When `mpt_purge_health()` is unhealthy it sends a Telegram message to the "MPT Alerts" group via `pg_net`. The bot token and chat id are stored only in Supabase Vault (`telegram_alert_token`, `telegram_alert_chat_id`), never in this repo. Send a test message with `select public.mpt_purge_alert(true);` (service_role only).
 
 ## Verify
 1. `select * from cron.job where jobname = 'mpt-purge-expired-scan-results';` → `active = true`.
