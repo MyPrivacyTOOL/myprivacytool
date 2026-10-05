@@ -68,3 +68,9 @@ Pattern: the only provider with a member-level list-and-revoke API is likely Mic
 1. Live-run the Google PoC on the test account; mark the MPC-6960 [verify] items confirmed or refuted.
 2. Microsoft Graph PoC #2 to confirm user-level list and revoke.
 3. Product sign-off on guided-audit scope; then create implementation tickets.
+
+## 6. Deployment (updated 2026-10-05)
+
+The PoC Worker lives in the **MyPrivacyTOOL Cloudflare account** (`35cb17172c65a20f5cf1baf131485382`), not the personal cransford account (see Notion "MPT Infrastructure - GitHub, Cloudflare & Supabase (Ops)"). It deploys on merge to `main` via `.github/workflows/deploy-oauth-poc.yml`, using the same repo Actions secrets as `deploy-mpt-leads.yml`. Live URL: `https://myprivacytool-oauth-poc.myprivacytool.workers.dev`.
+
+Secret values are set only in the Cloudflare dashboard (Workers & Pages > myprivacytool-oauth-poc > Settings > Variables and Secrets). Names are in `workers/oauth-poc/EXPECTED_SECRETS.txt`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY` (64 hex chars), `REDIRECT_URI` (`https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback`, also an authorised redirect URI on the Google **Web application** client). The workflow warns, but does not fail, when a name is missing on the first deploy.

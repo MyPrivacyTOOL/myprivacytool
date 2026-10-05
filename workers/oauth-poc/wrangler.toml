@@ -1,11 +1,18 @@
 name = "myprivacytool-oauth-poc"
 main = "index.js"
 compatibility_date = "2024-01-01"
+workers_dev = true
 
 # MPC-6971 Phase 5 proof of concept: Google OAuth 2.0 (auth code + PKCE).
-# Secrets are set with `wrangler secret put`, never in this file:
-#   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, STATE_SIGNING_KEY
-# Vars: REDIRECT_URI (must match the OAuth client's authorised redirect URI)
+# Lives in the MyPrivacyTOOL Cloudflare account (35cb17172c65a20f5cf1baf131485382), deployed by
+# .github/workflows/deploy-oauth-poc.yml. Live URL once deployed:
+#   https://myprivacytool-oauth-poc.myprivacytool.workers.dev
+#
+# Secrets are NOT declared here and `wrangler deploy` never touches their values. Set them in the
+# Cloudflare dashboard (Workers & Pages > myprivacytool-oauth-poc > Settings > Variables and Secrets).
+# Names: EXPECTED_SECRETS.txt. REDIRECT_URI must equal
+#   https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback
+# and be an authorised redirect URI on the Google Web application OAuth client.
 
 [observability]
 enabled = true
