@@ -21,6 +21,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Free Scan", href: "/" },
   { label: "How it works", href: "/#how-it-works", isAnchor: true },
+  { label: "Your journey", href: "/journey" },
   { label: "Pricing", href: "/pricing" },
   { label: "For Business", href: "/business" },
   { label: "Guides", href: "/blog" },
