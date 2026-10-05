@@ -2,19 +2,19 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const SITE = 'https://myprivacytool.io';
 
 // The confirmation may only promise what buildReportEmail delivers. Keep the two in sync.
+// DRAFT COPY (free version, no paid breach API): Chris must approve before any real-user send.
 export function buildConfirmationEmail() {
   const subject = 'We received your privacy scan request';
   const text = [
     'Thanks for requesting a privacy scan from MyPrivacyTOOL.',
     '',
     'Within 48 hours we will email you a report that includes:',
-    '  - Which known data breaches include your email address (via Have I Been Pwned)',
-    '  - A privacy score from 0 to 100, based only on the checks we can run (we label anything we have not checked)',
-    '  - Removal steps for five people-search sites: Spokeo, Whitepages, BeenVerified, MyLife and Intelius',
+    '  - Step-by-step removal instructions for five people-search sites: Spokeo, Whitepages, BeenVerified, MyLife and Intelius',
+    '  - A link and short guide to check, free, whether your email address appears in known data breaches',
     '',
-    'What the report does not cover yet: automatic lookups on people-search sites (they need your name and',
-    'location and do not allow automated searches), social media, AI-training data and 40+ other signals.',
-    'We will say "not yet checked" rather than guess.',
+    'What the report does not do yet: we do not look you up on those sites or in breach databases for you,',
+    'and we do not give a privacy score until we can check something about you. Where we have not checked,',
+    'the report says "not yet checked" rather than guess.',
     '',
     'You can reply to this email with any questions, or ask us to delete your data at any time.',
     '',
@@ -23,10 +23,9 @@ export function buildConfirmationEmail() {
   const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#111">
 <h2>We received your privacy scan request</h2>
 <p>Within <strong>48 hours</strong> we will email you a report that includes:</p>
-<ul><li>Which known data breaches include your email address (via Have I Been Pwned)</li>
-<li>A privacy score from 0 to 100, based only on the checks we can run. Anything we have not checked is labelled.</li>
-<li>Removal steps for five people-search sites: Spokeo, Whitepages, BeenVerified, MyLife and Intelius</li></ul>
-<p><strong>Not covered yet:</strong> automatic lookups on people-search sites (they need your name and location and do not allow automated searches), social media, AI-training data and 40+ other signals. We will say &ldquo;not yet checked&rdquo; rather than guess.</p>
+<ul><li>Step-by-step removal instructions for five people-search sites: Spokeo, Whitepages, BeenVerified, MyLife and Intelius</li>
+<li>A link and short guide to check, free, whether your email address appears in known data breaches</li></ul>
+<p><strong>What the report does not do yet:</strong> we do not look you up on those sites or in breach databases for you, and we do not give a privacy score until we can check something about you. Where we have not checked, the report says &ldquo;not yet checked&rdquo; rather than guess.</p>
 <p>Reply to this email with any questions, or to ask us to delete your data.</p>
 <p>The MyPrivacyTOOL team</p>
 <hr style="border:none;border-top:1px solid #eee"><p style="font-size:12px;color:#999">MyPrivacyTOOL &middot; myprivacytool.io</p>
@@ -36,11 +35,13 @@ export function buildConfirmationEmail() {
 
 export function buildReportEmail({ scan, breaches, breachStatus, brokers }) {
   const s = scan;
-  const partialNote = s.partial
+  const partialNote = s.score === null
+    ? 'No privacy score yet: we have not been able to check anything about you automatically, so we will not invent a number.'
+    : s.partial
     ? `Partial score: based on ${s.categories_checked.length} of 8 categories (${s.categories_checked.join(', ') || 'none'}). Not yet checked: ${s.hexagons.filter((h) => !h.checked).map((h) => h.label).join('; ')}.`
     : 'Score covers all 8 categories.';
   const breachLines = breachStatus !== 'checked'
-    ? ['Breach check: not yet checked (the breach service was unavailable). We will not guess.']
+    ? ['Breach check: not yet checked by us. Check your own address free at https://haveibeenpwned.com (10 seconds). If it appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.']
     : breaches.length === 0
       ? ['Good news: your email address was not found in any breach known to Have I Been Pwned.']
       : breaches.map((b) => `- ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`);
@@ -50,17 +51,17 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers }) {
     return `${head}\n  Remove yourself: ${b.removal_url} (${b.time_needed || 'a few minutes'}; ${b.processing_time || 'timing varies'})\n` +
       (b.steps ? b.steps.map((st, i) => `   ${i + 1}. ${st}`).join('\n') : '');
   });
-  const subject = `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
+  const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
   const text = [
-    `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, partialNote, '',
+    s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, partialNote, '',
     'EMAIL BREACHES', ...breachLines, '',
     'PEOPLE-SEARCH SITES', ...brokerLines, '',
     `More removal guides: ${SITE}/opt-out`, 'Reply to this email to ask a question or have your data deleted.',
   ].join('\n');
   const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:640px;margin:0 auto;padding:20px;color:#111">
-<h2>Your privacy score: ${s.score}/100 <small style="color:#666">(${esc(s.risk_level)} exposure)</small></h2>
+<h2>${s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 <small style="color:#666">(${esc(s.risk_level)} exposure)</small>`}</h2>
 <p style="background:#f4f4f5;padding:10px;border-radius:6px">${esc(partialNote)}</p>
-<h3>Email breaches</h3>${breachStatus !== 'checked' ? '<p>Not yet checked. We will not guess.</p>'
+<h3>Email breaches</h3>${breachStatus !== 'checked' ? '<p>Not yet checked by us. <a href="https://haveibeenpwned.com">Check your own address free at haveibeenpwned.com</a> (10 seconds). If it appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.</p>'
     : breaches.length === 0 ? '<p>Your email address was not found in any breach known to Have I Been Pwned.</p>'
     : `<ul>${breaches.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7))}): ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}</ul><p>Change the password on any listed service, and anywhere you reused it.</p>`}
 <h3>People-search sites</h3><p>We have <strong>not yet checked</strong> these sites for you. Search for yourself and remove your listing:</p>

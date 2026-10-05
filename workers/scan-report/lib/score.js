@@ -54,9 +54,10 @@ export function computeScore(signals, checked) {
     return { category, label: c.label, checked: isChecked, score, signals_count: byCat[category].count,
              risk_multiplier: c.multiplier, color: colorFor(score) };
   });
-  const score = clamp(Math.round(100 - total));
   const unchecked = Object.keys(CATEGORIES).filter((k) => !checked.has(k));
-  const risk_level = score >= 90 ? 'low' : score >= 70 ? 'medium' : score >= 50 ? 'high' : 'critical';
+  // Nothing checked => no score at all. A bare "100" would be a guess dressed up as a result.
+  const score = checked.size === 0 ? null : clamp(Math.round(100 - total));
+  const risk_level = score === null ? null : score >= 90 ? 'low' : score >= 70 ? 'medium' : score >= 50 ? 'high' : 'critical';
   return {
     score, risk_level, hexagons,
     signals_found: signals.filter((s) => checked.has(s.category)).length,

@@ -11,6 +11,8 @@ const EMAIL = 'testingnt69@gmail.com';
 // ---- score
 let r = computeScore([], new Set(['email']));
 check(r.score === 100 && r.partial && r.categories_unchecked.length === 7, 'no breaches, email only => 100, partial, 7 unchecked');
+r = computeScore([], new Set());
+check(r.score === null && r.risk_level === null && r.hexagons.every((h) => h.score === null), 'nothing checked => NO score (null), never a bare 100');
 r = computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email']));
 check(r.score === 90 && r.hexagons.find((h) => h.category === 'broker').score === null, 'one password breach => 90; unchecked hexagon score is null (not guessed)');
 r = computeScore(Array(20).fill({ category: 'email', risk: 10, ageDays: 0 }), new Set(['email']));
@@ -32,9 +34,11 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(/48 hours/.test(conf.text) && /does not cover yet/i.test(conf.text) && !/20\+|46 data|AI-platform/i.test(conf.text), 'confirmation promises 48h and states gaps; no 20+/46/AI-platform claims');
-const rep = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
-check(/not yet checked/i.test(rep.text) && /Partial score/.test(rep.text) && rep.subject.includes('(partial)'), 'report labels partial score + not yet checked');
+check(/48 hours/.test(conf.text) && /does not do yet/i.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation promises 48h, removal steps, states gaps; no score/breach-lookup promise');
+const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
+check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /not yet checked/i.test(rep.text), 'free report: no score, self-check HIBP link, not yet checked');
+const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
+check(/Partial score/.test(rep2.text) && rep2.subject.includes('(partial)'), 'with HIBP: partial score labelled');
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
@@ -81,10 +85,10 @@ check(F.calls.filter((c) => c.url.includes('resend')).length === 2, 'no duplicat
 
 // HIBP missing => report held, nothing sent
 F = fake(); await handleScan({ ...env, HIBP_API_KEY: undefined }, null, input, F.f);
-res = await runReportJob({ ...env, HIBP_API_KEY: undefined }, F.f);
-check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.calls.filter((c) => c.url.includes('resend')).length === 1, 'no HIBP key => report held (pending), not sent half-built');
+res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'false' }, F.f);
+check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.calls.filter((c) => c.url.includes('resend')).length === 1, 'no HIBP key + ALLOW_PARTIAL_REPORT=false => report held (pending)');
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'true' }, F.f);
-check(res.sent === 1 && /not yet checked/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text), 'ALLOW_PARTIAL_REPORT sends a report with breaches marked not yet checked');
+check(res.sent === 1 && /not yet checked/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not yet checked; privacy_score stays null');
 
 // allowlist blocks real users
 F = fake(); await handleScan({ ...env, RECIPIENT_ALLOWLIST: 'someone@else.com' }, null, input, F.f);

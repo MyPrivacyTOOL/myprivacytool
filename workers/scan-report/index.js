@@ -132,7 +132,7 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
 async function processScan(env, sb, job, fetchImpl) {
   const email = job.email_scanned;
   const hibp = await checkBreaches(email, env, fetchImpl);
-  if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // the report promises breach results
+  if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
 
   const breaches = hibp.status === 'checked' ? hibp.breaches : [];
