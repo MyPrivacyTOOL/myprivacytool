@@ -13,7 +13,8 @@ import {
   startSessionTimer,
   trackSessionDuration,
   trackError,
-  trackScrollToFooter
+  trackScrollToFooter,
+  trackNewsletterSignup
 } from '@/lib/analytics';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
@@ -138,6 +139,17 @@ const Index = () => {
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };
+  }, []);
+
+  // The newsletter form is a HubSpot embed; HubSpot posts a message to the page when it submits successfully.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'hsFormCallback' && e.data?.eventName === 'onFormSubmitted') {
+        trackNewsletterSignup({ source: 'home_embed' });
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   // Check if should show federated learning modal (after 5+ predictions)
