@@ -1,0 +1,24 @@
+# MPC-6677: scan -> confirmation -> 48-hour privacy report. One Worker owns both the confirmation
+# email and the report (no duplicate senders). Deploy to the MyPrivacyTOOL Cloudflare account.
+name = "mpt-scan-report"
+main = "index.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+# Cron fallback + report runner: every 5 minutes. Each scan is due within 48h (report_due_at).
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
+HUBSPOT_LEAD_SOURCE = "web_scan"
+# Safety gate until the privacy policy (MPC-6545) is live and Chris approves a real-user send:
+# only these addresses (gmail "+tag" ignored) get emails. Remove/empty to open to everyone.
+RECIPIENT_ALLOWLIST = "testingnt69@gmail.com,testingnt7@gmail.com"
+# Free mode: send the report even without a HIBP key (breaches shown as "not yet checked" + self-check link).
+# With HIBP_API_KEY set, breaches are checked for real. Set "false" to HOLD reports until HIBP works.
+ALLOW_PARTIAL_REPORT = "true"
+
+# Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
+[observability]
+enabled = true

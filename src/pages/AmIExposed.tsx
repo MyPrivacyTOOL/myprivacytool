@@ -13,7 +13,7 @@ const AmIExposed = () => (
         Australia and the United States.
       </p>
       <Button asChild size="lg" className="mb-12">
-        <Link to="/scan">Start free scan</Link>
+        <Link to="/scan">Check My Exposure</Link>
       </Button>
       <div className="grid gap-6 sm:grid-cols-3 text-left mb-12">
         {[
@@ -29,7 +29,7 @@ const AmIExposed = () => (
       </div>
       <p className="text-muted-foreground">
         Already know who has your data? Jump straight to the{" "}
-        <Link to="/opt-out-guides" className="text-primary hover:underline">opt-out guides</Link>.
+        <Link to="/opt-out-guides" className="text-brand hover:underline">opt-out guides</Link>.
       </p>
     </div>
   </>

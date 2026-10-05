@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 
 interface EmailCaptureModalProps {
   riskScore: number;
+  categoryScores?: Record<string, number>;
   confirmedCount: number;
   onClose: () => void;
   onSubmit: (email: string) => void;
@@ -11,8 +12,16 @@ interface EmailCaptureModalProps {
 
 const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://mpt-leads.myprivacytool.workers.dev';
 
+interface Baseline {
+  overall_score: number;
+  created_at: string;
+  is_first: boolean;
+  delta: number;
+}
+
 export default function EmailCaptureModal({
   riskScore,
+  categoryScores,
   confirmedCount,
   onClose,
   onSubmit,
@@ -21,11 +30,12 @@ export default function EmailCaptureModal({
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [consent, setConsent] = useState(false);
+  const [baseline, setBaseline] = useState<Baseline | null>(null);
 
   const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return { label: 'High Risk', color: 'text-risk-high', bg: 'bg-risk-high-soft border-risk-high/30' };
-    if (risk >= 40) return { label: 'Medium Risk', color: 'text-risk-mid', bg: 'bg-risk-mid-soft border-risk-mid/30' };
-    return { label: 'Low Risk', color: 'text-risk-low', bg: 'bg-risk-low-soft border-risk-low/30' };
+    if (risk >= 70) return { label: 'High Risk', color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
+    if (risk >= 40) return { label: 'Medium Risk', color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
+    return { label: 'Low Risk', color: 'text-foreground', bg: 'bg-risk-low-soft border-risk-low/30' };
   };
 
   const { label: riskLabel, color: riskColor, bg: riskBg } = getRiskLabel(riskScore);
@@ -53,6 +63,7 @@ export default function EmailCaptureModal({
         body: JSON.stringify({
           email: trimmed,
           riskScore,
+          categoryScores,
           confirmedCount,
           source: 'web_scan_summary',
           consent: true,
@@ -62,6 +73,8 @@ export default function EmailCaptureModal({
       });
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json().catch(() => null);
+      if (data?.baseline) setBaseline(data.baseline);
 
       setStatus('success');
       onSubmit(trimmed);
@@ -80,7 +93,7 @@ export default function EmailCaptureModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-md bg-gradient-to-br from-secondary to-secondary border border-risk-low/30 rounded-2xl shadow-2xl shadow-card overflow-hidden">
+      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl shadow-card overflow-hidden">
 
         {/* Close button */}
         <button
@@ -92,7 +105,7 @@ export default function EmailCaptureModal({
         </button>
 
         {/* Top accent bar */}
-        <div className="h-1 w-full bg-gradient-to-r from-risk-low via-[hsl(var(--cat-storage))] to-[hsl(var(--cat-device))]" />
+        <div className="h-1 w-full bg-primary" />
 
         <div className="p-6 space-y-5">
 
@@ -125,10 +138,10 @@ export default function EmailCaptureModal({
             {[
               'Personalised fix plan for your top privacy issues',
               'One-click data broker removal checklist',
-              'Monthly privacy digest (unsubscribe anytime)',
+              'Privacy Check, our monthly newsletter (unsubscribe anytime)',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
-                <ChevronRight className="w-4 h-4 text-[hsl(var(--cat-storage))] shrink-0 mt-0.5" />
+                <ChevronRight className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                 {item}
               </li>
             ))}
@@ -137,13 +150,21 @@ export default function EmailCaptureModal({
           {/* Form */}
           {status === 'success' ? (
             <div className="text-center py-4 space-y-2">
-              <div className="text-3xl">✅</div>
-              <p className="font-semibold text-risk-low">You're on the list.</p>
-              <p className="text-sm text-muted-foreground">Check your inbox — fix guide incoming.</p>
+                            <p className="font-semibold text-risk-low">You're on the list.</p>
+              <p className="text-sm text-muted-foreground">Check your inbox for your fix guide.</p>
+              {baseline && (
+                <p className="text-sm text-foreground">
+                  {baseline.is_first
+                    ? `Baseline saved: ${baseline.overall_score}/100 risk (${new Date(baseline.created_at).toLocaleDateString()}).`
+                    : `Your baseline: ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}). Now ${riskScore}/100, ${
+                        baseline.delta === 0 ? 'no change' : `${Math.abs(baseline.delta)} points ${baseline.delta < 0 ? 'lower (better)' : 'higher (worse)'}`
+                      }.`}
+                </p>
+              )}
               <Button
                 variant="outline"
                 onClick={onClose}
-                className="mt-3 border-risk-low/30 text-risk-low hover:brightness-95"
+                className="mt-3 border-risk-low/30 text-foreground hover:bg-risk-low-soft"
               >
                 Close
               </Button>
@@ -161,7 +182,7 @@ export default function EmailCaptureModal({
                   autoFocus
                 />
                 {errorMsg && (
-                  <p className="mt-1.5 text-xs text-risk-high">{errorMsg}</p>
+                  <p role="alert" className="mt-1.5 text-xs text-foreground border-l-2 border-destructive pl-2">{errorMsg}</p>
                 )}
               </div>
 
@@ -173,23 +194,23 @@ export default function EmailCaptureModal({
                   disabled={status === 'loading'}
                   className="mt-0.5"
                 />
-                <span>Email me my fix guide and the monthly privacy digest. I can unsubscribe at any time.</span>
+                <span>Email me my fix guide and Privacy Check, the monthly newsletter. I can unsubscribe at any time.</span>
               </label>
 
               <Button
                 type="submit"
                 disabled={status === 'loading'}
-                className="w-full bg-gradient-to-r from-risk-low to-[hsl(var(--cat-storage))] hover:opacity-90 text-primary-foreground font-semibold py-3 rounded-lg transition-all disabled:opacity-60"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white font-semibold py-3 rounded-lg transition-all disabled:opacity-60"
               >
-                {status === 'loading' ? 'Sending…' : 'Send my fix guide →'}
+                {status === 'loading' ? 'Sending…' : 'Send My Privacy Check'}
               </Button>
 
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full text-xs text-muted-foreground hover:text-muted-foreground transition-colors py-1"
+                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
               >
-                No thanks, I'll figure it out myself
+                No thanks
               </button>
             </form>
           )}

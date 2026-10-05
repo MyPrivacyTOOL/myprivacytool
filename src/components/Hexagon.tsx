@@ -9,17 +9,12 @@ interface HexagonProps {
   isRevealing?: boolean;
 }
 
-// Category colours come from the theme tokens in index.css (--cat-<name>, --cat-<name>-tint).
-const CATEGORIES = ['device','network','privacy','language','profile','orientation','fingerprint','storage','social','security','behavior','default'] as const;
-type CategoryKey = typeof CATEGORIES[number];
-
-const categoryColors = Object.fromEntries(
-  CATEGORIES.map((c) => [c, {
-    primary: `hsl(var(--cat-${c}))`,
-    glow: `hsl(var(--cat-${c}) / 0.45)`,
-    bg: [`hsl(var(--surface) / var(--surface-alpha))`, `hsl(var(--cat-${c}-tint) / var(--surface-alpha))`],
-  }])
-) as Record<CategoryKey, { primary: string; glow: string; bg: [string, string] }>;
+// Single palette treatment: deep green outline on a soft green tint (see index.css brand tokens).
+const hexColors = {
+  primary: 'hsl(var(--brand-ink))',
+  glow: 'hsl(var(--brand-ink) / 0.45)',
+  bg: ['hsl(var(--surface) / var(--surface-alpha))', 'hsl(var(--brand-soft) / var(--surface-alpha))'] as [string, string],
+};
 
 export default function Hexagon({ data, onConfirm, onHover, isRevealing = false }: HexagonProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -42,9 +37,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
     onHover(null);
   };
 
-  // Get category colors
-  const category = data.category || 'default';
-  const colors = categoryColors[category as CategoryKey] || categoryColors.default;
+  const colors = hexColors;
 
   // Pointy-top hexagon path (vertices at top and bottom)
   const hexPath = "M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z";
@@ -197,7 +190,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
               <circle cx="10" cy="10" r="10" style={{ fill: colors.primary }} />
               <path
                 d="M6 10 L9 13 L15 7"
-                stroke="#fff"
+                stroke="hsl(var(--brand-white))"
                 strokeWidth="2"
                 fill="none"
                 strokeLinecap="round"

@@ -7,13 +7,13 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 
 const categoryColors: { [key: string]: string } = {
-  "Privacy Awareness": "bg-blue-100 text-blue-800",
-  "Privacy Advocacy": "bg-red-100 text-red-800",
-  "Social Media": "bg-purple-100 text-purple-800",
-  "Data Brokers": "bg-red-100 text-red-800",
-  "AI & Emerging Threats": "bg-orange-100 text-orange-800",
-  "Regulatory": "bg-green-100 text-green-800",
-  "Privacy Guides": "bg-emerald-100 text-emerald-800"
+  "Privacy Awareness": "bg-secondary text-foreground",
+  "Privacy Advocacy": "bg-secondary text-foreground",
+  "Social Media": "bg-secondary text-foreground",
+  "Data Brokers": "bg-secondary text-foreground",
+  "AI & Emerging Threats": "bg-secondary text-foreground",
+  "Regulatory": "bg-secondary text-foreground",
+  "Privacy Guides": "bg-secondary text-foreground"
 };
 
 export default function Blog() {
@@ -26,23 +26,23 @@ export default function Blog() {
   const categories = Array.from(new Set(blogPosts.map(post => post.category)));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-background">
       <Seo {...pageMeta["/blog"]} path="/blog" />
       {/* Header */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-card border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Link to="/" className="text-sm text-slate-600 hover:text-slate-900">
+              <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
                 Home
               </Link>
-              <span className="text-slate-300">/</span>
-              <span className="text-sm font-medium text-slate-900">Blog</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-sm font-medium text-foreground">Blog</span>
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 mb-2">Privacy Insights</h1>
-              <p className="text-lg text-slate-600">
-                Expert articles on data privacy, AI threats, and protecting your digital identity
+              <h1 className="text-4xl font-bold text-foreground mb-2">Privacy Insights</h1>
+              <p className="text-lg text-muted-foreground">
+                Expert articles on data privacy, AI and your data, and taking back control of your digital footprint
               </p>
             </div>
           </div>
@@ -77,7 +77,7 @@ export default function Blog() {
           {filteredPosts.map(post => (
             <Card key={post.slug} className="overflow-hidden hover:shadow-lg transition-shadow">
               {post.image && (
-                <div className="h-48 bg-slate-200 overflow-hidden">
+                <div className="h-48 bg-muted overflow-hidden">
                   <img
                     src={post.image}
                     alt={post.title}
@@ -87,18 +87,18 @@ export default function Blog() {
               )}
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${categoryColors[post.category] || "bg-slate-100 text-slate-800"}`}>
+                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${categoryColors[post.category] || "bg-secondary text-foreground"}`}>
                     {post.category}
                   </span>
-                  <span className="text-xs text-slate-500">{post.readTime} min read</span>
+                  <span className="text-xs text-muted-foreground">{post.readTime} min read</span>
                 </div>
                 <CardTitle className="line-clamp-2">{post.title}</CardTitle>
                 <CardDescription className="line-clamp-2 mt-2">{post.excerpt}</CardDescription>
               </CardHeader>
               <CardContent className="pb-4">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-slate-500">
-                    <p className="font-medium text-slate-700">{post.author}</p>
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">{post.author}</p>
                     <p>{post.date}</p>
                   </div>
                 </div>
@@ -115,14 +115,14 @@ export default function Blog() {
         {/* Empty State */}
         {filteredPosts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-slate-600">No articles found in this category.</p>
+            <p className="text-muted-foreground">No articles found in this category.</p>
           </div>
         )}
 
         {/* Newsletter CTA */}
         <div className="mt-16 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
-          <h2 className="text-2xl font-bold mb-2">Get Privacy Updates Weekly</h2>
-          <p className="mb-4 text-muted-foreground">Subscribe to our newsletter for the latest privacy insights and protection tips</p>
+          <h2 className="text-2xl font-bold mb-2">Privacy Check</h2>
+          <p className="mb-4 text-muted-foreground">Subscribe to Privacy Check, our newsletter, for privacy insights and practical steps you can act on</p>
           <Link to="/newsletter">
             <Button size="lg">Subscribe Now</Button>
           </Link>

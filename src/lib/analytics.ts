@@ -446,3 +446,12 @@ export const trackStartSignup = (params?: Record<string, string>) => {
   trackEvent('start_scan_signup', { form: 'start_scan', ...params });
   trackEvent('generate_lead', { method: 'start_scan', ...params });
 };
+
+// ---------------------------------------------------------------------------
+// Alice HD voice waitlist (MPC-6977 site-wide form wiring). Fire only after a
+// confirmed successful HubSpot submit.
+// ---------------------------------------------------------------------------
+export const trackAliceHDWaitlistSignup = (params?: Record<string, string>) => {
+  trackEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
+  trackEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
+};

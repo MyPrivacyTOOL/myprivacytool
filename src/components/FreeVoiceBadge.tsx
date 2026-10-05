@@ -28,7 +28,7 @@ export default function FreeVoiceBadge() {
         {/* Tooltip */}
         {showTooltip && (
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-surface/95 border border-risk-low/30 rounded-lg shadow-lg whitespace-nowrap z-50">
-            <p className="text-risk-low text-xs">
+            <p className="text-foreground text-xs">
               Upgrade to Alice HD for professional voice quality
             </p>
             <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">

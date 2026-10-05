@@ -22,8 +22,8 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return 'text-risk-low';
-    if (confidence >= 60) return 'text-risk-mid';
-    return 'text-risk-high';
+    if (confidence >= 60) return 'text-foreground';
+    return 'text-foreground';
   };
 
   const getProfileIcon = (profile: string) => {
@@ -161,7 +161,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
                   variant="outline"
                   size="sm"
                   onClick={() => handleFeedback(true)}
-                  className="gap-2 hover:bg-risk-low-soft hover:text-risk-low hover:border-risk-low"
+                  className="gap-2 hover:bg-risk-low-soft hover:text-foreground hover:border-risk-low"
                 >
                   <ThumbsUp className="w-4 h-4" />
                   Yes, correct
@@ -170,7 +170,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
                   variant="outline"
                   size="sm"
                   onClick={() => handleFeedback(false)}
-                  className="gap-2 hover:bg-risk-high-soft hover:text-risk-high hover:border-risk-high"
+                  className="gap-2 hover:bg-risk-high-soft hover:text-foreground hover:border-risk-high"
                 >
                   <ThumbsDown className="w-4 h-4" />
                   Not quite
@@ -178,7 +178,7 @@ export default function PredictionPanel({ prediction, isLoading, onFeedback }: P
               </div>
             ) : (
               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                feedbackGiven ? 'bg-risk-low-soft text-risk-low' : 'bg-risk-high-soft text-risk-high'
+                feedbackGiven ? 'bg-risk-low-soft text-foreground' : 'bg-risk-high-soft text-foreground'
               }`}>
                 {feedbackGiven ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}
                 <span className="text-sm font-medium">

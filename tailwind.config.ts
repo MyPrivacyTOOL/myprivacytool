@@ -15,7 +15,8 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Space Grotesk', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['Fira Code', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -26,7 +27,18 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
         },
+        "brand-green": {
+          DEFAULT: "hsl(var(--brand-green))",
+          hover: "hsl(var(--brand-green-hover))",
+        },
+        "brand-black": "hsl(var(--brand-black))",
+        "brand-white": "hsl(var(--brand-white))",
+        "brand-near-black": "hsl(var(--brand-near-black))",
+        "brand-dark-border": "hsl(var(--brand-dark-border))",
+        "brand-off-white": "hsl(var(--brand-off-white))",
+        "brand-error": "hsl(var(--brand-error))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

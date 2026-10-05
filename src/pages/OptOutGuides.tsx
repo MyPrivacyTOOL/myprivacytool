@@ -132,9 +132,9 @@ const OptOutGuides = () => {
 
         <div className="rounded-lg bg-secondary p-6 text-center">
           <h2 className="text-xl font-semibold text-foreground mb-2">Not sure who has your data?</h2>
-          <p className="text-muted-foreground mb-4">Run a free scan first, then use the guides to remove what you find.</p>
+          <p className="text-muted-foreground mb-4">Check your exposure first, then use the guides to remove what you find.</p>
           <Button asChild>
-            <Link to="/am-i-exposed">Check if I'm exposed</Link>
+            <Link to="/am-i-exposed">Check My Exposure</Link>
           </Button>
         </div>
       </div>

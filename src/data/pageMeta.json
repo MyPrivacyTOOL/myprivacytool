@@ -61,9 +61,8 @@
     "description": "MyPrivacyTOOL is a Hong Kong company helping people see their digital shadow: what their browser and device reveal about them, shown as Privacy Hexagons."
   },
   "/contact": {
-    "title": "Contact",
-    "description": "A dedicated way to reach our team is on its way.",
-    "noindex": true
+    "title": "Contact Us | MyPrivacyTOOL",
+    "description": "Get in touch with the MyPrivacyTOOL team for support, data removal requests, business enquiries or press."
   },
   "/faq": {
     "title": "FAQ | MyPrivacyTOOL",

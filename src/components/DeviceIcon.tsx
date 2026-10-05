@@ -119,7 +119,7 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
           <div className={`text-[10px] sm:text-xs font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full transition-colors ${
             isLandscape 
               ? 'bg-risk-mid-soft text-risk-mid' 
-              : 'bg-risk-low-soft text-risk-low'
+              : 'bg-risk-low-soft text-foreground'
           }`}>
             {orientationLabel}
           </div>

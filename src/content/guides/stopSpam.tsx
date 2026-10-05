@@ -75,8 +75,8 @@ const Content = () => (
         broker lists, several different callers may hold your number.
       </li>
       <li>
-        <strong>Leaked and breached databases.</strong> When a service is hacked, its customer records often end up
-        being traded. Criminals then use those emails and numbers for phishing and scam campaigns.
+        <strong>Leaked and breached databases.</strong> When a service's data is exposed, its customer records often end up
+        being traded. Scammers then use those emails and numbers for phishing and scam campaigns.
       </li>
       <li>
         <strong>Lead-generation forms.</strong> Competitions, quote comparison sites, free-trial forms and survey pages
