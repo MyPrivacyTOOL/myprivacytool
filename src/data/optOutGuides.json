@@ -255,7 +255,7 @@
     "difficulty": "Easy",
     "requirements": ["An email address", "Your name plus city or state to find the record"],
     "steps": [
-      "Go to fastpeoplesearch.com/removal and pass the browser check if shown.",
+      "Go to fastpeoplesearch.com/removal and pass the browser check if shown. If you see \"Sorry, you have been blocked\", the site is rejecting your network or country: try again from a different network or from a US connection.",
       "Enter your email address, tick the box confirming you are the subject of the record, complete the reCAPTCHA and select Begin Removal Process.",
       "Search for your record by name, phone or address.",
       "On your listing, click Remove My Record.",
