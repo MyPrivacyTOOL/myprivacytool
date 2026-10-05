@@ -14,17 +14,17 @@ Each creator gets a slug (e.g. `sg-honeymoney`) and two entry routes:
 
 Front end (`src/`): on first landing, read `utm_*` and `ref` from the URL, store in first-party storage (30-day window, last-click for creators), and send with the lead.
 
-## 3. Worker changes (`workers/webhook-receiver`)
-Current state: `POST /webhook/leads` (`handleLeads`, `index.js`) accepts `{ email, riskScore, confirmedCount, source }` only; no attribution. `createHubSpotContact` (`hubspot-client.js`) has no attribution fields.
+## 3. Worker changes (`workers/mpt-leads`)
+Live lead capture is the `mpt-leads` Cloudflare Worker (MPT account), deployed from this repo by `.github/workflows/deploy-mpt-leads.yml` on push to main. The earlier `workers/webhook-receiver` is not deployed anywhere.
 
-Required:
-- Accept `ref`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `code` in the leads body; validate `ref`/`code` against an allow-list in KV (`creator:<slug>`), ignore unknown values.
-- Store `lead:<email>` state with attribution; write HubSpot properties `creator_ref`, `utm_source`, `utm_campaign`, `utm_content` (create these custom contact properties first).
-- Dedupe: one counted scan per email per creator.
-- Tighten CORS from `*` to `https://myprivacytool.io`; add basic rate limiting.
-- Conversion event: when a lead becomes paid, set HubSpot `lifecyclestage` and `creator_ref` stays for payout reporting.
+Already works: `mpt-leads` accepts `utm_source/medium/campaign/content` + `referrer` and stores them in the Notion Leads DB, alerts Slack, syncs the contact to HubSpot (name/email/phone/status only) and writes `mpt_user_engagement` in Supabase. So per-creator tracking works with `utm_content=<creator-slug>` once the live page forwards the UTMs (MPC-7120 wires the site to the worker).
 
-**Deployment gap found 2026-10-02:** the connected Cloudflare account lists only `myprivacytool-oauth-poc`, `boxingtool-io`, `throbbing-king-e686`, `chrisransford`; there is no `myprivacytool-webhook-receiver` worker and no D1 database. Confirm where lead capture is actually deployed (another account, or not yet live) before building on it. Wrangler routes are also still commented out.
+Proposed follow-ups (each needs its Notion/HubSpot property created first, otherwise the write fails):
+- Slack label for `utm_source=creator` showing the creator slug.
+- Optional `ref`/`code` field -> new Notion 'Creator Ref' property.
+- HubSpot custom properties for utm_source/campaign/content.
+- One counted scan per email per creator for payouts (dedupe at reporting time).
+- Front end: capture `utm_*`/`ref` on first landing (30-day last click) and send with the lead.
 
 ## 4. Reporting
 Monthly rows in the O3 KPI Dashboard per creator: scans, paid conversions, payout owed, CAC vs $20 guardrail. Source: HubSpot contacts filtered by `creator_ref`.
@@ -33,7 +33,7 @@ Monthly rows in the O3 KPI Dashboard per creator: scans, paid conversions, payou
 Eligibility; how attribution works (link/code, 30-day last-click); payout rates, caps and monthly schedule; fraud (self-referrals, incentivised or bot scans void payouts); mandatory disclosure ("Paid partnership with MyPrivacyTOOL" + platform label); no guaranteed privacy outcomes or fear-based claims; data handling (we do not share creator audience data); termination; governing law (to be confirmed by counsel). Needs legal review before publishing.
 
 ## 6. Open items
-- Confirm lead-capture deployment location (see gap above).
+- MPC-7120: wire the live site to mpt-leads.
 - Create HubSpot custom properties.
 - Scan-to-paid assumption once paid tiers are public.
 - Counsel review of creator agreement and terms page.
