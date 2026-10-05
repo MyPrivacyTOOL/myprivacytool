@@ -13,12 +13,20 @@ Cloudflare account `35cb17172c65a20f5cf1baf131485382`). Accepts a POST on any pa
   SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL.
 
 ## Deploy
-Cloudflare dashboard -> Workers & Pages -> mpt-leads -> Edit code -> paste `worker.js` -> Deploy.
-The dashboard keeps existing secrets. If deploying by API, upload with
-`keep_bindings: ["secret_text","plain_text"]` or the secrets are dropped.
+Merging to `main` deploys automatically: `.github/workflows/deploy-mpt-leads.yml` runs the stub
+tests, snapshots the Worker's secret NAMES, runs `wrangler deploy` (secrets are not touched), and
+then fails the run if any secret name changed or any name in `EXPECTED_SECRETS.txt` is missing.
 
-## Verify
-Submit the scan email modal once, then in Supabase:
+One-time setup (human): create a Cloudflare API token (MPT account only, permission
+Account > Workers Scripts > Edit) and add repo secrets `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` (= 35cb17172c65a20f5cf1baf131485382).
+Manual fallback: Cloudflare dashboard -> Workers & Pages -> mpt-leads -> Edit code -> paste -> Deploy.
+
+## Test
+`node workers/mpt-leads/worker.test.mjs` (stubbed fetch, no network, no secrets).
+
+## Verify live
+Submit the scan email modal once, then in Supabase (project xmdmkumwxpgahmlweuug):
 `select * from public.mpt_user_engagement order by created_at desc limit 5;`
 Expect a row with `full_scan_completed = true`. Worker logs show
-`Supabase mpt_user_engagement insert failed` on any failure.
+`Supabase mpt_user_engagement insert failed` (with the HTTP status) on any failure.

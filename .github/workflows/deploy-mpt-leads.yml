@@ -1,0 +1,78 @@
+name: Deploy mpt-leads Worker
+
+# MPC-6956: the live lead-capture Worker deploys from this repo to the MyPrivacyTOOL
+# Cloudflare account on merge to main. No droplet, no relay.
+#
+# Repo secrets required (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
+#   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
+#
+# Safety: runs the Worker's stub tests first; after deploy it lists the Worker's secret
+# NAMES via the API and FAILS if any name in workers/mpt-leads/EXPECTED_SECRETS.txt is
+# missing (a dropped secret silently breaks lead capture and cannot be recovered by an API call).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/mpt-leads/**'
+      - '.github/workflows/deploy-mpt-leads.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mpt-leads
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check required secrets are configured
+        env:
+          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          A: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
+
+      - name: Test Worker (stubbed fetch)
+        run: node workers/mpt-leads/worker.test.mjs
+
+      - name: Snapshot secret names before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-leads/secrets" \
+            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.before
+          echo "secret names before:"; cat /tmp/secrets.before
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-leads
+          command: deploy
+
+      - name: Verify secrets survived the deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-leads/secrets" \
+            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
+          echo "secret names after:"; cat /tmp/secrets.after
+          if ! diff -q /tmp/secrets.before /tmp/secrets.after >/dev/null; then echo "::error::secret names changed across deploy"; diff /tmp/secrets.before /tmp/secrets.after; exit 1; fi
+          sort workers/mpt-leads/EXPECTED_SECRETS.txt > /tmp/secrets.expected
+          missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
+          [ -z "$missing" ] || { echo "::error::expected secrets missing: $missing"; exit 1; }
+          echo "OK: all expected secrets present"
