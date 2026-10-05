@@ -217,7 +217,7 @@ const Index = () => {
           <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10">
             <h1 
               id="hero-heading"
-              className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-foreground"
+              className="max-w-4xl text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-foreground [text-wrap:balance]"
             >
               Your data is everywhere. See where. Take it back.
             </h1>

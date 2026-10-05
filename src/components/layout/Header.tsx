@@ -79,7 +79,7 @@ const Header = () => {
           <img
             src={logoHeader}
             alt="MyPrivacyTOOL"
-            className="h-10 w-auto min-w-16 m-2 object-contain"
+            className="h-14 w-auto min-w-24 -my-4 mx-2 object-contain"
           />
         </Link>
 
