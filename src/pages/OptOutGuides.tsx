@@ -63,7 +63,7 @@ const OptOutGuides = () => {
           <h3 className="font-semibold text-foreground mb-1">{g.name}</h3>
           <p className="text-sm text-muted-foreground mb-3">{g.summary}</p>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="w-3 h-3" aria-hidden="true" /> {g.timeNeeded} · Verified {g.lastVerified}
+            <Clock className="w-3 h-3" aria-hidden="true" /> {g.timeNeeded} · Reviewed {g.lastVerified}
           </p>
         </Link>
       ))}
@@ -84,9 +84,9 @@ const OptOutGuides = () => {
       <div className="container mx-auto px-4 py-12 max-w-5xl">
         <h1 className="text-4xl font-bold text-foreground mb-3">Opt-out guides</h1>
         <p className="text-lg text-muted-foreground mb-8 max-w-3xl">
-          Step-by-step removal guides for people-search sites, marketing lists and do-not-call registries, starting with
-          Hong Kong, Singapore and Australia, where few other services help. Every guide links to the official opt-out
-          page and shows when we last verified it.
+          Step-by-step opt-out guides for do-not-call registers, marketing lists, directory listings and people-search
+          sites, starting with Hong Kong, Singapore and Australia, where few other services help. Every guide links to
+          the official opt-out page and shows when we last reviewed it.
         </p>
 
         <div className="relative mb-4">

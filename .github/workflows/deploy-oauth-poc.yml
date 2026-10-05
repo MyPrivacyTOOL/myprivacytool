@@ -1,20 +1,23 @@
 name: Deploy oauth-poc Worker
 
-# MPC-6960 / MPC-6971: the Google OAuth proof-of-concept Worker (workers/oauth-poc) deploys to the
-# MyPrivacyTOOL Cloudflare account. MANUAL trigger only (Actions -> Deploy oauth-poc Worker -> Run workflow)
-# so a public OAuth endpoint is never deployed by accident.
+# MPC-6971: the Phase 5 Google OAuth proof of concept deploys from this repo to the MyPrivacyTOOL
+# Cloudflare account on merge to main (same pattern as deploy-mpt-leads.yml).
 #
-# Same repo secrets as deploy-mpt-leads.yml:
-#   CLOUDFLARE_API_TOKEN   (MPT account, Workers Scripts > Edit)
+# Repo secrets required (already used by deploy-mpt-leads.yml):
+#   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
 #   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
 #
-# Worker secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, STATE_SIGNING_KEY) are set by a human in the
-# Cloudflare dashboard (Workers & Pages -> myprivacytool-oauth-poc -> Settings -> Variables and Secrets).
-# `wrangler deploy` never touches secret values. The PoC is inert until they are set.
-# After deploy this workflow only reports which expected secret NAMES are still missing; it does not fail
-# on that, because the first deploy necessarily happens before the human sets them.
+# Safety: runs the unit tests first. After deploy it FAILS if the Worker's secret NAMES changed
+# across the deploy, and WARNS (does not fail) if names in workers/oauth-poc/EXPECTED_SECRETS.txt
+# are missing, because the very first deploy creates the Worker with no secrets. Secret VALUES are
+# only ever set by a human in the Cloudflare dashboard.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/oauth-poc/**'
+      - '.github/workflows/deploy-oauth-poc.yml'
   workflow_dispatch:
 
 concurrency:
@@ -39,8 +42,19 @@ jobs:
         run: |
           [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
 
-      - name: Test Worker (mocked fetch)
+      - name: Test Worker (mocked Google calls)
         run: node --test workers/oauth-poc/oauth.test.mjs
+
+      - name: Snapshot secret names before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # A missing Worker (first deploy) returns no usable result; treat that as "no secrets yet".
+          curl -s --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/myprivacytool-oauth-poc/secrets" \
+            | jq -r '(.result // [])[].name' 2>/dev/null | sort > /tmp/secrets.before || true
+          echo "secret names before:"; cat /tmp/secrets.before
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
@@ -50,14 +64,16 @@ jobs:
           workingDirectory: workers/oauth-poc
           command: deploy
 
-      - name: Report which Worker secret names are still missing
+      - name: Verify secrets survived the deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/myprivacytool-oauth-poc/secrets" \
-            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
+            | jq -r '.result[].name' | sort > /tmp/secrets.after
+          echo "secret names after:"; cat /tmp/secrets.after
+          if ! diff -q /tmp/secrets.before /tmp/secrets.after >/dev/null; then echo "::error::secret names changed across deploy"; diff /tmp/secrets.before /tmp/secrets.after; exit 1; fi
           sort workers/oauth-poc/EXPECTED_SECRETS.txt > /tmp/secrets.expected
           missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
-          if [ -n "$missing" ]; then echo "::warning::Worker secrets still to be set in the dashboard: $missing"; else echo "OK: all expected secrets present"; fi
+          if [ -n "$missing" ]; then echo "::warning::expected secrets not set yet (set them in the Cloudflare dashboard): $missing"; else echo "OK: all expected secrets present"; fi

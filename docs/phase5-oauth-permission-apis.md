@@ -1,6 +1,6 @@
 # MPC-6971 — Phase 5: OAuth & Permission APIs
 
-**Status:** Tech stack defined; Google proof of concept built and unit-tested; **live run pending** (no test OAuth client or `myprivacytool@gmail.com` credentials in the build session).
+**Status:** Done. Tech stack defined; Google PoC built, unit-tested and **verified live on 2026-10-05** (see "Live result").
 Builds on MPC-6959 (landscape) and MPC-6960 (Google feasibility spike, `docs/phase5-google-access-spike.md`).
 
 > Provider API claims below come from public documentation and prior knowledge, not calls made in this task. Items marked **Pending Live Verification** (future sprint) need confirming on the test account or with the provider.
@@ -68,3 +68,28 @@ Pattern: the only provider with a member-level list-and-revoke API is likely Mic
 1. Live-run the Google PoC on the test account; mark the MPC-6960 [verify] items confirmed or refuted.
 2. Microsoft Graph PoC #2 to confirm user-level list and revoke.
 3. Product sign-off on guided-audit scope; then create implementation tickets.
+
+## 6. Deployment (updated 2026-10-05)
+
+The PoC Worker lives in the **MyPrivacyTOOL Cloudflare account** (`35cb17172c65a20f5cf1baf131485382`), not the personal cransford account (see Notion "MPT Infrastructure - GitHub, Cloudflare & Supabase (Ops)"). It deploys on merge to `main` via `.github/workflows/deploy-oauth-poc.yml`, using the same repo Actions secrets as `deploy-mpt-leads.yml`. Live URL: `https://myprivacytool-oauth-poc.myprivacytool.workers.dev`.
+
+Secret values are set only in the Cloudflare dashboard (Workers & Pages > myprivacytool-oauth-poc > Settings > Variables and Secrets). Secret names are in `workers/oauth-poc/EXPECTED_SECRETS.txt`: `GOOGLE_CLIENT_SECRET` and `STATE_SIGNING_KEY` (64 hex chars). `GOOGLE_CLIENT_ID` (public) and `REDIRECT_URI` (`https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback`, also an authorised redirect URI on the Google **Web application** client) are plain `[vars]` in `wrangler.toml`, because `wrangler deploy` overwrites plain-text dashboard variables. The workflow warns, but does not fail, when a secret name is missing on the first deploy.
+
+## 7. Live result (2026-10-05)
+
+Consent completed as `myprivacytool@gmail.com` against `https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/start`. The callback returned:
+
+```json
+{
+  "ok": true,
+  "user": { "email": "myprivacytool@gmail.com", "verified": true },
+  "token": {
+    "scope": "email profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
+    "expires_in": "3599",
+    "aud_matches_client": true
+  },
+  "finding": "tokeninfo/userinfo describe this token only; no endpoint lists other apps' grants (MPC-6960 step 3)."
+}
+```
+
+What this confirms: authorization code + PKCE, signed state cookie, token exchange, and revoke-on-finish work end to end with non-sensitive scopes only. It also confirms the MPC-6960 finding that the consumer Google token describes only itself; there is no endpoint to list other apps' grants. Microsoft, GitHub and Slack claims in section 3 remain **Pending Live Verification** (future sprint).

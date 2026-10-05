@@ -1,9 +1,15 @@
 # MPC-6960 — Phase 5 feasibility spike: AI and third-party app access on a Google account
 
-**Status:** Research complete; live proof of concept **not executed** (see "Proof of concept").
+**Status:** Research complete. Live PoC steps 1–3 **run and confirmed on 2026-10-05** on the MPT test account (see "PoC result"); steps 4–5 still open.
 **Decision:** **No-go** on an automated OAuth-based scanner for consumer Google accounts. **Go** on a guided fallback (deep links + Takeout/Data Portability import + on-device analysis). **Conditional go** on a Workspace-admin scanner, only if there is customer demand.
 
 > Confidence note: this was written without access to the MPT test account, so the Google API behaviour below comes from Google's public documentation and prior knowledge, not from calls made in this spike. Items marked **[verify]** should be confirmed on the test account before the decision is treated as final. The verification script in "Next steps" covers all of them in under an hour.
+
+## PoC result (2026-10-05, steps 1–3)
+
+Run on `myprivacytool@gmail.com` using the `workers/oauth-poc` Worker deployed to the MPT Cloudflare account (OAuth 2.0 auth code + PKCE, scopes `openid email profile`, online access, token revoked by the Worker after use). The callback returned: user `myprivacytool@gmail.com` (verified), token scope `email profile …/userinfo.email …/userinfo.profile openid`, `expires_in` 3598, `aud_matches_client: true`. `tokeninfo` and `userinfo` describe only the calling token; neither lists other apps' grants. This confirms the OAuth foundation works and supports the no-go on a consumer scanner. It is not an exhaustive sweep of every Google API.
+
+Still open: step 4 (what `myaccount.google.com/connections` calls under the hood) and step 5 (Data Portability scopes, which needs the API enabled and a Worker extension).
 
 ## The question
 
@@ -20,7 +26,7 @@ What a PoC on the test account should do to confirm this (about 30 minutes):
 
 1. Create an OAuth client (Web) in a Google Cloud project, add the test account as a test user.
 2. Request only `openid email profile` and complete the flow.
-3. Try to list other apps' grants using that token. Expect: no endpoint exists. Try `GET https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=…` (only describes *this* token) **[verify]**.
+3. Try to list other apps' grants using that token. Expect: no endpoint exists. Try `GET https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=…` (only describes *this* token) **[confirmed 2026-10-05]**.
 4. Confirm `https://myaccount.google.com/connections` shows the grants and has no public API behind it (inspect the network calls; expect internal, unsupported RPCs) **[verify]**.
 5. Request a Data Portability API scope (`dataportability.myactivity.*`) and check whether any resource group exposes app-access or Gemini activity **[verify]**.
 

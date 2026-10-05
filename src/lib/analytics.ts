@@ -415,3 +415,21 @@ export const trackNewsletterSignup = (params?: Record<string, string>) => {
   // GA4 recommended event so the signup can be marked as a key event
   trackEvent('generate_lead', { method: 'newsletter', ...params });
 };
+
+// ---------------------------------------------------------------------------
+// Business audit request (MPC-6977 follow-up B). Fire only after a confirmed
+// successful HubSpot submit.
+// ---------------------------------------------------------------------------
+export const trackBusinessLead = (params?: Record<string, string>) => {
+  trackEvent('business_audit_request', { form: 'business_inquiry', ...params });
+  trackEvent('generate_lead', { method: 'business_inquiry', ...params });
+};
+
+// ---------------------------------------------------------------------------
+// Start page email capture (MPC-6977 follow-up B). Fire only after a confirmed
+// successful HubSpot submit.
+// ---------------------------------------------------------------------------
+export const trackStartSignup = (params?: Record<string, string>) => {
+  trackEvent('start_scan_signup', { form: 'start_scan', ...params });
+  trackEvent('generate_lead', { method: 'start_scan', ...params });
+};
