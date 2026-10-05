@@ -7,5 +7,10 @@ compatibility_date = "2024-01-01"
 #   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, STATE_SIGNING_KEY
 # Vars: REDIRECT_URI (must match the OAuth client's authorised redirect URI)
 
+# MPT Cloudflare account workers.dev subdomain is `myprivacytool` (not a secret).
+# Deployed by .github/workflows/deploy-oauth-poc.yml (MPC-6960).
+[vars]
+REDIRECT_URI = "https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback"
+
 [observability]
 enabled = true
