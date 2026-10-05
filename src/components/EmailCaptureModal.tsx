@@ -9,7 +9,7 @@ interface EmailCaptureModalProps {
   onSubmit: (email: string) => void;
 }
 
-const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://myprivacytool-webhook-receiver.workers.dev';
+const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://mpt-leads.myprivacytool.workers.dev';
 
 export default function EmailCaptureModal({
   riskScore,
@@ -47,7 +47,7 @@ export default function EmailCaptureModal({
     setErrorMsg('');
 
     try {
-      const res = await fetch(`${WORKER_ENDPOINT}/webhook/leads`, {
+      const res = await fetch(WORKER_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -27,7 +27,7 @@ const ComingSoonPage = ({ title, description }: ComingSoonPageProps) => {
             This page is coming soon. In the meantime, run a free scan to see what's already exposed about you.
           </p>
           <Button asChild size="lg">
-            <Link to="/">Scan free</Link>
+            <Link to="/scan">Scan free</Link>
           </Button>
         </div>
       </div>

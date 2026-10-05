@@ -66,6 +66,12 @@ export default {
 
       const firstName = name ? name.split(' ')[0] : 'there';
 
+      // MPC-7120: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement)
+      // BEFORE the Notion write and independent of it: a Notion failure must never block the engagement row.
+      // Fail-soft and off the response path; stores no PII (random session id + funnel booleans).
+      const engagement = recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
+      ctx.waitUntil(engagement);
+
       // 1. Save to Notion
       const properties = {
         Name:   { title: [{ text: { content: name || email } }] },
@@ -239,10 +245,6 @@ export default {
           }).catch(() => {})
         );
       }
-
-      // 6. MPC-6956: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement).
-      // Fail-soft and off the response path: a Supabase problem must never affect lead capture.
-      side.push(recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null }));
 
       ctx.waitUntil(Promise.all(side));
 

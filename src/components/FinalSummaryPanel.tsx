@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -14,6 +14,7 @@ import autoTable from 'jspdf-autotable';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
+import EmailCaptureModal from '@/components/EmailCaptureModal';
 
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
@@ -322,6 +323,13 @@ export default function FinalSummaryPanel({
 
     return Math.min(Math.round(totalRisk), 100);
   }, [categoryStats, fingerprint]);
+
+  // MPC-7120: offer the email capture once the scan is complete (this panel only renders after all hexagons are confirmed)
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowEmailModal(true), 1500);
+    return () => window.clearTimeout(t);
+  }, []);
 
   // Calculate uniqueness estimate
   const uniquenessEstimate = useMemo(() => {
@@ -971,10 +979,18 @@ Test yours at: ${window.location.origin}`;
         <div className="flex items-center gap-3 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
           <span className="text-xl">🔒</span>
           <p className="text-xs text-risk-low">
-            <strong>100% Local:</strong> All 46 data points were analyzed in your browser. Nothing was transmitted to any server.
+            <strong>100% Local:</strong> All 46 data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.
           </p>
         </div>
       </CardContent>
+      {showEmailModal && (
+        <EmailCaptureModal
+          riskScore={overallRisk}
+          confirmedCount={confirmedCount}
+          onClose={() => setShowEmailModal(false)}
+          onSubmit={() => {}}
+        />
+      )}
     </Card>
   );
 }
