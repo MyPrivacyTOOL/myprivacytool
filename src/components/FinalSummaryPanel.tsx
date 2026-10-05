@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getPdfTheme, RGB } from '@/lib/pdfTheme';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
@@ -375,24 +376,13 @@ export default function FinalSummaryPanel({
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 15;
       let yPos = margin;
+      const t = getPdfTheme();
+      const riskInk: RGB = overallRisk >= 70 ? t.high : overallRisk >= 40 ? t.mid : t.low;
+      const riskSoft: RGB = overallRisk >= 70 ? t.highSoft : overallRisk >= 40 ? t.midSoft : t.lowSoft;
 
-      // PDF palette: RGB equivalents of the MPC-6906 light tokens in src/index.css
-      // (jsPDF cannot read CSS variables, so keep these in sync with the tokens).
-      const PDF = {
-        ink: [26, 26, 26],            // --foreground
-        muted: [82, 82, 82],          // --muted-foreground
-        card: [245, 245, 245],        // --card / zebra rows
-        track: [235, 235, 235],       // --muted
-        brand: [0, 112, 48],          // --brand-ink
-        brandSoft: [235, 250, 241],   // --brand-soft
-        riskHigh: [169, 25, 25],      // --risk-high
-        riskHighSoft: [254, 236, 236],
-        riskMid: [129, 78, 3],        // --risk-mid
-        riskMidSoft: [255, 246, 219],
-        riskOrange: [165, 69, 9],     // --risk-orange
-        purple: [93, 34, 195],        // --cat-device
-        cyan: [7, 102, 126],          // --cat-storage
-      } satisfies Record<string, [number, number, number]> as Record<string, [number, number, number]>;
+      // Paint the page white explicitly so printing/viewers never fall back to a tinted default
+      pdf.setFillColor(...t.page);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
 
       // Helper function to add new page if needed
       const checkNewPage = (neededHeight: number) => {
@@ -405,17 +395,19 @@ export default function FinalSummaryPanel({
       };
 
       // Header with gradient-like background
-      pdf.setFillColor(...PDF.brandSoft);
+      pdf.setFillColor(...t.brandSoft);
       pdf.rect(0, 0, pageWidth, 45, 'F');
+      pdf.setDrawColor(...t.border);
+      pdf.line(0, 45, pageWidth, 45);
       
       // Title
-      pdf.setTextColor(...PDF.brand); // Green
+      pdf.setTextColor(...t.brand);
       pdf.setFontSize(24);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Digital Shadow Report', margin, 20);
       
       // Subtitle
-      pdf.setTextColor(...PDF.muted); // Gray
+      pdf.setTextColor(...t.muted);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
       pdf.text('Complete Privacy Analysis - 46 Data Points', margin, 28);
@@ -424,8 +416,9 @@ export default function FinalSummaryPanel({
       yPos = 55;
 
       // Overall Statistics Box
-      pdf.setFillColor(...PDF.card);
-      pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 35, 3, 3, 'F');
+      pdf.setFillColor(...t.panel);
+      pdf.setDrawColor(...t.border);
+      pdf.roundedRect(margin, yPos, pageWidth - 2 * margin, 35, 3, 3, 'FD');
       
       // Stats grid
       const statsY = yPos + 12;
@@ -435,49 +428,49 @@ export default function FinalSummaryPanel({
       pdf.setFont('helvetica', 'bold');
       
       // Data Points
-      pdf.setTextColor(...PDF.brand);
+      pdf.setTextColor(...t.brand);
       pdf.text('46', margin + colWidth * 0 + 10, statsY);
       pdf.setFontSize(8);
-      pdf.setTextColor(...PDF.muted);
+      pdf.setTextColor(...t.muted);
       pdf.text('Data Points', margin + colWidth * 0 + 10, statsY + 8);
       
       // Risk Score
       pdf.setFontSize(18);
-      pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
+      pdf.setTextColor(...riskInk);
       pdf.text(String(overallRisk), margin + colWidth * 1 + 10, statsY);
       pdf.setFontSize(8);
-      pdf.setTextColor(...PDF.muted);
+      pdf.setTextColor(...t.muted);
       pdf.text('Risk Score', margin + colWidth * 1 + 10, statsY + 8);
       
       // Uniqueness
       pdf.setFontSize(14);
-      pdf.setTextColor(...PDF.purple);
+      pdf.setTextColor(...t.device);
       pdf.text(`1:${uniquenessEstimate.toLocaleString()}`, margin + colWidth * 2 + 10, statsY);
       pdf.setFontSize(8);
-      pdf.setTextColor(...PDF.muted);
+      pdf.setTextColor(...t.muted);
       pdf.text('Uniqueness', margin + colWidth * 2 + 10, statsY + 8);
       
       // Exposure
       pdf.setFontSize(18);
-      pdf.setTextColor(...PDF.cyan);
+      pdf.setTextColor(...t.storage);
       pdf.text(`${Math.round((confirmedCount / 46) * 100)}%`, margin + colWidth * 3 + 10, statsY);
       pdf.setFontSize(8);
-      pdf.setTextColor(...PDF.muted);
+      pdf.setTextColor(...t.muted);
       pdf.text('Exposure', margin + colWidth * 3 + 10, statsY + 8);
       
       yPos += 45;
 
       // Risk Level Badge
-      pdf.setFillColor(...(overallRisk >= 70 ? PDF.riskHighSoft : overallRisk >= 40 ? PDF.riskMidSoft : PDF.brandSoft));
+      pdf.setFillColor(...riskSoft);
       pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
       pdf.setFontSize(9);
-      pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
+      pdf.setTextColor(...riskInk);
       pdf.text(`⚠ ${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
       
       yPos += 20;
 
       // Category Breakdown Section
-      pdf.setTextColor(...PDF.brand);
+      pdf.setTextColor(...t.brand);
       pdf.setFontSize(14);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Category Breakdown', margin, yPos);
@@ -501,18 +494,18 @@ export default function FinalSummaryPanel({
         body: categoryData,
         theme: 'plain',
         headStyles: {
-          fillColor: [...PDF.brandSoft],
-          textColor: [...PDF.brand],
+          fillColor: t.brandSoft,
+          textColor: t.brand,
           fontStyle: 'bold',
           fontSize: 9
         },
         bodyStyles: {
-          fillColor: [255, 255, 255],
-          textColor: [...PDF.ink],
+          fillColor: t.page,
+          textColor: t.ink,
           fontSize: 8
         },
         alternateRowStyles: {
-          fillColor: [...PDF.card]
+          fillColor: t.panel
         },
         margin: { left: margin, right: margin },
         columnStyles: {
@@ -529,7 +522,7 @@ export default function FinalSummaryPanel({
       // Draw a simple bar chart for categories
       checkNewPage(60);
       
-      pdf.setTextColor(...PDF.brand);
+      pdf.setTextColor(...t.brand);
       pdf.setFontSize(14);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Category Risk Visualization', margin, yPos);
@@ -543,22 +536,22 @@ export default function FinalSummaryPanel({
         
         // Category name
         pdf.setFontSize(8);
-        pdf.setTextColor(...PDF.muted);
+        pdf.setTextColor(...t.muted);
         pdf.text(cat.name.substring(0, 15), margin, yPos + 5);
         
         // Background bar
-        pdf.setFillColor(...PDF.track);
+        pdf.setFillColor(...t.panelAlt);
         pdf.roundedRect(margin + 50, yPos, chartWidth, chartHeight, 1, 1, 'F');
         
         // Progress bar
-        const barColor = percentage >= 80 ? PDF.riskHigh : percentage >= 50 ? PDF.riskMid : PDF.brand;
-        pdf.setFillColor(...barColor);
+        const barColor: RGB = percentage >= 80 ? t.high : percentage >= 50 ? t.mid : t.low;
+        pdf.setFillColor(barColor[0], barColor[1], barColor[2]);
         if (percentage > 0) {
           pdf.roundedRect(margin + 50, yPos, (chartWidth * percentage) / 100, chartHeight, 1, 1, 'F');
         }
         
         // Percentage text
-        pdf.setTextColor(...barColor);
+        pdf.setTextColor(barColor[0], barColor[1], barColor[2]);
         pdf.text(`${percentage}%`, margin + 50 + chartWidth + 5, yPos + 5);
         
         yPos += chartHeight + 4;
@@ -570,7 +563,7 @@ export default function FinalSummaryPanel({
       if (topConcerns.length > 0) {
         checkNewPage(50);
         
-        pdf.setTextColor(...PDF.riskHigh);
+        pdf.setTextColor(...t.high);
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
         pdf.text('⚠ Top Privacy Concerns', margin, yPos);
@@ -580,28 +573,28 @@ export default function FinalSummaryPanel({
           checkNewPage(25);
           
           // Severity badge
-          const severityColors: Record<string, number[]> = {
-            critical: [...PDF.riskHigh],
-            high: [...PDF.riskOrange],
-            medium: [...PDF.riskMid]
+          const severityColors: Record<string, RGB> = {
+            critical: t.high,
+            high: t.orange,
+            medium: t.mid
           };
-          const color = severityColors[concern.severity] || [...PDF.muted];
+          const color = severityColors[concern.severity] || t.muted;
           
-          pdf.setFillColor(...(color as [number, number, number]));
-          pdf.setTextColor(255, 255, 255);
+          pdf.setFillColor(color[0], color[1], color[2]);
+          pdf.setTextColor(...t.onBrand);
           pdf.roundedRect(margin, yPos, 20, 5, 1, 1, 'F');
           pdf.setFontSize(6);
           pdf.text(concern.severity.toUpperCase(), margin + 2, yPos + 3.5);
           
           // Title
-          pdf.setTextColor(...PDF.ink);
+          pdf.setTextColor(...t.ink);
           pdf.setFontSize(10);
           pdf.setFont('helvetica', 'bold');
           pdf.text(concern.title, margin + 25, yPos + 4);
           yPos += 7;
           
           // Description
-          pdf.setTextColor(...PDF.muted);
+          pdf.setTextColor(...t.muted);
           pdf.setFontSize(8);
           pdf.setFont('helvetica', 'normal');
           const descLines = pdf.splitTextToSize(concern.description, pageWidth - 2 * margin - 25);
@@ -610,7 +603,7 @@ export default function FinalSummaryPanel({
           
           // Fix recommendation
           if (concern.fix) {
-            pdf.setTextColor(...PDF.cyan);
+            pdf.setTextColor(...t.brand);
             pdf.setFontSize(7);
             pdf.text(`💡 ${concern.fix}`, margin + 25, yPos + 2);
             yPos += 6;
@@ -624,14 +617,14 @@ export default function FinalSummaryPanel({
       if (strengths.length > 0) {
         checkNewPage(40);
         
-        pdf.setTextColor(...PDF.brand);
+        pdf.setTextColor(...t.low);
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
         pdf.text('✓ What You\'re Doing Well', margin, yPos);
         yPos += 8;
 
         strengths.forEach((strength) => {
-          pdf.setTextColor(...PDF.brand);
+          pdf.setTextColor(...t.ink);
           pdf.setFontSize(9);
           pdf.setFont('helvetica', 'normal');
           pdf.text(`• ${strength}`, margin + 5, yPos);
@@ -644,7 +637,7 @@ export default function FinalSummaryPanel({
       // Action Plan
       checkNewPage(50);
       
-      pdf.setTextColor(...PDF.cyan);
+      pdf.setTextColor(...t.brand);
       pdf.setFontSize(14);
       pdf.setFont('helvetica', 'bold');
       pdf.text('Prioritized Action Plan', margin, yPos);
@@ -657,14 +650,14 @@ export default function FinalSummaryPanel({
       ];
 
       actionItems.forEach((item, i) => {
-        pdf.setFillColor(...PDF.cyan);
+        pdf.setFillColor(...t.brand);
         pdf.circle(margin + 3, yPos - 1.5, 3, 'F');
-        pdf.setTextColor(255, 255, 255);
+        pdf.setTextColor(...t.onBrand);
         pdf.setFontSize(8);
         pdf.setFont('helvetica', 'bold');
         pdf.text(String(i + 1), margin + 1.5, yPos);
         
-        pdf.setTextColor(...PDF.ink);
+        pdf.setTextColor(...t.ink);
         pdf.setFontSize(9);
         pdf.setFont('helvetica', 'normal');
         const actionLines = pdf.splitTextToSize(item, pageWidth - 2 * margin - 15);
@@ -676,15 +669,17 @@ export default function FinalSummaryPanel({
       checkNewPage(25);
       yPos = pageHeight - 25;
       
-      pdf.setFillColor(...PDF.brandSoft);
+      pdf.setFillColor(...t.brandSoft);
       pdf.rect(0, yPos - 5, pageWidth, 30, 'F');
+      pdf.setDrawColor(...t.border);
+      pdf.line(0, yPos - 5, pageWidth, yPos - 5);
       
-      pdf.setTextColor(...PDF.brand);
+      pdf.setTextColor(...t.brand);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
       pdf.text('🔒 100% Local Analysis', margin, yPos + 5);
       
-      pdf.setTextColor(...PDF.muted);
+      pdf.setTextColor(...t.muted);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
       pdf.text('All 46 data points were analyzed in your browser. Nothing was transmitted to any server.', margin, yPos + 12);

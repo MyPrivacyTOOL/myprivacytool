@@ -23,7 +23,7 @@ const ComingSoonPage = ({ title, description }: ComingSoonPageProps) => {
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-3">{title}</h1>
           <p className="text-muted-foreground mb-8">{description}</p>
-          <p className="text-sm text-muted-foreground/70 mb-8">
+          <p className="text-sm text-muted-foreground mb-8">
             This page is coming soon. In the meantime, run a free scan to see what's already exposed about you.
           </p>
           <Button asChild size="lg">
