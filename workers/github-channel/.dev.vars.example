@@ -1,0 +1,9 @@
+# Copy to .dev.vars for `wrangler dev`. NEVER commit real values (.dev.vars is gitignored).
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+STATE_SIGNING_KEY=        # openssl rand -hex 32
+ENCRYPTION_KEY=           # openssl rand -hex 32 (64 hex chars = AES-256)
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+REDIRECT_URI=http://localhost:8787/oauth/github/callback
+ALLOWED_ORIGIN=http://localhost:8080
