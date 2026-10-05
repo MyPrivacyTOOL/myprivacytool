@@ -1,9 +1,9 @@
 import worker from './worker.js';
-let calls=[]; let supa='ok';
+let calls=[]; let supa='ok'; let notionFail=false;
 globalThis.fetch = async (url, opts) => {
   calls.push({url:String(url), body: opts?.body});
   if (String(url).includes('supabase.co')) return supa==='ok' ? {ok:true,status:201,text:async()=>''} : {ok:false,status:500,text:async()=>'boom'};
-  if (String(url).includes('api.notion.com/v1/pages')) return {ok:true,text:async()=>'',json:async()=>({})};
+  if (String(url).includes('api.notion.com/v1/pages')) return notionFail?{ok:false,text:async()=>'notion down'}:{ok:true,text:async()=>'',json:async()=>({})};
   return {ok:true,status:200,text:async()=>'',json:async()=>({results:[],has_more:false})};
 };
 const env={NOTION_TOKEN:'n',LEADS_DB_ID:'abc-def',SUPABASE_SERVICE_ROLE_KEY:'k',HUBSPOT_TOKEN:'h',RESEND_API_KEY:'r',SLACK_BOT_TOKEN:'s'};
@@ -25,4 +25,7 @@ let hp=hs()[0]; check(hp&&/^\d{4}-\d{2}-\d{2}$/.test(hp.consent_given_at)&&hp.co
 await run({email:'c@d.co',riskScore:5,source:'web_scan'}); hp=hs()[0]; check(hp&&!('consent_given_at' in hp)&&!('consent_source' in hp),'no consent flag => consent fields NOT sent');
 await run({email:'c@d.co',consent:'false'}); hp=hs()[0]; check(hp&&!('consent_given_at' in hp),'consent="false" => not treated as consent');
 await run({email:'c@d.co',consent:true,consent_source:'bad value<script>'}); hp=hs()[0]; check(hp&&hp.consent_source==='badvaluescript','consent_source is sanitised');
+// MPC-7120: Notion failure must not block the engagement row
+notionFail=true; r=await run({email:'n@f.co',riskScore:9}); notionFail=false;
+check(r.status===500&&r.supa.length===1&&JSON.parse(r.supa[0].body).full_scan_completed===true,'Notion 500 => engagement row still written');
 process.exit(ok?0:1);
