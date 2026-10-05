@@ -33,9 +33,9 @@ const STEPS: Step[] = [
     status: "Live",
     happens:
       "The free scan checks what your browser and device already reveal about you, so you can see your digital shadow the way a stranger would.",
-    youDo: "Run the free scan and confirm which data points are really you.",
+    youDo: "Check your exposure and confirm which data points are really you.",
     youGet: "A clear picture of your footprint, one hexagon per data point.",
-    cta: { label: "Run the free scan", to: "/" },
+    cta: { label: "Check My Exposure", to: "/" },
   },
   {
     id: 2,
@@ -129,7 +129,7 @@ const LANES: { id: Lane; label: string }[] = [
 ];
 
 const STATUS_STYLE: Record<Status, string> = {
-  Live: "bg-[hsl(var(--risk-low-soft))] text-[hsl(var(--risk-low))] border-[hsl(var(--risk-low)/0.3)]",
+  Live: "bg-[hsl(var(--risk-low-soft))] text-foreground border-[hsl(var(--risk-low)/0.3)]",
   "Coming soon":
     "bg-[hsl(var(--risk-mid-soft))] text-[hsl(var(--risk-mid))] border-[hsl(var(--risk-mid)/0.3)]",
   Roadmap: "bg-muted text-muted-foreground border-border",

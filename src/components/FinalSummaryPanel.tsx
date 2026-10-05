@@ -93,8 +93,8 @@ export default function FinalSummaryPanel({
         confirmed: categories.device.confirmed + categories.network.confirmed,
         total: categories.device.total + categories.network.total,
         icon: <Globe className="w-4 h-4" />,
-        color: 'text-[hsl(var(--cat-language))]',
-        bgColor: 'bg-[hsl(var(--cat-language-tint))]',
+        color: 'text-brand',
+        bgColor: 'bg-brand-soft',
         criticalIssues: categories.device.critical + categories.network.critical,
         warnings: categories.device.warnings + categories.network.warnings,
       },
@@ -104,8 +104,8 @@ export default function FinalSummaryPanel({
         confirmed: categories.language.confirmed,
         total: categories.language.total,
         icon: <Globe className="w-4 h-4" />,
-        color: 'text-[hsl(var(--cat-storage))]',
-        bgColor: 'bg-[hsl(var(--cat-storage-tint))]',
+        color: 'text-brand',
+        bgColor: 'bg-brand-soft',
         criticalIssues: categories.language.critical,
         warnings: categories.language.warnings,
       },
@@ -115,8 +115,8 @@ export default function FinalSummaryPanel({
         confirmed: categories.orientation.confirmed,
         total: categories.orientation.total,
         icon: <Smartphone className="w-4 h-4" />,
-        color: 'text-risk-orange',
-        bgColor: 'bg-risk-orange-soft',
+        color: 'text-foreground',
+        bgColor: 'bg-risk-mid-soft',
         criticalIssues: categories.orientation.critical,
         warnings: categories.orientation.warnings,
       },
@@ -126,7 +126,7 @@ export default function FinalSummaryPanel({
         confirmed: categories.fingerprint.confirmed,
         total: categories.fingerprint.total,
         icon: <Fingerprint className="w-4 h-4" />,
-        color: 'text-risk-high',
+        color: 'text-foreground',
         bgColor: 'bg-risk-high-soft',
         criticalIssues: categories.fingerprint.critical,
         warnings: categories.fingerprint.warnings,
@@ -137,8 +137,8 @@ export default function FinalSummaryPanel({
         confirmed: categories.storage.confirmed,
         total: categories.storage.total,
         icon: <Database className="w-4 h-4" />,
-        color: 'text-[hsl(var(--cat-language))]',
-        bgColor: 'bg-[hsl(var(--cat-language-tint))]',
+        color: 'text-brand',
+        bgColor: 'bg-brand-soft',
         criticalIssues: categories.storage.critical,
         warnings: categories.storage.warnings,
       },
@@ -148,8 +148,8 @@ export default function FinalSummaryPanel({
         confirmed: categories.social.confirmed,
         total: categories.social.total,
         icon: <Users className="w-4 h-4" />,
-        color: 'text-[hsl(var(--cat-social))]',
-        bgColor: 'bg-[hsl(var(--cat-social-tint))]',
+        color: 'text-foreground',
+        bgColor: 'bg-muted',
         criticalIssues: categories.social.critical,
         warnings: categories.social.warnings,
       },
@@ -159,7 +159,7 @@ export default function FinalSummaryPanel({
         confirmed: categories.security.confirmed,
         total: categories.security.total,
         icon: <ShieldAlert className="w-4 h-4" />,
-        color: 'text-risk-high',
+        color: 'text-foreground',
         bgColor: 'bg-risk-high-soft',
         criticalIssues: categories.security.critical,
         warnings: categories.security.warnings,
@@ -170,7 +170,7 @@ export default function FinalSummaryPanel({
         confirmed: categories.behavior.confirmed,
         total: categories.behavior.total,
         icon: <Mouse className="w-4 h-4" />,
-        color: 'text-risk-mid',
+        color: 'text-foreground',
         bgColor: 'bg-risk-mid-soft',
         criticalIssues: categories.behavior.critical,
         warnings: categories.behavior.warnings,
@@ -342,8 +342,8 @@ export default function FinalSummaryPanel({
   }, [confirmedCount]);
 
   const getRiskColor = (risk: number) => {
-    if (risk >= 70) return 'text-risk-high';
-    if (risk >= 40) return 'text-risk-mid';
+    if (risk >= 70) return 'text-foreground';
+    if (risk >= 40) return 'text-foreground';
     return 'text-risk-low';
   };
 
@@ -361,9 +361,9 @@ export default function FinalSummaryPanel({
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'text-risk-high bg-risk-high/15 border-risk-high/30';
-      case 'high': return 'text-risk-orange bg-risk-orange/15 border-risk-orange/30';
-      case 'medium': return 'text-risk-mid bg-risk-mid/15 border-risk-mid/30';
+      case 'critical': return 'text-foreground bg-risk-high/15 border-risk-high/30';
+      case 'high': return 'text-foreground bg-risk-mid/15 border-risk-mid/30';
+      case 'medium': return 'text-foreground bg-risk-mid/15 border-risk-mid/30';
       default: return 'text-muted-foreground bg-muted border-surface-border';
     }
   };
@@ -381,19 +381,19 @@ export default function FinalSummaryPanel({
       // PDF palette: RGB equivalents of the MPC-6906 light tokens in src/index.css
       // (jsPDF cannot read CSS variables, so keep these in sync with the tokens).
       const PDF = {
-        ink: [26, 26, 26],            // --foreground
-        muted: [82, 82, 82],          // --muted-foreground
-        card: [245, 245, 245],        // --card / zebra rows
-        track: [235, 235, 235],       // --muted
-        brand: [0, 112, 48],          // --brand-ink
-        brandSoft: [235, 250, 241],   // --brand-soft
-        riskHigh: [169, 25, 25],      // --risk-high
-        riskHighSoft: [254, 236, 236],
-        riskMid: [129, 78, 3],        // --risk-mid
-        riskMidSoft: [255, 246, 219],
-        riskOrange: [165, 69, 9],     // --risk-orange
-        purple: [93, 34, 195],        // --cat-device
-        cyan: [7, 102, 126],          // --cat-storage
+        ink: [26, 26, 26],            // --brand-near-black
+        muted: [89, 89, 89],          // --muted-foreground
+        card: [244, 244, 244],        // --brand-off-white / zebra rows
+        track: [244, 244, 244],       // --brand-off-white
+        brand: [30, 132, 73],         // --brand-ink (Deep Green)
+        brandSoft: [233, 246, 238],   // --brand-soft
+        riskHigh: [26, 26, 26],       // near black (no red text in print)
+        riskHighSoft: [244, 244, 244],
+        riskMid: [89, 89, 89],
+        riskMidSoft: [244, 244, 244],
+        riskOrange: [89, 89, 89],
+        purple: [30, 132, 73],        // Deep Green
+        cyan: [26, 26, 26],           // near black
       } satisfies Record<string, [number, number, number]> as Record<string, [number, number, number]>;
 
       // Helper function to add new page if needed
@@ -474,7 +474,7 @@ export default function FinalSummaryPanel({
       pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
       pdf.setFontSize(9);
       pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
-      pdf.text(`⚠ ${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
+      pdf.text(`${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
       
       yPos += 20;
 
@@ -492,14 +492,14 @@ export default function FinalSummaryPanel({
           cat.name,
           `${cat.confirmed}/${cat.total}`,
           `${percentage}%`,
-          cat.criticalIssues > 0 ? `${cat.criticalIssues} critical` : '-',
+          cat.criticalIssues > 0 ? `${cat.criticalIssues} high priority` : '-',
           cat.warnings > 0 ? `${cat.warnings} warnings` : '-'
         ];
       });
 
       autoTable(pdf, {
         startY: yPos,
-        head: [['Category', 'Detected', 'Accuracy', 'Critical', 'Warnings']],
+        head: [['Category', 'Detected', 'Accuracy', 'High priority', 'Warnings']],
         body: categoryData,
         theme: 'plain',
         headStyles: {
@@ -553,7 +553,7 @@ export default function FinalSummaryPanel({
         pdf.roundedRect(margin + 50, yPos, chartWidth, chartHeight, 1, 1, 'F');
         
         // Progress bar
-        const barColor = percentage >= 80 ? PDF.riskHigh : percentage >= 50 ? PDF.riskMid : PDF.brand;
+        const barColor = percentage >= 80 ? PDF.ink : percentage >= 50 ? PDF.muted : PDF.brand;
         pdf.setFillColor(...barColor);
         if (percentage > 0) {
           pdf.roundedRect(margin + 50, yPos, (chartWidth * percentage) / 100, chartHeight, 1, 1, 'F');
@@ -575,7 +575,7 @@ export default function FinalSummaryPanel({
         pdf.setTextColor(...PDF.riskHigh);
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('⚠ Top Privacy Concerns', margin, yPos);
+        pdf.text('Top Privacy Concerns', margin, yPos);
         yPos += 8;
 
         topConcerns.forEach((concern, i) => {
@@ -585,7 +585,7 @@ export default function FinalSummaryPanel({
           const severityColors: Record<string, number[]> = {
             critical: [...PDF.riskHigh],
             high: [...PDF.riskOrange],
-            medium: [...PDF.riskMid]
+            medium: [...PDF.brand]
           };
           const color = severityColors[concern.severity] || [...PDF.muted];
           
@@ -614,7 +614,7 @@ export default function FinalSummaryPanel({
           if (concern.fix) {
             pdf.setTextColor(...PDF.cyan);
             pdf.setFontSize(7);
-            pdf.text(`💡 ${concern.fix}`, margin + 25, yPos + 2);
+            pdf.text(`${concern.fix}`, margin + 25, yPos + 2);
             yPos += 6;
           }
           
@@ -629,7 +629,7 @@ export default function FinalSummaryPanel({
         pdf.setTextColor(...PDF.brand);
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('✓ What You\'re Doing Well', margin, yPos);
+        pdf.text('What You\'re Doing Well', margin, yPos);
         yPos += 8;
 
         strengths.forEach((strength) => {
@@ -767,7 +767,7 @@ export default function FinalSummaryPanel({
 
 📊 46 data points analyzed
 🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / 46) * 100)}%)
-⚠️ Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
+Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
 🔍 Uniqueness: 1 in ${uniquenessEstimate.toLocaleString()} browsers
 ${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
 
@@ -795,7 +795,7 @@ Test yours at: ${window.location.origin}`;
           <div>
             <CardTitle className="text-xl font-bold text-risk-low flex items-center gap-2">
               🎯 Your Complete Digital Shadow
-              <Badge className="bg-risk-mid/15 text-risk-mid border-risk-mid/30">
+              <Badge className="bg-risk-mid/15 text-foreground border-risk-mid/30">
                 <Trophy className="w-3 h-3 mr-1" />
                 FINAL REPORT
               </Badge>
@@ -819,11 +819,11 @@ Test yours at: ${window.location.origin}`;
             <p className="text-xs text-muted-foreground">Risk Score</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-lg font-bold text-[hsl(var(--cat-social))]">1:{uniquenessEstimate.toLocaleString()}</p>
+            <p className="text-lg font-bold text-foreground">1:{uniquenessEstimate.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Uniqueness</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-[hsl(var(--cat-storage))]">{Math.round((confirmedCount / 46) * 100)}%</p>
+            <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / 46) * 100)}%</p>
             <p className="text-xs text-muted-foreground">Exposure</p>
           </div>
         </div>
@@ -871,8 +871,8 @@ Test yours at: ${window.location.origin}`;
                       <span className={`text-sm font-medium ${cat.color}`}>{cat.name}</span>
                       <div className="flex items-center gap-2">
                         {cat.criticalIssues > 0 && (
-                          <Badge variant="outline" className="text-risk-high border-risk-high/30 text-xs px-1.5">
-                            {cat.criticalIssues} critical
+                          <Badge variant="outline" className="text-foreground border-risk-high/30 text-xs px-1.5">
+                            {cat.criticalIssues} high priority
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground">{cat.confirmed}/{cat.total}</span>
@@ -880,7 +880,7 @@ Test yours at: ${window.location.origin}`;
                     </div>
                     <Progress value={percentage} className="h-1.5 bg-risk-low-soft" />
                   </div>
-                  <span className={`text-sm font-mono ${percentage >= 80 ? 'text-risk-high' : percentage >= 50 ? 'text-risk-mid' : 'text-risk-low'}`}>
+                  <span className={`text-sm font-mono ${percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-foreground' : 'text-risk-low'}`}>
                     {percentage}%
                   </span>
                 </div>
@@ -892,7 +892,7 @@ Test yours at: ${window.location.origin}`;
         {/* Top 5 Privacy Concerns */}
         {topConcerns.length > 0 && (
           <div className="p-4 bg-risk-high-soft rounded-xl border border-risk-high/20">
-            <h4 className="text-sm font-semibold text-risk-high mb-3 flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
               Top Privacy Concerns
             </h4>
@@ -939,28 +939,28 @@ Test yours at: ${window.location.origin}`;
         )}
 
         {/* Action Plan */}
-        <div className="p-4 bg-[hsl(var(--cat-storage-tint))] rounded-xl border border-[hsl(var(--cat-storage)/0.2)]">
-          <h4 className="text-sm font-semibold text-[hsl(var(--cat-storage))] mb-3 flex items-center gap-2">
+        <div className="p-4 bg-brand-soft rounded-xl border border-brand/20">
+          <h4 className="text-sm font-semibold text-brand mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Prioritized Action Plan
           </h4>
           <ol className="space-y-2 text-sm text-foreground">
             {topConcerns.slice(0, 3).map((concern, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="w-5 h-5 rounded-full bg-[hsl(var(--cat-storage)/0.15)] text-[hsl(var(--cat-storage))] text-xs flex items-center justify-center flex-shrink-0">
+                <span className="w-5 h-5 rounded-full bg-brand/15 text-brand text-xs flex items-center justify-center flex-shrink-0">
                   {i + 1}
                 </span>
                 {concern.fix || `Address ${concern.title.toLowerCase()}`}
               </li>
             ))}
             <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-[hsl(var(--cat-storage)/0.15)] text-[hsl(var(--cat-storage))] text-xs flex items-center justify-center flex-shrink-0">
+              <span className="w-5 h-5 rounded-full bg-brand/15 text-brand text-xs flex items-center justify-center flex-shrink-0">
                 4
               </span>
               Use a privacy-focused browser like Brave or Firefox
             </li>
             <li className="flex items-start gap-2">
-              <span className="w-5 h-5 rounded-full bg-[hsl(var(--cat-storage)/0.15)] text-[hsl(var(--cat-storage))] text-xs flex items-center justify-center flex-shrink-0">
+              <span className="w-5 h-5 rounded-full bg-brand/15 text-brand text-xs flex items-center justify-center flex-shrink-0">
                 5
               </span>
               Regularly clear cookies and browser data
@@ -970,26 +970,26 @@ Test yours at: ${window.location.origin}`;
 
         {/* Action Buttons */}
         <div className="grid grid-cols-3 gap-3">
-          <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-risk-low/30 text-risk-low hover:bg-risk-low-soft">
+          <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-risk-low/30 text-foreground hover:bg-risk-low-soft">
             <FileText className="w-4 h-4 mr-2" />
             {isExporting ? 'Generating...' : 'Export PDF'}
           </Button>
-          <Button variant="outline" onClick={handleExportJSON} className="border-[hsl(var(--cat-language)/0.3)] text-[hsl(var(--cat-language))] hover:bg-[hsl(var(--cat-language-tint))]">
+          <Button variant="outline" onClick={handleExportJSON} className="border-brand/30 text-foreground hover:bg-muted">
             <FileJson className="w-4 h-4 mr-2" />
             Export JSON
           </Button>
-          <Button variant="outline" onClick={handleShare} className="border-[hsl(var(--cat-storage)/0.3)] text-[hsl(var(--cat-storage))] hover:bg-[hsl(var(--cat-storage-tint))]">
+          <Button variant="outline" onClick={handleShare} className="border-brand/30 text-foreground hover:bg-muted">
             <Share2 className="w-4 h-4 mr-2" />
             Share
           </Button>
         </div>
 
         <div className="flex gap-3">
-          <Button variant="default" onClick={onStartOver} className="flex-1 bg-brand text-white hover:bg-brand/90">
+          <Button variant="default" onClick={onStartOver} className="flex-1 bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white">
             <RotateCcw className="w-4 h-4 mr-2" />
             Start New Scan
           </Button>
-          <Button variant="outline" onClick={() => window.open('https://privacyguides.org', '_blank')} className="border-[hsl(var(--cat-social)/0.3)] text-[hsl(var(--cat-social))] hover:bg-[hsl(var(--cat-social-tint))]">
+          <Button variant="outline" onClick={() => window.open('https://privacyguides.org', '_blank')} className="border-border text-foreground hover:bg-muted">
             <BookOpen className="w-4 h-4 mr-2" />
             Protection Guide
           </Button>

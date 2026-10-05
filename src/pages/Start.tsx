@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X } from "lucide-react";
+import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X, MessageCircle, Send, MessageSquare, Instagram } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
@@ -14,20 +14,20 @@ const FORM_ID =
 const SOURCE_TAG = "start-scan";
 
 const hexagonData = [
-  { icon: Eye, label: "Name", value: "Detected from your profile", color: "#ff4444" },
-  { icon: MapPin, label: "Location", value: "City & country visible", color: "#ff6b35" },
-  { icon: Phone, label: "Phone", value: "Checking public records...", color: "#ff4444" },
-  { icon: Mail, label: "Email", value: "Associated addresses found", color: "#ff6b35" },
-  { icon: Globe, label: "Social Profiles", value: "Multiple platforms linked", color: "#ff4444" },
-  { icon: Database, label: "Data Broker Exposure", value: "Estimated 40+ sites", color: "#ff6b35" },
+  { icon: Eye, label: "Name", value: "Detected from your profile", color: "hsl(var(--brand-green))" },
+  { icon: MapPin, label: "Location", value: "City & country visible", color: "hsl(var(--brand-green-hover))" },
+  { icon: Phone, label: "Phone", value: "Checking public records...", color: "hsl(var(--brand-green))" },
+  { icon: Mail, label: "Email", value: "Associated addresses found", color: "hsl(var(--brand-green-hover))" },
+  { icon: Globe, label: "Social Profiles", value: "Multiple platforms linked", color: "hsl(var(--brand-green))" },
+  { icon: Database, label: "Data Broker Exposure", value: "Estimated 40+ sites", color: "hsl(var(--brand-green-hover))" },
 ];
 
 const channels = [
-  { name: "WhatsApp", emoji: "💬", url: "https://wa.me/YOUR_WHATSAPP_NUMBER?text=scan+me", color: "#25D366" },
-  { name: "Telegram", emoji: "✈️", url: "https://t.me/MyPrivacyToolBot?start=scan", color: "#2CA5E0" },
-  { name: "Messenger", emoji: "💙", url: "https://m.me/myprivacytool", color: "#006AFF" },
-  { name: "Instagram", emoji: "📸", url: "https://ig.me/m/myprivacytool", color: "#E1306C" },
-  { name: "Email", emoji: "📧", url: "mailto:scan@myprivacytool.io?subject=Scan%20Me", color: "#888" },
+  { name: "WhatsApp", Icon: MessageCircle, url: "https://wa.me/YOUR_WHATSAPP_NUMBER?text=scan+me" },
+  { name: "Telegram", Icon: Send, url: "https://t.me/MyPrivacyToolBot?start=scan" },
+  { name: "Messenger", Icon: MessageSquare, url: "https://m.me/myprivacytool" },
+  { name: "Instagram", Icon: Instagram, url: "https://ig.me/m/myprivacytool" },
+  { name: "Email", Icon: Mail, url: "mailto:scan@myprivacytool.io?subject=Scan%20Me" },
 ];
 
 export default function Start() {
@@ -64,12 +64,12 @@ export default function Start() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-mono">
+    <div className="min-h-screen bg-background text-foreground">
       <Seo {...pageMeta["/start"]} path="/start" />
       {/* Header */}
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
-        <Shield className="text-primary" size={20} />
-        <span className="text-primary text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
+        <Shield className="text-brand" size={20} />
+        <span className="text-brand text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
         <span className="text-muted-foreground text-xs ml-auto">First Hexagon — Privacy Exposure Report</span>
       </div>
 
@@ -78,11 +78,11 @@ export default function Start() {
         <div className="mb-10">
           <p className="text-muted-foreground text-xs tracking-widest uppercase mb-3">What we know about you right now</p>
           <h1 className="text-3xl font-bold text-foreground mb-4 leading-tight">
-            Your privacy is already<br />
-            <span className="text-destructive">being exposed.</span>
+            Your data is everywhere.<br />
+            <span className="text-brand">See where. Take it back.</span>
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Based on publicly available data and data broker records, here is what anyone can find about you today — before you've done anything to protect yourself.
+            Based on publicly available data and data broker records, here is what anyone can find about you today, so you can see your footprint and take control of it.
           </p>
         </div>
 
@@ -97,7 +97,7 @@ export default function Start() {
               <item.icon size={18} style={{ color: item.color }} className="shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">{item.label}</p>
-                <p className="text-sm text-foreground">{item.value}</p>
+                <p className="text-sm text-foreground font-mono">{item.value}</p>
               </div>
               <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: item.color }} />
             </div>
@@ -114,7 +114,7 @@ export default function Start() {
             <div className="flex gap-3">
               <button
                 onClick={() => handleConfirm(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Yes, that's me
@@ -133,7 +133,7 @@ export default function Start() {
         {/* Y — confirmed */}
         {confirmed === true && !submitted && (
           <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-primary text-sm font-semibold mb-1">✅ Confirmed.</p>
+            <p className="text-brand text-sm font-semibold mb-1">Confirmed.</p>
             <p className="text-muted-foreground text-xs mb-5">
               Enter your email and we'll send your full privacy report — and start removing you from data broker sites.
             </p>
@@ -149,21 +149,21 @@ export default function Start() {
               <button
                 type="submit"
                 disabled={sending}
-                className="bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground text-sm font-bold py-3 px-5 rounded-lg transition-colors flex items-center gap-2"
+                className="bg-primary hover:bg-primary-hover hover:text-brand-white disabled:opacity-60 text-primary-foreground text-sm font-bold py-3 px-5 rounded-lg transition-colors flex items-center gap-2"
               >
                 <ArrowRight size={16} />
-                {sending ? "Sending..." : "Start"}
+                {sending ? "Sending..." : "Check My Exposure"}
               </button>
               <ConsentCheckbox id="start-consent" checked={consent} onChange={setConsent} disabled={sending} labelClassName="text-muted-foreground" />
             </form>
-            {errorMsg && <p role="alert" className="text-destructive text-xs mt-3">{errorMsg}</p>}
+            {errorMsg && <p role="alert" className="text-foreground text-xs mt-3 border-l-4 border-destructive pl-3">{errorMsg}</p>}
           </div>
         )}
 
         {/* Submitted */}
         {submitted && (
           <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-primary font-semibold mb-1">✅ You're in the queue.</p>
+            <p className="text-brand font-semibold mb-1">You're in the queue.</p>
             <p className="text-muted-foreground text-xs">
               Check your inbox — your full privacy report is on its way. We'll also start the data broker removal process automatically.
             </p>
@@ -173,16 +173,16 @@ export default function Start() {
         {/* N — not me */}
         {confirmed === false && (
           <div className="bg-card border border-border rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-foreground font-semibold mb-1">🔍 Let's find the right profile.</p>
+            <p className="text-foreground font-semibold mb-1">Let's find the right profile.</p>
             <p className="text-muted-foreground text-xs mb-4">
               No problem — enter your name and we'll run a fresh scan specifically for you.
             </p>
             <a
               href="/scan"
-              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
             >
               <ArrowRight size={16} />
-              Run my scan
+              Check My Exposure
             </a>
           </div>
         )}
@@ -199,7 +199,7 @@ export default function Start() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-card hover:bg-muted border border-border rounded-lg px-4 py-3 transition-colors group"
               >
-                <span className="text-lg">{ch.emoji}</span>
+                <ch.Icon size={18} className="text-brand shrink-0" aria-hidden="true" />
                 <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{ch.name}</span>
               </a>
             ))}

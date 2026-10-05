@@ -622,10 +622,10 @@ export function detectAllSocialServices(): AllSocialDetectionResult {
  */
 export function getSocialRiskColor(risk: 'critical' | 'high' | 'medium' | 'low'): string {
   switch (risk) {
-    case 'critical': return '#dc2626'; // red-600
-    case 'high': return '#ea580c'; // orange-600
-    case 'medium': return '#ca8a04'; // yellow-600
-    case 'low': return '#16a34a'; // green-600
+    case 'critical': return 'hsl(var(--brand-error))'; // error red, fill/border use only
+    case 'high': return 'hsl(var(--brand-near-black))'; // near black
+    case 'medium': return 'hsl(var(--brand-green-hover))'; // deep green
+    case 'low': return 'hsl(var(--brand-green))'; // matrix green
   }
 }
 

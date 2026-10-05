@@ -42,8 +42,8 @@ export default function OrientationDisplay() {
                   <stop offset="100%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.1" />
                 </linearGradient>
                 <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="hsl(var(--risk-high))" />
-                  <stop offset="100%" stopColor="hsl(var(--risk-high))" />
+                  <stop offset="0%" stopColor="hsl(var(--brand-green))" />
+                  <stop offset="100%" stopColor="hsl(var(--brand-green))" />
                 </linearGradient>
               </defs>
 
@@ -117,11 +117,11 @@ export default function OrientationDisplay() {
                   transformOrigin: '100px 100px'
                 }}
               >
-                {/* Arrow pointer (red) */}
+                {/* Arrow pointer */}
                 <polygon
                   points="100,30 92,70 100,60 108,70"
                   fill="url(#arrowGradient)"
-                  stroke="hsl(var(--risk-high))"
+                  stroke="hsl(var(--brand-green))"
                   strokeWidth="1"
                 />
                 {/* Arrow tail */}
