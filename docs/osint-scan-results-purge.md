@@ -32,7 +32,7 @@ wrangler deploy
 3. Unset `NOTION_TOKEN` in staging and confirm a Telegram alert arrives.
 
 ## Future
-When agents switch to Supabase `mpt_osint_scan_results` (MPC-6956), add a matching purge (`delete where expires_at < now()`), e.g. via pg_cron.
+When agents switch to Supabase `mpt_osint_scan_results` (MPC-6956), the matching purge is already in place: see below.
 
 ## Supabase purge (MPC-6977)
-The same daily cron also calls `purgeExpiredSupabaseScanResults` (`workers/webhook-receiver/supabase-client.js`), which deletes `mpt_osint_scan_results` rows where `expires_at < now()` via the service_role key. It is a no-op (warning logged, returns -1) until `SUPABASE_SERVICE_ROLE_KEY` is set: `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`. Logs the deleted row count only.
+`mpt_osint_scan_results` rows past `expires_at` are deleted inside Supabase by a `pg_cron` job (`mpt-purge-expired-scan-results`, hourly) that calls `public.mpt_purge_expired_scan_results()`. No Worker, secret or deploy is involved. The SQL is recorded in `supabase/sql/mpt-purge-expired-scan-results.sql`; it was applied to project `xmdmkumwxpgahmlweuug` on 2026-10-05 and tested with an already-expired row (deleted; 0 expired rows afterwards).

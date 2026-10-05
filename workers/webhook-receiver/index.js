@@ -12,7 +12,7 @@ import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
 import { purgeExpiredScanResults } from './purge-expired.js';
-import { recordEngagement, purgeExpiredSupabaseScanResults } from './supabase-client.js';
+import { recordEngagement } from './supabase-client.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
 const META_QUERY = {
@@ -43,13 +43,9 @@ export default {
     return new Response('Not Found', { status: 404 });
   },
 
-  // Cron Trigger (see wrangler.toml) — purge expired scan results from Notion (MPC-6957)
-  // and from Supabase (MPC-6977). Supabase purge is a no-op until its secret is set.
+  // Cron Trigger (see wrangler.toml) — purge expired scan results
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(Promise.all([
-      purgeExpiredScanResults(env),
-      purgeExpiredSupabaseScanResults(env),
-    ]));
+    ctx.waitUntil(purgeExpiredScanResults(env));
   },
 };
 
