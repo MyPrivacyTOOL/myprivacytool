@@ -233,7 +233,7 @@ export default function FederatedLearningModal({
           <div className="flex flex-col gap-2 pt-2">
             <button
               onClick={() => handleConsent(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-risk-low hover:opacity-90 text-primary-foreground font-semibold rounded-xl transition-all shadow-card "
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white font-semibold rounded-xl transition-all shadow-card "
             >
               <Heart className="w-4 h-4" />
               Yes, Help Improve Predictions

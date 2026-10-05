@@ -305,7 +305,7 @@ export default function FingerprintVerification({
       switch (method) {
         case 'webrtc':
           const webrtc = await detectWebRTCLeak();
-          result = webrtc.isLeaking ? '❌ Still Leaking' : '✅ Protected!';
+          result = webrtc.isLeaking ? 'Still leaking' : 'Protected';
           break;
         case 'canvas':
           const fp = await calculateFingerprintUniqueness();
@@ -386,7 +386,7 @@ export default function FingerprintVerification({
       return { change: percent, text: `${percent}% less unique! 🎉`, improved: true };
     } else {
       const percent = Math.round((after / before - 1) * 100);
-      return { change: -percent, text: `${percent}% more unique ⚠️`, improved: false };
+      return { change: -percent, text: `${percent}% more unique`, improved: false };
     }
   };
 
@@ -439,7 +439,7 @@ export default function FingerprintVerification({
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/95 backdrop-blur-sm">
           <div className="text-center animate-scale-in">
             <PartyPopper className="w-16 h-16 text-foreground mx-auto mb-4 animate-bounce" />
-            <h3 className="text-2xl font-bold text-foreground mb-2">Great Job! 🎉</h3>
+            <h3 className="text-2xl font-bold text-foreground mb-2">Great job</h3>
             <p className="text-risk-low">Your privacy is much better protected!</p>
           </div>
         </div>
@@ -451,7 +451,7 @@ export default function FingerprintVerification({
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6 text-foreground" />
             <div>
-              <h3 className="text-foreground font-bold">⚠️ Your Protection Decreased!</h3>
+              <h3 className="text-foreground font-bold">Your protection decreased</h3>
               <p className="text-foreground text-sm">Some settings changed that made you more trackable.</p>
             </div>
           </div>
@@ -480,7 +480,7 @@ export default function FingerprintVerification({
         <Button
           onClick={handleFullRetest}
           disabled={isRetesting}
-          className="w-full h-14 text-lg bg-primary hover:opacity-90 text-primary-foreground shadow-card "
+          className="w-full h-14 text-lg bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white shadow-card "
         >
           {isRetesting ? (
             <>

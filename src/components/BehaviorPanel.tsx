@@ -173,7 +173,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
             </div>
             <div>
               <CardTitle className="text-xl text-foreground">
-                🖱️ Your Behavior is Being Tracked
+                Your behavior is visible to trackers
               </CardTitle>
               <p className="text-sm text-foreground mt-1">
                 Real-time interaction monitoring
@@ -559,7 +559,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
           
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            ⚠️ This only stops our demo. Real sites continue tracking.
+            This only stops our demo. Real sites continue tracking.
           </p>
         </div>
       </CardContent>

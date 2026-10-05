@@ -553,7 +553,7 @@ export default function FingerprintPanel() {
         {/* Advanced Fingerprinting Breakdown */}
         <div className="space-y-3">
           <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <span>🔬</span> Advanced Fingerprinting Methods
+            Advanced Fingerprinting Methods
           </h4>
           <div className="space-y-2">
             {advancedBreakdown.map((item) => (

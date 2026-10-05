@@ -201,7 +201,7 @@ export default function EmailCaptureModal({
               <Button
                 type="submit"
                 disabled={status === 'loading'}
-                className="w-full bg-primary hover:opacity-90 text-primary-foreground font-semibold py-3 rounded-lg transition-all disabled:opacity-60"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white font-semibold py-3 rounded-lg transition-all disabled:opacity-60"
               >
                 {status === 'loading' ? 'Sending…' : 'Send my fix guide →'}
               </Button>

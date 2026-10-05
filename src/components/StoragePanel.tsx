@@ -729,7 +729,7 @@ export default function StoragePanel() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearStorage} className="bg-risk-high hover:bg-risk-high">
+                <AlertDialogAction onClick={handleClearStorage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   Yes, Clear Everything
                 </AlertDialogAction>
               </AlertDialogFooter>

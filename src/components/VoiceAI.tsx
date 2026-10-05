@@ -95,7 +95,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     if (value.toLowerCase().includes('leaking') || value.toLowerCase().includes('leak')) {
       const ipMatch = value.match(/(\d+\.\d+\.\d+\.\d+)/);
       const leakedIP = ipMatch ? ipMatch[1] : 'your real IP';
-      return `CRITICAL ALERT: I detected a WebRTC leak. Your VPN might be showing a different IP, but WebRTC is broadcasting your real IP address: ${leakedIP}. This means websites can see through your VPN and know your actual location. You need to disable WebRTC or use a leak prevention extension immediately. This is one of the most serious privacy vulnerabilities I can detect.`;
+      return `I detected a WebRTC leak. Your VPN may show a different IP, but WebRTC is sharing your real IP address: ${leakedIP}. Websites can use this to see your actual location. Disabling WebRTC or using a leak prevention extension gives you control back.`;
     }
     if (value.toLowerCase().includes('blocked') || value.toLowerCase().includes('no leak')) {
       return "Good news - I checked for WebRTC leaks and found none. Your real IP address is properly hidden. This is crucial for VPN privacy.";
@@ -242,7 +242,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     return "Your language settings don't match your timezone - you're likely an expatriate.";
   }
   if (label.includes('user profile')) {
-    return `You appear to be ${hexagonData.value.toLowerCase()}. This lifestyle pattern is valuable for targeted attacks.`;
+    return `You appear to be ${hexagonData.value.toLowerCase()}. This lifestyle pattern can be used for targeted advertising and profiling.`;
   }
   // Orientation hexagons
   if (label.includes('orientation') || label.includes('rotation') || label.includes('tilt') || label.includes('motion')) {
@@ -291,7 +291,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     }
     const connectionMatch = value.match(/(\d+)\s*connections?/i);
     const connections = connectionMatch ? parseInt(connectionMatch[1]) : 1;
-    return `CRITICAL: I detected Single Sign-On usage with ${connections > 1 ? connections + ' connections' : 'active linking'}. You're using a major provider to log into other websites. This is extremely privacy-invasive because the SSO provider receives a notification every time you visit any site using their login—giving them your complete browsing history across all connected sites. This is one of the most comprehensive tracking methods I can detect.`;
+    return `I detected Single Sign-On usage with ${connections > 1 ? connections + ' connections' : 'active linking'}. You use a major provider to log into other websites. That provider can see when you visit sites that use its login, which builds a detailed profile of your browsing. Using separate logins for each site reduces that visibility.`;
   }
   
   // STORAGE HEXAGONS
@@ -376,7 +376,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     if (value.toLowerCase().includes('leaking') || value.toLowerCase().includes('leak')) {
       const locationMatch = value.match(/\(([^)]+)\)/);
       const location = locationMatch ? locationMatch[1] : 'your real location';
-      return `URGENT SECURITY ALERT: I detected a DNS leak. Your DNS requests are going to your ISP's servers instead of your VPN's DNS. This is catastrophic for privacy—your ISP can see every website you visit, and websites can determine your real location at ${location}. Your VPN is essentially useless with this leak. You must fix this immediately by enabling DNS leak protection in your VPN settings.`;
+      return `I detected a DNS leak. Your DNS requests are going to your ISP's servers instead of your VPN's DNS. Your ISP can see the websites you visit, and websites can work out your real location at ${location}. Turning on DNS leak protection in your VPN settings fixes this.`;
     }
     if (value.toLowerCase().includes('vpn protected') || value.toLowerCase().includes('protected')) {
       return "Excellent—your VPN is properly protecting your DNS requests. No leak detected. Your DNS queries are being routed through secure servers, keeping your browsing history hidden from your ISP.";
@@ -385,17 +385,17 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
       return "No DNS leak detected. Your DNS requests are properly routed through secure servers, protecting your browsing history from surveillance.";
     }
     if (value.toLowerCase().includes('checking') || value.toLowerCase().includes('...')) {
-      return "I'm checking for DNS leaks—this is one of the most critical privacy vulnerabilities that can expose your real location even when using a VPN.";
+      return "I'm checking for DNS leaks. A DNS leak can expose your real location even when you use a VPN.";
     }
     return "DNS leaks can expose every website you visit to your ISP and network administrators. I'm analyzing your DNS configuration.";
   }
   
   if (label.includes('connection security') || label.includes('https status') || label === 'https-status') {
     if (value.toLowerCase().includes('insecure') || value.toLowerCase().includes('http') && !value.toLowerCase().includes('https')) {
-      return "WARNING: This site uses HTTP, not HTTPS. Everything you do here—including passwords, credit cards, and personal information—is transmitted in plain text. Anyone on your WiFi network, your ISP, or network administrators can intercept this data. Never enter sensitive information on HTTP sites. Look for the padlock icon before entering any personal data.";
+      return "This site uses HTTP, not HTTPS. What you enter here, including passwords and personal information, is sent unencrypted, so people on your WiFi network or your ISP could read it. Check for the padlock icon before entering personal data.";
     }
     if (value.toLowerCase().includes('hsts')) {
-      return "This site uses HTTPS with HSTS enforcement, which is excellent. HSTS ensures your browser always uses an encrypted connection and prevents downgrade attacks. Your connection is secure and encrypted.";
+      return "This site uses HTTPS with HSTS enforcement. HSTS makes sure your browser always uses an encrypted connection. Your connection is secure and encrypted.";
     }
     if (value.toLowerCase().includes('secure') || value.toLowerCase().includes('https')) {
       return "This site uses HTTPS encryption. Your connection is secure and encrypted, protecting your data from eavesdroppers on your network.";
@@ -409,7 +409,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     }
     const countMatch = value.match(/(\d+)\s*insecure/i);
     const insecureCount = countMatch ? parseInt(countMatch[1]) : 1;
-    return `I found ${insecureCount} insecure resource${insecureCount > 1 ? 's' : ''} loading on this HTTPS page. This creates security holes—attackers could inject malicious code through these HTTP resources. While your main connection is encrypted, these insecure elements compromise the page's security and could be used for man-in-the-middle attacks.`;
+    return `I found ${insecureCount} insecure resource${insecureCount > 1 ? 's' : ''} loading on this HTTPS page. Your main connection is encrypted, but these HTTP resources weaken the page's protection and could be tampered with in transit.`;
   }
   
   if (label.includes('security headers')) {
@@ -420,12 +420,12 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
       return "This site has strong security headers configured. Headers like Content-Security-Policy and X-Frame-Options are protecting you from cross-site scripting and clickjacking attacks.";
     }
     if (value.toLowerCase().includes('weak') || (scoreMatch && parseInt(scoreMatch[1]) < 50)) {
-      return "This site is missing critical security headers. Without proper Content-Security-Policy, X-Frame-Options, and other protections, you're more vulnerable to cross-site scripting and content injection attacks when visiting this site. While this is the site owner's responsibility, it affects your security.";
+      return "This site is missing important security headers such as Content-Security-Policy and X-Frame-Options. Without them, the page is more open to cross-site scripting and content injection. Fixing this is the site owner's job, but it affects you.";
     }
     if (countMatch) {
       const present = parseInt(countMatch[1]);
       const total = parseInt(countMatch[2]);
-      return `This site has ${present} of ${total} security headers configured. Missing headers can leave you vulnerable to certain web attacks. Security headers are the site's responsibility but they protect you from XSS and clickjacking.`;
+      return `This site has ${present} of ${total} security headers configured. Missing headers can leave you open to certain web attacks. They are the site's responsibility, but they help protect you from XSS and clickjacking.`;
     }
     return "Security headers protect you from common web attacks like cross-site scripting. I'm checking what protections this site has in place.";
   }
@@ -434,10 +434,10 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     if (value.toLowerCase().includes('vulnerable')) {
       const versionMatch = value.match(/\d+/);
       const version = versionMatch ? versionMatch[0] : 'current';
-      return `CRITICAL: Your browser version ${version} has known security vulnerabilities that attackers actively exploit. Outdated browsers are one of the easiest ways for malware to infect your system. You should update immediately—not just for privacy, but for basic security. Go to your browser's About page to check for updates.`;
+      return `Your browser version ${version} has known security issues. Outdated browsers are a common way for malware to get onto a device. Updating is worth doing for basic security as well as privacy. Check your browser's About page for updates.`;
     }
     if (value.toLowerCase().includes('outdated')) {
-      return "Your browser version is outdated. Outdated browsers have known security vulnerabilities that attackers actively exploit. You should update immediately—not just for privacy, but for basic security.";
+      return "Your browser version is outdated and has known security issues. Updating is worth doing for basic security as well as privacy.";
     }
     if (value.toLowerCase().includes('up to date') || value.toLowerCase().includes('current')) {
       return "Your browser is up-to-date with the latest security patches. This is excellent—you're protected against known vulnerabilities.";
@@ -447,7 +447,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   
   if (label.includes('encryption') || label.includes('tls config') || label.includes('tls-config')) {
     if (value.toLowerCase().includes('no encryption') || value.toLowerCase().includes('none')) {
-      return "CRITICAL: There is no TLS encryption on this connection. All your data is transmitted in plain text and can be read by anyone on your network. Do not enter any personal information on this site.";
+      return "There is no TLS encryption on this connection. Your data is sent in plain text and can be read by anyone on your network. Avoid entering personal information on this site.";
     }
     if (value.toLowerCase().includes('1.3') || value.toLowerCase().includes('tls 1.3')) {
       return "Excellent! This site uses TLS 1.3, the most modern and secure encryption protocol available. Your data is protected with state-of-the-art encryption that's resistant to known attacks.";
@@ -456,7 +456,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
       return "This site uses TLS 1.2 encryption, which is still considered secure. While TLS 1.3 is newer, TLS 1.2 with proper configuration provides strong protection for your data.";
     }
     if (value.toLowerCase().includes('weak') || value.toLowerCase().includes('old')) {
-      return "Warning: This site may be using outdated TLS encryption. Older TLS versions have known vulnerabilities. Modern browsers should refuse weak encryption, but be cautious with sensitive data.";
+      return "This site may be using outdated TLS encryption. Older TLS versions have known weaknesses. Modern browsers usually refuse weak encryption, but take care with sensitive data.";
     }
     return "TLS encryption protects your data in transit. I'm checking what encryption protocol this site uses.";
   }
@@ -535,7 +535,7 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
   
   // Priority 1: WebRTC leak is the most critical
   if (label.includes('webrtc') && (value.includes('leaking') || value.includes('leak'))) {
-    return "URGENTLY disable WebRTC in your browser settings. In Firefox, go to about:config and set media.peerconnection.enabled to false. In Chrome, use the WebRTC Leak Prevent extension. This is your top priority";
+    return "Disable WebRTC in your browser settings. In Firefox, go to about:config and set media.peerconnection.enabled to false. In Chrome, use the WebRTC Leak Prevent extension. This is your top priority";
   }
   
   // Advanced fingerprint-specific recommendations
@@ -624,7 +624,7 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
   }
   if (label.includes('cross-site identity') || label.includes('account linking') || label.includes('cross-site')) {
     if (!value.toLowerCase().includes('not linked') && value !== '0 connections') {
-      return "URGENTLY stop using Sign in with Google or Facebook. Create unique passwords for each site using a password manager. SSO gives tech giants your complete browsing history";
+      return "Stop using Sign in with Google or Facebook where you can. Create unique passwords for each site using a password manager. SSO gives those providers visibility into where you log in";
     }
     return "excellent choice avoiding SSO. Continue using unique passwords for each service";
   }
@@ -653,14 +653,14 @@ const getTopRecommendation = (riskLevel: RiskLevel, hexagonData: HexagonData | n
   
   if (label.includes('security headers')) {
     if (value.toLowerCase().includes('weak') || value.includes('1/') || value.includes('2/')) {
-      return "be extra cautious on sites with weak security headers. They're more vulnerable to XSS attacks. Avoid clicking suspicious links and consider using NoScript extension for protection";
+      return "be careful on sites with weak security headers. They are more open to XSS attacks. Avoid clicking suspicious links and consider using the NoScript extension for protection";
     }
     return "this site has good security configuration. Continue normal browsing";
   }
   
   if (label.includes('browser status') || label.includes('browser security')) {
     if (value.toLowerCase().includes('vulnerable') || value.toLowerCase().includes('outdated')) {
-      return "UPDATE YOUR BROWSER IMMEDIATELY. Go to your browser menu, then Help, then About to check for updates. Outdated browsers are actively exploited by malware. This is critical for your security";
+      return "Update your browser. Go to your browser menu, then Help, then About to check for updates. Outdated browsers can be exploited by malware, so this matters for your security";
     }
     return "keep auto-updates enabled to maintain security. Consider using a privacy-focused browser like Firefox or Brave";
   }
@@ -763,12 +763,12 @@ const generateFinalSummary = (
   const riskLevel = riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low';
   const uniquenessText = fingerprintUniqueness ? `${fingerprintUniqueness}% unique` : 'highly trackable';
   
-  let summary = `I've now analyzed all ${confirmedCount} aspects of your digital shadow across 7 categories: your device and network, your language and location, your physical device orientation, your browser fingerprint which is ${uniquenessText}, your stored data, your connected accounts, your security vulnerabilities, and your behavioral patterns. `;
+  let summary = `I've now analyzed all ${confirmedCount} aspects of your digital shadow across 7 categories: your device and network, your language and location, your physical device orientation, your browser fingerprint which is ${uniquenessText}, your stored data, your connected accounts, your security checks, and your behavioral patterns. `;
   
   summary += `Your overall privacy risk score is ${riskScore} out of 100. `;
   
   if (riskLevel === 'high') {
-    summary += `This is concerning. You're leaving a significant digital trail that can be used to track and identify you across the web. I recommend taking immediate action on the critical issues I've identified.`;
+    summary += `You're leaving a significant digital trail that can be used to track and identify you across the web. I recommend starting with the highest-impact items I've identified.`;
   } else if (riskLevel === 'medium') {
     summary += `You have moderate exposure. While you're taking some privacy precautions, there are still gaps that could be exploited. Focus on the high-risk items I've flagged.`;
   } else {
@@ -971,7 +971,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('protection')) {
           const protValue = hexagonData.value?.toLowerCase() || '';
           if (protValue.includes('none')) {
-            newMessage = `⚠️ No fingerprint protection detected! You're fully trackable. Click to learn how to protect yourself.`;
+            newMessage = `No fingerprint protection detected. You're fully trackable. Click to learn how to protect yourself.`;
           } else {
             newMessage = `🛡️ ${hexagonData.value} detected! You have some fingerprint protection. Click to verify.`;
           }
@@ -979,7 +979,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('webrtc')) {
           const hasLeak = hexagonData.value?.toLowerCase().includes('leaking') || hexagonData.value?.toLowerCase().includes('leak');
           if (hasLeak) {
-            newMessage = `🚨 CRITICAL: WebRTC is leaking your real IP! ${hexagonData.value}. This bypasses your VPN. Click to confirm and learn how to fix.`;
+            newMessage = `WebRTC is sharing your real IP: ${hexagonData.value}. This bypasses your VPN. Click to confirm and learn how to fix.`;
           } else {
             newMessage = `WebRTC Status: ${hexagonData.value}. Click to confirm your IP leak status.`;
           }
@@ -990,7 +990,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('timezone')) {
           const hasMismatch = hexagonData.risk?.toLowerCase().includes('mismatch');
           newMessage = hasMismatch 
-            ? `⚠️ Timezone/Locale: ${hexagonData.value}. MISMATCH DETECTED - VPN usage revealed! Click to confirm.`
+            ? `Timezone/Locale: ${hexagonData.value}. Mismatch detected, which can reveal VPN use. Click to confirm.`
             : `Timezone/Locale: ${hexagonData.value}. Geographic fingerprint detected. Click to confirm.`;
         } else if (label.includes('battery')) {
           newMessage = `Battery Status: ${hexagonData.value}. This API can track your device patterns. Click to confirm.`;
@@ -1012,7 +1012,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('session') || label.includes('time')) {
           newMessage = `⏱️ Session Duration: ${hexagonData.value}. Time on site plus activity patterns build your behavioral profile. Click to confirm.`;
         } else if (label.includes('engagement') || label.includes('heatmap')) {
-          newMessage = `🔥 Engagement Map: ${hexagonData.value}. Your interaction hotspots reveal attention patterns and interests. Click to confirm.`;
+          newMessage = `Engagement Map: ${hexagonData.value}. Your interaction hotspots reveal attention patterns and interests. Click to confirm.`;
         } else {
           newMessage = `${hexagonData.label}: ${hexagonData.value}. Behavioral tracking creates a unique signature. Click to confirm.`;
         }
@@ -1052,13 +1052,13 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
     } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= 46) {
       newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that's approximately 90% unique. This can identify you even in incognito mode.`;
     } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < 46) {
-      newMessage = `Almost there! I now have a complete picture of your digital shadow. This is what attackers can find about you with just $50.`;
+      newMessage = `Almost there! I now have a complete picture of your digital shadow.`;
     } else if (confirmedCount === totalCount && totalCount >= 46) {
       // Final comprehensive summary for full 46 hexagons
       newMessage = `COMPLETE! I've analyzed all 46 aspects of your digital shadow across 7 categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
       trackVoiceAIMessage('full_scan_complete');
     } else if (confirmedCount === totalCount && totalCount > 0) {
-      newMessage = `Complete! Your digital shadow is fully mapped. This data is being sold by 100+ data brokers right now. Ready to take back control?`;
+      newMessage = `Complete! Your digital shadow is fully mapped. Data brokers collect and sell this kind of data. Ready to take back control?`;
     } else if (hexagonData?.confirmed) {
       // Special confirmed messages for fingerprint hexagons
       if (category === 'fingerprint') {
@@ -1075,7 +1075,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('protection')) {
           const protValue = hexagonData.value?.toLowerCase() || '';
           if (protValue.includes('none')) {
-            newMessage = `Protection status confirmed. You're vulnerable to fingerprint tracking. Consider using Brave or Firefox with privacy settings.`;
+            newMessage = `Protection status confirmed. You're open to fingerprint tracking. Consider using Brave or Firefox with privacy settings.`;
           } else {
             newMessage = `Protection confirmed! Your ${hexagonData.value} is helping reduce your fingerprint trackability.`;
           }
@@ -1083,7 +1083,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('webrtc')) {
           const hasLeak = hexagonData.value?.toLowerCase().includes('leaking') || hexagonData.value?.toLowerCase().includes('leak');
           if (hasLeak) {
-            newMessage = `🚨 WebRTC leak CONFIRMED! This is critical - your real IP is exposed. Fix this immediately by disabling WebRTC in browser settings.`;
+            newMessage = `WebRTC leak confirmed. Your real IP is exposed. You can fix this by disabling WebRTC in browser settings.`;
           } else {
             newMessage = `WebRTC status confirmed! Your real IP is protected from WebRTC leaks.`;
           }
@@ -1117,7 +1117,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('session') || label.includes('time')) {
           newMessage = `⏱️ Session duration confirmed! Your time patterns combined with interaction data build a comprehensive behavioral profile.`;
         } else if (label.includes('engagement') || label.includes('heatmap')) {
-          newMessage = `🔥 Engagement map confirmed! Your attention hotspots reveal interests and visual patterns. This is the most insidious form of tracking—invisible and unblockable.`;
+          newMessage = `Engagement map confirmed. Your attention hotspots reveal interests and visual patterns, and are hard to block.`;
         } else {
           newMessage = `${hexagonData.label} confirmed! Behavioral tracking cannot be blocked by privacy tools. Awareness is your only defense.`;
         }
