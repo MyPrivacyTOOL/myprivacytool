@@ -21,7 +21,7 @@
       "If you still receive telemarketing after 21 days, file a complaint through the DNC Registry website."
     ],
     "relistingWarning": "Registration is free and does not expire, but it only covers the numbers you register (register every number you own). It does not remove your data from broker or people-search databases and does not stop marketing from organisations you gave consent to. Withdraw consent with those senders directly.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "hong-kong-do-not-call-registers",
@@ -45,7 +45,7 @@
       "To stop marketing you consented to, or messages that are not covered, use the unsubscribe facility that every commercial message must contain, or make an opt-out request under the PDPO (see our Hong Kong direct marketing opt-out guide)."
     ],
     "relistingWarning": "The registers only cover the specific numbers and message types you register. They do not cover person-to-person live calls, and they do not remove your details from marketing lists or people-search sites. You can be contacted by senders you have an existing relationship with.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "hong-kong-direct-marketing-opt-out",
@@ -55,7 +55,7 @@
     "region": "APAC",
     "type": "Marketing-list opt-out right",
     "optOutUrl": "https://www.pcpd.org.hk/english/resources_centre/publications/files/opt_out2015_e.pdf",
-    "optOutUrlLabel": "PCPD opt-out guidance (PDF)",
+    "optOutUrlLabel": "PCPD opt-out guidance (PDF, 2015 edition)",
     "summary": "Under Hong Kong's Personal Data (Privacy) Ordinance, you can tell any company to stop using your personal data for direct marketing, and to stop passing it to third parties, free of charge.",
     "timeNeeded": "10 minutes per company",
     "processingTime": "Company must comply without charge once you ask; there is no fixed public processing window, so follow up in writing",
@@ -69,7 +69,7 @@
       "If the company ignores you or keeps marketing, you can complain to the Office of the Privacy Commissioner for Personal Data (PCPD), which has taken enforcement action over ignored opt-out requests."
     ],
     "relistingWarning": "This is a request per company, not a central list, and each company must be contacted separately. Your data may re-enter marketing lists if you later give consent again (for example by ticking a promotional box on a new sign-up).",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "australia-do-not-call-register",
@@ -93,7 +93,7 @@
       "Report calls received more than 30 days after registration through the complaint option on the same website."
     ],
     "relistingWarning": "Registrations are now permanent and do not need renewing, but the register does not stop calls from charities, political parties, researchers or organisations you have a relationship with, and does not remove your data from any database. Scammers ignore the register entirely.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "australia-white-pages-listing",
@@ -134,13 +134,13 @@
     "difficulty": "Easy",
     "requirements": ["Your name and postal address exactly as they appear on the mail you receive"],
     "steps": [
-      "Go to adma.com.au and find the Do Not Mail Register information under Regulatory / Compliance.",
+      "Go to adma.com.au/about-regulatory and scroll down to the \"Do Not Mail For Consumers\" section.",
       "Complete the consumer form with your full name and postal address, including every name variation and address variation that appears on the mail you receive.",
       "Submit the form and wait at least 45 days for processing.",
       "For mail that continues to arrive, contact the sender directly and ask to be removed from their list, quoting the source code printed near your address."
     ],
-    "relistingWarning": "The register only binds ADMA members and a few participating non-members. It does not stop unaddressed letterbox drops, mail from new businesses that source your details elsewhere, or mail sent to a differently spelled version of your name or address.",
-    "lastVerified": "2026-09-30"
+    "relistingWarning": "The register only binds ADMA members and a few participating non-members. It will not stop mail from companies that are not ADMA members, new businesses seeking you out as a new lead, businesses marketing to your business, or unaddressed mail such as brochures, letterbox drops and flyers.",
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "truecaller-unlist-number",
@@ -158,13 +158,13 @@
     "requirements": ["The phone number to unlist, with country code", "Access to the phone to receive a verification OTP if requested"],
     "steps": [
       "If you have a Truecaller account, deactivate it first in the app (Settings > Privacy Center > Deactivate).",
-      "Go to truecaller.com/unlisting in a browser.",
+      "Go to truecaller.com/unlisting in a browser. Truecaller warns that unlisting can't be reversed.",
       "Enter your phone number including country code, choose a reason for unlisting, and complete the captcha.",
       "Click Unlist phone number and complete any OTP verification you are asked for.",
       "Wait up to 24 hours, then search for your number in Truecaller to confirm it no longer shows a name."
     ],
     "relistingWarning": "Truecaller builds its database from other users' contact books. If any of them still has you saved and uses the app, your number and name can reappear. Re-check every few months, and repeat the unlisting if needed.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "spokeo",
@@ -189,7 +189,7 @@
       "Repeat for every profile that matches you (name variations, old addresses)."
     ],
     "relistingWarning": "Spokeo re-imports data from public records and data partners, so new profiles can appear later. Search again every 3 to 6 months and repeat the opt-out for anything new.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "whitepages",
@@ -214,7 +214,7 @@
       "If the form fails, email privacyrequest@whitepages.com, or write to the Whitepages Privacy Manager, 2033 Sixth Avenue, Suite 1100, Seattle, WA 98121."
     ],
     "relistingWarning": "Whitepages may re-list you if it collects new data about you. Re-check periodically and repeat the suppression for any new listing. Do not confuse this with Australia's whitepages.com.au, which is a separate company.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "truthfinder",
@@ -225,20 +225,20 @@
     "type": "People-search site",
     "optOutUrl": "https://www.truthfinder.com/opt-out/",
     "optOutUrlLabel": "truthfinder.com/opt-out",
-    "summary": "Suppress your TruthFinder record via its dedicated opt-out page. Do not use the general contact form, which does not process opt-outs.",
+    "summary": "Suppress your TruthFinder record via its dedicated opt-out page, which runs through the PeopleConnect Suppression Center. Do not use the general contact form, which does not process opt-outs.",
     "timeNeeded": "10 minutes",
     "processingTime": "Up to 48 hours after email confirmation",
     "difficulty": "Easy",
-    "requirements": ["Your name and state of residence", "A valid email address"],
+    "requirements": ["A valid email address you can open to confirm", "Your name and state of residence to find your record"],
     "steps": [
-      "Go to truthfinder.com/opt-out.",
-      "Enter your first name, last name and state, then select the correct record from the results.",
-      "Click the opt-out / remove option next to your record and enter your email address.",
-      "Open the verification email from TruthFinder and click the confirmation link. Processing begins once you confirm.",
+      "Go to truthfinder.com/opt-out. It redirects to the PeopleConnect Suppression Center (suppression.peopleconnect.us), the company that runs TruthFinder's opt-outs.",
+      "Under Step 1, enter your email address, tick the box agreeing to the Terms of Use and Privacy Policy, and click Continue.",
+      "Open the verification email and click its link to proceed.",
+      "Follow the remaining on-screen steps to find your record (you will need your name and state) and select it for suppression.",
       "Repeat for other records that match you."
     ],
     "relistingWarning": "TruthFinder is one of a family of brands that share data sources. Records can reappear as new public data arrives, so re-check every few months.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "fastpeoplesearch",
@@ -255,7 +255,7 @@
     "difficulty": "Easy",
     "requirements": ["An email address", "Your name plus city or state to find the record"],
     "steps": [
-      "Go to fastpeoplesearch.com/removal and pass the browser check if shown.",
+      "Go to fastpeoplesearch.com/removal and pass the browser check if shown. If you see an \"Access denied\" or \"Sorry, you have been blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
       "Enter your email address, tick the box confirming you are the subject of the record, complete the reCAPTCHA and select Begin Removal Process.",
       "Search for your record by name, phone or address.",
       "On your listing, click Remove My Record.",
@@ -280,7 +280,7 @@
     "difficulty": "Easy",
     "requirements": ["Your name and state", "An email address (a disposable or alias address helps avoid follow-up marketing)"],
     "steps": [
-      "Go to beenverified.com/app/optout/search.",
+      "Go to beenverified.com/app/optout/search. If you see an \"Access denied\" or \"Sorry, you have been blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
       "Enter your name and state and click Search.",
       "Click Proceed to Opt Out next to your record.",
       "Enter your email address, complete the CAPTCHA and click Send Verification Email.",
