@@ -789,7 +789,7 @@ Test yours at: ${window.location.origin}`;
     <Card className="bg-surface/95 shadow-card border border-surface-border overflow-hidden">
       <CardHeader className="border-b border-risk-low/20 pb-4 bg-brand-soft">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-risk-low/15">
+          <div className="p-2 rounded-lg bg-risk-low-soft">
             <Target className="w-6 h-6 text-risk-low" />
           </div>
           <div>
