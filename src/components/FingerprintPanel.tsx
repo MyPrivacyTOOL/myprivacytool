@@ -348,7 +348,7 @@ export default function FingerprintPanel() {
       <Card className="bg-risk-high-soft border-risk-high/30">
         <CardContent className="py-8 text-center">
           <div className="animate-pulse flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-risk-high/15 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-risk-high-soft flex items-center justify-center">
               <span className="text-2xl animate-spin-slow">🔴</span>
             </div>
             <p className="text-risk-high">Analyzing your browser fingerprint...</p>
@@ -369,18 +369,18 @@ export default function FingerprintPanel() {
     <Card className="bg-risk-high-soft border-risk-high/30 overflow-hidden">
       {/* CRITICAL: WebRTC Leak Warning Banner */}
       {advancedFP.webrtc?.isLeaking && (
-        <div className="bg-risk-high p-4 border-b border-risk-high animate-pulse">
+        <div className="bg-risk-high-soft p-4 border-b-2 border-risk-high animate-pulse">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-white flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-6 h-6 text-risk-high flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-white font-bold text-lg flex items-center gap-2">
+              <h3 className="text-risk-high font-bold text-lg flex items-center gap-2">
                 ⚠️ CRITICAL: Your VPN is Leaking Your Real IP!
               </h3>
               <p className="text-foreground text-sm mt-1">
                 Even though you may be using a VPN, WebRTC is revealing your actual IP address. 
                 Websites can see both your VPN IP and your real IP.
               </p>
-              <div className="mt-2 p-2 bg-risk-high/50 rounded-lg">
+              <div className="mt-2 p-2 bg-surface border border-risk-high/30 rounded-lg">
                 <p className="text-foreground text-xs font-mono">
                   <span className="text-risk-high">Leaked IPs:</span> {advancedFP.webrtc.publicIPs.join(', ') || advancedFP.webrtc.localIPs.join(', ')}
                 </p>
@@ -443,7 +443,7 @@ export default function FingerprintPanel() {
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div className={`flex items-center gap-2 p-2 rounded-lg ${
-              !advancedFP.webrtc?.isLeaking ? 'bg-risk-low-soft' : 'bg-risk-high/15'
+              !advancedFP.webrtc?.isLeaking ? 'bg-risk-low-soft' : 'bg-risk-high-soft'
             }`}>
               {!advancedFP.webrtc?.isLeaking ? (
                 <CheckCircle className="w-4 h-4 text-risk-low" />
@@ -539,9 +539,9 @@ export default function FingerprintPanel() {
                   />
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'high' || item.impact === 'critical' ? 'bg-risk-high/15 text-risk-high' : 
-                  item.impact === 'medium' ? 'bg-risk-mid/15 text-risk-mid' : 
-                  'bg-risk-low/15 text-risk-low'
+                  item.impact === 'high' || item.impact === 'critical' ? 'bg-risk-high-soft text-risk-high' : 
+                  item.impact === 'medium' ? 'bg-risk-mid-soft text-risk-mid' : 
+                  'bg-risk-low-soft text-risk-low'
                 }`}>
                   {item.impact}
                 </span>
@@ -561,7 +561,7 @@ export default function FingerprintPanel() {
                 key={item.name}
                 className={`flex items-center gap-3 p-3 rounded-lg border ${
                   item.impact === 'critical' 
-                    ? 'bg-risk-high/15 border-risk-high/40 animate-pulse' 
+                    ? 'bg-risk-high-soft border-risk-high/40 animate-pulse' 
                     : 'bg-risk-orange-soft border-risk-orange/20'
                 }`}
               >
@@ -583,10 +583,10 @@ export default function FingerprintPanel() {
                   />
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'critical' ? 'bg-risk-high/15 text-risk-high animate-pulse' :
-                  item.impact === 'high' ? 'bg-risk-high/15 text-risk-high' : 
-                  item.impact === 'medium' ? 'bg-risk-mid/15 text-risk-mid' : 
-                  'bg-risk-low/15 text-risk-low'
+                  item.impact === 'critical' ? 'bg-risk-high-soft text-risk-high animate-pulse' :
+                  item.impact === 'high' ? 'bg-risk-high-soft text-risk-high' : 
+                  item.impact === 'medium' ? 'bg-risk-mid-soft text-risk-mid' : 
+                  'bg-risk-low-soft text-risk-low'
                 }`}>
                   {item.impact}
                 </span>
@@ -661,7 +661,7 @@ export default function FingerprintPanel() {
                 <Globe className="w-4 h-4" />
                 Geographic Indicators
                 {advancedFP.timezone?.mismatch && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-risk-mid/15 text-risk-mid">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-risk-mid-soft text-risk-mid">
                     Mismatch Detected
                   </span>
                 )}
@@ -735,7 +735,7 @@ export default function FingerprintPanel() {
             }`}>
               <Shield className="w-4 h-4" />
               Browser Protection: {fingerprint.protection.effectiveness.charAt(0).toUpperCase() + fingerprint.protection.effectiveness.slice(1)}
-              <span className="ml-auto text-xs opacity-70">Score: {fingerprint.protection.score}/100</span>
+              <span className="ml-auto text-xs">Score: {fingerprint.protection.score}/100</span>
             </h4>
             
             <p className={`text-xs leading-relaxed ${

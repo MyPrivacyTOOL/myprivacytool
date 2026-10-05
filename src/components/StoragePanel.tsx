@@ -590,7 +590,7 @@ export default function StoragePanel() {
               <span className="text-2xl">{getRiskIcon(storageData.overallRisk)}</span>
               <div>
                 <p className="font-semibold capitalize">{storageData.overallRisk} Risk</p>
-                <p className="text-sm opacity-80">
+                <p className="text-sm">
                   {storageData.overallRisk === 'high' && 'Third-party cookies and tracking detected'}
                   {storageData.overallRisk === 'medium' && 'Some tracking detected in storage'}
                   {storageData.overallRisk === 'low' && 'Minimal storage, mostly session data'}

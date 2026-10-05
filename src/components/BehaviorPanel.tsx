@@ -151,6 +151,15 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
     }
   };
 
+  const getEngagementBg = (engagement: string) => {
+    switch (engagement) {
+      case 'high': return 'bg-risk-low-soft';
+      case 'medium': return 'bg-risk-mid-soft';
+      case 'low': return 'bg-risk-high-soft';
+      default: return 'bg-muted';
+    }
+  };
+
   const getPatternBadge = (pattern: string) => {
     if (pattern === 'human') {
       return <Badge className="bg-risk-low-soft text-risk-low border-risk-low/30">Human</Badge>;
@@ -321,7 +330,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
                 <ScrollText className="w-4 h-4 text-risk-mid" />
                 <span className="font-medium text-risk-mid">Scroll Behavior</span>
               </div>
-              <Badge className={`${getEngagementColor(scrollData.engagement)} bg-opacity-20 border-current/30`}>
+              <Badge className={`${getEngagementColor(scrollData.engagement)} ${getEngagementBg(scrollData.engagement)} border-current/30`}>
                 {scrollData.engagement.toUpperCase()}
               </Badge>
             </div>

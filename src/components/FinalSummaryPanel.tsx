@@ -360,9 +360,9 @@ export default function FinalSummaryPanel({
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'critical': return 'text-risk-high bg-risk-high/15 border-risk-high/30';
-      case 'high': return 'text-risk-orange bg-risk-orange/15 border-risk-orange/30';
-      case 'medium': return 'text-risk-mid bg-risk-mid/15 border-risk-mid/30';
+      case 'critical': return 'text-risk-high bg-risk-high-soft border-risk-high/30';
+      case 'high': return 'text-risk-orange bg-risk-orange-soft border-risk-orange/30';
+      case 'medium': return 'text-risk-mid bg-risk-mid-soft border-risk-mid/30';
       default: return 'text-muted-foreground bg-muted border-surface-border';
     }
   };
@@ -782,13 +782,13 @@ Test yours at: ${window.location.origin}`;
     <Card className="bg-surface/95 shadow-card border border-surface-border overflow-hidden">
       <CardHeader className="border-b border-risk-low/20 pb-4 bg-brand-soft">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-risk-low/15">
+          <div className="p-2 rounded-lg bg-risk-low-soft">
             <Target className="w-6 h-6 text-risk-low" />
           </div>
           <div>
             <CardTitle className="text-xl font-bold text-risk-low flex items-center gap-2">
               🎯 Your Complete Digital Shadow
-              <Badge className="bg-risk-mid/15 text-risk-mid border-risk-mid/30">
+              <Badge className="bg-risk-mid-soft text-risk-mid border-risk-mid/30">
                 <Trophy className="w-3 h-3 mr-1" />
                 FINAL REPORT
               </Badge>
@@ -895,14 +895,14 @@ Test yours at: ${window.location.origin}`;
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-medium text-sm">{concern.title}</p>
-                      <p className="text-xs opacity-70 mt-0.5">{concern.description}</p>
+                      <p className="text-xs mt-0.5">{concern.description}</p>
                     </div>
                     <Badge variant="outline" className={`text-xs shrink-0 ${getSeverityColor(concern.severity)}`}>
                       {concern.severity}
                     </Badge>
                   </div>
                   {concern.fix && (
-                    <div className="mt-2 flex items-center gap-1 text-xs opacity-80">
+                    <div className="mt-2 flex items-center gap-1 text-xs">
                       <Zap className="w-3 h-3" />
                       {concern.fix}
                     </div>
