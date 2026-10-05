@@ -92,7 +92,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-background via-background to-risk-high-soft border-risk-high/30">
         <DialogHeader className="border-b border-risk-high/30 pb-4">
           <DialogTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 bg-risk-high-soft rounded-lg animate-pulse">
+            <div className="p-2 bg-risk-high-soft rounded-lg">
               <AlertTriangle className="w-6 h-6 text-foreground" />
             </div>
             <div>

@@ -565,8 +565,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'fingerprint' 
-              ? "text-risk-high bg-risk-high-soft border-b-2 border-risk-high" 
-              : "text-muted-foreground hover:text-risk-high"
+              ? "text-foreground bg-risk-high-soft border-b-2 border-risk-high" 
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
           <Fingerprint className="w-3 h-3" />
@@ -588,7 +588,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 <span className="text-muted-foreground">Current Risk Score:</span>
                 <span className={cn(
                   "font-mono font-bold",
-                  currentRiskScore >= 70 ? "text-risk-high" :
+                  currentRiskScore >= 70 ? "text-foreground" :
                   currentRiskScore >= 40 ? "text-risk-mid" : "text-risk-low"
                 )}>{currentRiskScore}</span>
               </div>
@@ -652,7 +652,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 resetAllVoiceData();
                 refreshData();
               }}
-              className="w-full mt-2 px-3 py-1.5 text-muted-foreground text-xs hover:text-risk-high transition-colors"
+              className="w-full mt-2 px-3 py-1.5 text-muted-foreground text-xs hover:text-foreground transition-colors"
             >
               Reset All Data
             </button>
@@ -678,7 +678,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       <span className={cn(
                         "font-mono font-bold",
                         stats.accuracy >= 80 ? "text-risk-low" :
-                        stats.accuracy >= 60 ? "text-risk-mid" : "text-risk-high"
+                        stats.accuracy >= 60 ? "text-risk-mid" : "text-foreground"
                       )}>
                         {stats.correct}/{stats.total} ({stats.accuracy}%)
                       </span>
@@ -836,7 +836,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     </button>
                     <button
                       onClick={() => setSyntheticData(null)}
-                      className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors"
+                      className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -979,14 +979,14 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     <AlertDialogTrigger asChild>
                       <button
                         disabled={isTraining}
-                        className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
+                        className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                       >
                         <RotateCcw className="w-3 h-3" />
                       </button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-risk-high">Reset to Default Model?</AlertDialogTitle>
+                        <AlertDialogTitle className="text-foreground">Reset to Default Model?</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground">
                           This will remove the trained model and revert to the heuristic-based predictions. You can retrain anytime.
                         </AlertDialogDescription>
@@ -995,7 +995,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                         <AlertDialogCancel className="bg-transparent border-[hsl(var(--cat-device)/0.3)] text-[hsl(var(--cat-device))] hover:brightness-95">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleResetModel}
-                          className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
+                          className="bg-risk-high-soft border border-risk-high/50 text-foreground hover:brightness-95"
                         >
                           Reset Model
                         </AlertDialogAction>
@@ -1065,7 +1065,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           <span className={cn(
                             "font-mono font-bold",
                             rewardStats.averageReward >= 0.5 ? "text-risk-low" :
-                            rewardStats.averageReward >= 0 ? "text-risk-mid" : "text-risk-high"
+                            rewardStats.averageReward >= 0 ? "text-risk-mid" : "text-foreground"
                           )}>
                             {rewardStats.averageReward >= 0 ? '+' : ''}{rewardStats.averageReward.toFixed(2)}
                           </span>
@@ -1075,7 +1075,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           <span className="font-mono">
                             <span className="text-risk-low">{totalPositive}</span>
                             <span className="text-muted-foreground"> / </span>
-                            <span className="text-risk-high">{totalNegative}</span>
+                            <span className="text-foreground">{totalNegative}</span>
                           </span>
                         </div>
                         
@@ -1087,11 +1087,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                             ) : positiveRatio >= 50 ? (
                               <AlertTriangle className="w-3.5 h-3.5 text-risk-mid" />
                             ) : (
-                              <AlertTriangle className="w-3.5 h-3.5 text-risk-high" />
+                              <AlertTriangle className="w-3.5 h-3.5 text-foreground" />
                             )}
                             <span className={cn(
                               positiveRatio >= 70 ? "text-risk-low" :
-                              positiveRatio >= 50 ? "text-risk-mid" : "text-risk-high"
+                              positiveRatio >= 50 ? "text-risk-mid" : "text-foreground"
                             )}>
                               Model seems {positiveRatio >= 70 ? 'accurate' : positiveRatio >= 50 ? 'moderate' : 'needs work'}: {positiveRatio}% positive signals
                             </span>
@@ -1161,7 +1161,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                         )}
                         {worstProfile && worstProfile !== bestProfile && (
                           <div className="flex items-center gap-2 text-xs">
-                            <ThumbsDown className="w-3 h-3 text-risk-high" />
+                            <ThumbsDown className="w-3 h-3 text-foreground" />
                             <span className="text-muted-foreground">
                               Needs work: <span className="capitalize font-medium">{worstProfile.profile}</span> (avg: {worstProfile.average.toFixed(2)})
                             </span>
@@ -1199,7 +1199,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                               </span>
                               <span className={cn(
                                 "font-mono font-bold min-w-8 text-right",
-                                event.reward > 0 ? "text-risk-low" : "text-risk-high"
+                                event.reward > 0 ? "text-risk-low" : "text-foreground"
                               )}>
                                 {event.reward > 0 ? '+' : ''}{event.reward.toFixed(1)}
                               </span>
@@ -1225,7 +1225,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       <AlertDialogTrigger asChild>
                         <button
                           disabled={rewardStats.totalEvents === 0}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-3 h-3" />
                           Reset History
@@ -1233,7 +1233,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       </AlertDialogTrigger>
                       <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                         <AlertDialogHeader>
-                          <AlertDialogTitle className="text-risk-high">Reset Reward History?</AlertDialogTitle>
+                          <AlertDialogTitle className="text-foreground">Reset Reward History?</AlertDialogTitle>
                           <AlertDialogDescription className="text-muted-foreground">
                             This will permanently delete all {rewardStats.totalEvents} reward events from your local storage. This action cannot be undone.
                           </AlertDialogDescription>
@@ -1246,7 +1246,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                               setRewardEvents([]);
                               refreshData();
                             }}
-                            className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
+                            className="bg-risk-high-soft border border-risk-high/50 text-foreground hover:brightness-95"
                           >
                             Reset All
                           </AlertDialogAction>
@@ -1324,7 +1324,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                         <span className={cn(
                           "font-mono",
                           performanceStats.agreementRate >= 80 ? "text-risk-low" :
-                          performanceStats.agreementRate >= 60 ? "text-risk-mid" : "text-risk-high"
+                          performanceStats.agreementRate >= 60 ? "text-risk-mid" : "text-foreground"
                         )}>
                           {performanceStats.agreementRate}%
                         </span>
@@ -1395,8 +1395,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                             </>
                           ) : (
                             <>
-                              <AlertTriangle className="w-3.5 h-3.5 text-risk-high" />
-                              <span className="text-risk-high">
+                              <AlertTriangle className="w-3.5 h-3.5 text-foreground" />
+                              <span className="text-foreground">
                                 Heuristics are {Math.abs(performanceStats.improvement)}% more accurate
                               </span>
                             </>
@@ -1460,7 +1460,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                             <span className="text-muted-foreground">Reward:</span>
                             <span className={cn(
                               "font-mono font-bold",
-                              comp.reward > 0 ? "text-risk-low" : "text-risk-high"
+                              comp.reward > 0 ? "text-risk-low" : "text-foreground"
                             )}>
                               {comp.reward > 0 ? '+' : ''}{comp.reward.toFixed(1)}
                             </span>
@@ -1487,7 +1487,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <AlertDialogTrigger asChild>
                     <button
                       disabled={!performanceStats || performanceStats.totalComparisons === 0}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-3 h-3" />
                       Clear Data
@@ -1495,7 +1495,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   </AlertDialogTrigger>
                   <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="text-risk-high">Clear Comparison Data?</AlertDialogTitle>
+                      <AlertDialogTitle className="text-foreground">Clear Comparison Data?</AlertDialogTitle>
                       <AlertDialogDescription className="text-muted-foreground">
                         This will delete all {performanceStats?.totalComparisons || 0} comparison records. This cannot be undone.
                       </AlertDialogDescription>
@@ -1508,7 +1508,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           setPerformanceStats(getPerformanceStats());
                           setComparisons([]);
                         }}
-                        className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
+                        className="bg-risk-high-soft border border-risk-high/50 text-foreground hover:brightness-95"
                       >
                         Clear All
                       </AlertDialogAction>
@@ -1540,7 +1540,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <span className={cn(
                     "font-mono font-bold",
                     federatedStatus.consent === true ? "text-risk-low" :
-                    federatedStatus.consent === false ? "text-risk-high" : "text-risk-mid"
+                    federatedStatus.consent === false ? "text-foreground" : "text-risk-mid"
                   )}>
                     {federatedStatus.consent === true ? 'Enabled' :
                      federatedStatus.consent === false ? 'Disabled' : 'Not Asked'}
@@ -1637,26 +1637,26 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   </button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <button className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors">
+                      <button className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors">
                         <X className="w-3 h-3" />
                       </button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-risk-high">Revoke Consent?</AlertDialogTitle>
+                        <AlertDialogTitle className="text-foreground">Revoke Consent?</AlertDialogTitle>
                         <AlertDialogDescription className="text-muted-foreground">
                           This will disable federated learning and delete all stored gradients. You can re-enable anytime.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-transparent border-risk-high/30 text-risk-high hover:brightness-95">Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-transparent border-risk-high/30 text-foreground hover:brightness-95">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => {
                             revokeFederatedConsent();
                             setFederatedStatus(getFederatedStatus());
                             setGradientSummary(null);
                           }}
-                          className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
+                          className="bg-risk-high-soft border border-risk-high/50 text-foreground hover:brightness-95"
                         >
                           Revoke & Delete
                         </AlertDialogAction>
@@ -1799,7 +1799,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     "mb-3 p-2 rounded text-[10px]",
                     rlUpdateResult.success 
                       ? "bg-risk-low-soft text-risk-low" 
-                      : "bg-risk-high-soft text-risk-high"
+                      : "bg-risk-high-soft text-foreground"
                   )}>
                     {rlUpdateResult.message}
                   </div>
@@ -1921,7 +1921,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   setFederatedStatus(getFederatedStatus());
                   setGradientSummary(null);
                 }}
-                className="w-full mt-2 text-muted-foreground text-xs hover:text-risk-high transition-colors"
+                className="w-full mt-2 text-muted-foreground text-xs hover:text-foreground transition-colors"
               >
                 Clear Local Gradient Data
               </button>
@@ -1931,7 +1931,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           <>
             {/* Fingerprint Testing Header */}
             <div className="mb-4">
-              <h4 className="text-risk-high font-semibold text-sm flex items-center gap-2">
+              <h4 className="text-foreground font-semibold text-sm flex items-center gap-2">
                 <Fingerprint className="w-4 h-4" />
                 Fingerprint Testing & Validation
               </h4>
@@ -1942,21 +1942,21 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
 
             {isTestingFingerprint && (
               <div className="mb-4 p-3 bg-risk-high-soft border border-risk-high/30 rounded-lg flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-risk-high animate-spin" />
-                <span className="text-risk-high text-xs">Running fingerprint tests...</span>
+                <RefreshCw className="w-4 h-4 text-foreground animate-spin" />
+                <span className="text-foreground text-xs">Running fingerprint tests...</span>
               </div>
             )}
 
             {/* Regeneration Test */}
             <div className="mb-4 p-3 bg-risk-high-soft border border-risk-high/30 rounded-lg">
-              <h5 className="text-risk-high text-xs font-medium mb-2 flex items-center gap-2">
+              <h5 className="text-foreground text-xs font-medium mb-2 flex items-center gap-2">
                 <RefreshCw className="w-3 h-3" />
                 Fingerprint Regeneration Test
               </h5>
               <button
                 onClick={handleRegenerateFingerprints}
                 disabled={isTestingFingerprint}
-                className="w-full mb-2 px-3 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
+                className="w-full mb-2 px-3 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
               >
                 Regenerate All Fingerprints
               </button>
@@ -1966,25 +1966,25 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Canvas:</span>
                     <span className={fingerprintData.canvas?.hash === previousFingerprint.canvas?.hash ? 'text-risk-low' : 'text-risk-mid'}>
-                      {fingerprintData.canvas?.hash === previousFingerprint.canvas?.hash ? 'Stable ✅' : 'Changed ⚠️'}
+                      {fingerprintData.canvas?.hash === previousFingerprint.canvas?.hash ? 'Stable' : 'Changed'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">WebGL:</span>
                     <span className={fingerprintData.webgl?.hash === previousFingerprint.webgl?.hash ? 'text-risk-low' : 'text-risk-mid'}>
-                      {fingerprintData.webgl?.hash === previousFingerprint.webgl?.hash ? 'Stable ✅' : 'Changed ⚠️'}
+                      {fingerprintData.webgl?.hash === previousFingerprint.webgl?.hash ? 'Stable' : 'Changed'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Audio:</span>
                     <span className={fingerprintData.audio?.hash === previousFingerprint.audio?.hash ? 'text-risk-low' : 'text-risk-mid'}>
-                      {fingerprintData.audio?.hash === previousFingerprint.audio?.hash ? 'Stable ✅' : 'Changed ⚠️'}
+                      {fingerprintData.audio?.hash === previousFingerprint.audio?.hash ? 'Stable' : 'Changed'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Fonts:</span>
                     <span className={fingerprintData.fonts?.count === previousFingerprint.fonts?.count ? 'text-risk-low' : 'text-risk-mid'}>
-                      {fingerprintData.fonts?.count === previousFingerprint.fonts?.count ? 'Stable ✅' : 'Changed ⚠️'}
+                      {fingerprintData.fonts?.count === previousFingerprint.fonts?.count ? 'Stable' : 'Changed'}
                     </span>
                   </div>
                 </div>
@@ -2008,10 +2008,10 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 </span>
               </div>
               {stabilityStats.total > 0 && stabilityStats.stable === stabilityStats.total && (
-                <p className="text-muted-foreground text-[10px]">⚠️ Fingerprint never changes - easily trackable</p>
+                <p className="text-muted-foreground text-[10px]">Fingerprint stays the same, so it can be used to recognise this browser</p>
               )}
               {stabilityStats.total > 0 && stabilityStats.stable < stabilityStats.total && (
-                <p className="text-muted-foreground text-[10px]">✅ Fingerprint changes - good for privacy!</p>
+                <p className="text-muted-foreground text-[10px]">Fingerprint changes, which makes it harder to recognise this browser</p>
               )}
             </div>
 
@@ -2037,11 +2037,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       <span className={
                         value === 'blocked' ? 'text-risk-low' :
                         value === 'partial' ? 'text-risk-mid' :
-                        value === 'allowed' ? 'text-risk-high' : 'text-muted-foreground'
+                        value === 'allowed' ? 'text-foreground' : 'text-muted-foreground'
                       }>
-                        {value === 'blocked' ? 'Blocked ✅' :
-                         value === 'partial' ? 'Partial 🔶' :
-                         value === 'allowed' ? 'Allowed ⚠️' : 'Not tested'}
+                        {value === 'blocked' ? 'Blocked' :
+                         value === 'partial' ? 'Partial' :
+                         value === 'allowed' ? 'Allowed' : 'Not tested'}
                       </span>
                     </div>
                   ))}
@@ -2139,7 +2139,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                         "text-[9px]",
                         sim.risk === 'very-low' ? 'text-risk-low' :
                         sim.risk === 'low' ? 'text-risk-low' :
-                        'text-risk-high'
+                        'text-foreground'
                       )}>
                         {sim.risk} risk
                       </div>
@@ -2184,7 +2184,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             <button
               onClick={exportFingerprintReport}
               disabled={!fingerprintData}
-              className="w-full mb-2 px-3 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full mb-2 px-3 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Download className="w-3 h-3" />
               Export Fingerprint Report
@@ -2201,7 +2201,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   setStabilityStats({ total: 0, stable: 0 });
                   localStorage.removeItem('fingerprint-history');
                 }}
-                className="w-full mt-2 text-muted-foreground text-xs hover:text-risk-high transition-colors"
+                className="w-full mt-2 text-muted-foreground text-xs hover:text-foreground transition-colors"
               >
                 Clear Fingerprint History
               </button>

@@ -367,20 +367,20 @@ export default function FingerprintPanel() {
 
   return (
     <Card className="bg-risk-high-soft border-risk-high/30 overflow-hidden">
-      {/* CRITICAL: WebRTC Leak Warning Banner */}
+      {/* WebRTC leak notice */}
       {advancedFP.webrtc?.isLeaking && (
-        <div className="bg-risk-high p-4 border-b border-risk-high animate-pulse">
+        <div className="bg-risk-high-soft p-4 border-b border-risk-high/30">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-6 h-6 text-white flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-6 h-6 text-foreground flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                ⚠️ CRITICAL: Your VPN is Leaking Your Real IP!
+              <h3 className="text-foreground font-bold text-lg flex items-center gap-2">
+                WebRTC is showing your real IP address
               </h3>
               <p className="text-foreground text-sm mt-1">
-                Even though you may be using a VPN, WebRTC is revealing your actual IP address. 
+                If you use a VPN, WebRTC can still reveal your actual IP address. 
                 Websites can see both your VPN IP and your real IP.
               </p>
-              <div className="mt-2 p-2 bg-risk-high/50 rounded-lg">
+              <div className="mt-2 p-2 bg-surface rounded-lg">
                 <p className="text-foreground text-xs font-mono">
                   <span className="text-foreground">Leaked IPs:</span> {advancedFP.webrtc.publicIPs.join(', ') || advancedFP.webrtc.localIPs.join(', ')}
                 </p>
@@ -561,7 +561,7 @@ export default function FingerprintPanel() {
                 key={item.name}
                 className={`flex items-center gap-3 p-3 rounded-lg border ${
                   item.impact === 'critical' 
-                    ? 'bg-risk-high/15 border-risk-high/40 animate-pulse' 
+                    ? 'bg-risk-high/15 border-risk-high/40' 
                     : 'bg-risk-mid-soft border-risk-mid/20'
                 }`}
               >
@@ -574,7 +574,7 @@ export default function FingerprintPanel() {
                       item.impact === 'high' ? 'text-foreground' : 
                       item.impact === 'medium' ? 'text-foreground' : 'text-risk-low'
                     }`}>
-                      {item.impact === 'critical' ? 'CRITICAL' : `${item.uniqueness.toFixed(1)}% unique`}
+                      {item.impact === 'critical' ? 'Highest impact' : `${item.uniqueness.toFixed(1)}% unique`}
                     </span>
                   </div>
                   <Progress 
@@ -583,7 +583,7 @@ export default function FingerprintPanel() {
                   />
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
-                  item.impact === 'critical' ? 'bg-risk-high/15 text-foreground animate-pulse' :
+                  item.impact === 'critical' ? 'bg-risk-high/15 text-foreground' :
                   item.impact === 'high' ? 'bg-risk-high/15 text-foreground' : 
                   item.impact === 'medium' ? 'bg-risk-mid/15 text-foreground' : 
                   'bg-risk-low/15 text-risk-low'
@@ -759,8 +759,8 @@ export default function FingerprintPanel() {
             {advancedFP.webrtc?.isLeaking && (
               <>
                 <li className="flex items-start gap-2 text-foreground">
-                  <span className="text-foreground">⚠️</span>
-                  <strong>URGENT:</strong> Disable WebRTC in browser settings or use an extension like "WebRTC Leak Prevent"
+                  <span className="text-foreground">•</span>
+                  <strong>Recommended:</strong> Disable WebRTC in browser settings or use an extension like "WebRTC Leak Prevent"
                 </li>
                 <li className="flex items-start gap-2 text-foreground">
                   <span className="text-foreground">•</span>

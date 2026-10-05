@@ -168,7 +168,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-risk-mid-soft animate-pulse">
+            <div className="p-2 rounded-lg bg-risk-mid-soft">
               <Mouse className="w-6 h-6 text-foreground" />
             </div>
             <div>
@@ -182,7 +182,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
           <div className="flex items-center gap-2">
             {isTracking ? (
-              <Badge className="bg-risk-high-soft text-foreground border-risk-high/30 animate-pulse">
+              <Badge className="bg-risk-high-soft text-foreground border-risk-high/30">
                 <Activity className="w-3 h-3 mr-1" />
                 LIVE
               </Badge>

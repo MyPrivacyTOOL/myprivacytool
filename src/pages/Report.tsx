@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Search, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
@@ -17,7 +18,7 @@ const Report = () => {
         "Overview of data categories exposed",
         "Removal priority list",
       ],
-      cta: "Start Free",
+      cta: "Check My Exposure",
       highlight: false,
     },
     {
@@ -62,15 +63,15 @@ const Report = () => {
           Full Visibility · Active Removal · Continuous Protection
         </div>
 
-        <h1 className="text-4xl md:text-6xl font-black leading-tight mb-6 tracking-tight">
+        <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
           See Everything.<br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand to-brand">
+          <span className="text-brand">
             Remove Everything.
           </span>
         </h1>
 
         <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
-          A free scan shows you the problem. The Full Exposure Report gives you the
+          A free scan shows you where your data is. The Full Exposure Report gives you the
           complete picture — every broker, every data point, every removal path.
         </p>
         <p className="text-muted-foreground text-base mb-16 max-w-xl mx-auto">
@@ -82,12 +83,12 @@ const Report = () => {
       <section className="max-w-3xl mx-auto px-6 mb-16">
         <div className="grid md:grid-cols-3 gap-4 text-center">
           {[
-            { icon: "🔬", title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you." },
-            { icon: "✉️", title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs." },
-            { icon: "🔄", title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again." },
-          ].map(({ icon, title, desc }) => (
+            { Icon: Search, title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you." },
+            { Icon: Mail, title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs." },
+            { Icon: RefreshCw, title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again." },
+          ].map(({ Icon, title, desc }) => (
             <div key={title} className="p-6 rounded-xl bg-surface border border-surface-border">
-              <div className="text-3xl mb-3">{icon}</div>
+              <Icon className="w-8 h-8 text-brand mx-auto mb-3" aria-hidden="true" />
               <div className="font-bold text-foreground mb-2">{title}</div>
               <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
             </div>
@@ -114,14 +115,14 @@ const Report = () => {
               }`}
             >
               {plan.badge && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-brand text-white text-xs font-bold px-3 py-1 rounded-full">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
                   {plan.badge}
                 </div>
               )}
               <div className="mb-4">
                 <div className="text-muted-foreground text-sm font-semibold mb-1">{plan.name}</div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-foreground">{plan.price}</span>
+                  <span className="text-3xl font-bold text-foreground">{plan.price}</span>
                   {plan.period && <span className="text-muted-foreground text-sm">{plan.period}</span>}
                 </div>
               </div>
@@ -136,7 +137,7 @@ const Report = () => {
               <Button
                 className={`w-full font-bold ${
                   plan.highlight
-                    ? "bg-brand hover:bg-brand/90 text-white"
+                    ? "bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground"
                     : "bg-secondary hover:bg-muted text-foreground"
                 }`}
                 onClick={() => setSelected(plan.id)}

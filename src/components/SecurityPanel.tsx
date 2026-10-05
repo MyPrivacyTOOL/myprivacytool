@@ -165,9 +165,9 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
 
   if (loading) {
     return (
-      <Card className="border-2 border-risk-high/30 bg-gradient-to-br from-background via-background to-risk-high-soft">
+      <Card className="border border-border bg-card">
         <CardContent className="py-12 text-center">
-          <Shield className="w-12 h-12 mx-auto mb-4 text-foreground animate-pulse" />
+          <Shield className="w-12 h-12 mx-auto mb-4 text-foreground" />
           <p className="text-muted-foreground">Running security scan...</p>
         </CardContent>
       </Card>
@@ -195,7 +195,7 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
     securityData.overallRisk === 'critical';
 
   return (
-    <Card className="border-2 border-risk-high/30 bg-gradient-to-br from-background via-background to-risk-high-soft overflow-hidden">
+    <Card className="border border-risk-high/30 bg-card overflow-hidden">
       <CardHeader className="border-b border-risk-high/30 bg-risk-high-soft">
         <CardTitle className="flex items-center gap-3">
           {hasCriticalIssues ? (
@@ -215,19 +215,19 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
       </CardHeader>
       
       <CardContent className="p-4 space-y-6">
-        {/* CRITICAL ALERTS */}
+        {/* Priority notices */}
         {securityData.dnsLeak?.isLeaking && (
-          <div className="bg-risk-high-soft border-2 border-risk-high rounded-lg p-4 animate-pulse">
+          <div className="bg-risk-high-soft border border-risk-high/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-6 h-6 text-foreground flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-foreground font-bold text-lg mb-2">
-                  🚨 CRITICAL: DNS LEAK DETECTED
+                  DNS leak detected
                 </h3>
                 <p className="text-sm text-foreground mb-3">
                   Your DNS requests are being sent to your ISP instead of your VPN's DNS. 
-                  This completely defeats your VPN—websites can see your real location 
-                  and your ISP can log every website you visit.
+                  Websites can see your real location, 
+                  and your ISP can see the sites you visit.
                 </p>
                 <p className="text-xs text-foreground mb-3">
                   Detected location: {securityData.dnsLeak.actualLocation}
@@ -245,16 +245,16 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         )}
 
         {!securityData.httpsStatus.isSecure && (
-          <div className="bg-risk-mid-soft border-2 border-risk-mid rounded-lg p-4">
+          <div className="bg-risk-mid-soft border border-border rounded-lg p-4">
             <div className="flex items-start gap-3">
               <Unlock className="w-6 h-6 text-foreground flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <h3 className="text-foreground font-bold text-lg mb-2">
-                  ⚠️ WARNING: Insecure Connection
+                  Insecure connection
                 </h3>
                 <p className="text-sm text-foreground mb-3">
                   This site uses HTTP instead of HTTPS. Your data is transmitted in plain text 
-                  and can be intercepted by anyone on your network, including passwords and personal info.
+                  and can be read by others on your network, including passwords and personal info.
                 </p>
                 <Button 
                   variant="outline" 

@@ -212,33 +212,32 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
     <TooltipProvider>
       <div className="bg-brand-soft rounded-xl border border-border p-6 space-y-6 animate-fade-in">
         
-        {/* SSO CRITICAL ALERT - Pulsing red banner */}
+        {/* Single sign-on notice */}
         {crossSiteData?.ssoDetected && (
-          <div className="relative overflow-hidden rounded-lg border-2 border-risk-high bg-risk-high-soft p-4 animate-pulse">
-            <div className="absolute inset-0 bg-risk-high-soft animate-pulse" />
+          <div className="relative overflow-hidden rounded-lg border border-risk-high/30 bg-risk-high-soft p-4">
             <div className="relative flex items-start gap-3">
-              <AlertCircle className="w-8 h-8 text-foreground flex-shrink-0 animate-bounce" />
+              <AlertCircle className="w-8 h-8 text-foreground flex-shrink-0" />
               <div>
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  🚨 CRITICAL: Single Sign-On Detected
+                  Single sign-on detected
                 </h3>
                 <p className="text-sm text-foreground mt-1">
-                  <span className="font-semibold">{ssoProvider}</span> sees <span className="font-bold uppercase">every site</span> you visit using their login. 
-                  Your complete browsing history is being shared with this provider.
+                  <span className="font-semibold">{ssoProvider}</span> can see the sites where you use its login. 
+                  That activity can be added to your profile with this provider.
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* HIGH TRACKING EXPOSURE BANNER - Orange/red gradient */}
+        {/* Tracking exposure notice */}
         {privacyScore.loggedInCount >= 2 && !crossSiteData?.ssoDetected && (
           <div className="rounded-lg border border-risk-mid/30 bg-risk-mid-soft p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-7 h-7 text-foreground flex-shrink-0" />
               <div>
                 <h3 className="text-base font-bold text-foreground">
-                  ⚠️ HIGH TRACKING EXPOSURE
+                  Tracking exposure
                 </h3>
                 <p className="text-sm text-foreground mt-1">
                   You're logged into <span className="font-bold">{privacyScore.loggedInCount} services</span> that can track you across 
@@ -255,7 +254,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
             <div className="flex items-start gap-3">
               <Radio className="w-5 h-5 text-foreground flex-shrink-0 animate-pulse" />
               <div>
-                <h4 className="text-sm font-semibold text-foreground">Live Tracking Active</h4>
+                <h4 className="text-sm font-semibold text-foreground">Live tracking visibility</h4>
                 <p className="text-xs text-muted-foreground mt-1">
                   Right now, because you're logged into{' '}
                   {[
@@ -263,7 +262,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
                     metaData?.isLoggedIn && 'Facebook',
                     microsoftData?.isLoggedIn && 'Microsoft',
                   ].filter(Boolean).join(', ')}
-                  , these companies are tracking this very page visit and adding it to your profile.
+                  , these companies can see this page visit and add it to your profile.
                 </p>
               </div>
             </div>
@@ -272,7 +271,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
 
         {/* Header */}
         <div className="text-center border-b border-border pb-4">
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-[hsl(var(--cat-social))] via-[hsl(var(--cat-profile))] to-[hsl(var(--cat-profile))] bg-clip-text text-transparent flex items-center justify-center gap-2">
+          <h2 className="text-2xl font-bold text-foreground flex items-center justify-center gap-2">
             <Link2 className="w-6 h-6 text-foreground" />
             Your Connected Identity
           </h2>
@@ -547,7 +546,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
             Quick Logout Options
           </h3>
           <p className="text-xs text-muted-foreground mb-3">
-            ⚠️ Logging out may sign you out of related services and affect saved preferences.
+            Logging out may sign you out of related services and affect saved preferences.
           </p>
           <div className="flex flex-wrap gap-2">
             {googleData?.isLoggedIn && (

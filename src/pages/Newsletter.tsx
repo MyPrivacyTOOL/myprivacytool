@@ -52,13 +52,13 @@ export default function Newsletter() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-mono">
+    <div className="min-h-screen bg-background text-foreground">
       <Seo {...pageMeta["/newsletter"]} path="/newsletter" />
       {/* Header */}
       <div className="border-b border-brand/30 px-6 py-4 flex items-center gap-3">
         <Shield className="text-brand" size={20} />
         <span className="text-brand text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
-        <span className="text-muted-foreground text-xs ml-auto">Privacy Intelligence — Weekly Briefing</span>
+        <span className="text-muted-foreground text-xs ml-auto">Privacy Check</span>
       </div>
 
       <div className="max-w-lg mx-auto px-6 py-16">
@@ -73,11 +73,11 @@ export default function Newsletter() {
         {/* Headline */}
         <div className="text-center mb-10">
           <h1 className="text-2xl font-bold text-foreground mb-3 leading-tight">
-            Your data is out there.<br />
-            <span className="text-brand">Stay ahead of it.</span>
+            Privacy Check<br />
+            <span className="text-brand">Stay on top of your data.</span>
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Weekly privacy intelligence — what's changed in the data broker landscape, new removal tactics, and what you need to know to protect your digital footprint.
+            A weekly note on what has changed with data brokers, new removal steps, and what you need to know to protect your digital footprint.
           </p>
         </div>
 
@@ -86,9 +86,9 @@ export default function Newsletter() {
           <p className="text-xs text-muted-foreground uppercase tracking-widest mb-4">What you'll get</p>
           <div className="space-y-3">
             {[
-              "Weekly data broker exposure alerts",
+              "Weekly data exposure updates",
               "Step-by-step removal guides",
-              "New privacy threats & how to block them",
+              "New privacy risks and how to reduce them",
               "Your personal exposure score updates",
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3">
@@ -115,20 +115,20 @@ export default function Newsletter() {
             </div>
 
             {status === "error" && (
-              <p className="text-destructive text-xs">{errorMsg}</p>
+              <p role="alert" className="text-foreground text-xs border-l-4 border-destructive pl-3">{errorMsg}</p>
             )}
 
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white disabled:opacity-60 text-primary-foreground text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
             >
               {status === "loading" ? (
                 <span className="animate-pulse">Subscribing...</span>
               ) : (
                 <>
                   <ArrowRight size={16} />
-                  Get Weekly Privacy Intelligence
+                  Subscribe to Privacy Check
                 </>
               )}
             </button>
@@ -147,20 +147,20 @@ export default function Newsletter() {
             </div>
             <p className="text-brand font-semibold mb-2">You're in.</p>
             <p className="text-muted-foreground text-sm">
-              Check your inbox — your first privacy briefing is on its way.
+              Check your inbox — your first Privacy Check is on its way.
             </p>
             <a
               href="/"
               className="inline-flex items-center gap-2 mt-6 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              ← Run your free exposure scan
+              ← Check My Exposure
             </a>
           </div>
         )}
 
         {/* Footer */}
         <p className="text-muted-foreground text-xs text-center mt-10">
-          myprivacytool.io · Protecting your digital footprint
+          MyPrivacyTOOL · See it. Control it. Protect it.
         </p>
       </div>
     </div>

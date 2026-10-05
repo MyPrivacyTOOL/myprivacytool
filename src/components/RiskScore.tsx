@@ -363,7 +363,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-risk-high' : percentage >= 50 ? 'text-risk-mid' : 'text-risk-low')}>
+            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-risk-mid' : 'text-risk-low')}>
               {percentage}%
             </span>
           </div>
@@ -373,7 +373,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         <div className="flex-1 text-center sm:text-left">
           <div className={cn(
             "inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-2 border",
-            percentage >= 80 ? "bg-risk-high-soft text-risk-high border-risk-high/30" : 
+            percentage >= 80 ? "bg-risk-high-soft text-foreground border-risk-high/30" : 
             percentage >= 50 ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" : 
             "bg-risk-low-soft text-risk-low border-risk-low/30"
           )}>
@@ -392,7 +392,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasFingerprint && fingerprintRisk && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                fingerprintRisk === 'high' ? "bg-risk-high-soft text-risk-high border-risk-high/30" :
+                fingerprintRisk === 'high' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
                 fingerprintRisk === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
                 "bg-risk-low-soft text-risk-low border-risk-low/30"
               )}>
@@ -405,13 +405,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasSocial && socialRiskLevel && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                socialRiskLevel === 'critical' ? "bg-risk-high-soft text-risk-high border-risk-high/30" :
-                socialRiskLevel === 'high' ? "bg-risk-orange-soft text-risk-orange border-risk-orange/30" :
+                socialRiskLevel === 'critical' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
+                socialRiskLevel === 'high' ? "bg-risk-orange-soft text-foreground border-risk-orange/30" :
                 socialRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
                 "bg-risk-low-soft text-risk-low border-risk-low/30"
               )}>
                 <Users className="w-3 h-3" />
-                Social: {socialRiskLevel === 'critical' ? 'Critical' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
+                Social: {socialRiskLevel === 'critical' ? 'High' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
               </div>
             )}
 
@@ -419,13 +419,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasSecurity && securityRiskLevel && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                securityRiskLevel === 'critical' ? "bg-risk-high-soft text-risk-high border-risk-high/30 animate-pulse" :
-                securityRiskLevel === 'high' ? "bg-risk-orange-soft text-risk-orange border-risk-orange/30" :
+                securityRiskLevel === 'critical' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
+                securityRiskLevel === 'high' ? "bg-risk-orange-soft text-foreground border-risk-orange/30" :
                 securityRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
                 "bg-risk-low-soft text-risk-low border-risk-low/30"
               )}>
                 <ShieldAlert className="w-3 h-3" />
-                Security: {securityRiskLevel === 'critical' ? '🚨 Critical' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
+                Security: {securityRiskLevel === 'critical' ? 'Needs attention' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
               </div>
             )}
 

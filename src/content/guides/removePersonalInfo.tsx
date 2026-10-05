@@ -54,7 +54,7 @@ const Content = () => (
       Search for your own name and you may be surprised. An old forum account, a school
       alumni page, a listing on a people-search site, a company filing with your home
       address on it. None of it was stolen, and much of it was perfectly legal to collect.
-      Together, though, it gives scammers, people-search sites and marketers a detailed picture of you.
+      Together, though, it gives scammers, stalkers and marketers a detailed picture of you.
     </p>
     <p>
       This guide walks through a practical, ordered process for reducing that footprint. It
