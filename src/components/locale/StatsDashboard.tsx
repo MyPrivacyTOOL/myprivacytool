@@ -56,11 +56,11 @@ export default function StatsDashboard({ feedbackStats }: StatsDashboardProps) {
             <div className="text-xs text-muted-foreground">Accuracy Rate</div>
           </div>
           <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <div className="text-2xl font-bold text-[hsl(var(--cat-language))]">6</div>
+            <div className="text-2xl font-bold text-brand">6</div>
             <div className="text-xs text-muted-foreground">Signals Detected</div>
           </div>
           <div className="text-center p-4 bg-muted/30 rounded-lg">
-            <div className="text-2xl font-bold text-[hsl(var(--cat-social))]">4</div>
+            <div className="text-2xl font-bold text-foreground">4</div>
             <div className="text-xs text-muted-foreground">Profile Types</div>
           </div>
         </div>

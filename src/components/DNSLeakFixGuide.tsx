@@ -93,10 +93,10 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
         <DialogHeader className="border-b border-risk-high/30 pb-4">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <div className="p-2 bg-risk-high-soft rounded-lg animate-pulse">
-              <AlertTriangle className="w-6 h-6 text-risk-high" />
+              <AlertTriangle className="w-6 h-6 text-foreground" />
             </div>
             <div>
-              <span className="text-risk-high">Fix Your DNS Leak Immediately</span>
+              <span className="text-foreground">Fix Your DNS Leak Immediately</span>
               <DialogDescription className="text-muted-foreground mt-1">
                 Your ISP can see every website you visit
               </DialogDescription>
@@ -111,7 +111,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               <div className="flex justify-center mb-4">
                 <div className="relative">
                   <ShieldCheck className="w-16 h-16 text-risk-low" />
-                  <Sparkles className="w-6 h-6 text-risk-mid absolute -top-1 -right-1 animate-pulse" />
+                  <Sparkles className="w-6 h-6 text-foreground absolute -top-1 -right-1 animate-pulse" />
                 </div>
               </div>
               <h3 className="text-2xl font-bold text-risk-low mb-2">
@@ -135,7 +135,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               {/* VISUAL EXPLANATION */}
               <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-risk-high" />
+                  <Eye className="w-5 h-5 text-foreground" />
                   What's Happening Now
                 </h3>
                 
@@ -144,8 +144,8 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                   <Card className="border-risk-high/30 bg-risk-high-soft">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <XCircle className="w-5 h-5 text-risk-high" />
-                        <span className="font-medium text-risk-high">Current (Leaking)</span>
+                        <XCircle className="w-5 h-5 text-foreground" />
+                        <span className="font-medium text-foreground">Current (Leaking)</span>
                       </div>
                       
                       <div className="space-y-2 text-sm">
@@ -153,12 +153,12 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                           <Monitor className="w-4 h-4" />
                           <span>Your Device</span>
                         </div>
-                        <ArrowRight className="w-4 h-4 ml-4 text-risk-high" />
-                        <div className="flex items-center gap-2 text-risk-high">
+                        <ArrowRight className="w-4 h-4 ml-4 text-foreground" />
+                        <div className="flex items-center gap-2 text-foreground">
                           <Server className="w-4 h-4" />
                           <span>ISP DNS Servers</span>
                         </div>
-                        <ArrowRight className="w-4 h-4 ml-4 text-risk-high" />
+                        <ArrowRight className="w-4 h-4 ml-4 text-foreground" />
                         <div className="flex items-center gap-2">
                           <Globe className="w-4 h-4" />
                           <span>Websites</span>
@@ -402,28 +402,28 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               {/* WHY THIS MATTERS */}
               <div className="bg-risk-high-soft border border-risk-high/30 rounded-lg p-4">
                 <h3 className="font-semibold flex items-center gap-2 mb-3">
-                  <AlertTriangle className="w-5 h-5 text-risk-high" />
+                  <AlertTriangle className="w-5 h-5 text-foreground" />
                   Why This Matters
                 </h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
-                    <span className="text-risk-high">•</span>
+                    <span className="text-foreground">•</span>
                     <span>DNS leaks reveal <strong>every website you visit</strong> (complete browsing history)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-risk-high">•</span>
+                    <span className="text-foreground">•</span>
                     <span>Your ISP logs <strong>when you visit</strong> and <strong>how often</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-risk-high">•</span>
+                    <span className="text-foreground">•</span>
                     <span>ISPs can <strong>sell this data to advertisers</strong> in many countries</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-risk-high">•</span>
+                    <span className="text-foreground">•</span>
                     <span>Governments can <strong>request logs without warrant</strong> in many jurisdictions</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-risk-high">•</span>
+                    <span className="text-foreground">•</span>
                     <span>This is <strong>worse than IP leaks</strong> because it reveals detailed behavior patterns</span>
                   </li>
                 </ul>
@@ -475,7 +475,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                 </div>
 
                 {testResult === 'still-leaking' && (
-                  <p className="text-sm text-risk-high text-center">
+                  <p className="text-sm text-foreground text-center">
                     DNS is still leaking. Try a different method above, or try disconnecting and reconnecting your VPN.
                   </p>
                 )}
@@ -500,13 +500,13 @@ const VPNGuide = ({
 }) => (
   <div className="p-3 bg-background/50 rounded-lg border border-border">
     <h4 className="font-medium mb-2 flex items-center gap-2">
-      <Shield className="w-4 h-4 text-primary" />
+      <Shield className="w-4 h-4 text-brand" />
       {name}
     </h4>
     <ol className="space-y-1 text-sm text-muted-foreground">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary font-medium">{i + 1}.</span>
+          <span className="text-brand font-medium">{i + 1}.</span>
           {step}
         </li>
       ))}
@@ -530,13 +530,13 @@ const SystemGuide = ({
 }) => (
   <div className="p-3 bg-background/50 rounded-lg border border-border">
     <h4 className="font-medium mb-2 flex items-center gap-2">
-      <Monitor className="w-4 h-4 text-primary" />
+      <Monitor className="w-4 h-4 text-brand" />
       {os}
     </h4>
     <ol className="space-y-1 text-sm text-muted-foreground">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary font-medium">{i + 1}.</span>
+          <span className="text-brand font-medium">{i + 1}.</span>
           {step}
         </li>
       ))}
@@ -555,13 +555,13 @@ const BrowserGuide = ({
 }) => (
   <div className="p-3 bg-background/50 rounded-lg border border-border">
     <h4 className="font-medium mb-2 flex items-center gap-2">
-      <Globe className="w-4 h-4 text-primary" />
+      <Globe className="w-4 h-4 text-brand" />
       {browser}
     </h4>
     <ol className="space-y-1 text-sm text-muted-foreground">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary font-medium">{i + 1}.</span>
+          <span className="text-brand font-medium">{i + 1}.</span>
           {step}
         </li>
       ))}
@@ -607,7 +607,7 @@ const DNSProvider = ({
       {features.map((feature) => (
         <span
           key={feature}
-          className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded"
+          className="text-xs px-2 py-0.5 bg-primary/10 text-brand rounded"
         >
           {feature}
         </span>

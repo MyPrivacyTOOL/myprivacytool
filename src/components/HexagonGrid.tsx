@@ -279,13 +279,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-        colors: ['#0B8A3D', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+        colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
       });
       confetti({
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-        colors: ['#0B8A3D', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+        colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
       });
     }, 250);
   }, []);
@@ -299,7 +299,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       if (dnsResult.isLeaking) {
         setCriticalSecurityAlert({
           type: 'dns',
-          message: `Your DNS is leaking to your ISP! Location exposed: ${dnsResult.actualLocation}`,
+          message: `Your DNS requests are visible to your ISP. Location shown: ${dnsResult.actualLocation}`,
         });
         // Auto-show the fix guide after a short delay
         setTimeout(() => setShowDNSFixGuide(true), 2000);
@@ -428,7 +428,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           if (label.includes('dns') && value.includes('leak')) {
             setCriticalSecurityAlert({
               type: 'dns',
-              message: 'Critical: DNS leak detected! Your browsing history is exposed.',
+              message: 'DNS leak detected. Your browsing history is visible to your ISP.',
             });
           }
           return newCount;
@@ -525,10 +525,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
       {/* Critical Security Alert Banner */}
       {criticalSecurityAlert && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white py-3 px-4 flex items-center justify-between animate-pulse">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-brand-near-black text-brand-white border-b border-brand-dark-border py-3 px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6" />
-            <span className="font-bold">🚨 CRITICAL SECURITY ISSUE</span>
+            <span className="font-bold">Security notice</span>
             <span className="hidden sm:inline">- {criticalSecurityAlert.message}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -536,15 +536,15 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
               size="sm"
               variant="secondary"
               onClick={() => setShowDNSFixGuide(true)}
-              className="bg-white text-red-600 hover:bg-gray-100"
+              className="bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white"
             >
-              Fix Now
+              See how to fix
             </Button>
             <Button
               size="icon"
               variant="ghost"
               onClick={() => setCriticalSecurityAlert(null)}
-              className="text-white hover:bg-red-700"
+              className="text-brand-white hover:bg-brand-dark-border hover:text-brand-white"
             >
               <X className="w-4 h-4" />
             </Button>

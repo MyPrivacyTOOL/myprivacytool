@@ -113,7 +113,7 @@ const Footer = () => {
 
         <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
           <Link to="/" className="flex items-center" aria-label="MyPrivacyTOOL home">
-            <img src={logoFooter} alt="MyPrivacyTOOL.IO" className="h-8 object-contain" loading="lazy" />
+            <img src={logoFooter} alt="MyPrivacyTOOL" className="h-10 w-auto min-w-16 m-2 object-contain" loading="lazy" />
           </Link>
           <p className="text-xs text-muted-foreground text-center">
             © {year} MyPrivacyTOOL, MyPrivacyTOOL Ltd., Hong Kong

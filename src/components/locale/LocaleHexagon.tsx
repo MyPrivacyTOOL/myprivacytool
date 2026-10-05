@@ -100,8 +100,8 @@ export default function LocaleHexagon({ data, onConfirm, onHover }: LocaleHexago
           absolute bottom-4 left-1/2 -translate-x-1/2
           px-2 py-0.5 rounded-full text-[10px] font-medium
           ${data.confidence >= 90 ? 'bg-risk-low-soft text-risk-low' :
-            data.confidence >= 70 ? 'bg-risk-mid-soft text-risk-mid' :
-            'bg-risk-high-soft text-risk-high'}
+            data.confidence >= 70 ? 'bg-risk-mid-soft text-foreground' :
+            'bg-risk-high-soft text-foreground'}
         `}>
           {data.confidence}%
         </div>

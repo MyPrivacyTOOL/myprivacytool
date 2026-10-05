@@ -157,8 +157,8 @@ export default function LanguageIntelligencePanel({
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return 'text-risk-low';
-    if (confidence >= 60) return 'text-risk-mid';
-    return 'text-risk-high';
+    if (confidence >= 60) return 'text-foreground';
+    return 'text-foreground';
   };
 
   const getConfidenceBgColor = (confidence: number) => {
@@ -170,9 +170,9 @@ export default function LanguageIntelligencePanel({
   const getVpnIndicator = (likelihood: 'low' | 'medium' | 'high') => {
     switch (likelihood) {
       case 'high':
-        return { color: 'text-risk-mid', bg: 'bg-risk-mid/15', label: 'Likely VPN' };
+        return { color: 'text-foreground', bg: 'bg-risk-mid/15', label: 'Likely VPN' };
       case 'medium':
-        return { color: 'text-risk-orange', bg: 'bg-risk-orange/15', label: 'Possible VPN' };
+        return { color: 'text-foreground', bg: 'bg-risk-mid/15', label: 'Possible VPN' };
       default:
         return { color: 'text-risk-low', bg: 'bg-risk-low/15', label: 'No VPN detected' };
     }
@@ -421,9 +421,9 @@ export default function LanguageIntelligencePanel({
         {analysis.hasLanguageLocationMismatch && analysis.mismatchDetails && (
           <div className="p-4 bg-risk-mid-soft border border-risk-mid/30 rounded-lg animate-pulse-slow">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-risk-mid flex-shrink-0" />
+              <AlertTriangle className="w-5 h-5 text-foreground flex-shrink-0" />
               <div>
-                <h5 className="font-medium text-risk-mid mb-1">Language-Location Mismatch Detected</h5>
+                <h5 className="font-medium text-foreground mb-1">Language-Location Mismatch Detected</h5>
                 <p className="text-muted-foreground text-sm">{analysis.mismatchDetails}</p>
                 {analysis.expatriatePatternDetected && (
                   <p className="text-muted-foreground text-xs mt-2">
@@ -482,14 +482,14 @@ export default function LanguageIntelligencePanel({
                     </button>
                     <button
                       onClick={() => handleFeedback(false)}
-                      className="flex items-center gap-2 px-4 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-risk-high text-sm hover:bg-risk-high/15 transition-all hover:scale-105"
+                      className="flex items-center gap-2 px-4 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-foreground text-sm hover:bg-risk-high/15 transition-all hover:scale-105"
                     >
                       <ThumbsDown className="w-4 h-4" />
                       No
                     </button>
                     <button
                       onClick={() => setShowWhyModal(true)}
-                      className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--cat-social-tint))] border border-[hsl(var(--cat-social)/0.3)] rounded-lg text-[hsl(var(--cat-social))] text-sm hover:bg-[hsl(var(--cat-social)/0.15)] transition-all"
+                      className="flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg text-foreground text-sm hover:bg-border transition-all"
                     >
                       <HelpCircle className="w-4 h-4" />
                       Tell me more
@@ -509,7 +509,7 @@ export default function LanguageIntelligencePanel({
                 ) : (
                   <div className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all",
-                    feedbackGiven ? "bg-risk-low-soft text-risk-low" : "bg-risk-high-soft text-risk-high",
+                    feedbackGiven ? "bg-risk-low-soft text-risk-low" : "bg-risk-high-soft text-foreground",
                     showThankYou && "animate-scale-in"
                   )}>
                     {feedbackGiven ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}
@@ -528,9 +528,9 @@ export default function LanguageIntelligencePanel({
 
           {/* Why We Asked Modal */}
           <Dialog open={showWhyModal} onOpenChange={setShowWhyModal}>
-            <DialogContent className="bg-surface border-[hsl(var(--cat-social)/0.3)] text-foreground max-w-md">
+            <DialogContent className="bg-surface border-border text-foreground max-w-md">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-[hsl(var(--cat-social))]">
+                <DialogTitle className="flex items-center gap-2 text-foreground">
                   <Brain className="w-5 h-5" />
                   How We Detected Your Language
                 </DialogTitle>
@@ -540,34 +540,34 @@ export default function LanguageIntelligencePanel({
               </DialogHeader>
               
               <div className="space-y-4 mt-4">
-                <div className="p-3 bg-[hsl(var(--cat-social-tint))] rounded-lg border border-[hsl(var(--cat-social)/0.2)]">
-                  <h4 className="text-sm font-medium text-[hsl(var(--cat-social))] mb-2 flex items-center gap-2">
+                <div className="p-3 bg-muted rounded-lg border border-border">
+                  <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                     <Globe className="w-4 h-4" />
                     Browser Language Settings
                   </h4>
-                  <p className="text-xs text-[hsl(var(--cat-social))]">
+                  <p className="text-xs text-foreground">
                     We analyze your browser's configured languages ({analysis?.languages.slice(0, 3).join(', ')}) 
                     to understand your language preferences and their priority order.
                   </p>
                 </div>
 
-                <div className="p-3 bg-[hsl(var(--cat-social-tint))] rounded-lg border border-[hsl(var(--cat-social)/0.2)]">
-                  <h4 className="text-sm font-medium text-[hsl(var(--cat-social))] mb-2 flex items-center gap-2">
+                <div className="p-3 bg-muted rounded-lg border border-border">
+                  <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4" />
                     Timezone Analysis
                   </h4>
-                  <p className="text-xs text-[hsl(var(--cat-social))]">
+                  <p className="text-xs text-foreground">
                     Your timezone ({analysis?.timezone}) helps us detect if you might be an expatriate 
                     or traveler using their native language abroad.
                   </p>
                 </div>
 
-                <div className="p-3 bg-[hsl(var(--cat-social-tint))] rounded-lg border border-[hsl(var(--cat-social)/0.2)]">
-                  <h4 className="text-sm font-medium text-[hsl(var(--cat-social))] mb-2 flex items-center gap-2">
+                <div className="p-3 bg-muted rounded-lg border border-border">
+                  <h4 className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
                     <User className="w-4 h-4" />
                     User Profile Classification
                   </h4>
-                  <p className="text-xs text-[hsl(var(--cat-social))]">
+                  <p className="text-xs text-foreground">
                     Our TensorFlow.js model classifies you as a {prediction?.userProfile || 'user'} with 
                     {prediction?.userProfileConfidence || 0}% confidence based on pattern analysis.
                   </p>
@@ -593,12 +593,12 @@ export default function LanguageIntelligencePanel({
           {/* Dev Mode: Aggregate Stats */}
           {import.meta.env.DEV && accuracyStats.total > 0 && (
             <div className="mt-4 p-3 bg-risk-mid-soft border border-risk-mid/20 rounded-lg">
-              <div className="flex items-center gap-2 text-risk-mid text-xs font-medium mb-2">
+              <div className="flex items-center gap-2 text-foreground text-xs font-medium mb-2">
                 <TrendingUp className="w-3.5 h-3.5" />
                 <span>Dev Mode: Model Accuracy Stats</span>
               </div>
-              <div className="text-risk-mid text-sm">
-                Model accuracy: <span className="font-bold text-risk-mid">{accuracyStats.accuracy}%</span> based on your {accuracyStats.total} confirmation{accuracyStats.total > 1 ? 's' : ''}
+              <div className="text-foreground text-sm">
+                Model accuracy: <span className="font-bold text-foreground">{accuracyStats.accuracy}%</span> based on your {accuracyStats.total} confirmation{accuracyStats.total > 1 ? 's' : ''}
               </div>
               {Object.entries(accuracyStats.profileBreakdown).some(([_, data]) => data.total > 0) && (
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">

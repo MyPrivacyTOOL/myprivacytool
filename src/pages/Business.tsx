@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { KeyRound, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
@@ -56,31 +57,31 @@ const Business = () => {
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <div className="inline-block bg-primary/10 border border-primary/30 text-primary text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+            <div className="inline-block bg-primary/10 border border-primary/30 text-brand text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
               For Teams & Organisations
             </div>
 
             <h1 className="text-4xl md:text-5xl font-black leading-tight mb-6 tracking-tight">
-              Your Employees Are{" "}
-              <span className="text-primary">
-                Your Attack Surface
+              Your team's data is{" "}
+              <span className="text-brand">
+                out there
               </span>
             </h1>
 
             <p className="text-muted-foreground text-lg mb-4 leading-relaxed">
-              When data brokers sell your team's home addresses, personal emails,
-              and family connections — social engineering and targeted attacks
-              become trivially easy.
+              Data brokers list your team's home addresses, personal emails,
+              and family connections. That public data exposure makes targeted
+              scams easier to run.
             </p>
             <p className="text-muted-foreground text-base mb-8">
-              We run company-wide privacy audits and remove your team from
-              the public data broker ecosystem — before attackers exploit it.
+              We run company-wide privacy audits and help remove your team from
+              data broker listings, so you can see it and take control of it.
             </p>
 
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              {["SOC 2 Compliant", "GDPR Ready", "Bulk Pricing", "Dedicated Support"].map((tag) => (
+              {["Bulk Pricing", "Dedicated Support"].map((tag) => (
                 <span key={tag} className="flex items-center gap-1.5">
-                  <span className="text-primary">✓</span> {tag}
+                  <span className="text-brand">✓</span> {tag}
                 </span>
               ))}
             </div>
@@ -95,7 +96,7 @@ const Business = () => {
               >
                 <h2 className="text-xl font-bold mb-2">Get a Free Company Audit</h2>
                 <p className="text-muted-foreground text-sm mb-6">
-                  We'll scan your team and send a full exposure report within 48 hours.
+                  We'll scan your team and send an exposure report within 48 hours.
                 </p>
                 <Input
                   placeholder="Your name"
@@ -138,7 +139,7 @@ const Business = () => {
                   disabled={status === "loading"}
                   className="w-full font-bold h-11 text-base"
                 >
-                  {status === "loading" ? "Sending..." : "Request Free Company Audit →"}
+                  {status === "loading" ? "Sending..." : "Talk to us"}
                 </Button>
                 <p className="text-muted-foreground text-xs text-center">
                   No payment required. Results in 48 hours.
@@ -150,7 +151,7 @@ const Business = () => {
               </form>
             ) : (
               <div className="bg-primary/10 border border-primary/30 rounded-2xl p-8 text-center">
-                <div className="text-primary text-4xl mb-4">✓</div>
+                <div className="text-brand text-4xl mb-4">✓</div>
                 <h3 className="text-xl font-bold mb-2">Request received</h3>
                 <p className="text-muted-foreground text-sm">
                   We'll run your company audit and send results to{" "}
@@ -165,44 +166,29 @@ const Business = () => {
       {/* Risk Cards */}
       <section className="max-w-4xl mx-auto px-6 pb-16">
         <h2 className="text-2xl font-bold text-center mb-10 text-foreground">
-          What exposed employee data enables
+          What exposed employee data can lead to
         </h2>
         <div className="grid md:grid-cols-3 gap-4">
           {[
             {
-              icon: "🎣",
-              threat: "Spear Phishing",
-              desc: "Attackers use personal data (family names, home town, interests) to craft convincing messages that bypass spam filters and staff awareness.",
-              severity: "High",
-              color: "red",
+              icon: Mail,
+              threat: "Targeted phishing",
+              desc: "Personal details (family names, home town, interests) can be used to write convincing messages that are harder for spam filters and staff to spot.",
             },
             {
-              icon: "📞",
-              threat: "Vishing & Impersonation",
-              desc: "With a home address and personal number, attackers impersonate IT support or leadership by phone — then extract credentials.",
-              severity: "High",
-              color: "red",
+              icon: Phone,
+              threat: "Phone impersonation",
+              desc: "With a home address and personal number, someone can pose as IT support or leadership by phone and ask for credentials.",
             },
             {
-              icon: "🔑",
-              threat: "Account Takeover",
-              desc: "Security questions answered from public data. Reset flows bypassed. Email, banking, and corporate accounts accessed without a single password.",
-              severity: "Critical",
-              color: "orange",
+              icon: KeyRound,
+              threat: "Account access",
+              desc: "Security questions can be answered from public data, which can make account recovery flows easier to misuse.",
             },
-          ].map(({ icon, threat, desc, severity, color }) => (
+          ].map(({ icon: Icon, threat, desc }) => (
             <div key={threat} className="p-6 rounded-xl bg-card border border-border">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-2xl">{icon}</span>
-                <span
-                  className={`text-xs font-bold px-2 py-1 rounded-full ${
-                    color === "red"
-                      ? "bg-risk-high-soft text-risk-high"
-                      : "bg-risk-orange-soft text-risk-orange"
-                  }`}
-                >
-                  {severity}
-                </span>
+              <div className="mb-4">
+                <Icon className="w-6 h-6 text-brand" aria-hidden="true" />
               </div>
               <div className="font-bold text-foreground mb-2">{threat}</div>
               <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
@@ -218,10 +204,10 @@ const Business = () => {
           <div className="space-y-6">
             {[
               { step: "01", title: "Submit your team list", desc: "Provide a list of employee names and work emails (or let us start with your leadership team)." },
-              { step: "02", title: "We run the full scan", desc: "Our system checks 4,000+ data brokers for each team member — addresses, phone numbers, family, social profiles, income estimates." },
-              { step: "03", title: "You get the exposure report", desc: "We send you a full company privacy report within 48 hours — who's exposed, what data is visible, and your risk level." },
+              { step: "02", title: "We run the full scan", desc: "We check data brokers for each team member: addresses, phone numbers, family, social profiles." },
+              { step: "03", title: "You get the exposure report", desc: "We send you a company privacy report within 48 hours: who's exposed, what data is visible, and your risk level." },
               { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days." },
-              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data constantly. We scan monthly and remove continuously — keeping your team off the map." },
+              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint." },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex gap-6 items-start">
                 <div className="text-brand font-black text-2xl w-10 flex-shrink-0">{step}</div>
@@ -244,7 +230,7 @@ const Business = () => {
             {[
               { tier: "Starter", price: "$5", per: "/employee/mo", seats: "Up to 10 employees", features: ["Monthly scan", "Automated removals", "Company report", "Email support"] },
               { tier: "Team", price: "$4", per: "/employee/mo", seats: "11–100 employees", features: ["Everything in Starter", "Slack/Teams alerts", "Executive priority scan", "Quarterly review call"], highlight: true },
-              { tier: "Enterprise", price: "Custom", per: "", seats: "100+ employees", features: ["Everything in Team", "API access", "Dedicated account manager", "SLA guarantee", "SSO / SCIM"] },
+              { tier: "Custom", price: "Custom", per: "", seats: "100+ employees", features: ["Everything in Team", "API access", "Dedicated account manager", "SSO / SCIM"] },
             ].map(({ tier, price, per, seats, features, highlight }) => (
               <div
                 key={tier}
@@ -261,7 +247,7 @@ const Business = () => {
                 <ul className="space-y-2 mb-6">
                   {features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="text-primary flex-shrink-0 mt-0.5">✓</span> {f}
+                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> {f}
                     </li>
                   ))}
                 </ul>
@@ -271,7 +257,7 @@ const Business = () => {
                   }`}
                   onClick={() => document.querySelector("form")?.scrollIntoView({ behavior: "smooth" })}
                 >
-                  {tier === "Enterprise" ? "Contact Us" : "Get Started"}
+                  Talk to us
                 </Button>
               </div>
             ))}

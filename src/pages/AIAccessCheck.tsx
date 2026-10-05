@@ -83,15 +83,15 @@ export default function AIAccessCheck() {
           <span className="text-brand">reading your email?</span>
         </h1>
         <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
-          Run the free AI Access Check: in about three minutes, see what AI systems and data brokers
+          Run the AI Access Check: in about three minutes, see what AI systems and data brokers
           can learn about you from your browser alone — no account, no personal details.
         </p>
         <Link
           to={scanHref}
           onClick={() => trackAIAccessCheckCta("hero")}
-          className="inline-flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 text-white text-sm font-bold py-3.5 px-8 rounded-lg transition-colors"
+          className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground text-sm font-bold py-3.5 px-8 rounded-lg transition-colors"
         >
-          <ArrowRight size={16} /> Run the free scan
+          <ArrowRight size={16} /> Check My Exposure
         </Link>
       </section>
 
@@ -131,7 +131,7 @@ export default function AIAccessCheck() {
               <button
                 type="submit"
                 disabled={status === "loading"}
-                className="w-full flex items-center justify-center gap-2 bg-brand hover:bg-brand/90 disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
+                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white disabled:opacity-60 text-primary-foreground text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
               >
                 {status === "loading" ? <span className="animate-pulse">Joining...</span> : <><ArrowRight size={16} /> Join the waitlist</>}
               </button>
@@ -149,18 +149,18 @@ export default function AIAccessCheck() {
                 <Check className="text-brand" size={22} />
               </div>
               <p className="text-brand font-semibold mb-2">You're on the list.</p>
-              <p className="text-muted-foreground text-sm mb-5">While you wait, run the free scan now.</p>
+              <p className="text-muted-foreground text-sm mb-5">While you wait, check your exposure now.</p>
               <Link
                 to={scanHref}
                 onClick={() => trackAIAccessCheckCta("post_signup")}
                 className="inline-flex items-center gap-2 text-sm text-brand hover:text-foreground transition-colors"
               >
-                Run the free scan <ArrowRight size={14} />
+                Check My Exposure <ArrowRight size={14} />
               </Link>
             </div>
           )}
         </div>
-        <p className="text-muted-foreground text-xs text-center mt-8">myprivacytool.io · Protecting your digital footprint</p>
+        <p className="text-muted-foreground text-xs text-center mt-8">MyPrivacyTOOL · See it. Control it. Protect it.</p>
       </section>
     </div>
   );

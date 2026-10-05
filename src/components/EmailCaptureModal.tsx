@@ -33,8 +33,8 @@ export default function EmailCaptureModal({
   const [baseline, setBaseline] = useState<Baseline | null>(null);
 
   const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return { label: 'High Risk', color: 'text-risk-high', bg: 'bg-risk-high-soft border-risk-high/30' };
-    if (risk >= 40) return { label: 'Medium Risk', color: 'text-risk-mid', bg: 'bg-risk-mid-soft border-risk-mid/30' };
+    if (risk >= 70) return { label: 'High Risk', color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
+    if (risk >= 40) return { label: 'Medium Risk', color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
     return { label: 'Low Risk', color: 'text-risk-low', bg: 'bg-risk-low-soft border-risk-low/30' };
   };
 
@@ -105,7 +105,7 @@ export default function EmailCaptureModal({
         </button>
 
         {/* Top accent bar */}
-        <div className="h-1 w-full bg-gradient-to-r from-risk-low via-[hsl(var(--cat-storage))] to-[hsl(var(--cat-device))]" />
+        <div className="h-1 w-full bg-primary" />
 
         <div className="p-6 space-y-5">
 
@@ -141,7 +141,7 @@ export default function EmailCaptureModal({
               'Monthly privacy digest (unsubscribe anytime)',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
-                <ChevronRight className="w-4 h-4 text-[hsl(var(--cat-storage))] shrink-0 mt-0.5" />
+                <ChevronRight className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                 {item}
               </li>
             ))}
@@ -183,7 +183,7 @@ export default function EmailCaptureModal({
                   autoFocus
                 />
                 {errorMsg && (
-                  <p className="mt-1.5 text-xs text-risk-high">{errorMsg}</p>
+                  <p className="mt-1.5 text-xs text-foreground">{errorMsg}</p>
                 )}
               </div>
 
@@ -201,7 +201,7 @@ export default function EmailCaptureModal({
               <Button
                 type="submit"
                 disabled={status === 'loading'}
-                className="w-full bg-gradient-to-r from-risk-low to-[hsl(var(--cat-storage))] hover:opacity-90 text-primary-foreground font-semibold py-3 rounded-lg transition-all disabled:opacity-60"
+                className="w-full bg-primary hover:opacity-90 text-primary-foreground font-semibold py-3 rounded-lg transition-all disabled:opacity-60"
               >
                 {status === 'loading' ? 'Sending…' : 'Send my fix guide →'}
               </Button>

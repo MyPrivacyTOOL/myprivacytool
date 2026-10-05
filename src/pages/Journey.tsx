@@ -5,7 +5,7 @@ const Journey = () => (
   <>
     <Seo
       title="Get clean before you go agentic | MyPrivacyTOOL"
-      description="An 8-step guide: see your footprint, erase it, then bring AI agents on board safely. Start with the free scan."
+      description="An 8-step guide: see your footprint, erase it, then bring AI agents on board safely. Start with Check My Exposure."
       path="/journey"
     />
     <main className="container mx-auto px-4 py-10 sm:py-14">

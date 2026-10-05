@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Home, Phone, Users, MapPin, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
@@ -56,7 +57,7 @@ const Scan = () => {
         disabled={submitting}
         className="font-bold h-12 px-8 text-base whitespace-nowrap"
       >
-        {submitting ? "Sending…" : "Start Free Scan →"}
+        {submitting ? "Sending…" : "Check My Exposure →"}
       </Button>
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
     </form>
@@ -64,7 +65,7 @@ const Scan = () => {
 
   const thanks = (
     <div className="bg-primary/10 border border-primary/30 rounded-xl px-8 py-6 max-w-md mx-auto" role="status">
-      <div className="text-primary text-2xl mb-2">✓</div>
+      <div className="text-brand text-2xl mb-2">✓</div>
       <p className="text-foreground font-semibold mb-1">Thanks, we have your email.</p>
       <p className="text-muted-foreground text-sm">
         We'll email <span className="text-foreground">{email}</span> with your next steps.
@@ -77,24 +78,24 @@ const Scan = () => {
       <Seo {...pageMeta["/scan"]} path="/scan" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 text-center">
-        <div className="inline-block bg-primary/10 border border-primary/30 text-primary text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+        <div className="inline-block bg-primary/10 border border-primary/30 text-brand text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
           Free · No Credit Card
         </div>
 
-        <h1 className="text-4xl md:text-6xl font-black leading-tight mb-6 tracking-tight">
+        <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
           Find Out What the<br />
-          <span className="text-primary">Internet Knows About You</span>
+          <span className="text-brand">Internet Knows About You</span>
         </h1>
 
         <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
           Data brokers and people-search sites can list your name, address and phone number without you knowing.
         </p>
         <p className="text-muted-foreground text-base mb-12 max-w-xl mx-auto">
-          Run a free scan to see where your information may be listed, then follow our step-by-step guides to remove it.
+          Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.
         </p>
 
         {!submitted ? renderForm("top") : thanks}
-        {errorMsg && <p role="alert" className="text-destructive text-sm mt-3">{errorMsg}</p>}
+        {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 
         <p className="text-muted-foreground text-xs mt-4">
           We never sell your data. Unsubscribe any time.
@@ -108,15 +109,15 @@ const Scan = () => {
         </h2>
         <div className="grid md:grid-cols-2 gap-4">
           {[
-            { icon: "🏠", title: "Home address history", desc: "Past and current addresses, often shown on people-search sites." },
-            { icon: "📞", title: "Phone numbers", desc: "Current and historical numbers linked to your name." },
-            { icon: "👥", title: "Family connections", desc: "Relatives and associates that sites link to your profile." },
-            { icon: "📍", title: "Location clues", desc: "Where you live and work, inferred from public records." },
-            { icon: "✉️", title: "Email addresses", desc: "Addresses used by marketing lists and directories." },
-            { icon: "🔍", title: "Public profiles", desc: "Public social accounts that sites gather in one place." },
-          ].map(({ icon, title, desc }) => (
+            { Icon: Home, title: "Home address history", desc: "Past and current addresses, often shown on people-search sites." },
+            { Icon: Phone, title: "Phone numbers", desc: "Current and historical numbers linked to your name." },
+            { Icon: Users, title: "Family connections", desc: "Relatives and associates that sites link to your profile." },
+            { Icon: MapPin, title: "Location clues", desc: "Where you live and work, inferred from public records." },
+            { Icon: Mail, title: "Email addresses", desc: "Addresses used by marketing lists and directories." },
+            { Icon: Search, title: "Public profiles", desc: "Public social accounts that sites gather in one place." },
+          ].map(({ Icon, title, desc }) => (
             <div key={title} className="flex gap-4 p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors">
-              <span className="text-2xl flex-shrink-0">{icon}</span>
+              <Icon className="w-6 h-6 text-brand flex-shrink-0" aria-hidden="true" />
               <div>
                 <div className="font-semibold text-foreground text-sm mb-1">{title}</div>
                 <div className="text-muted-foreground text-xs leading-relaxed">{desc}</div>
@@ -132,7 +133,7 @@ const Scan = () => {
           Find out where you are listed.
         </h2>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          Run your free scan, then use our opt-out guides to take your details down.
+          Check your exposure, then use our opt-out guides to take your details down.
         </p>
         {!submitted && renderForm("bottom")}
       </section>

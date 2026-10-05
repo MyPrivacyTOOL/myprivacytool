@@ -94,16 +94,16 @@ export default function FederatedLearningModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gradient-to-br from-[hsl(var(--cat-device-tint))] via-secondary to-surface/95 border-[hsl(var(--cat-device)/0.3)] max-w-lg max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="bg-gradient-to-br from-[hsl(var(--cat-device-tint))] via-secondary to-surface/95 border-brand/30 max-w-lg max-h-[90vh] overflow-y-auto p-0">
         {/* Header with gradient */}
         <div className="relative overflow-hidden rounded-t-lg">
-          <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--cat-device-tint))] via-[hsl(var(--cat-language-tint))] to-[hsl(var(--cat-device-tint))]" />
+          <div className="absolute inset-0 bg-brand-soft" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[hsl(var(--cat-device-tint))] via-transparent to-transparent" />
           
           <DialogHeader className="relative p-6 pb-4">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-full bg-[hsl(var(--cat-device-tint))] flex items-center justify-center">
-                <Globe className="w-6 h-6 text-[hsl(var(--cat-device))]" />
+              <div className="w-12 h-12 rounded-full bg-brand-soft flex items-center justify-center">
+                <Globe className="w-6 h-6 text-brand" />
               </div>
             </div>
             <DialogTitle className="text-center text-xl font-bold text-foreground">
@@ -116,13 +116,13 @@ export default function FederatedLearningModal({
           {/* Section 1: What is this? */}
           <div className="text-center">
             <p className="text-muted-foreground text-sm leading-relaxed">
-              MyPrivacyTOOL can improve its language predictions by learning from anonymous patterns—<span className="text-[hsl(var(--cat-device))] font-medium">without ever seeing your personal data</span>.
+              MyPrivacyTOOL can improve its language predictions by learning from anonymous patterns—<span className="text-brand font-medium">without ever seeing your personal data</span>.
             </p>
           </div>
 
           {/* Section 2: What's shared? */}
-          <div className="bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-xl p-4">
-            <h4 className="text-[hsl(var(--cat-device))] text-sm font-semibold mb-3 flex items-center gap-2">
+          <div className="bg-brand-soft border border-brand/30 rounded-xl p-4">
+            <h4 className="text-brand text-sm font-semibold mb-3 flex items-center gap-2">
               <Shield className="w-4 h-4" />
               What's Shared vs. Protected
             </h4>
@@ -145,22 +145,22 @@ export default function FederatedLearningModal({
               </div>
 
               {/* What's NEVER shared */}
-              <div className="mt-2 pt-2 border-t border-[hsl(var(--cat-device)/0.3)]">
+              <div className="mt-2 pt-2 border-t border-brand/30">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-risk-high-soft border border-risk-high/30">
-                    <X className="w-3.5 h-3.5 text-risk-high flex-shrink-0" />
+                    <X className="w-3.5 h-3.5 text-foreground flex-shrink-0" />
                     <span className="text-muted-foreground text-[10px]">Your languages</span>
                   </div>
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-risk-high-soft border border-risk-high/30">
-                    <X className="w-3.5 h-3.5 text-risk-high flex-shrink-0" />
+                    <X className="w-3.5 h-3.5 text-foreground flex-shrink-0" />
                     <span className="text-muted-foreground text-[10px]">Your location</span>
                   </div>
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-risk-high-soft border border-risk-high/30">
-                    <X className="w-3.5 h-3.5 text-risk-high flex-shrink-0" />
+                    <X className="w-3.5 h-3.5 text-foreground flex-shrink-0" />
                     <span className="text-muted-foreground text-[10px]">Your identity</span>
                   </div>
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-risk-high-soft border border-risk-high/30">
-                    <X className="w-3.5 h-3.5 text-risk-high flex-shrink-0" />
+                    <X className="w-3.5 h-3.5 text-foreground flex-shrink-0" />
                     <span className="text-muted-foreground text-[10px]">Browsing data</span>
                   </div>
                 </div>
@@ -169,50 +169,50 @@ export default function FederatedLearningModal({
           </div>
 
           {/* Section 3: Technical Details (Expandable) */}
-          <div className="border border-[hsl(var(--cat-device)/0.3)] rounded-xl overflow-hidden">
+          <div className="border border-brand/30 rounded-xl overflow-hidden">
             <button
               onClick={() => setShowTechnical(!showTechnical)}
-              className="w-full flex items-center justify-between p-3 bg-[hsl(var(--cat-device-tint))] hover:brightness-95 transition-colors"
+              className="w-full flex items-center justify-between p-3 bg-brand-soft hover:brightness-95 transition-colors"
             >
-              <span className="text-[hsl(var(--cat-device))] text-xs font-medium flex items-center gap-2">
+              <span className="text-brand text-xs font-medium flex items-center gap-2">
                 <Sparkles className="w-3.5 h-3.5" />
                 How does it work? (Technical Details)
               </span>
               {showTechnical ? (
-                <ChevronUp className="w-4 h-4 text-[hsl(var(--cat-device))]" />
+                <ChevronUp className="w-4 h-4 text-brand" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-[hsl(var(--cat-device))]" />
+                <ChevronDown className="w-4 h-4 text-brand" />
               )}
             </button>
             
             {showTechnical && (
-              <div className="p-4 bg-[hsl(var(--cat-device-tint))] border-t border-[hsl(var(--cat-device)/0.3)]">
+              <div className="p-4 bg-brand-soft border-t border-brand/30">
                 <p className="text-muted-foreground text-xs leading-relaxed mb-3">
-                  We use <span className="text-[hsl(var(--cat-device))] font-medium">federated learning</span>—a privacy-preserving technique pioneered by Google:
+                  We use <span className="text-brand font-medium">federated learning</span>—a privacy-preserving technique pioneered by Google:
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--cat-device))] mt-1.5 flex-shrink-0" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
                     Your device computes small improvements locally
                   </li>
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--cat-device))] mt-1.5 flex-shrink-0" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
                     Only mathematical updates (gradients) are shared
                   </li>
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--cat-device))] mt-1.5 flex-shrink-0" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
                     These are combined with others to improve the global model
                   </li>
                   <li className="flex items-start gap-2 text-muted-foreground text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[hsl(var(--cat-device))] mt-1.5 flex-shrink-0" />
-                    <span className="font-medium text-[hsl(var(--cat-device))]">Your individual data never leaves your device</span>
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 flex-shrink-0" />
+                    <span className="font-medium text-brand">Your individual data never leaves your device</span>
                   </li>
                 </ul>
                 <a
                   href="https://ai.google/research/pubs/pub45648"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 mt-3 text-[hsl(var(--cat-device))] text-xs hover:text-[hsl(var(--cat-device))] transition-colors"
+                  className="inline-flex items-center gap-1 mt-3 text-brand text-xs hover:text-brand transition-colors"
                 >
                   Learn more about Federated Learning
                   <ExternalLink className="w-3 h-3" />
@@ -248,7 +248,7 @@ export default function FederatedLearningModal({
           </div>
 
           {/* Trust badges */}
-          <div className="flex items-center justify-center gap-4 pt-2 border-t border-[hsl(var(--cat-device)/0.3)]">
+          <div className="flex items-center justify-center gap-4 pt-2 border-t border-brand/30">
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <Lock className="w-3 h-3" />
               <span>End-to-end privacy</span>
@@ -322,14 +322,14 @@ export function FederatedSettings({ onOpenModal }: FederatedSettingsProps) {
   };
 
   return (
-    <div className="p-4 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-xl">
+    <div className="p-4 bg-brand-soft border border-brand/30 rounded-xl">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[hsl(var(--cat-device-tint))] flex items-center justify-center">
-            <Globe className="w-5 h-5 text-[hsl(var(--cat-device))]" />
+          <div className="w-10 h-10 rounded-full bg-brand-soft flex items-center justify-center">
+            <Globe className="w-5 h-5 text-brand" />
           </div>
           <div>
-            <h4 className="text-[hsl(var(--cat-device))] font-medium text-sm">Federated Learning</h4>
+            <h4 className="text-brand font-medium text-sm">Federated Learning</h4>
             <p className="text-muted-foreground text-xs">Help improve predictions anonymously</p>
           </div>
         </div>
@@ -362,14 +362,14 @@ export function FederatedSettings({ onOpenModal }: FederatedSettingsProps) {
           {summary && (
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Gradient updates:</span>
-              <span className="text-[hsl(var(--cat-device))] font-mono">{summary.rewardBasis} computed</span>
+              <span className="text-brand font-mono">{summary.rewardBasis} computed</span>
             </div>
           )}
 
           {status.hasGradients && (
             <button
               onClick={handleViewShared}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg text-[hsl(var(--cat-device))] text-xs font-medium hover:brightness-95 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-brand-soft border border-brand/30 rounded-lg text-brand text-xs font-medium hover:brightness-95 transition-colors"
             >
               <Eye className="w-3 h-3" />
               View What's Shared

@@ -192,11 +192,11 @@ const Index = () => {
           <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <img 
               src={logoFull} 
-              alt="MyPrivacyTOOL.IO logo - Privacy awareness platform" 
+              alt="MyPrivacyTOOL" 
               className="h-8 object-contain" 
             />
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">Scan Failed</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">Scan did not finish</h2>
           <p className="text-muted-foreground mb-6">{error}</p>
           <Button onClick={handleRetry} className="gap-2">
             <RefreshCw className="w-4 h-4" />
@@ -219,7 +219,7 @@ const Index = () => {
               id="hero-heading"
               className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-foreground"
             >
-              What is your Digital Shadow?
+              Your data is everywhere. See where. Take it back.
             </h1>
           </div>
         </section>
@@ -227,7 +227,7 @@ const Index = () => {
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
           <p className="text-sm sm:text-lg text-foreground">
-            The <span className="text-brand">Privacy<span className="font-bold">TOOL</span></span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
+            <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
           </p>
           <p className="text-sm sm:text-lg text-foreground">
             Click the ones that are correct.

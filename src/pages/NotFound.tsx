@@ -11,11 +11,11 @@ const NotFound = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted">
-      <Seo title="Page not found | MyPrivacyTOOL" description="The page you were looking for does not exist. Run a free privacy scan from the MyPrivacyTOOL homepage." noindex />
+      <Seo title="Page not found | MyPrivacyTOOL" description="The page you were looking for does not exist. Check your exposure from the MyPrivacyTOOL homepage." noindex />
       <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">404</h1>
-        <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
-        <a href="/" className="text-primary underline hover:text-primary/90">
+        <h1 className="mb-4 text-4xl font-bold text-foreground">404</h1>
+        <p className="mb-4 text-xl text-muted-foreground">Page not found</p>
+        <a href="/" className="text-brand underline hover:text-foreground">
           Return to Home
         </a>
       </div>

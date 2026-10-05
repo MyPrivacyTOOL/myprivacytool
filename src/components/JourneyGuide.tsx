@@ -33,9 +33,9 @@ const STEPS: Step[] = [
     status: "Live",
     happens:
       "The free scan checks what your browser and device already reveal about you, so you can see your digital shadow the way a stranger would.",
-    youDo: "Run the free scan and confirm which data points are really you.",
+    youDo: "Check your exposure and confirm which data points are really you.",
     youGet: "A clear picture of your footprint, one hexagon per data point.",
-    cta: { label: "Run the free scan", to: "/" },
+    cta: { label: "Check My Exposure", to: "/" },
   },
   {
     id: 2,

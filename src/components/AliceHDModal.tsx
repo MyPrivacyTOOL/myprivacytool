@@ -115,14 +115,14 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
 
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-risk-low-soft to-risk-low-soft border border-risk-low/50 rounded-full mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-risk-low-soft border border-risk-low/50 rounded-full mb-4">
             <Mic className="w-5 h-5 text-risk-low" />
             <span className="text-risk-low font-bold">Alice HD Voice</span>
           </div>
           
           {showRateLimitMessage && (
             <div className="bg-risk-high-soft border border-risk-high/30 rounded-lg p-3 mb-4">
-              <p className="text-risk-high text-sm font-medium">
+              <p className="text-foreground text-sm font-medium">
                 You've used all 20 free sessions today
               </p>
               <p className="text-muted-foreground text-xs mt-1">
@@ -194,14 +194,14 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
                 maxLength={255}
               />
               {emailError && (
-                <p className="text-risk-high text-xs mt-1">{emailError}</p>
+                <p className="text-foreground text-xs mt-1">{emailError}</p>
               )}
             </div>
             <ConsentCheckbox id="alice-hd-consent" checked={consent} onChange={setConsent} disabled={submitting} />
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 bg-gradient-to-r from-risk-low-soft to-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low font-bold hover:brightness-95 transition-all"
+              className="w-full py-3 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low font-bold hover:brightness-95 transition-all"
             >
               {submitting ? 'Joining…' : 'Join Waitlist'}
             </button>
