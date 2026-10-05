@@ -11,6 +11,8 @@
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
+import { purgeExpiredScanResults } from './purge-expired.js';
+import { recordEngagement } from './supabase-client.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
 const META_QUERY = {
@@ -39,7 +41,12 @@ export default {
     if (path === '/webhook/leads')     return handleLeads(request, env);
 
     return new Response('Not Found', { status: 404 });
-  }
+  },
+
+  // Cron Trigger (see wrangler.toml) — purge expired scan results
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeExpiredScanResults(env));
+  },
 };
 
 // ─── TELEGRAM ────────────────────────────────────────────────────────────────
@@ -280,6 +287,8 @@ async function handleLeads(request, env) {
       email, riskScore, confirmedCount, ts: Date.now(),
     });
 
+    await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: true });
+
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -312,6 +321,10 @@ async function handleConfirmation(text, state, env, stateKey) {
 
   if (n === 'Y' || n === 'YES') {
     await saveConversationState(env, stateKey, { ...state, stage: 'confirmed', confirmedAt: Date.now() });
+    await recordEngagement(env, stateKey, {
+      email_confirmed: state.platform === 'email',
+      mobile_confirmed: state.platform === 'sms',
+    });
     return '✅ Thanks for confirming!\n\nYour full Privacy Report is being prepared. You\'ll receive it here within 60 seconds.\n\nWant to remove yourself from data broker sites? Visit:\nhttps://myprivacytool.io/report';
   }
 

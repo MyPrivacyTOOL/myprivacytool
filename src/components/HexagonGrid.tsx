@@ -277,13 +277,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-        colors: ['#00ff41', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+        colors: ['#0B8A3D', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
       });
       confetti({
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-        colors: ['#00ff41', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+        colors: ['#0B8A3D', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
       });
     }, 250);
   }, []);
@@ -565,7 +565,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         <p className="text-sm sm:text-base text-muted-foreground">
           We found {visibleCount} data points about you without asking.
           {visibleCount < orderedHexagons.length && (
-            <span className="text-green-400 ml-1">{getPhaseDescription()}</span>
+            <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
         </p>
       </div>
@@ -685,25 +685,25 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {/* Completion Celebration Banner */}
       {showCompletionCelebration && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-gradient-to-r from-green-600/90 to-cyan-600/90 backdrop-blur-sm px-8 py-6 rounded-2xl border-2 border-white/30 shadow-2xl animate-scale-in text-center pointer-events-auto">
+          <div className="bg-surface border border-surface-border shadow-card px-8 py-6 rounded-2xl animate-scale-in text-center pointer-events-auto">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <PartyPopper className="w-8 h-8 text-yellow-300 animate-bounce" />
-              <h2 className="text-2xl font-bold text-white">Complete Digital Shadow Revealed!</h2>
-              <PartyPopper className="w-8 h-8 text-yellow-300 animate-bounce" />
+              <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
+              <h2 className="text-2xl font-bold text-foreground">Complete Digital Shadow Revealed!</h2>
+              <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
             </div>
-            <p className="text-white/80 text-sm">All 46 hexagons analyzed across 8 categories</p>
+            <p className="text-muted-foreground text-sm">All 46 hexagons analyzed across 8 categories</p>
             <div className="flex items-center justify-center gap-4 mt-4">
               <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-300">46</p>
-                <p className="text-xs text-white/60">Data Points</p>
+                <p className="text-3xl font-bold text-brand">46</p>
+                <p className="text-xs text-muted-foreground">Data Points</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-300">8</p>
-                <p className="text-xs text-white/60">Categories</p>
+                <p className="text-3xl font-bold text-brand">8</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-300">100%</p>
-                <p className="text-xs text-white/60">Complete</p>
+                <p className="text-3xl font-bold text-brand">100%</p>
+                <p className="text-xs text-muted-foreground">Complete</p>
               </div>
             </div>
           </div>

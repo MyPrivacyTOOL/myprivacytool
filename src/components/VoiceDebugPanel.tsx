@@ -451,7 +451,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           setIsOpen(true);
           refreshData();
         }}
-        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-2 sm:right-4 z-50 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 hover:bg-yellow-500/30 transition-colors"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-2 sm:right-4 z-50 p-2 bg-risk-mid-soft border border-risk-mid/50 rounded-lg text-risk-mid hover:brightness-95 transition-colors"
         title="Open Voice Debug Panel (Shift+Alt+V)"
       >
         <Bug className="w-5 h-5" />
@@ -460,30 +460,30 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
   }
 
   return (
-    <div className="fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] right-2 sm:right-4 left-2 sm:left-auto z-50 sm:w-96 bg-black/95 border border-yellow-500/50 rounded-xl shadow-[0_0_20px_rgba(234,179,8,0.3)] max-h-[70vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed bottom-[calc(0.5rem+env(safe-area-inset-bottom))] right-2 sm:right-4 left-2 sm:left-auto z-50 sm:w-96 bg-surface/95 border border-risk-mid/50 rounded-xl shadow-card max-h-[70vh] sm:max-h-[80vh] overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-yellow-500/30">
+      <div className="flex items-center justify-between p-4 border-b border-risk-mid/30">
         <div className="flex items-center gap-2">
-          <Bug className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-yellow-400 font-bold text-sm">Debug Panel</h3>
+          <Bug className="w-5 h-5 text-risk-mid" />
+          <h3 className="text-risk-mid font-bold text-sm">Debug Panel</h3>
         </div>
         <button
           onClick={() => setIsOpen(false)}
-          className="text-yellow-400/60 hover:text-yellow-400 transition-colors"
+          className="text-muted-foreground hover:text-risk-mid transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-yellow-500/30">
+      <div className="flex border-b border-risk-mid/30">
         <button
           onClick={() => setActiveTab('voice')}
           className={cn(
             "flex-1 px-3 py-2 text-xs font-medium transition-colors",
             activeTab === 'voice' 
-              ? "text-yellow-400 bg-yellow-500/20 border-b-2 border-yellow-400" 
-              : "text-yellow-400/60 hover:text-yellow-400"
+              ? "text-risk-mid bg-risk-mid-soft border-b-2 border-risk-mid" 
+              : "text-muted-foreground hover:text-risk-mid"
           )}
         >
           Voice
@@ -493,8 +493,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'locale' 
-              ? "text-cyan-400 bg-cyan-500/20 border-b-2 border-cyan-400" 
-              : "text-cyan-400/60 hover:text-cyan-400"
+              ? "text-[hsl(var(--cat-storage))] bg-[hsl(var(--cat-storage-tint))] border-b-2 border-[hsl(var(--cat-storage))]" 
+              : "text-muted-foreground hover:text-[hsl(var(--cat-storage))]"
           )}
         >
           <Globe className="w-3 h-3" />
@@ -508,8 +508,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'rewards' 
-              ? "text-amber-400 bg-amber-500/20 border-b-2 border-amber-400" 
-              : "text-amber-400/60 hover:text-amber-400"
+              ? "text-risk-mid bg-risk-mid-soft border-b-2 border-risk-mid" 
+              : "text-muted-foreground hover:text-risk-mid"
           )}
         >
           <Gift className="w-3 h-3" />
@@ -524,8 +524,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-3 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'compare' 
-              ? "text-pink-400 bg-pink-500/20 border-b-2 border-pink-400" 
-              : "text-pink-400/60 hover:text-pink-400"
+              ? "text-[hsl(var(--cat-profile))] bg-[hsl(var(--cat-profile-tint))] border-b-2 border-[hsl(var(--cat-profile))]" 
+              : "text-muted-foreground hover:text-[hsl(var(--cat-profile))]"
           )}
         >
           <BarChart3 className="w-3 h-3" />
@@ -542,8 +542,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'federated' 
-              ? "text-emerald-400 bg-emerald-500/20 border-b-2 border-emerald-400" 
-              : "text-emerald-400/60 hover:text-emerald-400"
+              ? "text-risk-low bg-risk-low-soft border-b-2 border-risk-low" 
+              : "text-muted-foreground hover:text-risk-low"
           )}
         >
           <Share2 className="w-3 h-3" />
@@ -565,8 +565,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'fingerprint' 
-              ? "text-red-400 bg-red-500/20 border-b-2 border-red-400" 
-              : "text-red-400/60 hover:text-red-400"
+              ? "text-risk-high bg-risk-high-soft border-b-2 border-risk-high" 
+              : "text-muted-foreground hover:text-risk-high"
           )}
         >
           <Fingerprint className="w-3 h-3" />
@@ -581,40 +581,40 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             {/* Voice Stats */}
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-xs">
-                <span className="text-yellow-300/70">Sessions Today:</span>
-                <span className="text-yellow-400 font-mono">{data.voiceSessionCount} / 20</span>
+                <span className="text-muted-foreground">Sessions Today:</span>
+                <span className="text-risk-mid font-mono">{data.voiceSessionCount} / 20</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-yellow-300/70">Current Risk Score:</span>
+                <span className="text-muted-foreground">Current Risk Score:</span>
                 <span className={cn(
                   "font-mono font-bold",
-                  currentRiskScore >= 70 ? "text-red-400" :
-                  currentRiskScore >= 40 ? "text-yellow-400" : "text-green-400"
+                  currentRiskScore >= 70 ? "text-risk-high" :
+                  currentRiskScore >= 40 ? "text-risk-mid" : "text-risk-low"
                 )}>{currentRiskScore}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-yellow-300/70">Best Risk Score:</span>
-                <span className="text-green-400 font-mono">{data.bestRiskScore}</span>
+                <span className="text-muted-foreground">Best Risk Score:</span>
+                <span className="text-risk-low font-mono">{data.bestRiskScore}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-yellow-300/70">Total Scans:</span>
-                <span className="text-yellow-400 font-mono">{data.totalScansCompleted}</span>
+                <span className="text-muted-foreground">Total Scans:</span>
+                <span className="text-risk-mid font-mono">{data.totalScansCompleted}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-yellow-300/70">Hexagons Today:</span>
-                <span className="text-yellow-400 font-mono">{data.completedHexagons.length}</span>
+                <span className="text-muted-foreground">Hexagons Today:</span>
+                <span className="text-risk-mid font-mono">{data.completedHexagons.length}</span>
               </div>
             </div>
 
             {/* Last 5 Responses */}
             <div className="mb-4">
-              <h4 className="text-yellow-300/70 text-xs mb-2">Last 5 Responses:</h4>
+              <h4 className="text-muted-foreground text-xs mb-2">Last 5 Responses:</h4>
               <div className="max-h-32 overflow-y-auto space-y-1">
                 {data.responseHistory.length === 0 ? (
-                  <p className="text-yellow-300/40 text-xs italic">No responses yet</p>
+                  <p className="text-muted-foreground text-xs italic">No responses yet</p>
                 ) : (
                   data.responseHistory.map((response, i) => (
-                    <p key={i} className="text-yellow-300/60 text-xs truncate" title={response}>
+                    <p key={i} className="text-muted-foreground text-xs truncate" title={response}>
                       {i + 1}. {response.slice(0, 60)}...
                     </p>
                   ))
@@ -629,7 +629,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   resetDailyCounter();
                   refreshData();
                 }}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-400 text-xs font-medium hover:bg-yellow-500/30 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-risk-mid-soft border border-risk-mid/50 rounded-lg text-risk-mid text-xs font-medium hover:brightness-95 transition-colors"
               >
                 <RotateCcw className="w-3 h-3" />
                 Reset Daily
@@ -639,7 +639,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   onSimulateComplete?.();
                   refreshData();
                 }}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors"
               >
                 <CheckCircle2 className="w-3 h-3" />
                 Complete All
@@ -652,7 +652,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 resetAllVoiceData();
                 refreshData();
               }}
-              className="w-full mt-2 px-3 py-1.5 text-red-400/60 text-xs hover:text-red-400 transition-colors"
+              className="w-full mt-2 px-3 py-1.5 text-muted-foreground text-xs hover:text-risk-high transition-colors"
             >
               Reset All Data
             </button>
@@ -660,10 +660,10 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
         ) : activeTab === 'locale' ? (
           <>
             {/* Feedback Stats Section */}
-            <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg">
+            <div className="mb-4 p-3 bg-gradient-to-r from-[hsl(var(--cat-device-tint))] to-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg">
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-4 h-4 text-purple-400" />
-                <h4 className="text-purple-400 text-xs font-medium">Language Feedback Stats</h4>
+                <TrendingUp className="w-4 h-4 text-[hsl(var(--cat-device))]" />
+                <h4 className="text-[hsl(var(--cat-device))] text-xs font-medium">Language Feedback Stats</h4>
               </div>
               
               {(() => {
@@ -674,34 +674,34 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 return (
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs">
-                      <span className="text-purple-300/70">Model Accuracy:</span>
+                      <span className="text-muted-foreground">Model Accuracy:</span>
                       <span className={cn(
                         "font-mono font-bold",
-                        stats.accuracy >= 80 ? "text-green-400" :
-                        stats.accuracy >= 60 ? "text-yellow-400" : "text-red-400"
+                        stats.accuracy >= 80 ? "text-risk-low" :
+                        stats.accuracy >= 60 ? "text-risk-mid" : "text-risk-high"
                       )}>
                         {stats.correct}/{stats.total} ({stats.accuracy}%)
                       </span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-purple-300/70">Total Predictions:</span>
-                      <span className="text-purple-400 font-mono">{totalPredictions}</span>
+                      <span className="text-muted-foreground">Total Predictions:</span>
+                      <span className="text-[hsl(var(--cat-device))] font-mono">{totalPredictions}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-purple-300/70">User Contributions:</span>
-                      <span className="text-purple-400 font-mono">{contributions}</span>
+                      <span className="text-muted-foreground">User Contributions:</span>
+                      <span className="text-[hsl(var(--cat-device))] font-mono">{contributions}</span>
                     </div>
                     
                     {/* Profile Distribution */}
                     {Object.entries(stats.profileBreakdown).some(([_, d]) => d.total > 0) && (
-                      <div className="pt-2 mt-2 border-t border-purple-500/20">
+                      <div className="pt-2 mt-2 border-t border-[hsl(var(--cat-device)/0.3)]">
                         <div className="flex items-center gap-1 mb-2">
-                          <Users className="w-3 h-3 text-purple-400/60" />
-                          <span className="text-purple-400/60 text-xs">Profile Distribution</span>
+                          <Users className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-muted-foreground text-xs">Profile Distribution</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1">
                           {Object.entries(stats.profileBreakdown).map(([profile, data]) => (
-                            <div key={profile} className="text-xs text-purple-300/60 capitalize">
+                            <div key={profile} className="text-xs text-muted-foreground capitalize">
                               {profile}: {data.total > 0 ? `${data.correct}/${data.total}` : '-'}
                             </div>
                           ))}
@@ -716,11 +716,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             {/* Locale Test Mode */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-cyan-400/70 text-xs font-medium">Language Scenarios</h4>
+                <h4 className="text-muted-foreground text-xs font-medium">Language Scenarios</h4>
                 <button
                   onClick={runAllTests}
                   disabled={isRunningTest}
-                  className="px-2 py-1 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 text-xs hover:bg-cyan-500/30 transition-colors flex items-center gap-1 disabled:opacity-50"
+                  className="px-2 py-1 bg-[hsl(var(--cat-storage-tint))] border border-[hsl(var(--cat-storage)/0.5)] rounded text-[hsl(var(--cat-storage))] text-xs hover:brightness-95 transition-colors flex items-center gap-1 disabled:opacity-50"
                 >
                   <Play className="w-3 h-3" />
                   Run All
@@ -733,34 +733,34 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   return (
                     <div
                       key={scenario.id}
-                      className="p-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg"
+                      className="p-2 bg-[hsl(var(--cat-storage-tint))] border border-[hsl(var(--cat-storage)/0.3)] rounded-lg"
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <span>{scenario.icon}</span>
-                          <span className="text-cyan-400 text-xs font-medium">{scenario.name}</span>
+                          <span className="text-[hsl(var(--cat-storage))] text-xs font-medium">{scenario.name}</span>
                         </div>
                         <button
                           onClick={() => runScenarioTest(scenario.id)}
                           disabled={isRunningTest}
-                          className="px-2 py-0.5 bg-cyan-500/20 border border-cyan-500/30 rounded text-cyan-400 text-xs hover:bg-cyan-500/30 transition-colors disabled:opacity-50"
+                          className="px-2 py-0.5 bg-[hsl(var(--cat-storage-tint))] border border-[hsl(var(--cat-storage)/0.3)] rounded text-[hsl(var(--cat-storage))] text-xs hover:brightness-95 transition-colors disabled:opacity-50"
                         >
                           Test
                         </button>
                       </div>
-                      <div className="text-xs text-cyan-400/60">
+                      <div className="text-xs text-muted-foreground">
                         {scenario.languages.join(', ')} • {scenario.timezone}
                       </div>
                       {result && (
-                        <div className="mt-2 pt-2 border-t border-cyan-500/20">
+                        <div className="mt-2 pt-2 border-t border-[hsl(var(--cat-storage)/0.3)]">
                           <div className="flex items-center gap-2">
                             {result.prediction?.allProfiles.slice(0, 3).map(p => (
                               <div key={p.profile} className="flex items-center gap-1 text-xs">
                                 <span>{p.icon}</span>
-                                <span className="text-cyan-400/70">{p.probability}%</span>
+                                <span className="text-muted-foreground">{p.probability}%</span>
                               </div>
                             ))}
-                            <Check className="w-3 h-3 text-green-400 ml-auto" />
+                            <Check className="w-3 h-3 text-risk-low ml-auto" />
                           </div>
                         </div>
                       )}
@@ -771,11 +771,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             </div>
 
             {/* Synthetic Data Generator */}
-            <div className="mb-4 p-3 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg">
+            <div className="mb-4 p-3 bg-gradient-to-r from-risk-low-soft to-[hsl(var(--cat-network-tint))] border border-risk-low/30 rounded-lg">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Database className="w-4 h-4 text-emerald-400" />
-                  <h4 className="text-emerald-400 text-xs font-medium">Training Data Generator</h4>
+                  <Database className="w-4 h-4 text-risk-low" />
+                  <h4 className="text-risk-low text-xs font-medium">Training Data Generator</h4>
                 </div>
               </div>
               
@@ -788,35 +788,35 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     return (
                       <div className="space-y-2 mb-3">
                         <div className="flex justify-between text-xs">
-                          <span className="text-emerald-300/70">Total Examples:</span>
-                          <span className="text-emerald-400 font-mono">{stats.total}</span>
+                          <span className="text-muted-foreground">Total Examples:</span>
+                          <span className="text-risk-low font-mono">{stats.total}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-emerald-300/70">Unique Language Combos:</span>
-                          <span className="text-emerald-400 font-mono">{stats.uniqueLanguageCombos}</span>
+                          <span className="text-muted-foreground">Unique Language Combos:</span>
+                          <span className="text-risk-low font-mono">{stats.uniqueLanguageCombos}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-emerald-300/70">Unique Timezones:</span>
-                          <span className="text-emerald-400 font-mono">{stats.uniqueTimezones}</span>
+                          <span className="text-muted-foreground">Unique Timezones:</span>
+                          <span className="text-risk-low font-mono">{stats.uniqueTimezones}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-emerald-300/70">Validation:</span>
+                          <span className="text-muted-foreground">Validation:</span>
                           <span className={cn(
                             "font-mono",
-                            validation.invalid === 0 ? "text-green-400" : "text-yellow-400"
+                            validation.invalid === 0 ? "text-risk-low" : "text-risk-mid"
                           )}>
                             {validation.valid} valid / {validation.invalid} invalid
                           </span>
                         </div>
                         
                         {/* Pattern Distribution */}
-                        <div className="pt-2 mt-2 border-t border-emerald-500/20">
-                          <span className="text-emerald-400/60 text-xs">Distribution:</span>
+                        <div className="pt-2 mt-2 border-t border-risk-low/30">
+                          <span className="text-muted-foreground text-xs">Distribution:</span>
                           <div className="grid grid-cols-2 gap-1 mt-1">
                             {Object.entries(stats.byPattern).map(([pattern, data]) => (
                               <div key={pattern} className="flex justify-between text-xs">
-                                <span className="text-emerald-300/60 capitalize">{pattern.replace('_', ' ')}:</span>
-                                <span className="text-emerald-400/80 font-mono">{data.count}</span>
+                                <span className="text-muted-foreground capitalize">{pattern.replace('_', ' ')}:</span>
+                                <span className="text-muted-foreground font-mono">{data.count}</span>
                               </div>
                             ))}
                           </div>
@@ -829,14 +829,14 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <div className="flex gap-2">
                     <button
                       onClick={() => exportToJSON(syntheticData)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors"
                     >
                       <FileJson className="w-3 h-3" />
                       Download JSON
                     </button>
                     <button
                       onClick={() => setSyntheticData(null)}
-                      className="px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors"
+                      className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -844,7 +844,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 </>
               ) : (
                 <>
-                  <p className="text-emerald-400/60 text-xs mb-3">
+                  <p className="text-muted-foreground text-xs mb-3">
                     Generate 1000+ synthetic training examples with realistic language-timezone combinations.
                   </p>
                   <button
@@ -857,7 +857,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       }, 100);
                     }}
                     disabled={isGenerating}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                   >
                     {isGenerating ? (
                       <>
@@ -876,68 +876,68 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             </div>
 
             {/* Model Training Section */}
-            <div className="mb-4 p-3 bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/30 rounded-lg">
+            <div className="mb-4 p-3 bg-gradient-to-r from-[hsl(var(--cat-device-tint))] to-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-violet-400" />
-                  <h4 className="text-violet-400 text-xs font-medium">TensorFlow Model</h4>
+                  <Cpu className="w-4 h-4 text-[hsl(var(--cat-device))]" />
+                  <h4 className="text-[hsl(var(--cat-device))] text-xs font-medium">TensorFlow Model</h4>
                 </div>
                 {modelMetadata && (
-                  <span className="text-[10px] text-violet-400/60 font-mono">{modelMetadata.version}</span>
+                  <span className="text-[10px] text-muted-foreground font-mono">{modelMetadata.version}</span>
                 )}
               </div>
               
               {/* Model Status */}
               {modelMetadata ? (
                 <div className="space-y-2 mb-3">
-                  <div className="flex items-center gap-2 p-2 bg-green-500/10 border border-green-500/30 rounded">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
-                    <span className="text-green-400 text-xs font-medium">Trained Model Active</span>
+                  <div className="flex items-center gap-2 p-2 bg-risk-low-soft border border-risk-low/30 rounded">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-risk-low" />
+                    <span className="text-risk-low text-xs font-medium">Trained Model Active</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-violet-300/70">Training Accuracy:</span>
-                    <span className="text-violet-400 font-mono">{modelMetadata.trainingAccuracy}%</span>
+                    <span className="text-muted-foreground">Training Accuracy:</span>
+                    <span className="text-[hsl(var(--cat-device))] font-mono">{modelMetadata.trainingAccuracy}%</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-violet-300/70">Validation Accuracy:</span>
-                    <span className="text-violet-400 font-mono">{modelMetadata.validationAccuracy}%</span>
+                    <span className="text-muted-foreground">Validation Accuracy:</span>
+                    <span className="text-[hsl(var(--cat-device))] font-mono">{modelMetadata.validationAccuracy}%</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-violet-300/70">Trained On:</span>
-                    <span className="text-violet-400 font-mono">{modelMetadata.examplesUsed} examples</span>
+                    <span className="text-muted-foreground">Trained On:</span>
+                    <span className="text-[hsl(var(--cat-device))] font-mono">{modelMetadata.examplesUsed} examples</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-violet-300/70">Trained At:</span>
-                    <span className="text-violet-400/70 font-mono text-[10px]">
+                    <span className="text-muted-foreground">Trained At:</span>
+                    <span className="text-muted-foreground font-mono text-[10px]">
                       {new Date(modelMetadata.trainedAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 p-2 mb-3 bg-yellow-500/10 border border-yellow-500/30 rounded">
-                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
-                  <span className="text-yellow-400 text-xs">Using heuristic model (not trained)</span>
+                <div className="flex items-center gap-2 p-2 mb-3 bg-risk-mid-soft border border-risk-mid/30 rounded">
+                  <AlertTriangle className="w-3.5 h-3.5 text-risk-mid" />
+                  <span className="text-risk-mid text-xs">Using heuristic model (not trained)</span>
                 </div>
               )}
               
               {/* Training Progress */}
               {isTraining && trainingProgress && (
-                <div className="mb-3 p-2 bg-black/30 rounded">
+                <div className="mb-3 p-2 bg-secondary rounded">
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-violet-400/70">
+                    <span className="text-muted-foreground">
                       {trainingProgress.phase === 'preparing' ? 'Preparing...' :
                        trainingProgress.phase === 'training' ? `Epoch ${trainingProgress.epoch}/${trainingProgress.totalEpochs}` :
                        trainingProgress.phase === 'validating' ? 'Validating...' : 'Complete!'}
                     </span>
-                    <span className="text-violet-400 font-mono">{trainingProgress.accuracy.toFixed(1)}%</span>
+                    <span className="text-[hsl(var(--cat-device))] font-mono">{trainingProgress.accuracy.toFixed(1)}%</span>
                   </div>
-                  <div className="h-2 bg-black/40 rounded-full overflow-hidden">
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all duration-300"
+                      className="h-full bg-gradient-to-r from-[hsl(var(--cat-device))] to-[hsl(var(--cat-device))] transition-all duration-300"
                       style={{ width: `${(trainingProgress.epoch / trainingProgress.totalEpochs) * 100}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] text-violet-400/50 mt-1">
+                  <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
                     <span>Loss: {trainingProgress.loss.toFixed(4)}</span>
                     <span>Accuracy: {trainingProgress.accuracy.toFixed(1)}%</span>
                   </div>
@@ -946,8 +946,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               
               {/* Training Result */}
               {trainingResult && !isTraining && (
-                <div className="mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded">
-                  <div className="flex items-center gap-2 text-xs text-green-400">
+                <div className="mb-3 p-2 bg-risk-low-soft border border-risk-low/30 rounded">
+                  <div className="flex items-center gap-2 text-xs text-risk-low">
                     <Zap className="w-3 h-3" />
                     Training complete! Accuracy: {trainingResult.accuracy}% (val: {trainingResult.validationAccuracy}%)
                   </div>
@@ -959,7 +959,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 <button
                   onClick={handleTrainModel}
                   disabled={isTraining}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-violet-500/20 border border-violet-500/50 rounded-lg text-violet-400 text-xs font-medium hover:bg-violet-500/30 transition-colors disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.5)] rounded-lg text-[hsl(var(--cat-device))] text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                 >
                   {isTraining ? (
                     <>
@@ -979,23 +979,23 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     <AlertDialogTrigger asChild>
                       <button
                         disabled={isTraining}
-                        className="px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                        className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                       >
                         <RotateCcw className="w-3 h-3" />
                       </button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-black/95 border-red-500/30">
+                    <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-red-400">Reset to Default Model?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-violet-400/70">
+                        <AlertDialogTitle className="text-risk-high">Reset to Default Model?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
                           This will remove the trained model and revert to the heuristic-based predictions. You can retrain anytime.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-transparent border-violet-500/30 text-violet-400 hover:bg-violet-500/10">Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-transparent border-[hsl(var(--cat-device)/0.3)] text-[hsl(var(--cat-device))] hover:brightness-95">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={handleResetModel}
-                          className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                          className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
                         >
                           Reset Model
                         </AlertDialogAction>
@@ -1007,12 +1007,12 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             </div>
 
             {/* Quick Links */}
-            <div className="pt-3 border-t border-cyan-500/30">
+            <div className="pt-3 border-t border-[hsl(var(--cat-storage)/0.3)]">
               <a
                 href="/test-locale"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full px-3 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 text-xs font-medium hover:bg-purple-500/30 transition-colors text-center"
+                className="block w-full px-3 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.5)] rounded-lg text-[hsl(var(--cat-device))] text-xs font-medium hover:brightness-95 transition-colors text-center"
               >
                 Open Full Test Page →
               </a>
@@ -1046,52 +1046,52 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               return (
                 <div className="space-y-4">
                   {/* Overview Stats */}
-                  <div className="p-3 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg">
-                    <h4 className="text-amber-400 text-xs font-medium mb-3 flex items-center gap-2">
+                  <div className="p-3 bg-gradient-to-r from-risk-mid-soft to-risk-orange-soft border border-risk-mid/30 rounded-lg">
+                    <h4 className="text-risk-mid text-xs font-medium mb-3 flex items-center gap-2">
                       <TrendingUp className="w-3.5 h-3.5" />
                       Language Model Rewards
                     </h4>
                     
                     {rewardStats.totalEvents === 0 ? (
-                      <p className="text-amber-400/50 text-xs italic">No reward events tracked yet. Use the app to generate data.</p>
+                      <p className="text-muted-foreground text-xs italic">No reward events tracked yet. Use the app to generate data.</p>
                     ) : (
                       <div className="space-y-2">
                         <div className="flex justify-between text-xs">
-                          <span className="text-amber-300/70">Total Predictions:</span>
-                          <span className="text-amber-400 font-mono">{rewardStats.totalEvents}</span>
+                          <span className="text-muted-foreground">Total Predictions:</span>
+                          <span className="text-risk-mid font-mono">{rewardStats.totalEvents}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-amber-300/70">Average Reward:</span>
+                          <span className="text-muted-foreground">Average Reward:</span>
                           <span className={cn(
                             "font-mono font-bold",
-                            rewardStats.averageReward >= 0.5 ? "text-green-400" :
-                            rewardStats.averageReward >= 0 ? "text-yellow-400" : "text-red-400"
+                            rewardStats.averageReward >= 0.5 ? "text-risk-low" :
+                            rewardStats.averageReward >= 0 ? "text-risk-mid" : "text-risk-high"
                           )}>
                             {rewardStats.averageReward >= 0 ? '+' : ''}{rewardStats.averageReward.toFixed(2)}
                           </span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-amber-300/70">Positive / Negative:</span>
+                          <span className="text-muted-foreground">Positive / Negative:</span>
                           <span className="font-mono">
-                            <span className="text-green-400">{totalPositive}</span>
-                            <span className="text-amber-400/40"> / </span>
-                            <span className="text-red-400">{totalNegative}</span>
+                            <span className="text-risk-low">{totalPositive}</span>
+                            <span className="text-muted-foreground"> / </span>
+                            <span className="text-risk-high">{totalNegative}</span>
                           </span>
                         </div>
                         
                         {/* Accuracy indicator */}
-                        <div className="mt-2 p-2 bg-black/30 rounded">
+                        <div className="mt-2 p-2 bg-secondary rounded">
                           <div className="flex items-center gap-2 text-xs">
                             {positiveRatio >= 70 ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-risk-low" />
                             ) : positiveRatio >= 50 ? (
-                              <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />
+                              <AlertTriangle className="w-3.5 h-3.5 text-risk-mid" />
                             ) : (
-                              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                              <AlertTriangle className="w-3.5 h-3.5 text-risk-high" />
                             )}
                             <span className={cn(
-                              positiveRatio >= 70 ? "text-green-400" :
-                              positiveRatio >= 50 ? "text-yellow-400" : "text-red-400"
+                              positiveRatio >= 70 ? "text-risk-low" :
+                              positiveRatio >= 50 ? "text-risk-mid" : "text-risk-high"
                             )}>
                               Model seems {positiveRatio >= 70 ? 'accurate' : positiveRatio >= 50 ? 'moderate' : 'needs work'}: {positiveRatio}% positive signals
                             </span>
@@ -1103,8 +1103,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   
                   {/* Reward Distribution */}
                   {rewardStats.totalEvents > 0 && (
-                    <div className="p-3 bg-black/30 border border-amber-500/20 rounded-lg">
-                      <h4 className="text-amber-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                    <div className="p-3 bg-secondary border border-risk-mid/30 rounded-lg">
+                      <h4 className="text-muted-foreground text-xs font-medium mb-3 flex items-center gap-2">
                         <ArrowUpDown className="w-3 h-3" />
                         Reward Distribution
                       </h4>
@@ -1118,19 +1118,19 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           return (
                             <div key={reason} className="space-y-1">
                               <div className="flex justify-between text-xs">
-                                <span className="text-amber-300/60 capitalize">{formatReason(reason)}</span>
+                                <span className="text-muted-foreground capitalize">{formatReason(reason)}</span>
                                 <span className={cn(
                                   "font-mono",
-                                  isPositive ? "text-green-400/70" : "text-red-400/70"
+                                  isPositive ? "text-muted-foreground" : "text-muted-foreground"
                                 )}>
                                   {data.count} events
                                 </span>
                               </div>
-                              <div className="h-1.5 bg-black/40 rounded-full overflow-hidden">
+                              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                                 <div
                                   className={cn(
                                     "h-full rounded-full transition-all",
-                                    isPositive ? "bg-green-500/60" : "bg-red-500/60"
+                                    isPositive ? "bg-risk-low-soft" : "bg-risk-high-soft"
                                   )}
                                   style={{ width: `${barWidth}%` }}
                                 />
@@ -1144,8 +1144,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   
                   {/* Profile Performance */}
                   {profilePerformance.length > 0 && (
-                    <div className="p-3 bg-black/30 border border-amber-500/20 rounded-lg">
-                      <h4 className="text-amber-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                    <div className="p-3 bg-secondary border border-risk-mid/30 rounded-lg">
+                      <h4 className="text-muted-foreground text-xs font-medium mb-3 flex items-center gap-2">
                         <Users className="w-3 h-3" />
                         Profile Performance
                       </h4>
@@ -1153,16 +1153,16 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       <div className="space-y-2">
                         {bestProfile && (
                           <div className="flex items-center gap-2 text-xs">
-                            <ThumbsUp className="w-3 h-3 text-green-400" />
-                            <span className="text-green-400/80">
+                            <ThumbsUp className="w-3 h-3 text-risk-low" />
+                            <span className="text-muted-foreground">
                               Best: <span className="capitalize font-medium">{bestProfile.profile}</span> (avg: {bestProfile.average.toFixed(2)})
                             </span>
                           </div>
                         )}
                         {worstProfile && worstProfile !== bestProfile && (
                           <div className="flex items-center gap-2 text-xs">
-                            <ThumbsDown className="w-3 h-3 text-red-400" />
-                            <span className="text-red-400/80">
+                            <ThumbsDown className="w-3 h-3 text-risk-high" />
+                            <span className="text-muted-foreground">
                               Needs work: <span className="capitalize font-medium">{worstProfile.profile}</span> (avg: {worstProfile.average.toFixed(2)})
                             </span>
                           </div>
@@ -1173,8 +1173,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   
                   {/* Recent Reward History */}
                   {rewardEvents.length > 0 && (
-                    <div className="p-3 bg-black/30 border border-amber-500/20 rounded-lg">
-                      <h4 className="text-amber-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                    <div className="p-3 bg-secondary border border-risk-mid/30 rounded-lg">
+                      <h4 className="text-muted-foreground text-xs font-medium mb-3 flex items-center gap-2">
                         <Clock className="w-3 h-3" />
                         Recent Events (Last 10)
                       </h4>
@@ -1183,23 +1183,23 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                         {rewardEvents.map((event) => (
                           <div 
                             key={event.id} 
-                            className="flex items-center justify-between text-xs p-1.5 bg-black/20 rounded"
+                            className="flex items-center justify-between text-xs p-1.5 bg-secondary rounded"
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <span className="text-amber-400/40 font-mono text-[10px]">
+                              <span className="text-muted-foreground font-mono text-[10px]">
                                 {formatTime(event.timestamp)}
                               </span>
-                              <span className="text-amber-300/60 truncate" title={event.prediction}>
+                              <span className="text-muted-foreground truncate" title={event.prediction}>
                                 {event.prediction.slice(0, 12)}...
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-amber-400/50 text-[10px] truncate max-w-16" title={formatReason(event.reason)}>
+                              <span className="text-muted-foreground text-[10px] truncate max-w-16" title={formatReason(event.reason)}>
                                 {formatReason(event.reason)}
                               </span>
                               <span className={cn(
                                 "font-mono font-bold min-w-8 text-right",
-                                event.reward > 0 ? "text-green-400" : "text-red-400"
+                                event.reward > 0 ? "text-risk-low" : "text-risk-high"
                               )}>
                                 {event.reward > 0 ? '+' : ''}{event.reward.toFixed(1)}
                               </span>
@@ -1215,7 +1215,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     <button
                       onClick={exportRewardsAsJson}
                       disabled={rewardStats.totalEvents === 0}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-500/20 border border-amber-500/50 rounded-lg text-amber-400 text-xs font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-mid-soft border border-risk-mid/50 rounded-lg text-risk-mid text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Download className="w-3 h-3" />
                       Export JSON
@@ -1225,28 +1225,28 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       <AlertDialogTrigger asChild>
                         <button
                           disabled={rewardStats.totalEvents === 0}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-3 h-3" />
                           Reset History
                         </button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-black/95 border-red-500/30">
+                      <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                         <AlertDialogHeader>
-                          <AlertDialogTitle className="text-red-400">Reset Reward History?</AlertDialogTitle>
-                          <AlertDialogDescription className="text-amber-400/70">
+                          <AlertDialogTitle className="text-risk-high">Reset Reward History?</AlertDialogTitle>
+                          <AlertDialogDescription className="text-muted-foreground">
                             This will permanently delete all {rewardStats.totalEvents} reward events from your local storage. This action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel className="bg-transparent border-amber-500/30 text-amber-400 hover:bg-amber-500/10">Cancel</AlertDialogCancel>
+                          <AlertDialogCancel className="bg-transparent border-risk-mid/30 text-risk-mid hover:brightness-95">Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => {
                               clearRewards();
                               setRewardEvents([]);
                               refreshData();
                             }}
-                            className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                            className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
                           >
                             Reset All
                           </AlertDialogAction>
@@ -1256,7 +1256,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   </div>
                   
                   {/* Privacy notice */}
-                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-amber-400/40">
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
                     <Lock className="w-2.5 h-2.5" />
                     <span>Data never leaves your device</span>
                   </div>
@@ -1269,11 +1269,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             {/* Model Performance Comparison Tab */}
             <div className="space-y-4">
               {/* A/B Testing Mode */}
-              <div className="p-3 bg-gradient-to-r from-pink-500/10 to-rose-500/10 border border-pink-500/30 rounded-lg">
+              <div className="p-3 bg-gradient-to-r from-[hsl(var(--cat-profile-tint))] to-[hsl(var(--cat-privacy-tint))] border border-[hsl(var(--cat-profile)/0.3)] rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Settings2 className="w-4 h-4 text-pink-400" />
-                    <h4 className="text-pink-400 text-xs font-medium">A/B Testing Mode</h4>
+                    <Settings2 className="w-4 h-4 text-[hsl(var(--cat-profile))]" />
+                    <h4 className="text-[hsl(var(--cat-profile))] text-xs font-medium">A/B Testing Mode</h4>
                   </div>
                 </div>
                 
@@ -1288,15 +1288,15 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       className={cn(
                         "px-2 py-1.5 text-xs rounded border transition-colors capitalize",
                         predictionMode === mode
-                          ? "bg-pink-500/30 border-pink-500 text-pink-400"
-                          : "bg-black/20 border-pink-500/30 text-pink-400/60 hover:text-pink-400"
+                          ? "bg-[hsl(var(--cat-profile-tint))] border-[hsl(var(--cat-profile))] text-[hsl(var(--cat-profile))]"
+                          : "bg-secondary border-[hsl(var(--cat-profile)/0.3)] text-muted-foreground hover:text-[hsl(var(--cat-profile))]"
                       )}
                     >
                       {mode === 'best' ? 'Best of Both' : mode}
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-pink-400/50 mt-2">
+                <p className="text-[10px] text-muted-foreground mt-2">
                   {predictionMode === 'trained' && 'Using trained TensorFlow model only'}
                   {predictionMode === 'heuristic' && 'Using heuristic rules only'}
                   {predictionMode === 'best' && 'Using whichever has higher confidence'}
@@ -1305,58 +1305,58 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               
               {/* Performance Stats */}
               {performanceStats && (
-                <div className="p-3 bg-black/30 border border-pink-500/20 rounded-lg">
-                  <h4 className="text-pink-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                <div className="p-3 bg-secondary border border-[hsl(var(--cat-profile)/0.3)] rounded-lg">
+                  <h4 className="text-muted-foreground text-xs font-medium mb-3 flex items-center gap-2">
                     <BarChart3 className="w-3 h-3" />
                     Model Performance Comparison
                   </h4>
                   
                   {performanceStats.totalComparisons === 0 ? (
-                    <p className="text-pink-400/50 text-xs italic">No comparisons yet. Make predictions to see data.</p>
+                    <p className="text-muted-foreground text-xs italic">No comparisons yet. Make predictions to see data.</p>
                   ) : (
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs">
-                        <span className="text-pink-300/70">Total Comparisons:</span>
-                        <span className="text-pink-400 font-mono">{performanceStats.totalComparisons}</span>
+                        <span className="text-muted-foreground">Total Comparisons:</span>
+                        <span className="text-[hsl(var(--cat-profile))] font-mono">{performanceStats.totalComparisons}</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-pink-300/70">Agreement Rate:</span>
+                        <span className="text-muted-foreground">Agreement Rate:</span>
                         <span className={cn(
                           "font-mono",
-                          performanceStats.agreementRate >= 80 ? "text-green-400" :
-                          performanceStats.agreementRate >= 60 ? "text-yellow-400" : "text-red-400"
+                          performanceStats.agreementRate >= 80 ? "text-risk-low" :
+                          performanceStats.agreementRate >= 60 ? "text-risk-mid" : "text-risk-high"
                         )}>
                           {performanceStats.agreementRate}%
                         </span>
                       </div>
                       
-                      <div className="pt-2 mt-2 border-t border-pink-500/20">
+                      <div className="pt-2 mt-2 border-t border-[hsl(var(--cat-profile)/0.3)]">
                         <div className="flex justify-between text-xs mb-1">
-                          <span className="text-pink-300/70">Trained Model Confidence:</span>
-                          <span className="text-pink-400 font-mono">{performanceStats.trainedModelAvgConfidence}%</span>
+                          <span className="text-muted-foreground">Trained Model Confidence:</span>
+                          <span className="text-[hsl(var(--cat-profile))] font-mono">{performanceStats.trainedModelAvgConfidence}%</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                          <span className="text-pink-300/70">Heuristic Confidence:</span>
-                          <span className="text-pink-400 font-mono">{performanceStats.heuristicAvgConfidence}%</span>
+                          <span className="text-muted-foreground">Heuristic Confidence:</span>
+                          <span className="text-[hsl(var(--cat-profile))] font-mono">{performanceStats.heuristicAvgConfidence}%</span>
                         </div>
                       </div>
                       
                       {(performanceStats.trainedModelAccuracy > 0 || performanceStats.heuristicAccuracy > 0) && (
-                        <div className="pt-2 mt-2 border-t border-pink-500/20">
+                        <div className="pt-2 mt-2 border-t border-[hsl(var(--cat-profile)/0.3)]">
                           <div className="flex justify-between text-xs mb-1">
-                            <span className="text-pink-300/70">Trained Model Accuracy:</span>
+                            <span className="text-muted-foreground">Trained Model Accuracy:</span>
                             <span className={cn(
                               "font-mono font-bold",
-                              performanceStats.trainedModelAccuracy >= performanceStats.heuristicAccuracy ? "text-green-400" : "text-pink-400"
+                              performanceStats.trainedModelAccuracy >= performanceStats.heuristicAccuracy ? "text-risk-low" : "text-[hsl(var(--cat-profile))]"
                             )}>
                               {performanceStats.trainedModelAccuracy}%
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
-                            <span className="text-pink-300/70">Heuristic Accuracy:</span>
+                            <span className="text-muted-foreground">Heuristic Accuracy:</span>
                             <span className={cn(
                               "font-mono font-bold",
-                              performanceStats.heuristicAccuracy > performanceStats.trainedModelAccuracy ? "text-green-400" : "text-pink-400"
+                              performanceStats.heuristicAccuracy > performanceStats.trainedModelAccuracy ? "text-risk-low" : "text-[hsl(var(--cat-profile))]"
                             )}>
                               {performanceStats.heuristicAccuracy}%
                             </span>
@@ -1365,15 +1365,15 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       )}
                       
                       {/* Wins breakdown */}
-                      <div className="pt-2 mt-2 border-t border-pink-500/20">
+                      <div className="pt-2 mt-2 border-t border-[hsl(var(--cat-profile)/0.3)]">
                         <div className="flex justify-between text-xs mb-1">
-                          <span className="text-pink-300/70">Confidence Wins:</span>
+                          <span className="text-muted-foreground">Confidence Wins:</span>
                           <div className="font-mono text-[10px]">
-                            <span className="text-green-400">{performanceStats.trainedModelWins} trained</span>
-                            <span className="text-pink-400/40"> / </span>
-                            <span className="text-yellow-400">{performanceStats.heuristicWins} heuristic</span>
-                            <span className="text-pink-400/40"> / </span>
-                            <span className="text-gray-400">{performanceStats.ties} ties</span>
+                            <span className="text-risk-low">{performanceStats.trainedModelWins} trained</span>
+                            <span className="text-muted-foreground"> / </span>
+                            <span className="text-risk-mid">{performanceStats.heuristicWins} heuristic</span>
+                            <span className="text-muted-foreground"> / </span>
+                            <span className="text-muted-foreground">{performanceStats.ties} ties</span>
                           </div>
                         </div>
                       </div>
@@ -1383,20 +1383,20 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                         <div className={cn(
                           "mt-2 p-2 rounded text-xs flex items-center gap-2",
                           performanceStats.improvement > 0 
-                            ? "bg-green-500/10 border border-green-500/30" 
-                            : "bg-red-500/10 border border-red-500/30"
+                            ? "bg-risk-low-soft border border-risk-low/30" 
+                            : "bg-risk-high-soft border border-risk-high/30"
                         )}>
                           {performanceStats.improvement > 0 ? (
                             <>
-                              <TrendingUp className="w-3.5 h-3.5 text-green-400" />
-                              <span className="text-green-400">
+                              <TrendingUp className="w-3.5 h-3.5 text-risk-low" />
+                              <span className="text-risk-low">
                                 Trained model is {Math.abs(performanceStats.improvement)}% more accurate
                               </span>
                             </>
                           ) : (
                             <>
-                              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
-                              <span className="text-red-400">
+                              <AlertTriangle className="w-3.5 h-3.5 text-risk-high" />
+                              <span className="text-risk-high">
                                 Heuristics are {Math.abs(performanceStats.improvement)}% more accurate
                               </span>
                             </>
@@ -1405,7 +1405,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       )}
                       
                       {/* Recommendation */}
-                      <div className="mt-2 p-2 bg-pink-500/10 rounded text-[10px] text-pink-400/70">
+                      <div className="mt-2 p-2 bg-[hsl(var(--cat-profile-tint))] rounded text-[10px] text-muted-foreground">
                         💡 {performanceStats.recommendation}
                       </div>
                     </div>
@@ -1415,8 +1415,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               
               {/* Recent Comparisons */}
               {comparisons.length > 0 && (
-                <div className="p-3 bg-black/30 border border-pink-500/20 rounded-lg">
-                  <h4 className="text-pink-400/70 text-xs font-medium mb-3 flex items-center gap-2">
+                <div className="p-3 bg-secondary border border-[hsl(var(--cat-profile)/0.3)] rounded-lg">
+                  <h4 className="text-muted-foreground text-xs font-medium mb-3 flex items-center gap-2">
                     <Clock className="w-3 h-3" />
                     Recent Comparisons (Last 10)
                   </h4>
@@ -1425,42 +1425,42 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     {comparisons.map((comp) => (
                       <div 
                         key={comp.id} 
-                        className="p-2 bg-black/20 rounded text-[10px]"
+                        className="p-2 bg-secondary rounded text-[10px]"
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-pink-400/40 font-mono">
+                          <span className="text-muted-foreground font-mono">
                             {new Date(comp.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                           {comp.agree ? (
-                            <span className="text-green-400/70 flex items-center gap-1">
+                            <span className="text-muted-foreground flex items-center gap-1">
                               <Check className="w-2.5 h-2.5" /> Agree
                             </span>
                           ) : (
-                            <span className="text-yellow-400/70 flex items-center gap-1">
+                            <span className="text-muted-foreground flex items-center gap-1">
                               <AlertTriangle className="w-2.5 h-2.5" /> Differ
                             </span>
                           )}
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[10px]">
                           <div>
-                            <span className="text-pink-300/50">Trained: </span>
-                            <span className="text-pink-400 capitalize">
+                            <span className="text-muted-foreground">Trained: </span>
+                            <span className="text-[hsl(var(--cat-profile))] capitalize">
                               {comp.trainedModelProfile} {comp.trainedModelConfidence}%
                             </span>
                           </div>
                           <div>
-                            <span className="text-pink-300/50">Heuristic: </span>
-                            <span className="text-pink-400 capitalize">
+                            <span className="text-muted-foreground">Heuristic: </span>
+                            <span className="text-[hsl(var(--cat-profile))] capitalize">
                               {comp.heuristicProfile} {comp.heuristicConfidence}%
                             </span>
                           </div>
                         </div>
                         {comp.reward !== undefined && (
                           <div className="mt-1 flex items-center justify-between">
-                            <span className="text-pink-300/50">Reward:</span>
+                            <span className="text-muted-foreground">Reward:</span>
                             <span className={cn(
                               "font-mono font-bold",
-                              comp.reward > 0 ? "text-green-400" : "text-red-400"
+                              comp.reward > 0 ? "text-risk-low" : "text-risk-high"
                             )}>
                               {comp.reward > 0 ? '+' : ''}{comp.reward.toFixed(1)}
                             </span>
@@ -1477,7 +1477,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 <button
                   onClick={() => exportPerformanceReport()}
                   disabled={!performanceStats || performanceStats.totalComparisons === 0}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-pink-500/20 border border-pink-500/50 rounded-lg text-pink-400 text-xs font-medium hover:bg-pink-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[hsl(var(--cat-profile-tint))] border border-[hsl(var(--cat-profile)/0.5)] rounded-lg text-[hsl(var(--cat-profile))] text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download className="w-3 h-3" />
                   Export Report
@@ -1487,28 +1487,28 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <AlertDialogTrigger asChild>
                     <button
                       disabled={!performanceStats || performanceStats.totalComparisons === 0}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Trash2 className="w-3 h-3" />
                       Clear Data
                     </button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-black/95 border-red-500/30">
+                  <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="text-red-400">Clear Comparison Data?</AlertDialogTitle>
-                      <AlertDialogDescription className="text-pink-400/70">
+                      <AlertDialogTitle className="text-risk-high">Clear Comparison Data?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground">
                         This will delete all {performanceStats?.totalComparisons || 0} comparison records. This cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-transparent border-pink-500/30 text-pink-400 hover:bg-pink-500/10">Cancel</AlertDialogCancel>
+                      <AlertDialogCancel className="bg-transparent border-[hsl(var(--cat-profile)/0.3)] text-[hsl(var(--cat-profile))] hover:brightness-95">Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => {
                           clearComparisonData();
                           setPerformanceStats(getPerformanceStats());
                           setComparisons([]);
                         }}
-                        className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                        className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
                       >
                         Clear All
                       </AlertDialogAction>
@@ -1518,7 +1518,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               </div>
               
               {/* Privacy notice */}
-              <div className="flex items-center justify-center gap-1.5 text-[10px] text-pink-400/40">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
                 <Lock className="w-2.5 h-2.5" />
                 <span>All comparisons stored locally only</span>
               </div>
@@ -1527,45 +1527,45 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
         ) : activeTab === 'federated' ? (
           <>
             {/* Federated Learning Status */}
-            <div className="mb-4 p-3 bg-gradient-to-r from-emerald-500/10 to-emerald-600/10 border border-emerald-500/30 rounded-lg">
+            <div className="mb-4 p-3 bg-gradient-to-r from-risk-low-soft to-risk-low-soft border border-risk-low/30 rounded-lg">
               <div className="flex items-center gap-2 mb-3">
-                <Share2 className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-emerald-400 text-xs font-medium">Federated Learning (Beta)</h4>
+                <Share2 className="w-4 h-4 text-risk-low" />
+                <h4 className="text-risk-low text-xs font-medium">Federated Learning (Beta)</h4>
               </div>
               
               {/* Consent Status */}
               <div className="space-y-2 mb-4">
                 <div className="flex justify-between text-xs">
-                  <span className="text-emerald-300/70">Status:</span>
+                  <span className="text-muted-foreground">Status:</span>
                   <span className={cn(
                     "font-mono font-bold",
-                    federatedStatus.consent === true ? "text-green-400" :
-                    federatedStatus.consent === false ? "text-red-400" : "text-yellow-400"
+                    federatedStatus.consent === true ? "text-risk-low" :
+                    federatedStatus.consent === false ? "text-risk-high" : "text-risk-mid"
                   )}>
                     {federatedStatus.consent === true ? 'Enabled' :
                      federatedStatus.consent === false ? 'Disabled' : 'Not Asked'}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-emerald-300/70">Has Gradients:</span>
+                  <span className="text-muted-foreground">Has Gradients:</span>
                   <span className={cn(
                     "font-mono",
-                    federatedStatus.hasGradients ? "text-green-400" : "text-gray-400"
+                    federatedStatus.hasGradients ? "text-risk-low" : "text-muted-foreground"
                   )}>
                     {federatedStatus.hasGradients ? 'Yes' : 'No'}
                   </span>
                 </div>
                 {federatedStatus.lastUpdate && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-emerald-300/70">Last Update:</span>
-                    <span className="text-emerald-400 font-mono">
+                    <span className="text-muted-foreground">Last Update:</span>
+                    <span className="text-risk-low font-mono">
                       {new Date(federatedStatus.lastUpdate).toLocaleTimeString()}
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between text-xs">
-                  <span className="text-emerald-300/70">Model Version:</span>
-                  <span className="text-emerald-400 font-mono">
+                  <span className="text-muted-foreground">Model Version:</span>
+                  <span className="text-risk-low font-mono">
                     {federatedStatus.modelVersion || 'N/A'}
                   </span>
                 </div>
@@ -1575,23 +1575,23 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               {federatedStatus.consent === null ? (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors">
+                    <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors">
                       <Shield className="w-3 h-3" />
                       Enable Federated Learning
                     </button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent className="bg-black/95 border-emerald-500/30 max-h-[80vh] overflow-y-auto">
+                  <AlertDialogContent className="bg-surface/95 border-risk-low/30 max-h-[80vh] overflow-y-auto">
                     <AlertDialogHeader>
-                      <AlertDialogTitle className="text-emerald-400 flex items-center gap-2">
+                      <AlertDialogTitle className="text-risk-low flex items-center gap-2">
                         <Shield className="w-5 h-5" />
                         Privacy-First Federated Learning
                       </AlertDialogTitle>
-                      <AlertDialogDescription className="text-emerald-400/70 text-left whitespace-pre-wrap text-xs">
+                      <AlertDialogDescription className="text-muted-foreground text-left whitespace-pre-wrap text-xs">
                         {PRIVACY_EXPLANATION}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel className="bg-transparent border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+                      <AlertDialogCancel className="bg-transparent border-risk-low/30 text-risk-low hover:brightness-95">
                         Not Now
                       </AlertDialogCancel>
                       <AlertDialogAction
@@ -1599,7 +1599,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           setFederatedConsent(true);
                           setFederatedStatus(getFederatedStatus());
                         }}
-                        className="bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30"
+                        className="bg-risk-low-soft border border-risk-low/50 text-risk-low hover:brightness-95"
                       >
                         Enable & Help Improve
                       </AlertDialogAction>
@@ -1621,11 +1621,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       setIsComputingGradients(false);
                     }}
                     disabled={isComputingGradients}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                   >
                     {isComputingGradients ? (
                       <>
-                        <div className="w-3 h-3 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-risk-low/30 border-t-risk-low rounded-full animate-spin" />
                         Computing...
                       </>
                     ) : (
@@ -1637,26 +1637,26 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   </button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <button className="px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors">
+                      <button className="px-3 py-2 bg-risk-high-soft border border-risk-high/50 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors">
                         <X className="w-3 h-3" />
                       </button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-black/95 border-red-500/30">
+                    <AlertDialogContent className="bg-surface/95 border-risk-high/30">
                       <AlertDialogHeader>
-                        <AlertDialogTitle className="text-red-400">Revoke Consent?</AlertDialogTitle>
-                        <AlertDialogDescription className="text-red-400/70">
+                        <AlertDialogTitle className="text-risk-high">Revoke Consent?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
                           This will disable federated learning and delete all stored gradients. You can re-enable anytime.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-transparent border-red-500/30 text-red-400 hover:bg-red-500/10">Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="bg-transparent border-risk-high/30 text-risk-high hover:brightness-95">Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => {
                             revokeFederatedConsent();
                             setFederatedStatus(getFederatedStatus());
                             setGradientSummary(null);
                           }}
-                          className="bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30"
+                          className="bg-risk-high-soft border border-risk-high/50 text-risk-high hover:brightness-95"
                         >
                           Revoke & Delete
                         </AlertDialogAction>
@@ -1670,7 +1670,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     setFederatedConsent(true);
                     setFederatedStatus(getFederatedStatus());
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500/20 border border-emerald-500/50 rounded-lg text-emerald-400 text-xs font-medium hover:bg-emerald-500/30 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors"
                 >
                   <Shield className="w-3 h-3" />
                   Re-enable Federated Learning
@@ -1680,28 +1680,28 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
 
             {/* Gradient Summary */}
             {gradientSummary && (
-              <div className="mb-4 p-3 bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/30 rounded-lg">
+              <div className="mb-4 p-3 bg-gradient-to-r from-[hsl(var(--cat-language-tint))] to-[hsl(var(--cat-language-tint))] border border-[hsl(var(--cat-language)/0.3)] rounded-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <Eye className="w-4 h-4 text-blue-400" />
-                  <h4 className="text-blue-400 text-xs font-medium">Your Gradient Summary</h4>
+                  <Eye className="w-4 h-4 text-[hsl(var(--cat-language))]" />
+                  <h4 className="text-[hsl(var(--cat-language))] text-xs font-medium">Your Gradient Summary</h4>
                 </div>
                 
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-blue-300/70">Layers:</span>
-                    <span className="text-blue-400 font-mono">{gradientSummary.layerCount}</span>
+                    <span className="text-muted-foreground">Layers:</span>
+                    <span className="text-[hsl(var(--cat-language))] font-mono">{gradientSummary.layerCount}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-blue-300/70">Parameters:</span>
-                    <span className="text-blue-400 font-mono">{gradientSummary.totalParameters.toLocaleString()}</span>
+                    <span className="text-muted-foreground">Parameters:</span>
+                    <span className="text-[hsl(var(--cat-language))] font-mono">{gradientSummary.totalParameters.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-blue-300/70">Avg Magnitude:</span>
-                    <span className="text-blue-400 font-mono">{gradientSummary.averageMagnitude.toFixed(6)}</span>
+                    <span className="text-muted-foreground">Avg Magnitude:</span>
+                    <span className="text-[hsl(var(--cat-language))] font-mono">{gradientSummary.averageMagnitude.toFixed(6)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-blue-300/70">Based on Rewards:</span>
-                    <span className="text-blue-400 font-mono">{gradientSummary.rewardBasis}</span>
+                    <span className="text-muted-foreground">Based on Rewards:</span>
+                    <span className="text-[hsl(var(--cat-language))] font-mono">{gradientSummary.rewardBasis}</span>
                   </div>
                 </div>
 
@@ -1719,7 +1719,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       URL.revokeObjectURL(url);
                     }
                   }}
-                  className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-colors"
+                  className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-[hsl(var(--cat-language-tint))] border border-[hsl(var(--cat-language)/0.5)] rounded-lg text-[hsl(var(--cat-language))] text-xs font-medium hover:brightness-95 transition-colors"
                 >
                   <Download className="w-3 h-3" />
                   Export Gradients (View What's Shared)
@@ -1729,36 +1729,36 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
 
             {/* Local Learning Progress */}
             {federatedStatus.consent && localLearningStatus && (
-              <div className="mb-4 p-3 bg-gradient-to-r from-purple-500/10 to-purple-600/10 border border-purple-500/30 rounded-lg">
+              <div className="mb-4 p-3 bg-gradient-to-r from-[hsl(var(--cat-device-tint))] to-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className="w-4 h-4 text-purple-400" />
-                  <h4 className="text-purple-400 text-xs font-medium">Local Learning Progress</h4>
+                  <TrendingUp className="w-4 h-4 text-[hsl(var(--cat-device))]" />
+                  <h4 className="text-[hsl(var(--cat-device))] text-xs font-medium">Local Learning Progress</h4>
                 </div>
                 
                 {/* Stats */}
                 <div className="space-y-2 mb-4">
                   <div className="flex justify-between text-xs">
-                    <span className="text-purple-300/70">Model Updates:</span>
-                    <span className="text-purple-400 font-mono">
+                    <span className="text-muted-foreground">Model Updates:</span>
+                    <span className="text-[hsl(var(--cat-device))] font-mono">
                       {localLearningStatus.successfulUpdates} / {localLearningStatus.totalUpdates}
                     </span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-purple-300/70">Current Accuracy:</span>
-                    <span className="text-purple-400 font-mono">
+                    <span className="text-muted-foreground">Current Accuracy:</span>
+                    <span className="text-[hsl(var(--cat-device))] font-mono">
                       {localLearningStatus.currentAccuracy.toFixed(1)}%
                     </span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="text-purple-300/70">Best Accuracy:</span>
-                    <span className="text-green-400 font-mono">
+                    <span className="text-muted-foreground">Best Accuracy:</span>
+                    <span className="text-risk-low font-mono">
                       {localLearningStatus.bestAccuracy.toFixed(1)}%
                     </span>
                   </div>
                   {localLearningStatus.lastUpdateTime && (
                     <div className="flex justify-between text-xs">
-                      <span className="text-purple-300/70">Last Update:</span>
-                      <span className="text-purple-400 font-mono">
+                      <span className="text-muted-foreground">Last Update:</span>
+                      <span className="text-[hsl(var(--cat-device))] font-mono">
                         {new Date(localLearningStatus.lastUpdateTime).toLocaleDateString()}
                       </span>
                     </div>
@@ -1768,7 +1768,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 {/* Accuracy Trend Chart (Simple) */}
                 {localLearningStatus.improvementHistory.length > 0 && (
                   <div className="mb-4">
-                    <h5 className="text-purple-400/70 text-[10px] font-medium mb-2">Accuracy Trend</h5>
+                    <h5 className="text-muted-foreground text-[10px] font-medium mb-2">Accuracy Trend</h5>
                     <div className="h-16 flex items-end gap-1">
                       {localLearningStatus.improvementHistory.slice(-10).map((imp, idx) => (
                         <div 
@@ -1778,13 +1778,13 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           <div 
                             className={cn(
                               "w-full rounded-t transition-all",
-                              imp.improved ? "bg-green-500/60" : "bg-red-500/40"
+                              imp.improved ? "bg-risk-low-soft" : "bg-risk-high-soft"
                             )}
                             style={{ 
                               height: `${Math.max(4, (imp.accuracyAfter / 100) * 48)}px` 
                             }}
                           />
-                          <span className="text-[8px] text-purple-400/50">
+                          <span className="text-[8px] text-muted-foreground">
                             {imp.accuracyAfter.toFixed(0)}
                           </span>
                         </div>
@@ -1798,8 +1798,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <div className={cn(
                     "mb-3 p-2 rounded text-[10px]",
                     rlUpdateResult.success 
-                      ? "bg-green-500/20 text-green-400" 
-                      : "bg-red-500/20 text-red-400"
+                      ? "bg-risk-low-soft text-risk-low" 
+                      : "bg-risk-high-soft text-risk-high"
                   )}>
                     {rlUpdateResult.message}
                   </div>
@@ -1819,11 +1819,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       setIsRunningRLUpdate(false);
                     }}
                     disabled={isRunningRLUpdate}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 text-xs font-medium hover:bg-purple-500/30 transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.5)] rounded-lg text-[hsl(var(--cat-device))] text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                   >
                     {isRunningRLUpdate ? (
                       <>
-                        <div className="w-3 h-3 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-[hsl(var(--cat-device)/0.3)] border-t-[hsl(var(--cat-device))] rounded-full animate-spin" />
                         Learning...
                       </>
                     ) : (
@@ -1837,7 +1837,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 
                 {/* Update Status */}
                 {!localLearningStatus.canRunUpdate && localLearningStatus.reasonCannotRun && (
-                  <div className="mt-2 text-[10px] text-purple-400/50 flex items-center gap-1">
+                  <div className="mt-2 text-[10px] text-muted-foreground flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {localLearningStatus.reasonCannotRun}
                   </div>
@@ -1846,7 +1846,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 {/* Version History */}
                 {localLearningStatus.versionHistory.length > 0 && (
                   <div className="mt-4">
-                    <h5 className="text-purple-400/70 text-[10px] font-medium mb-2 flex items-center gap-1">
+                    <h5 className="text-muted-foreground text-[10px] font-medium mb-2 flex items-center gap-1">
                       <History className="w-3 h-3" />
                       Version History (Last 3)
                     </h5>
@@ -1854,11 +1854,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       {localLearningStatus.versionHistory.slice(-3).reverse().map((version: ModelVersion, idx: number) => (
                         <div 
                           key={version.id}
-                          className="flex items-center justify-between p-1.5 bg-black/20 rounded text-[10px]"
+                          className="flex items-center justify-between p-1.5 bg-secondary rounded text-[10px]"
                         >
                           <div>
-                            <span className="text-purple-400 font-mono">{version.id.slice(0, 12)}...</span>
-                            <span className="text-purple-400/50 ml-2">
+                            <span className="text-[hsl(var(--cat-device))] font-mono">{version.id.slice(0, 12)}...</span>
+                            <span className="text-muted-foreground ml-2">
                               {version.accuracy.toFixed(1)}%
                             </span>
                           </div>
@@ -1870,14 +1870,14 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                                 setFederatedStatus(getFederatedStatus());
                                 setGradientSummary(getGradientSummary());
                               }}
-                              className="px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-yellow-400 hover:bg-yellow-500/30 transition-colors flex items-center gap-1"
+                              className="px-2 py-0.5 bg-risk-mid-soft border border-risk-mid/30 rounded text-risk-mid hover:brightness-95 transition-colors flex items-center gap-1"
                             >
                               <RefreshCw className="w-2.5 h-2.5" />
                               Rollback
                             </button>
                           )}
                           {idx === 0 && (
-                            <span className="text-green-400/70 text-[9px]">Current</span>
+                            <span className="text-muted-foreground text-[9px]">Current</span>
                           )}
                         </div>
                       ))}
@@ -1888,12 +1888,12 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             )}
 
             {/* Privacy Notice */}
-            <div className="p-3 bg-gradient-to-r from-gray-500/10 to-gray-600/10 border border-gray-500/30 rounded-lg">
+            <div className="p-3 bg-gradient-to-r from-secondary to-secondary border border-surface-border rounded-lg">
               <div className="flex items-start gap-2">
-                <Lock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                <Lock className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <div>
-                  <h5 className="text-gray-400 text-xs font-medium mb-1">Privacy Guarantees</h5>
-                  <ul className="text-[10px] text-gray-400/70 space-y-1">
+                  <h5 className="text-muted-foreground text-xs font-medium mb-1">Privacy Guarantees</h5>
+                  <ul className="text-[10px] text-muted-foreground space-y-1">
                     <li>✓ Only gradients computed, never raw data</li>
                     <li>✓ No browser languages shared</li>
                     <li>✓ No timezone or location data</li>
@@ -1907,7 +1907,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             {/* View Dashboard Link */}
             <Link
               to="/model-performance"
-              className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-400 text-xs font-medium hover:bg-purple-500/30 transition-colors"
+              className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.5)] rounded-lg text-[hsl(var(--cat-device))] text-xs font-medium hover:brightness-95 transition-colors"
             >
               <BarChart3 className="w-3 h-3" />
               View Performance Dashboard
@@ -1921,7 +1921,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   setFederatedStatus(getFederatedStatus());
                   setGradientSummary(null);
                 }}
-                className="w-full mt-2 text-red-400/60 text-xs hover:text-red-400 transition-colors"
+                className="w-full mt-2 text-muted-foreground text-xs hover:text-risk-high transition-colors"
               >
                 Clear Local Gradient Data
               </button>
@@ -1931,32 +1931,32 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           <>
             {/* Fingerprint Testing Header */}
             <div className="mb-4">
-              <h4 className="text-red-400 font-semibold text-sm flex items-center gap-2">
+              <h4 className="text-risk-high font-semibold text-sm flex items-center gap-2">
                 <Fingerprint className="w-4 h-4" />
                 Fingerprint Testing & Validation
               </h4>
-              <p className="text-red-300/60 text-xs mt-1">
+              <p className="text-muted-foreground text-xs mt-1">
                 Test fingerprint detection accuracy and protection
               </p>
             </div>
 
             {isTestingFingerprint && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-red-400 animate-spin" />
-                <span className="text-red-300 text-xs">Running fingerprint tests...</span>
+              <div className="mb-4 p-3 bg-risk-high-soft border border-risk-high/30 rounded-lg flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-risk-high animate-spin" />
+                <span className="text-risk-high text-xs">Running fingerprint tests...</span>
               </div>
             )}
 
             {/* Regeneration Test */}
-            <div className="mb-4 p-3 bg-red-950/30 border border-red-500/20 rounded-lg">
-              <h5 className="text-red-300 text-xs font-medium mb-2 flex items-center gap-2">
+            <div className="mb-4 p-3 bg-risk-high-soft border border-risk-high/30 rounded-lg">
+              <h5 className="text-risk-high text-xs font-medium mb-2 flex items-center gap-2">
                 <RefreshCw className="w-3 h-3" />
                 Fingerprint Regeneration Test
               </h5>
               <button
                 onClick={handleRegenerateFingerprints}
                 disabled={isTestingFingerprint}
-                className="w-full mb-2 px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                className="w-full mb-2 px-3 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
               >
                 Regenerate All Fingerprints
               </button>
@@ -1964,26 +1964,26 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               {fingerprintData && previousFingerprint && (
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-red-300/70">Canvas:</span>
-                    <span className={fingerprintData.canvas?.hash === previousFingerprint.canvas?.hash ? 'text-green-400' : 'text-yellow-400'}>
+                    <span className="text-muted-foreground">Canvas:</span>
+                    <span className={fingerprintData.canvas?.hash === previousFingerprint.canvas?.hash ? 'text-risk-low' : 'text-risk-mid'}>
                       {fingerprintData.canvas?.hash === previousFingerprint.canvas?.hash ? 'Stable ✅' : 'Changed ⚠️'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-red-300/70">WebGL:</span>
-                    <span className={fingerprintData.webgl?.hash === previousFingerprint.webgl?.hash ? 'text-green-400' : 'text-yellow-400'}>
+                    <span className="text-muted-foreground">WebGL:</span>
+                    <span className={fingerprintData.webgl?.hash === previousFingerprint.webgl?.hash ? 'text-risk-low' : 'text-risk-mid'}>
                       {fingerprintData.webgl?.hash === previousFingerprint.webgl?.hash ? 'Stable ✅' : 'Changed ⚠️'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-red-300/70">Audio:</span>
-                    <span className={fingerprintData.audio?.hash === previousFingerprint.audio?.hash ? 'text-green-400' : 'text-yellow-400'}>
+                    <span className="text-muted-foreground">Audio:</span>
+                    <span className={fingerprintData.audio?.hash === previousFingerprint.audio?.hash ? 'text-risk-low' : 'text-risk-mid'}>
                       {fingerprintData.audio?.hash === previousFingerprint.audio?.hash ? 'Stable ✅' : 'Changed ⚠️'}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-red-300/70">Fonts:</span>
-                    <span className={fingerprintData.fonts?.count === previousFingerprint.fonts?.count ? 'text-green-400' : 'text-yellow-400'}>
+                    <span className="text-muted-foreground">Fonts:</span>
+                    <span className={fingerprintData.fonts?.count === previousFingerprint.fonts?.count ? 'text-risk-low' : 'text-risk-mid'}>
                       {fingerprintData.fonts?.count === previousFingerprint.fonts?.count ? 'Stable ✅' : 'Changed ⚠️'}
                     </span>
                   </div>
@@ -1992,39 +1992,39 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             </div>
 
             {/* Stability Tracking */}
-            <div className="mb-4 p-3 bg-blue-950/30 border border-blue-500/20 rounded-lg">
-              <h5 className="text-blue-300 text-xs font-medium mb-2 flex items-center gap-2">
+            <div className="mb-4 p-3 bg-[hsl(var(--cat-language-tint))] border border-[hsl(var(--cat-language)/0.3)] rounded-lg">
+              <h5 className="text-[hsl(var(--cat-language))] text-xs font-medium mb-2 flex items-center gap-2">
                 <Activity className="w-3 h-3" />
                 Fingerprint Stability
               </h5>
               <div className="flex justify-between text-xs mb-2">
-                <span className="text-blue-300/70">History:</span>
-                <span className="text-blue-400">{fingerprintHistory.length} checks</span>
+                <span className="text-muted-foreground">History:</span>
+                <span className="text-[hsl(var(--cat-language))]">{fingerprintHistory.length} checks</span>
               </div>
               <div className="flex justify-between text-xs mb-2">
-                <span className="text-blue-300/70">Stability:</span>
-                <span className={stabilityStats.total > 0 && stabilityStats.stable === stabilityStats.total ? 'text-yellow-400' : 'text-green-400'}>
+                <span className="text-muted-foreground">Stability:</span>
+                <span className={stabilityStats.total > 0 && stabilityStats.stable === stabilityStats.total ? 'text-risk-mid' : 'text-risk-low'}>
                   {stabilityStats.total > 0 ? `${stabilityStats.stable}/${stabilityStats.total} stable` : 'No data yet'}
                 </span>
               </div>
               {stabilityStats.total > 0 && stabilityStats.stable === stabilityStats.total && (
-                <p className="text-yellow-400/80 text-[10px]">⚠️ Fingerprint never changes - easily trackable</p>
+                <p className="text-muted-foreground text-[10px]">⚠️ Fingerprint never changes - easily trackable</p>
               )}
               {stabilityStats.total > 0 && stabilityStats.stable < stabilityStats.total && (
-                <p className="text-green-400/80 text-[10px]">✅ Fingerprint changes - good for privacy!</p>
+                <p className="text-muted-foreground text-[10px]">✅ Fingerprint changes - good for privacy!</p>
               )}
             </div>
 
             {/* Protection Effectiveness Test */}
-            <div className="mb-4 p-3 bg-green-950/30 border border-green-500/20 rounded-lg">
-              <h5 className="text-green-300 text-xs font-medium mb-2 flex items-center gap-2">
+            <div className="mb-4 p-3 bg-risk-low-soft border border-risk-low/30 rounded-lg">
+              <h5 className="text-risk-low text-xs font-medium mb-2 flex items-center gap-2">
                 <Shield className="w-3 h-3" />
                 Protection Effectiveness
               </h5>
               <button
                 onClick={handleTestProtection}
                 disabled={isTestingFingerprint}
-                className="w-full mb-2 px-3 py-2 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-colors disabled:opacity-50"
+                className="w-full mb-2 px-3 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
               >
                 Test Fingerprint Protection
               </button>
@@ -2033,11 +2033,11 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 <div className="space-y-1 text-xs">
                   {Object.entries(protectionTestResults).map(([key, value]) => (
                     <div key={key} className="flex justify-between">
-                      <span className="text-green-300/70 capitalize">{key}:</span>
+                      <span className="text-muted-foreground capitalize">{key}:</span>
                       <span className={
-                        value === 'blocked' ? 'text-green-400' :
-                        value === 'partial' ? 'text-yellow-400' :
-                        value === 'allowed' ? 'text-red-400' : 'text-gray-400'
+                        value === 'blocked' ? 'text-risk-low' :
+                        value === 'partial' ? 'text-risk-mid' :
+                        value === 'allowed' ? 'text-risk-high' : 'text-muted-foreground'
                       }>
                         {value === 'blocked' ? 'Blocked ✅' :
                          value === 'partial' ? 'Partial 🔶' :
@@ -2045,10 +2045,10 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       </span>
                     </div>
                   ))}
-                  <div className="pt-2 mt-2 border-t border-green-500/20">
+                  <div className="pt-2 mt-2 border-t border-risk-low/30">
                     <div className="flex justify-between font-medium">
-                      <span className="text-green-300">Overall:</span>
-                      <span className="text-green-400">
+                      <span className="text-risk-low">Overall:</span>
+                      <span className="text-risk-low">
                         {Math.round((Object.values(protectionTestResults).filter(v => v === 'blocked').length / 5) * 100)}% protected
                       </span>
                     </div>
@@ -2059,8 +2059,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
 
             {/* Entropy Calculator */}
             {fingerprintData && (
-              <div className="mb-4 p-3 bg-purple-950/30 border border-purple-500/20 rounded-lg">
-                <h5 className="text-purple-300 text-xs font-medium mb-2 flex items-center gap-2">
+              <div className="mb-4 p-3 bg-[hsl(var(--cat-device-tint))] border border-[hsl(var(--cat-device)/0.3)] rounded-lg">
+                <h5 className="text-[hsl(var(--cat-device))] text-xs font-medium mb-2 flex items-center gap-2">
                   <Zap className="w-3 h-3" />
                   Fingerprint Entropy
                 </h5>
@@ -2069,31 +2069,31 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   return (
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-purple-300/70">Canvas:</span>
-                        <span className="text-purple-400 font-mono">{entropy.breakdown.canvas.toFixed(1)} bits</span>
+                        <span className="text-muted-foreground">Canvas:</span>
+                        <span className="text-[hsl(var(--cat-device))] font-mono">{entropy.breakdown.canvas.toFixed(1)} bits</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-purple-300/70">WebGL:</span>
-                        <span className="text-purple-400 font-mono">{entropy.breakdown.webgl.toFixed(1)} bits</span>
+                        <span className="text-muted-foreground">WebGL:</span>
+                        <span className="text-[hsl(var(--cat-device))] font-mono">{entropy.breakdown.webgl.toFixed(1)} bits</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-purple-300/70">Audio:</span>
-                        <span className="text-purple-400 font-mono">{entropy.breakdown.audio.toFixed(1)} bits</span>
+                        <span className="text-muted-foreground">Audio:</span>
+                        <span className="text-[hsl(var(--cat-device))] font-mono">{entropy.breakdown.audio.toFixed(1)} bits</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-purple-300/70">Fonts:</span>
-                        <span className="text-purple-400 font-mono">{entropy.breakdown.fonts.toFixed(1)} bits</span>
+                        <span className="text-muted-foreground">Fonts:</span>
+                        <span className="text-[hsl(var(--cat-device))] font-mono">{entropy.breakdown.fonts.toFixed(1)} bits</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-purple-300/70">Plugins:</span>
-                        <span className="text-purple-400 font-mono">{entropy.breakdown.plugins.toFixed(1)} bits</span>
+                        <span className="text-muted-foreground">Plugins:</span>
+                        <span className="text-[hsl(var(--cat-device))] font-mono">{entropy.breakdown.plugins.toFixed(1)} bits</span>
                       </div>
-                      <div className="pt-2 mt-2 border-t border-purple-500/20">
+                      <div className="pt-2 mt-2 border-t border-[hsl(var(--cat-device)/0.3)]">
                         <div className="flex justify-between font-medium">
-                          <span className="text-purple-300">Total:</span>
-                          <span className="text-purple-400 font-mono">{entropy.total.toFixed(1)} bits</span>
+                          <span className="text-[hsl(var(--cat-device))]">Total:</span>
+                          <span className="text-[hsl(var(--cat-device))] font-mono">{entropy.total.toFixed(1)} bits</span>
                         </div>
-                        <p className="text-purple-300/60 text-[10px] mt-1">
+                        <p className="text-muted-foreground text-[10px] mt-1">
                           1 in {Math.pow(2, entropy.total).toLocaleString(undefined, { maximumFractionDigits: 0 })} browsers
                         </p>
                       </div>
@@ -2104,42 +2104,42 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             )}
 
             {/* Cross-Browser Comparison */}
-            <div className="mb-4 p-3 bg-amber-950/30 border border-amber-500/20 rounded-lg">
-              <h5 className="text-amber-300 text-xs font-medium mb-2 flex items-center gap-2">
+            <div className="mb-4 p-3 bg-risk-mid-soft border border-risk-mid/30 rounded-lg">
+              <h5 className="text-risk-mid text-xs font-medium mb-2 flex items-center gap-2">
                 <Globe className="w-3 h-3" />
                 Cross-Browser Comparison
               </h5>
-              <p className="text-amber-300/60 text-[10px] mb-2">
+              <p className="text-muted-foreground text-[10px] mb-2">
                 Your current fingerprint hash:
               </p>
-              <code className="block text-amber-400 text-[10px] font-mono bg-amber-950/50 p-2 rounded break-all mb-2">
+              <code className="block text-risk-mid text-[10px] font-mono bg-risk-mid-soft p-2 rounded break-all mb-2">
                 {fingerprintData?.compositeHash || 'Not yet computed'}
               </code>
-              <p className="text-amber-300/60 text-[10px]">
+              <p className="text-muted-foreground text-[10px]">
                 Open in different browsers to compare fingerprint differences
               </p>
             </div>
 
             {/* Simulated Fingerprints */}
-            <div className="mb-4 p-3 bg-cyan-950/30 border border-cyan-500/20 rounded-lg">
-              <h5 className="text-cyan-300 text-xs font-medium mb-2 flex items-center gap-2">
+            <div className="mb-4 p-3 bg-[hsl(var(--cat-storage-tint))] border border-[hsl(var(--cat-storage)/0.3)] rounded-lg">
+              <h5 className="text-[hsl(var(--cat-storage))] text-xs font-medium mb-2 flex items-center gap-2">
                 <Eye className="w-3 h-3" />
                 Simulate Fresh Browser
               </h5>
               <div className="space-y-2">
                 {Object.entries(simulatedFingerprints).map(([key, sim]) => (
-                  <div key={key} className="flex items-center justify-between p-2 bg-cyan-950/50 rounded">
+                  <div key={key} className="flex items-center justify-between p-2 bg-[hsl(var(--cat-storage-tint))] rounded">
                     <div>
-                      <span className="text-cyan-300 text-xs capitalize">{key.replace(/-/g, ' ')}</span>
-                      <div className="text-cyan-400/60 text-[10px] font-mono">{sim.hash}</div>
+                      <span className="text-[hsl(var(--cat-storage))] text-xs capitalize">{key.replace(/-/g, ' ')}</span>
+                      <div className="text-muted-foreground text-[10px] font-mono">{sim.hash}</div>
                     </div>
                     <div className="text-right">
-                      <span className="text-cyan-300/70 text-[10px]">{sim.uniqueness}</span>
+                      <span className="text-muted-foreground text-[10px]">{sim.uniqueness}</span>
                       <div className={cn(
                         "text-[9px]",
-                        sim.risk === 'very-low' ? 'text-green-400' :
-                        sim.risk === 'low' ? 'text-green-400' :
-                        'text-red-400'
+                        sim.risk === 'very-low' ? 'text-risk-low' :
+                        sim.risk === 'low' ? 'text-risk-low' :
+                        'text-risk-high'
                       )}>
                         {sim.risk} risk
                       </div>
@@ -2150,29 +2150,29 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             </div>
 
             {/* External Validation */}
-            <div className="mb-4 p-3 bg-gray-950/30 border border-gray-500/20 rounded-lg">
-              <h5 className="text-gray-300 text-xs font-medium mb-2 flex items-center gap-2">
+            <div className="mb-4 p-3 bg-secondary border border-surface-border rounded-lg">
+              <h5 className="text-foreground text-xs font-medium mb-2 flex items-center gap-2">
                 <ExternalLink className="w-3 h-3" />
                 External Validation Tools
               </h5>
               <div className="space-y-2">
                 <button
                   onClick={() => window.open('https://coveryourtracks.eff.org/', '_blank')}
-                  className="w-full px-3 py-2 bg-gray-500/10 border border-gray-500/20 rounded text-gray-300 text-xs hover:bg-gray-500/20 transition-colors flex items-center justify-between"
+                  className="w-full px-3 py-2 bg-secondary border border-surface-border rounded text-foreground text-xs hover:bg-muted transition-colors flex items-center justify-between"
                 >
                   <span>EFF Cover Your Tracks</span>
                   <ExternalLink className="w-3 h-3" />
                 </button>
                 <button
                   onClick={() => window.open('https://amiunique.org/', '_blank')}
-                  className="w-full px-3 py-2 bg-gray-500/10 border border-gray-500/20 rounded text-gray-300 text-xs hover:bg-gray-500/20 transition-colors flex items-center justify-between"
+                  className="w-full px-3 py-2 bg-secondary border border-surface-border rounded text-foreground text-xs hover:bg-muted transition-colors flex items-center justify-between"
                 >
                   <span>AmIUnique</span>
                   <ExternalLink className="w-3 h-3" />
                 </button>
                 <button
                   onClick={() => window.open('https://browserleaks.com/', '_blank')}
-                  className="w-full px-3 py-2 bg-gray-500/10 border border-gray-500/20 rounded text-gray-300 text-xs hover:bg-gray-500/20 transition-colors flex items-center justify-between"
+                  className="w-full px-3 py-2 bg-secondary border border-surface-border rounded text-foreground text-xs hover:bg-muted transition-colors flex items-center justify-between"
                 >
                   <span>BrowserLeaks</span>
                   <ExternalLink className="w-3 h-3" />
@@ -2184,12 +2184,12 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
             <button
               onClick={exportFingerprintReport}
               disabled={!fingerprintData}
-              className="w-full mb-2 px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full mb-2 px-3 py-2 bg-risk-high-soft border border-risk-high/30 rounded-lg text-risk-high text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Download className="w-3 h-3" />
               Export Fingerprint Report
             </button>
-            <p className="text-center text-gray-400/60 text-[10px]">
+            <p className="text-center text-muted-foreground text-[10px]">
               🔒 Safe to share - contains no personal data
             </p>
 
@@ -2201,7 +2201,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   setStabilityStats({ total: 0, stable: 0 });
                   localStorage.removeItem('fingerprint-history');
                 }}
-                className="w-full mt-2 text-red-400/60 text-xs hover:text-red-400 transition-colors"
+                className="w-full mt-2 text-muted-foreground text-xs hover:text-risk-high transition-colors"
               >
                 Clear Fingerprint History
               </button>
@@ -2211,8 +2211,8 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
       </div>
 
       {/* Hotkey hint */}
-      <div className="p-2 border-t border-yellow-500/30">
-        <p className="text-center text-yellow-300/40 text-xs">
+      <div className="p-2 border-t border-risk-mid/30">
+        <p className="text-center text-muted-foreground text-xs">
           Press Shift+Alt+V to toggle
         </p>
       </div>

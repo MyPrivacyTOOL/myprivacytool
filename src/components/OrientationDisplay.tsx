@@ -16,7 +16,7 @@ export default function OrientationDisplay() {
 
   return (
     <div className="w-full max-w-sm mx-auto">
-      <div className="bg-card rounded-2xl shadow-lg border border-border p-6 space-y-6">
+      <div className="bg-surface/95 rounded-2xl shadow-card border border-surface-border p-6 space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <h3 className="text-lg font-semibold text-foreground">
@@ -34,17 +34,16 @@ export default function OrientationDisplay() {
               width="200" 
               height="200" 
               viewBox="0 0 200 200"
-              className="drop-shadow-lg"
             >
               {/* Outer ring with gradient */}
               <defs>
                 <linearGradient id="compassGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
-                  <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity="0.1" />
+                  <stop offset="0%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.1" />
                 </linearGradient>
                 <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#ef4444" />
-                  <stop offset="100%" stopColor="#dc2626" />
+                  <stop offset="0%" stopColor="hsl(var(--risk-high))" />
+                  <stop offset="100%" stopColor="hsl(var(--risk-high))" />
                 </linearGradient>
               </defs>
 
@@ -54,7 +53,7 @@ export default function OrientationDisplay() {
                 cy="100" 
                 r="95" 
                 fill="url(#compassGradient)"
-                stroke="hsl(var(--border))"
+                stroke="hsl(var(--surface-border))"
                 strokeWidth="2"
               />
 
@@ -63,8 +62,8 @@ export default function OrientationDisplay() {
                 cx="100" 
                 cy="100" 
                 r="75" 
-                fill="hsl(var(--card))"
-                stroke="hsl(var(--border))"
+                fill="hsl(var(--surface))"
+                stroke="hsl(var(--surface-border))"
                 strokeWidth="1"
               />
 
@@ -122,14 +121,14 @@ export default function OrientationDisplay() {
                 <polygon
                   points="100,30 92,70 100,60 108,70"
                   fill="url(#arrowGradient)"
-                  stroke="#b91c1c"
+                  stroke="hsl(var(--risk-high))"
                   strokeWidth="1"
                 />
                 {/* Arrow tail */}
                 <polygon
                   points="100,170 92,130 100,140 108,130"
                   fill="hsl(var(--muted-foreground))"
-                  stroke="hsl(var(--border))"
+                  stroke="hsl(var(--surface-border))"
                   strokeWidth="1"
                 />
                 {/* Center circle */}
@@ -137,8 +136,8 @@ export default function OrientationDisplay() {
                   cx="100" 
                   cy="100" 
                   r="8" 
-                  fill="hsl(var(--primary))"
-                  stroke="hsl(var(--primary-foreground))"
+                  fill="hsl(var(--brand-ink))"
+                  stroke="hsl(var(--surface))"
                   strokeWidth="2"
                 />
               </g>
@@ -161,13 +160,13 @@ export default function OrientationDisplay() {
           {/* Orientation type */}
           <div className="bg-secondary/50 rounded-xl p-4 text-center space-y-2">
             <div 
-              className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary/10"
+              className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-soft"
               style={{
                 transform: isPortrait ? 'rotate(0deg)' : 'rotate(90deg)',
                 transition: 'transform 0.3s ease-out'
               }}
             >
-              <DeviceIcon className="w-5 h-5 text-primary" />
+              <DeviceIcon className="w-5 h-5 text-brand" />
             </div>
             <div className="text-sm font-medium text-foreground">
               {isPortrait ? 'Portrait' : 'Landscape'}
@@ -188,8 +187,8 @@ export default function OrientationDisplay() {
         {/* Live indicator */}
         <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
           </span>
           <span>Live tracking active</span>
         </div>

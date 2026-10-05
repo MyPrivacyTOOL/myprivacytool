@@ -10,7 +10,7 @@
   --sal: env(safe-area-inset-left);
 }
 
-/* MyPrivacyTOOL.io Design System - Dark Cyber-Security Theme */
+/* MyPrivacyTOOL.io Design System - Light Professional Theme (MPC-6906) */
 
 @layer base {
   :root {
@@ -25,33 +25,80 @@
     --popover-foreground: 0 0% 10%;
 
     /* Matrix Green as primary */
-    --primary: 120 100% 35%;
+    --primary: 145 100% 24%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 10%;
 
     --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 32%;
 
     /* Matrix Green accent */
-    --accent: 120 100% 35%;
+    --accent: 145 100% 24%;
     --accent-foreground: 0 0% 100%;
 
-    --success: 120 100% 35%;
+    --success: 145 100% 24%;
     --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 10%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 42%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 0 0% 90%;
     --input: 0 0% 96%;
-    --ring: 120 100% 35%;
+    --ring: 145 100% 24%;
 
     --radius: 0.75rem;
+
+    /* ------------------------------------------------------------------
+       MPC-6906 theme tokens - single source of truth for the light Matrix
+       theme. HSL triplets (use as hsl(var(--x)) or hsl(var(--x) / a)).
+       Change here; nothing else hard-codes these colours.
+       ------------------------------------------------------------------ */
+
+    /* Matrix rain (canvas reads these at runtime) */
+    --matrix-bg: 0 0% 100%;
+    --matrix-glyph: 146 85% 29%;      /* #0B8A3D */
+    --matrix-lead: 143 100% 24%;      /* #007A2F, leading glyph darker not white */
+    --matrix-glyph-alpha: 0.18;       /* peak trail opacity, spec 12-20% */
+    --matrix-lead-alpha: 0.32;
+
+    /* Brand green for TEXT/strokes on light surfaces (>= 4.5:1 on white) */
+    --brand-ink: 145 100% 22%;
+    --brand-soft: 145 60% 96%;
+
+    /* Surfaces for hero components */
+    --surface: 0 0% 100%;
+    --surface-alpha: 0.94;            /* lets the rain read faintly through cards */
+    --surface-border: 0 0% 82%;
+    --shadow-card: 0 4px 18px hsl(0 0% 0% / 0.06);
+
+    /* Risk / status: ink = text + strokes, soft = pill fill (all AA on soft/white) */
+    --risk-low: 145 100% 22%;
+    --risk-low-soft: 145 60% 94%;
+    --risk-mid: 32 95% 26%;
+    --risk-mid-soft: 45 100% 93%;
+    --risk-orange: 21 90% 34%;
+    --risk-orange-soft: 24 100% 94%;
+    --risk-high: 0 74% 38%;
+    --risk-high-soft: 0 86% 96%;
+
+    /* Hexagon categories: ink (label/stroke/text) + tint (card fill) */
+    --cat-device: 262 70% 45%;       --cat-device-tint: 262 100% 97%;
+    --cat-network: 162 90% 22%;      --cat-network-tint: 152 70% 96%;
+    --cat-privacy: 0 74% 40%;        --cat-privacy-tint: 0 100% 97%;
+    --cat-language: 224 76% 42%;     --cat-language-tint: 214 100% 97%;
+    --cat-profile: 331 80% 38%;      --cat-profile-tint: 330 100% 97%;
+    --cat-orientation: 30 92% 27%;   --cat-orientation-tint: 40 100% 96%;
+    --cat-fingerprint: 0 70% 33%;    --cat-fingerprint-tint: 0 90% 96%;
+    --cat-storage: 192 90% 26%;      --cat-storage-tint: 186 80% 96%;
+    --cat-social: 280 70% 41%;       --cat-social-tint: 280 100% 97%;
+    --cat-security: 0 74% 38%;       --cat-security-tint: 0 100% 96%;
+    --cat-behavior: 36 92% 25%;      --cat-behavior-tint: 48 100% 95%;
+    --cat-default: 145 100% 22%;     --cat-default-tint: 145 60% 96%;
 
     /* Custom tokens for hexagon UI - Matrix Green */
     --hexagon-bg: 120 100% 35%;
@@ -112,7 +159,8 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background: hsl(0 0% 100%);
+    background: hsl(var(--matrix-bg));
+    overflow-x: clip;
     min-height: 100vh;
   }
 }
@@ -138,7 +186,7 @@
 
   /* Text gradient - Matrix green */
   .text-gradient {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(120 100% 25%) 100%);
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--brand-ink)) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -146,8 +194,7 @@
 
   /* Matrix text effect */
   .text-matrix {
-    color: hsl(var(--primary));
-    text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+    color: hsl(var(--brand-ink));
   }
 
   /* Backdrop blur card */
@@ -275,10 +322,10 @@
 
   @keyframes hexagon-glow {
     0%, 100% {
-      filter: brightness(1) drop-shadow(0 0 8px rgba(0, 255, 65, 0.5));
+      filter: brightness(1) drop-shadow(0 0 6px hsl(var(--brand-ink) / 0.35));
     }
     50% {
-      filter: brightness(1.2) drop-shadow(0 0 15px rgba(0, 255, 65, 0.8));
+      filter: brightness(1.2) drop-shadow(0 0 10px hsl(var(--brand-ink) / 0.5));
     }
   }
 

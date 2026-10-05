@@ -6,9 +6,9 @@ const ShadowHands = () => {
         <svg viewBox="0 0 100 180" className="w-full h-full animate-hand-push-left">
           <defs>
             <radialGradient id="handGradientLeft" cx="50%" cy="30%" r="70%">
-              <stop offset="0%" stopColor="rgba(0,0,0,0.85)" />
-              <stop offset="60%" stopColor="rgba(0,0,0,0.5)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="0%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.28" />
+              <stop offset="60%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.14" />
+              <stop offset="100%" stopColor="hsl(var(--brand-ink))" stopOpacity="0" />
             </radialGradient>
             <filter id="blurLeft" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
@@ -58,9 +58,9 @@ const ShadowHands = () => {
         <svg viewBox="0 0 100 180" className="w-full h-full animate-hand-push-right" style={{ transform: 'scaleX(-1)' }}>
           <defs>
             <radialGradient id="handGradientRight" cx="50%" cy="30%" r="70%">
-              <stop offset="0%" stopColor="rgba(0,0,0,0.85)" />
-              <stop offset="60%" stopColor="rgba(0,0,0,0.5)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="0%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.28" />
+              <stop offset="60%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.14" />
+              <stop offset="100%" stopColor="hsl(var(--brand-ink))" stopOpacity="0" />
             </radialGradient>
             <filter id="blurRight" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
@@ -110,14 +110,14 @@ const ShadowHands = () => {
         <svg viewBox="0 0 200 320" className="w-full h-full animate-hand-push-center">
           <defs>
             <radialGradient id="bodyGradient" cx="50%" cy="25%" r="60%">
-              <stop offset="0%" stopColor="rgba(0,0,0,0.7)" />
-              <stop offset="50%" stopColor="rgba(0,0,0,0.35)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="0%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.24" />
+              <stop offset="50%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="hsl(var(--brand-ink))" stopOpacity="0" />
             </radialGradient>
             <radialGradient id="headGradient" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="rgba(0,0,0,0.6)" />
-              <stop offset="70%" stopColor="rgba(0,0,0,0.25)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="0%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.2" />
+              <stop offset="70%" stopColor="hsl(var(--brand-ink))" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="hsl(var(--brand-ink))" stopOpacity="0" />
             </radialGradient>
             <filter id="blurBody" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceGraphic" stdDeviation="8" />

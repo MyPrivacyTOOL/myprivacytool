@@ -1,9 +1,18 @@
 import React from 'react';
+import { Helmet } from 'react-helmet';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
 import blogPosts from '@/data/blogPosts.json';
+import { guides } from '@/content/guides';
+
+const SITE_URL = 'https://www.myprivacytool.io';
+
+const toIsoDate = (d: string) => {
+  const parsed = new Date(d);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, 10);
+};
 
 const blogContent: { [key: string]: React.ReactNode } = {
   "how-exposed-are-you": (
@@ -346,7 +355,9 @@ export default function BlogPost() {
   const navigate = useNavigate();
   const meta = slug ? blogPosts.find((p) => p.slug === slug) : undefined;
 
-  if (!slug || !meta || !blogContent[slug]) {
+  const guide = slug ? guides[slug] : undefined;
+
+  if (!slug || !meta || (!blogContent[slug] && !guide)) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
@@ -359,7 +370,39 @@ export default function BlogPost() {
     );
   }
 
-  const post = { ...meta, content: blogContent[slug] };
+  const GuideContent = guide?.Content;
+  const post = { ...meta, content: GuideContent ? <GuideContent /> : blogContent[slug] };
+  const updated = 'updated' in meta ? (meta as { updated?: string }).updated : undefined;
+  const canonical = `${SITE_URL}/blog/${slug}`;
+  const scanHref = `/scan?utm_source=blog&utm_medium=${slug}`;
+  const relatedGuides = guide
+    ? blogPosts.filter((p) => p.slug !== slug && guides[p.slug])
+    : [];
+
+  const jsonLd: object[] = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: post.title,
+      description: post.excerpt,
+      author: { '@type': 'Organization', name: post.author },
+      publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL', url: SITE_URL },
+      datePublished: toIsoDate(post.date),
+      dateModified: toIsoDate(updated ?? post.date),
+      mainEntityOfPage: canonical,
+    },
+  ];
+  if (guide && guide.faqs.length > 0) {
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: guide.faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    });
+  }
 
   const handleShare = async () => {
     const url = `${window.location.origin}/blog/${slug}`;
@@ -376,6 +419,18 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Helmet>
+        <title>{post.title} | MyPrivacyTOOL</title>
+        <meta name="description" content={post.excerpt} />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="article" />
+        <meta property="og:title" content={post.title} />
+        <meta property="og:description" content={post.excerpt} />
+        <meta property="og:url" content={canonical} />
+        {jsonLd.map((block, i) => (
+          <script key={i} type="application/ld+json">{JSON.stringify(block)}</script>
+        ))}
+      </Helmet>
       {/* Article Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -400,8 +455,15 @@ export default function BlogPost() {
             <div className="flex items-center justify-between text-slate-600 pt-4">
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="font-medium text-slate-900">{post.author}</p>
-                  <p className="text-sm">{post.date}</p>
+                  <p className="font-medium text-slate-900">By {post.author}</p>
+                  <p className="text-sm">
+                    Published <time dateTime={toIsoDate(post.date)}>{post.date}</time>
+                    {updated && (
+                      <>
+                        {' · '}Updated on <time dateTime={toIsoDate(updated)}>{updated}</time>
+                      </>
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="text-sm">
@@ -428,8 +490,36 @@ export default function BlogPost() {
       {/* Article Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="bg-white rounded-lg p-8 mb-8 shadow-sm">
+          {guide && (
+            <nav aria-label="Table of contents" className="mb-8 rounded-lg border border-slate-200 bg-slate-50 p-5">
+              <p className="font-bold text-slate-900 mb-3">In this guide</p>
+              <ol className="list-decimal pl-5 space-y-1 text-slate-700">
+                {guide.sections.map((sec) => (
+                  <li key={sec.id}>
+                    <a href={`#${sec.id}`} className="text-blue-700 hover:underline">{sec.title}</a>
+                  </li>
+                ))}
+                <li>
+                  <a href="#faq" className="text-blue-700 hover:underline">Frequently asked questions</a>
+                </li>
+              </ol>
+            </nav>
+          )}
+
           <div className="prose prose-slate prose-lg max-w-none">
             {post.content}
+
+            {guide && guide.faqs.length > 0 && (
+              <section aria-labelledby="faq">
+                <h2 id="faq">Frequently asked questions</h2>
+                {guide.faqs.map((f) => (
+                  <div key={f.q}>
+                    <h3>{f.q}</h3>
+                    <p>{f.a}</p>
+                  </div>
+                ))}
+              </section>
+            )}
           </div>
 
           {/* Social Share & CTA */}
@@ -465,7 +555,7 @@ export default function BlogPost() {
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
               <h3 className="font-bold text-slate-900 mb-2">Ready to reclaim your privacy?</h3>
               <p className="text-slate-600 mb-4">Run a free scan to see exactly where your data is exposed.</p>
-              <Link to="/scan">
+              <Link to={scanHref}>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   Start Free Scan →
                 </Button>
@@ -473,6 +563,21 @@ export default function BlogPost() {
             </div>
           </div>
         </div>
+
+        {relatedGuides.length > 0 && (
+          <Card className="mb-8">
+            <CardContent className="p-8">
+              <h3 className="text-xl font-bold text-slate-900 mb-3">More privacy guides</h3>
+              <ul className="space-y-2">
+                {relatedGuides.map((p) => (
+                  <li key={p.slug}>
+                    <Link to={`/blog/${p.slug}`} className="text-blue-700 hover:underline">{p.title}</Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Related Content CTA */}
         <Card className="bg-slate-900 text-white">
