@@ -97,17 +97,17 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
       
       if (spot.intensity > 0.7) {
-        gradient.addColorStop(0, tok('--risk-high', 0.8));
-        gradient.addColorStop(0.5, tok('--risk-mid', 0.4));
-        gradient.addColorStop(1, tok('--risk-mid', 0));
+        gradient.addColorStop(0, tok('--brand-near-black', 0.8));
+        gradient.addColorStop(0.5, tok('--brand-green-hover', 0.4));
+        gradient.addColorStop(1, tok('--brand-green-hover', 0));
       } else if (spot.intensity > 0.4) {
-        gradient.addColorStop(0, tok('--risk-mid', 0.6));
-        gradient.addColorStop(0.5, tok('--risk-mid', 0.3));
-        gradient.addColorStop(1, tok('--risk-mid', 0));
+        gradient.addColorStop(0, tok('--brand-green-hover', 0.6));
+        gradient.addColorStop(0.5, tok('--brand-green-hover', 0.3));
+        gradient.addColorStop(1, tok('--brand-green-hover', 0));
       } else {
-        gradient.addColorStop(0, tok('--cat-language', 0.5));
-        gradient.addColorStop(0.5, tok('--cat-language', 0.2));
-        gradient.addColorStop(1, tok('--cat-language', 0));
+        gradient.addColorStop(0, tok('--brand-green', 0.5));
+        gradient.addColorStop(0.5, tok('--brand-green', 0.2));
+        gradient.addColorStop(1, tok('--brand-green', 0));
       }
 
       ctx.fillStyle = gradient;
@@ -398,11 +398,11 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
             />
             <div className="absolute bottom-2 right-2 flex gap-2 text-xs">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-risk-high" />
+                <div className="w-3 h-3 rounded-full bg-brand-near-black" />
                 <span className="text-muted-foreground">High</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-risk-mid" />
+                <div className="w-3 h-3 rounded-full bg-brand-green-hover" />
                 <span className="text-muted-foreground">Medium</span>
               </div>
               <div className="flex items-center gap-1">

@@ -1154,7 +1154,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           <div className="w-full">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg text-risk-low font-semibold">
-                Hi, I'm Alice, your AI Privacy TOOL
+                Hi, I'm Alice, your MyPrivacyTOOL guide
               </h2>
               <AliceHDBadge />
             </div>

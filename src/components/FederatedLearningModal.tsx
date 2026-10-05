@@ -71,13 +71,13 @@ export default function FederatedLearningModal({
   if (isSuccess) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="bg-gradient-to-br from-risk-low-soft to-surface/95 border-risk-low/30 max-w-md">
+        <DialogContent className="bg-card border-risk-low/30 max-w-md">
           <div className="flex flex-col items-center py-8 text-center">
-            <div className="w-20 h-20 rounded-full bg-risk-low-soft flex items-center justify-center mb-4 animate-pulse">
+            <div className="w-20 h-20 rounded-full bg-risk-low-soft flex items-center justify-center mb-4">
               <Heart className="w-10 h-10 text-risk-low" />
             </div>
             <h3 className="text-xl font-bold text-risk-low mb-2">
-              Thank You! 💚
+              Thank you
             </h3>
             <p className="text-muted-foreground text-sm">
               Your device will help improve language predictions for everyone—while keeping your data completely private.
@@ -94,11 +94,10 @@ export default function FederatedLearningModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gradient-to-br from-[hsl(var(--cat-device-tint))] via-secondary to-surface/95 border-brand/30 max-w-lg max-h-[90vh] overflow-y-auto p-0">
-        {/* Header with gradient */}
+      <DialogContent className="bg-card border-brand/30 max-w-lg max-h-[90vh] overflow-y-auto p-0">
+        {/* Header */}
         <div className="relative overflow-hidden rounded-t-lg">
           <div className="absolute inset-0 bg-brand-soft" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[hsl(var(--cat-device-tint))] via-transparent to-transparent" />
           
           <DialogHeader className="relative p-6 pb-4">
             <div className="flex items-center justify-center gap-3 mb-2">
@@ -107,7 +106,7 @@ export default function FederatedLearningModal({
               </div>
             </div>
             <DialogTitle className="text-center text-xl font-bold text-foreground">
-              Help Improve Language Predictions 🌍
+              Help Improve Language Predictions
             </DialogTitle>
           </DialogHeader>
         </div>

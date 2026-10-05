@@ -172,9 +172,9 @@ export default function StoragePanel() {
 
   const getRiskIcon = (risk: 'high' | 'medium' | 'low') => {
     switch (risk) {
-      case 'high': return '🔴';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
+      case 'high': return 'High';
+      case 'medium': return 'Medium';
+      case 'low': return 'Low';
     }
   };
 
@@ -214,11 +214,11 @@ export default function StoragePanel() {
 
   // Pie chart data
   const pieData: StorageBreakdownItem[] = [
-    { name: 'Cookies', value: storageData.cookies.count * 100, color: 'hsl(var(--cat-behavior))' },
-    { name: 'LocalStorage', value: storageData.localStorage.sizeKB * 1024, color: 'hsl(var(--cat-storage))' },
-    { name: 'SessionStorage', value: storageData.sessionStorage.sizeKB * 1024, color: 'hsl(var(--cat-network))' },
-    { name: 'IndexedDB', value: storageData.indexedDB.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--cat-device))' },
-    { name: 'Cache', value: storageData.cacheStorage.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--cat-profile))' },
+    { name: 'Cookies', value: storageData.cookies.count * 100, color: 'hsl(var(--brand-near-black))' },
+    { name: 'LocalStorage', value: storageData.localStorage.sizeKB * 1024, color: 'hsl(var(--brand-green))' },
+    { name: 'SessionStorage', value: storageData.sessionStorage.sizeKB * 1024, color: 'hsl(var(--brand-green-hover))' },
+    { name: 'IndexedDB', value: storageData.indexedDB.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--brand-near-black) / 0.55)' },
+    { name: 'Cache', value: storageData.cacheStorage.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--brand-green) / 0.5)' },
   ].filter(item => item.value > 0);
 
   // All detected tracking keys
@@ -236,7 +236,6 @@ export default function StoragePanel() {
       {/* Header */}
       <CardHeader className="border-b border-brand/30 pb-4">
         <CardTitle className="flex items-center gap-3 text-brand">
-          <span className="text-2xl">💾</span>
           <div className="flex-1">
             <h3 className="text-lg sm:text-xl font-bold">Your Stored Data & Tracking Persistence</h3>
             <p className="text-sm text-brand font-normal">What websites are storing about you</p>
@@ -260,7 +259,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Cookie className="w-5 h-5" />
               <h4 className="font-semibold">Cookies</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.cookies.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.cookies.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -286,7 +285,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <HardDrive className="w-5 h-5" />
               <h4 className="font-semibold">LocalStorage</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.localStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.localStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -314,7 +313,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Clock className="w-5 h-5" />
               <h4 className="font-semibold">Session Storage</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.sessionStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.sessionStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -336,7 +335,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-5 h-5" />
               <h4 className="font-semibold">IndexedDB</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.indexedDB.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.indexedDB.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -364,7 +363,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Box className="w-5 h-5" />
               <h4 className="font-semibold">Cache & Service Worker</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.cacheStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.cacheStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -587,7 +586,7 @@ export default function StoragePanel() {
           </h4>
           <div className={`p-4 rounded-lg ${getRiskColor(storageData.overallRisk)}`}>
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{getRiskIcon(storageData.overallRisk)}</span>
+              <span className="text-base font-semibold text-foreground">{getRiskIcon(storageData.overallRisk)}</span>
               <div>
                 <p className="font-semibold capitalize">{storageData.overallRisk} Risk</p>
                 <p className="text-sm opacity-80">

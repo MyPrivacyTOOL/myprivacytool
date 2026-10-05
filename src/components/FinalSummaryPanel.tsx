@@ -381,19 +381,19 @@ export default function FinalSummaryPanel({
       // PDF palette: RGB equivalents of the MPC-6906 light tokens in src/index.css
       // (jsPDF cannot read CSS variables, so keep these in sync with the tokens).
       const PDF = {
-        ink: [26, 26, 26],            // --foreground
-        muted: [82, 82, 82],          // --muted-foreground
-        card: [245, 245, 245],        // --card / zebra rows
-        track: [235, 235, 235],       // --muted
-        brand: [0, 112, 48],          // --brand-ink
-        brandSoft: [235, 250, 241],   // --brand-soft
-        riskHigh: [169, 25, 25],      // --risk-high
-        riskHighSoft: [254, 236, 236],
-        riskMid: [129, 78, 3],        // --risk-mid
-        riskMidSoft: [255, 246, 219],
-        riskOrange: [165, 69, 9],     // --risk-mid
-        purple: [93, 34, 195],        // --cat-device
-        cyan: [7, 102, 126],          // --cat-storage
+        ink: [26, 26, 26],            // --brand-near-black
+        muted: [89, 89, 89],          // --muted-foreground
+        card: [244, 244, 244],        // --brand-off-white / zebra rows
+        track: [244, 244, 244],       // --brand-off-white
+        brand: [30, 132, 73],         // --brand-ink (Deep Green)
+        brandSoft: [233, 246, 238],   // --brand-soft
+        riskHigh: [26, 26, 26],       // near black (no red text in print)
+        riskHighSoft: [244, 244, 244],
+        riskMid: [89, 89, 89],
+        riskMidSoft: [244, 244, 244],
+        riskOrange: [89, 89, 89],
+        purple: [30, 132, 73],        // Deep Green
+        cyan: [26, 26, 26],           // near black
       } satisfies Record<string, [number, number, number]> as Record<string, [number, number, number]>;
 
       // Helper function to add new page if needed
@@ -474,7 +474,7 @@ export default function FinalSummaryPanel({
       pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
       pdf.setFontSize(9);
       pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
-      pdf.text(`⚠ ${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
+      pdf.text(`${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
       
       yPos += 20;
 
@@ -492,14 +492,14 @@ export default function FinalSummaryPanel({
           cat.name,
           `${cat.confirmed}/${cat.total}`,
           `${percentage}%`,
-          cat.criticalIssues > 0 ? `${cat.criticalIssues} critical` : '-',
+          cat.criticalIssues > 0 ? `${cat.criticalIssues} high priority` : '-',
           cat.warnings > 0 ? `${cat.warnings} warnings` : '-'
         ];
       });
 
       autoTable(pdf, {
         startY: yPos,
-        head: [['Category', 'Detected', 'Accuracy', 'Critical', 'Warnings']],
+        head: [['Category', 'Detected', 'Accuracy', 'High priority', 'Warnings']],
         body: categoryData,
         theme: 'plain',
         headStyles: {
@@ -553,7 +553,7 @@ export default function FinalSummaryPanel({
         pdf.roundedRect(margin + 50, yPos, chartWidth, chartHeight, 1, 1, 'F');
         
         // Progress bar
-        const barColor = percentage >= 80 ? PDF.riskHigh : percentage >= 50 ? PDF.riskMid : PDF.brand;
+        const barColor = percentage >= 80 ? PDF.ink : percentage >= 50 ? PDF.muted : PDF.brand;
         pdf.setFillColor(...barColor);
         if (percentage > 0) {
           pdf.roundedRect(margin + 50, yPos, (chartWidth * percentage) / 100, chartHeight, 1, 1, 'F');
@@ -575,7 +575,7 @@ export default function FinalSummaryPanel({
         pdf.setTextColor(...PDF.riskHigh);
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('⚠ Top Privacy Concerns', margin, yPos);
+        pdf.text('Top Privacy Concerns', margin, yPos);
         yPos += 8;
 
         topConcerns.forEach((concern, i) => {
@@ -585,7 +585,7 @@ export default function FinalSummaryPanel({
           const severityColors: Record<string, number[]> = {
             critical: [...PDF.riskHigh],
             high: [...PDF.riskOrange],
-            medium: [...PDF.riskMid]
+            medium: [...PDF.brand]
           };
           const color = severityColors[concern.severity] || [...PDF.muted];
           
@@ -614,7 +614,7 @@ export default function FinalSummaryPanel({
           if (concern.fix) {
             pdf.setTextColor(...PDF.cyan);
             pdf.setFontSize(7);
-            pdf.text(`💡 ${concern.fix}`, margin + 25, yPos + 2);
+            pdf.text(`${concern.fix}`, margin + 25, yPos + 2);
             yPos += 6;
           }
           
@@ -629,7 +629,7 @@ export default function FinalSummaryPanel({
         pdf.setTextColor(...PDF.brand);
         pdf.setFontSize(14);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('✓ What You\'re Doing Well', margin, yPos);
+        pdf.text('What You\'re Doing Well', margin, yPos);
         yPos += 8;
 
         strengths.forEach((strength) => {
@@ -767,7 +767,7 @@ export default function FinalSummaryPanel({
 
 📊 46 data points analyzed
 🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / 46) * 100)}%)
-⚠️ Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
+Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
 🔍 Uniqueness: 1 in ${uniquenessEstimate.toLocaleString()} browsers
 ${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
 
@@ -872,7 +872,7 @@ Test yours at: ${window.location.origin}`;
                       <div className="flex items-center gap-2">
                         {cat.criticalIssues > 0 && (
                           <Badge variant="outline" className="text-foreground border-risk-high/30 text-xs px-1.5">
-                            {cat.criticalIssues} critical
+                            {cat.criticalIssues} high priority
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground">{cat.confirmed}/{cat.total}</span>
@@ -985,7 +985,7 @@ Test yours at: ${window.location.origin}`;
         </div>
 
         <div className="flex gap-3">
-          <Button variant="default" onClick={onStartOver} className="flex-1 bg-brand text-white hover:bg-brand/90">
+          <Button variant="default" onClick={onStartOver} className="flex-1 bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white">
             <RotateCcw className="w-4 h-4 mr-2" />
             Start New Scan
           </Button>

@@ -16,11 +16,11 @@ export default function LocaleHexagon({ data, onConfirm, onHover }: LocaleHexago
       case 'language':
         return 'from-brand to-brand';
       case 'timezone':
-        return 'from-[hsl(var(--cat-language))] to-[hsl(var(--cat-language))]';
+        return 'from-brand to-brand';
       case 'profile':
-        return 'from-[hsl(var(--cat-social))] to-[hsl(var(--cat-social))]';
+        return 'from-brand-near-black to-brand-near-black';
       case 'format':
-        return 'from-risk-mid to-risk-mid';
+        return 'from-brand-near-black to-brand-near-black';
       default:
         return 'from-brand to-brand';
     }

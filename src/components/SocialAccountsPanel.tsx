@@ -70,7 +70,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ name, icon, isLoggedIn, servi
         <div className="flex-1">
           <h4 className="font-semibold text-foreground">{name}</h4>
           <span className={`text-xs ${isLoggedIn ? riskColors[risk] : 'text-muted-foreground'}`}>
-            {isLoggedIn ? '✅ Logged In' : '❌ Not Detected'}
+            {isLoggedIn ? 'Logged in' : 'Not detected'}
           </span>
         </div>
         {isLoggedIn && (
@@ -158,10 +158,10 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
     if (socialData) loggedInCount += socialData.totalLoggedIn;
 
     if (crossSiteData?.ssoDetected && crossSiteData.linkedAccounts > 2) {
-      return { level: 'critical', label: 'Critical', description: 'Complete browsing history exposed via SSO', loggedInCount };
+      return { level: 'critical', label: 'Highest', description: 'Browsing activity visible to your SSO provider', loggedInCount };
     }
     if (loggedInCount >= 3) {
-      return { level: 'high', label: 'High Risk', description: 'Extensive tracking network active', loggedInCount };
+      return { level: 'high', label: 'High', description: 'Extensive tracking network active', loggedInCount };
     }
     if (loggedInCount >= 1) {
       return { level: 'medium', label: 'Moderate', description: 'Some cross-site tracking possible', loggedInCount };
@@ -301,11 +301,11 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
                 <h4 className="font-semibold text-foreground text-sm">With Your Logins</h4>
               </div>
               <p className="text-xs text-muted-foreground">
-                Websites see: <span className="text-foreground">"Your full identity"</span>
+                Websites see: <span className="text-foreground">"Your identity"</span>
               </p>
               <ul className="text-xs text-muted-foreground mt-2 space-y-1">
                 <li>• Your name & email</li>
-                <li>• Complete browsing history</li>
+                <li>• Browsing activity across sites</li>
                 <li>• Interests, friends, purchases</li>
               </ul>
             </div>
@@ -482,8 +482,8 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
           </h3>
           <p className="text-sm text-muted-foreground leading-relaxed mb-3">
             You're using <span className="text-foreground font-semibold">"Sign in with Google/Facebook"</span> on various sites. 
-            While convenient, this means the provider knows <span className="text-foreground">every site you visit</span> that 
-            uses their login. They can track your complete browsing history across all connected sites.
+            While convenient, this means the provider can see <span className="text-foreground">the sites you visit</span> that 
+            uses their login. They can follow your activity across all connected sites.
           </p>
           <p className="text-xs text-foreground flex items-center gap-1">
             <Lock className="w-3 h-3" />

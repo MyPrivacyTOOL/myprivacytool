@@ -61,7 +61,7 @@ const Business = () => {
               For Teams & Organisations
             </div>
 
-            <h1 className="text-4xl md:text-5xl font-black leading-tight mb-6 tracking-tight">
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6 tracking-tight">
               Your team's data is{" "}
               <span className="text-brand">
                 out there
@@ -210,7 +210,7 @@ const Business = () => {
               { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint." },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex gap-6 items-start">
-                <div className="text-brand font-black text-2xl w-10 flex-shrink-0">{step}</div>
+                <div className="text-brand font-bold text-2xl w-10 flex-shrink-0">{step}</div>
                 <div>
                   <div className="font-semibold text-foreground mb-1">{title}</div>
                   <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
@@ -240,7 +240,7 @@ const Business = () => {
               >
                 <div className="text-muted-foreground text-sm font-semibold mb-1">{tier}</div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-black text-foreground">{price}</span>
+                  <span className="text-3xl font-bold text-foreground">{price}</span>
                   <span className="text-muted-foreground text-xs">{per}</span>
                 </div>
                 <div className="text-muted-foreground text-xs mb-5">{seats}</div>

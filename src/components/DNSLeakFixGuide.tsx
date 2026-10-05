@@ -89,16 +89,16 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-background via-background to-risk-high-soft border-risk-high/30">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-background border-risk-high/30">
         <DialogHeader className="border-b border-risk-high/30 pb-4">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <div className="p-2 bg-risk-high-soft rounded-lg">
               <AlertTriangle className="w-6 h-6 text-foreground" />
             </div>
             <div>
-              <span className="text-foreground">Fix Your DNS Leak Immediately</span>
+              <span className="text-foreground">Fix your DNS leak</span>
               <DialogDescription className="text-muted-foreground mt-1">
-                Your ISP can see every website you visit
+                Your ISP can see the websites you visit
               </DialogDescription>
             </div>
           </DialogTitle>
@@ -111,18 +111,18 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               <div className="flex justify-center mb-4">
                 <div className="relative">
                   <ShieldCheck className="w-16 h-16 text-risk-low" />
-                  <Sparkles className="w-6 h-6 text-foreground absolute -top-1 -right-1 animate-pulse" />
+                  <Sparkles className="w-6 h-6 text-foreground absolute -top-1 -right-1" />
                 </div>
               </div>
               <h3 className="text-2xl font-bold text-risk-low mb-2">
-                🎉 DNS Leak Fixed!
+                DNS leak fixed
               </h3>
               <p className="text-risk-low">
                 Your DNS requests are now secure. Your ISP can no longer see which websites you visit.
               </p>
               <Button
                 variant="outline"
-                className="mt-4 border-risk-low text-risk-low hover:brightness-95"
+                className="mt-4 border-risk-low text-risk-low hover:bg-risk-low-soft"
                 onClick={() => onOpenChange(false)}
               >
                 Close Guide
@@ -140,7 +140,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                 </h3>
                 
                 <div className="grid md:grid-cols-2 gap-4">
-                  {/* CURRENT STATE - BAD */}
+                  {/* CURRENT STATE */}
                   <Card className="border-risk-high/30 bg-risk-high-soft">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-3">
@@ -172,7 +172,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                     </CardContent>
                   </Card>
 
-                  {/* FIXED STATE - GOOD */}
+                  {/* FIXED STATE */}
                   <Card className="border-risk-low/30 bg-risk-low-soft">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-3">
@@ -408,23 +408,19 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <span className="text-foreground">•</span>
-                    <span>DNS leaks reveal <strong>every website you visit</strong> (complete browsing history)</span>
+                    <span>A DNS leak lets your ISP see <strong>which websites you visit</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-foreground">•</span>
-                    <span>Your ISP logs <strong>when you visit</strong> and <strong>how often</strong></span>
+                    <span>Your ISP can see <strong>when you visit</strong> and <strong>how often</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-foreground">•</span>
-                    <span>ISPs can <strong>sell this data to advertisers</strong> in many countries</span>
+                    <span>That browsing pattern can build a detailed picture of your behavior</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-foreground">•</span>
-                    <span>Governments can <strong>request logs without warrant</strong> in many jurisdictions</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-foreground">•</span>
-                    <span>This is <strong>worse than IP leaks</strong> because it reveals detailed behavior patterns</span>
+                    <span>Fixing it keeps this visibility with your VPN instead</span>
                   </li>
                 </ul>
               </div>
@@ -441,7 +437,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                     disabled={testing}
                     className={cn(
                       "min-w-[200px]",
-                      testResult === 'still-leaking' && "bg-risk-high hover:brightness-95"
+                      testResult === 'still-leaking' && "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     )}
                   >
                     {testing ? (
@@ -457,7 +453,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                     ) : (
                       <>
                         <Shield className="w-4 h-4 mr-2" />
-                        Test DNS Leak Now
+                        Test DNS leak
                       </>
                     )}
                   </Button>
