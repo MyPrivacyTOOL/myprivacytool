@@ -236,7 +236,8 @@ export default {
       }
 
       // 5. Confirmation email via Resend
-      if (env.RESEND_API_KEY) {
+      // MPC-6677: when the scan-report Worker owns confirmations, skip this one (no duplicate senders).
+      if (env.RESEND_API_KEY && env.CONFIRMATION_OWNER !== 'scan-report') {
         const emailHtml = buildConfirmationEmail(firstName, source);
         side.push(
           fetch('https://api.resend.com/emails', {

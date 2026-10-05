@@ -1,0 +1,65 @@
+name: Deploy scan-report Worker
+
+# MPC-6677: confirmation email + 48h privacy report Worker ("mpt-scan-report").
+# Needs repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (same as deploy-mpt-leads).
+# Worker secrets (SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, HIBP_API_KEY, HUBSPOT_TOKEN) are set by a human
+# with `wrangler secret put`; `wrangler deploy` never touches them. Until they exist the Worker degrades safely
+# (no email, reports held), see workers/scan-report/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/scan-report/**'
+      - 'src/data/optOutGuides.json'
+      - '.github/workflows/deploy-scan-report.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-scan-report
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check required secrets are configured
+        env:
+          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          A: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
+      - name: Test Worker (stubbed fetch)
+        run: node workers/scan-report/worker.test.mjs
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/scan-report
+          command: deploy
+      # Optional: copy Worker secrets from GitHub repo secrets onto the Worker (write-only in Cloudflare).
+      # Only non-empty ones are set; nothing is printed. Same values can instead be set in the Cloudflare dashboard.
+      - name: Sync Worker secrets from GitHub secrets
+        working-directory: workers/scan-report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          HUBSPOT_TOKEN: ${{ secrets.SCAN_REPORT_HUBSPOT_TOKEN }}
+          HIBP_API_KEY: ${{ secrets.SCAN_REPORT_HIBP_API_KEY }}
+        run: |
+          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY HUBSPOT_TOKEN HIBP_API_KEY; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --yes wrangler@3 secret put "$name" >/dev/null && echo "set $name"
+            else
+              echo "skipped $name (no GitHub secret)"
+            fi
+          done
