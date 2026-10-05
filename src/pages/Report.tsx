@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const Report = () => {
   const [selected, setSelected] = useState<string | null>(null);
@@ -54,7 +55,7 @@ const Report = () => {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-sans">
-      <Seo title="Your Privacy Exposure Report | MyPrivacyTOOL" description="See your personal privacy exposure score and a prioritised list of what to fix first." path="/report" />
+      <Seo {...pageMeta["/report"]} path="/report" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-12 text-center">
         <div className="inline-block bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackBusinessLead } from "@/lib/analytics";
@@ -50,7 +51,7 @@ const Business = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <Seo title="Employee Privacy Protection for Business | MyPrivacyTOOL" description="Protect your team from data broker exposure and social engineering. Request a business privacy assessment from MyPrivacyTOOL." path="/business" />
+      <Seo {...pageMeta["/business"]} path="/business" />
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
