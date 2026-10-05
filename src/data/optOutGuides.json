@@ -158,13 +158,13 @@
     "requirements": ["The phone number to unlist, with country code", "Access to the phone to receive a verification OTP if requested"],
     "steps": [
       "If you have a Truecaller account, deactivate it first in the app (Settings > Privacy Center > Deactivate).",
-      "Go to truecaller.com/unlisting in a browser.",
+      "Go to truecaller.com/unlisting in a browser. Truecaller warns that unlisting can't be reversed.",
       "Enter your phone number including country code, choose a reason for unlisting, and complete the captcha.",
       "Click Unlist phone number and complete any OTP verification you are asked for.",
       "Wait up to 24 hours, then search for your number in Truecaller to confirm it no longer shows a name."
     ],
     "relistingWarning": "Truecaller builds its database from other users' contact books. If any of them still has you saved and uses the app, your number and name can reappear. Re-check every few months, and repeat the unlisting if needed.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "spokeo",
