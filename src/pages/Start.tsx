@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X } from "lucide-react";
+import Seo from "@/components/Seo";
 
 const hexagonData = [
   { icon: Eye, label: "Name", value: "Detected from your profile", color: "#ff4444" },
@@ -36,6 +37,7 @@ export default function Start() {
 
   return (
     <div className="min-h-screen bg-black text-white font-mono">
+      <Seo title="Start Your Free Privacy Scan | MyPrivacyTOOL" description="Start a free privacy scan from WhatsApp, Telegram, Messenger, Instagram or email and see what is exposed about you." path="/start" />
       {/* Header */}
       <div className="border-b border-red-900/40 px-6 py-4 flex items-center gap-3">
         <Shield className="text-red-500" size={20} />
