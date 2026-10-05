@@ -11,6 +11,29 @@ const FORM_ID =
   import.meta.env.VITE_HUBSPOT_START_FORM_ID || "22ee30ae-6cf9-419b-aa46-b656b0e7b1bf";
 const SOURCE_TAG = "scan-page";
 
+// MPC-6677: scan-report Worker (confirmation email + 48h report). Unset = feature off, HubSpot-only as before.
+const SCAN_API_URL = import.meta.env.VITE_SCAN_API_URL as string | undefined;
+
+async function requestScanReport(email: string): Promise<void> {
+  if (!SCAN_API_URL) return;
+  const q = new URLSearchParams(window.location.search);
+  const res = await fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/scan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email,
+      consent: true, // only called after the consent checkbox is ticked
+      consent_source: "scan_page",
+      utm_source: q.get("utm_source") ?? "",
+      utm_medium: q.get("utm_medium") ?? "",
+      utm_campaign: q.get("utm_campaign") ?? "",
+      utm_content: q.get("utm_content") ?? "",
+      referrer: document.referrer,
+    }),
+  });
+  if (!res.ok) throw new Error(`scan-report ${res.status}`);
+}
+
 const Scan = () => {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
@@ -29,6 +52,11 @@ const Scan = () => {
         fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("scan_page") },
         pageName: "Free exposure scan",
       });
+      try {
+        await requestScanReport(email.trim());
+      } catch (reportErr) {
+        console.error("Scan report request failed", reportErr); // never block the HubSpot lead
+      }
       trackStartSignup({ source: "scan_page" });
       setSubmitted(true);
     } catch (err: unknown) {
