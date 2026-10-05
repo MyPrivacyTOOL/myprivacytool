@@ -581,12 +581,12 @@ export default function BlogPost() {
         )}
 
         {/* Related Content CTA */}
-        <Card className="bg-slate-900 text-white">
+        <Card className="bg-brand-soft border-surface-border text-foreground">
           <CardContent className="p-8">
             <h3 className="text-2xl font-bold mb-2">Get Privacy Updates Weekly</h3>
-            <p className="text-slate-200 mb-4">New articles on data brokers, AI threats, and protection tactics delivered to your inbox.</p>
+            <p className="text-muted-foreground mb-4">New articles on data brokers, AI threats, and protection tactics delivered to your inbox.</p>
             <Link to="/newsletter">
-              <Button variant="secondary">Subscribe Now</Button>
+              <Button>Subscribe Now</Button>
             </Link>
           </CardContent>
         </Card>

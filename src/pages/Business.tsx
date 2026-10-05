@@ -197,8 +197,8 @@ const Business = () => {
                 <span
                   className={`text-xs font-bold px-2 py-1 rounded-full ${
                     color === "red"
-                      ? "bg-red-500/10 text-red-600"
-                      : "bg-orange-500/10 text-orange-600"
+                      ? "bg-risk-high-soft text-risk-high"
+                      : "bg-risk-orange-soft text-risk-orange"
                   }`}
                 >
                   {severity}
@@ -224,7 +224,7 @@ const Business = () => {
               { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data constantly. We scan monthly and remove continuously — keeping your team off the map." },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex gap-6 items-start">
-                <div className="text-primary/40 font-black text-2xl w-10 flex-shrink-0">{step}</div>
+                <div className="text-brand font-black text-2xl w-10 flex-shrink-0">{step}</div>
                 <div>
                   <div className="font-semibold text-foreground mb-1">{title}</div>
                   <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
