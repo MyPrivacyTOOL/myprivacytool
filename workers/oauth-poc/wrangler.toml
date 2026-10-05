@@ -10,9 +10,15 @@ workers_dev = true
 #
 # Secrets are NOT declared here and `wrangler deploy` never touches their values. Set them in the
 # Cloudflare dashboard (Workers & Pages > myprivacytool-oauth-poc > Settings > Variables and Secrets).
-# Names: EXPECTED_SECRETS.txt. REDIRECT_URI must equal
-#   https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback
-# and be an authorised redirect URI on the Google Web application OAuth client.
+# Secret names: EXPECTED_SECRETS.txt (GOOGLE_CLIENT_SECRET, STATE_SIGNING_KEY).
+#
+# The two NON-secret settings below are declared here on purpose: `wrangler deploy` replaces
+# plain-text dashboard variables with whatever is in this file, so values set only in the dashboard
+# would be wiped by the next deploy. A Google OAuth client ID is public (it is sent in the browser
+# redirect). REDIRECT_URI must also be an authorised redirect URI on the Google Web application client.
+[vars]
+GOOGLE_CLIENT_ID = "170369535424-ter5ocj6pu6aap8s2f06dd5jdjm4ck2h.apps.googleusercontent.com"
+REDIRECT_URI = "https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback"
 
 [observability]
 enabled = true
