@@ -162,7 +162,7 @@ export default function LanguageIntelligencePanel({
   };
 
   const getConfidenceBgColor = (confidence: number) => {
-    if (confidence >= 80) return 'bg-risk-low/15 border-risk-low/30';
+    if (confidence >= 80) return 'bg-risk-low-soft border-risk-low/30';
     if (confidence >= 60) return 'bg-risk-mid/15 border-risk-mid/30';
     return 'bg-risk-high/15 border-risk-high/30';
   };
@@ -174,7 +174,7 @@ export default function LanguageIntelligencePanel({
       case 'medium':
         return { color: 'text-foreground', bg: 'bg-risk-mid/15', label: 'Possible VPN' };
       default:
-        return { color: 'text-risk-low', bg: 'bg-risk-low/15', label: 'No VPN detected' };
+        return { color: 'text-risk-low', bg: 'bg-risk-low-soft', label: 'No VPN detected' };
     }
   };
 
@@ -213,7 +213,7 @@ export default function LanguageIntelligencePanel({
       <div className="bg-brand-soft border-b border-risk-low/20 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-risk-low/15 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-risk-low-soft flex items-center justify-center">
               <Brain className="w-5 h-5 text-risk-low" />
             </div>
             <div>
@@ -309,7 +309,7 @@ export default function LanguageIntelligencePanel({
                         {profile.profile}
                       </span>
                       {index === 0 && (
-                        <span className="ml-2 text-xs bg-risk-low/15 text-risk-low px-2 py-0.5 rounded-full">
+                        <span className="ml-2 text-xs bg-risk-low-soft text-risk-low px-2 py-0.5 rounded-full">
                           Most Likely
                         </span>
                       )}
@@ -475,7 +475,7 @@ export default function LanguageIntelligencePanel({
                   <div className="flex gap-2 flex-wrap justify-center">
                     <button
                       onClick={() => handleFeedback(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-foreground text-sm hover:bg-risk-low/15 transition-all hover:scale-105"
+                      className="flex items-center gap-2 px-4 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-foreground text-sm hover:bg-risk-low-soft transition-all hover:scale-105"
                     >
                       <ThumbsUp className="w-4 h-4" />
                       Yes

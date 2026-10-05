@@ -76,7 +76,10 @@
     --matrix-lead-alpha: 0.34;
 
     /* ---- Component tokens (palette-derived) ---- */
-    --brand-ink: var(--brand-green-hover);       /* green TEXT / strokes on light surfaces (AA) */
+    /* Green TEXT on light surfaces. Deep Green #1E8449 is 5.1:1 on white but only 3.9-4.3:1 on the tinted
+       surfaces (--brand-off-white, --brand-soft, 15% risk tints), so text uses this darker derivative
+       (>= 5.0:1 on all of them). Brand palette values above are unchanged. MPC-7166 */
+    --brand-ink: 145 63% 27%;
     --brand-soft: 145 45% 94%;                   /* Matrix Green at ~10% on white */
 
     --surface: var(--brand-white);
@@ -85,7 +88,7 @@
     --shadow-card: 0 4px 18px hsl(0 0% 0% / 0.06);
 
     /* Risk / status. Palette only: low = green, medium = near black, high = error red (fills/strokes/borders only) */
-    --risk-low: var(--brand-green-hover);
+    --risk-low: var(--brand-ink);
     --risk-low-soft: var(--brand-soft);
     --risk-mid: var(--brand-near-black);
     --risk-mid-soft: var(--brand-off-white);

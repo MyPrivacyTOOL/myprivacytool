@@ -541,7 +541,7 @@ export default function FingerprintPanel() {
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                   item.impact === 'high' || item.impact === 'critical' ? 'bg-risk-high/15 text-foreground' : 
                   item.impact === 'medium' ? 'bg-risk-mid/15 text-foreground' : 
-                  'bg-risk-low/15 text-risk-low'
+                  'bg-risk-low-soft text-risk-low'
                 }`}>
                   {item.impact}
                 </span>
@@ -586,7 +586,7 @@ export default function FingerprintPanel() {
                   item.impact === 'critical' ? 'bg-risk-high/15 text-foreground' :
                   item.impact === 'high' ? 'bg-risk-high/15 text-foreground' : 
                   item.impact === 'medium' ? 'bg-risk-mid/15 text-foreground' : 
-                  'bg-risk-low/15 text-risk-low'
+                  'bg-risk-low-soft text-risk-low'
                 }`}>
                   {item.impact}
                 </span>
