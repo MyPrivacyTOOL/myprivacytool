@@ -20,15 +20,18 @@ export default {
     try {
       let name = '', email = '', phone = '';
       let utm_source = '', utm_medium = '', utm_campaign = '', utm_content = '', referrer = '';
+      let riskScore = null; // MPC-6956: only the post-scan email modal sends this
       const ct = request.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const b = await request.json();
+        riskScore = b.riskScore ?? null;
         name = b.name || ''; email = b.email || ''; phone = b.phone || '';
         utm_source = b.utm_source || ''; utm_medium = b.utm_medium || '';
         utm_campaign = b.utm_campaign || ''; utm_content = b.utm_content || '';
         referrer = b.referrer || '';
       } else {
         const fd = await request.formData();
+        riskScore = fd.get('riskScore') || null;
         name = fd.get('name') || ''; email = fd.get('email') || ''; phone = fd.get('phone') || '';
         utm_source = fd.get('utm_source') || ''; utm_medium = fd.get('utm_medium') || '';
         utm_campaign = fd.get('utm_campaign') || ''; utm_content = fd.get('utm_content') || '';
@@ -227,6 +230,10 @@ export default {
         );
       }
 
+      // 6. MPC-6956: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement).
+      // Fail-soft and off the response path: a Supabase problem must never affect lead capture.
+      side.push(recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null }));
+
       ctx.waitUntil(Promise.all(side));
 
       return new Response(JSON.stringify({ success: true }), {
@@ -240,6 +247,37 @@ export default {
     }
   }
 };
+
+// MPC-6956: insert one row into public.mpt_user_engagement using the service_role key
+// (the table has RLS forced and no anon/authenticated write access). Stores no PII:
+// only a random session id and funnel booleans. Never throws.
+const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+async function recordEngagement(env, sessionId, flags) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn('Supabase not configured - skipping engagement write');
+    return false;
+  }
+  try {
+    const res = await fetch(`${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_user_engagement`, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ session_id: sessionId, ...flags }),
+    });
+    if (!res.ok) {
+      console.error('Supabase mpt_user_engagement insert failed:', res.status, (await res.text()).slice(0, 200));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Supabase mpt_user_engagement insert error:', String(err));
+    return false;
+  }
+}
 
 // Parse User-Agent string into browser, os, device
 function parseUserAgent(ua) {
