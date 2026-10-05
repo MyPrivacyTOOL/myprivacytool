@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 
 interface EmailCaptureModalProps {
   riskScore: number;
+  categoryScores?: Record<string, number>;
   confirmedCount: number;
   onClose: () => void;
   onSubmit: (email: string) => void;
@@ -11,8 +12,16 @@ interface EmailCaptureModalProps {
 
 const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://mpt-leads.myprivacytool.workers.dev';
 
+interface Baseline {
+  overall_score: number;
+  created_at: string;
+  is_first: boolean;
+  delta: number;
+}
+
 export default function EmailCaptureModal({
   riskScore,
+  categoryScores,
   confirmedCount,
   onClose,
   onSubmit,
@@ -21,6 +30,7 @@ export default function EmailCaptureModal({
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [consent, setConsent] = useState(false);
+  const [baseline, setBaseline] = useState<Baseline | null>(null);
 
   const getRiskLabel = (risk: number) => {
     if (risk >= 70) return { label: 'High Risk', color: 'text-risk-high', bg: 'bg-risk-high-soft border-risk-high/30' };
@@ -53,6 +63,7 @@ export default function EmailCaptureModal({
         body: JSON.stringify({
           email: trimmed,
           riskScore,
+          categoryScores,
           confirmedCount,
           source: 'web_scan_summary',
           consent: true,
@@ -62,6 +73,8 @@ export default function EmailCaptureModal({
       });
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json().catch(() => null);
+      if (data?.baseline) setBaseline(data.baseline);
 
       setStatus('success');
       onSubmit(trimmed);
@@ -140,6 +153,15 @@ export default function EmailCaptureModal({
               <div className="text-3xl">✅</div>
               <p className="font-semibold text-risk-low">You're on the list.</p>
               <p className="text-sm text-muted-foreground">Check your inbox — fix guide incoming.</p>
+              {baseline && (
+                <p className="text-sm text-foreground">
+                  {baseline.is_first
+                    ? `Baseline saved: ${baseline.overall_score}/100 risk (${new Date(baseline.created_at).toLocaleDateString()}).`
+                    : `Your baseline: ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}). Now ${riskScore}/100, ${
+                        baseline.delta === 0 ? 'no change' : `${Math.abs(baseline.delta)} points ${baseline.delta < 0 ? 'lower (better)' : 'higher (worse)'}`
+                      }.`}
+                </p>
+              )}
               <Button
                 variant="outline"
                 onClick={onClose}
