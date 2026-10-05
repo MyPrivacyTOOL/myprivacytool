@@ -35,7 +35,7 @@ export default function EmailCaptureModal({
   const getRiskLabel = (risk: number) => {
     if (risk >= 70) return { label: 'High Risk', color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
     if (risk >= 40) return { label: 'Medium Risk', color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
-    return { label: 'Low Risk', color: 'text-risk-low', bg: 'bg-risk-low-soft border-risk-low/30' };
+    return { label: 'Low Risk', color: 'text-foreground', bg: 'bg-risk-low-soft border-risk-low/30' };
   };
 
   const { label: riskLabel, color: riskColor, bg: riskBg } = getRiskLabel(riskScore);
@@ -164,7 +164,7 @@ export default function EmailCaptureModal({
               <Button
                 variant="outline"
                 onClick={onClose}
-                className="mt-3 border-risk-low/30 text-risk-low hover:bg-risk-low-soft"
+                className="mt-3 border-risk-low/30 text-foreground hover:bg-risk-low-soft"
               >
                 Close
               </Button>

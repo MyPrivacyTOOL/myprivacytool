@@ -129,7 +129,7 @@ const LANES: { id: Lane; label: string }[] = [
 ];
 
 const STATUS_STYLE: Record<Status, string> = {
-  Live: "bg-[hsl(var(--risk-low-soft))] text-[hsl(var(--risk-low))] border-[hsl(var(--risk-low)/0.3)]",
+  Live: "bg-[hsl(var(--risk-low-soft))] text-foreground border-[hsl(var(--risk-low)/0.3)]",
   "Coming soon":
     "bg-[hsl(var(--risk-mid-soft))] text-[hsl(var(--risk-mid))] border-[hsl(var(--risk-mid)/0.3)]",
   Roadmap: "bg-muted text-muted-foreground border-border",

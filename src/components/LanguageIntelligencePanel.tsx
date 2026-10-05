@@ -475,7 +475,7 @@ export default function LanguageIntelligencePanel({
                   <div className="flex gap-2 flex-wrap justify-center">
                     <button
                       onClick={() => handleFeedback(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-risk-low text-sm hover:bg-risk-low/15 transition-all hover:scale-105"
+                      className="flex items-center gap-2 px-4 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-foreground text-sm hover:bg-risk-low/15 transition-all hover:scale-105"
                     >
                       <ThumbsUp className="w-4 h-4" />
                       Yes
@@ -509,7 +509,7 @@ export default function LanguageIntelligencePanel({
                 ) : (
                   <div className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-all",
-                    feedbackGiven ? "bg-risk-low-soft text-risk-low" : "bg-risk-high-soft text-foreground",
+                    feedbackGiven ? "bg-risk-low-soft text-foreground" : "bg-risk-high-soft text-foreground",
                     showThankYou && "animate-scale-in"
                   )}>
                     {feedbackGiven ? <ThumbsUp className="w-4 h-4" /> : <ThumbsDown className="w-4 h-4" />}

@@ -19,7 +19,7 @@ export default function AliceHDBadge({ showRateLimitMessage = false }: AliceHDBa
     <>
       <button
         onClick={handleOpenModal}
-        className="inline-flex items-center gap-2 px-3 py-1.5 bg-risk-low-soft border border-risk-low/30 rounded-full text-risk-low text-sm font-medium hover:brightness-95 hover:border-risk-low/50 transition-all group"
+        className="inline-flex items-center gap-2 px-3 py-1.5 bg-risk-low-soft border border-risk-low/30 rounded-full text-foreground text-sm font-medium hover:brightness-95 hover:border-risk-low/50 transition-all group"
       >
         <Mic className="w-4 h-4" />
         <span>Upgrade to Alice HD</span>

@@ -13,7 +13,7 @@ const categoryColors: { [key: string]: string } = {
   "Data Brokers": "bg-secondary text-foreground",
   "AI & Emerging Threats": "bg-secondary text-foreground",
   "Regulatory": "bg-secondary text-foreground",
-  "Privacy Guides": "bg-secondary text-brand"
+  "Privacy Guides": "bg-secondary text-foreground"
 };
 
 export default function Blog() {

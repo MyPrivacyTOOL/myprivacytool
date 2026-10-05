@@ -78,7 +78,7 @@ const Scan = () => {
       <Seo {...pageMeta["/scan"]} path="/scan" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 text-center">
-        <div className="inline-block bg-primary/10 border border-primary/30 text-brand text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+        <div className="inline-block bg-primary/10 border border-primary/30 text-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
           Free · No Credit Card
         </div>
 

@@ -600,7 +600,7 @@ export default function FingerprintPanel() {
           <CollapsibleTrigger asChild>
             <Button 
               variant="ghost" 
-              className="w-full justify-between text-muted-foreground hover:text-brand hover:bg-brand-soft"
+              className="w-full justify-between text-muted-foreground hover:text-foreground hover:bg-brand-soft"
             >
               <span className="flex items-center gap-2">
                 <Cpu className="w-4 h-4" />

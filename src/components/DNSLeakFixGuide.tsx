@@ -122,7 +122,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               </p>
               <Button
                 variant="outline"
-                className="mt-4 border-risk-low text-risk-low hover:bg-risk-low-soft"
+                className="mt-4 border-risk-low text-foreground hover:bg-risk-low-soft"
                 onClick={() => onOpenChange(false)}
               >
                 Close Guide
@@ -603,7 +603,7 @@ const DNSProvider = ({
       {features.map((feature) => (
         <span
           key={feature}
-          className="text-xs px-2 py-0.5 bg-primary/10 text-brand rounded"
+          className="text-xs px-2 py-0.5 bg-primary/10 text-foreground rounded"
         >
           {feature}
         </span>

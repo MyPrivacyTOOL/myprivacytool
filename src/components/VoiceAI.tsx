@@ -1206,8 +1206,8 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
                 className={cn(
                   "relative z-10 flex items-center justify-center gap-3 px-8 py-4 border-2 rounded-xl font-bold text-lg transition-all cursor-pointer",
                   isVoiceActive 
-                    ? "bg-risk-low-soft border-risk-low text-risk-low" 
-                    : "bg-risk-low-soft border-risk-low/50 text-risk-low hover:brightness-95 hover:border-risk-low"
+                    ? "bg-risk-low-soft border-risk-low text-foreground" 
+                    : "bg-risk-low-soft border-risk-low/50 text-foreground hover:brightness-95 hover:border-risk-low"
                 )} 
                 style={{ boxShadow: 'var(--shadow-card)' }}
               >

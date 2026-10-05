@@ -57,7 +57,7 @@ const Business = () => {
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <div className="inline-block bg-primary/10 border border-primary/30 text-brand text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+            <div className="inline-block bg-primary/10 border border-primary/30 text-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
               For Teams & Organisations
             </div>
 

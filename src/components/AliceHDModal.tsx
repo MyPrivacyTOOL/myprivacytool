@@ -201,7 +201,7 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low font-bold hover:brightness-95 transition-all"
+              className="w-full py-3 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground font-bold hover:brightness-95 transition-all"
             >
               {submitting ? 'Joining…' : 'Join Waitlist'}
             </button>

@@ -368,7 +368,7 @@ export function FederatedSettings({ onOpenModal }: FederatedSettingsProps) {
           {status.hasGradients && (
             <button
               onClick={handleViewShared}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-brand-soft border border-brand/30 rounded-lg text-brand text-xs font-medium hover:brightness-95 transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-brand-soft border border-brand/30 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors"
             >
               <Eye className="w-3 h-3" />
               View What's Shared

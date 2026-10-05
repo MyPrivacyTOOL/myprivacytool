@@ -375,7 +375,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             "inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-2 border",
             percentage >= 80 ? "bg-risk-high-soft text-foreground border-risk-high/30" : 
             percentage >= 50 ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" : 
-            "bg-risk-low-soft text-risk-low border-risk-low/30"
+            "bg-risk-low-soft text-foreground border-risk-low/30"
           )}>
             <risk.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {risk.label}
@@ -394,7 +394,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
                 fingerprintRisk === 'high' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
                 fingerprintRisk === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
-                "bg-risk-low-soft text-risk-low border-risk-low/30"
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <Fingerprint className="w-3 h-3" />
                 FP: {fingerprintRisk.charAt(0).toUpperCase() + fingerprintRisk.slice(1)}
@@ -408,7 +408,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
                 socialRiskLevel === 'critical' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
                 socialRiskLevel === 'high' ? "bg-risk-orange-soft text-foreground border-risk-orange/30" :
                 socialRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
-                "bg-risk-low-soft text-risk-low border-risk-low/30"
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <Users className="w-3 h-3" />
                 Social: {socialRiskLevel === 'critical' ? 'High' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
@@ -422,7 +422,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
                 securityRiskLevel === 'critical' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
                 securityRiskLevel === 'high' ? "bg-risk-orange-soft text-foreground border-risk-orange/30" :
                 securityRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
-                "bg-risk-low-soft text-risk-low border-risk-low/30"
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <ShieldAlert className="w-3 h-3" />
                 Security: {securityRiskLevel === 'critical' ? 'Needs attention' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
@@ -435,7 +435,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
                 behaviorRiskLevel === 'high' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
                 behaviorRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
-                "bg-risk-low-soft text-risk-low border-risk-low/30"
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <Activity className="w-3 h-3" />
                 Behavior: {behaviorDataPoints > 0 ? `${behaviorDataPoints} tracked` : 'Safe'}

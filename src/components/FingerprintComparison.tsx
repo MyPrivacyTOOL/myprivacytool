@@ -431,7 +431,7 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                 <p className="text-lg font-bold text-risk-low">{getSimulatedUniqueness()}</p>
               </div>
               {showProtection && getImprovementPercentage() && (
-                <div className="text-xs bg-risk-low-soft text-risk-low px-2 py-1 rounded-full">
+                <div className="text-xs bg-risk-low-soft text-foreground px-2 py-1 rounded-full">
                   {getImprovementPercentage()}
                 </div>
               )}

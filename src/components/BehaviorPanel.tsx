@@ -153,7 +153,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
 
   const getPatternBadge = (pattern: string) => {
     if (pattern === 'human') {
-      return <Badge className="bg-risk-low-soft text-risk-low border-risk-low/30">Human</Badge>;
+      return <Badge className="bg-risk-low-soft text-foreground border-risk-low/30">Human</Badge>;
     } else if (pattern === 'bot') {
       return <Badge className="bg-risk-high-soft text-foreground border-risk-high/30">Bot</Badge>;
     }
@@ -533,7 +533,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
           
           {showStopConfirm && (
-            <div className="mb-4 p-3 rounded-lg bg-risk-low-soft border border-risk-low/30 text-sm text-risk-low">
+            <div className="mb-4 p-3 rounded-lg bg-risk-low-soft border border-risk-low/30 text-sm text-foreground">
               ✓ Tracking stopped for this session
             </div>
           )}

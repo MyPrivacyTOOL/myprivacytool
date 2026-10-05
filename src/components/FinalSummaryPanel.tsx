@@ -970,15 +970,15 @@ Test yours at: ${window.location.origin}`;
 
         {/* Action Buttons */}
         <div className="grid grid-cols-3 gap-3">
-          <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-risk-low/30 text-risk-low hover:bg-risk-low-soft">
+          <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-risk-low/30 text-foreground hover:bg-risk-low-soft">
             <FileText className="w-4 h-4 mr-2" />
             {isExporting ? 'Generating...' : 'Export PDF'}
           </Button>
-          <Button variant="outline" onClick={handleExportJSON} className="border-brand/30 text-brand hover:bg-brand-soft">
+          <Button variant="outline" onClick={handleExportJSON} className="border-brand/30 text-foreground hover:bg-muted">
             <FileJson className="w-4 h-4 mr-2" />
             Export JSON
           </Button>
-          <Button variant="outline" onClick={handleShare} className="border-brand/30 text-brand hover:bg-brand-soft">
+          <Button variant="outline" onClick={handleShare} className="border-brand/30 text-foreground hover:bg-muted">
             <Share2 className="w-4 h-4 mr-2" />
             Share
           </Button>

@@ -166,7 +166,7 @@ export default function StoragePanel() {
     switch (risk) {
       case 'high': return 'text-foreground bg-risk-high-soft border-risk-high/30';
       case 'medium': return 'text-foreground bg-risk-mid-soft border-risk-mid/30';
-      case 'low': return 'text-risk-low bg-risk-low-soft border-risk-low/30';
+      case 'low': return 'text-foreground bg-risk-low-soft border-risk-low/30';
     }
   };
 

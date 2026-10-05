@@ -553,7 +553,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               <Button
                 variant="outline"
                 size="sm"
-                className="border-brand/30 text-brand hover:bg-brand-soft"
+                className="border-brand/30 text-foreground hover:bg-muted"
                 onClick={() => handleLogout('google')}
               >
                 <ExternalLink className="w-3 h-3 mr-1" />
@@ -564,7 +564,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               <Button
                 variant="outline"
                 size="sm"
-                className="border-brand/30 text-brand hover:bg-brand-soft"
+                className="border-brand/30 text-foreground hover:bg-muted"
                 onClick={() => handleLogout('facebook')}
               >
                 <ExternalLink className="w-3 h-3 mr-1" />
@@ -575,7 +575,7 @@ export const SocialAccountsPanel: React.FC<SocialAccountsPanelProps> = ({ onClos
               <Button
                 variant="outline"
                 size="sm"
-                className="border-brand/30 text-brand hover:bg-brand-soft"
+                className="border-brand/30 text-foreground hover:bg-muted"
                 onClick={() => handleLogout('microsoft')}
               >
                 <ExternalLink className="w-3 h-3 mr-1" />

@@ -628,7 +628,7 @@ const VulnerabilityExplainer = ({
     critical: 'bg-risk-high-soft text-foreground',
     warning: 'bg-risk-mid-soft text-foreground',
     info: 'bg-muted text-muted-foreground',
-    secure: 'bg-risk-low-soft text-risk-low',
+    secure: 'bg-risk-low-soft text-foreground',
   }[severity];
 
   return (

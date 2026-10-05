@@ -59,7 +59,7 @@ const Report = () => {
       <Seo {...pageMeta["/report"]} path="/report" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-12 text-center">
-        <div className="inline-block bg-brand-soft border border-brand/30 text-brand text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+        <div className="inline-block bg-brand-soft border border-brand/30 text-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
           Full Visibility · Active Removal · Continuous Protection
         </div>
 

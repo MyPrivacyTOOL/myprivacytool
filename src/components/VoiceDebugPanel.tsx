@@ -542,7 +542,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
           className={cn(
             "flex-1 px-2 py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1",
             activeTab === 'federated' 
-              ? "text-risk-low bg-risk-low-soft border-b-2 border-risk-low" 
+              ? "text-foreground bg-risk-low-soft border-b-2 border-risk-low" 
               : "text-muted-foreground hover:text-risk-low"
           )}
         >
@@ -639,7 +639,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   onSimulateComplete?.();
                   refreshData();
                 }}
-                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors"
               >
                 <CheckCircle2 className="w-3 h-3" />
                 Complete All
@@ -829,7 +829,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <div className="flex gap-2">
                     <button
                       onClick={() => exportToJSON(syntheticData)}
-                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors"
                     >
                       <FileJson className="w-3 h-3" />
                       Download JSON
@@ -857,7 +857,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       }, 100);
                     }}
                     disabled={isGenerating}
-                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                   >
                     {isGenerating ? (
                       <>
@@ -1575,7 +1575,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               {federatedStatus.consent === null ? (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors">
+                    <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors">
                       <Shield className="w-3 h-3" />
                       Enable Federated Learning
                     </button>
@@ -1599,7 +1599,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                           setFederatedConsent(true);
                           setFederatedStatus(getFederatedStatus());
                         }}
-                        className="bg-risk-low-soft border border-risk-low/50 text-risk-low hover:brightness-95"
+                        className="bg-risk-low-soft border border-risk-low/50 text-foreground hover:brightness-95"
                       >
                         Enable & Help Improve
                       </AlertDialogAction>
@@ -1621,7 +1621,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                       setIsComputingGradients(false);
                     }}
                     disabled={isComputingGradients}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
                   >
                     {isComputingGradients ? (
                       <>
@@ -1670,7 +1670,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                     setFederatedConsent(true);
                     setFederatedStatus(getFederatedStatus());
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors"
                 >
                   <Shield className="w-3 h-3" />
                   Re-enable Federated Learning
@@ -1798,7 +1798,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                   <div className={cn(
                     "mb-3 p-2 rounded text-[10px]",
                     rlUpdateResult.success 
-                      ? "bg-risk-low-soft text-risk-low" 
+                      ? "bg-risk-low-soft text-foreground" 
                       : "bg-risk-high-soft text-foreground"
                   )}>
                     {rlUpdateResult.message}
@@ -2024,7 +2024,7 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
               <button
                 onClick={handleTestProtection}
                 disabled={isTestingFingerprint}
-                className="w-full mb-2 px-3 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-risk-low text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
+                className="w-full mb-2 px-3 py-2 bg-risk-low-soft border border-risk-low/30 rounded-lg text-foreground text-xs font-medium hover:brightness-95 transition-colors disabled:opacity-50"
               >
                 Test Fingerprint Protection
               </button>
