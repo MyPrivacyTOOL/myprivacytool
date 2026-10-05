@@ -463,9 +463,11 @@ const Terms = () => {
                 <p>
                   <strong>Mailing Address:</strong>
                   <br />
-                  MyPrivacyTOOL Ltd.
+                  MyPrivacyTOOL Ltd
                   <br />
-                  Hong Kong
+                  12E, Block 5, 8 Pak Lai Road, Park Island, Ma Wan,
+                  <br />
+                  Tsuen Wan District, New Territories, Hong Kong, HK99
                 </p>
               </div>
             </section>
