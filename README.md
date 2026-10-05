@@ -71,3 +71,7 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Reddit channel integration (MPC-116)
+
+Environment variables (see `docs/channels/reddit.md`): `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`, `CHANNEL_TOKEN_ENCRYPTION_KEY`. Run `npm test` for the adapter, rate-limiter and PaPIT transformer tests.
