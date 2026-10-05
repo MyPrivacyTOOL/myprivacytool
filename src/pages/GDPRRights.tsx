@@ -1,15 +1,9 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
 
 const GDPRRights = () => {
   return (
     <>
-      <Helmet>
-        <title>GDPR Rights Request - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data."
-        />
-      </Helmet>
+      <Seo title="GDPR Rights Request | MyPrivacyTOOL" description="Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data." />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">

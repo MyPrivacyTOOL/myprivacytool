@@ -4,10 +4,10 @@ import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
 import MatrixRain from "@/components/MatrixRain";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
-const SITE_URL = "https://www.myprivacytool.io";
-const DEFAULT_DESCRIPTION =
-  "Discover what data brokers know about you in 3 minutes. See your location, device, ISP, and 8+ data points detected without asking. Free privacy scan.";
+const { title: DEFAULT_TITLE, description: DEFAULT_DESCRIPTION } = pageMeta["/"];
 
 const Layout = () => {
   const location = useLocation();
@@ -21,8 +21,9 @@ const Layout = () => {
     return () => clearTimeout(timeout);
   }, [location.pathname, location.hash]);
 
-  // index.html's canonical/description/robots carry data-react-helmet so Helmet replaces them
-  // instead of duplicating them. Defaults below; deeper <Helmet>/<Seo> instances override.
+  // index.html's canonical/description/robots/og/twitter tags carry data-react-helmet so Helmet replaces
+  // them instead of duplicating them. Defaults below (title, description, og/twitter, canonical);
+  // deeper <Helmet>/<Seo> instances override.
   // Default self-referencing canonical (no query/hash, no trailing slash). Pages that
   // render their own <Helmet> canonical override this because react-helmet keeps the
   // deepest instance. Without it every route inherits the homepage canonical from index.html.
@@ -30,9 +31,8 @@ const Layout = () => {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-clip">
+      <Seo title={DEFAULT_TITLE} description={DEFAULT_DESCRIPTION} path={canonicalPath} />
       <Helmet>
-        <link rel="canonical" href={`${SITE_URL}${canonicalPath}`} />
-        <meta name="description" content={DEFAULT_DESCRIPTION} />
         <meta name="robots" content="index, follow" />
       </Helmet>
       <MatrixRain />

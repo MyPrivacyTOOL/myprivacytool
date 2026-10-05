@@ -1,19 +1,11 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
-const SITE_URL = "https://www.myprivacytool.io";
-
 const AmIExposed = () => (
   <>
-    <Helmet>
-      <title>Am I Exposed? Free Exposure Scan | MyPrivacyTOOL</title>
-      <meta
-        name="description"
-        content="Free exposure check: find out which data brokers, people-search sites and marketing lists may hold your personal information, then remove yourself with step-by-step guides."
-      />
-      <link rel="canonical" href={`${SITE_URL}/am-i-exposed`} />
-    </Helmet>
+    <Seo {...pageMeta["/am-i-exposed"]} path="/am-i-exposed" />
     <div className="container mx-auto px-4 py-16 max-w-3xl text-center">
       <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">Am I exposed?</h1>
       <p className="text-lg text-muted-foreground mb-8">

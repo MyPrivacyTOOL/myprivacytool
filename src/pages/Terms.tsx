@@ -1,15 +1,10 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const Terms = () => {
   return (
     <>
-      <Helmet>
-        <title>Terms of Service - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="Terms of Service for MyPrivacyTOOL. Review our service terms, limitations, and user responsibilities."
-        />
-      </Helmet>
+      <Seo {...pageMeta["/terms"]} path="/terms" />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">

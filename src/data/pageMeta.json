@@ -1,0 +1,74 @@
+{
+  "/": {
+    "title": "MyPrivacyTOOL.IO - See Your Digital Shadow Without Asking",
+    "description": "Discover what data brokers know about you in 3 minutes. See your location, device, ISP, and 8+ data points detected without asking. Free privacy scan."
+  },
+  "/scan": {
+    "title": "Free Data Exposure Scan | MyPrivacyTOOL",
+    "description": "Run a free scan to see what data brokers and the open internet may know about you, then get step-by-step guides to remove it."
+  },
+  "/report": {
+    "title": "Your Privacy Exposure Report | MyPrivacyTOOL",
+    "description": "See your personal privacy exposure score and a prioritised list of what to fix first."
+  },
+  "/business": {
+    "title": "Employee Privacy Protection for Business | MyPrivacyTOOL",
+    "description": "Protect your team from data broker exposure and social engineering. Request a business privacy assessment from MyPrivacyTOOL."
+  },
+  "/start": {
+    "title": "Start Your Free Privacy Scan | MyPrivacyTOOL",
+    "description": "Start a free privacy scan from WhatsApp, Telegram, Messenger, Instagram or email and see what is exposed about you."
+  },
+  "/newsletter": {
+    "title": "Privacy Newsletter | MyPrivacyTOOL",
+    "description": "Plain-English privacy tips, data broker opt-out guides and new exposure research, delivered to your inbox. Unsubscribe anytime."
+  },
+  "/ai-access-check": {
+    "title": "Free AI Access Check | MyPrivacyTOOL",
+    "description": "Find out which AI tools and agents can access your accounts and data, and how to revoke that access. Join the waitlist."
+  },
+  "/blog": {
+    "title": "Privacy Blog: Data Brokers, Opt-Outs & Digital Footprint | MyPrivacyTOOL",
+    "description": "Practical guides on data brokers, digital footprints, AI training data and how to take back control of your personal information."
+  },
+  "/opt-out-guides": {
+    "title": "Opt-Out Guides: Hong Kong, Singapore, Australia & US | MyPrivacyTOOL",
+    "description": "Step-by-step opt-out guides for data brokers, people-search sites and marketing lists, with a focus on Hong Kong, Singapore and Australia plus major US brokers."
+  },
+  "/am-i-exposed": {
+    "title": "Am I Exposed? Free Exposure Scan | MyPrivacyTOOL",
+    "description": "Free exposure check: find out which data brokers, people-search sites and marketing lists may hold your personal information, then remove yourself with step-by-step guides."
+  },
+  "/privacy": {
+    "title": "Privacy Policy | MyPrivacyTOOL",
+    "description": "Our Privacy Policy explains how we collect, use, and protect your personal data in compliance with GDPR, CCPA, PDPO, and PDPA."
+  },
+  "/terms": {
+    "title": "Terms of Service | MyPrivacyTOOL",
+    "description": "Terms of Service for MyPrivacyTOOL. Review our service terms, limitations, and user responsibilities."
+  },
+  "/cookies": {
+    "title": "Cookie Policy | MyPrivacyTOOL",
+    "description": "Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
+  },
+  "/pricing": {
+    "title": "Pricing",
+    "description": "Simple, transparent pricing for individuals and families is on its way.",
+    "noindex": true
+  },
+  "/about": {
+    "title": "About",
+    "description": "The story behind MyPrivacyTOOL and why we built it.",
+    "noindex": true
+  },
+  "/contact": {
+    "title": "Contact",
+    "description": "A dedicated way to reach our team is on its way.",
+    "noindex": true
+  },
+  "/faq": {
+    "title": "Frequently Asked Questions",
+    "description": "Answers to common questions about scans, removals, and pricing.",
+    "noindex": true
+  }
+}
