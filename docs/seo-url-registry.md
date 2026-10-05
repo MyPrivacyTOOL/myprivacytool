@@ -98,11 +98,11 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 ## 5. Per-URL head tags: build-time prerender (MPC-7169)
 The site is a client-only SPA, so before MPC-7169 every URL returned the homepage `<title>`, description and og tags to crawlers that do not run JS (LinkedIn, X, Facebook, Slack previews, many SEO tools).
 
-- `npm run build` runs `postbuild` → `scripts/prerender-meta.mjs`, which writes `dist/<route>/index.html` for every static route, blog post and opt-out guide (36 routes) with that route's own `<title>`, description, robots, canonical, `og:*` and `twitter:*` tags. Cloudflare Pages serves it for the matching URL; the SPA then hydrates and `react-helmet` replaces the tags (they carry `data-react-helmet`, so no duplicates).
+- `npm run build` runs `postbuild` → `scripts/prerender-meta.mjs`, which writes `dist/<route>.html` (not `<route>/index.html`: Pages serves `blog.html` at `/blog`, but `blog/index.html` only at `/blog/` behind a 308, contradicting the slashless canonicals) for every static route, blog post and opt-out guide (36 routes) with that route's own `<title>`, description, robots, canonical, `og:*` and `twitter:*` tags. Cloudflare Pages serves it for the matching URL; the SPA then hydrates and `react-helmet` replaces the tags (they carry `data-react-helmet`, so no duplicates).
 - Sources: `src/data/pageMeta.json` (static routes; also read by the pages via `<Seo>`), `blogPosts.json`, `optOutGuides.json`. Title formulas for posts/guides are duplicated in the script and in `BlogPost.tsx` / `OptOutGuide.tsx`; change both.
 - `components/Seo.tsx` emits title, description, canonical, og and twitter tags from the same props; `Layout` supplies the homepage defaults so every route always has a full set. Default share image: `public/og-image.jpg` (1200×630).
 - Only the `<head>` is prerendered; page body content is still rendered client-side.
-- Known gap: `blogPosts.json` references `/blog/mass-surveillance.jpg`, which is not in `public/blog/`, so that post's og:image (and blog card) 404s.
+- `25-years-mass-surveillance` has no `image` in `blogPosts.json` (its referenced file never existed), so it uses the default og image. Add `public/blog/<file>.jpg` and the field to give it its own.
 
 ## 6. Change process
 Adding or renaming a URL: update this file, `scripts/generate-sitemap.mjs` (unless noindex), `src/data/pageMeta.json` (static routes; posts/guides are picked up from their JSON), and add a 301 for any renamed path.

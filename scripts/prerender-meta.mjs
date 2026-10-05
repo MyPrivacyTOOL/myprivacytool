@@ -1,7 +1,7 @@
 // Build-time "prerender" of the <head> for every indexable route (MPC-7169).
 // The site is a client-only SPA: every URL used to ship the homepage <title>/og tags, which is all
 // non-JS crawlers (LinkedIn, X, Facebook, Slack) ever see. After `vite build` this writes
-// dist/<route>/index.html with that route's own title, description, canonical, Open Graph and
+// dist/<route>.html with that route's own title, description, canonical, Open Graph and
 // Twitter tags; Cloudflare Pages serves it for the matching URL and the SPA hydrates as before.
 // Metadata sources: src/data/pageMeta.json (static routes), blogPosts.json, optOutGuides.json.
 // Keep the title formulas for posts/guides in sync with BlogPost.tsx / OptOutGuide.tsx.
@@ -96,7 +96,9 @@ function main() {
   const routes = buildRoutes();
   for (const r of routes) {
     const html = template.replace("</head>", `${headBlock(r)}\n  </head>`);
-    const out = r.route === "/" ? indexPath : path.join(DIST, r.route, "index.html");
+    // <route>.html, not <route>/index.html: Cloudflare Pages serves blog.html at /blog, whereas
+    // blog/index.html is served at /blog/ behind a 308, which contradicts our slashless canonicals.
+    const out = r.route === "/" ? indexPath : path.join(DIST, `${r.route}.html`);
     mkdirSync(path.dirname(out), { recursive: true });
     writeFileSync(out, html, "utf8");
   }
