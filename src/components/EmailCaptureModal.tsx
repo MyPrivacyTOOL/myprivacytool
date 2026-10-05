@@ -20,6 +20,7 @@ export default function EmailCaptureModal({
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [consent, setConsent] = useState(false);
 
   const getRiskLabel = (risk: number) => {
     if (risk >= 70) return { label: 'High Risk', color: 'text-risk-high', bg: 'bg-risk-high-soft border-risk-high/30' };
@@ -37,6 +38,11 @@ export default function EmailCaptureModal({
       return;
     }
 
+    if (!consent) {
+      setErrorMsg('Please tick the box to receive your fix guide by email.');
+      return;
+    }
+
     setStatus('loading');
     setErrorMsg('');
 
@@ -49,6 +55,8 @@ export default function EmailCaptureModal({
           riskScore,
           confirmedCount,
           source: 'web_scan_summary',
+          consent: true,
+          consent_source: 'web_scan_summary',
           ts: Date.now(),
         }),
       });
@@ -156,6 +164,17 @@ export default function EmailCaptureModal({
                   <p className="mt-1.5 text-xs text-risk-high">{errorMsg}</p>
                 )}
               </div>
+
+              <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => { setConsent(e.target.checked); setErrorMsg(''); }}
+                  disabled={status === 'loading'}
+                  className="mt-0.5"
+                />
+                <span>Email me my fix guide and the monthly privacy digest. I can unsubscribe at any time.</span>
+              </label>
 
               <Button
                 type="submit"

@@ -21,6 +21,7 @@ export default {
       let name = '', email = '', phone = '';
       let utm_source = '', utm_medium = '', utm_campaign = '', utm_content = '', referrer = '';
       let riskScore = null; // MPC-6956: only the post-scan email modal sends this
+      let consentRaw = null, consentSourceRaw = '', sourceRaw = ''; // MPC-6971: explicit consent only
       const ct = request.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const b = await request.json();
@@ -29,6 +30,7 @@ export default {
         utm_source = b.utm_source || ''; utm_medium = b.utm_medium || '';
         utm_campaign = b.utm_campaign || ''; utm_content = b.utm_content || '';
         referrer = b.referrer || '';
+        consentRaw = b.consent ?? null; consentSourceRaw = b.consent_source || ''; sourceRaw = b.source || '';
       } else {
         const fd = await request.formData();
         riskScore = fd.get('riskScore') || null;
@@ -36,7 +38,11 @@ export default {
         utm_source = fd.get('utm_source') || ''; utm_medium = fd.get('utm_medium') || '';
         utm_campaign = fd.get('utm_campaign') || ''; utm_content = fd.get('utm_content') || '';
         referrer = fd.get('referrer') || '';
+        consentRaw = fd.get('consent'); consentSourceRaw = fd.get('consent_source') || ''; sourceRaw = fd.get('source') || '';
       }
+      // MPC-6971: record consent only when the client explicitly says the user gave it. Never default to true.
+      const consented = consentRaw === true || consentRaw === 'true' || consentRaw === 'on';
+      const consentSource = String(consentSourceRaw || sourceRaw || 'landing_page').replace(/[^a-z0-9_-]/gi, '').slice(0, 64) || 'landing_page';
 
       if (!email) {
         return new Response(JSON.stringify({ error: 'Email required' }), {
@@ -191,6 +197,10 @@ export default {
           hs_lead_status: 'NEW',
         };
         if (phone) hsProps.phone = phone;
+        if (consented) {
+          hsProps.consent_given_at = new Date().toISOString().slice(0, 10); // HubSpot date property: YYYY-MM-DD (UTC)
+          hsProps.consent_source = consentSource;
+        }
 
         side.push(
           fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
