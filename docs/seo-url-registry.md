@@ -78,7 +78,7 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | GA4 base tag | `G-1BWMDBJSPL` in `index.html`; `trackEvent` no-ops when `gtag` absent. | OK |
 | GA4 `generate_lead` — AI Access Check | Fires via `trackAIAccessCheckSignup`. | OK (verify live, below) |
 | GA4 `generate_lead` — Newsletter | No event fired on signup. | **Fixed:** `trackNewsletterSignup` fires `newsletter_signup` + `generate_lead` on success. |
-| GA4 — `/business` form | Form only sets local state; **nothing is submitted or tracked.** | **Open (tracked in Notion follow-up task):** needs HubSpot wiring per `docs/form-wiring-playbook.md`, then a `generate_lead` event. Not instrumented on purpose: firing a conversion for a form that captures no lead would corrupt data. |
+| GA4 — `/business` form | Form only sets local state; **nothing is submitted or tracked.** | **Fixed:** submits to HubSpot and fires `business_audit_request` + `generate_lead {method: business_inquiry}` only after a successful submit. |
 | GA4 — `/start` form | Submit is a `TODO` (no POST). Same issue. | **Open** |
 | Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost: `main` shipped its own Helmet with canonical, og tags and JSON-LD, which replaced this component on blog posts). Superseded by MPC-7169 (section 5): og/twitter tags are now per page and prerendered. |
 
@@ -88,6 +88,16 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | Head tags | Initially every page had **two** canonicals (static `index.html` + Helmet), a stale generic description, and a duplicate robots tag: Helmet does not replace static tags. Fixed by marking the static canonical/description/robots in `index.html` with `data-react-helmet="true"` and giving `Layout` default description + robots. Re-run: exactly one canonical, description and robots per page on `/`, `/scan`, `/privacy`, `/blog`, `/blog/how-exposed-are-you`, `/opt-out-guides/spokeo`, `/pricing` (noindex), 404 (noindex), `/newsletter`, `/ai-access-check`. |
 | GA4 events (client side) | Newsletter submit fires `newsletter_signup` + `generate_lead {method: newsletter}`; AI Access Check submit fires `ai_access_check_waitlist_submit` + `generate_lead {method: ai_access_check_waitlist}`. Verified by intercepting `window.gtag` with Supabase/HubSpot responses stubbed. |
 | Not verified | Whether GA4 **ingests** them and marks `generate_lead` a key event, and consent-manager gating: the cloud environment's network policy blocks `www.myprivacytool.io` (HTTP 403 on CONNECT), `googletagmanager.com` and `google-analytics.com`, and GA4 DebugView needs a signed-in Google session. Still Follow-up A. |
+
+### Site-wide form inventory (2026-10-05)
+| Form | HubSpot | GA4 `generate_lead` method |
+|---|---|---|
+| `/newsletter`, home-page embed | yes (embed on `/`) | `newsletter` (home embed fires via HubSpot `onFormSubmitted` message, `source: home_embed`) |
+| `/ai-access-check` | yes | `ai_access_check_waitlist` |
+| `/business` | yes | `business_inquiry` |
+| `/start`, `/scan` | yes | `start_scan` |
+| Alice HD voice waitlist modal | yes (reuses the Start Scan form, `source_tag=alice-hd-waitlist`; previously localStorage only) | `alice_hd_waitlist` |
+| `EmailCaptureModal` | not rendered anywhere; posts to a placeholder worker URL. Wire or delete before use. | none |
 
 ## 4. Manual verification still required (needs a live browser / GA4 access)
 

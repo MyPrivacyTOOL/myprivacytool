@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { X, Mic, Zap, Infinity, Heart, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { trackUpgradeModalClosed, trackWaitlistEmailSubmitted } from '@/lib/analytics';
+import { trackUpgradeModalClosed, trackWaitlistEmailSubmitted, trackAliceHDWaitlistSignup } from '@/lib/analytics';
+import { submitHubSpotForm, consentFields } from '@/lib/hubspot';
+import ConsentCheckbox from '@/components/ConsentCheckbox';
 import { z } from 'zod';
+
+// Reuses the public HubSpot "Start Scan" form (email + source_tag + consent fields); segment by source_tag.
+const FORM_ID =
+  import.meta.env.VITE_HUBSPOT_START_FORM_ID || '22ee30ae-6cf9-419b-aa46-b656b0e7b1bf';
+const SOURCE_TAG = 'alice-hd-waitlist';
 
 const emailSchema = z.string().trim().email({ message: "Please enter a valid email" }).max(255);
 
@@ -40,13 +47,15 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
   const [emailError, setEmailError] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isAlreadyOnList, setIsAlreadyOnList] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleClose = () => {
     trackUpgradeModalClosed();
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError('');
     
@@ -57,13 +66,30 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
       return;
     }
 
-    // Add to waitlist
+    if (!consent || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await submitHubSpotForm({
+        formId: FORM_ID,
+        fields: { email: result.data, source_tag: SOURCE_TAG, ...consentFields('alice_hd_modal') },
+        pageName: 'Alice HD waitlist',
+      });
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+
+    // Local list only de-duplicates the confirmation message; HubSpot is the source of truth.
     const added = addToWaitlist(result.data);
     if (!added) {
       setIsAlreadyOnList(true);
     }
-    
+
     trackWaitlistEmailSubmitted(result.data);
+    trackAliceHDWaitlistSignup({ source: 'alice_hd_modal' });
     setIsSubmitted(true);
   };
 
@@ -171,11 +197,13 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
                 <p className="text-risk-high text-xs mt-1">{emailError}</p>
               )}
             </div>
+            <ConsentCheckbox id="alice-hd-consent" checked={consent} onChange={setConsent} disabled={submitting} />
             <button
               type="submit"
+              disabled={submitting}
               className="w-full py-3 bg-gradient-to-r from-risk-low-soft to-risk-low-soft border border-risk-low/50 rounded-lg text-risk-low font-bold hover:brightness-95 transition-all"
             >
-              Join Waitlist
+              {submitting ? 'Joining…' : 'Join Waitlist'}
             </button>
           </form>
         ) : (
