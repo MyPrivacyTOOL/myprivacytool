@@ -84,7 +84,7 @@ Full write-up: `docs/phase5-oauth-permission-apis.md`. Google PoC: `workers/oaut
 - **Status:** PoC unit-tested with mocked provider calls; live run pending test-account credentials.
 - **Risks:** provider APIs may not expose grants; MPT holding OAuth access is a trust risk (mitigated by no storage and revoke-on-finish); focus risk against the Phase 2 KPI.
 
-## 6. Phase deep-dives (proposals for decision)
+## 7. Phase deep-dives (proposals for decision)
 
 Sections 1–5 are sourced research. This section is a proposal built on that research and on the Notion strategy page (sections 2A–2D). Figures, timings and scores are design assumptions, not sourced facts. Written 2026-09-30.
 
