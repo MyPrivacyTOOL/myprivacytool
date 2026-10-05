@@ -5,6 +5,7 @@ import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import {
@@ -248,6 +249,21 @@ const Index = () => {
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
           <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+        </section>
+
+        {/* Journey teaser */}
+        <section className="pb-12 px-4" aria-labelledby="journey-teaser-heading">
+          <div className="max-w-2xl mx-auto text-center rounded-2xl border border-surface-border bg-brand-soft p-6 sm:p-8">
+            <h2 id="journey-teaser-heading" className="text-xl sm:text-2xl font-bold text-foreground mb-2">
+              Get clean before you go agentic
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground mb-5">
+              Eight steps from seeing your footprint to bringing AI agents on board safely.
+            </p>
+            <Button asChild>
+              <Link to="/journey">See your journey</Link>
+            </Button>
+          </div>
         </section>
 
         {/* Newsletter Sign-Up */}
