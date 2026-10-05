@@ -1,4 +1,6 @@
-import guides from '../../../src/data/optOutGuides.json' with { type: 'json' };
+// Dynamic import: Node 22 (tests) needs the JSON import attribute, but wrangler's bundler cannot parse the
+// static `import ... with {}` form. The dynamic form parses in both and the bundler inlines the JSON.
+const { default: guides } = await import('../../../src/data/optOutGuides.json', { with: { type: 'json' } });
 
 // People-search brokers named in MPC-6677. The report only ever says what we could verify.
 //
