@@ -80,7 +80,7 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | GA4 `generate_lead` — Newsletter | No event fired on signup. | **Fixed:** `trackNewsletterSignup` fires `newsletter_signup` + `generate_lead` on success. |
 | GA4 — `/business` form | Form only sets local state; **nothing is submitted or tracked.** | **Open (tracked in Notion follow-up task):** needs HubSpot wiring per `docs/form-wiring-playbook.md`, then a `generate_lead` event. Not instrumented on purpose: firing a conversion for a form that captures no lead would corrupt data. |
 | GA4 — `/start` form | Submit is a `TODO` (no POST). Same issue. | **Open** |
-| Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost: `main` shipped its own Helmet with canonical, og tags and JSON-LD, which replaced this component on blog posts). **Open:** blog posts may now have both their og tags and the static `index.html` og tags; check in a browser. |
+| Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost: `main` shipped its own Helmet with canonical, og tags and JSON-LD, which replaced this component on blog posts). Superseded by MPC-7169 (section 5): og/twitter tags are now per page and prerendered. |
 
 ### Local browser verification (2026-09-30, production build served locally, headless Chromium)
 | Check | Result |
@@ -95,5 +95,14 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 2. Google Search Console: submit `/sitemap.xml`, inspect `/privacy` and one blog URL to confirm the user-declared canonical is honoured.
 3. Confirm consent-gating still lets `gtag` load before the events fire.
 
-## 5. Change process
-Adding or renaming a URL: update this file, `scripts/generate-sitemap.mjs` (unless noindex), the page's `<Helmet>` (title, description, canonical), and add a 301 for any renamed path.
+## 5. Per-URL head tags: build-time prerender (MPC-7169)
+The site is a client-only SPA, so before MPC-7169 every URL returned the homepage `<title>`, description and og tags to crawlers that do not run JS (LinkedIn, X, Facebook, Slack previews, many SEO tools).
+
+- `npm run build` runs `postbuild` → `scripts/prerender-meta.mjs`, which writes `dist/<route>/index.html` for every static route, blog post and opt-out guide (36 routes) with that route's own `<title>`, description, robots, canonical, `og:*` and `twitter:*` tags. Cloudflare Pages serves it for the matching URL; the SPA then hydrates and `react-helmet` replaces the tags (they carry `data-react-helmet`, so no duplicates).
+- Sources: `src/data/pageMeta.json` (static routes; also read by the pages via `<Seo>`), `blogPosts.json`, `optOutGuides.json`. Title formulas for posts/guides are duplicated in the script and in `BlogPost.tsx` / `OptOutGuide.tsx`; change both.
+- `components/Seo.tsx` emits title, description, canonical, og and twitter tags from the same props; `Layout` supplies the homepage defaults so every route always has a full set. Default share image: `public/og-image.jpg` (1200×630).
+- Only the `<head>` is prerendered; page body content is still rendered client-side.
+- Known gap: `blogPosts.json` references `/blog/mass-surveillance.jpg`, which is not in `public/blog/`, so that post's og:image (and blog card) 404s.
+
+## 6. Change process
+Adding or renaming a URL: update this file, `scripts/generate-sitemap.mjs` (unless noindex), `src/data/pageMeta.json` (static routes; posts/guides are picked up from their JSON), and add a 301 for any renamed path.

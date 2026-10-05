@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import blogPosts from '@/data/blogPosts.json';
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-blue-100 text-blue-800",
@@ -26,7 +27,7 @@ export default function Blog() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <Seo title="Privacy Blog: Data Brokers, Opt-Outs & Digital Footprint | MyPrivacyTOOL" description="Practical guides on data brokers, digital footprints, AI training data and how to take back control of your personal information." path="/blog" />
+      <Seo {...pageMeta["/blog"]} path="/blog" />
       {/* Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

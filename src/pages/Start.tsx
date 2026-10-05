@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X } from "lucide-react";
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackStartSignup } from "@/lib/analytics";
@@ -64,7 +65,7 @@ export default function Start() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-mono">
-      <Seo title="Start Your Free Privacy Scan | MyPrivacyTOOL" description="Start a free privacy scan from WhatsApp, Telegram, Messenger, Instagram or email and see what is exposed about you." path="/start" />
+      <Seo {...pageMeta["/start"]} path="/start" />
       {/* Header */}
       <div className="border-b border-border px-6 py-4 flex items-center gap-3">
         <Shield className="text-primary" size={20} />

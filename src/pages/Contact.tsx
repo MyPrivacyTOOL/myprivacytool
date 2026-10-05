@@ -1,9 +1,10 @@
+import pageMeta from "@/data/pageMeta.json";
 import ComingSoonPage from "@/components/ComingSoonPage";
 
 const Contact = () => (
   <ComingSoonPage
-    title="Contact"
-    description="A dedicated way to reach our team is on its way."
+    title={pageMeta["/contact"].title}
+    description={pageMeta["/contact"].description}
   />
 );
 

@@ -1,15 +1,10 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const Cookies = () => {
   return (
     <>
-      <Helmet>
-        <title>Cookie Policy - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
-        />
-      </Helmet>
+      <Seo {...pageMeta["/cookies"]} path="/cookies" />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">

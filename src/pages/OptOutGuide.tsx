@@ -1,11 +1,11 @@
 import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
 import { Link, useParams } from "react-router-dom";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import guides from "@/data/optOutGuides.json";
 import NotFound from "./NotFound";
 
-const SITE_URL = "https://www.myprivacytool.io";
 
 const OptOutGuide = () => {
   const { slug } = useParams();
@@ -24,10 +24,12 @@ const OptOutGuide = () => {
 
   return (
     <>
+      <Seo
+        title={`${title} (${guide.countryName}) | MyPrivacyTOOL`}
+        description={guide.summary}
+        path={`/opt-out-guides/${guide.slug}`}
+      />
       <Helmet>
-        <title>{title} ({guide.countryName}) | MyPrivacyTOOL</title>
-        <meta name="description" content={guide.summary} />
-        <link rel="canonical" href={`${SITE_URL}/opt-out-guides/${guide.slug}`} />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>
       <article className="container mx-auto px-4 py-12 max-w-3xl">
