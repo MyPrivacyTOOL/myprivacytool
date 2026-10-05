@@ -255,7 +255,7 @@
     "difficulty": "Easy",
     "requirements": ["An email address", "Your name plus city or state to find the record"],
     "steps": [
-      "Go to fastpeoplesearch.com/removal and pass the browser check if shown. If you see \"Sorry, you have been blocked\", the site is rejecting your network or country: try again from a different network or from a US connection.",
+      "Go to fastpeoplesearch.com/removal and pass the browser check if shown. If you see an \"Access denied\" or \"Sorry, you have been blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
       "Enter your email address, tick the box confirming you are the subject of the record, complete the reCAPTCHA and select Begin Removal Process.",
       "Search for your record by name, phone or address.",
       "On your listing, click Remove My Record.",
@@ -280,7 +280,7 @@
     "difficulty": "Easy",
     "requirements": ["Your name and state", "An email address (a disposable or alias address helps avoid follow-up marketing)"],
     "steps": [
-      "Go to beenverified.com/app/optout/search.",
+      "Go to beenverified.com/app/optout/search. If you see an \"Access denied\" or \"Sorry, you have been blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
       "Enter your name and state and click Search.",
       "Click Proceed to Opt Out next to your record.",
       "Enter your email address, complete the CAPTCHA and click Send Verification Email.",
