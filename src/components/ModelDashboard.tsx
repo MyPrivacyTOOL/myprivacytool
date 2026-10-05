@@ -56,14 +56,14 @@ import {
 
 // Chart colors
 const COLORS = {
-  purple: 'hsl(var(--cat-device))',
-  blue: 'hsl(var(--cat-language))',
-  green: 'hsl(var(--risk-low))',
-  red: 'hsl(var(--risk-high))',
-  yellow: 'hsl(var(--risk-mid))',
-  cyan: 'hsl(var(--cat-storage))',
-  orange: 'hsl(var(--risk-orange))',
-  pink: 'hsl(var(--cat-profile))',
+  purple: 'hsl(var(--brand-green-hover))',
+  blue: 'hsl(var(--brand-near-black) / 0.75)',
+  green: 'hsl(var(--brand-green))',
+  red: 'hsl(var(--brand-near-black))',
+  yellow: 'hsl(var(--brand-near-black) / 0.3)',
+  cyan: 'hsl(var(--brand-near-black) / 0.55)',
+  orange: 'hsl(var(--brand-near-black) / 0.45)',
+  pink: 'hsl(var(--brand-green) / 0.5)',
 };
 
 const PROFILE_COLORS = {
@@ -343,7 +343,7 @@ export default function ModelDashboard() {
             <div className="text-sm text-muted-foreground">
               Total Reward Score: <span className={cn(
                 "font-bold ml-1",
-                totalRewardScore >= 0 ? "text-risk-low" : "text-risk-high"
+                totalRewardScore >= 0 ? "text-risk-low" : "text-foreground"
               )}>
                 {totalRewardScore >= 0 ? '+' : ''}{totalRewardScore.toFixed(1)}
               </span>
@@ -404,7 +404,7 @@ export default function ModelDashboard() {
                       {imp.improved ? (
                         <TrendingUp className="w-3 h-3 text-risk-low" />
                       ) : (
-                        <RefreshCw className="w-3 h-3 text-risk-high" />
+                        <RefreshCw className="w-3 h-3 text-foreground" />
                       )}
                       <span className="text-muted-foreground">
                         {new Date(imp.timestamp).toLocaleDateString()}
@@ -413,7 +413,7 @@ export default function ModelDashboard() {
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">{imp.accuracyBefore.toFixed(1)}%</span>
                       <span className="text-[hsl(var(--cat-device))]">→</span>
-                      <span className={imp.improved ? "text-risk-low" : "text-risk-high"}>
+                      <span className={imp.improved ? "text-risk-low" : "text-foreground"}>
                         {imp.accuracyAfter.toFixed(1)}%
                       </span>
                     </div>

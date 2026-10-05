@@ -22,6 +22,7 @@ import Terms from "./pages/Terms";
 import Cookies from "./pages/Cookies";
 import OptOutGuides from "./pages/OptOutGuides";
 import OptOutGuide from "./pages/OptOutGuide";
+import Journey from "./pages/Journey";
 import AmIExposed from "./pages/AmIExposed";
 import NotFound from "./pages/NotFound";
 
@@ -59,6 +60,7 @@ const App = () => (
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />
             <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />
+            <Route path="/journey" element={<Journey />} />
             <Route path="/am-i-exposed" element={<AmIExposed />} />
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
             <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />

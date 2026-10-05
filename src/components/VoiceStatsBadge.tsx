@@ -39,13 +39,13 @@ export default function VoiceStatsBadge() {
           <Trophy className={cn(
             "w-3 h-3 sm:w-4 sm:h-4",
             data.bestRiskScore < 40 ? "text-risk-low" :
-            data.bestRiskScore < 70 ? "text-risk-mid" : "text-risk-high"
+            data.bestRiskScore < 70 ? "text-foreground" : "text-foreground"
           )} />
           <span className="text-muted-foreground text-[10px] sm:text-xs">
             Best: <span className={cn(
               "font-bold",
               data.bestRiskScore < 40 ? "text-risk-low" :
-              data.bestRiskScore < 70 ? "text-risk-mid" : "text-risk-high"
+              data.bestRiskScore < 70 ? "text-foreground" : "text-foreground"
             )}>{data.bestRiskScore}</span>
           </span>
         </div>

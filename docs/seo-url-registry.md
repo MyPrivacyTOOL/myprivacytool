@@ -78,9 +78,9 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | GA4 base tag | `G-1BWMDBJSPL` in `index.html`; `trackEvent` no-ops when `gtag` absent. | OK |
 | GA4 `generate_lead` — AI Access Check | Fires via `trackAIAccessCheckSignup`. | OK (verify live, below) |
 | GA4 `generate_lead` — Newsletter | No event fired on signup. | **Fixed:** `trackNewsletterSignup` fires `newsletter_signup` + `generate_lead` on success. |
-| GA4 — `/business` form | Form only sets local state; **nothing is submitted or tracked.** | **Open (tracked in Notion follow-up task):** needs HubSpot wiring per `docs/form-wiring-playbook.md`, then a `generate_lead` event. Not instrumented on purpose: firing a conversion for a form that captures no lead would corrupt data. |
+| GA4 — `/business` form | Form only sets local state; **nothing is submitted or tracked.** | **Fixed:** submits to HubSpot and fires `business_audit_request` + `generate_lead {method: business_inquiry}` only after a successful submit. |
 | GA4 — `/start` form | Submit is a `TODO` (no POST). Same issue. | **Open** |
-| Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost: `main` shipped its own Helmet with canonical, og tags and JSON-LD, which replaced this component on blog posts). **Open:** blog posts may now have both their og tags and the static `index.html` og tags; check in a browser. |
+| Page titles / meta descriptions | Scan, Report, Business, Start, Newsletter, Blog, BlogPost and AI Access Check used the generic `index.html` title/description (`ComingSoonPage` and the legal/opt-out pages already set their own). | **Fixed:** new `components/Seo.tsx` sets title, description, og tags and canonical on those pages (BlogPost: `main` shipped its own Helmet with canonical, og tags and JSON-LD, which replaced this component on blog posts). Superseded by MPC-7169 (section 5): og/twitter tags are now per page and prerendered. |
 
 ### Local browser verification (2026-09-30, production build served locally, headless Chromium)
 | Check | Result |
@@ -89,11 +89,30 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | GA4 events (client side) | Newsletter submit fires `newsletter_signup` + `generate_lead {method: newsletter}`; AI Access Check submit fires `ai_access_check_waitlist_submit` + `generate_lead {method: ai_access_check_waitlist}`. Verified by intercepting `window.gtag` with Supabase/HubSpot responses stubbed. |
 | Not verified | Whether GA4 **ingests** them and marks `generate_lead` a key event, and consent-manager gating: the cloud environment's network policy blocks `www.myprivacytool.io` (HTTP 403 on CONNECT), `googletagmanager.com` and `google-analytics.com`, and GA4 DebugView needs a signed-in Google session. Still Follow-up A. |
 
+### Site-wide form inventory (2026-10-05)
+| Form | HubSpot | GA4 `generate_lead` method |
+|---|---|---|
+| `/newsletter`, home-page embed | yes (embed on `/`) | `newsletter` (home embed fires via HubSpot `onFormSubmitted` message, `source: home_embed`) |
+| `/ai-access-check` | yes | `ai_access_check_waitlist` |
+| `/business` | yes | `business_inquiry` |
+| `/start`, `/scan` | yes | `start_scan` |
+| Alice HD voice waitlist modal | yes (reuses the Start Scan form, `source_tag=alice-hd-waitlist`; previously localStorage only) | `alice_hd_waitlist` |
+| `EmailCaptureModal` | not rendered anywhere; posts to a placeholder worker URL. Wire or delete before use. | none |
+
 ## 4. Manual verification still required (needs a live browser / GA4 access)
 
 1. GA4 DebugView on production: submit the AI Access Check and Newsletter forms; confirm `generate_lead` with `method` param and that it is marked as a key event.
 2. Google Search Console: submit `/sitemap.xml`, inspect `/privacy` and one blog URL to confirm the user-declared canonical is honoured.
 3. Confirm consent-gating still lets `gtag` load before the events fire.
 
-## 5. Change process
-Adding or renaming a URL: update this file, `scripts/generate-sitemap.mjs` (unless noindex), the page's `<Helmet>` (title, description, canonical), and add a 301 for any renamed path.
+## 5. Per-URL head tags: build-time prerender (MPC-7169)
+The site is a client-only SPA, so before MPC-7169 every URL returned the homepage `<title>`, description and og tags to crawlers that do not run JS (LinkedIn, X, Facebook, Slack previews, many SEO tools).
+
+- `npm run build` runs `postbuild` → `scripts/prerender-meta.mjs`, which writes `dist/<route>.html` (not `<route>/index.html`: Pages serves `blog.html` at `/blog`, but `blog/index.html` only at `/blog/` behind a 308, contradicting the slashless canonicals) for every static route, blog post and opt-out guide (36 routes) with that route's own `<title>`, description, robots, canonical, `og:*` and `twitter:*` tags. Cloudflare Pages serves it for the matching URL; the SPA then hydrates and `react-helmet` replaces the tags (they carry `data-react-helmet`, so no duplicates).
+- Sources: `src/data/pageMeta.json` (static routes; also read by the pages via `<Seo>`), `blogPosts.json`, `optOutGuides.json`. Title formulas for posts/guides are duplicated in the script and in `BlogPost.tsx` / `OptOutGuide.tsx`; change both.
+- `components/Seo.tsx` emits title, description, canonical, og and twitter tags from the same props; `Layout` supplies the homepage defaults so every route always has a full set. Default share image: `public/og-image.jpg` (1200×630).
+- Only the `<head>` is prerendered; page body content is still rendered client-side.
+- `25-years-mass-surveillance` has no `image` in `blogPosts.json` (its referenced file never existed), so it uses the default og image. Add `public/blog/<file>.jpg` and the field to give it its own.
+
+## 6. Change process
+Adding or renaming a URL: update this file, `scripts/generate-sitemap.mjs` (unless noindex), `src/data/pageMeta.json` (static routes; posts/guides are picked up from their JSON), and add a 301 for any renamed path.

@@ -305,7 +305,7 @@ export default function FingerprintVerification({
       switch (method) {
         case 'webrtc':
           const webrtc = await detectWebRTCLeak();
-          result = webrtc.isLeaking ? '❌ Still Leaking' : '✅ Protected!';
+          result = webrtc.isLeaking ? 'Still leaking' : 'Protected';
           break;
         case 'canvas':
           const fp = await calculateFingerprintUniqueness();
@@ -386,7 +386,7 @@ export default function FingerprintVerification({
       return { change: percent, text: `${percent}% less unique! 🎉`, improved: true };
     } else {
       const percent = Math.round((after / before - 1) * 100);
-      return { change: -percent, text: `${percent}% more unique ⚠️`, improved: false };
+      return { change: -percent, text: `${percent}% more unique`, improved: false };
     }
   };
 
@@ -433,13 +433,13 @@ export default function FingerprintVerification({
   const uniquenessChange = getUniquenessChange();
 
   return (
-    <Card className="bg-gradient-to-br from-risk-low-soft to-risk-low-soft border-risk-low/30 overflow-hidden">
+    <Card className="bg-risk-low-soft border-risk-low/30 overflow-hidden">
       {/* Celebration Overlay */}
       {showCelebration && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/95 backdrop-blur-sm">
           <div className="text-center animate-scale-in">
-            <PartyPopper className="w-16 h-16 text-risk-mid mx-auto mb-4 animate-bounce" />
-            <h3 className="text-2xl font-bold text-foreground mb-2">Great Job! 🎉</h3>
+            <PartyPopper className="w-16 h-16 text-foreground mx-auto mb-4 animate-bounce" />
+            <h3 className="text-2xl font-bold text-foreground mb-2">Great job</h3>
             <p className="text-risk-low">Your privacy is much better protected!</p>
           </div>
         </div>
@@ -449,10 +449,10 @@ export default function FingerprintVerification({
       {hasRegressions && showComparison && (
         <div className="bg-risk-high-soft p-4 border-b border-risk-high/30">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-risk-high" />
+            <AlertTriangle className="w-6 h-6 text-foreground" />
             <div>
-              <h3 className="text-risk-high font-bold">⚠️ Your Protection Decreased!</h3>
-              <p className="text-risk-high text-sm">Some settings changed that made you more trackable.</p>
+              <h3 className="text-foreground font-bold">Your protection decreased</h3>
+              <p className="text-foreground text-sm">Some settings changed that made you more trackable.</p>
             </div>
           </div>
         </div>
@@ -480,7 +480,7 @@ export default function FingerprintVerification({
         <Button
           onClick={handleFullRetest}
           disabled={isRetesting}
-          className="w-full h-14 text-lg bg-gradient-to-r from-risk-low to-[hsl(var(--cat-network))] hover:opacity-90 text-primary-foreground shadow-card "
+          className="w-full h-14 text-lg bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white shadow-card "
         >
           {isRetesting ? (
             <>
@@ -525,7 +525,7 @@ export default function FingerprintVerification({
                           </span>
                         )}
                         {row.status === 'regressed' && (
-                          <span className="inline-flex items-center gap-1 text-risk-high text-xs">
+                          <span className="inline-flex items-center gap-1 text-foreground text-xs">
                             <XCircle className="w-4 h-4" /> Worse
                           </span>
                         )}
@@ -548,7 +548,7 @@ export default function FingerprintVerification({
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Uniqueness Change</span>
-                  <span className={`font-bold ${uniquenessChange.improved ? 'text-risk-low' : 'text-risk-high'}`}>
+                  <span className={`font-bold ${uniquenessChange.improved ? 'text-risk-low' : 'text-foreground'}`}>
                     {uniquenessChange.text}
                   </span>
                 </div>
@@ -660,9 +660,9 @@ export default function FingerprintVerification({
                 {item.checked ? (
                   <CheckCircle className="w-4 h-4 text-risk-low" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-risk-high" />
+                  <XCircle className="w-4 h-4 text-foreground" />
                 )}
-                <span className={item.checked ? 'text-risk-low' : 'text-risk-high'}>
+                <span className={item.checked ? 'text-risk-low' : 'text-foreground'}>
                   {item.label}
                 </span>
               </div>

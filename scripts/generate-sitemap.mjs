@@ -20,6 +20,7 @@ const STATIC_ROUTES = [
   { path: "/ai-access-check", file: "src/pages/AIAccessCheck.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/blog", file: "src/pages/Blog.tsx", priority: "0.7", changefreq: "weekly" },
   { path: "/opt-out-guides", file: "src/pages/OptOutGuides.tsx", priority: "0.9", changefreq: "weekly" },
+  { path: "/journey", file: "src/pages/Journey.tsx", priority: "0.7", changefreq: "monthly" },
   { path: "/am-i-exposed", file: "src/pages/AmIExposed.tsx", priority: "0.8", changefreq: "monthly" },
   { path: "/contact", file: "src/pages/Contact.tsx", priority: "0.4", changefreq: "yearly" },
   { path: "/privacy", file: "src/pages/Privacy.tsx", priority: "0.3", changefreq: "yearly" },

@@ -52,6 +52,19 @@ export const trackFunnelStep = (step: string, metadata?: Record<string, string |
   });
 };
 
+// Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
+// is confirmed (funnel step all_hexagons_confirmed). Fires once per page session.
+let scanCompletedTracked = false;
+
+export const trackScanCompleted = (hexagonCount: number) => {
+  if (scanCompletedTracked) return;
+  scanCompletedTracked = true;
+  trackEvent('privacy_scan_completed', {
+    hexagon_count: hexagonCount,
+    funnel_step: 'all_hexagons_confirmed',
+  });
+};
+
 // Device profile tracking
 export const trackDeviceProfile = (deviceData: {
   device: { type: string; os: string; browser: string };
@@ -432,4 +445,13 @@ export const trackBusinessLead = (params?: Record<string, string>) => {
 export const trackStartSignup = (params?: Record<string, string>) => {
   trackEvent('start_scan_signup', { form: 'start_scan', ...params });
   trackEvent('generate_lead', { method: 'start_scan', ...params });
+};
+
+// ---------------------------------------------------------------------------
+// Alice HD voice waitlist (MPC-6977 site-wide form wiring). Fire only after a
+// confirmed successful HubSpot submit.
+// ---------------------------------------------------------------------------
+export const trackAliceHDWaitlistSignup = (params?: Record<string, string>) => {
+  trackEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
+  trackEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
 };

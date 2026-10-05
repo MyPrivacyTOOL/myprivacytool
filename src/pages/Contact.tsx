@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 
@@ -67,11 +68,7 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
-      <Seo
-        title="Contact Us | MyPrivacyTOOL"
-        description="Get in touch with the MyPrivacyTOOL team for support, data removal requests, business enquiries or press."
-        path="/contact"
-      />
+      <Seo {...pageMeta["/contact"]} path="/contact" />
 
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-8 text-center">
         <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">

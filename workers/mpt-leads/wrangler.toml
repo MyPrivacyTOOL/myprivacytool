@@ -20,3 +20,8 @@ head_sampling_rate = 1
 
 # Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
 # Expected names: EXPECTED_SECRETS.txt (the workflow fails if any goes missing).
+
+# MPC-6677: the scan-report Worker owns the confirmation email (no duplicate senders).
+# Declared here, not in the dashboard, because `wrangler deploy` replaces dashboard-set plain vars.
+[vars]
+CONFIRMATION_OWNER = "scan-report"

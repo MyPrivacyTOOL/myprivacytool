@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Search, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const Report = () => {
   const [selected, setSelected] = useState<string | null>(null);
@@ -16,7 +18,7 @@ const Report = () => {
         "Overview of data categories exposed",
         "Removal priority list",
       ],
-      cta: "Start Free",
+      cta: "Check My Exposure",
       highlight: false,
     },
     {
@@ -53,26 +55,26 @@ const Report = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white font-sans">
-      <Seo title="Your Privacy Exposure Report | MyPrivacyTOOL" description="See your personal privacy exposure score and a prioritised list of what to fix first." path="/report" />
+    <div className="min-h-screen bg-background text-foreground font-sans">
+      <Seo {...pageMeta["/report"]} path="/report" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-12 text-center">
-        <div className="inline-block bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
+        <div className="inline-block bg-brand-soft border border-brand/30 text-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
           Full Visibility · Active Removal · Continuous Protection
         </div>
 
-        <h1 className="text-4xl md:text-6xl font-black leading-tight mb-6 tracking-tight">
+        <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
           See Everything.<br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-yellow-400">
+          <span className="text-brand">
             Remove Everything.
           </span>
         </h1>
 
-        <p className="text-white/60 text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
-          A free scan shows you the problem. The Full Exposure Report gives you the
+        <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
+          A free scan shows you where your data is. The Full Exposure Report gives you the
           complete picture — every broker, every data point, every removal path.
         </p>
-        <p className="text-white/40 text-base mb-16 max-w-xl mx-auto">
+        <p className="text-muted-foreground text-base mb-16 max-w-xl mx-auto">
           And because brokers re-add you within weeks, we scan continuously.
         </p>
       </section>
@@ -81,14 +83,14 @@ const Report = () => {
       <section className="max-w-3xl mx-auto px-6 mb-16">
         <div className="grid md:grid-cols-3 gap-4 text-center">
           {[
-            { icon: "🔬", title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you." },
-            { icon: "✉️", title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs." },
-            { icon: "🔄", title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again." },
-          ].map(({ icon, title, desc }) => (
-            <div key={title} className="p-6 rounded-xl bg-white/[0.03] border border-white/10">
-              <div className="text-3xl mb-3">{icon}</div>
-              <div className="font-bold text-white mb-2">{title}</div>
-              <div className="text-white/40 text-sm leading-relaxed">{desc}</div>
+            { Icon: Search, title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you." },
+            { Icon: Mail, title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs." },
+            { Icon: RefreshCw, title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again." },
+          ].map(({ Icon, title, desc }) => (
+            <div key={title} className="p-6 rounded-xl bg-surface border border-surface-border">
+              <Icon className="w-8 h-8 text-brand mx-auto mb-3" aria-hidden="true" />
+              <div className="font-bold text-foreground mb-2">{title}</div>
+              <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
             </div>
           ))}
         </div>
@@ -106,28 +108,28 @@ const Report = () => {
               onClick={() => setSelected(plan.id)}
               className={`relative rounded-2xl border p-6 cursor-pointer transition-all duration-200 ${
                 plan.highlight
-                  ? "border-orange-400/60 bg-orange-500/5 shadow-lg shadow-orange-500/10"
+                  ? "border-brand/60 bg-brand-soft shadow-lg"
                   : selected === plan.id
-                  ? "border-white/40 bg-white/[0.05]"
-                  : "border-white/10 bg-white/[0.03] hover:border-white/20"
+                  ? "border-brand/40 bg-muted"
+                  : "border-surface-border bg-surface hover:border-brand/40"
               }`}
             >
               {plan.badge && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
                   {plan.badge}
                 </div>
               )}
               <div className="mb-4">
-                <div className="text-white/60 text-sm font-semibold mb-1">{plan.name}</div>
+                <div className="text-muted-foreground text-sm font-semibold mb-1">{plan.name}</div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-white">{plan.price}</span>
-                  {plan.period && <span className="text-white/40 text-sm">{plan.period}</span>}
+                  <span className="text-3xl font-bold text-foreground">{plan.price}</span>
+                  {plan.period && <span className="text-muted-foreground text-sm">{plan.period}</span>}
                 </div>
               </div>
               <ul className="space-y-2 mb-6">
                 {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-white/60">
-                    <span className="text-green-400 mt-0.5 flex-shrink-0">✓</span>
+                  <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <span className="text-brand mt-0.5 flex-shrink-0">✓</span>
                     {f}
                   </li>
                 ))}
@@ -135,8 +137,8 @@ const Report = () => {
               <Button
                 className={`w-full font-bold ${
                   plan.highlight
-                    ? "bg-orange-500 hover:bg-orange-400 text-white"
-                    : "bg-white/10 hover:bg-white/20 text-white"
+                    ? "bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground"
+                    : "bg-secondary hover:bg-muted text-foreground"
                 }`}
                 onClick={() => setSelected(plan.id)}
               >
@@ -149,14 +151,14 @@ const Report = () => {
 
       {/* Comparison Table */}
       <section className="max-w-3xl mx-auto px-6 pb-16">
-        <h2 className="text-xl font-bold text-center mb-8 text-white/80">Free scan vs Full Report</h2>
-        <div className="rounded-xl overflow-hidden border border-white/10">
+        <h2 className="text-xl font-bold text-center mb-8 text-foreground">Free scan vs Full Report</h2>
+        <div className="rounded-xl overflow-hidden border border-surface-border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="text-left px-4 py-3 text-white/40 font-semibold">Feature</th>
-                <th className="px-4 py-3 text-white/40 font-semibold text-center">Free</th>
-                <th className="px-4 py-3 text-orange-400 font-semibold text-center">Full Report</th>
+              <tr className="border-b border-surface-border">
+                <th className="text-left px-4 py-3 text-muted-foreground font-semibold">Feature</th>
+                <th className="px-4 py-3 text-muted-foreground font-semibold text-center">Free</th>
+                <th className="px-4 py-3 text-brand font-semibold text-center">Full Report</th>
               </tr>
             </thead>
             <tbody>
@@ -169,10 +171,10 @@ const Report = () => {
                 ["Dark web monitoring", "—", "✓"],
                 ["Removal confirmation", "—", "✓"],
               ].map(([feature, free, paid]) => (
-                <tr key={feature} className="border-b border-white/5 hover:bg-white/[0.02]">
-                  <td className="px-4 py-3 text-white/60">{feature}</td>
-                  <td className="px-4 py-3 text-center text-white/30">{free}</td>
-                  <td className="px-4 py-3 text-center text-green-400 font-semibold">{paid}</td>
+                <tr key={feature} className="border-b border-surface-border hover:bg-muted">
+                  <td className="px-4 py-3 text-muted-foreground">{feature}</td>
+                  <td className="px-4 py-3 text-center text-muted-foreground">{free}</td>
+                  <td className="px-4 py-3 text-center text-brand font-semibold">{paid}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,11 +1,11 @@
 {
-  "name": "MyPrivacyTOOL.IO",
+  "name": "MyPrivacyTOOL",
   "short_name": "MyPrivacyTOOL",
-  "description": "See what data brokers know about you without asking",
+  "description": "See where your data is. Understand the risk. Take control.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#00ff41",
+  "background_color": "#FFFFFF",
+  "theme_color": "#27AE60",
   "icons": [
     {
       "src": "/favicon-16x16.png",

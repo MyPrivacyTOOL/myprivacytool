@@ -19,8 +19,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Free Scan", href: "/" },
+  { label: "Home", href: "/" },
   { label: "How it works", href: "/#how-it-works", isAnchor: true },
+  { label: "Your journey", href: "/journey" },
   { label: "Pricing", href: "/pricing" },
   { label: "For Business", href: "/business" },
   { label: "Guides", href: "/blog" },
@@ -56,8 +57,8 @@ const Header = () => {
         }}
         aria-current={isActive(item.href) ? "page" : undefined}
         className={cn(
-          "text-sm font-medium transition-colors hover:text-primary",
-          isActive(item.href) ? "text-primary" : "text-foreground/70",
+          "text-sm font-medium transition-colors hover:text-brand",
+          isActive(item.href) ? "text-brand" : "text-foreground/70",
         )}
       >
         {item.label}
@@ -77,8 +78,8 @@ const Header = () => {
         <Link to="/" className="flex items-center shrink-0" aria-label="MyPrivacyTOOL home">
           <img
             src={logoHeader}
-            alt="MyPrivacyTOOL.IO"
-            className="h-9 sm:h-10 object-contain"
+            alt="MyPrivacyTOOL"
+            className="h-14 w-auto min-w-24 -my-4 mx-2 object-contain"
           />
         </Link>
 
@@ -86,7 +87,7 @@ const Header = () => {
 
         <div className="hidden md:block">
           <Button asChild>
-            <Link to="/scan">Scan free</Link>
+            <Link to="/scan">Check My Exposure</Link>
           </Button>
         </div>
 
@@ -108,7 +109,7 @@ const Header = () => {
               {renderLinks(() => setMobileOpen(false))}
               <SheetClose asChild>
                 <Button asChild className="mt-2">
-                  <Link to="/scan">Scan free</Link>
+                  <Link to="/scan">Check My Exposure</Link>
                 </Button>
               </SheetClose>
             </div>

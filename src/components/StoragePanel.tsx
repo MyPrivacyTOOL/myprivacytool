@@ -164,17 +164,17 @@ export default function StoragePanel() {
 
   const getRiskColor = (risk: 'high' | 'medium' | 'low') => {
     switch (risk) {
-      case 'high': return 'text-risk-high bg-risk-high-soft border-risk-high/30';
-      case 'medium': return 'text-risk-mid bg-risk-mid-soft border-risk-mid/30';
-      case 'low': return 'text-risk-low bg-risk-low-soft border-risk-low/30';
+      case 'high': return 'text-foreground bg-risk-high-soft border-risk-high/30';
+      case 'medium': return 'text-foreground bg-risk-mid-soft border-risk-mid/30';
+      case 'low': return 'text-foreground bg-risk-low-soft border-risk-low/30';
     }
   };
 
   const getRiskIcon = (risk: 'high' | 'medium' | 'low') => {
     switch (risk) {
-      case 'high': return '🔴';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
+      case 'high': return 'High';
+      case 'medium': return 'Medium';
+      case 'low': return 'Low';
     }
   };
 
@@ -190,13 +190,13 @@ export default function StoragePanel() {
 
   if (isLoading) {
     return (
-      <Card className="bg-gradient-to-br from-[hsl(var(--cat-storage-tint))] to-[hsl(var(--cat-language-tint))] border-[hsl(var(--cat-storage)/0.3)]">
+      <Card className="bg-brand-soft border-brand/30">
         <CardContent className="py-8 text-center">
           <div className="animate-pulse flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-[hsl(var(--cat-storage-tint))] flex items-center justify-center">
-              <HardDrive className="w-8 h-8 text-[hsl(var(--cat-storage))] animate-spin" />
+            <div className="w-16 h-16 rounded-full bg-brand-soft flex items-center justify-center">
+              <HardDrive className="w-8 h-8 text-brand animate-spin" />
             </div>
-            <p className="text-[hsl(var(--cat-storage))]">Analyzing your browser storage...</p>
+            <p className="text-brand">Analyzing your browser storage...</p>
           </div>
         </CardContent>
       </Card>
@@ -214,11 +214,11 @@ export default function StoragePanel() {
 
   // Pie chart data
   const pieData: StorageBreakdownItem[] = [
-    { name: 'Cookies', value: storageData.cookies.count * 100, color: 'hsl(var(--cat-behavior))' },
-    { name: 'LocalStorage', value: storageData.localStorage.sizeKB * 1024, color: 'hsl(var(--cat-storage))' },
-    { name: 'SessionStorage', value: storageData.sessionStorage.sizeKB * 1024, color: 'hsl(var(--cat-network))' },
-    { name: 'IndexedDB', value: storageData.indexedDB.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--cat-device))' },
-    { name: 'Cache', value: storageData.cacheStorage.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--cat-profile))' },
+    { name: 'Cookies', value: storageData.cookies.count * 100, color: 'hsl(var(--brand-near-black))' },
+    { name: 'LocalStorage', value: storageData.localStorage.sizeKB * 1024, color: 'hsl(var(--brand-green))' },
+    { name: 'SessionStorage', value: storageData.sessionStorage.sizeKB * 1024, color: 'hsl(var(--brand-green-hover))' },
+    { name: 'IndexedDB', value: storageData.indexedDB.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--brand-near-black) / 0.55)' },
+    { name: 'Cache', value: storageData.cacheStorage.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--brand-green) / 0.5)' },
   ].filter(item => item.value > 0);
 
   // All detected tracking keys
@@ -232,20 +232,19 @@ export default function StoragePanel() {
   ];
 
   return (
-    <Card className="bg-gradient-to-br from-[hsl(var(--cat-storage-tint))] to-[hsl(var(--cat-language-tint))] border-[hsl(var(--cat-storage)/0.3)] overflow-hidden">
+    <Card className="bg-brand-soft border-brand/30 overflow-hidden">
       {/* Header */}
-      <CardHeader className="border-b border-[hsl(var(--cat-storage)/0.3)] pb-4">
-        <CardTitle className="flex items-center gap-3 text-[hsl(var(--cat-storage))]">
-          <span className="text-2xl">💾</span>
+      <CardHeader className="border-b border-brand/30 pb-4">
+        <CardTitle className="flex items-center gap-3 text-brand">
           <div className="flex-1">
             <h3 className="text-lg sm:text-xl font-bold">Your Stored Data & Tracking Persistence</h3>
-            <p className="text-sm text-[hsl(var(--cat-storage))] font-normal">What websites are storing about you</p>
+            <p className="text-sm text-brand font-normal">What websites are storing about you</p>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={loadStorageData}
-            className="text-[hsl(var(--cat-storage))] hover:text-[hsl(var(--cat-storage))]"
+            className="text-brand hover:text-brand"
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -260,7 +259,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Cookie className="w-5 h-5" />
               <h4 className="font-semibold">Cookies</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.cookies.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.cookies.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -273,7 +272,7 @@ export default function StoragePanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tracking:</span>
-                <span className="font-mono text-risk-high">{storageData.cookies.thirdParty}</span>
+                <span className="font-mono text-foreground">{storageData.cookies.thirdParty}</span>
               </div>
             </div>
             <p className="mt-3 text-xs text-muted-foreground italic">
@@ -286,7 +285,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <HardDrive className="w-5 h-5" />
               <h4 className="font-semibold">LocalStorage</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.localStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.localStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -299,7 +298,7 @@ export default function StoragePanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tracking keys:</span>
-                <span className={`font-mono ${storageData.localStorage.hasTracking ? 'text-risk-high' : 'text-risk-low'}`}>
+                <span className={`font-mono ${storageData.localStorage.hasTracking ? 'text-foreground' : 'text-risk-low'}`}>
                   {storageData.localStorage.trackingKeys.length}
                 </span>
               </div>
@@ -314,7 +313,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Clock className="w-5 h-5" />
               <h4 className="font-semibold">Session Storage</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.sessionStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.sessionStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -336,7 +335,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-5 h-5" />
               <h4 className="font-semibold">IndexedDB</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.indexedDB.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.indexedDB.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -350,7 +349,7 @@ export default function StoragePanel() {
               {storageData.indexedDB.hasTracking && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tracking DBs:</span>
-                  <span className="font-mono text-risk-high">{storageData.indexedDB.trackingDatabases.length}</span>
+                  <span className="font-mono text-foreground">{storageData.indexedDB.trackingDatabases.length}</span>
                 </div>
               )}
             </div>
@@ -364,12 +363,12 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Box className="w-5 h-5" />
               <h4 className="font-semibold">Cache & Service Worker</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.cacheStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.cacheStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status:</span>
-                <span className={`font-mono ${storageData.cacheStorage.serviceWorkerActive ? 'text-risk-mid' : 'text-risk-low'}`}>
+                <span className={`font-mono ${storageData.cacheStorage.serviceWorkerActive ? 'text-foreground' : 'text-risk-low'}`}>
                   {storageData.cacheStorage.serviceWorkerActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -414,17 +413,17 @@ export default function StoragePanel() {
         </div>
 
         {/* Total Storage Usage */}
-        <div className="p-6 rounded-xl border border-[hsl(var(--cat-storage)/0.3)] bg-[hsl(var(--cat-storage-tint))]">
-          <h4 className="text-lg font-bold text-[hsl(var(--cat-storage))] mb-4 flex items-center gap-2">
+        <div className="p-6 rounded-xl border border-brand/30 bg-brand-soft">
+          <h4 className="text-lg font-bold text-brand mb-4 flex items-center gap-2">
             <HardDrive className="w-5 h-5" />
             Total Storage Usage
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-[hsl(var(--cat-storage))]">
+              <p className="text-3xl font-bold text-brand">
                 {formatBytes(totalSizeBytes)}
               </p>
-              <p className="text-sm text-[hsl(var(--cat-storage))] mt-1">
+              <p className="text-sm text-brand mt-1">
                 Websites are storing this much data about you
               </p>
             </div>
@@ -494,8 +493,8 @@ export default function StoragePanel() {
             </div>
             <div className="flex items-center gap-3">
               <div className="w-24 text-xs text-muted-foreground">Persistent Cookies</div>
-              <div className="flex-1 h-4 bg-risk-orange-soft rounded-full relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-[70%] bg-risk-orange rounded-full" />
+              <div className="flex-1 h-4 bg-risk-mid-soft rounded-full relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-[70%] bg-risk-mid rounded-full" />
               </div>
               <div className="w-32 text-xs">1 year or more</div>
             </div>
@@ -517,12 +516,12 @@ export default function StoragePanel() {
         </div>
 
         {/* What This Means */}
-        <div className="p-6 rounded-xl border border-[hsl(var(--cat-language)/0.3)] bg-[hsl(var(--cat-language-tint))]">
-          <h4 className="text-lg font-bold text-[hsl(var(--cat-language))] mb-4 flex items-center gap-2">
+        <div className="p-6 rounded-xl border border-brand/30 bg-brand-soft">
+          <h4 className="text-lg font-bold text-brand mb-4 flex items-center gap-2">
             <Info className="w-5 h-5" />
             Storage & Tracking Persistence
           </h4>
-          <p className="text-sm text-[hsl(var(--cat-language))] leading-relaxed">
+          <p className="text-sm text-brand leading-relaxed">
             Websites store data on your device to track you over time. Even after clearing your 
             browsing history, this stored data can identify you on return visits. Combined with 
             your browser fingerprint, this creates a persistent identity that follows you across 
@@ -568,7 +567,7 @@ export default function StoragePanel() {
           ].map((item) => (
             <Collapsible key={item.id} open={expandedSections[item.id]} onOpenChange={() => toggleSection(item.id)}>
               <CollapsibleTrigger className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted transition-colors">
-                <span className="text-[hsl(var(--cat-storage))]">{item.icon}</span>
+                <span className="text-brand">{item.icon}</span>
                 <span className="font-medium flex-1 text-left">{item.title}</span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${expandedSections[item.id] ? 'rotate-180' : ''}`} />
               </CollapsibleTrigger>
@@ -587,7 +586,7 @@ export default function StoragePanel() {
           </h4>
           <div className={`p-4 rounded-lg ${getRiskColor(storageData.overallRisk)}`}>
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{getRiskIcon(storageData.overallRisk)}</span>
+              <span className="text-base font-semibold text-foreground">{getRiskIcon(storageData.overallRisk)}</span>
               <div>
                 <p className="font-semibold capitalize">{storageData.overallRisk} Risk</p>
                 <p className="text-sm opacity-80">
@@ -603,15 +602,15 @@ export default function StoragePanel() {
         {/* Detected Tracking Keys */}
         {allTrackingKeys.length > 0 && (
           <div className="p-4 rounded-xl border border-risk-high/30 bg-risk-high-soft">
-            <h4 className="font-bold text-risk-high mb-3 flex items-center gap-2">
+            <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
               <Eye className="w-4 h-4" />
               Tracking & Analytics Detected
             </h4>
             <div className="space-y-2">
               {allTrackingKeys.slice(0, 10).map((key, index) => (
                 <div key={index} className="flex items-center gap-2 text-sm">
-                  <span className="text-risk-high">•</span>
-                  <span className="font-mono text-risk-high">{key}</span>
+                  <span className="text-foreground">•</span>
+                  <span className="font-mono text-foreground">{key}</span>
                   <span className="text-muted-foreground">({getTrackingKeyDescription(key)})</span>
                 </div>
               ))}
@@ -621,7 +620,7 @@ export default function StoragePanel() {
                 </p>
               )}
             </div>
-            <p className="mt-3 text-xs text-risk-high">
+            <p className="mt-3 text-xs text-foreground">
               These keys indicate active tracking by third parties
             </p>
           </div>
@@ -659,7 +658,7 @@ export default function StoragePanel() {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-[hsl(var(--cat-storage))] border-[hsl(var(--cat-storage)/0.3)]"
+                className="text-brand border-brand/30"
                 onClick={() => window.open('chrome://settings/clearBrowserData', '_blank')}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -702,7 +701,7 @@ export default function StoragePanel() {
         {/* Clear Storage Button */}
         <div className="flex flex-wrap gap-4 items-center justify-between p-4 rounded-xl border border-risk-high/30 bg-risk-high-soft">
           <div>
-            <h4 className="font-bold text-risk-high">Clear This Site's Storage</h4>
+            <h4 className="font-bold text-foreground">Clear This Site's Storage</h4>
             <p className="text-xs text-muted-foreground">This will log you out and reset settings</p>
           </div>
           <AlertDialog>
@@ -719,7 +718,7 @@ export default function StoragePanel() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-risk-high" />
+                  <AlertTriangle className="w-5 h-5 text-foreground" />
                   Clear All Storage?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
@@ -729,7 +728,7 @@ export default function StoragePanel() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearStorage} className="bg-risk-high hover:bg-risk-high">
+                <AlertDialogAction onClick={handleClearStorage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   Yes, Clear Everything
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -738,11 +737,11 @@ export default function StoragePanel() {
         </div>
 
         {/* Storage Monitoring */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-[hsl(var(--cat-storage)/0.3)] bg-[hsl(var(--cat-storage-tint))]">
+        <div className="flex items-center justify-between p-4 rounded-xl border border-brand/30 bg-brand-soft">
           <div className="flex items-center gap-3">
-            <Eye className="w-5 h-5 text-[hsl(var(--cat-storage))]" />
+            <Eye className="w-5 h-5 text-brand" />
             <div>
-              <h4 className="font-semibold text-[hsl(var(--cat-storage))]">Monitor Storage Changes</h4>
+              <h4 className="font-semibold text-brand">Monitor Storage Changes</h4>
               <p className="text-xs text-muted-foreground">
                 {monitoringEnabled 
                   ? `${storageChanges} changes detected since enabled`

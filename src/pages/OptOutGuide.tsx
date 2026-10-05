@@ -1,11 +1,11 @@
 import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
 import { Link, useParams } from "react-router-dom";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import guides from "@/data/optOutGuides.json";
 import NotFound from "./NotFound";
 
-const SITE_URL = "https://www.myprivacytool.io";
 
 const OptOutGuide = () => {
   const { slug } = useParams();
@@ -24,10 +24,12 @@ const OptOutGuide = () => {
 
   return (
     <>
+      <Seo
+        title={`${title} (${guide.countryName}) | MyPrivacyTOOL`}
+        description={guide.summary}
+        path={`/opt-out-guides/${guide.slug}`}
+      />
       <Helmet>
-        <title>{title} ({guide.countryName}) | MyPrivacyTOOL</title>
-        <meta name="description" content={guide.summary} />
-        <link rel="canonical" href={`${SITE_URL}/opt-out-guides/${guide.slug}`} />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>
       <article className="container mx-auto px-4 py-12 max-w-3xl">
@@ -61,18 +63,18 @@ const OptOutGuide = () => {
         </ol>
         <p className="text-sm text-muted-foreground mb-8">Processing time: {guide.processingTime}.</p>
 
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 mb-10 flex gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+        <div className="rounded-lg border border-border bg-muted p-4 mb-10 flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-brand shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <h2 className="font-semibold text-foreground mb-1">Warning: you can be re-listed</h2>
+            <h2 className="font-semibold text-foreground mb-1">Note: you can be re-listed</h2>
             <p className="text-sm text-muted-foreground">{guide.relistingWarning}</p>
           </div>
         </div>
 
         <div className="rounded-lg bg-secondary p-6 text-center mb-10">
-          <h2 className="text-xl font-semibold text-foreground mb-2">Find out where else you're exposed</h2>
-          <p className="text-muted-foreground mb-4">Scan free to see which other sites hold your data.</p>
-          <Button asChild><Link to="/scan">Scan free</Link></Button>
+          <h2 className="text-xl font-semibold text-foreground mb-2">Find out where else your data is</h2>
+          <p className="text-muted-foreground mb-4">See which other sites hold your data.</p>
+          <Button asChild><Link to="/scan">Check My Exposure</Link></Button>
         </div>
 
         {related.length > 0 && (
@@ -81,7 +83,7 @@ const OptOutGuide = () => {
             <ul className="space-y-2">
               {related.map((g) => (
                 <li key={g.slug}>
-                  <Link className="text-primary hover:underline" to={`/opt-out-guides/${g.slug}`}>How to opt out of {g.name}</Link>
+                  <Link className="text-brand hover:underline" to={`/opt-out-guides/${g.slug}`}>How to opt out of {g.name}</Link>
                 </li>
               ))}
             </ul>

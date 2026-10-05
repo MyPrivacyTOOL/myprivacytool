@@ -5,6 +5,7 @@ import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import logoFull from '@/assets/logo-full.png';
 import {
@@ -13,7 +14,8 @@ import {
   startSessionTimer,
   trackSessionDuration,
   trackError,
-  trackScrollToFooter
+  trackScrollToFooter,
+  trackNewsletterSignup
 } from '@/lib/analytics';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
@@ -140,6 +142,17 @@ const Index = () => {
     };
   }, []);
 
+  // The newsletter form is a HubSpot embed; HubSpot posts a message to the page when it submits successfully.
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'hsFormCallback' && e.data?.eventName === 'onFormSubmitted') {
+        trackNewsletterSignup({ source: 'home_embed' });
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   // Check if should show federated learning modal (after 5+ predictions)
   useEffect(() => {
     if (!loading && !federatedCheckDone.current) {
@@ -179,11 +192,11 @@ const Index = () => {
           <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <img 
               src={logoFull} 
-              alt="MyPrivacyTOOL.IO logo - Privacy awareness platform" 
+              alt="MyPrivacyTOOL" 
               className="h-8 object-contain" 
             />
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">Scan Failed</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">Scan did not finish</h2>
           <p className="text-muted-foreground mb-6">{error}</p>
           <Button onClick={handleRetry} className="gap-2">
             <RefreshCw className="w-4 h-4" />
@@ -204,9 +217,9 @@ const Index = () => {
           <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10">
             <h1 
               id="hero-heading"
-              className="text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-foreground"
+              className="max-w-4xl text-2xl sm:text-4xl md:text-6xl font-bold mb-4 sm:mb-6 text-center leading-tight text-foreground [text-wrap:balance]"
             >
-              What is your Digital Shadow?
+              Your data is everywhere. See where. Take it back.
             </h1>
           </div>
         </section>
@@ -214,7 +227,7 @@ const Index = () => {
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
           <p className="text-sm sm:text-lg text-foreground">
-            The <span className="text-brand">Privacy<span className="font-bold">TOOL</span></span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
+            <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
           </p>
           <p className="text-sm sm:text-lg text-foreground">
             Click the ones that are correct.
@@ -236,6 +249,21 @@ const Index = () => {
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
           <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+        </section>
+
+        {/* Journey teaser */}
+        <section className="pb-12 px-4" aria-labelledby="journey-teaser-heading">
+          <div className="max-w-2xl mx-auto text-center rounded-2xl border border-surface-border bg-brand-soft p-6 sm:p-8">
+            <h2 id="journey-teaser-heading" className="text-xl sm:text-2xl font-bold text-foreground mb-2">
+              Get clean before you go agentic
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground mb-5">
+              Eight steps from seeing your footprint to bringing AI agents on board safely.
+            </p>
+            <Button asChild>
+              <Link to="/journey">See your journey</Link>
+            </Button>
+          </div>
         </section>
 
         {/* Newsletter Sign-Up */}
