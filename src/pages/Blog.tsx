@@ -119,11 +119,11 @@ export default function Blog() {
         )}
 
         {/* Newsletter CTA */}
-        <div className="mt-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-8 text-white text-center">
+        <div className="mt-16 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
           <h2 className="text-2xl font-bold mb-2">Get Privacy Updates Weekly</h2>
-          <p className="mb-4 text-blue-100">Subscribe to our newsletter for the latest privacy insights and protection tips</p>
+          <p className="mb-4 text-muted-foreground">Subscribe to our newsletter for the latest privacy insights and protection tips</p>
           <Link to="/newsletter">
-            <Button variant="secondary" size="lg">Subscribe Now</Button>
+            <Button size="lg">Subscribe Now</Button>
           </Link>
         </div>
       </div>
