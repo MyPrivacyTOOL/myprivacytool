@@ -27,6 +27,7 @@ import {
   trackHexagonConfirm, 
   trackDeepScanUnlocked, 
   trackFunnelStep,
+  trackScanCompleted,
   trackHexagonAccuracy,
   trackTimeToFirstConfirmation,
   trackActivity
@@ -232,6 +233,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     // Check for final summary (all 46+ hexagons confirmed)
     if (confirmedCount >= visibleCount && visibleCount >= 46 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
+      trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
       // Trigger celebration confetti
       triggerCompletionCelebration();
