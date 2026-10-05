@@ -55,7 +55,7 @@
     "region": "APAC",
     "type": "Marketing-list opt-out right",
     "optOutUrl": "https://www.pcpd.org.hk/english/resources_centre/publications/files/opt_out2015_e.pdf",
-    "optOutUrlLabel": "PCPD opt-out guidance (PDF)",
+    "optOutUrlLabel": "PCPD opt-out guidance (PDF, 2015 edition)",
     "summary": "Under Hong Kong's Personal Data (Privacy) Ordinance, you can tell any company to stop using your personal data for direct marketing, and to stop passing it to third parties, free of charge.",
     "timeNeeded": "10 minutes per company",
     "processingTime": "Company must comply without charge once you ask; there is no fixed public processing window, so follow up in writing",
@@ -69,7 +69,7 @@
       "If the company ignores you or keeps marketing, you can complain to the Office of the Privacy Commissioner for Personal Data (PCPD), which has taken enforcement action over ignored opt-out requests."
     ],
     "relistingWarning": "This is a request per company, not a central list, and each company must be contacted separately. Your data may re-enter marketing lists if you later give consent again (for example by ticking a promotional box on a new sign-up).",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "australia-do-not-call-register",
