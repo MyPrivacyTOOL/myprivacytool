@@ -1,15 +1,48 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
+import { submitHubSpotForm } from "@/lib/hubspot";
+import { trackBusinessLead } from "@/lib/analytics";
+
+// HubSpot form "Business Inquiry" (portal 246502821). Form GUIDs are public (they ship in
+// every embed). Override per environment with VITE_HUBSPOT_BUSINESS_FORM_ID. The form defines a
+// hidden "source_tag" field, which we also send explicitly below.
+const FORM_ID =
+  import.meta.env.VITE_HUBSPOT_BUSINESS_FORM_ID || "954226ca-7c3e-4206-8557-6d97d60b63bd";
+const SOURCE_TAG = "business-inquiry";
 
 const Business = () => {
   const [form, setForm] = useState({ name: "", email: "", company: "", size: "" });
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+  const submitted = status === "success";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.email && form.company) setSubmitted(true);
+    if (!form.email || !form.company || status === "loading") return;
+    setStatus("loading");
+    setErrorMsg("");
+    const [firstname, ...rest] = form.name.trim().split(/\s+/);
+    try {
+      await submitHubSpotForm({
+        formId: FORM_ID,
+        fields: {
+          firstname: firstname || "",
+          lastname: rest.join(" "),
+          email: form.email.trim(),
+          company: form.company.trim(),
+          source_tag: SOURCE_TAG,
+        },
+        pageName: "Business audit request",
+      });
+      trackBusinessLead({ source: "business_page" });
+      setStatus("success");
+    } catch (err: unknown) {
+      setStatus("error");
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    }
   };
 
   return (
@@ -92,14 +125,22 @@ const Business = () => {
                   <option value="51-200">51–200 employees</option>
                   <option value="200+">200+ employees</option>
                 </select>
+                {status === "error" && (
+                  <p role="alert" className="text-red-400 text-xs">{errorMsg}</p>
+                )}
                 <Button
                   type="submit"
-                  className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold h-11 text-base transition-all duration-200"
+                  disabled={status === "loading"}
+                  className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-bold h-11 text-base transition-all duration-200"
                 >
-                  Request Free Company Audit →
+                  {status === "loading" ? "Sending..." : "Request Free Company Audit →"}
                 </Button>
                 <p className="text-white/20 text-xs text-center">
                   No payment required. Results in 48 hours.
+                </p>
+                <p className="text-white/30 text-xs text-center">
+                  We use your details only to prepare and send your audit. See our{" "}
+                  <Link to="/privacy" className="underline hover:text-white/60">Privacy Policy</Link>.
                 </p>
               </form>
             ) : (
