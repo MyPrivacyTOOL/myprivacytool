@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X } from "lucide-react";
 import Seo from "@/components/Seo";
+import { submitHubSpotForm } from "@/lib/hubspot";
+import { trackStartSignup } from "@/lib/analytics";
+
+// HubSpot form "Start Scan" (portal 246502821). Form GUIDs are public (they ship in every
+// embed). Override per environment with VITE_HUBSPOT_START_FORM_ID. The form defines a hidden
+// "source_tag" field, which we also send explicitly below.
+const FORM_ID =
+  import.meta.env.VITE_HUBSPOT_START_FORM_ID || "22ee30ae-6cf9-419b-aa46-b656b0e7b1bf";
+const SOURCE_TAG = "start-scan";
 
 const hexagonData = [
   { icon: Eye, label: "Name", value: "Detected from your profile", color: "#ff4444" },
@@ -23,16 +32,32 @@ export default function Start() {
   const [confirmed, setConfirmed] = useState<null | boolean>(null);
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleConfirm = (yes: boolean) => {
     setConfirmed(yes);
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    // TODO: POST to /api/hubspot-contact with email
+    if (sending) return;
+    setSending(true);
+    setErrorMsg("");
+    try {
+      await submitHubSpotForm({
+        formId: FORM_ID,
+        fields: { email: email.trim(), source_tag: SOURCE_TAG },
+        pageName: "Start scan",
+      });
+      trackStartSignup({ source: "start_page" });
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -120,12 +145,14 @@ export default function Start() {
               />
               <button
                 type="submit"
-                className="bg-red-600 hover:bg-red-500 text-white text-sm font-bold py-3 px-5 rounded-lg transition-colors flex items-center gap-2"
+                disabled={sending}
+                className="bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white text-sm font-bold py-3 px-5 rounded-lg transition-colors flex items-center gap-2"
               >
                 <ArrowRight size={16} />
-                Start
+                {sending ? "Sending..." : "Start"}
               </button>
             </form>
+            {errorMsg && <p role="alert" className="text-red-400 text-xs mt-3">{errorMsg}</p>}
           </div>
         )}
 
