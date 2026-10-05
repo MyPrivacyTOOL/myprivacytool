@@ -225,20 +225,20 @@
     "type": "People-search site",
     "optOutUrl": "https://www.truthfinder.com/opt-out/",
     "optOutUrlLabel": "truthfinder.com/opt-out",
-    "summary": "Suppress your TruthFinder record via its dedicated opt-out page. Do not use the general contact form, which does not process opt-outs.",
+    "summary": "Suppress your TruthFinder record via its dedicated opt-out page, which runs through the PeopleConnect Suppression Center. Do not use the general contact form, which does not process opt-outs.",
     "timeNeeded": "10 minutes",
     "processingTime": "Up to 48 hours after email confirmation",
     "difficulty": "Easy",
-    "requirements": ["Your name and state of residence", "A valid email address"],
+    "requirements": ["A valid email address you can open to confirm", "Your name and state of residence to find your record"],
     "steps": [
-      "Go to truthfinder.com/opt-out.",
-      "Enter your first name, last name and state, then select the correct record from the results.",
-      "Click the opt-out / remove option next to your record and enter your email address.",
-      "Open the verification email from TruthFinder and click the confirmation link. Processing begins once you confirm.",
+      "Go to truthfinder.com/opt-out. It redirects to the PeopleConnect Suppression Center (suppression.peopleconnect.us), the company that runs TruthFinder's opt-outs.",
+      "Under Step 1, enter your email address, tick the box agreeing to the Terms of Use and Privacy Policy, and click Continue.",
+      "Open the verification email and click its link to proceed.",
+      "Follow the remaining on-screen steps to find your record (you will need your name and state) and select it for suppression.",
       "Repeat for other records that match you."
     ],
     "relistingWarning": "TruthFinder is one of a family of brands that share data sources. Records can reappear as new public data arrives, so re-check every few months.",
-    "lastVerified": "2026-09-30"
+    "lastVerified": "2026-10-05"
   },
   {
     "slug": "fastpeoplesearch",
