@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackStartSignup } from "@/lib/analytics";
@@ -73,7 +74,7 @@ const Scan = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Seo title="Free Data Exposure Scan | MyPrivacyTOOL" description="Run a free scan to see what data brokers and the open internet may know about you, then get step-by-step guides to remove it." path="/scan" />
+      <Seo {...pageMeta["/scan"]} path="/scan" />
       {/* Hero */}
       <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 text-center">
         <div className="inline-block bg-primary/10 border border-primary/30 text-primary text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">

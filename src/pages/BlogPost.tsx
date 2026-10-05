@@ -1,5 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
+import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -419,14 +420,14 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <Seo
+        title={`${post.title} | MyPrivacyTOOL`}
+        description={post.excerpt}
+        path={`/blog/${slug}`}
+        type="article"
+        image={post.image ? `${SITE_URL}${post.image}` : undefined}
+      />
       <Helmet>
-        <title>{post.title} | MyPrivacyTOOL</title>
-        <meta name="description" content={post.excerpt} />
-        <link rel="canonical" href={canonical} />
-        <meta property="og:type" content="article" />
-        <meta property="og:title" content={post.title} />
-        <meta property="og:description" content={post.excerpt} />
-        <meta property="og:url" content={canonical} />
         {jsonLd.map((block, i) => (
           <script key={i} type="application/ld+json">{JSON.stringify(block)}</script>
         ))}
@@ -580,12 +581,12 @@ export default function BlogPost() {
         )}
 
         {/* Related Content CTA */}
-        <Card className="bg-slate-900 text-white">
+        <Card className="bg-brand-soft border-surface-border text-foreground">
           <CardContent className="p-8">
             <h3 className="text-2xl font-bold mb-2">Get Privacy Updates Weekly</h3>
-            <p className="text-slate-200 mb-4">New articles on data brokers, AI threats, and protection tactics delivered to your inbox.</p>
+            <p className="text-muted-foreground mb-4">New articles on data brokers, AI threats, and protection tactics delivered to your inbox.</p>
             <Link to="/newsletter">
-              <Button variant="secondary">Subscribe Now</Button>
+              <Button>Subscribe Now</Button>
             </Link>
           </CardContent>
         </Card>

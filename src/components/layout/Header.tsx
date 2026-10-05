@@ -86,7 +86,7 @@ const Header = () => {
 
         <div className="hidden md:block">
           <Button asChild>
-            <Link to="/">Scan free</Link>
+            <Link to="/scan">Scan free</Link>
           </Button>
         </div>
 
@@ -108,7 +108,7 @@ const Header = () => {
               {renderLinks(() => setMobileOpen(false))}
               <SheetClose asChild>
                 <Button asChild className="mt-2">
-                  <Link to="/">Scan free</Link>
+                  <Link to="/scan">Scan free</Link>
                 </Button>
               </SheetClose>
             </div>

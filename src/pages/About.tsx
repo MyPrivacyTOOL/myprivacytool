@@ -1,15 +1,10 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 import { Link } from "react-router-dom";
 
 const About = () => (
   <>
-    <Helmet>
-      <title>About - MyPrivacyTOOL</title>
-      <meta
-        name="description"
-        content="MyPrivacyTOOL is a Hong Kong company helping people see their digital shadow: what their browser and device reveal about them, shown as Privacy Hexagons."
-      />
-    </Helmet>
+    <Seo {...pageMeta["/about"]} path="/about" />
     <main className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
         <h1 className="mb-2 text-4xl font-bold text-gray-900">About MyPrivacyTOOL</h1>

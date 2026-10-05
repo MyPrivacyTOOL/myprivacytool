@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
 import { Link } from "react-router-dom";
 import { Construction } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,7 @@ interface ComingSoonPageProps {
 const ComingSoonPage = ({ title, description }: ComingSoonPageProps) => {
   return (
     <>
-      <Helmet>
-        <title>{title} | MyPrivacyTOOL</title>
-        <meta name="description" content={description} />
-        <meta name="robots" content="noindex" />
-      </Helmet>
+      <Seo title={`${title} | MyPrivacyTOOL`} description={description} noindex />
       <div className="min-h-[60vh] flex items-center justify-center px-4 py-20">
         <div className="max-w-lg text-center">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
@@ -27,7 +23,7 @@ const ComingSoonPage = ({ title, description }: ComingSoonPageProps) => {
             This page is coming soon. In the meantime, run a free scan to see what's already exposed about you.
           </p>
           <Button asChild size="lg">
-            <Link to="/">Scan free</Link>
+            <Link to="/scan">Scan free</Link>
           </Button>
         </div>
       </div>

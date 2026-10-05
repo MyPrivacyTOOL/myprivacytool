@@ -1,5 +1,7 @@
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 // Every answer here is limited to what the code does (src/lib/deviceDetection.ts, EmailCaptureModal.tsx,
 // index.html). Encryption, retention and audit claims are deliberately absent: see the MPC-6545 PR notes.
@@ -62,12 +64,8 @@ const Faq = () => {
   };
   return (
     <>
+      <Seo {...pageMeta["/faq"]} path="/faq" />
       <Helmet>
-        <title>FAQ - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="Answers about MyPrivacyTOOL: how the scan works, what stays in your browser, which third parties are contacted and how to reach us."
-        />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>
       <main className="min-h-screen bg-gray-50">

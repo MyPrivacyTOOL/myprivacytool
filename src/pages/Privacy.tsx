@@ -1,16 +1,11 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const Privacy = () => {
 
   return (
     <>
-      <Helmet>
-        <title>Privacy Policy - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="Our Privacy Policy explains how we collect, use, and protect your personal data in compliance with GDPR, CCPA, PDPO, and PDPA."
-        />
-      </Helmet>
+      <Seo {...pageMeta["/privacy"]} path="/privacy" />
       <main className="min-h-screen bg-gray-50">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
