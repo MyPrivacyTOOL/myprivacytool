@@ -61,15 +61,20 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Canvas cannot resolve CSS variables, so read theme tokens directly
+    const rootStyle = getComputedStyle(document.documentElement);
+    const tok = (name: string, alpha: number) =>
+      `hsl(${rootStyle.getPropertyValue(name).trim()} / ${alpha})`;
+
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     // Draw background grid
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.05)';
+    ctx.fillStyle = tok('--risk-mid', 0.06);
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Draw grid lines
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.1)';
+    ctx.strokeStyle = tok('--surface-border', 1);
     ctx.lineWidth = 1;
     for (let i = 0; i < 10; i++) {
       ctx.beginPath();
@@ -92,17 +97,17 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
       
       if (spot.intensity > 0.7) {
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.8)');
-        gradient.addColorStop(0.5, 'rgba(245, 158, 11, 0.4)');
-        gradient.addColorStop(1, 'rgba(245, 158, 11, 0)');
+        gradient.addColorStop(0, tok('--brand-near-black', 0.8));
+        gradient.addColorStop(0.5, tok('--brand-green-hover', 0.4));
+        gradient.addColorStop(1, tok('--brand-green-hover', 0));
       } else if (spot.intensity > 0.4) {
-        gradient.addColorStop(0, 'rgba(245, 158, 11, 0.6)');
-        gradient.addColorStop(0.5, 'rgba(251, 191, 36, 0.3)');
-        gradient.addColorStop(1, 'rgba(251, 191, 36, 0)');
+        gradient.addColorStop(0, tok('--brand-green-hover', 0.6));
+        gradient.addColorStop(0.5, tok('--brand-green-hover', 0.3));
+        gradient.addColorStop(1, tok('--brand-green-hover', 0));
       } else {
-        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.5)');
-        gradient.addColorStop(0.5, 'rgba(59, 130, 246, 0.2)');
-        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+        gradient.addColorStop(0, tok('--brand-green', 0.5));
+        gradient.addColorStop(0.5, tok('--brand-green', 0.2));
+        gradient.addColorStop(1, tok('--brand-green', 0));
       }
 
       ctx.fillStyle = gradient;
@@ -139,50 +144,50 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
 
   const getEngagementColor = (engagement: string) => {
     switch (engagement) {
-      case 'high': return 'text-green-400';
-      case 'medium': return 'text-amber-400';
-      case 'low': return 'text-red-400';
+      case 'high': return 'text-risk-low';
+      case 'medium': return 'text-foreground';
+      case 'low': return 'text-foreground';
       default: return 'text-muted-foreground';
     }
   };
 
   const getPatternBadge = (pattern: string) => {
     if (pattern === 'human') {
-      return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Human</Badge>;
+      return <Badge className="bg-risk-low-soft text-foreground border-risk-low/30">Human</Badge>;
     } else if (pattern === 'bot') {
-      return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Bot</Badge>;
+      return <Badge className="bg-risk-high-soft text-foreground border-risk-high/30">Bot</Badge>;
     }
-    return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Unknown</Badge>;
+    return <Badge className="bg-risk-mid-soft text-foreground border-risk-mid/30">Unknown</Badge>;
   };
 
   // Calculate session timeline
   const sessionProgress = Math.min((timeData.activeTime / timeData.totalTime) * 100, 100);
 
   return (
-    <Card className="bg-gradient-to-br from-amber-950/40 via-background to-amber-900/20 border-amber-500/30 shadow-lg shadow-amber-500/10">
+    <Card className="bg-risk-mid-soft border-risk-mid/30 shadow-card">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-500/20 animate-pulse">
-              <Mouse className="w-6 h-6 text-amber-400" />
+            <div className="p-2 rounded-lg bg-risk-mid-soft">
+              <Mouse className="w-6 h-6 text-foreground" />
             </div>
             <div>
-              <CardTitle className="text-xl text-amber-100">
-                🖱️ Your Behavior is Being Tracked
+              <CardTitle className="text-xl text-foreground">
+                Your behavior is visible to trackers
               </CardTitle>
-              <p className="text-sm text-amber-400/80 mt-1">
+              <p className="text-sm text-foreground mt-1">
                 Real-time interaction monitoring
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {isTracking ? (
-              <Badge className="bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">
+              <Badge className="bg-risk-high-soft text-foreground border-risk-high/30">
                 <Activity className="w-3 h-3 mr-1" />
                 LIVE
               </Badge>
             ) : (
-              <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">
+              <Badge className="bg-muted text-muted-foreground border-surface-border">
                 <EyeOff className="w-3 h-3 mr-1" />
                 STOPPED
               </Badge>
@@ -193,18 +198,18 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
 
       <CardContent className="space-y-6">
         {/* Live Counter Banner */}
-        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+        <div className="p-4 rounded-lg bg-risk-mid-soft border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-2">
-            <Eye className="w-4 h-4 text-amber-400" />
-            <span className="text-sm font-medium text-amber-200">Live Tracking Summary</span>
+            <Eye className="w-4 h-4 text-foreground" />
+            <span className="text-sm font-medium text-foreground">Live Tracking Summary</span>
           </div>
-          <p className="text-sm text-amber-100">
-            We've tracked <span className="font-bold text-amber-400">{mouseData.totalMovements}</span> mouse movements, 
-            <span className="font-bold text-amber-400"> {typingData.keystrokeCount}</span> keystrokes, and 
-            <span className="font-bold text-amber-400"> {clickData.totalClicks}</span> clicks in the last 
-            <span className="font-bold text-amber-400"> {formatTime(timeData.totalTime)}</span>.
+          <p className="text-sm text-foreground">
+            We've tracked <span className="font-bold text-foreground">{mouseData.totalMovements}</span> mouse movements, 
+            <span className="font-bold text-foreground"> {typingData.keystrokeCount}</span> keystrokes, and 
+            <span className="font-bold text-foreground"> {clickData.totalClicks}</span> clicks in the last 
+            <span className="font-bold text-foreground"> {formatTime(timeData.totalTime)}</span>.
           </p>
-          <p className="text-xs text-amber-400/70 mt-2">
+          <p className="text-xs text-foreground mt-2">
             This data is being used to profile your behavior patterns.
           </p>
         </div>
@@ -212,29 +217,29 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
         {/* Tracking Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Mouse Movement Card */}
-          <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+          <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Mouse className="w-4 h-4 text-amber-400" />
-                <span className="font-medium text-amber-100">Mouse Movement</span>
+                <Mouse className="w-4 h-4 text-foreground" />
+                <span className="font-medium text-foreground">Mouse Movement</span>
               </div>
               {getPatternBadge(mouseData.pattern)}
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total movements:</span>
-                <span className="text-amber-200 font-mono">{mouseData.totalMovements}</span>
+                <span className="text-foreground font-mono">{mouseData.totalMovements}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Average speed:</span>
-                <span className="text-amber-200 font-mono">{mouseData.averageSpeed.toFixed(1)} px/s</span>
+                <span className="text-foreground font-mono">{mouseData.averageSpeed.toFixed(1)} px/s</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Pattern detected:</span>
-                <span className="text-amber-200 capitalize">{mouseData.pattern}</span>
+                <span className="text-foreground capitalize">{mouseData.pattern}</span>
               </div>
               <div className="mt-2">
-                <Badge variant="outline" className="text-red-400 border-red-400/30 text-xs">
+                <Badge variant="outline" className="text-foreground border-risk-high/30 text-xs">
                   High Risk
                 </Badge>
               </div>
@@ -242,33 +247,33 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
 
           {/* Typing Patterns Card */}
-          <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+          <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Keyboard className="w-4 h-4 text-amber-400" />
-                <span className="font-medium text-amber-100">Keystroke Dynamics</span>
+                <Keyboard className="w-4 h-4 text-foreground" />
+                <span className="font-medium text-foreground">Keystroke Dynamics</span>
               </div>
               {typingData.hasPattern ? (
-                <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Unique Signature</Badge>
+                <Badge className="bg-risk-high-soft text-foreground border-risk-high/30">Unique Signature</Badge>
               ) : (
-                <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">Collecting...</Badge>
+                <Badge className="bg-muted text-muted-foreground border-surface-border">Collecting...</Badge>
               )}
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Keystrokes:</span>
-                <span className="text-amber-200 font-mono">{typingData.keystrokeCount}</span>
+                <span className="text-foreground font-mono">{typingData.keystrokeCount}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Typing speed:</span>
-                <span className="text-amber-200 font-mono">{typingData.averageSpeed.toFixed(0)} WPM</span>
+                <span className="text-foreground font-mono">{typingData.averageSpeed.toFixed(0)} WPM</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Signature detected:</span>
-                <span className="text-amber-200">{typingData.hasPattern ? 'Yes' : 'No'}</span>
+                <span className="text-foreground">{typingData.hasPattern ? 'Yes' : 'No'}</span>
               </div>
               <div className="mt-2">
-                <Badge variant="outline" className="text-amber-400 border-amber-400/30 text-xs">
+                <Badge variant="outline" className="text-foreground border-risk-mid/30 text-xs">
                   Medium Risk
                 </Badge>
               </div>
@@ -276,33 +281,33 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
 
           {/* Click Behavior Card */}
-          <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+          <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <MousePointer2 className="w-4 h-4 text-amber-400" />
-                <span className="font-medium text-amber-100">Click Patterns</span>
+                <MousePointer2 className="w-4 h-4 text-foreground" />
+                <span className="font-medium text-foreground">Click Patterns</span>
               </div>
-              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+              <Badge className="bg-risk-mid-soft text-foreground border-risk-mid/30">
                 {clickData.pattern || 'Analyzing'}
               </Badge>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total clicks:</span>
-                <span className="text-amber-200 font-mono">{clickData.totalClicks}</span>
+                <span className="text-foreground font-mono">{clickData.totalClicks}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Click rate:</span>
-                <span className="text-amber-200 font-mono">{clickData.clickRate.toFixed(2)}/min</span>
+                <span className="text-foreground font-mono">{clickData.clickRate.toFixed(2)}/min</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Most clicked:</span>
-                <span className="text-amber-200 truncate max-w-[120px]">
+                <span className="text-foreground truncate max-w-[120px]">
                   {clickData.targets.slice(0, 2).join(', ') || 'N/A'}
                 </span>
               </div>
               <div className="mt-2">
-                <Badge variant="outline" className="text-amber-400 border-amber-400/30 text-xs">
+                <Badge variant="outline" className="text-foreground border-risk-mid/30 text-xs">
                   Medium Risk
                 </Badge>
               </div>
@@ -310,11 +315,11 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
 
           {/* Scroll Activity Card */}
-          <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+          <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <ScrollText className="w-4 h-4 text-amber-400" />
-                <span className="font-medium text-amber-100">Scroll Behavior</span>
+                <ScrollText className="w-4 h-4 text-foreground" />
+                <span className="font-medium text-foreground">Scroll Behavior</span>
               </div>
               <Badge className={`${getEngagementColor(scrollData.engagement)} bg-opacity-20 border-current/30`}>
                 {scrollData.engagement.toUpperCase()}
@@ -323,12 +328,12 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Scroll depth:</span>
-                <span className="text-amber-200 font-mono">{scrollData.scrollDepth.toFixed(0)}%</span>
+                <span className="text-foreground font-mono">{scrollData.scrollDepth.toFixed(0)}%</span>
               </div>
-              <Progress value={scrollData.scrollDepth} className="h-1 bg-amber-900/30" />
+              <Progress value={scrollData.scrollDepth} className="h-1 bg-risk-mid-soft" />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total scrolls:</span>
-                <span className="text-amber-200 font-mono">{scrollData.totalScrolls}</span>
+                <span className="text-foreground font-mono">{scrollData.totalScrolls}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Engagement:</span>
@@ -341,26 +346,26 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
         </div>
 
         {/* Session Timeline */}
-        <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+        <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-3">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-100">Session Timeline</span>
-            <Badge variant="outline" className="text-green-400 border-green-400/30 text-xs ml-auto">
+            <Clock className="w-4 h-4 text-foreground" />
+            <span className="font-medium text-foreground">Session Timeline</span>
+            <Badge variant="outline" className="text-risk-low border-risk-low/30 text-xs ml-auto">
               Low Risk
             </Badge>
           </div>
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Total time:</span>
-              <span className="text-amber-200 font-mono">{formatTime(timeData.totalTime)}</span>
+              <span className="text-foreground font-mono">{formatTime(timeData.totalTime)}</span>
             </div>
-            <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden">
+            <div className="relative h-4 bg-muted rounded-full overflow-hidden">
               <div 
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-500 to-green-400"
+                className="absolute left-0 top-0 h-full bg-risk-low"
                 style={{ width: `${sessionProgress}%` }}
               />
               <div 
-                className="absolute top-0 h-full bg-gray-600"
+                className="absolute top-0 h-full bg-muted"
                 style={{ left: `${sessionProgress}%`, width: `${100 - sessionProgress}%` }}
               />
             </div>
@@ -370,21 +375,21 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Tab switches:</span>
-              <span className="text-amber-200 font-mono">{timeData.tabSwitches}</span>
+              <span className="text-foreground font-mono">{timeData.tabSwitches}</span>
             </div>
           </div>
         </div>
 
         {/* Interaction Heatmap */}
-        <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+        <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-3">
-            <Flame className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-100">Interaction Heatmap</span>
-            <Badge variant="outline" className="text-red-400 border-red-400/30 text-xs ml-auto">
+            <Flame className="w-4 h-4 text-foreground" />
+            <span className="font-medium text-foreground">Interaction Heatmap</span>
+            <Badge variant="outline" className="text-foreground border-risk-high/30 text-xs ml-auto">
               High Risk
             </Badge>
           </div>
-          <div className="relative rounded-lg overflow-hidden border border-amber-500/10">
+          <div className="relative rounded-lg overflow-hidden border border-risk-mid/30">
             <canvas 
               ref={canvasRef}
               width={400}
@@ -393,67 +398,67 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
             />
             <div className="absolute bottom-2 right-2 flex gap-2 text-xs">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-red-500" />
+                <div className="w-3 h-3 rounded-full bg-brand-near-black" />
                 <span className="text-muted-foreground">High</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                <div className="w-3 h-3 rounded-full bg-brand-green-hover" />
                 <span className="text-muted-foreground">Medium</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                <div className="w-3 h-3 rounded-full bg-primary" />
                 <span className="text-muted-foreground">Low</span>
               </div>
             </div>
           </div>
           <div className="mt-2 flex justify-between text-sm">
             <span className="text-muted-foreground">Hotspots detected:</span>
-            <span className="text-amber-200 font-mono">{heatmapData.hotspots.length}</span>
+            <span className="text-foreground font-mono">{heatmapData.hotspots.length}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Engagement score:</span>
-            <span className="text-amber-200 font-mono">{heatmapData.engagementScore.toFixed(0)}%</span>
+            <span className="text-foreground font-mono">{heatmapData.engagementScore.toFixed(0)}%</span>
           </div>
         </div>
 
         {/* What This Reveals */}
-        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+        <div className="p-4 rounded-lg bg-risk-high-soft border border-risk-high/30">
           <div className="flex items-center gap-2 mb-3">
-            <ShieldAlert className="w-5 h-5 text-red-400" />
-            <span className="font-medium text-red-200">What This Reveals About You</span>
+            <ShieldAlert className="w-5 h-5 text-foreground" />
+            <span className="font-medium text-foreground">What This Reveals About You</span>
           </div>
-          <p className="text-sm text-red-100/80 mb-3">
+          <p className="text-sm text-foreground mb-3">
             Behavioral biometrics can uniquely identify you based on:
           </p>
-          <ul className="space-y-2 text-sm text-red-100/70">
+          <ul className="space-y-2 text-sm text-foreground">
             <li className="flex items-start gap-2">
-              <Target className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-              <span>Mouse movement patterns are <strong className="text-red-300">97% unique</strong></span>
+              <Target className="w-4 h-4 text-foreground mt-0.5 flex-shrink-0" />
+              <span>Mouse movement patterns are <strong className="text-foreground">97% unique</strong></span>
             </li>
             <li className="flex items-start gap-2">
-              <Zap className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-              <span>Typing rhythm is like a <strong className="text-red-300">fingerprint</strong></span>
+              <Zap className="w-4 h-4 text-foreground mt-0.5 flex-shrink-0" />
+              <span>Typing rhythm is like a <strong className="text-foreground">fingerprint</strong></span>
             </li>
             <li className="flex items-start gap-2">
-              <BarChart3 className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-              <span>Scroll behavior reveals <strong className="text-red-300">reading patterns</strong></span>
+              <BarChart3 className="w-4 h-4 text-foreground mt-0.5 flex-shrink-0" />
+              <span>Scroll behavior reveals <strong className="text-foreground">reading patterns</strong></span>
             </li>
             <li className="flex items-start gap-2">
-              <TrendingUp className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-              <span>Click patterns show <strong className="text-red-300">decision-making style</strong></span>
+              <TrendingUp className="w-4 h-4 text-foreground mt-0.5 flex-shrink-0" />
+              <span>Click patterns show <strong className="text-foreground">decision-making style</strong></span>
             </li>
           </ul>
-          <p className="text-xs text-red-400/80 mt-3 p-2 bg-red-500/10 rounded">
+          <p className="text-xs text-foreground mt-3 p-2 bg-risk-high-soft rounded">
             Combined, these create a behavioral signature that can track you across sites 
             even without cookies or fingerprints.
           </p>
         </div>
 
         {/* How Sites Use This */}
-        <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+        <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-3">
-            <Info className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-100">How Sites Use This Data</span>
+            <Info className="w-4 h-4 text-foreground" />
+            <span className="font-medium text-foreground">How Sites Use This Data</span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-sm">
             {[
@@ -464,8 +469,8 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
               'Engagement analytics',
               'A/B testing optimization'
             ].map((use, i) => (
-              <div key={i} className="flex items-center gap-2 p-2 rounded bg-amber-500/5">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <div key={i} className="flex items-center gap-2 p-2 rounded bg-risk-mid-soft">
+                <div className="w-1.5 h-1.5 rounded-full bg-risk-mid" />
                 <span className="text-muted-foreground text-xs">{use}</span>
               </div>
             ))}
@@ -473,15 +478,15 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
         </div>
 
         {/* Privacy Impact */}
-        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+        <div className="p-4 rounded-lg bg-risk-mid-soft border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400" />
-            <span className="font-medium text-amber-200">Privacy Impact</span>
+            <AlertTriangle className="w-5 h-5 text-foreground" />
+            <span className="font-medium text-foreground">Privacy Impact</span>
           </div>
-          <p className="text-sm text-amber-100/80 mb-3">
+          <p className="text-sm text-foreground mb-3">
             Unlike fingerprints or cookies, behavioral tracking:
           </p>
-          <ul className="space-y-1.5 text-sm text-amber-100/70">
+          <ul className="space-y-1.5 text-sm text-foreground">
             <li>• Cannot be blocked by browser extensions</li>
             <li>• Works in incognito/private mode</li>
             <li>• Doesn't require storage or cookies</li>
@@ -491,44 +496,44 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
         </div>
 
         {/* Protection Recommendations */}
-        <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+        <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-3">
-            <Eye className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-100">Protection Recommendations</span>
+            <Eye className="w-4 h-4 text-foreground" />
+            <span className="font-medium text-foreground">Protection Recommendations</span>
           </div>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
-              <span className="text-amber-400">•</span>
+              <span className="text-foreground">•</span>
               Use mouse movement randomizers (limited effectiveness)
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-amber-400">•</span>
+              <span className="text-foreground">•</span>
               Vary your typing speed and patterns
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-amber-400">•</span>
+              <span className="text-foreground">•</span>
               Use autofill instead of typing sensitive data
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-amber-400">•</span>
+              <span className="text-foreground">•</span>
               Navigate via keyboard instead of mouse when possible
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-amber-400">•</span>
-              <strong className="text-amber-200">Understand that complete protection is nearly impossible</strong>
+              <span className="text-foreground">•</span>
+              <strong className="text-foreground">Understand that complete protection is nearly impossible</strong>
             </li>
           </ul>
         </div>
 
         {/* Data Control Buttons */}
-        <div className="p-4 rounded-lg bg-background/50 border border-amber-500/20">
+        <div className="p-4 rounded-lg bg-surface/95 border border-risk-mid/30">
           <div className="flex items-center gap-2 mb-4">
-            <EyeOff className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-100">Data Control</span>
+            <EyeOff className="w-4 h-4 text-foreground" />
+            <span className="font-medium text-foreground">Data Control</span>
           </div>
           
           {showStopConfirm && (
-            <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm text-green-200">
+            <div className="mb-4 p-3 rounded-lg bg-risk-low-soft border border-risk-low/30 text-sm text-foreground">
               ✓ Tracking stopped for this session
             </div>
           )}
@@ -538,7 +543,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
               onClick={handleStopTracking}
               disabled={!isTracking}
               variant="outline"
-              className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+              className="flex-1 border-risk-high/30 text-foreground hover:bg-risk-high-soft hover:text-foreground"
             >
               <EyeOff className="w-4 h-4 mr-2" />
               Stop Tracking for This Session
@@ -546,7 +551,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
             <Button 
               onClick={handleClearData}
               variant="outline"
-              className="flex-1 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+              className="flex-1 border-risk-mid/30 text-foreground hover:bg-risk-mid-soft hover:text-foreground"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Clear & Restart Tracking
@@ -554,7 +559,7 @@ const BehaviorPanel: React.FC<BehaviorPanelProps> = ({ onClose }) => {
           </div>
           
           <p className="text-xs text-muted-foreground mt-3 text-center">
-            ⚠️ This only stops our demo. Real sites continue tracking.
+            This only stops our demo. Real sites continue tracking.
           </p>
         </div>
       </CardContent>

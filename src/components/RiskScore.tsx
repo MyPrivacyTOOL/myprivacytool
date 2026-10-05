@@ -334,7 +334,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
   const risk = getRiskLevel(percentage);
 
   return (
-    <div className="bg-black/40 border border-green-500/30 rounded-xl p-4 sm:p-6 mx-2 sm:mx-auto mb-4 shadow-[0_0_20px_rgba(0,255,65,0.15)] backdrop-blur-sm max-w-[460px]">
+    <div className="bg-surface/95 border border-surface-border rounded-xl p-4 sm:p-6 mx-2 sm:mx-auto mb-4 shadow-card max-w-[460px]">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6">
         {/* Score Circle */}
         <div className="relative flex-shrink-0">
@@ -345,7 +345,7 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
               cy="50"
               r="40"
               fill="none"
-              stroke="rgba(0, 255, 65, 0.2)"
+              stroke="hsl(var(--risk-low) / 0.18)"
               strokeWidth="8"
             />
             {/* Progress circle */}
@@ -354,16 +354,16 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
               cy="50"
               r="40"
               fill="none"
-              stroke={percentage >= 80 ? '#ff4444' : percentage >= 50 ? '#ffaa00' : '#00ff41'}
+              stroke={percentage >= 80 ? 'hsl(var(--risk-high))' : percentage >= 50 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
               strokeWidth="8"
               strokeLinecap="round"
               strokeDasharray={`${percentage * 2.51} 251`}
               className="transition-all duration-500 ease-out"
-              style={{ filter: 'drop-shadow(0 0 6px currentColor)' }}
+              
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-red-500' : percentage >= 50 ? 'text-yellow-500' : 'text-green-400')} style={{ textShadow: '0 0 10px currentColor' }}>
+            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-risk-mid' : 'text-risk-low')}>
               {percentage}%
             </span>
           </div>
@@ -373,17 +373,17 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         <div className="flex-1 text-center sm:text-left">
           <div className={cn(
             "inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-2 border",
-            percentage >= 80 ? "bg-red-500/10 text-red-400 border-red-500/30" : 
-            percentage >= 50 ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" : 
-            "bg-green-500/10 text-green-400 border-green-500/30"
+            percentage >= 80 ? "bg-risk-high-soft text-foreground border-risk-high/30" : 
+            percentage >= 50 ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" : 
+            "bg-risk-low-soft text-foreground border-risk-low/30"
           )}>
             <risk.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {risk.label}
           </div>
 
-          <div className="text-green-300/70 text-sm sm:text-base">
-            <span className="font-medium text-green-400">{confirmed}</span> of{' '}
-            <span className="font-medium text-green-400">{total}</span> data points confirmed
+          <div className="text-muted-foreground text-sm sm:text-base">
+            <span className="font-medium text-risk-low">{confirmed}</span> of{' '}
+            <span className="font-medium text-risk-low">{total}</span> data points confirmed
           </div>
 
           {/* Risk indicators row */}
@@ -392,9 +392,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasFingerprint && fingerprintRisk && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                fingerprintRisk === 'high' ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                fingerprintRisk === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-                "bg-green-500/10 text-green-400 border-green-500/20"
+                fingerprintRisk === 'high' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
+                fingerprintRisk === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <Fingerprint className="w-3 h-3" />
                 FP: {fingerprintRisk.charAt(0).toUpperCase() + fingerprintRisk.slice(1)}
@@ -405,13 +405,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasSocial && socialRiskLevel && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                socialRiskLevel === 'critical' ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                socialRiskLevel === 'high' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                socialRiskLevel === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-                "bg-green-500/10 text-green-400 border-green-500/20"
+                socialRiskLevel === 'critical' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
+                socialRiskLevel === 'high' ? "bg-risk-orange-soft text-foreground border-risk-orange/30" :
+                socialRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <Users className="w-3 h-3" />
-                Social: {socialRiskLevel === 'critical' ? 'Critical' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
+                Social: {socialRiskLevel === 'critical' ? 'High' : loggedInServices > 0 ? `${loggedInServices} logged in` : 'Safe'}
               </div>
             )}
 
@@ -419,13 +419,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasSecurity && securityRiskLevel && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                securityRiskLevel === 'critical' ? "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse" :
-                securityRiskLevel === 'high' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                securityRiskLevel === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-                "bg-green-500/10 text-green-400 border-green-500/20"
+                securityRiskLevel === 'critical' ? "bg-risk-high-soft text-foreground border-risk-high/30" :
+                securityRiskLevel === 'high' ? "bg-risk-orange-soft text-foreground border-risk-orange/30" :
+                securityRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <ShieldAlert className="w-3 h-3" />
-                Security: {securityRiskLevel === 'critical' ? '🚨 Critical' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
+                Security: {securityRiskLevel === 'critical' ? 'Needs attention' : securityIssuesCount > 0 ? `${securityIssuesCount} issues` : 'Secure'}
               </div>
             )}
 
@@ -433,9 +433,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {hasBehavior && behaviorRiskLevel && (
               <div className={cn(
                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border",
-                behaviorRiskLevel === 'high' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                behaviorRiskLevel === 'medium' ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
-                "bg-green-500/10 text-green-400 border-green-500/20"
+                behaviorRiskLevel === 'high' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
+                behaviorRiskLevel === 'medium' ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" :
+                "bg-risk-low-soft text-foreground border-risk-low/30"
               )}>
                 <Activity className="w-3 h-3" />
                 Behavior: {behaviorDataPoints > 0 ? `${behaviorDataPoints} tracked` : 'Safe'}
@@ -444,13 +444,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
           </div>
 
           {/* Progress bar */}
-          <div className="mt-2 sm:mt-3 h-1.5 sm:h-2 bg-green-900/30 rounded-full overflow-hidden max-w-xs mx-auto sm:mx-0 border border-green-500/20">
+          <div className="mt-2 sm:mt-3 h-1.5 sm:h-2 bg-risk-low/10 rounded-full overflow-hidden max-w-xs mx-auto sm:mx-0 border border-risk-low/20">
             <div 
               className={cn(
                 "h-full rounded-full transition-all duration-500 ease-out",
-                percentage >= 80 ? "bg-red-500" : percentage >= 50 ? "bg-yellow-500" : "bg-green-500"
+                percentage >= 80 ? "bg-risk-high" : percentage >= 50 ? "bg-risk-mid" : "bg-risk-low"
               )}
-              style={{ width: `${percentage}%`, boxShadow: '0 0 10px currentColor' }}
+              style={{ width: `${percentage}%` }}
             />
           </div>
         </div>

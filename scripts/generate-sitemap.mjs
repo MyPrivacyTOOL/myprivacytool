@@ -17,7 +17,15 @@ const STATIC_ROUTES = [
   { path: "/business", file: "src/pages/Business.tsx", priority: "0.8", changefreq: "weekly" },
   { path: "/start", file: "src/pages/Start.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/newsletter", file: "src/pages/Newsletter.tsx", priority: "0.5", changefreq: "monthly" },
+  { path: "/ai-access-check", file: "src/pages/AIAccessCheck.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/blog", file: "src/pages/Blog.tsx", priority: "0.7", changefreq: "weekly" },
+  { path: "/opt-out-guides", file: "src/pages/OptOutGuides.tsx", priority: "0.9", changefreq: "weekly" },
+  { path: "/journey", file: "src/pages/Journey.tsx", priority: "0.7", changefreq: "monthly" },
+  { path: "/am-i-exposed", file: "src/pages/AmIExposed.tsx", priority: "0.8", changefreq: "monthly" },
+  { path: "/contact", file: "src/pages/Contact.tsx", priority: "0.4", changefreq: "yearly" },
+  { path: "/privacy", file: "src/pages/Privacy.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/terms", file: "src/pages/Terms.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/cookies", file: "src/pages/Cookies.tsx", priority: "0.3", changefreq: "yearly" },
 ];
 
 function gitLastmod(relativeFile) {
@@ -71,6 +79,18 @@ function generateSitemap() {
         lastmod: postDateToLastmod(post.date),
         changefreq: "monthly",
         priority: "0.6",
+      }),
+    );
+  }
+
+  const guides = JSON.parse(readFileSync(path.join(ROOT, "src/data/optOutGuides.json"), "utf8"));
+  for (const guide of guides) {
+    entries.push(
+      buildUrlEntry({
+        loc: `${SITE_URL}/opt-out-guides/${guide.slug}`,
+        lastmod: guide.lastVerified,
+        changefreq: "monthly",
+        priority: "0.8",
       }),
     );
   }

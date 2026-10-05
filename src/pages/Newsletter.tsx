@@ -1,5 +1,8 @@
 import { useState } from "react";
+import { trackNewsletterSignup } from "@/lib/analytics";
 import { Shield, Mail, ArrowRight, Check, Lock } from "lucide-react";
+import Seo from "@/components/Seo";
+import pageMeta from "@/data/pageMeta.json";
 
 const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV";
@@ -31,6 +34,7 @@ export default function Newsletter() {
       });
 
       if (res.ok || res.status === 201) {
+        trackNewsletterSignup({ source: "newsletter_page" });
         setStatus("success");
       } else {
         const data = await res.json().catch(() => ({}));
@@ -48,47 +52,48 @@ export default function Newsletter() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono">
+    <div className="min-h-screen bg-background text-foreground">
+      <Seo {...pageMeta["/newsletter"]} path="/newsletter" />
       {/* Header */}
-      <div className="border-b border-[#27AE60]/30 px-6 py-4 flex items-center gap-3">
-        <Shield className="text-[#27AE60]" size={20} />
-        <span className="text-[#27AE60] text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
-        <span className="text-gray-600 text-xs ml-auto">Privacy Intelligence — Weekly Briefing</span>
+      <div className="border-b border-brand/30 px-6 py-4 flex items-center gap-3">
+        <Shield className="text-brand" size={20} />
+        <span className="text-brand text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
+        <span className="text-muted-foreground text-xs ml-auto">Privacy Check</span>
       </div>
 
       <div className="max-w-lg mx-auto px-6 py-16">
 
         {/* Icon */}
         <div className="flex justify-center mb-8">
-          <div className="w-16 h-16 rounded-full bg-[#1A1A1A] border border-[#27AE60]/40 flex items-center justify-center">
-            <Mail className="text-[#27AE60]" size={28} />
+          <div className="w-16 h-16 rounded-full bg-surface border border-brand/40 flex items-center justify-center">
+            <Mail className="text-brand" size={28} />
           </div>
         </div>
 
         {/* Headline */}
         <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold text-white mb-3 leading-tight">
-            Your data is out there.<br />
-            <span className="text-[#27AE60]">Stay ahead of it.</span>
+          <h1 className="text-2xl font-bold text-foreground mb-3 leading-tight">
+            Privacy Check<br />
+            <span className="text-brand">Stay on top of your data.</span>
           </h1>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            Weekly privacy intelligence — what's changed in the data broker landscape, new removal tactics, and what you need to know to protect your digital footprint.
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            A weekly note on what has changed with data brokers, new removal steps, and what you need to know to protect your digital footprint.
           </p>
         </div>
 
         {/* What you get */}
-        <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl p-5 mb-8">
-          <p className="text-xs text-gray-500 uppercase tracking-widest mb-4">What you'll get</p>
+        <div className="bg-surface border border-surface-border rounded-xl p-5 mb-8">
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-4">What you'll get</p>
           <div className="space-y-3">
             {[
-              "Weekly data broker exposure alerts",
+              "Weekly data exposure updates",
               "Step-by-step removal guides",
-              "New privacy threats & how to block them",
+              "New privacy risks and how to reduce them",
               "Your personal exposure score updates",
             ].map((item, i) => (
               <div key={i} className="flex items-start gap-3">
-                <Check size={14} className="text-[#27AE60] mt-0.5 shrink-0" />
-                <span className="text-sm text-gray-300">{item}</span>
+                <Check size={14} className="text-brand mt-0.5 shrink-0" />
+                <span className="text-sm text-muted-foreground">{item}</span>
               </div>
             ))}
           </div>
@@ -105,57 +110,57 @@ export default function Newsletter() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 disabled={status === "loading"}
-                className="w-full bg-black border border-[#2A2A2A] rounded-lg px-4 py-3.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#27AE60] disabled:opacity-50 transition-colors"
+                className="w-full bg-background border border-surface-border rounded-lg px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand disabled:opacity-50 transition-colors"
               />
             </div>
 
             {status === "error" && (
-              <p className="text-red-400 text-xs">{errorMsg}</p>
+              <p role="alert" className="text-foreground text-xs border-l-4 border-destructive pl-3">{errorMsg}</p>
             )}
 
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full flex items-center justify-center gap-2 bg-[#27AE60] hover:bg-[#1E8449] disabled:opacity-60 text-white text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white disabled:opacity-60 text-primary-foreground text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
             >
               {status === "loading" ? (
                 <span className="animate-pulse">Subscribing...</span>
               ) : (
                 <>
                   <ArrowRight size={16} />
-                  Get Weekly Privacy Intelligence
+                  Subscribe to Privacy Check
                 </>
               )}
             </button>
 
             {/* Trust signal */}
             <div className="flex items-center justify-center gap-2 pt-1">
-              <Lock size={11} className="text-gray-600" />
-              <p className="text-gray-600 text-xs">No spam. Unsubscribe anytime. We never sell your data.</p>
+              <Lock size={11} className="text-muted-foreground" />
+              <p className="text-muted-foreground text-xs">No spam. Unsubscribe anytime. We never sell your data.</p>
             </div>
           </form>
         ) : (
           /* Success state */
-          <div className="bg-[#1A1A1A] border border-[#27AE60]/40 rounded-xl p-6 text-center animate-fade-in">
-            <div className="w-12 h-12 rounded-full bg-black border border-[#27AE60] flex items-center justify-center mx-auto mb-4">
-              <Check className="text-[#27AE60]" size={22} />
+          <div className="bg-surface border border-brand/40 rounded-xl p-6 text-center animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-background border border-brand flex items-center justify-center mx-auto mb-4">
+              <Check className="text-brand" size={22} />
             </div>
-            <p className="text-[#27AE60] font-semibold mb-2">You're in.</p>
-            <p className="text-gray-400 text-sm">
-              Check your inbox — your first privacy briefing is on its way.
+            <p className="text-brand font-semibold mb-2">You're in.</p>
+            <p className="text-muted-foreground text-sm">
+              Check your inbox — your first Privacy Check is on its way.
             </p>
             <a
               href="/"
-              className="inline-flex items-center gap-2 mt-6 text-xs text-gray-500 hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 mt-6 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              ← Run your free exposure scan
+              ← Check My Exposure
             </a>
           </div>
         )}
 
         {/* Footer */}
-        <p className="text-gray-700 text-xs text-center mt-10">
-          myprivacytool.io · Protecting your digital footprint
+        <p className="text-muted-foreground text-xs text-center mt-10">
+          MyPrivacyTOOL · See it. Control it. Protect it.
         </p>
       </div>
     </div>

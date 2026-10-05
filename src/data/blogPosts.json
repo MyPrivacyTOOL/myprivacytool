@@ -1,5 +1,38 @@
 [
   {
+    "slug": "remove-personal-information-from-internet",
+    "title": "How to Remove Your Personal Information From the Internet",
+    "excerpt": "A step-by-step guide to finding, removing and keeping your personal data off data brokers, people-search sites and search engines — with Hong Kong, Singapore and Australia rights covered.",
+    "date": "September 30, 2026",
+    "updated": "September 30, 2026",
+    "author": "MyPrivacyTOOL Editorial Team",
+    "category": "Privacy Guides",
+    "readTime": 13,
+    "guide": true
+  },
+  {
+    "slug": "remove-your-name-and-info-from-google",
+    "title": "How to Remove Your Name and Personal Info From Google",
+    "excerpt": "Use Google's Results about you tool, removal request forms and source-site takedowns to get your name, address and phone number out of search results — including what applies in HK, SG and AU.",
+    "date": "September 30, 2026",
+    "updated": "September 30, 2026",
+    "author": "MyPrivacyTOOL Editorial Team",
+    "category": "Privacy Guides",
+    "readTime": 13,
+    "guide": true
+  },
+  {
+    "slug": "stop-spam-calls-texts-and-emails",
+    "title": "How to Stop Spam Calls, Texts and Emails",
+    "excerpt": "Block spam at the source: phone and email filters, Do Not Call registers, safe unsubscribing and reporting — with Hong Kong, Singapore and Australia rules and reporting channels.",
+    "date": "September 30, 2026",
+    "updated": "September 30, 2026",
+    "author": "MyPrivacyTOOL Editorial Team",
+    "category": "Privacy Guides",
+    "readTime": 13,
+    "guide": true
+  },
+  {
     "slug": "how-exposed-are-you",
     "title": "How Exposed Are You? The 46 Things Tracking You Online",
     "excerpt": "Your digital footprint is larger than you think. Discover the 46 privacy vectors exposing your personal data right now — from data brokers to AI training datasets.",
@@ -16,8 +49,7 @@
     "date": "September 22, 2026",
     "author": "MyPrivacyTOOL",
     "category": "Privacy Advocacy",
-    "readTime": 9,
-    "image": "/blog/mass-surveillance.jpg"
+    "readTime": 9
   },
   {
     "slug": "linkedin-data-brokers",

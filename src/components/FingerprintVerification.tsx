@@ -305,7 +305,7 @@ export default function FingerprintVerification({
       switch (method) {
         case 'webrtc':
           const webrtc = await detectWebRTCLeak();
-          result = webrtc.isLeaking ? '❌ Still Leaking' : '✅ Protected!';
+          result = webrtc.isLeaking ? 'Still leaking' : 'Protected';
           break;
         case 'canvas':
           const fp = await calculateFingerprintUniqueness();
@@ -386,7 +386,7 @@ export default function FingerprintVerification({
       return { change: percent, text: `${percent}% less unique! 🎉`, improved: true };
     } else {
       const percent = Math.round((after / before - 1) * 100);
-      return { change: -percent, text: `${percent}% more unique ⚠️`, improved: false };
+      return { change: -percent, text: `${percent}% more unique`, improved: false };
     }
   };
 
@@ -433,39 +433,39 @@ export default function FingerprintVerification({
   const uniquenessChange = getUniquenessChange();
 
   return (
-    <Card className="bg-gradient-to-br from-emerald-950/40 to-emerald-900/20 border-emerald-500/30 overflow-hidden">
+    <Card className="bg-risk-low-soft border-risk-low/30 overflow-hidden">
       {/* Celebration Overlay */}
       {showCelebration && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/95 backdrop-blur-sm">
           <div className="text-center animate-scale-in">
-            <PartyPopper className="w-16 h-16 text-yellow-400 mx-auto mb-4 animate-bounce" />
-            <h3 className="text-2xl font-bold text-white mb-2">Great Job! 🎉</h3>
-            <p className="text-emerald-200">Your privacy is much better protected!</p>
+            <PartyPopper className="w-16 h-16 text-foreground mx-auto mb-4 animate-bounce" />
+            <h3 className="text-2xl font-bold text-foreground mb-2">Great job</h3>
+            <p className="text-risk-low">Your privacy is much better protected!</p>
           </div>
         </div>
       )}
 
       {/* Regression Warning */}
       {hasRegressions && showComparison && (
-        <div className="bg-gradient-to-r from-red-600 to-red-700 p-4 border-b border-red-500">
+        <div className="bg-risk-high-soft p-4 border-b border-risk-high/30">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-white" />
+            <AlertTriangle className="w-6 h-6 text-foreground" />
             <div>
-              <h3 className="text-white font-bold">⚠️ Your Protection Decreased!</h3>
-              <p className="text-red-100 text-sm">Some settings changed that made you more trackable.</p>
+              <h3 className="text-foreground font-bold">Your protection decreased</h3>
+              <p className="text-foreground text-sm">Some settings changed that made you more trackable.</p>
             </div>
           </div>
         </div>
       )}
 
-      <CardHeader className="border-b border-emerald-500/20 pb-4">
-        <CardTitle className="flex items-center justify-between text-emerald-400">
+      <CardHeader className="border-b border-risk-low/30 pb-4">
+        <CardTitle className="flex items-center justify-between text-risk-low">
           <div className="flex items-center gap-3">
             <Shield className="w-5 h-5" />
             <div>
               <h3 className="text-lg font-bold">Verify Your Protection</h3>
               {lastTestTime && (
-                <p className="text-sm text-emerald-300/60 font-normal flex items-center gap-1">
+                <p className="text-sm text-muted-foreground font-normal flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   Last tested: {getTimeAgo(lastTestTime)}
                 </p>
@@ -480,7 +480,7 @@ export default function FingerprintVerification({
         <Button
           onClick={handleFullRetest}
           disabled={isRetesting}
-          className="w-full h-14 text-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-900/30"
+          className="w-full h-14 text-lg bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white shadow-card "
         >
           {isRetesting ? (
             <>
@@ -498,34 +498,34 @@ export default function FingerprintVerification({
         {/* Comparison Table */}
         {showComparison && comparison.length > 0 && (
           <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-emerald-300 flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-risk-low flex items-center gap-2">
               📊 Before/After Comparison
             </h4>
             
-            <div className="rounded-lg border border-emerald-500/20 overflow-hidden">
+            <div className="rounded-lg border border-risk-low/30 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-emerald-950/50 border-emerald-500/20">
-                    <TableHead className="text-emerald-300">Method</TableHead>
-                    <TableHead className="text-emerald-300">Before</TableHead>
-                    <TableHead className="text-emerald-300">After</TableHead>
-                    <TableHead className="text-emerald-300 text-center">Status</TableHead>
+                  <TableRow className="bg-risk-low-soft border-risk-low/30">
+                    <TableHead className="text-risk-low">Method</TableHead>
+                    <TableHead className="text-risk-low">Before</TableHead>
+                    <TableHead className="text-risk-low">After</TableHead>
+                    <TableHead className="text-risk-low text-center">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {comparison.map((row) => (
-                    <TableRow key={row.method} className="border-emerald-500/10">
+                    <TableRow key={row.method} className="border-risk-low/30">
                       <TableCell className="font-medium text-foreground">{row.method}</TableCell>
                       <TableCell className="text-muted-foreground text-xs font-mono">{row.before}</TableCell>
                       <TableCell className="text-muted-foreground text-xs font-mono">{row.after}</TableCell>
                       <TableCell className="text-center">
                         {row.status === 'improved' && (
-                          <span className="inline-flex items-center gap-1 text-green-400 text-xs">
+                          <span className="inline-flex items-center gap-1 text-risk-low text-xs">
                             <CheckCircle className="w-4 h-4" /> Improved
                           </span>
                         )}
                         {row.status === 'regressed' && (
-                          <span className="inline-flex items-center gap-1 text-red-400 text-xs">
+                          <span className="inline-flex items-center gap-1 text-foreground text-xs">
                             <XCircle className="w-4 h-4" /> Worse
                           </span>
                         )}
@@ -544,20 +544,20 @@ export default function FingerprintVerification({
             {/* Improvement Score */}
             {uniquenessChange && (
               <div className={`p-4 rounded-xl border ${
-                uniquenessChange.improved ? 'bg-green-950/30 border-green-500/30' : 'bg-red-950/30 border-red-500/30'
+                uniquenessChange.improved ? 'bg-risk-low-soft border-risk-low/30' : 'bg-risk-high-soft border-risk-high/30'
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm text-muted-foreground">Uniqueness Change</span>
-                  <span className={`font-bold ${uniquenessChange.improved ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`font-bold ${uniquenessChange.improved ? 'text-risk-low' : 'text-foreground'}`}>
                     {uniquenessChange.text}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-2 bg-black/20 rounded-lg">
+                  <div className="p-2 bg-secondary rounded-lg">
                     <p className="text-xs text-muted-foreground">Before</p>
                     <p className="text-sm font-medium text-foreground">{previousData?.uniqueness}</p>
                   </div>
-                  <div className="p-2 bg-black/20 rounded-lg">
+                  <div className="p-2 bg-secondary rounded-lg">
                     <p className="text-xs text-muted-foreground">After</p>
                     <p className="text-sm font-medium text-foreground">{currentFingerprint.uniqueness}</p>
                   </div>
@@ -569,7 +569,7 @@ export default function FingerprintVerification({
 
         {/* Individual Test Buttons */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-emerald-300 flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-risk-low flex items-center gap-2">
             <Zap className="w-4 h-4" />
             Quick Tests
           </h4>
@@ -579,7 +579,7 @@ export default function FingerprintVerification({
               size="sm"
               onClick={() => handleSingleTest('webrtc')}
               disabled={testingMethod === 'webrtc'}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/30"
+              className="border-risk-low/30 text-risk-low hover:brightness-95"
             >
               {testingMethod === 'webrtc' ? (
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -593,7 +593,7 @@ export default function FingerprintVerification({
               size="sm"
               onClick={() => handleSingleTest('canvas')}
               disabled={testingMethod === 'canvas'}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/30"
+              className="border-risk-low/30 text-risk-low hover:brightness-95"
             >
               {testingMethod === 'canvas' ? (
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -607,7 +607,7 @@ export default function FingerprintVerification({
               size="sm"
               onClick={() => handleSingleTest('webgl')}
               disabled={testingMethod === 'webgl'}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/30"
+              className="border-risk-low/30 text-risk-low hover:brightness-95"
             >
               {testingMethod === 'webgl' ? (
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -621,7 +621,7 @@ export default function FingerprintVerification({
               size="sm"
               onClick={() => handleSingleTest('uniqueness')}
               disabled={testingMethod === 'uniqueness'}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/30"
+              className="border-risk-low/30 text-risk-low hover:brightness-95"
             >
               {testingMethod === 'uniqueness' ? (
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
@@ -636,17 +636,17 @@ export default function FingerprintVerification({
         {/* Protection Checklist */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-emerald-300 flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-risk-low flex items-center gap-2">
               ✅ Protection Checklist
             </h4>
-            <span className="text-sm text-emerald-400">
+            <span className="text-sm text-risk-low">
               {checkedCount}/{checklist.length} protected
             </span>
           </div>
           
           <Progress 
             value={(checkedCount / checklist.length) * 100} 
-            className="h-2 bg-emerald-950/50"
+            className="h-2 bg-risk-low-soft"
           />
           
           <div className="grid gap-1.5">
@@ -654,15 +654,15 @@ export default function FingerprintVerification({
               <div 
                 key={item.label}
                 className={`flex items-center gap-2 p-2 rounded-lg text-sm ${
-                  item.checked ? 'bg-green-500/10' : 'bg-red-500/10'
+                  item.checked ? 'bg-risk-low-soft' : 'bg-risk-high-soft'
                 }`}
               >
                 {item.checked ? (
-                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <CheckCircle className="w-4 h-4 text-risk-low" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-red-400" />
+                  <XCircle className="w-4 h-4 text-foreground" />
                 )}
-                <span className={item.checked ? 'text-green-200' : 'text-red-200'}>
+                <span className={item.checked ? 'text-risk-low' : 'text-foreground'}>
                   {item.label}
                 </span>
               </div>
@@ -671,10 +671,10 @@ export default function FingerprintVerification({
         </div>
 
         {/* Monitoring Toggle */}
-        <div className="flex items-center justify-between p-4 bg-emerald-950/30 rounded-xl border border-emerald-500/20">
+        <div className="flex items-center justify-between p-4 bg-risk-low-soft rounded-xl border border-risk-low/30">
           <div>
-            <p className="text-sm font-medium text-emerald-300">Monitor Fingerprint Changes</p>
-            <p className="text-xs text-emerald-300/60">Auto-test every 24 hours</p>
+            <p className="text-sm font-medium text-risk-low">Monitor Fingerprint Changes</p>
+            <p className="text-xs text-muted-foreground">Auto-test every 24 hours</p>
           </div>
           <Switch 
             checked={monitoringEnabled} 
@@ -686,7 +686,7 @@ export default function FingerprintVerification({
         <Button
           variant="outline"
           onClick={handleExportReport}
-          className="w-full border-emerald-500/30 text-emerald-300 hover:bg-emerald-950/30"
+          className="w-full border-risk-low/30 text-risk-low hover:brightness-95"
         >
           <Download className="w-4 h-4 mr-2" />
           Export Verification Report

@@ -1,14 +1,24 @@
 import React from 'react';
+import { Helmet } from 'react-helmet';
+import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
 import blogPosts from '@/data/blogPosts.json';
+import { guides } from '@/content/guides';
+
+const SITE_URL = 'https://www.myprivacytool.io';
+
+const toIsoDate = (d: string) => {
+  const parsed = new Date(d);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, 10);
+};
 
 const blogContent: { [key: string]: React.ReactNode } = {
   "how-exposed-are-you": (
-      <div className="prose prose-slate max-w-none">
-        <p>Your digital footprint is larger than you think. Every day, your personal data is being collected, packaged, sold, and used in ways you never authorized.</p>
+      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+        <p>Your digital footprint is likely larger than you think. Your personal data is collected, packaged, sold, and used in ways you may not have agreed to, and you can take control of it.</p>
         
         <h2>The 46 Privacy Vectors Exposing Your Data</h2>
         <p>We've identified 46 distinct sources where your personal information is currently exposed:</p>
@@ -73,30 +83,30 @@ const blogContent: { [key: string]: React.ReactNode } = {
           <li>Beta testing accounts</li>
         </ul>
         
-        <h2>Why This Matters Now</h2>
-        <p>The combination of these 46 vectors creates a complete digital shadow profile of you. Advertisers, employers, landlords, and bad actors can:</p>
+        <h2>Why This Matters</h2>
+        <p>The combination of these 46 vectors creates a complete digital shadow profile of you. Advertisers, employers, landlords, and others can use it to:</p>
         <ul>
           <li>Reconstruct your entire movement history</li>
           <li>Predict your health status, financial situation, and life choices</li>
-          <li>Impersonate you or commit identity theft</li>
+          <li>Make impersonation or identity theft easier</li>
           <li>Deny you opportunities based on inferred data</li>
-          <li>Target you with precision manipulation</li>
+          <li>Target you with highly tailored messaging</li>
         </ul>
         
         <h2>What You Can Do Right Now</h2>
-        <p>Run a free scan with MyPrivacyTOOL to see exactly where your data is exposed. We'll map all 46 vectors for you, then give you step-by-step removal instructions for each one.</p>
+        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 46 vectors for you, then give you step-by-step removal instructions for each one.</p>
         
-        <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough — you need ongoing monitoring and regular removal cycles.</p>
+        <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough, so ongoing monitoring and regular removal rounds help keep your footprint small.</p>
       </div>
   ),
   "25-years-mass-surveillance": (
-      <div className="prose prose-slate max-w-none">
-        <p>A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to demand a different future.</p>
+      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+        <p>A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to ask for a different future.</p>
         
         <h2>The Timeline: How We Got Here</h2>
         
         <h3>2001 — The PATRIOT Act & The Beginning</h3>
-        <p>Post-9/11 panic gave governments unprecedented surveillance powers. The PATRIOT Act authorized bulk data collection without individual warrants. What was supposed to be temporary became permanent infrastructure.</p>
+        <p>After 9/11, governments were given unprecedented surveillance powers. The PATRIOT Act authorized bulk data collection without individual warrants. What was supposed to be temporary became permanent infrastructure.</p>
         
         <h3>2007 — The Smartphone Era</h3>
         <p>The iPhone launched, and with it, a new vector: location tracking. Every smartphone became a tracking device, with Apple, Google, and app developers collecting your movement history. GPS, cellular, and WiFi triangulation made it impossible to move without leaving a digital trail.</p>
@@ -104,12 +114,12 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <h3>2013 — The Snowden Revelations</h3>
         <p>Edward Snowden revealed the scope: the NSA was collecting billions of phone records daily, the GCHQ was tapping undersea cables, and Silicon Valley tech companies were forwarding user data to intelligence agencies under secret court orders.</p>
         
-        <p>The response? Shock. Then... nothing. Surveillance continued, now with public knowledge.</p>
+        <p>Surveillance continued, now with public knowledge.</p>
         
         <h3>2015–2020 — The Data Broker Boom</h3>
-        <p>Private companies realized the gold mine: sell what governments collected for free. ZoomInfo, Apollo, Hunter, Clearbit, and hundreds of smaller brokers scraped the web and resold profiles to sales teams, marketers, and private investigators.</p>
+        <p>Private companies saw a market in selling collected data. ZoomInfo, Apollo, Hunter, Clearbit, and hundreds of smaller brokers scraped the web and resold profiles to sales teams, marketers, and private investigators.</p>
         
-        <h3>2020–2024 — AI Training & Weaponization</h3>
+        <h3>2020–2024 — AI Training</h3>
         <p>All of your collected data — public profiles, deleted tweets, medical records, shopping history, location data, chat logs — was fed into AI models. Now, AI can predict your behavior, preferences, and vulnerabilities better than you can yourself.</p>
         
         <h2>What We've Normalized</h2>
@@ -134,14 +144,14 @@ const blogContent: { [key: string]: React.ReactNode } = {
           <li><strong>Workplace surveillance:</strong> Employers track mouse movement, keystroke activity, camera feeds, and location</li>
         </ul>
         
-        <h2>The Cost We Haven't Paid Yet</h2>
+        <h2>What Is at Stake</h2>
         
-        <p>The real danger of 25 years of surveillance is not what's being collected — it's what happens when that data is misused by actors with bad intent:</p>
+        <p>The main concern with 25 years of surveillance is not only what is collected, but how that data can be misused:</p>
         
         <ul>
           <li><strong>Political manipulation:</strong> Detailed profiles of voters used to target propaganda with surgical precision (we're seeing this now)</li>
           <li><strong>Discrimination:</strong> Employers, landlords, and insurance companies using algorithmic profiles to deny opportunities</li>
-          <li><strong>Blackmail & extortion:</strong> Access to intimate data being weaponized against individuals</li>
+          <li><strong>Blackmail & extortion:</strong> Access to intimate data being used against individuals</li>
           <li><strong>Authoritarian control:</strong> In countries with repressive regimes, this data becomes a tool of oppression</li>
           <li><strong>Systemic oppression:</strong> Minority communities are disproportionately surveilled and tracked by law enforcement</li>
         </ul>
@@ -166,7 +176,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <p>Programs like bulk phone metadata collection were authorized under emergency powers. Those emergencies are 25 years old. Sunsets are necessary.</p>
         
         <h3>4. Default Encryption Everywhere</h3>
-        <p>All messages, emails, and cloud storage should be end-to-end encrypted by default. No backdoors for governments.</p>
+        <p>All messages, emails, and online file storage should be end-to-end encrypted by default. No backdoors for governments.</p>
         
         <h3>5. Right to Deletion & Audit</h3>
         <p>You should have the right to know what data is held about you, who holds it, and how to delete it. GDPR's CCPA's model works.</p>
@@ -189,10 +199,10 @@ const blogContent: { [key: string]: React.ReactNode } = {
       </div>
   ),
   "linkedin-data-brokers": (
-      <div className="prose prose-slate max-w-none">
-        <p>LinkedIn says your profile is yours to control. But behind the scenes, companies like Apollo, ZoomInfo, Lusha, and Clearbit are legally scraping your entire profile — every job, school, skill, and connection — and reselling it to thousands of sales teams and recruiters.</p>
+      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+        <p>LinkedIn says your profile is yours to control. But companies like Apollo, ZoomInfo, Lusha, and Clearbit are legally scraping your entire profile — every job, school, skill, and connection — and reselling it to thousands of sales teams and recruiters.</p>
         
-        <h2>How Your LinkedIn Data Is Harvested</h2>
+        <h2>How Your LinkedIn Data Is Collected</h2>
         <p>LinkedIn's ToS technically forbids scraping. But enforcement is almost nonexistent, and the data is too valuable to ignore. These brokers operate in a gray zone:</p>
         
         <ul>
@@ -208,7 +218,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
           <li>Full name, location, phone (if public)</li>
           <li>Complete job history with dates</li>
           <li>Education and credentials</li>
-          <li>Skills and endorsements (a data broker's goldmine)</li>
+          <li>Skills and endorsements</li>
           <li>Company size and industry signals</li>
           <li>Inferred seniority and decision-making authority</li>
           <li>Email address (matched via various databases)</li>
@@ -244,7 +254,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
       </div>
   ),
   "ai-training-data-opt-out": (
-      <div className="prose prose-slate max-w-none">
+      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
         <p>Every tweet, Reddit comment, blog post, and public profile you've ever published is now part of an AI training dataset. OpenAI, Google, Meta, and dozens of startups have already ingested billions of lines of your data into their models. The question is no longer "is my data in AI?" — it's "where can I opt out?"</p>
         
         <h2>How Your Data Became AI Training Material</h2>
@@ -274,19 +284,19 @@ const blogContent: { [key: string]: React.ReactNode } = {
         
         <h2>What This Means For Your Privacy</h2>
         
-        <p>Your data in AI models creates several risks:</p>
+        <p>Your data in AI models raises several privacy concerns:</p>
         
         <h3>1. Information Leakage</h3>
         <p>AI models can sometimes reproduce exact training data if prompted correctly. A researcher at DeepMind demonstrated that GPT-3 could reproduce verbatim personal information (SSNs, addresses, phone numbers) when the model had been trained on scraped datasets containing this data.</p>
         
-        <h3>2. Inference Attacks</h3>
+        <h3>2. Membership Inference</h3>
         <p>Researchers can determine if your data was in the training set by submitting queries and analyzing the model's confidence and output patterns. This "membership inference" attack works even on large models.</p>
         
         <h3>3. Commercial Reuse Without Consent</h3>
         <p>Your words — your thoughts, your writing, your expertise — are now part of a product that generates billions in value. You received no compensation, and no one asked permission.</p>
         
-        <h3>4. Misinformation & Impersonation Risk</h3>
-        <p>If your writing style and ideas are part of a model's training data, an attacker can use that model to impersonate you convincingly or generate content falsely attributed to your voice.</p>
+        <h3>4. Impersonation Risk</h3>
+        <p>If your writing style and ideas are part of a model's training data, someone could use that model to impersonate you convincingly or generate content falsely attributed to your voice.</p>
         
         <h2>How to Opt Out (The Current Options)</h2>
         
@@ -302,7 +312,7 @@ Disallow: /</code></pre>
         <p><strong>Reddit:</strong> You cannot opt out of past scraping, but you can delete your account and all historical posts. Reddit's new API terms (2024) now restrict scraping, so future data should be better protected.</p>
         <p><strong>GitHub:</strong> Use <code>Settings → Copilot → Block matching public code</code> to prevent future training on your repos, though past training is not reversed.</p>
         
-        <h3>3. Delete Your Content (Nuclear Option)</h3>
+        <h3>3. Delete Your Content (Most Thorough Option)</h3>
         <p>The only way to guarantee your data is not in AI models going forward is to delete it entirely:</p>
         <ul>
           <li>Delete old blog posts and archives</li>
@@ -321,8 +331,8 @@ Disallow: /</code></pre>
         </ul>
         <p>These requests vary in effectiveness. GDPR gives you strong removal rights in the EU, but US privacy laws are weaker.</p>
         
-        <h2>The Hard Truth</h2>
-        <p>Your data is already in dozens of AI models. Opting out today only stops future training. What's already done cannot be undone with current technology.</p>
+        <h2>What Opting Out Can and Cannot Do</h2>
+        <p>Opting out today only stops future training. Data already used in training cannot be removed from existing models with current technology.</p>
         
         <p>The real protection comes from:</p>
         <ol>
@@ -346,11 +356,13 @@ export default function BlogPost() {
   const navigate = useNavigate();
   const meta = slug ? blogPosts.find((p) => p.slug === slug) : undefined;
 
-  if (!slug || !meta || !blogContent[slug]) {
+  const guide = slug ? guides[slug] : undefined;
+
+  if (!slug || !meta || (!blogContent[slug] && !guide)) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900 mb-4">Article Not Found</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-4">Article Not Found</h1>
           <Link to="/blog">
             <Button variant="outline">← Back to Blog</Button>
           </Link>
@@ -359,7 +371,39 @@ export default function BlogPost() {
     );
   }
 
-  const post = { ...meta, content: blogContent[slug] };
+  const GuideContent = guide?.Content;
+  const post = { ...meta, content: GuideContent ? <GuideContent /> : blogContent[slug] };
+  const updated = 'updated' in meta ? (meta as { updated?: string }).updated : undefined;
+  const canonical = `${SITE_URL}/blog/${slug}`;
+  const scanHref = `/scan?utm_source=blog&utm_medium=${slug}`;
+  const relatedGuides = guide
+    ? blogPosts.filter((p) => p.slug !== slug && guides[p.slug])
+    : [];
+
+  const jsonLd: object[] = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: post.title,
+      description: post.excerpt,
+      author: { '@type': 'Organization', name: post.author },
+      publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL', url: SITE_URL },
+      datePublished: toIsoDate(post.date),
+      dateModified: toIsoDate(updated ?? post.date),
+      mainEntityOfPage: canonical,
+    },
+  ];
+  if (guide && guide.faqs.length > 0) {
+    jsonLd.push({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: guide.faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    });
+  }
 
   const handleShare = async () => {
     const url = `${window.location.origin}/blog/${slug}`;
@@ -375,9 +419,21 @@ export default function BlogPost() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
+      <Seo
+        title={`${post.title} | MyPrivacyTOOL`}
+        description={post.excerpt}
+        path={`/blog/${slug}`}
+        type="article"
+        image={post.image ? `${SITE_URL}${post.image}` : undefined}
+      />
+      <Helmet>
+        {jsonLd.map((block, i) => (
+          <script key={i} type="application/ld+json">{JSON.stringify(block)}</script>
+        ))}
+      </Helmet>
       {/* Article Header */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-card border-b border-border">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Button
             variant="ghost"
@@ -389,19 +445,26 @@ export default function BlogPost() {
           </Button>
 
           <div className="space-y-4">
-            <div className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+            <div className="inline-block px-3 py-1 rounded-full text-sm font-semibold bg-secondary text-foreground">
               {post.category}
             </div>
             
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-900">
+            <h1 className="text-4xl md:text-5xl font-bold text-foreground">
               {post.title}
             </h1>
 
-            <div className="flex items-center justify-between text-slate-600 pt-4">
+            <div className="flex items-center justify-between text-muted-foreground pt-4">
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="font-medium text-slate-900">{post.author}</p>
-                  <p className="text-sm">{post.date}</p>
+                  <p className="font-medium text-foreground">By {post.author}</p>
+                  <p className="text-sm">
+                    Published <time dateTime={toIsoDate(post.date)}>{post.date}</time>
+                    {updated && (
+                      <>
+                        {' · '}Updated on <time dateTime={toIsoDate(updated)}>{updated}</time>
+                      </>
+                    )}
+                  </p>
                 </div>
               </div>
               <div className="text-sm">
@@ -415,7 +478,7 @@ export default function BlogPost() {
       {/* Article Image */}
       {post.image && (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="h-96 bg-slate-200 rounded-lg overflow-hidden">
+          <div className="h-96 bg-muted rounded-lg overflow-hidden">
             <img
               src={post.image}
               alt={post.title}
@@ -427,16 +490,44 @@ export default function BlogPost() {
 
       {/* Article Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="bg-white rounded-lg p-8 mb-8 shadow-sm">
-          <div className="prose prose-slate prose-lg max-w-none">
+        <div className="bg-card rounded-lg p-8 mb-8 shadow-sm">
+          {guide && (
+            <nav aria-label="Table of contents" className="mb-8 rounded-lg border border-border bg-secondary p-5">
+              <p className="font-bold text-foreground mb-3">In this guide</p>
+              <ol className="list-decimal pl-5 space-y-1 text-foreground">
+                {guide.sections.map((sec) => (
+                  <li key={sec.id}>
+                    <a href={`#${sec.id}`} className="text-brand hover:underline">{sec.title}</a>
+                  </li>
+                ))}
+                <li>
+                  <a href="#faq" className="text-brand hover:underline">Frequently asked questions</a>
+                </li>
+              </ol>
+            </nav>
+          )}
+
+          <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand prose-lg max-w-none">
             {post.content}
+
+            {guide && guide.faqs.length > 0 && (
+              <section aria-labelledby="faq">
+                <h2 id="faq">Frequently asked questions</h2>
+                {guide.faqs.map((f) => (
+                  <div key={f.q}>
+                    <h3>{f.q}</h3>
+                    <p>{f.a}</p>
+                  </div>
+                ))}
+              </section>
+            )}
           </div>
 
           {/* Social Share & CTA */}
-          <div className="border-t border-slate-200 mt-8 pt-8">
+          <div className="border-t border-border mt-8 pt-8">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <p className="text-sm font-medium text-slate-900 mb-2">Share this article</p>
+                <p className="text-sm font-medium text-foreground mb-2">Share this article</p>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -462,25 +553,40 @@ export default function BlogPost() {
             </div>
 
             {/* CTA Box */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border border-blue-200">
-              <h3 className="font-bold text-slate-900 mb-2">Ready to reclaim your privacy?</h3>
-              <p className="text-slate-600 mb-4">Run a free scan to see exactly where your data is exposed.</p>
-              <Link to="/scan">
-                <Button className="bg-blue-600 hover:bg-blue-700">
-                  Start Free Scan →
+            <div className="bg-secondary rounded-lg p-6 border border-border">
+              <h3 className="font-bold text-foreground mb-2">Ready to reclaim your privacy?</h3>
+              <p className="text-muted-foreground mb-4">See where your data is exposed, then take it back.</p>
+              <Link to={scanHref}>
+                <Button>
+                  Check My Exposure →
                 </Button>
               </Link>
             </div>
           </div>
         </div>
 
+        {relatedGuides.length > 0 && (
+          <Card className="mb-8">
+            <CardContent className="p-8">
+              <h3 className="text-xl font-bold text-foreground mb-3">More privacy guides</h3>
+              <ul className="space-y-2">
+                {relatedGuides.map((p) => (
+                  <li key={p.slug}>
+                    <Link to={`/blog/${p.slug}`} className="text-brand hover:underline">{p.title}</Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Related Content CTA */}
-        <Card className="bg-slate-900 text-white">
+        <Card className="bg-brand-soft border-surface-border text-foreground">
           <CardContent className="p-8">
-            <h3 className="text-2xl font-bold mb-2">Get Privacy Updates Weekly</h3>
-            <p className="text-slate-200 mb-4">New articles on data brokers, AI threats, and protection tactics delivered to your inbox.</p>
+            <h3 className="text-2xl font-bold mb-2">Privacy Check</h3>
+            <p className="text-muted-foreground mb-4">Privacy Check is our newsletter: new articles on data brokers, AI and your data, and practical protection steps, delivered to your inbox.</p>
             <Link to="/newsletter">
-              <Button variant="secondary">Subscribe Now</Button>
+              <Button>Subscribe Now</Button>
             </Link>
           </CardContent>
         </Card>

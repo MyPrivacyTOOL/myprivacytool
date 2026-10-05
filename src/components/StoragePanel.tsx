@@ -164,17 +164,17 @@ export default function StoragePanel() {
 
   const getRiskColor = (risk: 'high' | 'medium' | 'low') => {
     switch (risk) {
-      case 'high': return 'text-red-400 bg-red-500/10 border-red-500/30';
-      case 'medium': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
-      case 'low': return 'text-green-400 bg-green-500/10 border-green-500/30';
+      case 'high': return 'text-foreground bg-risk-high-soft border-risk-high/30';
+      case 'medium': return 'text-foreground bg-risk-mid-soft border-risk-mid/30';
+      case 'low': return 'text-foreground bg-risk-low-soft border-risk-low/30';
     }
   };
 
   const getRiskIcon = (risk: 'high' | 'medium' | 'low') => {
     switch (risk) {
-      case 'high': return '🔴';
-      case 'medium': return '🟡';
-      case 'low': return '🟢';
+      case 'high': return 'High';
+      case 'medium': return 'Medium';
+      case 'low': return 'Low';
     }
   };
 
@@ -190,13 +190,13 @@ export default function StoragePanel() {
 
   if (isLoading) {
     return (
-      <Card className="bg-gradient-to-br from-cyan-950/40 to-blue-900/20 border-cyan-500/30">
+      <Card className="bg-brand-soft border-brand/30">
         <CardContent className="py-8 text-center">
           <div className="animate-pulse flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-cyan-500/20 flex items-center justify-center">
-              <HardDrive className="w-8 h-8 text-cyan-400 animate-spin" />
+            <div className="w-16 h-16 rounded-full bg-brand-soft flex items-center justify-center">
+              <HardDrive className="w-8 h-8 text-brand animate-spin" />
             </div>
-            <p className="text-cyan-300">Analyzing your browser storage...</p>
+            <p className="text-brand">Analyzing your browser storage...</p>
           </div>
         </CardContent>
       </Card>
@@ -214,11 +214,11 @@ export default function StoragePanel() {
 
   // Pie chart data
   const pieData: StorageBreakdownItem[] = [
-    { name: 'Cookies', value: storageData.cookies.count * 100, color: '#f59e0b' },
-    { name: 'LocalStorage', value: storageData.localStorage.sizeKB * 1024, color: '#06b6d4' },
-    { name: 'SessionStorage', value: storageData.sessionStorage.sizeKB * 1024, color: '#10b981' },
-    { name: 'IndexedDB', value: storageData.indexedDB.estimatedSizeMB * 1024 * 1024, color: '#8b5cf6' },
-    { name: 'Cache', value: storageData.cacheStorage.estimatedSizeMB * 1024 * 1024, color: '#ec4899' },
+    { name: 'Cookies', value: storageData.cookies.count * 100, color: 'hsl(var(--brand-near-black))' },
+    { name: 'LocalStorage', value: storageData.localStorage.sizeKB * 1024, color: 'hsl(var(--brand-green))' },
+    { name: 'SessionStorage', value: storageData.sessionStorage.sizeKB * 1024, color: 'hsl(var(--brand-green-hover))' },
+    { name: 'IndexedDB', value: storageData.indexedDB.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--brand-near-black) / 0.55)' },
+    { name: 'Cache', value: storageData.cacheStorage.estimatedSizeMB * 1024 * 1024, color: 'hsl(var(--brand-green) / 0.5)' },
   ].filter(item => item.value > 0);
 
   // All detected tracking keys
@@ -232,20 +232,19 @@ export default function StoragePanel() {
   ];
 
   return (
-    <Card className="bg-gradient-to-br from-cyan-950/40 to-blue-900/20 border-cyan-500/30 overflow-hidden">
+    <Card className="bg-brand-soft border-brand/30 overflow-hidden">
       {/* Header */}
-      <CardHeader className="border-b border-cyan-500/20 pb-4">
-        <CardTitle className="flex items-center gap-3 text-cyan-400">
-          <span className="text-2xl">💾</span>
+      <CardHeader className="border-b border-brand/30 pb-4">
+        <CardTitle className="flex items-center gap-3 text-brand">
           <div className="flex-1">
             <h3 className="text-lg sm:text-xl font-bold">Your Stored Data & Tracking Persistence</h3>
-            <p className="text-sm text-cyan-300/70 font-normal">What websites are storing about you</p>
+            <p className="text-sm text-brand font-normal">What websites are storing about you</p>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={loadStorageData}
-            className="text-cyan-400 hover:text-cyan-300"
+            className="text-brand hover:text-brand"
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -260,7 +259,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Cookie className="w-5 h-5" />
               <h4 className="font-semibold">Cookies</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.cookies.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.cookies.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -273,7 +272,7 @@ export default function StoragePanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tracking:</span>
-                <span className="font-mono text-red-400">{storageData.cookies.thirdParty}</span>
+                <span className="font-mono text-foreground">{storageData.cookies.thirdParty}</span>
               </div>
             </div>
             <p className="mt-3 text-xs text-muted-foreground italic">
@@ -286,7 +285,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <HardDrive className="w-5 h-5" />
               <h4 className="font-semibold">LocalStorage</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.localStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.localStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -299,7 +298,7 @@ export default function StoragePanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tracking keys:</span>
-                <span className={`font-mono ${storageData.localStorage.hasTracking ? 'text-red-400' : 'text-green-400'}`}>
+                <span className={`font-mono ${storageData.localStorage.hasTracking ? 'text-foreground' : 'text-risk-low'}`}>
                   {storageData.localStorage.trackingKeys.length}
                 </span>
               </div>
@@ -314,7 +313,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Clock className="w-5 h-5" />
               <h4 className="font-semibold">Session Storage</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.sessionStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.sessionStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -336,7 +335,7 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Database className="w-5 h-5" />
               <h4 className="font-semibold">IndexedDB</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.indexedDB.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.indexedDB.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -350,7 +349,7 @@ export default function StoragePanel() {
               {storageData.indexedDB.hasTracking && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tracking DBs:</span>
-                  <span className="font-mono text-red-400">{storageData.indexedDB.trackingDatabases.length}</span>
+                  <span className="font-mono text-foreground">{storageData.indexedDB.trackingDatabases.length}</span>
                 </div>
               )}
             </div>
@@ -364,12 +363,12 @@ export default function StoragePanel() {
             <div className="flex items-center gap-2 mb-3">
               <Box className="w-5 h-5" />
               <h4 className="font-semibold">Cache & Service Worker</h4>
-              <span className="ml-auto text-lg">{getRiskIcon(storageData.cacheStorage.risk)}</span>
+              <span className="ml-auto text-xs font-medium text-foreground">{getRiskIcon(storageData.cacheStorage.risk)}</span>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status:</span>
-                <span className={`font-mono ${storageData.cacheStorage.serviceWorkerActive ? 'text-yellow-400' : 'text-green-400'}`}>
+                <span className={`font-mono ${storageData.cacheStorage.serviceWorkerActive ? 'text-foreground' : 'text-risk-low'}`}>
                   {storageData.cacheStorage.serviceWorkerActive ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -388,10 +387,10 @@ export default function StoragePanel() {
           </div>
 
           {/* Storage Quota Card */}
-          <div className="p-4 rounded-xl border border-slate-500/30 bg-slate-500/10">
+          <div className="p-4 rounded-xl border border-surface-border bg-muted">
             <div className="flex items-center gap-2 mb-3">
-              <HardDrive className="w-5 h-5 text-slate-400" />
-              <h4 className="font-semibold text-slate-300">Storage Quota</h4>
+              <HardDrive className="w-5 h-5 text-muted-foreground" />
+              <h4 className="font-semibold text-muted-foreground">Storage Quota</h4>
             </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -414,17 +413,17 @@ export default function StoragePanel() {
         </div>
 
         {/* Total Storage Usage */}
-        <div className="p-6 rounded-xl border border-cyan-500/30 bg-cyan-950/30">
-          <h4 className="text-lg font-bold text-cyan-300 mb-4 flex items-center gap-2">
+        <div className="p-6 rounded-xl border border-brand/30 bg-brand-soft">
+          <h4 className="text-lg font-bold text-brand mb-4 flex items-center gap-2">
             <HardDrive className="w-5 h-5" />
             Total Storage Usage
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="text-center">
-              <p className="text-3xl font-bold text-cyan-400">
+              <p className="text-3xl font-bold text-brand">
                 {formatBytes(totalSizeBytes)}
               </p>
-              <p className="text-sm text-cyan-300/70 mt-1">
+              <p className="text-sm text-brand mt-1">
                 Websites are storing this much data about you
               </p>
             </div>
@@ -448,8 +447,8 @@ export default function StoragePanel() {
                     <Tooltip 
                       formatter={(value: number) => formatBytes(value)}
                       contentStyle={{ 
-                        background: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
+                        background: 'hsl(var(--surface))', 
+                        border: '1px solid hsl(var(--surface-border))',
                         borderRadius: '8px',
                       }}
                     />
@@ -472,44 +471,44 @@ export default function StoragePanel() {
         </div>
 
         {/* Tracking Persistence Timeline */}
-        <div className="p-6 rounded-xl border border-slate-500/30 bg-slate-900/30">
-          <h4 className="text-lg font-bold text-slate-300 mb-4 flex items-center gap-2">
+        <div className="p-6 rounded-xl border border-surface-border bg-muted">
+          <h4 className="text-lg font-bold text-muted-foreground mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5" />
             Tracking Persistence Timeline
           </h4>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="w-24 text-xs text-muted-foreground">Session</div>
-              <div className="flex-1 h-4 bg-green-500/30 rounded-full relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-[10%] bg-green-500 rounded-full" />
+              <div className="flex-1 h-4 bg-risk-low-soft rounded-full relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-[10%] bg-risk-low rounded-full" />
               </div>
               <div className="w-32 text-xs">Cleared on tab close</div>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-24 text-xs text-muted-foreground">Session Cookies</div>
-              <div className="flex-1 h-4 bg-yellow-500/30 rounded-full relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-[25%] bg-yellow-500 rounded-full" />
+              <div className="flex-1 h-4 bg-risk-mid-soft rounded-full relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-[25%] bg-risk-mid rounded-full" />
               </div>
               <div className="w-32 text-xs">Browser close</div>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-24 text-xs text-muted-foreground">Persistent Cookies</div>
-              <div className="flex-1 h-4 bg-orange-500/30 rounded-full relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-[70%] bg-orange-500 rounded-full" />
+              <div className="flex-1 h-4 bg-risk-mid-soft rounded-full relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-[70%] bg-risk-mid rounded-full" />
               </div>
               <div className="w-32 text-xs">1 year or more</div>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-24 text-xs text-muted-foreground">LocalStorage</div>
-              <div className="flex-1 h-4 bg-red-500/30 rounded-full relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-full bg-red-500 rounded-full" />
+              <div className="flex-1 h-4 bg-risk-high-soft rounded-full relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-full bg-risk-high rounded-full" />
               </div>
               <div className="w-32 text-xs">Indefinitely</div>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-24 text-xs text-muted-foreground">IndexedDB</div>
-              <div className="flex-1 h-4 bg-red-500/30 rounded-full relative overflow-hidden">
-                <div className="absolute left-0 top-0 bottom-0 w-full bg-red-500 rounded-full" />
+              <div className="flex-1 h-4 bg-risk-high-soft rounded-full relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-full bg-risk-high rounded-full" />
               </div>
               <div className="w-32 text-xs">Indefinitely</div>
             </div>
@@ -517,12 +516,12 @@ export default function StoragePanel() {
         </div>
 
         {/* What This Means */}
-        <div className="p-6 rounded-xl border border-blue-500/30 bg-blue-950/30">
-          <h4 className="text-lg font-bold text-blue-300 mb-4 flex items-center gap-2">
+        <div className="p-6 rounded-xl border border-brand/30 bg-brand-soft">
+          <h4 className="text-lg font-bold text-brand mb-4 flex items-center gap-2">
             <Info className="w-5 h-5" />
             Storage & Tracking Persistence
           </h4>
-          <p className="text-sm text-blue-200/80 leading-relaxed">
+          <p className="text-sm text-brand leading-relaxed">
             Websites store data on your device to track you over time. Even after clearing your 
             browsing history, this stored data can identify you on return visits. Combined with 
             your browser fingerprint, this creates a persistent identity that follows you across 
@@ -532,7 +531,7 @@ export default function StoragePanel() {
 
         {/* Storage Types Explained */}
         <div className="space-y-2">
-          <h4 className="text-lg font-bold text-slate-300 mb-4">Storage Types Explained</h4>
+          <h4 className="text-lg font-bold text-muted-foreground mb-4">Storage Types Explained</h4>
           
           {[
             {
@@ -567,8 +566,8 @@ export default function StoragePanel() {
             },
           ].map((item) => (
             <Collapsible key={item.id} open={expandedSections[item.id]} onOpenChange={() => toggleSection(item.id)}>
-              <CollapsibleTrigger className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-slate-800/50 transition-colors">
-                <span className="text-cyan-400">{item.icon}</span>
+              <CollapsibleTrigger className="flex items-center gap-3 w-full p-3 rounded-lg hover:bg-muted transition-colors">
+                <span className="text-brand">{item.icon}</span>
                 <span className="font-medium flex-1 text-left">{item.title}</span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${expandedSections[item.id] ? 'rotate-180' : ''}`} />
               </CollapsibleTrigger>
@@ -580,14 +579,14 @@ export default function StoragePanel() {
         </div>
 
         {/* Privacy Impact */}
-        <div className="p-4 rounded-xl border border-slate-500/30 bg-slate-900/30">
-          <h4 className="font-bold text-slate-300 mb-3 flex items-center gap-2">
+        <div className="p-4 rounded-xl border border-surface-border bg-muted">
+          <h4 className="font-bold text-muted-foreground mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Privacy Impact Assessment
           </h4>
           <div className={`p-4 rounded-lg ${getRiskColor(storageData.overallRisk)}`}>
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{getRiskIcon(storageData.overallRisk)}</span>
+              <span className="text-base font-semibold text-foreground">{getRiskIcon(storageData.overallRisk)}</span>
               <div>
                 <p className="font-semibold capitalize">{storageData.overallRisk} Risk</p>
                 <p className="text-sm opacity-80">
@@ -602,16 +601,16 @@ export default function StoragePanel() {
 
         {/* Detected Tracking Keys */}
         {allTrackingKeys.length > 0 && (
-          <div className="p-4 rounded-xl border border-red-500/30 bg-red-950/30">
-            <h4 className="font-bold text-red-300 mb-3 flex items-center gap-2">
+          <div className="p-4 rounded-xl border border-risk-high/30 bg-risk-high-soft">
+            <h4 className="font-bold text-foreground mb-3 flex items-center gap-2">
               <Eye className="w-4 h-4" />
               Tracking & Analytics Detected
             </h4>
             <div className="space-y-2">
               {allTrackingKeys.slice(0, 10).map((key, index) => (
                 <div key={index} className="flex items-center gap-2 text-sm">
-                  <span className="text-red-400">•</span>
-                  <span className="font-mono text-red-300">{key}</span>
+                  <span className="text-foreground">•</span>
+                  <span className="font-mono text-foreground">{key}</span>
                   <span className="text-muted-foreground">({getTrackingKeyDescription(key)})</span>
                 </div>
               ))}
@@ -621,7 +620,7 @@ export default function StoragePanel() {
                 </p>
               )}
             </div>
-            <p className="mt-3 text-xs text-red-300/70">
+            <p className="mt-3 text-xs text-foreground">
               These keys indicate active tracking by third parties
             </p>
           </div>
@@ -629,29 +628,29 @@ export default function StoragePanel() {
 
         {/* Storage Clearing Guide */}
         <Collapsible open={expandedSections['clearing']} onOpenChange={() => toggleSection('clearing')}>
-          <CollapsibleTrigger className="flex items-center gap-3 w-full p-4 rounded-xl border border-slate-500/30 bg-slate-900/30 hover:bg-slate-800/50 transition-colors">
-            <Trash2 className="w-5 h-5 text-slate-400" />
-            <span className="font-bold text-slate-300 flex-1 text-left">Storage Clearing Guide</span>
+          <CollapsibleTrigger className="flex items-center gap-3 w-full p-4 rounded-xl border border-surface-border bg-muted hover:bg-muted transition-colors">
+            <Trash2 className="w-5 h-5 text-muted-foreground" />
+            <span className="font-bold text-muted-foreground flex-1 text-left">Storage Clearing Guide</span>
             <ChevronDown className={`w-4 h-4 transition-transform ${expandedSections['clearing'] ? 'rotate-180' : ''}`} />
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2 p-4 rounded-xl border border-slate-500/30 bg-slate-900/30">
+          <CollapsibleContent className="mt-2 p-4 rounded-xl border border-surface-border bg-muted">
             <div className="space-y-4">
               <div>
-                <h5 className="font-semibold text-slate-300 mb-2">Chrome:</h5>
+                <h5 className="font-semibold text-muted-foreground mb-2">Chrome:</h5>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                   <li>Settings → Privacy → Clear browsing data</li>
                   <li>Select: Cookies, Cached images, Site settings</li>
                 </ul>
               </div>
               <div>
-                <h5 className="font-semibold text-slate-300 mb-2">Firefox:</h5>
+                <h5 className="font-semibold text-muted-foreground mb-2">Firefox:</h5>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                   <li>Options → Privacy → Clear Data</li>
                   <li>Select: Cookies, Cache</li>
                 </ul>
               </div>
               <div>
-                <h5 className="font-semibold text-slate-300 mb-2">Safari:</h5>
+                <h5 className="font-semibold text-muted-foreground mb-2">Safari:</h5>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
                   <li>Preferences → Privacy → Manage Website Data</li>
                 </ul>
@@ -659,7 +658,7 @@ export default function StoragePanel() {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-cyan-400 border-cyan-500/30"
+                className="text-brand border-brand/30"
                 onClick={() => window.open('chrome://settings/clearBrowserData', '_blank')}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
@@ -670,39 +669,39 @@ export default function StoragePanel() {
         </Collapsible>
 
         {/* Protection Recommendations */}
-        <div className="p-4 rounded-xl border border-green-500/30 bg-green-950/30">
-          <h4 className="font-bold text-green-300 mb-3 flex items-center gap-2">
+        <div className="p-4 rounded-xl border border-risk-low/30 bg-risk-low-soft">
+          <h4 className="font-bold text-risk-low mb-3 flex items-center gap-2">
             <Shield className="w-4 h-4" />
             Protection Recommendations
           </h4>
-          <ul className="space-y-2 text-sm text-green-200/80">
+          <ul className="space-y-2 text-sm text-risk-low">
             <li className="flex items-start gap-2">
-              <span className="text-green-400">✓</span>
+              <span className="text-risk-low">✓</span>
               Clear storage regularly
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-green-400">✓</span>
+              <span className="text-risk-low">✓</span>
               Use private/incognito mode
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-green-400">✓</span>
+              <span className="text-risk-low">✓</span>
               Block third-party cookies
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-green-400">✓</span>
+              <span className="text-risk-low">✓</span>
               Use privacy extensions (Cookie AutoDelete)
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-green-400">✓</span>
+              <span className="text-risk-low">✓</span>
               Enable "Clear on exit" in browser settings
             </li>
           </ul>
         </div>
 
         {/* Clear Storage Button */}
-        <div className="flex flex-wrap gap-4 items-center justify-between p-4 rounded-xl border border-red-500/30 bg-red-950/20">
+        <div className="flex flex-wrap gap-4 items-center justify-between p-4 rounded-xl border border-risk-high/30 bg-risk-high-soft">
           <div>
-            <h4 className="font-bold text-red-300">Clear This Site's Storage</h4>
+            <h4 className="font-bold text-foreground">Clear This Site's Storage</h4>
             <p className="text-xs text-muted-foreground">This will log you out and reset settings</p>
           </div>
           <AlertDialog>
@@ -719,7 +718,7 @@ export default function StoragePanel() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  <AlertTriangle className="w-5 h-5 text-foreground" />
                   Clear All Storage?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
@@ -729,7 +728,7 @@ export default function StoragePanel() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearStorage} className="bg-red-600 hover:bg-red-700">
+                <AlertDialogAction onClick={handleClearStorage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   Yes, Clear Everything
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -738,11 +737,11 @@ export default function StoragePanel() {
         </div>
 
         {/* Storage Monitoring */}
-        <div className="flex items-center justify-between p-4 rounded-xl border border-cyan-500/30 bg-cyan-950/20">
+        <div className="flex items-center justify-between p-4 rounded-xl border border-brand/30 bg-brand-soft">
           <div className="flex items-center gap-3">
-            <Eye className="w-5 h-5 text-cyan-400" />
+            <Eye className="w-5 h-5 text-brand" />
             <div>
-              <h4 className="font-semibold text-cyan-300">Monitor Storage Changes</h4>
+              <h4 className="font-semibold text-brand">Monitor Storage Changes</h4>
               <p className="text-xs text-muted-foreground">
                 {monitoringEnabled 
                   ? `${storageChanges} changes detected since enabled`

@@ -1,36 +1,30 @@
-import { Helmet } from "react-helmet";
+import Seo from "@/components/Seo";
 
 const Accessibility = () => {
   return (
     <>
-      <Helmet>
-        <title>Accessibility Statement - MyPrivacyTOOL</title>
-        <meta
-          name="description"
-          content="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance."
-        />
-      </Helmet>
-      <main className="min-h-screen bg-gray-50">
+      <Seo title="Accessibility Statement | MyPrivacyTOOL" description="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance." />
+      <main className="min-h-screen bg-background">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
-            <h1 className="mb-2 text-4xl font-bold text-gray-900">
+            <h1 className="mb-2 text-4xl font-bold text-foreground">
               Accessibility Statement
             </h1>
-            <p className="mb-8 text-lg text-gray-600">
+            <p className="mb-8 text-lg text-muted-foreground">
               MyPrivacyTOOL's commitment to digital accessibility and inclusive design
             </p>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Commitment to Accessibility
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 MyPrivacyTOOL is committed to providing a digital experience that is
                 accessible to everyone, regardless of ability or disability. We
                 believe that digital accessibility is a fundamental right and an
                 essential part of building an inclusive online experience.
               </p>
-              <p className="mt-4 text-gray-700">
+              <p className="mt-4 text-muted-foreground">
                 Our goal is to ensure that all users, including those with visual,
                 hearing, motor, or cognitive disabilities, can navigate and interact
                 with our website and services effectively.
@@ -38,18 +32,18 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Standards & Compliance
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 MyPrivacyTOOL aims to comply with the Web Content Accessibility
                 Guidelines (WCAG) 2.1 Level AA standard. This is the most widely
                 recognized international standard for web accessibility.
               </p>
-              <p className="mt-4 text-gray-700 font-semibold">
+              <p className="mt-4 text-muted-foreground font-semibold">
                 What WCAG 2.1 Level AA means:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Perceivable:</strong> Information and user interface
                   components are presented in a way that users can perceive them
@@ -70,14 +64,14 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Accessibility Features
               </h2>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Visual Accessibility
               </h3>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>High Contrast Modes:</strong> Support for high-contrast
                   color schemes for users with low vision
@@ -100,10 +94,10 @@ const Accessibility = () => {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Keyboard Navigation
               </h3>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Full Keyboard Access:</strong> All functionality is
                   available from the keyboard
@@ -122,10 +116,10 @@ const Accessibility = () => {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Screen Reader Compatibility
               </h3>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Semantic HTML:</strong> Proper use of heading, list, and
                   landmark elements
@@ -144,10 +138,10 @@ const Accessibility = () => {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Hearing Accessibility
               </h3>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Captions & Transcripts:</strong> Video content includes
                   captions and transcripts
@@ -158,10 +152,10 @@ const Accessibility = () => {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Motor & Physical Accessibility
               </h3>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Large Click Targets:</strong> Buttons and links are at
                   least 44x44 CSS pixels
@@ -176,10 +170,10 @@ const Accessibility = () => {
                 </li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Cognitive Accessibility
               </h3>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Clear Language:</strong> Simple, direct language avoiding
                   jargon
@@ -200,40 +194,40 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Accessibility Across Services
               </h2>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Website & Application
               </h3>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 Our website and user application are designed with accessibility as
                 a core principle. We continuously test with assistive technologies
                 and accessibility tools.
               </p>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Documents & Downloads
               </h3>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 All downloadable documents (PDFs, guides, etc.) are created with
                 accessibility in mind, including:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>Tagged PDF structure for screen reader navigation</li>
                 <li>Alternative text descriptions for images and diagrams</li>
                 <li>Proper heading hierarchy</li>
                 <li>Accessible color contrasts</li>
               </ul>
 
-              <h3 className="mt-6 text-xl font-semibold text-gray-800">
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 Video Content
               </h3>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 All video content includes:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>Closed captions (CC) for all dialogue and sound effects</li>
                 <li>Detailed audio descriptions for visual content</li>
                 <li>Transcripts of all video content</li>
@@ -241,14 +235,14 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Known Limitations
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 While we strive for full accessibility, some areas may have
                 limitations:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
                   <strong>Third-Party Content:</strong> Embedded third-party
                   content (e.g., social media widgets) may not meet our
@@ -266,45 +260,45 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Testing & Evaluation
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 MyPrivacyTOOL regularly tests our website and services for
                 accessibility using:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>Automated accessibility testing tools</li>
                 <li>Manual testing with actual assistive technologies</li>
                 <li>User testing with people with disabilities</li>
                 <li>Third-party accessibility audits</li>
               </ul>
-              <p className="mt-4 text-gray-700">
+              <p className="mt-4 text-muted-foreground">
                 We conduct accessibility reviews regularly to identify and fix any
                 issues.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Browser & Assistive Technology Support
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 MyPrivacyTOOL is tested with and supports the following:
               </p>
-              <p className="mt-4 text-gray-700 font-semibold">
+              <p className="mt-4 text-muted-foreground font-semibold">
                 Browsers:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>Chrome (latest)</li>
                 <li>Firefox (latest)</li>
                 <li>Safari (latest)</li>
                 <li>Edge (latest)</li>
               </ul>
-              <p className="mt-4 text-gray-700 font-semibold">
+              <p className="mt-4 text-muted-foreground font-semibold">
                 Assistive Technologies:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>NVDA (Windows screen reader)</li>
                 <li>JAWS (Windows screen reader)</li>
                 <li>VoiceOver (Mac/iOS screen reader)</li>
@@ -313,33 +307,33 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Feedback & Accessibility Issues
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 If you encounter any accessibility barriers or issues while using
                 MyPrivacyTOOL, please let us know. We take accessibility seriously
                 and want to fix any problems.
               </p>
-              <p className="mt-4 text-gray-700">
+              <p className="mt-4 text-muted-foreground">
                 To report an accessibility issue:
               </p>
-              <div className="mt-4 rounded-lg bg-gray-100 p-6">
-                <p className="font-semibold text-gray-900">
+              <div className="mt-4 rounded-lg bg-muted p-6">
+                <p className="font-semibold text-foreground">
                   Accessibility Support Email:
                 </p>
-                <p className="text-gray-700 mt-2">
+                <p className="text-muted-foreground mt-2">
                   <a
                     href="mailto:accessibility@myprivacytool.io"
-                    className="text-blue-600 hover:text-blue-700"
+                    className="text-brand underline hover:text-foreground"
                   >
                     accessibility@myprivacytool.io
                   </a>
                 </p>
-                <p className="text-gray-700 mt-4">
+                <p className="text-muted-foreground mt-4">
                   Please include:
                 </p>
-                <ul className="list-inside list-disc space-y-2 text-gray-700 mt-2">
+                <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-2">
                   <li>A description of the accessibility issue</li>
                   <li>The page or feature where the issue occurs</li>
                   <li>Your browser and operating system</li>
@@ -347,21 +341,21 @@ const Accessibility = () => {
                   <li>Steps to reproduce the issue</li>
                 </ul>
               </div>
-              <p className="mt-6 text-gray-700">
+              <p className="mt-6 text-muted-foreground">
                 We aim to respond to accessibility reports within 48 hours and will
                 work with you to find a solution.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Accessibility Resources & Tools
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 Here are some tools and resources to help you use the web more
                 accessibly:
               </p>
-              <ul className="list-inside list-disc space-y-3 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-3 text-muted-foreground mt-4">
                 <li>
                   <strong>WebAIM Contrast Checker:</strong> Check color contrast
                   ratios (webaim.org/resources/contrastchecker/)
@@ -382,13 +376,13 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Our Accessibility Team
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 MyPrivacyTOOL has a dedicated team committed to accessibility:
               </p>
-              <ul className="list-inside list-disc space-y-2 text-gray-700 mt-4">
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>Product team trained in accessibility best practices</li>
                 <li>
                   Regular accessibility audits by third-party specialists
@@ -399,35 +393,35 @@ const Accessibility = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Accessibility Statement Updates
               </h2>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 This accessibility statement is reviewed and updated regularly. The
                 last update was in September 2026.
               </p>
-              <p className="mt-4 text-gray-700">
+              <p className="mt-4 text-muted-foreground">
                 As we make improvements to our website and services, we will update
                 this statement to reflect our progress.
               </p>
             </section>
 
-            <section className="mb-12 rounded-lg bg-purple-50 p-6">
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">
+            <section className="mb-12 rounded-lg bg-muted p-6">
+              <h3 className="mb-4 text-lg font-semibold text-foreground">
                 We're Committed to Inclusion
               </h3>
-              <p className="text-gray-700">
+              <p className="text-muted-foreground">
                 Digital accessibility is not a feature — it's a foundation. We
                 believe everyone deserves equal access to our services, and we're
                 committed to continuously improving our digital experience for all
                 users.
               </p>
-              <p className="mt-4 text-gray-700">
+              <p className="mt-4 text-muted-foreground">
                 If you have any accessibility concerns or suggestions, we'd love to
                 hear from you. Please contact our accessibility team at{" "}
                 <a
                   href="mailto:accessibility@myprivacytool.io"
-                  className="text-blue-600 hover:text-blue-700"
+                  className="text-brand underline hover:text-foreground"
                 >
                   accessibility@myprivacytool.io
                 </a>

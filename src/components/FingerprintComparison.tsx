@@ -56,11 +56,11 @@ const canvasDistributionData = [
 
 // GPU distribution data
 const gpuDistributionData = [
-  { name: 'Intel', share: 45, color: 'hsl(210, 80%, 60%)' },
-  { name: 'NVIDIA', share: 28, color: 'hsl(120, 60%, 50%)' },
-  { name: 'AMD', share: 18, color: 'hsl(0, 70%, 55%)' },
-  { name: 'Apple', share: 6, color: 'hsl(270, 60%, 60%)' },
-  { name: 'Other', share: 3, color: 'hsl(40, 70%, 50%)' },
+  { name: 'Intel', share: 45, color: 'hsl(var(--brand-near-black) / 0.75)' },
+  { name: 'NVIDIA', share: 28, color: 'hsl(var(--brand-near-black) / 0.55)' },
+  { name: 'AMD', share: 18, color: 'hsl(var(--brand-near-black) / 0.4)' },
+  { name: 'Apple', share: 6, color: 'hsl(var(--brand-near-black) / 0.3)' },
+  { name: 'Other', share: 3, color: 'hsl(var(--brand-near-black) / 0.2)' },
 ];
 
 // Font count distribution (bell curve simulation)
@@ -77,19 +77,19 @@ const fontDistributionData = [
 
 // Browser comparison data
 const browserComparisonData = [
-  { browser: 'Chrome', uniqueness: '1 in 350K', risk: 'High', color: 'text-red-400', riskLevel: 4 },
-  { browser: 'Safari', uniqueness: '1 in 180K', risk: 'High', color: 'text-red-400', riskLevel: 4 },
-  { browser: 'Edge', uniqueness: '1 in 250K', risk: 'High', color: 'text-red-400', riskLevel: 4 },
-  { browser: 'Firefox', uniqueness: '1 in 45K', risk: 'Medium-High', color: 'text-orange-400', riskLevel: 3 },
-  { browser: 'Firefox (RFP)', uniqueness: '1 in 5K', risk: 'Medium', color: 'text-yellow-400', riskLevel: 2 },
-  { browser: 'Brave', uniqueness: '1 in 400', risk: 'Low', color: 'text-green-400', riskLevel: 1 },
-  { browser: 'Tor', uniqueness: '1 in 10', risk: 'Very Low', color: 'text-green-500', riskLevel: 0 },
+  { browser: 'Chrome', uniqueness: '1 in 350K', risk: 'High', color: 'text-foreground', riskLevel: 4 },
+  { browser: 'Safari', uniqueness: '1 in 180K', risk: 'High', color: 'text-foreground', riskLevel: 4 },
+  { browser: 'Edge', uniqueness: '1 in 250K', risk: 'High', color: 'text-foreground', riskLevel: 4 },
+  { browser: 'Firefox', uniqueness: '1 in 45K', risk: 'Medium-High', color: 'text-foreground', riskLevel: 3 },
+  { browser: 'Firefox (RFP)', uniqueness: '1 in 5K', risk: 'Medium', color: 'text-foreground', riskLevel: 2 },
+  { browser: 'Brave', uniqueness: '1 in 400', risk: 'Low', color: 'text-risk-low', riskLevel: 1 },
+  { browser: 'Tor', uniqueness: '1 in 10', risk: 'Very Low', color: 'text-risk-low', riskLevel: 0 },
 ];
 
 // Time-based tracking data
 const trackingDurationData = [
   { method: 'Cookies', duration: 'Indefinitely', icon: '🍪', description: 'Until manually cleared' },
-  { method: 'Fingerprint Only', duration: 'Months to Years', icon: '🔴', description: 'Stable fingerprint persists' },
+  { method: 'Fingerprint Only', duration: 'Months to Years', icon: '📌', description: 'Stable fingerprint persists' },
   { method: 'Changing Config', duration: 'Days to Weeks', icon: '🔄', description: 'Browser updates change fingerprint' },
   { method: 'With Protection', duration: 'Hours to Days', icon: '🛡️', description: 'Randomization limits tracking' },
 ];
@@ -186,14 +186,14 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
     <TooltipProvider>
       <div className="space-y-6">
         {/* Population Visualization */}
-        <Card className="bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/30">
+        <Card className="bg-gradient-to-br from-secondary to-secondary border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-red-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Users className="w-4 h-4" />
               Your Position Among 1,000 Browsers
               <Tooltip>
                 <TooltipTrigger>
-                  <Info className="w-4 h-4 text-red-400/50" />
+                  <Info className="w-4 h-4 text-muted-foreground" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
                   <p>This visualization shows how unique your browser is. The highlighted dot represents you among 1,000 random browser configurations.</p>
@@ -202,24 +202,24 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative p-4 bg-red-950/30 rounded-lg border border-red-500/20 overflow-hidden">
+            <div className="relative p-4 bg-secondary rounded-lg border border-border overflow-hidden">
               <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${Math.ceil(Math.sqrt(1000))}, 1fr)` }}>
                 {populationDots.slice(0, 400).map((dot, idx) => (
                   <div
                     key={idx}
                     className={`w-2 h-2 rounded-full transition-all duration-500 ${
                       dot.isUser && animatedDotIndex === idx
-                        ? 'bg-red-500 ring-2 ring-red-400 ring-offset-1 ring-offset-red-950 scale-150 z-10'
-                        : 'bg-red-500/20'
+                        ? 'bg-primary ring-2 ring-primary ring-offset-1 ring-offset-surface scale-150 z-10'
+                        : 'bg-secondary'
                     }`}
                     style={{ animationDelay: `${idx * 2}ms` }}
                   />
                 ))}
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-red-950/80 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-t from-secondary to-transparent pointer-events-none" />
               <div className="absolute bottom-2 left-0 right-0 text-center">
-                <p className="text-xs text-red-300/80">
-                  <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1 align-middle" /> 
+                <p className="text-xs text-muted-foreground">
+                  <span className="inline-block w-2 h-2 rounded-full bg-primary mr-1 align-middle" /> 
                   You are here — unique among {(1000000 / (uniquenessScore + 1)).toLocaleString(undefined, { maximumFractionDigits: 0 })}+ browsers
                 </p>
               </div>
@@ -228,19 +228,19 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
         </Card>
 
         {/* Distribution Charts */}
-        <Card className="bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/30">
+        <Card className="bg-gradient-to-br from-secondary to-secondary border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-red-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               📊 Fingerprint Distribution Analysis
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="canvas" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 bg-red-950/50 mb-4">
-                <TabsTrigger value="canvas" className="text-xs data-[state=active]:bg-red-500/20">Canvas</TabsTrigger>
-                <TabsTrigger value="gpu" className="text-xs data-[state=active]:bg-red-500/20">GPU</TabsTrigger>
-                <TabsTrigger value="fonts" className="text-xs data-[state=active]:bg-red-500/20">Fonts</TabsTrigger>
-                <TabsTrigger value="entropy" className="text-xs data-[state=active]:bg-red-500/20">Overall</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4 bg-secondary mb-4">
+                <TabsTrigger value="canvas" className="text-xs data-[state=active]:bg-secondary">Canvas</TabsTrigger>
+                <TabsTrigger value="gpu" className="text-xs data-[state=active]:bg-secondary">GPU</TabsTrigger>
+                <TabsTrigger value="fonts" className="text-xs data-[state=active]:bg-secondary">Fonts</TabsTrigger>
+                <TabsTrigger value="entropy" className="text-xs data-[state=active]:bg-secondary">Overall</TabsTrigger>
               </TabsList>
 
               {/* Canvas Distribution */}
@@ -248,35 +248,35 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={canvasDistributionData} layout="horizontal">
-                      <XAxis dataKey="range" tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }} />
-                      <YAxis tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }} />
+                      <XAxis dataKey="range" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                      <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                       <RechartsTooltip 
                         contentStyle={{ 
-                          backgroundColor: 'hsl(0, 30%, 15%)', 
-                          border: '1px solid hsl(0, 50%, 30%)',
+                          backgroundColor: 'hsl(var(--surface))', 
+                          border: '1px solid hsl(var(--surface-border))',
                           borderRadius: '8px',
                         }}
-                        labelStyle={{ color: 'hsl(0, 50%, 80%)' }}
+                        labelStyle={{ color: 'hsl(var(--foreground))' }}
                       />
-                      <Bar dataKey="users" fill="hsl(0, 60%, 45%)" radius={[4, 4, 0, 0]}>
+                      <Bar dataKey="users" fill="hsl(var(--brand-green))" radius={[4, 4, 0, 0]}>
                         {canvasDistributionData.map((entry, index) => (
                           <Cell 
                             key={index} 
-                            fill={entry.range === '90-100%' ? 'hsl(0, 70%, 50%)' : 'hsl(0, 40%, 40%)'} 
+                            fill={entry.range === '90-100%' ? 'hsl(var(--brand-green))' : 'hsl(var(--muted-foreground))'} 
                           />
                         ))}
                       </Bar>
                       <ReferenceLine 
                         x="90-100%" 
-                        stroke="hsl(0, 70%, 60%)" 
+                        stroke="hsl(var(--brand-green))" 
                         strokeDasharray="3 3"
-                        label={{ value: 'You', position: 'top', fill: 'hsl(0, 70%, 70%)', fontSize: 10 }}
+                        label={{ value: 'You', position: 'top', fill: 'hsl(var(--brand-green))', fontSize: 10 }}
                       />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-red-300/70 mt-2 text-center">
-                  Your canvas fingerprint is <span className="text-red-400 font-semibold">99.8% unique</span> — only 0.2% of users share a similar signature
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Your canvas fingerprint is <span className="text-foreground font-semibold">99.8% unique</span> — only 0.2% of users share a similar signature
                 </p>
               </TabsContent>
 
@@ -285,12 +285,12 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={gpuDistributionData} layout="vertical">
-                      <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }} unit="%" />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }} width={60} />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} unit="%" />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} width={60} />
                       <RechartsTooltip 
                         contentStyle={{ 
-                          backgroundColor: 'hsl(0, 30%, 15%)', 
-                          border: '1px solid hsl(0, 50%, 30%)',
+                          backgroundColor: 'hsl(var(--surface))', 
+                          border: '1px solid hsl(var(--surface-border))',
                           borderRadius: '8px',
                         }}
                         formatter={(value: number) => [`${value}%`, 'Market Share']}
@@ -299,8 +299,8 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                         {gpuDistributionData.map((entry, index) => (
                           <Cell 
                             key={index} 
-                            fill={entry.name === userGpuVendor ? 'hsl(0, 70%, 55%)' : entry.color}
-                            stroke={entry.name === userGpuVendor ? 'hsl(0, 70%, 70%)' : 'transparent'}
+                            fill={entry.name === userGpuVendor ? 'hsl(var(--brand-green))' : entry.color}
+                            stroke={entry.name === userGpuVendor ? 'hsl(var(--brand-green))' : 'transparent'}
                             strokeWidth={2}
                           />
                         ))}
@@ -308,8 +308,8 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-red-300/70 mt-2 text-center">
-                  Your GPU: <span className="text-red-400 font-semibold">{fingerprint.webgl?.renderer || 'Unknown'}</span>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Your GPU: <span className="text-foreground font-semibold">{fingerprint.webgl?.renderer || 'Unknown'}</span>
                 </p>
               </TabsContent>
 
@@ -318,12 +318,12 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={fontDistributionData}>
-                      <XAxis dataKey="fonts" tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }} />
-                      <YAxis tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }} />
+                      <XAxis dataKey="fonts" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                      <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                       <RechartsTooltip 
                         contentStyle={{ 
-                          backgroundColor: 'hsl(0, 30%, 15%)', 
-                          border: '1px solid hsl(0, 50%, 30%)',
+                          backgroundColor: 'hsl(var(--surface))', 
+                          border: '1px solid hsl(var(--surface-border))',
                           borderRadius: '8px',
                         }}
                         formatter={(value: number) => [`${value}%`, 'Users']}
@@ -331,21 +331,21 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                       <Area 
                         type="monotone" 
                         dataKey="users" 
-                        stroke="hsl(0, 60%, 50%)" 
-                        fill="hsl(0, 50%, 40%)"
+                        stroke="hsl(var(--brand-green))" 
+                        fill="hsl(var(--brand-green))"
                         fillOpacity={0.4}
                       />
                       <ReferenceLine 
                         x={userFontRange}
-                        stroke="hsl(0, 70%, 60%)" 
+                        stroke="hsl(var(--brand-green))" 
                         strokeDasharray="3 3"
-                        label={{ value: 'You', position: 'top', fill: 'hsl(0, 70%, 70%)', fontSize: 10 }}
+                        label={{ value: 'You', position: 'top', fill: 'hsl(var(--brand-green))', fontSize: 10 }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-red-300/70 mt-2 text-center">
-                  You have <span className="text-red-400 font-semibold">{fingerprint.fonts?.count || 0} fonts</span> installed — 
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  You have <span className="text-foreground font-semibold">{fingerprint.fonts?.count || 0} fonts</span> installed — 
                   Most users have 60-100 fonts
                 </p>
               </TabsContent>
@@ -360,50 +360,50 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                         dataKey="entropy" 
                         name="Entropy" 
                         unit=" bits"
-                        tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         domain={[0, 35]}
                       />
                       <YAxis 
                         type="number" 
                         dataKey="population" 
                         name="Population" 
-                        tick={{ fontSize: 10, fill: 'hsl(0, 50%, 70%)' }}
+                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                         hide
                       />
                       <RechartsTooltip 
                         contentStyle={{ 
-                          backgroundColor: 'hsl(0, 30%, 15%)', 
-                          border: '1px solid hsl(0, 50%, 30%)',
+                          backgroundColor: 'hsl(var(--surface))', 
+                          border: '1px solid hsl(var(--surface-border))',
                           borderRadius: '8px',
                         }}
                         cursor={{ strokeDasharray: '3 3' }}
                       />
                       <Legend />
-                      <Scatter name="Other Browsers" data={entropyData.filter(d => !d.isUser)} fill="hsl(0, 30%, 40%)">
+                      <Scatter name="Other Browsers" data={entropyData.filter(d => !d.isUser)} fill="hsl(var(--muted-foreground))">
                         {entropyData.filter(d => !d.isUser).map((entry, index) => (
-                          <Cell key={index} fill="hsl(0, 30%, 40%)" />
+                          <Cell key={index} fill="hsl(var(--muted-foreground))" />
                         ))}
                       </Scatter>
-                      <Scatter name="You" data={entropyData.filter(d => d.isUser)} fill="hsl(0, 70%, 55%)">
+                      <Scatter name="You" data={entropyData.filter(d => d.isUser)} fill="hsl(var(--brand-green))">
                         {entropyData.filter(d => d.isUser).map((entry, index) => (
-                          <Cell key={index} fill="hsl(0, 70%, 55%)" />
+                          <Cell key={index} fill="hsl(var(--brand-green))" />
                         ))}
                       </Scatter>
                       {/* Region indicators */}
-                      <ReferenceLine x={10} stroke="hsl(120, 50%, 40%)" strokeDasharray="3 3" />
-                      <ReferenceLine x={20} stroke="hsl(40, 60%, 50%)" strokeDasharray="3 3" />
+                      <ReferenceLine x={10} stroke="hsl(var(--risk-low))" strokeDasharray="3 3" />
+                      <ReferenceLine x={20} stroke="hsl(var(--brand-near-black))" strokeDasharray="3 3" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="flex justify-center gap-4 mt-2 text-xs">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-green-500" /> Common (&lt;10 bits)
+                    <span className="w-2 h-2 rounded-full bg-risk-low" /> Common (&lt;10 bits)
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-yellow-500" /> Uncommon (10-20 bits)
+                    <span className="w-2 h-2 rounded-full bg-risk-mid" /> Uncommon (10-20 bits)
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-500" /> Unique (&gt;20 bits)
+                    <span className="w-2 h-2 rounded-full bg-primary" /> Unique (&gt;20 bits)
                   </span>
                 </div>
               </TabsContent>
@@ -412,26 +412,26 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
         </Card>
 
         {/* Protection Comparison */}
-        <Card className="bg-gradient-to-br from-green-950/40 to-green-900/20 border-green-500/30">
+        <Card className="bg-gradient-to-br from-risk-low-soft to-risk-low-soft border-risk-low/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-green-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-risk-low flex items-center gap-2">
               <Shield className="w-4 h-4" />
               Protection Comparison
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-green-950/30 rounded-lg border border-green-500/20">
+            <div className="flex items-center justify-between p-3 bg-risk-low-soft rounded-lg border border-risk-low/30">
               <div>
-                <p className="text-sm text-green-300">Without protection</p>
-                <p className="text-lg font-bold text-red-400">{fingerprint.uniqueness}</p>
+                <p className="text-sm text-risk-low">Without protection</p>
+                <p className="text-lg font-bold text-foreground">{fingerprint.uniqueness}</p>
               </div>
               <div className="text-2xl">→</div>
               <div>
-                <p className="text-sm text-green-300">With protection</p>
-                <p className="text-lg font-bold text-green-400">{getSimulatedUniqueness()}</p>
+                <p className="text-sm text-risk-low">With protection</p>
+                <p className="text-lg font-bold text-risk-low">{getSimulatedUniqueness()}</p>
               </div>
               {showProtection && getImprovementPercentage() && (
-                <div className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                <div className="text-xs bg-risk-low-soft text-foreground px-2 py-1 rounded-full">
                   {getImprovementPercentage()}
                 </div>
               )}
@@ -443,7 +443,7 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                 checked={showProtection}
                 onCheckedChange={setShowProtection}
               />
-              <Label htmlFor="protection-toggle" className="text-sm text-green-300/80">
+              <Label htmlFor="protection-toggle" className="text-sm text-muted-foreground">
                 Show me with protection enabled
               </Label>
             </div>
@@ -454,7 +454,7 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                   size="sm"
                   variant={simulatedBrowser === 'brave' ? 'default' : 'outline'}
                   onClick={() => setSimulatedBrowser('brave')}
-                  className={simulatedBrowser === 'brave' ? 'bg-green-600' : 'border-green-500/30 text-green-300'}
+                  className={simulatedBrowser === 'brave' ? 'bg-risk-low' : 'border-risk-low/30 text-risk-low'}
                 >
                   <Zap className="w-3 h-3 mr-1" /> Simulate Brave
                 </Button>
@@ -462,7 +462,7 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                   size="sm"
                   variant={simulatedBrowser === 'firefox-rfp' ? 'default' : 'outline'}
                   onClick={() => setSimulatedBrowser('firefox-rfp')}
-                  className={simulatedBrowser === 'firefox-rfp' ? 'bg-green-600' : 'border-green-500/30 text-green-300'}
+                  className={simulatedBrowser === 'firefox-rfp' ? 'bg-risk-low' : 'border-risk-low/30 text-risk-low'}
                 >
                   🦊 Simulate Firefox RFP
                 </Button>
@@ -470,7 +470,7 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
                   size="sm"
                   variant={simulatedBrowser === 'tor' ? 'default' : 'outline'}
                   onClick={() => setSimulatedBrowser('tor')}
-                  className={simulatedBrowser === 'tor' ? 'bg-green-600' : 'border-green-500/30 text-green-300'}
+                  className={simulatedBrowser === 'tor' ? 'bg-risk-low' : 'border-risk-low/30 text-risk-low'}
                 >
                   🧅 Simulate Tor
                 </Button>
@@ -480,24 +480,24 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
         </Card>
 
         {/* Browser Comparison Table */}
-        <Card className="bg-gradient-to-br from-red-950/40 to-red-900/20 border-red-500/30">
+        <Card className="bg-gradient-to-br from-secondary to-secondary border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-red-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               🌐 Browser Fingerprinting Comparison
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="border-red-500/20 hover:bg-transparent">
-                  <TableHead className="text-red-300/70">Browser</TableHead>
-                  <TableHead className="text-red-300/70">Uniqueness</TableHead>
-                  <TableHead className="text-red-300/70">Tracking Risk</TableHead>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Browser</TableHead>
+                  <TableHead className="text-muted-foreground">Uniqueness</TableHead>
+                  <TableHead className="text-muted-foreground">Tracking Risk</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {browserComparisonData.map((row) => (
-                  <TableRow key={row.browser} className="border-red-500/10 hover:bg-red-950/30">
+                  <TableRow key={row.browser} className="border-border hover:brightness-95">
                     <TableCell className="font-medium text-foreground">{row.browser}</TableCell>
                     <TableCell className="font-mono text-sm">{row.uniqueness}</TableCell>
                     <TableCell className={row.color}>{row.risk}</TableCell>
@@ -509,9 +509,9 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
         </Card>
 
         {/* Time-Based Tracking */}
-        <Card className="bg-gradient-to-br from-amber-950/40 to-amber-900/20 border-amber-500/30">
+        <Card className="bg-gradient-to-br from-secondary to-secondary border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-amber-300 flex items-center gap-2">
+            <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Clock className="w-4 h-4" />
               How Long Can You Be Tracked?
             </CardTitle>
@@ -521,14 +521,14 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
               {trackingDurationData.map((item) => (
                 <div 
                   key={item.method}
-                  className="p-3 bg-amber-950/30 rounded-lg border border-amber-500/20"
+                  className="p-3 bg-secondary rounded-lg border border-border"
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{item.icon}</span>
-                    <span className="text-sm font-medium text-amber-200">{item.method}</span>
+                    <span className="text-sm font-medium text-foreground">{item.method}</span>
                   </div>
-                  <p className="text-lg font-bold text-amber-400">{item.duration}</p>
-                  <p className="text-xs text-amber-300/60">{item.description}</p>
+                  <p className="text-lg font-bold text-foreground">{item.duration}</p>
+                  <p className="text-xs text-muted-foreground">{item.description}</p>
                 </div>
               ))}
             </div>
@@ -536,17 +536,17 @@ export default function FingerprintComparison({ fingerprint, uniquenessScore }: 
         </Card>
 
         {/* Call to Action */}
-        <Card className="bg-gradient-to-br from-blue-950/40 to-blue-900/20 border-blue-500/30">
+        <Card className="bg-gradient-to-br from-[hsl(var(--cat-language-tint))] to-[hsl(var(--cat-language-tint))] border-[hsl(var(--cat-language)/0.3)]">
           <CardContent className="py-4">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-center sm:text-left">
-                <h4 className="font-semibold text-blue-200">Want to test your protection?</h4>
-                <p className="text-xs text-blue-300/70">Visit EFF's Cover Your Tracks for an independent test</p>
+                <h4 className="font-semibold text-[hsl(var(--cat-language))]">Want to test your protection?</h4>
+                <p className="text-xs text-muted-foreground">Visit EFF's Cover Your Tracks for an independent test</p>
               </div>
               <Button 
                 variant="outline" 
                 size="sm"
-                className="border-blue-500/30 text-blue-300 hover:bg-blue-950/30"
+                className="border-[hsl(var(--cat-language)/0.3)] text-[hsl(var(--cat-language))] hover:brightness-95"
                 onClick={() => window.open('https://coveryourtracks.eff.org/', '_blank')}
               >
                 <ExternalLink className="w-4 h-4 mr-2" />

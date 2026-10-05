@@ -9,80 +9,11 @@ interface HexagonProps {
   isRevealing?: boolean;
 }
 
-// Category color configurations
-const categoryColors = {
-  device: {
-    primary: '#8B5CF6',      // Purple
-    glow: '#A78BFA',
-    gradient: ['rgba(139,92,246,0.3)', 'rgba(139,92,246,0.1)'],
-    bg: ['rgba(30,10,40,0.9)', 'rgba(20,5,30,0.95)'],
-  },
-  network: {
-    primary: '#10B981',      // Emerald/Green
-    glow: '#34D399',
-    gradient: ['rgba(16,185,129,0.3)', 'rgba(16,185,129,0.1)'],
-    bg: ['rgba(5,30,20,0.9)', 'rgba(0,20,15,0.95)'],
-  },
-  privacy: {
-    primary: '#EF4444',      // Red
-    glow: '#F87171',
-    gradient: ['rgba(239,68,68,0.3)', 'rgba(239,68,68,0.1)'],
-    bg: ['rgba(40,10,10,0.9)', 'rgba(30,5,5,0.95)'],
-  },
-  language: {
-    primary: '#3B82F6',      // Blue
-    glow: '#60A5FA',
-    gradient: ['rgba(59,130,246,0.3)', 'rgba(59,130,246,0.1)'],
-    bg: ['rgba(10,20,40,0.9)', 'rgba(5,15,30,0.95)'],
-  },
-  profile: {
-    primary: '#EC4899',      // Pink
-    glow: '#F472B6',
-    gradient: ['rgba(236,72,153,0.3)', 'rgba(236,72,153,0.1)'],
-    bg: ['rgba(40,10,30,0.9)', 'rgba(30,5,20,0.95)'],
-  },
-  orientation: {
-    primary: '#F59E0B',      // Amber/Orange
-    glow: '#FBBF24',
-    gradient: ['rgba(245,158,11,0.3)', 'rgba(245,158,11,0.1)'],
-    bg: ['rgba(40,25,5,0.9)', 'rgba(30,18,0,0.95)'],
-  },
-  fingerprint: {
-    primary: '#DC2626',      // Deep Red
-    glow: '#EF4444',
-    gradient: ['rgba(220,38,38,0.35)', 'rgba(220,38,38,0.15)'],
-    bg: ['rgba(50,5,5,0.95)', 'rgba(35,0,0,0.98)'],
-  },
-  storage: {
-    primary: '#06B6D4',      // Cyan
-    glow: '#22D3EE',
-    gradient: ['rgba(6,182,212,0.3)', 'rgba(6,182,212,0.1)'],
-    bg: ['rgba(5,25,35,0.9)', 'rgba(0,15,25,0.95)'],
-  },
-  social: {
-    primary: '#A855F7',      // Purple/Magenta
-    glow: '#D946EF',
-    gradient: ['rgba(168,85,247,0.35)', 'rgba(217,70,239,0.15)'],
-    bg: ['rgba(35,10,45,0.95)', 'rgba(25,5,35,0.98)'],
-  },
-  security: {
-    primary: '#DC2626',      // Red for security vulnerabilities
-    glow: '#EF4444',
-    gradient: ['rgba(220,38,38,0.4)', 'rgba(239,68,68,0.2)'],
-    bg: ['rgba(60,5,5,0.95)', 'rgba(40,0,0,0.98)'],
-  },
-  behavior: {
-    primary: '#F59E0B',      // Yellow/Gold for behavior tracking
-    glow: '#FBBF24',
-    gradient: ['rgba(245,158,11,0.35)', 'rgba(251,191,36,0.15)'],
-    bg: ['rgba(45,30,5,0.95)', 'rgba(35,20,0,0.98)'],
-  },
-  default: {
-    primary: '#00ff41',      // Matrix green
-    glow: '#00ff41',
-    gradient: ['rgba(0,255,0,0.3)', 'rgba(0,255,0,0.1)'],
-    bg: ['rgba(0,30,10,0.9)', 'rgba(0,15,5,0.95)'],
-  },
+// Single palette treatment: deep green outline on a soft green tint (see index.css brand tokens).
+const hexColors = {
+  primary: 'hsl(var(--brand-ink))',
+  glow: 'hsl(var(--brand-ink) / 0.45)',
+  bg: ['hsl(var(--surface) / var(--surface-alpha))', 'hsl(var(--brand-soft) / var(--surface-alpha))'] as [string, string],
 };
 
 export default function Hexagon({ data, onConfirm, onHover, isRevealing = false }: HexagonProps) {
@@ -113,19 +44,17 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
     onHover(null);
   };
 
-  // Get category colors
-  const category = data.category || 'default';
-  const colors = categoryColors[category] || categoryColors.default;
+  const colors = hexColors;
 
   // Pointy-top hexagon path (vertices at top and bottom)
   const hexPath = "M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z";
 
   // Determine stroke color based on state
   const getStrokeColor = () => {
-    if (isRevealing) return '#00ff00';
+    if (isRevealing) return 'hsl(var(--brand-ink))';
     if (data.confirmed) return colors.primary;
     if (isHovered) return colors.glow;
-    return '#ffffff';
+    return colors.primary;
   };
 
   // Determine label color based on category
@@ -178,13 +107,13 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
             <linearGradient id={`hexGradient-${data.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
               {isRevealing ? (
                 <>
-                  <stop offset="0%" stopColor="rgba(0,255,0,0.3)" />
-                  <stop offset="100%" stopColor="rgba(0,255,0,0.1)" />
+                  <stop offset="0%" style={{ stopColor: 'hsl(var(--brand-soft))' }} />
+                  <stop offset="100%" style={{ stopColor: 'hsl(var(--surface))' }} />
                 </>
               ) : (
                 <>
-                  <stop offset="0%" stopColor={colors.bg[0]} />
-                  <stop offset="100%" stopColor={colors.bg[1]} />
+                  <stop offset="0%" style={{ stopColor: colors.bg[0] }} />
+                  <stop offset="100%" style={{ stopColor: colors.bg[1] }} />
                 </>
               )}
             </linearGradient>
@@ -200,7 +129,6 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
           <path
             d={hexPath}
             fill="none"
-            stroke={getStrokeColor()}
             strokeWidth={isRevealing ? "3" : data.confirmed ? "3" : isHovered ? "2.5" : "2"}
             opacity={isRevealing ? 1 : data.confirmed ? 1 : isHovered ? 0.85 : 0.6}
             filter={isRevealing || data.confirmed || isHovered ? `url(#glow-${data.id})` : undefined}
@@ -209,11 +137,12 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
               isRevealing && "animate-pulse"
             )}
             style={{ 
+              stroke: getStrokeColor(),
               transition: 'all 0.3s ease',
               filter: isRevealing 
-                ? 'drop-shadow(0 0 10px #00ff00) drop-shadow(0 0 20px #00ff00)' 
+                ? 'drop-shadow(0 0 6px hsl(var(--brand-ink) / 0.4))' 
                 : (data.confirmed || isHovered) 
-                  ? `drop-shadow(0 0 8px ${colors.glow}) drop-shadow(0 0 15px ${colors.glow})`
+                  ? `drop-shadow(0 0 6px ${colors.glow})`
                   : undefined
             }}
           />
@@ -236,7 +165,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
             textAnchor="middle"
             fontSize="6"
             fontWeight="600"
-            fill={getLabelColor()}
+            style={{ fill: getLabelColor() }}
             className="uppercase tracking-wider select-none"
           >
             {data.label}
@@ -249,7 +178,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
             textAnchor="middle"
             fontSize="7"
             fontWeight="500"
-            fill="#ffffff"
+            style={{ fill: 'hsl(var(--foreground))' }}
             className="select-none"
           >
             {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
@@ -262,8 +191,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
               y="72"
               textAnchor="middle"
               fontSize="6"
-              fill={colors.primary}
-              opacity={0.7}
+              style={{ fill: colors.primary }}
               fontStyle="italic"
               className="select-none"
             >
@@ -274,10 +202,10 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
           {/* Confirmed checkmark with category color */}
           {data.confirmed && !isRevealing && (
             <g transform="translate(65, 8)">
-              <circle cx="10" cy="10" r="10" fill={colors.primary} />
+              <circle cx="10" cy="10" r="10" style={{ fill: colors.primary }} />
               <path
                 d="M6 10 L9 13 L15 7"
-                stroke="#000"
+                stroke="hsl(var(--brand-white))"
                 strokeWidth="2"
                 fill="none"
                 strokeLinecap="round"

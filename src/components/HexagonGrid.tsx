@@ -27,6 +27,7 @@ import {
   trackHexagonConfirm, 
   trackDeepScanUnlocked, 
   trackFunnelStep,
+  trackScanCompleted,
   trackHexagonAccuracy,
   trackTimeToFirstConfirmation,
   trackActivity
@@ -243,6 +244,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     // Check for final summary (all 46+ hexagons confirmed)
     if (confirmedCount >= visibleCount && visibleCount >= 46 && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
+      trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
       // Trigger celebration confetti
       triggerCompletionCelebration();
@@ -288,13 +290,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-        colors: ['#00ff41', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+        colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
       });
       confetti({
         ...defaults,
         particleCount,
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-        colors: ['#00ff41', '#22c55e', '#10b981', '#facc15', '#f59e0b'],
+        colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
       });
     }, 250);
   }, []);
@@ -308,7 +310,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       if (dnsResult.isLeaking) {
         setCriticalSecurityAlert({
           type: 'dns',
-          message: `Your DNS is leaking to your ISP! Location exposed: ${dnsResult.actualLocation}`,
+          message: `Your DNS requests are visible to your ISP. Location shown: ${dnsResult.actualLocation}`,
         });
         // Auto-show the fix guide after a short delay
         setTimeout(() => setShowDNSFixGuide(true), 2000);
@@ -438,7 +440,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           if (label.includes('dns') && value.includes('leak')) {
             setCriticalSecurityAlert({
               type: 'dns',
-              message: 'Critical: DNS leak detected! Your browsing history is exposed.',
+              message: 'DNS leak detected. Your browsing history is visible to your ISP.',
             });
           }
           return newCount;
@@ -532,10 +534,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
       {/* Critical Security Alert Banner */}
       {criticalSecurityAlert && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white py-3 px-4 flex items-center justify-between animate-pulse">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-brand-near-black text-brand-white border-b border-brand-dark-border py-3 px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6" />
-            <span className="font-bold">🚨 CRITICAL SECURITY ISSUE</span>
+            <span className="font-bold">Security notice</span>
             <span className="hidden sm:inline">- {criticalSecurityAlert.message}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -543,15 +545,15 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
               size="sm"
               variant="secondary"
               onClick={() => setShowDNSFixGuide(true)}
-              className="bg-white text-red-600 hover:bg-gray-100"
+              className="bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white"
             >
-              Fix Now
+              See how to fix
             </Button>
             <Button
               size="icon"
               variant="ghost"
               onClick={() => setCriticalSecurityAlert(null)}
-              className="text-white hover:bg-red-700"
+              className="text-brand-white hover:bg-brand-dark-border hover:text-brand-white"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -574,7 +576,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         <p className="text-sm sm:text-base text-muted-foreground">
           We found {visibleCount} data points about you without asking.
           {visibleCount < orderedHexagons.length && (
-            <span className="text-green-400 ml-1">{getPhaseDescription()}</span>
+            <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
         </p>
       </div>
@@ -717,25 +719,25 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {/* Completion Celebration Banner */}
       {showCompletionCelebration && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-gradient-to-r from-green-600/90 to-cyan-600/90 backdrop-blur-sm px-8 py-6 rounded-2xl border-2 border-white/30 shadow-2xl animate-scale-in text-center pointer-events-auto">
+          <div className="bg-surface border border-surface-border shadow-card px-8 py-6 rounded-2xl animate-scale-in text-center pointer-events-auto">
             <div className="flex items-center justify-center gap-3 mb-2">
-              <PartyPopper className="w-8 h-8 text-yellow-300 animate-bounce" />
-              <h2 className="text-2xl font-bold text-white">Complete Digital Shadow Revealed!</h2>
-              <PartyPopper className="w-8 h-8 text-yellow-300 animate-bounce" />
+              <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
+              <h2 className="text-2xl font-bold text-foreground">Complete Digital Shadow Revealed!</h2>
+              <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
             </div>
-            <p className="text-white/80 text-sm">All 46 hexagons analyzed across 8 categories</p>
+            <p className="text-muted-foreground text-sm">All 46 hexagons analyzed across 8 categories</p>
             <div className="flex items-center justify-center gap-4 mt-4">
               <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-300">46</p>
-                <p className="text-xs text-white/60">Data Points</p>
+                <p className="text-3xl font-bold text-brand">46</p>
+                <p className="text-xs text-muted-foreground">Data Points</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-300">8</p>
-                <p className="text-xs text-white/60">Categories</p>
+                <p className="text-3xl font-bold text-brand">8</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-yellow-300">100%</p>
-                <p className="text-xs text-white/60">Complete</p>
+                <p className="text-3xl font-bold text-brand">100%</p>
+                <p className="text-xs text-muted-foreground">Complete</p>
               </div>
             </div>
           </div>

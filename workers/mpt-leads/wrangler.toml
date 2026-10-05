@@ -1,0 +1,27 @@
+# mpt-leads — live lead-capture Worker (MyPrivacyTOOL Cloudflare account 35cb17172c65a20f5cf1baf131485382)
+name = "mpt-leads"
+main = "worker.js"
+workers_dev = true
+
+# DECISION: the LIVE worker has an EMPTY compatibility_date (oldest runtime behaviour). wrangler
+# requires one, so the first Action deploy changes it. The code is plain fetch/formData/crypto and is
+# covered by worker.test.mjs, but verify once with a real submission after the first Action deploy.
+compatibility_date = "2024-09-23"
+
+# Matches the live settings read on 2026-10-05 (logs on, invocation logs persisted).
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+persist = true
+head_sampling_rate = 1
+
+# Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
+# Expected names: EXPECTED_SECRETS.txt (the workflow fails if any goes missing).
+
+# MPC-6677: the scan-report Worker owns the confirmation email (no duplicate senders).
+# Declared here, not in the dashboard, because `wrangler deploy` replaces dashboard-set plain vars.
+[vars]
+CONFIRMATION_OWNER = "scan-report"

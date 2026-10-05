@@ -10,98 +10,138 @@
   --sal: env(safe-area-inset-left);
 }
 
-/* MyPrivacyTOOL.io Design System - Dark Cyber-Security Theme */
+/* MyPrivacyTOOL.io Design System - Brand Guidelines v2 (approved by Chris Ransford 2026-10-05)
+   Palette is LOCKED (2026-07-31). Every colour on the site comes from these tokens.
+   Source: Notion "Brand Guidelines - MyPrivacyTOOL" Part 3. Colours are HSL triplets,
+   use as hsl(var(--x)) or hsl(var(--x) / alpha). Do not hard-code colours elsewhere. */
 
 @layer base {
   :root {
-    /* White Minimalist Theme */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
+    /* ---- LOCKED BRAND PALETTE ---- */
+    --brand-green: 145 63% 41.8%;        /* #27AE60 Matrix Green: CTAs, highlights, fills, active states */
+    --brand-green-hover: 145 63% 31.8%;  /* #1E8449 Deep Green: hover states; also green TEXT on light (5.1:1 on white) */
+    --brand-black: 0 0% 0%;              /* #000000 */
+    --brand-white: 0 0% 100%;            /* #FFFFFF */
+    --brand-near-black: 0 0% 10.2%;      /* #1A1A1A dark cards, nav, body text */
+    --brand-dark-border: 0 0% 16.5%;     /* #2A2A2A card outlines on dark */
+    --brand-off-white: 0 0% 95.7%;       /* #F4F4F4 section dividers, input backgrounds */
+    --brand-error: 6 78% 57.1%;          /* #E74C3C genuine error states ONLY, never a brand colour */
 
-    --card: 0 0% 98%;
-    --card-foreground: 0 0% 10%;
+    /* ---- SEMANTIC TOKENS (shadcn names) mapped onto the palette ---- */
+    --background: var(--brand-white);
+    --foreground: var(--brand-near-black);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --card: var(--brand-white);
+    --card-foreground: var(--brand-near-black);
 
-    /* Matrix Green as primary */
-    --primary: 120 100% 35%;
-    --primary-foreground: 0 0% 100%;
+    --popover: var(--brand-white);
+    --popover-foreground: var(--brand-near-black);
 
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 10%;
+    /* Primary = Matrix Green fill. Black text on it is 7.5:1; white would only be 2.9:1 */
+    --primary: var(--brand-green);
+    --primary-foreground: var(--brand-black);
+    --primary-hover: var(--brand-green-hover);   /* hover fill; text flips to white (5.1:1) */
 
-    --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 45%;
+    --secondary: var(--brand-off-white);
+    --secondary-foreground: var(--brand-near-black);
 
-    /* Matrix Green accent */
-    --accent: 120 100% 35%;
-    --accent-foreground: 0 0% 100%;
+    --muted: var(--brand-off-white);
+    --muted-foreground: 0 0% 35%;                /* Near Black at ~72% on white: 6.9:1 */
 
-    --success: 120 100% 35%;
-    --success-foreground: 0 0% 100%;
+    --accent: var(--brand-green);
+    --accent-foreground: var(--brand-black);
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 10%;
+    --success: var(--brand-green-hover);
+    --success-foreground: var(--brand-white);
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    /* No amber/yellow in the palette: "warning" is Near Black */
+    --warning: var(--brand-near-black);
+    --warning-foreground: var(--brand-white);
 
-    --border: 0 0% 90%;
-    --input: 0 0% 96%;
-    --ring: 120 100% 35%;
+    /* Error red is the only red. Black text on it is 5.6:1; red TEXT on white is 3.8:1 so never use it for text */
+    --destructive: var(--brand-error);
+    --destructive-foreground: var(--brand-black);
+
+    --border: 0 0% 89%;                          /* Near Black at ~12% on white */
+    --input: var(--brand-off-white);
+    --ring: var(--brand-green-hover);
 
     --radius: 0.75rem;
 
-    /* Custom tokens for hexagon UI - Matrix Green */
-    --hexagon-bg: 120 100% 35%;
-    --hexagon-glow: 120 100% 45%;
-    --hexagon-confirmed: 120 100% 35%;
-    --hexagon-border: 0 0% 20%;
+    /* ---- Matrix rain (canvas reads these at runtime) ---- */
+    --matrix-bg: var(--brand-white);
+    --matrix-glyph: var(--brand-green);          /* #27AE60 */
+    --matrix-lead: var(--brand-green-hover);     /* #1E8449 leading glyph, darker not white */
+    --matrix-glyph-alpha: 0.2;
+    --matrix-lead-alpha: 0.34;
 
-    /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(120 100% 35%) 0%, hsl(120 100% 25%) 100%);
-    --gradient-bg: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 100%);
+    /* ---- Component tokens (palette-derived) ---- */
+    --brand-ink: var(--brand-green-hover);       /* green TEXT / strokes on light surfaces (AA) */
+    --brand-soft: 145 45% 94%;                   /* Matrix Green at ~10% on white */
 
-    /* Shadows - subtle grey */
-    --shadow-glow: 0 0 40px hsl(120 100% 35% / 0.2);
-    --shadow-confirmed: 0 0 40px hsl(120 100% 35% / 0.3);
+    --surface: var(--brand-white);
+    --surface-alpha: 0.94;                       /* lets the rain read faintly through cards */
+    --surface-border: var(--border);
+    --shadow-card: 0 4px 18px hsl(0 0% 0% / 0.06);
+
+    /* Risk / status. Palette only: low = green, medium = near black, high = error red (fills/strokes/borders only) */
+    --risk-low: var(--brand-green-hover);
+    --risk-low-soft: var(--brand-soft);
+    --risk-mid: var(--brand-near-black);
+    --risk-mid-soft: var(--brand-off-white);
+    --risk-orange: var(--brand-near-black);
+    --risk-orange-soft: var(--brand-off-white);
+    --risk-high: var(--brand-error);
+    --risk-high-soft: 6 78% 96%;                 /* Error red at ~8% on white */
+
+    /* Hexagon categories: benign = green, sensitive = near black (no off-palette hues) */
+    --cat-device: var(--brand-green-hover);      --cat-device-tint: var(--brand-soft);
+    --cat-network: var(--brand-green-hover);     --cat-network-tint: var(--brand-soft);
+    --cat-language: var(--brand-green-hover);    --cat-language-tint: var(--brand-soft);
+    --cat-profile: var(--brand-green-hover);     --cat-profile-tint: var(--brand-soft);
+    --cat-orientation: var(--brand-green-hover); --cat-orientation-tint: var(--brand-soft);
+    --cat-storage: var(--brand-green-hover);     --cat-storage-tint: var(--brand-soft);
+    --cat-privacy: var(--brand-near-black);      --cat-privacy-tint: var(--brand-off-white);
+    --cat-fingerprint: var(--brand-near-black);  --cat-fingerprint-tint: var(--brand-off-white);
+    --cat-social: var(--brand-near-black);       --cat-social-tint: var(--brand-off-white);
+    --cat-security: var(--brand-near-black);     --cat-security-tint: var(--brand-off-white);
+    --cat-behavior: var(--brand-near-black);     --cat-behavior-tint: var(--brand-off-white);
+    --cat-default: var(--brand-green-hover);     --cat-default-tint: var(--brand-soft);
+
+    --hexagon-bg: var(--brand-green);
+    --hexagon-glow: var(--brand-green);
+    --hexagon-confirmed: var(--brand-green-hover);
+    --hexagon-border: var(--brand-near-black);
+
+    --gradient-hero: linear-gradient(135deg, hsl(var(--brand-green)) 0%, hsl(var(--brand-green-hover)) 100%);
+    --gradient-bg: linear-gradient(135deg, hsl(var(--brand-white)) 0%, hsl(var(--brand-off-white)) 100%);
+
+    --shadow-glow: 0 0 40px hsl(var(--brand-green) / 0.2);
+    --shadow-confirmed: 0 0 40px hsl(var(--brand-green) / 0.3);
   }
 
+  /* Dark context (Near Black / Black backgrounds, text on dark) - palette only */
   .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
-
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 120 100% 40%;
-    --primary-foreground: 0 0% 5%;
-
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
-
-    --accent: 120 100% 40%;
-    --accent-foreground: 0 0% 5%;
-
-    --success: 120 100% 40%;
-    --success-foreground: 0 0% 5%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 5%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 20%;
-    --input: 0 0% 15%;
-    --ring: 120 100% 40%;
+    --background: var(--brand-black);
+    --foreground: var(--brand-white);
+    --card: var(--brand-near-black);
+    --card-foreground: var(--brand-white);
+    --popover: var(--brand-near-black);
+    --popover-foreground: var(--brand-white);
+    --primary: var(--brand-green);
+    --primary-foreground: var(--brand-black);
+    --secondary: var(--brand-dark-border);
+    --secondary-foreground: var(--brand-white);
+    --muted: var(--brand-dark-border);
+    --muted-foreground: 0 0% 70%;
+    --accent: var(--brand-green);
+    --accent-foreground: var(--brand-black);
+    --border: var(--brand-dark-border);
+    --input: var(--brand-dark-border);
+    --ring: var(--brand-green);
+    --brand-ink: var(--brand-green);
+    --surface: var(--brand-near-black);
+    --surface-border: var(--brand-dark-border);
   }
 }
 
@@ -112,7 +152,8 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    background: hsl(0 0% 100%);
+    background: hsl(var(--matrix-bg));
+    overflow-x: clip;
     min-height: 100vh;
   }
 }
@@ -138,7 +179,7 @@
 
   /* Text gradient - Matrix green */
   .text-gradient {
-    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(120 100% 25%) 100%);
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--brand-ink)) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -146,8 +187,7 @@
 
   /* Matrix text effect */
   .text-matrix {
-    color: hsl(var(--primary));
-    text-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+    color: hsl(var(--brand-ink));
   }
 
   /* Backdrop blur card */
@@ -155,7 +195,7 @@
     background: hsl(var(--card) / 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid hsl(var(--border));
-    box-shadow: 0 4px 20px hsl(0 0% 0% / 0.05);
+    box-shadow: var(--shadow-card);
   }
 }
 
@@ -275,10 +315,10 @@
 
   @keyframes hexagon-glow {
     0%, 100% {
-      filter: brightness(1) drop-shadow(0 0 8px rgba(0, 255, 65, 0.5));
+      filter: brightness(1) drop-shadow(0 0 6px hsl(var(--brand-ink) / 0.35));
     }
     50% {
-      filter: brightness(1.2) drop-shadow(0 0 15px rgba(0, 255, 65, 0.8));
+      filter: brightness(1.2) drop-shadow(0 0 10px hsl(var(--brand-ink) / 0.5));
     }
   }
 

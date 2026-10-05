@@ -61,7 +61,7 @@ const CopyButton = ({ text, label }: CopyButtonProps) => {
     >
       {label || text}
       {copied ? (
-        <Check className="w-3 h-3 text-green-400" />
+        <Check className="w-3 h-3 text-risk-low" />
       ) : (
         <Copy className="w-3 h-3 text-muted-foreground" />
       )}
@@ -89,16 +89,16 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-background via-background to-red-950/10 border-red-500/30">
-        <DialogHeader className="border-b border-red-500/20 pb-4">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-background border-risk-high/30">
+        <DialogHeader className="border-b border-risk-high/30 pb-4">
           <DialogTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 bg-red-500/20 rounded-lg animate-pulse">
-              <AlertTriangle className="w-6 h-6 text-red-400" />
+            <div className="p-2 bg-risk-high-soft rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-foreground" />
             </div>
             <div>
-              <span className="text-red-400">Fix Your DNS Leak Immediately</span>
+              <span className="text-foreground">Fix your DNS leak</span>
               <DialogDescription className="text-muted-foreground mt-1">
-                Your ISP can see every website you visit
+                Your ISP can see the websites you visit
               </DialogDescription>
             </div>
           </DialogTitle>
@@ -107,22 +107,22 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
         <div className="space-y-6 py-4">
           {/* SUCCESS CELEBRATION */}
           {testResult === 'fixed' && (
-            <div className="bg-green-500/20 border-2 border-green-500 rounded-lg p-6 text-center animate-in fade-in zoom-in duration-300">
+            <div className="bg-risk-low-soft border-2 border-risk-low rounded-lg p-6 text-center animate-in fade-in zoom-in duration-300">
               <div className="flex justify-center mb-4">
                 <div className="relative">
-                  <ShieldCheck className="w-16 h-16 text-green-400" />
-                  <Sparkles className="w-6 h-6 text-yellow-400 absolute -top-1 -right-1 animate-pulse" />
+                  <ShieldCheck className="w-16 h-16 text-risk-low" />
+                  <Sparkles className="w-6 h-6 text-foreground absolute -top-1 -right-1" />
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-green-400 mb-2">
-                🎉 DNS Leak Fixed!
+              <h3 className="text-2xl font-bold text-risk-low mb-2">
+                DNS leak fixed
               </h3>
-              <p className="text-green-200">
+              <p className="text-risk-low">
                 Your DNS requests are now secure. Your ISP can no longer see which websites you visit.
               </p>
               <Button
                 variant="outline"
-                className="mt-4 border-green-500 text-green-400 hover:bg-green-500/20"
+                className="mt-4 border-risk-low text-foreground hover:bg-risk-low-soft"
                 onClick={() => onOpenChange(false)}
               >
                 Close Guide
@@ -135,17 +135,17 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               {/* VISUAL EXPLANATION */}
               <div className="space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-red-400" />
+                  <Eye className="w-5 h-5 text-foreground" />
                   What's Happening Now
                 </h3>
                 
                 <div className="grid md:grid-cols-2 gap-4">
-                  {/* CURRENT STATE - BAD */}
-                  <Card className="border-red-500/30 bg-red-950/20">
+                  {/* CURRENT STATE */}
+                  <Card className="border-risk-high/30 bg-risk-high-soft">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <XCircle className="w-5 h-5 text-red-400" />
-                        <span className="font-medium text-red-400">Current (Leaking)</span>
+                        <XCircle className="w-5 h-5 text-foreground" />
+                        <span className="font-medium text-foreground">Current (Leaking)</span>
                       </div>
                       
                       <div className="space-y-2 text-sm">
@@ -153,31 +153,31 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                           <Monitor className="w-4 h-4" />
                           <span>Your Device</span>
                         </div>
-                        <ArrowRight className="w-4 h-4 ml-4 text-red-400" />
-                        <div className="flex items-center gap-2 text-red-300">
+                        <ArrowRight className="w-4 h-4 ml-4 text-foreground" />
+                        <div className="flex items-center gap-2 text-foreground">
                           <Server className="w-4 h-4" />
                           <span>ISP DNS Servers</span>
                         </div>
-                        <ArrowRight className="w-4 h-4 ml-4 text-red-400" />
+                        <ArrowRight className="w-4 h-4 ml-4 text-foreground" />
                         <div className="flex items-center gap-2">
                           <Globe className="w-4 h-4" />
                           <span>Websites</span>
                         </div>
                       </div>
                       
-                      <div className="mt-3 p-2 bg-red-500/20 rounded text-xs">
+                      <div className="mt-3 p-2 bg-risk-high-soft rounded text-xs">
                         <Eye className="w-3 h-3 inline mr-1" />
                         ISP logs: "User visited gmail.com, reddit.com, ..."
                       </div>
                     </CardContent>
                   </Card>
 
-                  {/* FIXED STATE - GOOD */}
-                  <Card className="border-green-500/30 bg-green-950/20">
+                  {/* FIXED STATE */}
+                  <Card className="border-risk-low/30 bg-risk-low-soft">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <CheckCircle2 className="w-5 h-5 text-green-400" />
-                        <span className="font-medium text-green-400">After Fixing</span>
+                        <CheckCircle2 className="w-5 h-5 text-risk-low" />
+                        <span className="font-medium text-risk-low">After Fixing</span>
                       </div>
                       
                       <div className="space-y-2 text-sm">
@@ -185,19 +185,19 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                           <Monitor className="w-4 h-4" />
                           <span>Your Device</span>
                         </div>
-                        <ArrowRight className="w-4 h-4 ml-4 text-green-400" />
-                        <div className="flex items-center gap-2 text-green-300">
+                        <ArrowRight className="w-4 h-4 ml-4 text-risk-low" />
+                        <div className="flex items-center gap-2 text-risk-low">
                           <Lock className="w-4 h-4" />
                           <span>VPN DNS (Encrypted)</span>
                         </div>
-                        <ArrowRight className="w-4 h-4 ml-4 text-green-400" />
+                        <ArrowRight className="w-4 h-4 ml-4 text-risk-low" />
                         <div className="flex items-center gap-2">
                           <Globe className="w-4 h-4" />
                           <span>Websites</span>
                         </div>
                       </div>
                       
-                      <div className="mt-3 p-2 bg-green-500/20 rounded text-xs">
+                      <div className="mt-3 p-2 bg-risk-low-soft rounded text-xs">
                         <EyeOff className="w-3 h-3 inline mr-1" />
                         ISP sees: Encrypted VPN traffic only
                       </div>
@@ -400,31 +400,27 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
               </Tabs>
 
               {/* WHY THIS MATTERS */}
-              <div className="bg-red-950/30 border border-red-500/20 rounded-lg p-4">
+              <div className="bg-risk-high-soft border border-risk-high/30 rounded-lg p-4">
                 <h3 className="font-semibold flex items-center gap-2 mb-3">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  <AlertTriangle className="w-5 h-5 text-foreground" />
                   Why This Matters
                 </h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
-                    <span className="text-red-400">•</span>
-                    <span>DNS leaks reveal <strong>every website you visit</strong> (complete browsing history)</span>
+                    <span className="text-foreground">•</span>
+                    <span>A DNS leak lets your ISP see <strong>which websites you visit</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-red-400">•</span>
-                    <span>Your ISP logs <strong>when you visit</strong> and <strong>how often</strong></span>
+                    <span className="text-foreground">•</span>
+                    <span>Your ISP can see <strong>when you visit</strong> and <strong>how often</strong></span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-red-400">•</span>
-                    <span>ISPs can <strong>sell this data to advertisers</strong> in many countries</span>
+                    <span className="text-foreground">•</span>
+                    <span>That browsing pattern can build a detailed picture of your behavior</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-red-400">•</span>
-                    <span>Governments can <strong>request logs without warrant</strong> in many jurisdictions</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-400">•</span>
-                    <span>This is <strong>worse than IP leaks</strong> because it reveals detailed behavior patterns</span>
+                    <span className="text-foreground">•</span>
+                    <span>Fixing it keeps this visibility with your VPN instead</span>
                   </li>
                 </ul>
               </div>
@@ -441,7 +437,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                     disabled={testing}
                     className={cn(
                       "min-w-[200px]",
-                      testResult === 'still-leaking' && "bg-red-600 hover:bg-red-700"
+                      testResult === 'still-leaking' && "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     )}
                   >
                     {testing ? (
@@ -457,7 +453,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                     ) : (
                       <>
                         <Shield className="w-4 h-4 mr-2" />
-                        Test DNS Leak Now
+                        Test DNS leak
                       </>
                     )}
                   </Button>
@@ -475,7 +471,7 @@ const DNSLeakFixGuide = ({ open, onOpenChange, currentLeak }: DNSLeakFixGuidePro
                 </div>
 
                 {testResult === 'still-leaking' && (
-                  <p className="text-sm text-red-400 text-center">
+                  <p className="text-sm text-foreground text-center">
                     DNS is still leaking. Try a different method above, or try disconnecting and reconnecting your VPN.
                   </p>
                 )}
@@ -500,13 +496,13 @@ const VPNGuide = ({
 }) => (
   <div className="p-3 bg-background/50 rounded-lg border border-border">
     <h4 className="font-medium mb-2 flex items-center gap-2">
-      <Shield className="w-4 h-4 text-primary" />
+      <Shield className="w-4 h-4 text-brand" />
       {name}
     </h4>
     <ol className="space-y-1 text-sm text-muted-foreground">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary font-medium">{i + 1}.</span>
+          <span className="text-brand font-medium">{i + 1}.</span>
           {step}
         </li>
       ))}
@@ -530,13 +526,13 @@ const SystemGuide = ({
 }) => (
   <div className="p-3 bg-background/50 rounded-lg border border-border">
     <h4 className="font-medium mb-2 flex items-center gap-2">
-      <Monitor className="w-4 h-4 text-primary" />
+      <Monitor className="w-4 h-4 text-brand" />
       {os}
     </h4>
     <ol className="space-y-1 text-sm text-muted-foreground">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary font-medium">{i + 1}.</span>
+          <span className="text-brand font-medium">{i + 1}.</span>
           {step}
         </li>
       ))}
@@ -555,13 +551,13 @@ const BrowserGuide = ({
 }) => (
   <div className="p-3 bg-background/50 rounded-lg border border-border">
     <h4 className="font-medium mb-2 flex items-center gap-2">
-      <Globe className="w-4 h-4 text-primary" />
+      <Globe className="w-4 h-4 text-brand" />
       {browser}
     </h4>
     <ol className="space-y-1 text-sm text-muted-foreground">
       {steps.map((step, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-primary font-medium">{i + 1}.</span>
+          <span className="text-brand font-medium">{i + 1}.</span>
           {step}
         </li>
       ))}
@@ -607,7 +603,7 @@ const DNSProvider = ({
       {features.map((feature) => (
         <span
           key={feature}
-          className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded"
+          className="text-xs px-2 py-0.5 bg-primary/10 text-foreground rounded"
         >
           {feature}
         </span>

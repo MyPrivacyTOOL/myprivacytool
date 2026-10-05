@@ -14,10 +14,11 @@ const COMPANY_LINKS = [
 ];
 
 const GUIDES_LINKS = [
-  { label: "Remove my info from the internet", to: "/guides/remove-my-info-from-internet" },
-  { label: "Remove my info from Google", to: "/guides/remove-from-google" },
-  { label: "Stop spam calls & emails", to: "/guides/stop-spam" },
+  { label: "Remove my info from the internet", to: "/blog/remove-personal-information-from-internet" },
+  { label: "Remove my info from Google", to: "/blog/remove-your-name-and-info-from-google" },
+  { label: "Stop spam calls & emails", to: "/blog/stop-spam-calls-texts-and-emails" },
   { label: "Opt-out guides", to: "/opt-out-guides" },
+  { label: "Am I exposed?", to: "/am-i-exposed" },
 ];
 
 const LEGAL_LINKS = [
@@ -61,7 +62,7 @@ const Footer = () => {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-border bg-background" role="contentinfo">
+    <footer className="border-t border-border bg-background/85" role="contentinfo">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <FooterLinkList title="Company" links={COMPANY_LINKS} />
@@ -112,7 +113,7 @@ const Footer = () => {
 
         <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
           <Link to="/" className="flex items-center" aria-label="MyPrivacyTOOL home">
-            <img src={logoFooter} alt="MyPrivacyTOOL.IO" className="h-8 object-contain" loading="lazy" />
+            <img src={logoFooter} alt="MyPrivacyTOOL" className="h-14 w-auto min-w-24 -my-3 mx-2 object-contain" loading="lazy" />
           </Link>
           <p className="text-xs text-muted-foreground text-center">
             © {year} MyPrivacyTOOL, MyPrivacyTOOL Ltd., Hong Kong

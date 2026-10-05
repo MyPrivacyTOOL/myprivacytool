@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import { X, Mic, Zap, Infinity, Heart, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { trackUpgradeModalClosed, trackWaitlistEmailSubmitted } from '@/lib/analytics';
+import { trackUpgradeModalClosed, trackWaitlistEmailSubmitted, trackAliceHDWaitlistSignup } from '@/lib/analytics';
+import { submitHubSpotForm, consentFields } from '@/lib/hubspot';
+import ConsentCheckbox from '@/components/ConsentCheckbox';
 import { z } from 'zod';
+
+// Reuses the public HubSpot "Start Scan" form (email + source_tag + consent fields); segment by source_tag.
+const FORM_ID =
+  import.meta.env.VITE_HUBSPOT_START_FORM_ID || '22ee30ae-6cf9-419b-aa46-b656b0e7b1bf';
+const SOURCE_TAG = 'alice-hd-waitlist';
 
 const emailSchema = z.string().trim().email({ message: "Please enter a valid email" }).max(255);
 
@@ -40,13 +47,15 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
   const [emailError, setEmailError] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isAlreadyOnList, setIsAlreadyOnList] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleClose = () => {
     trackUpgradeModalClosed();
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError('');
     
@@ -57,13 +66,30 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
       return;
     }
 
-    // Add to waitlist
+    if (!consent || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await submitHubSpotForm({
+        formId: FORM_ID,
+        fields: { email: result.data, source_tag: SOURCE_TAG, ...consentFields('alice_hd_modal') },
+        pageName: 'Alice HD waitlist',
+      });
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+
+    // Local list only de-duplicates the confirmation message; HubSpot is the source of truth.
     const added = addToWaitlist(result.data);
     if (!added) {
       setIsAlreadyOnList(true);
     }
-    
+
     trackWaitlistEmailSubmitted(result.data);
+    trackAliceHDWaitlistSignup({ source: 'alice_hd_modal' });
     setIsSubmitted(true);
   };
 
@@ -73,69 +99,69 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
         onClick={handleClose}
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-black/95 border border-green-500/50 rounded-2xl p-6 shadow-[0_0_40px_rgba(0,255,65,0.3)]">
+      <div className="relative w-full max-w-md bg-surface/95 border border-risk-low/50 rounded-2xl p-6 shadow-card">
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-green-400/60 hover:text-green-400 transition-colors"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-risk-low transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/50 rounded-full mb-4">
-            <Mic className="w-5 h-5 text-green-400" />
-            <span className="text-green-400 font-bold">Alice HD Voice</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-risk-low-soft border border-risk-low/50 rounded-full mb-4">
+            <Mic className="w-5 h-5 text-risk-low" />
+            <span className="text-risk-low font-bold">Alice HD Voice</span>
           </div>
           
           {showRateLimitMessage && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
-              <p className="text-red-400 text-sm font-medium">
+            <div className="bg-risk-high-soft border border-risk-high/30 rounded-lg p-3 mb-4">
+              <p className="text-foreground text-sm font-medium">
                 You've used all 20 free sessions today
               </p>
-              <p className="text-red-300/70 text-xs mt-1">
+              <p className="text-muted-foreground text-xs mt-1">
                 Alice HD users get unlimited sessions
               </p>
             </div>
           )}
 
-          <h2 className="text-xl font-bold text-green-300 mb-2">
+          <h2 className="text-xl font-bold text-risk-low mb-2">
             Get Professional Voice Quality
           </h2>
-          <p className="text-green-300/70 text-sm">
+          <p className="text-muted-foreground text-sm">
             Upgrade to Alice HD for the ultimate privacy guidance experience
           </p>
         </div>
 
         {/* Features */}
         <div className="space-y-3 mb-6">
-          <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <Infinity className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 p-3 bg-risk-low-soft border border-risk-low/30 rounded-lg">
+            <Infinity className="w-5 h-5 text-risk-low flex-shrink-0" />
             <div>
-              <p className="text-green-300 font-medium text-sm">Unlimited Daily Sessions</p>
-              <p className="text-green-300/60 text-xs">No more 20/day limit</p>
+              <p className="text-risk-low font-medium text-sm">Unlimited Daily Sessions</p>
+              <p className="text-muted-foreground text-xs">No more 20/day limit</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <Zap className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 p-3 bg-risk-low-soft border border-risk-low/30 rounded-lg">
+            <Zap className="w-5 h-5 text-risk-low flex-shrink-0" />
             <div>
-              <p className="text-green-300 font-medium text-sm">&lt;600ms Response Time</p>
-              <p className="text-green-300/60 text-xs">Ultra-fast AI voice synthesis</p>
+              <p className="text-risk-low font-medium text-sm">&lt;600ms Response Time</p>
+              <p className="text-muted-foreground text-xs">Ultra-fast AI voice synthesis</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <Heart className="w-5 h-5 text-green-400 flex-shrink-0" />
+          <div className="flex items-center gap-3 p-3 bg-risk-low-soft border border-risk-low/30 rounded-lg">
+            <Heart className="w-5 h-5 text-risk-low flex-shrink-0" />
             <div>
-              <p className="text-green-300 font-medium text-sm">Support Development</p>
-              <p className="text-green-300/60 text-xs">Help us build more privacy tools</p>
+              <p className="text-risk-low font-medium text-sm">Support Development</p>
+              <p className="text-muted-foreground text-xs">Help us build more privacy tools</p>
             </div>
           </div>
         </div>
@@ -143,10 +169,10 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
         {/* Pricing */}
         <div className="text-center mb-6">
           <div className="inline-flex items-baseline gap-1">
-            <span className="text-3xl font-bold text-green-400">$4.99</span>
-            <span className="text-green-300/60">/month</span>
+            <span className="text-3xl font-bold text-risk-low">$4.99</span>
+            <span className="text-muted-foreground">/month</span>
           </div>
-          <p className="text-yellow-400/80 text-sm font-medium mt-1">Coming Soon!</p>
+          <p className="text-muted-foreground text-sm font-medium mt-1">Coming Soon!</p>
         </div>
 
         {/* Waitlist Form */}
@@ -162,26 +188,28 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
                 }}
                 placeholder="Enter your email for early access"
                 className={cn(
-                  "w-full px-4 py-3 bg-black/50 border rounded-lg text-green-300 placeholder:text-green-300/40 focus:outline-none focus:ring-2 focus:ring-green-500/50 transition-all",
-                  emailError ? "border-red-500/50" : "border-green-500/30"
+                  "w-full px-4 py-3 bg-surface/95 border rounded-lg text-risk-low placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-risk-low transition-all",
+                  emailError ? "border-risk-high/50" : "border-risk-low/30"
                 )}
                 maxLength={255}
               />
               {emailError && (
-                <p className="text-red-400 text-xs mt-1">{emailError}</p>
+                <p className="text-foreground text-xs mt-1">{emailError}</p>
               )}
             </div>
+            <ConsentCheckbox id="alice-hd-consent" checked={consent} onChange={setConsent} disabled={submitting} />
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-r from-green-500/30 to-emerald-500/30 border border-green-500/50 rounded-lg text-green-400 font-bold hover:from-green-500/40 hover:to-emerald-500/40 transition-all"
+              disabled={submitting}
+              className="w-full py-3 bg-risk-low-soft border border-risk-low/50 rounded-lg text-foreground font-bold hover:brightness-95 transition-all"
             >
-              Join Waitlist
+              {submitting ? 'Joining…' : 'Join Waitlist'}
             </button>
           </form>
         ) : (
-          <div className="flex items-center justify-center gap-2 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-            <CheckCircle2 className="w-5 h-5 text-green-400" />
-            <p className="text-green-300 font-medium">
+          <div className="flex items-center justify-center gap-2 p-4 bg-risk-low-soft border border-risk-low/30 rounded-lg">
+            <CheckCircle2 className="w-5 h-5 text-risk-low" />
+            <p className="text-risk-low font-medium">
               {isAlreadyOnList 
                 ? "You're already on the waitlist!" 
                 : "Thanks! We'll notify you when Alice HD launches."
@@ -191,7 +219,7 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
         )}
 
         {/* Footer */}
-        <p className="text-center text-green-300/40 text-xs mt-4">
+        <p className="text-center text-muted-foreground text-xs mt-4">
           Currently using Free Voice (Web Speech API)
         </p>
       </div>
