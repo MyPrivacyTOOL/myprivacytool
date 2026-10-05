@@ -27,7 +27,7 @@ Proposed follow-ups (each needs its Notion/HubSpot property created first, other
 - Front end: capture `utm_*`/`ref` on first landing (30-day last click) and send with the lead.
 
 ## 4. Reporting
-Monthly rows in the O3 KPI Dashboard per creator: scans, paid conversions, payout owed, CAC vs $20 guardrail. Source: HubSpot contacts filtered by `creator_ref`.
+Monthly rows in the O3 KPI Dashboard per creator: scans, paid conversions, payout owed, CAC vs $20 guardrail. Source: Notion Leads DB filtered by `UTM Content` = creator slug (HubSpot once its custom properties exist).
 
 ## 5. Terms page (myprivacytool.io/creator-terms) — outline
 Eligibility; how attribution works (link/code, 30-day last-click); payout rates, caps and monthly schedule; fraud (self-referrals, incentivised or bot scans void payouts); mandatory disclosure ("Paid partnership with MyPrivacyTOOL" + platform label); no guaranteed privacy outcomes or fear-based claims; data handling (we do not share creator audience data); termination; governing law (to be confirmed by counsel). Needs legal review before publishing.
