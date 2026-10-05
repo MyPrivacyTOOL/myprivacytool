@@ -63,24 +63,24 @@ export default function Start() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-mono">
+    <div className="min-h-screen bg-background text-foreground font-mono">
       <Seo title="Start Your Free Privacy Scan | MyPrivacyTOOL" description="Start a free privacy scan from WhatsApp, Telegram, Messenger, Instagram or email and see what is exposed about you." path="/start" />
       {/* Header */}
-      <div className="border-b border-red-900/40 px-6 py-4 flex items-center gap-3">
-        <Shield className="text-red-500" size={20} />
-        <span className="text-red-500 text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
-        <span className="text-gray-600 text-xs ml-auto">First Hexagon — Privacy Exposure Report</span>
+      <div className="border-b border-border px-6 py-4 flex items-center gap-3">
+        <Shield className="text-primary" size={20} />
+        <span className="text-primary text-sm font-bold tracking-widest uppercase">MyPrivacyTOOL</span>
+        <span className="text-muted-foreground text-xs ml-auto">First Hexagon — Privacy Exposure Report</span>
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Intro */}
         <div className="mb-10">
-          <p className="text-gray-500 text-xs tracking-widest uppercase mb-3">What we know about you right now</p>
-          <h1 className="text-3xl font-bold text-white mb-4 leading-tight">
+          <p className="text-muted-foreground text-xs tracking-widest uppercase mb-3">What we know about you right now</p>
+          <h1 className="text-3xl font-bold text-foreground mb-4 leading-tight">
             Your privacy is already<br />
-            <span className="text-red-500">being exposed.</span>
+            <span className="text-destructive">being exposed.</span>
           </h1>
-          <p className="text-gray-400 text-sm leading-relaxed">
+          <p className="text-muted-foreground text-sm leading-relaxed">
             Based on publicly available data and data broker records, here is what anyone can find about you today — before you've done anything to protect yourself.
           </p>
         </div>
@@ -90,13 +90,13 @@ export default function Start() {
           {hexagonData.map((item, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 bg-gray-950 border border-gray-800 rounded-lg px-5 py-4"
+              className="flex items-center gap-4 bg-card border border-border rounded-lg px-5 py-4"
               style={{ borderLeftColor: item.color, borderLeftWidth: 3 }}
             >
               <item.icon size={18} style={{ color: item.color }} className="shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{item.label}</p>
-                <p className="text-sm text-white">{item.value}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">{item.label}</p>
+                <p className="text-sm text-foreground">{item.value}</p>
               </div>
               <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: item.color }} />
             </div>
@@ -105,22 +105,22 @@ export default function Start() {
 
         {/* Confirmation prompt */}
         {confirmed === null && (
-          <div className="bg-gray-950 border border-red-900/50 rounded-xl p-6 mb-8">
-            <p className="text-white text-sm mb-2 font-semibold">Is this data about you?</p>
-            <p className="text-gray-500 text-xs mb-6">
+          <div className="bg-card border border-border rounded-xl p-6 mb-8">
+            <p className="text-foreground text-sm mb-2 font-semibold">Is this data about you?</p>
+            <p className="text-muted-foreground text-xs mb-6">
               Confirm and we'll show you your full privacy report — and how to remove yourself from 40+ data broker sites.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleConfirm(true)}
-                className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white text-sm font-bold py-3 px-6 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 <Check size={16} />
                 Yes, that's me
               </button>
               <button
                 onClick={() => handleConfirm(false)}
-                className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-bold py-3 px-6 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 <X size={16} />
                 Not me
@@ -131,9 +131,9 @@ export default function Start() {
 
         {/* Y — confirmed */}
         {confirmed === true && !submitted && (
-          <div className="bg-gray-950 border border-green-900/50 rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-green-400 text-sm font-semibold mb-1">✅ Confirmed.</p>
-            <p className="text-gray-400 text-xs mb-5">
+          <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-8 animate-fade-in">
+            <p className="text-primary text-sm font-semibold mb-1">✅ Confirmed.</p>
+            <p className="text-muted-foreground text-xs mb-5">
               Enter your email and we'll send your full privacy report — and start removing you from data broker sites.
             </p>
             <form onSubmit={handleSubmit} className="flex flex-wrap gap-3">
@@ -143,27 +143,27 @@ export default function Start() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-500"
+                className="flex-1 bg-background border border-input rounded-lg px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
               />
               <button
                 type="submit"
                 disabled={sending}
-                className="bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white text-sm font-bold py-3 px-5 rounded-lg transition-colors flex items-center gap-2"
+                className="bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground text-sm font-bold py-3 px-5 rounded-lg transition-colors flex items-center gap-2"
               >
                 <ArrowRight size={16} />
                 {sending ? "Sending..." : "Start"}
               </button>
-              <ConsentCheckbox id="start-consent" checked={consent} onChange={setConsent} disabled={sending} labelClassName="text-gray-500" />
+              <ConsentCheckbox id="start-consent" checked={consent} onChange={setConsent} disabled={sending} labelClassName="text-muted-foreground" />
             </form>
-            {errorMsg && <p role="alert" className="text-red-400 text-xs mt-3">{errorMsg}</p>}
+            {errorMsg && <p role="alert" className="text-destructive text-xs mt-3">{errorMsg}</p>}
           </div>
         )}
 
         {/* Submitted */}
         {submitted && (
-          <div className="bg-gray-950 border border-green-900/50 rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-green-400 font-semibold mb-1">✅ You're in the queue.</p>
-            <p className="text-gray-400 text-xs">
+          <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-8 animate-fade-in">
+            <p className="text-primary font-semibold mb-1">✅ You're in the queue.</p>
+            <p className="text-muted-foreground text-xs">
               Check your inbox — your full privacy report is on its way. We'll also start the data broker removal process automatically.
             </p>
           </div>
@@ -171,14 +171,14 @@ export default function Start() {
 
         {/* N — not me */}
         {confirmed === false && (
-          <div className="bg-gray-950 border border-yellow-900/50 rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-yellow-400 font-semibold mb-1">🔍 Let's find the right profile.</p>
-            <p className="text-gray-400 text-xs mb-4">
+          <div className="bg-card border border-border rounded-xl p-6 mb-8 animate-fade-in">
+            <p className="text-foreground font-semibold mb-1">🔍 Let's find the right profile.</p>
+            <p className="text-muted-foreground text-xs mb-4">
               No problem — enter your name and we'll run a fresh scan specifically for you.
             </p>
             <a
               href="/scan"
-              className="inline-flex items-center gap-2 bg-yellow-600 hover:bg-yellow-500 text-black text-sm font-bold py-3 px-6 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
             >
               <ArrowRight size={16} />
               Run my scan
@@ -187,8 +187,8 @@ export default function Start() {
         )}
 
         {/* Channel CTAs */}
-        <div className="border-t border-gray-900 pt-8">
-          <p className="text-gray-600 text-xs uppercase tracking-widest mb-4 text-center">Or message us directly on any platform</p>
+        <div className="border-t border-border pt-8">
+          <p className="text-muted-foreground text-xs uppercase tracking-widest mb-4 text-center">Or message us directly on any platform</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {channels.map((ch) => (
               <a
@@ -196,14 +196,14 @@ export default function Start() {
                 href={ch.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-gray-950 hover:bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 transition-colors group"
+                className="flex items-center gap-3 bg-card hover:bg-muted border border-border rounded-lg px-4 py-3 transition-colors group"
               >
                 <span className="text-lg">{ch.emoji}</span>
-                <span className="text-sm text-gray-400 group-hover:text-white transition-colors">{ch.name}</span>
+                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{ch.name}</span>
               </a>
             ))}
           </div>
-          <p className="text-gray-700 text-xs text-center mt-4">
+          <p className="text-muted-foreground text-xs text-center mt-4">
             Send any message to get your First Hexagon report instantly
           </p>
         </div>
