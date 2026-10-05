@@ -25,8 +25,11 @@ GA4 `generate_lead` already fires client-side from `trackStartSignup` in `src/pa
 ## Secrets (names only; set with `wrangler secret put`)
 `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`.
 
+## Deploy (per the MPT Infrastructure Ops page)
+Merge to `main` runs `.github/workflows/deploy-scan-report.yml` (same `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` repo secrets as `deploy-mpt-leads`; MPT account 35cb17172c65a20f5cf1baf131485382). Expected URL: `https://mpt-scan-report.myprivacytool.workers.dev`. Worker secrets are write-only and set by a human in the dashboard (Workers & Pages -> mpt-scan-report -> Settings -> Variables and Secrets). The Cloudflare connector is read-only, so it can confirm the Worker exists but not deploy.
+
 ## Frontend flag
-Set `VITE_SCAN_API_URL` (Cloudflare Pages env) to the deployed Worker URL to enable. Unset = HubSpot-only, as today.
+Set `VITE_SCAN_API_URL` (Cloudflare Pages project `wwwmyprivacytool`, env var) to the Worker URL to enable. Unset = HubSpot-only, as today.
 
 ## Test
 `node workers/scan-report/worker.test.mjs` (stubbed fetch, no network).
