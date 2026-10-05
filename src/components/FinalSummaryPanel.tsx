@@ -290,8 +290,8 @@ export default function FinalSummaryPanel({
     return [...new Set(positives)].slice(0, 5);
   }, [hexagons]);
 
-  // Calculate overall privacy risk score (FINAL FORMULA)
-  const overallRisk = useMemo(() => {
+  // Calculate overall privacy risk score (FINAL FORMULA); also returns each category's 0-100 risk (MPC-7173 baseline)
+  const { overall: overallRisk, categoryRisk } = useMemo(() => {
     const weights = {
       device: 0.05,      // 5%
       privacy: 0.05,     // 5%
@@ -305,6 +305,7 @@ export default function FinalSummaryPanel({
     };
 
     let totalRisk = 0;
+    const categoryRisk: Record<string, number> = {};
     
     categoryStats.forEach((cat) => {
       const catWeight = weights[cat.key as keyof typeof weights] || 0.05;
@@ -312,6 +313,7 @@ export default function FinalSummaryPanel({
       const criticalBonus = cat.criticalIssues * 20;
       const warningBonus = cat.warnings * 10;
       const catRisk = Math.min(baseRisk + criticalBonus + warningBonus, 100);
+      categoryRisk[cat.key] = Math.round(catRisk);
       totalRisk += catRisk * catWeight;
     });
 
@@ -321,7 +323,7 @@ export default function FinalSummaryPanel({
       totalRisk += fpRiskMap[fingerprint.totalRisk] || 0;
     }
 
-    return Math.min(Math.round(totalRisk), 100);
+    return { overall: Math.min(Math.round(totalRisk), 100), categoryRisk };
   }, [categoryStats, fingerprint]);
 
   // MPC-7120: offer the email capture once the scan is complete (this panel only renders after all hexagons are confirmed)
@@ -986,6 +988,7 @@ Test yours at: ${window.location.origin}`;
       {showEmailModal && (
         <EmailCaptureModal
           riskScore={overallRisk}
+          categoryScores={categoryRisk}
           confirmedCount={confirmedCount}
           onClose={() => setShowEmailModal(false)}
           onSubmit={() => {}}

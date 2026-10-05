@@ -20,12 +20,14 @@ export default {
     try {
       let name = '', email = '', phone = '';
       let utm_source = '', utm_medium = '', utm_campaign = '', utm_content = '', referrer = '';
+      let categoryScores = null; // MPC-7173: per-category risk scores for the baseline snapshot
       let riskScore = null; // MPC-6956: only the post-scan email modal sends this
       let consentRaw = null, consentSourceRaw = '', sourceRaw = ''; // MPC-6971: explicit consent only
       const ct = request.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const b = await request.json();
         riskScore = b.riskScore ?? null;
+        categoryScores = b.categoryScores ?? null;
         name = b.name || ''; email = b.email || ''; phone = b.phone || '';
         utm_source = b.utm_source || ''; utm_medium = b.utm_medium || '';
         utm_campaign = b.utm_campaign || ''; utm_content = b.utm_content || '';
@@ -71,6 +73,10 @@ export default {
       // Fail-soft and off the response path; stores no PII (random session id + funnel booleans).
       const engagement = recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
       ctx.waitUntil(engagement);
+
+      // MPC-7173: save the first completed scan as the user's baseline and report it back so the
+      // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
+      const baseline = await saveBaseline(env, email, riskScore, categoryScores);
 
       // 1. Save to Notion
       const properties = {
@@ -248,7 +254,7 @@ export default {
 
       ctx.waitUntil(Promise.all(side));
 
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ success: true, ...(baseline ? { baseline } : {}) }), {
         status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
       });
 
@@ -288,6 +294,54 @@ async function recordEngagement(env, sessionId, flags) {
   } catch (err) {
     console.error('Supabase mpt_user_engagement insert error:', String(err));
     return false;
+  }
+}
+
+// MPC-7173: baseline snapshot. Keyed by SHA-256(lower-cased email); stores only scores, never the email.
+// Returns { overall_score, created_at, is_first, delta } (delta = this scan minus baseline) or null.
+async function saveBaseline(env, email, riskScore, categoryScores) {
+  const score = Number(riskScore);
+  if (riskScore === null || riskScore === '' || !Number.isFinite(score) || score < 0 || score > 100) return null;
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const overall = Math.round(score);
+  const cats = {};
+  if (categoryScores && typeof categoryScores === 'object' && !Array.isArray(categoryScores)) {
+    for (const [k, v] of Object.entries(categoryScores).slice(0, 20)) {
+      const n = Number(v);
+      if (/^[a-z_]{1,32}$/.test(k) && Number.isFinite(n) && n >= 0 && n <= 100) cats[k] = Math.round(n);
+    }
+  }
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(email).trim().toLowerCase()));
+    const emailHash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+    const base = `${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_score_baselines`;
+    const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' };
+
+    // First scan wins: insert and ignore the conflict if a baseline already exists, then read it back.
+    const ins = await fetch(base, {
+      method: 'POST',
+      headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
+      body: JSON.stringify({ email_hash: emailHash, overall_score: overall, category_scores: cats }),
+    });
+    if (!ins.ok) {
+      console.error('Supabase mpt_score_baselines insert failed:', ins.status, (await ins.text()).slice(0, 200));
+      return null;
+    }
+    const created = await ins.json();
+    if (Array.isArray(created) && created.length) {
+      return { overall_score: created[0].overall_score, created_at: created[0].created_at, is_first: true, delta: 0 };
+    }
+    const sel = await fetch(`${base}?email_hash=eq.${emailHash}&select=overall_score,created_at&limit=1`, { headers });
+    if (!sel.ok) {
+      console.error('Supabase mpt_score_baselines select failed:', sel.status);
+      return null;
+    }
+    const rows = await sel.json();
+    if (!Array.isArray(rows) || !rows.length) return null;
+    return { overall_score: rows[0].overall_score, created_at: rows[0].created_at, is_first: false, delta: overall - rows[0].overall_score };
+  } catch (err) {
+    console.error('Supabase mpt_score_baselines error:', String(err));
+    return null;
   }
 }
 
