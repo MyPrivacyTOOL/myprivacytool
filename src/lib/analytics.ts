@@ -52,6 +52,19 @@ export const trackFunnelStep = (step: string, metadata?: Record<string, string |
   });
 };
 
+// Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
+// is confirmed (funnel step all_hexagons_confirmed). Fires once per page session.
+let scanCompletedTracked = false;
+
+export const trackScanCompleted = (hexagonCount: number) => {
+  if (scanCompletedTracked) return;
+  scanCompletedTracked = true;
+  trackEvent('privacy_scan_completed', {
+    hexagon_count: hexagonCount,
+    funnel_step: 'all_hexagons_confirmed',
+  });
+};
+
 // Device profile tracking
 export const trackDeviceProfile = (deviceData: {
   device: { type: string; os: string; browser: string };
