@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
-import { submitHubSpotForm } from "@/lib/hubspot";
+import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
+import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackBusinessLead } from "@/lib/analytics";
 
 // HubSpot form "Business Inquiry" (portal 246502821). Form GUIDs are public (they ship in
@@ -17,11 +18,12 @@ const Business = () => {
   const [form, setForm] = useState({ name: "", email: "", company: "", size: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [consent, setConsent] = useState(false);
   const submitted = status === "success";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email || !form.company || status === "loading") return;
+    if (!form.email || !form.company || !consent || status === "loading") return;
     setStatus("loading");
     setErrorMsg("");
     const [firstname, ...rest] = form.name.trim().split(/\s+/);
@@ -34,6 +36,7 @@ const Business = () => {
           email: form.email.trim(),
           company: form.company.trim(),
           source_tag: SOURCE_TAG,
+          ...consentFields("business_page"),
         },
         pageName: "Business audit request",
       });
@@ -125,6 +128,7 @@ const Business = () => {
                   <option value="51-200">51–200 employees</option>
                   <option value="200+">200+ employees</option>
                 </select>
+                <ConsentCheckbox id="business-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-white/40" />
                 {status === "error" && (
                   <p role="alert" className="text-red-400 text-xs">{errorMsg}</p>
                 )}

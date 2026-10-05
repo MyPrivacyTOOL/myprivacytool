@@ -18,6 +18,16 @@ const readHubspotUtk = (): string | undefined => {
   return match ? decodeURIComponent(match[1]) : (window as unknown as HubSpotCookieWindow).hubspotutk;
 };
 
+// MPC-6971: consent evidence for HubSpot. `consent_given_at` is a date property, so the Forms API wants
+// midnight-UTC epoch millis. Both fields must also exist as (hidden) fields on the HubSpot form.
+export function consentFields(source: string): Record<string, string> {
+  const d = new Date();
+  return {
+    consent_given_at: String(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())),
+    consent_source: source,
+  };
+}
+
 export async function submitHubSpotForm({ formId, fields, pageName }: HubSpotSubmitOptions): Promise<void> {
   const res = await fetch(
     `https://api.hsforms.com/submissions/v3/integration/submit/${HUBSPOT_PORTAL_ID}/${formId}`,

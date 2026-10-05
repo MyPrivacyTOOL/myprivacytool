@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X } from "lucide-react";
 import Seo from "@/components/Seo";
-import { submitHubSpotForm } from "@/lib/hubspot";
+import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
+import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackStartSignup } from "@/lib/analytics";
 
 // HubSpot form "Start Scan" (portal 246502821). Form GUIDs are public (they ship in every
@@ -31,6 +32,7 @@ const channels = [
 export default function Start() {
   const [confirmed, setConfirmed] = useState<null | boolean>(null);
   const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -42,13 +44,13 @@ export default function Start() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (sending) return;
+    if (sending || !consent) return;
     setSending(true);
     setErrorMsg("");
     try {
       await submitHubSpotForm({
         formId: FORM_ID,
-        fields: { email: email.trim(), source_tag: SOURCE_TAG },
+        fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("start_page") },
         pageName: "Start scan",
       });
       trackStartSignup({ source: "start_page" });
@@ -134,7 +136,7 @@ export default function Start() {
             <p className="text-gray-400 text-xs mb-5">
               Enter your email and we'll send your full privacy report — and start removing you from data broker sites.
             </p>
-            <form onSubmit={handleSubmit} className="flex gap-3">
+            <form onSubmit={handleSubmit} className="flex flex-wrap gap-3">
               <input
                 type="email"
                 required
@@ -151,6 +153,7 @@ export default function Start() {
                 <ArrowRight size={16} />
                 {sending ? "Sending..." : "Start"}
               </button>
+              <ConsentCheckbox id="start-consent" checked={consent} onChange={setConsent} disabled={sending} labelClassName="text-gray-500" />
             </form>
             {errorMsg && <p role="alert" className="text-red-400 text-xs mt-3">{errorMsg}</p>}
           </div>

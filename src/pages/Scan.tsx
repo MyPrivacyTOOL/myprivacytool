@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
-import { submitHubSpotForm } from "@/lib/hubspot";
+import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
+import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackStartSignup } from "@/lib/analytics";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
@@ -12,19 +13,20 @@ const SOURCE_TAG = "scan-page";
 
 const Scan = () => {
   const [email, setEmail] = useState("");
+  const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || submitting) return;
+    if (!email.trim() || !consent || submitting) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
       await submitHubSpotForm({
         formId: FORM_ID,
-        fields: { email: email.trim(), source_tag: SOURCE_TAG },
+        fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("scan_page") },
         pageName: "Free exposure scan",
       });
       trackStartSignup({ source: "scan_page" });
@@ -37,7 +39,7 @@ const Scan = () => {
   };
 
   const renderForm = (idSuffix: string) => (
-    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:flex-wrap gap-3 max-w-md mx-auto">
       <Input
         id={`scan-email-${idSuffix}`}
         type="email"
@@ -55,6 +57,7 @@ const Scan = () => {
       >
         {submitting ? "Sending…" : "Start Free Scan →"}
       </Button>
+      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
     </form>
   );
 
