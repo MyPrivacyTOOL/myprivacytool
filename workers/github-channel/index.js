@@ -13,7 +13,7 @@
  */
 import { buildAuthUrl, exchangeCode, randomString, sign, verify, revokeGrant, refreshAccessToken } from './lib/oauth.js';
 import { GitHubAdapter, GitHubAdapterError } from './lib/adapter.js';
-import { githubToPapit } from './lib/papit.js';
+import { bridgeGithub } from './lib/bridge.js';
 import { getCached, putCached, deleteCached } from './lib/cache.js';
 import { saveToken, loadTokens, loadAccessToken, deleteToken } from './lib/store.js';
 
@@ -175,9 +175,9 @@ async function profile(request, env, cors, fetchFn, now) {
       log('token_refreshed');
       raw = await new GitHubAdapter({ token: fresh.access_token, fetchFn }).fetchIdentity();
     }
-    const papit = await githubToPapit(raw, { now: new Date(now()) });
+    const { papit, sanitization_receipt: sanitizationReceipt } = await bridgeGithub(raw, { now: new Date(now()) });
     await putCached(env.PROFILE_CACHE, subjectId, papit, now());
-    return json(papit, 200, { ...cors, 'X-Cache': 'MISS' });
+    return json(papit, 200, { ...cors, 'X-Cache': 'MISS', 'X-PaPIT-Sanitization-Receipt': sanitizationReceipt });
   } catch (e) {
     if (e instanceof GitHubAdapterError && e.status === 401) {
       // Token revoked on GitHub's side: drop our copy so the user is asked to reconnect.
