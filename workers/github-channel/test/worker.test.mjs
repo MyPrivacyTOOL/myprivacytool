@@ -32,9 +32,9 @@ function fakeNetwork({ githubStatus = 200 } = {}) {
       return ok({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN, scope: 'read:user', token_type: 'bearer' });
     }
     if (u.startsWith('https://sb.test/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.subject_id, r); return new Response(null, { status: 201 }); }
-      if (init.method === 'GET') { const id = decodeURIComponent(/subject_id=eq\.([^&]+)/.exec(u)[1]); return ok(rows.has(id) ? [rows.get(id)] : []); }
-      if (init.method === 'DELETE') { rows.delete(decodeURIComponent(/subject_id=eq\.([^&]+)/.exec(u)[1])); return new Response(null, { status: 204 }); }
+      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, r); return new Response(null, { status: 201 }); }
+      if (init.method === 'GET') { const id = decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1]); return ok(rows.has(id) ? [rows.get(id)] : []); }
+      if (init.method === 'DELETE') { rows.delete(decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])); return new Response(null, { status: 204 }); }
     }
     if (u.startsWith('https://api.github.com/applications/')) { log.revoked++; return new Response(null, { status: 204 }); }
     if (u.startsWith('https://api.github.com/')) {
@@ -95,7 +95,7 @@ test('callback stores ONLY ciphertext in Supabase and sets a session', async () 
   assert.equal(row.key_version, 1);
   assert.equal(row.scope, 'read:user');
   // The acceptance criterion: no plaintext token in anything sent to the database.
-  const sent = net.log.bodies.filter((b) => b.includes('subject_id')).join('\n');
+  const sent = net.log.bodies.filter((b) => b.includes('user_id')).join('\n');
   assert.ok(sent.length > 0);
   assert.ok(!sent.includes(ACCESS_TOKEN) && !sent.includes(REFRESH_TOKEN), 'plaintext token reached the DB request');
   assert.ok(!JSON.stringify([...net.rows.values()]).includes('PLAINTEXT'));

@@ -46,12 +46,12 @@ The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different or
 ## Security
 
 - **Zero plaintext tokens.** Access/refresh tokens are AES-256-GCM encrypted (`lib/encryption.js`) before the Supabase call:
-  random 96-bit IV, `v<key_version>.<iv>.<data>`, AAD `github:<subject>:<column>` binds a ciphertext to its row.
+  random 96-bit IV, `v<key_version>.<iv>.<data>`, AAD `github:<user_id>:<column>` binds a ciphertext to its row.
   Tested: the request bodies sent to Supabase contain no plaintext (`test/worker.test.mjs`).
 - **Key rotation.** `ENCRYPTION_KEY` is the current key (`ENCRYPTION_KEY_VERSION`). To rotate: set `ENCRYPTION_KEY_V<old>` to the old key,
   put the new key in `ENCRYPTION_KEY`, bump `ENCRYPTION_KEY_VERSION`. Old rows decrypt via their stored `key_version`; they are re-encrypted
   the next time the user reconnects.
-- **RLS.** `channel_tokens` has RLS enabled and forced, no policies, and no grants for `anon`/`authenticated`.
+- **RLS.** `channel_tokens` has RLS enabled and forced, no policies, and no grants for `anon`/`authenticated`. Rows are keyed `(user_id = GitHub user id, provider = 'github')`.
 - **Minimal scope.** `read:user` only. Public repos and public starred repos need no extra scope.
 - **Logs** hold event names and status codes only. The adapter's errors carry the HTTP status, never a URL, token or body.
 - **Cache** holds the sanitized PaPIT snapshot only, never tokens or raw GitHub responses.
@@ -65,7 +65,7 @@ GitHub allows 5,000 requests/hour per user token. A cold profile build costs at 
 
 1. **GitHub OAuth App** (github.com/settings/developers): Authorization callback URL = `REDIRECT_URI`
    (`http://localhost:8787/oauth/github/callback` for local dev). Enable PKCE-capable flow (default). Request no extra scopes.
-2. **Supabase**: apply `supabase/migrations/20261005180000_create_channel_tokens.sql` (after `20261005120000_scan_report_pipeline.sql`).
+2. **Supabase**: `public.channel_tokens` already exists (created by migration `create_channel_tokens`, 20261006060503). Apply `supabase/migrations/20261006120000_channel_tokens_worker_columns.sql`, which adds `key_version`, relaxes the ciphertext CHECKs for key rotation and forces RLS. It is additive and leaves existing rows alone.
 3. **KV**: `npx wrangler kv namespace create PROFILE_CACHE`, put the id in `wrangler.toml`.
 4. **Config**: fill the `REPLACE_*` vars in `workers/github-channel/wrangler.toml`.
 5. **Secrets** (names in `EXPECTED_SECRETS.txt`), from `workers/github-channel`:
@@ -82,7 +82,7 @@ GitHub allows 5,000 requests/hour per user token. A cold profile build costs at 
 
 After one live connect, in Supabase SQL editor:
 ```sql
-select subject_id, left(access_token_enc, 12) as prefix, key_version, scope from public.channel_tokens;
+select user_id, provider, left(access_token_enc, 12) as prefix, key_version, scope from public.channel_tokens;
 ```
 `prefix` must look like `v1.` + base64url, never `gho_`.
 
@@ -94,6 +94,6 @@ test advances a mocked clock past 24h.
 ## Rollback
 
 1. Revert the commit adding `workers/github-channel`, the workflow, migration and docs.
-2. `drop table if exists public.channel_tokens;`
+2. `alter table public.channel_tokens drop column if exists key_version;` (do not drop the table: it predates this task and may hold other rows)
 3. Revoke test tokens: GitHub > Settings > Applications > Authorized OAuth Apps, or `DELETE /channels/github`.
 4. `npx wrangler delete` the Worker, delete the `PROFILE_CACHE` KV namespace, remove the OAuth App secrets.

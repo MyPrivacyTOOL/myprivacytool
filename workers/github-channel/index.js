@@ -104,7 +104,7 @@ async function callback(request, url, env, fetchFn, now) {
     const adapter = new GitHubAdapter({ token: accessToken, fetchFn });
     const me = await adapter.get('/user'); // only .id is kept
     await saveToken(env, {
-      subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope,
+      subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope, expiresIn: tokens.expires_in,
     }, fetchFn);
 
     const session = await sign({ sub: String(me.id), exp: now() + SESSION_TTL_MS }, env.STATE_SIGNING_KEY);

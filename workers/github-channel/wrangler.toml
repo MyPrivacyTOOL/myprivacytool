@@ -8,11 +8,11 @@ workers_dev = true
 #
 # Secrets are NOT declared here (set with `wrangler secret put`, names in EXPECTED_SECRETS.txt).
 # Non-secret settings below are declared on purpose: `wrangler deploy` replaces dashboard plain-text
-# variables with this file. Every REPLACE_* value must be filled in before a real deploy.
+# variables with this file. Placeholder values must be replaced before a real deploy.
 [vars]
-GITHUB_CLIENT_ID = "REPLACE_WITH_GITHUB_OAUTH_APP_CLIENT_ID"
+GITHUB_CLIENT_ID = "Ov23liPwVZAmOuXl12Aq"
 REDIRECT_URI = "https://myprivacytool-github-channel.myprivacytool.workers.dev/oauth/github/callback"
-SUPABASE_URL = "https://REPLACE_WITH_PROJECT_REF.supabase.co"
+SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
 ALLOWED_ORIGIN = "https://myprivacytool.com"      # SPA origin: CORS + CSRF check
 SUCCESS_REDIRECT = "https://myprivacytool.com/?channel=github"  # where the callback sends the browser
 ENCRYPTION_KEY_VERSION = "1"                       # version that new tokens are encrypted with
@@ -20,7 +20,7 @@ ENCRYPTION_KEY_VERSION = "1"                       # version that new tokens are
 # 24h profile cache (MPC-115 decision C). Create with: wrangler kv namespace create PROFILE_CACHE
 [[kv_namespaces]]
 binding = "PROFILE_CACHE"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "422aa105e9264b1ebb354e500454ade9"
 
 [observability]
 enabled = true
