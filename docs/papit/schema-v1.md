@@ -1,13 +1,13 @@
 # PaPIT JSON schema v1 (MPC-115)
 
 PaPIT = Private and Portable Identity Tool profile. v1 is produced per channel; GitHub is the first
-(`workers/github-channel/lib/papit.js`). Reddit (MPC-116) will emit the same envelope.
+(`workers/github-channel/lib/papit.js`); Reddit (MPC-116) is the second (`lib/reddit-papit.js`) and emits the same envelope, see "Reddit channel" below.
 
 ```ts
 interface PaPITProfile {
   version: "1.0";
   generated_at: string;                 // ISO 8601, UTC
-  source_channel: "github";             // later: "reddit", ...
+  source_channel: "github";             // or "reddit" (see below)
   cryptographic_receipt: string;        // lowercase hex SHA-256 (see below)
   core_identity: {
     career: {
@@ -26,6 +26,8 @@ interface PaPITProfile {
   };
 }
 ```
+
+`core_identity` is produced by channels that expose durable facts (GitHub). A purely behavioral channel (Reddit) omits it.
 
 ## Derivations
 
@@ -65,3 +67,31 @@ Additive changes keep `version: "1.0"`. Removing or re-typing a field bumps the 
 
 Rollback: revert `index.js` to call `githubToPapit` directly (the profile body is identical), and treat any
 profile whose receipt header carries a withdrawn `rules_version` as invalid.
+
+## Reddit channel (MPC-116)
+
+Same envelope (`version`, `generated_at`, `source_channel: "reddit"`, `cryptographic_receipt`, `privacy_boundaries`), no `core_identity`.
+`behavioral` keeps the two v1 base fields so a consumer reads Reddit and GitHub the same way, and adds Reddit detail under
+`behavioral.reddit` (additive, so the version stays `1.0`):
+
+```ts
+interface PaPITRedditBehavioral {
+  interests: string[];                  // top <=20 topic keywords across subreddits, [a-z-] only
+  activity_level: "low" | "medium" | "high"; // comments + posts in the last 90 days, same thresholds as GitHub (<5, 5-50, >50)
+  reddit: {
+    communities: { subreddit: string;   // "r/privacy"
+                   engagement_level: "lurker" | "occasional" | "active" | "power_user"; // items: <3, 3-9, 10-29, >=30
+                   topic_tags: string[]; // <=5 keywords, never raw titles/bodies
+                 }[];
+    sentiment: { overall_tone: "positive" | "neutral" | "negative" | "mixed"; controversial_engagement: boolean };
+    activity: { account_age_days: number; post_frequency: "rare" | "weekly" | "daily" | "hyperactive"; comment_to_post_ratio: number };
+  };
+}
+// privacy_boundaries additionally carries raw_content_stored: false
+```
+
+Privacy: raw comment/post text exists only inside the transformer. It is first sanitized by the channel bridge (URLs, emails,
+@handles, SSNs, cards, IPs, phones), then PII-stripped (zip codes, street addresses, "I live in ..." locations, `u/` mentions, the
+user's own handle) and reduced to stopword-filtered keywords. The handle and account id are `restricted` records and are dropped
+by the bridge. `GET /channels/reddit/behavior` returns the sanitization receipt in `X-PaPIT-Sanitization-Receipt` like GitHub does.
+Enforced by `workers/github-channel/test/reddit-core.test.mjs` and `reddit-routes.test.mjs`.

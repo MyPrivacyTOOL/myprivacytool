@@ -21,6 +21,14 @@ ALLOWED_ORIGIN = "https://www.myprivacytool.io,https://myprivacytool.io"  # SPA 
 SUCCESS_REDIRECT = "https://www.myprivacytool.io/connect/github"  # where the callback sends the browser
 ENCRYPTION_KEY_VERSION = "1"                       # version that new tokens are encrypted with
 
+# Reddit channel (MPC-116, optional). Routes /oauth/reddit/* and /channels/reddit/* answer 503 until all three are set.
+# Create a "web app" at https://www.reddit.com/prefs/apps with redirect URI = REDDIT_REDIRECT_URI, then uncomment
+# these and run `npx wrangler secret put REDDIT_CLIENT_SECRET`. Reddit requires a descriptive User-Agent.
+# REDDIT_CLIENT_ID = "<the id under the app name>"
+# REDDIT_REDIRECT_URI = "https://channels.myprivacytool.io/oauth/reddit/callback"
+# REDDIT_USER_AGENT = "MyPrivacyTOOL/1.0 (by /u/<your-reddit-username>)"
+# REDDIT_SUCCESS_REDIRECT = "https://www.myprivacytool.io/connect/reddit"   # optional; JSON {ok:true} if unset
+
 # 24h profile cache (MPC-115 decision C). Create with: wrangler kv namespace create PROFILE_CACHE
 [[kv_namespaces]]
 binding = "PROFILE_CACHE"

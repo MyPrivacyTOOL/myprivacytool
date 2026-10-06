@@ -4,10 +4,10 @@
  * is also checked on read so the TTL is enforced (and testable with a mocked clock) independent of KV.
  */
 export const CACHE_TTL_SECONDS = 24 * 60 * 60;
-const key = (subjectId) => `papit:github:${subjectId}`;
+const key = (subjectId, channel) => `papit:${channel}:${subjectId}`;
 
-export async function getCached(kv, subjectId, now = Date.now()) {
-  const raw = await kv.get(key(subjectId));
+export async function getCached(kv, subjectId, now = Date.now(), channel = 'github') {
+  const raw = await kv.get(key(subjectId, channel));
   if (!raw) return null;
   try {
     const { cachedAt, profile } = JSON.parse(raw);
@@ -17,10 +17,10 @@ export async function getCached(kv, subjectId, now = Date.now()) {
   }
 }
 
-export function putCached(kv, subjectId, profile, now = Date.now()) {
-  return kv.put(key(subjectId), JSON.stringify({ cachedAt: now, profile }), { expirationTtl: CACHE_TTL_SECONDS });
+export function putCached(kv, subjectId, profile, now = Date.now(), channel = 'github') {
+  return kv.put(key(subjectId, channel), JSON.stringify({ cachedAt: now, profile }), { expirationTtl: CACHE_TTL_SECONDS });
 }
 
-export function deleteCached(kv, subjectId) {
-  return kv.delete(key(subjectId));
+export function deleteCached(kv, subjectId, channel = 'github') {
+  return kv.delete(key(subjectId, channel));
 }
