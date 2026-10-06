@@ -12,6 +12,10 @@ import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState } from './firestore-client.js';
 import { createHubSpotContact } from './hubspot-client.js';
 import { recordEngagement } from './supabase-client.js';
+import {
+  verifyTelegram, verifyMeta, verifyTwilio, verifySharedSecret, escapeHtml, escapeXml, clip,
+  EMAIL_RE, corsFor, unauthorized, timingSafeEqual,
+} from './security.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
 const META_QUERY = {
@@ -46,6 +50,8 @@ export default {
 // ─── TELEGRAM ────────────────────────────────────────────────────────────────
 
 async function handleTelegram(request, env) {
+  if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
+  if (!verifyTelegram(request, env)) return unauthorized();   // MPC-7350: authenticated, fails closed
   try {
     const body    = await request.json();
     const message = body?.message || body?.callback_query?.message;
@@ -53,13 +59,13 @@ async function handleTelegram(request, env) {
 
     const chatId   = String(message.chat.id);
     const text     = message.text || '';
-    const userName = message.from?.first_name || message.from?.username || 'there';
+    const userName = escapeHtml(clip(message.from?.first_name || message.from?.username || 'there', 64));   // parse_mode HTML
     const userId   = String(message.from?.id);
     const state    = await getConversationState(env, `telegram:${userId}`);
 
     if (!state || state.stage === 'new') {
       const hexagon = generateFirstHexagon({
-        name: userName, platform: 'telegram', handle: message.from?.username || null,
+        name: userName, platform: 'telegram', handle: message.from?.username ? escapeHtml(clip(message.from.username, 64)) : null,
       });
       await saveConversationState(env, `telegram:${userId}`, {
         stage: 'awaiting_confirmation', platform: 'telegram',
@@ -96,7 +102,9 @@ async function handleMessenger(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
 
   try {
-    const body      = await request.json();
+    const raw = await request.text();
+    if (!(await verifyMeta(request, raw, env))) return unauthorized();   // MPC-7350
+    const body      = JSON.parse(raw);
     const messaging = body.entry?.[0]?.messaging?.[0];
     if (!messaging) return ok();
 
@@ -126,10 +134,10 @@ async function handleMessenger(request, env) {
 async function sendMessenger(env, recipientId, text) {
   // Requires META_PAGE_ACCESS_KEY — stub until Meta App is approved
   if (!env.META_PAGE_ACCESS_KEY) return;
-  const url = `https://graph.facebook.com/v19.0/me/messages?${META_QUERY.accessParam}=${env.META_PAGE_ACCESS_KEY}`;
-  await fetch(url, {
+  // MPC-7350: bearer header, not a query string (URLs end up in logs and proxies).
+  await fetch('https://graph.facebook.com/v19.0/me/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` },
     body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
   });
 }
@@ -139,6 +147,7 @@ async function sendMessenger(env, recipientId, text) {
 async function handleInstagram(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
   // STUB — wire after Meta App approval (same Graph API structure as Messenger)
+  if (!(await verifyMeta(request, await request.text(), env))) return unauthorized();   // MPC-7350
   return ok();
 }
 
@@ -148,7 +157,9 @@ async function handleWhatsApp(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
 
   try {
-    const body = await request.json();
+    const raw = await request.text();
+    if (!(await verifyMeta(request, raw, env))) return unauthorized();   // MPC-7350
+    const body = JSON.parse(raw);
     const msg  = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
     if (!msg) return ok();
 
@@ -191,6 +202,7 @@ async function handleSMS(request, env) {
   try {
     const raw    = await request.text();
     const params = new URLSearchParams(raw);
+    if (!(await verifyTwilio(request, params, env))) return unauthorized();   // MPC-7350
     const from   = params.get('From');
     const body   = params.get('Body') || '';
     const state  = await getConversationState(env, `sms:${from}`);
@@ -217,7 +229,7 @@ async function handleSMS(request, env) {
 
 function sendSMSResponse(text) {
   return new Response(
-    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${text}</Message></Response>`,
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(text)}</Message></Response>`,
     { headers: { 'Content-Type': 'text/xml' } }
   );
 }
@@ -225,9 +237,12 @@ function sendSMSResponse(text) {
 // ─── EMAIL ───────────────────────────────────────────────────────────────────
 
 async function handleEmail(request, env) {
+  if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
+  if (!verifySharedSecret(request, env)) return unauthorized();   // MPC-7350
   try {
     const body  = await request.json();
-    const { from, name } = body;
+    const from = clip(body.from, 255).trim(), name = clip(body.name, 100);
+    if (!EMAIL_RE.test(from)) return new Response('Bad request', { status: 400 });
     const state = await getConversationState(env, `email:${from}`);
 
     if (!state || state.stage === 'new') {
@@ -253,27 +268,24 @@ async function handleEmail(request, env) {
 // ─── LEAD CAPTURE (EmailCaptureModal) ────────────────────────────────────────
 
 async function handleLeads(request, env) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin':  '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
-  }
+  // MPC-7350: origin allowlist instead of '*'. A browser request from another site is refused.
+  const cors = corsFor(request);
+  const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
+    status, headers: { ...cors.headers, 'Content-Type': 'application/json' },
+  });
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors.headers });
+  if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
+  if (!cors.allowed) return json({ error: 'Forbidden origin' }, 403);
+  if (Number(request.headers.get('content-length') || 0) > 16 * 1024) return json({ error: 'Payload too large' }, 413);
 
   try {
     const body = await request.json();
-    const { email, riskScore, confirmedCount, source = 'web_scan' } = body;
+    const email = clip(body?.email, 255).trim();
+    const riskScore = Number.isFinite(Number(body?.riskScore)) ? Number(body.riskScore) : undefined;
+    const confirmedCount = Number.isFinite(Number(body?.confirmedCount)) ? Number(body.confirmedCount) : undefined;
+    const source = clip(body?.source ?? 'web_scan', 64).replace(/[^a-z0-9_-]/gi, '') || 'web_scan';
 
-    if (!email || !email.includes('@')) {
-      return new Response(JSON.stringify({ error: 'Invalid email' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
-    }
+    if (email.length > 254 || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
 
     await createHubSpotContact(env, { source, email, riskScore, confirmedCount });
     await saveConversationState(env, `lead:${email}`, {
@@ -283,16 +295,10 @@ async function handleLeads(request, env) {
 
     await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: true });
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return json({ success: true });
   } catch (err) {
     console.error('Leads error:', err);
-    return new Response(JSON.stringify({ error: 'Internal error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return json({ error: err instanceof SyntaxError ? 'Invalid request' : 'Internal error' }, err instanceof SyntaxError ? 400 : 500);
   }
 }
 
@@ -304,7 +310,7 @@ function verifyMetaWebhook(request, env) {
   const provided  = url.searchParams.get(META_QUERY.verifyParam);
   const challenge = url.searchParams.get('hub.challenge');
 
-  if (mode === 'subscribe' && provided === env.META_VERIFY_KEY) {
+  if (mode === 'subscribe' && env.META_VERIFY_KEY && timingSafeEqual(provided, env.META_VERIFY_KEY)) {
     return new Response(challenge, { status: 200 });
   }
   return new Response('Forbidden', { status: 403 });

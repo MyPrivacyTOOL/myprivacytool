@@ -21,6 +21,9 @@ const Faq = lazy(() => import("./pages/Faq"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Cookies = lazy(() => import("./pages/Cookies"));
+const DPA = lazy(() => import("./pages/DPA"));
+const Trust = lazy(() => import("./pages/Trust"));
+const Developers = lazy(() => import("./pages/Developers"));
 const OptOutGuides = lazy(() => import("./pages/OptOutGuides"));
 const OptOutGuide = lazy(() => import("./pages/OptOutGuide"));
 const Journey = lazy(() => import("./pages/Journey"));
@@ -59,11 +62,15 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
+            <Route path="/dpa" element={<DPA />} />
+            <Route path="/trust" element={<Trust />} />
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />
             <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />
             <Route path="/journey" element={<Journey />} />
             <Route path="/am-i-exposed" element={<AmIExposed />} />
+            {/* Developer portal (MPC-7250) */}
+            <Route path="/developers" element={<Developers />} />
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
             <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />
             <Route path="/guides/stop-spam" element={<Navigate to="/blog/stop-spam-calls-texts-and-emails" replace />} />

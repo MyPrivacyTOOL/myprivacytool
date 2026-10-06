@@ -26,5 +26,12 @@
 /sitemap.xml
   Cache-Control: public, max-age=3600
 
+# MPC-7350: security response headers for Cloudflare Pages (served on every route).
+# CSP is intentionally NOT enforced here: the site loads GTM and the consentmanager.net CMP, and index.html
+# has inline scripts. Roll out a Content-Security-Policy-Report-Only first (see docs/security-audit-mpc-7350.md).
 /*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), payment=(), usb=(), interest-cohort=()

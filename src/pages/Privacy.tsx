@@ -260,8 +260,9 @@ const Privacy = () => {
                   <strong>Service Providers:</strong> Payment processors (Stripe),
                   hosting and edge infrastructure (Cloudflare), databases (Supabase,
                   Google Cloud), CRM and email (HubSpot), messaging platforms
-                  (Telegram), consent management (Consentmanager), and analytics
-                  (Google Analytics 4)
+                  (Telegram), transactional email (Resend), internal task and
+                  notification tools (Notion, Slack), consent management
+                  (Consentmanager), and analytics (Google Analytics 4)
                 </li>
                 <li>
                   <strong>Legal Authorities:</strong> When required by law or to

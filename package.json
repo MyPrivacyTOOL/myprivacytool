@@ -10,7 +10,14 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:workers:node": "node --test workers/github-channel/test/*.test.mjs workers/oauth-poc/oauth.test.mjs && node workers/mpt-leads/worker.test.mjs && node workers/scan-report/worker.test.mjs",
+    "test:db": "bash supabase/tests/run.sh",
+    "test:e2e": "playwright test",
+    "lint:tests": "eslint e2e src/test \"src/**/*.test.{ts,tsx}\" playwright.config.ts vitest.config.ts",
+    "check:env": "node scripts/ci/check-env.mjs",
+    "smoke": "node scripts/ci/smoke-test.mjs"
   },
   "dependencies": {
     "@fontsource/fira-code": "^5.3.0",
@@ -73,6 +80,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@playwright/test": "^1.49.1",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -82,6 +90,7 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -94,6 +103,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "yaml": "^2.9.1"
   }
 }

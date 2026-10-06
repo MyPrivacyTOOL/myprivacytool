@@ -11,6 +11,7 @@ const COMPANY_LINKS = [
   { label: "About", to: "/about" },
   { label: "FAQ", to: "/faq" },
   { label: "Blog", to: "/blog" },
+  { label: "Developers", to: "/developers" },
   { label: "Contact", to: "/contact" },
 ];
 
@@ -26,6 +27,8 @@ const LEGAL_LINKS = [
   { label: "Privacy Policy", to: "/privacy" },
   { label: "Terms of Service", to: "/terms" },
   { label: "Cookie Policy", to: "/cookies" },
+  { label: "Data Processing (DPA)", to: "/dpa" },
+  { label: "Trust Centre", to: "/trust" },
 ];
 
 const SOCIAL_ITEMS = [

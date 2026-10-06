@@ -7,7 +7,7 @@ name: Deploy oauth-poc Worker
 #   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
 #   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
 #
-# Safety: runs the unit tests first. After deploy it FAILS if the Worker's secret NAMES changed
+# Safety: runs the pre-deploy config checks and the unit tests first. After deploy it FAILS if the Worker's secret NAMES changed
 # across the deploy, and WARNS (does not fail) if names in workers/oauth-poc/EXPECTED_SECRETS.txt
 # are missing, because the very first deploy creates the Worker with no secrets. Secret VALUES are
 # only ever set by a human in the Cloudflare dashboard.
@@ -35,12 +35,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check required secrets are configured
+      # MPC-7300: pre-deployment checks (secrets present, wrangler.toml valid, EXPECTED_SECRETS.txt names only).
+      - name: Pre-deployment checks (secrets present, Worker config valid)
         env:
-          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          A: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/oauth-poc
 
       - name: Test Worker (mocked Google calls)
         run: node --test workers/oauth-poc/oauth.test.mjs
@@ -77,3 +77,19 @@ jobs:
           sort workers/oauth-poc/EXPECTED_SECRETS.txt > /tmp/secrets.expected
           missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
           if [ -n "$missing" ]; then echo "::warning::expected secrets not set yet (set them in the Cloudflare dashboard): $missing"; else echo "OK: all expected secrets present"; fi
+
+      # MPC-7300: post-deployment smoke test against the LIVE Worker (/health, redirect to Google, 404). Read-only:
+      # nothing is exchanged or stored. On failure, roll back to the previous version; the job still ends red.
+      # (The very first deploy has no previous version, so a failed rollback there is reported, not hidden.)
+      - name: Smoke test live Worker
+        id: smoke
+        run: node scripts/ci/smoke-test.mjs oauth-poc --retries 4 --delay-ms 10000
+
+      - name: Roll back to the previous Worker version (smoke test failed)
+        if: failure() && steps.smoke.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/oauth-poc
+          command: 'rollback --yes --message "auto-rollback, smoke test failed for ${{ github.sha }}"'

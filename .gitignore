@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test output (MPC-7300)
+coverage
+playwright-report
+test-results
