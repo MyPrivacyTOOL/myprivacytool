@@ -42,8 +42,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/oauth-poc
 
-      - name: Test Worker (mocked Google calls)
-        run: node --test workers/oauth-poc/oauth.test.mjs
+      - name: Test Worker (mocked Google and Supabase calls)
+        run: node --test workers/oauth-poc/oauth.test.mjs workers/oauth-poc/api.test.mjs
 
       - name: Snapshot secret names before deploy
         env:

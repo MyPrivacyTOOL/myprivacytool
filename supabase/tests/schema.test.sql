@@ -95,5 +95,21 @@ select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channe
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc) values ('u1', 'github', 'v1.dup')$$) = '23505', '(user_id, provider) is unique');
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.channel_tokens (user_id, provider, access_token_enc, key_version) values ('u4', 'github', 'v1.a', 0)$$) = '23514', 'key_version must be >= 1');
 
+-- ===== oauth-poc: public.mpt_find_auth_user_by_email (MPC-6971) ===================================
+-- Matches case-insensitively, only CONFIRMED and NOT-deleted users, and is callable by service_role only.
+insert into auth.users (id, email, email_confirmed_at, deleted_at) values
+  ('00000000-0000-0000-0000-0000000000a1', 'Confirmed@Example.com', now(), null),
+  ('00000000-0000-0000-0000-0000000000a2', 'unconfirmed@example.com', null, null),
+  ('00000000-0000-0000-0000-0000000000a3', 'deleted@example.com', now(), now());
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_find_auth_user_by_email('x@example.com')$$) = '', 'service_role can call the lookup');
+set local role service_role;
+select pg_temp.assert(public.mpt_find_auth_user_by_email('confirmed@example.COM') = '00000000-0000-0000-0000-0000000000a1', 'lookup is case-insensitive and finds the confirmed user');
+select pg_temp.assert(public.mpt_find_auth_user_by_email('unconfirmed@example.com') is null, 'an unconfirmed email is not linkable');
+select pg_temp.assert(public.mpt_find_auth_user_by_email('deleted@example.com') is null, 'a deleted user is not linkable');
+select pg_temp.assert(public.mpt_find_auth_user_by_email('nobody@example.com') is null, 'an unknown email returns NULL');
+reset role;
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_find_auth_user_by_email('confirmed@example.com')$$) = '42501', 'anon cannot call the lookup');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_find_auth_user_by_email('confirmed@example.com')$$) = '42501', 'authenticated cannot call the lookup');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
