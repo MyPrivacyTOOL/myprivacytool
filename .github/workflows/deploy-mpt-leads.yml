@@ -7,9 +7,10 @@ name: Deploy mpt-leads Worker
 #   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
 #   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
 #
-# Safety: runs the Worker's stub tests first; after deploy it lists the Worker's secret
+# Safety: runs the pre-deploy config checks and the Worker's stub tests first; after deploy it lists the Worker's secret
 # NAMES via the API and FAILS if any name in workers/mpt-leads/EXPECTED_SECRETS.txt is
 # missing (a dropped secret silently breaks lead capture and cannot be recovered by an API call).
+# MPC-7300: then smoke-tests the live Worker and auto-rolls back if that fails.
 
 on:
   push:
@@ -34,12 +35,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check required secrets are configured
+      # MPC-7300: pre-deployment checks. Fails BEFORE anything ships if repo secrets are missing, wrangler.toml
+      # still has REPLACE_* placeholders, or EXPECTED_SECRETS.txt holds anything but secret NAMES.
+      - name: Pre-deployment checks (secrets present, Worker config valid)
         env:
-          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          A: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-leads
 
       - name: Test Worker (stubbed fetch)
         run: node workers/mpt-leads/worker.test.mjs
@@ -76,3 +78,23 @@ jobs:
           missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
           [ -z "$missing" ] || { echo "::error::expected secrets missing: $missing"; exit 1; }
           echo "OK: all expected secrets present"
+
+      # MPC-7300: post-deployment smoke test against the LIVE Worker (CORS preflight + the side-effect-free
+      # watchdog healthcheck POST). If it fails, roll back to the previous version and re-check; the job still
+      # ends red so the incident is visible. See docs/ci-cd-testing.md#rollback.
+      - name: Smoke test live Worker
+        id: smoke
+        run: node scripts/ci/smoke-test.mjs mpt-leads --retries 4 --delay-ms 10000
+
+      - name: Roll back to the previous Worker version (smoke test failed)
+        if: failure() && steps.smoke.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-leads
+          command: 'rollback --yes --message "auto-rollback, smoke test failed for ${{ github.sha }}"'
+
+      - name: Re-run smoke test after rollback
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: node scripts/ci/smoke-test.mjs mpt-leads --retries 3 --delay-ms 10000

@@ -84,3 +84,9 @@ AES-256-GCM encrypted in Supabase, and serves a sanitized PaPIT v1 profile at `G
   `ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are set with `wrangler secret put`. For local dev copy `.dev.vars.example` to `.dev.vars`.
   Never commit real secrets.
 - Tests: `node --test workers/github-channel/test/*.test.mjs`
+
+## Testing and CI/CD
+
+`npm test` runs the unit, component and Worker tests; `npm run test:e2e` runs the Playwright suite; every pull request
+runs the full pipeline (see `.github/workflows/ci.yml`). Test layers, the merge gate, deploy smoke tests and the rollback
+runbook are in [docs/ci-cd-testing.md](docs/ci-cd-testing.md).
