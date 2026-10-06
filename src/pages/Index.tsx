@@ -17,6 +17,7 @@ import {
   trackScrollToFooter,
   trackNewsletterSignup
 } from '@/lib/analytics';
+import { afterFirstPaint } from '@/lib/idle';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -72,6 +73,8 @@ const Index = () => {
       try {
         setLoading(true);
         setError(null);
+        // MPC-7200: let the hero paint before the (CPU-heavy) fingerprint scan starts.
+        await afterFirstPaint();
         const data = await captureDeviceData();
         setDeviceData(data);
         

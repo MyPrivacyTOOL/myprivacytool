@@ -633,6 +633,18 @@ export function determineUserProfile(data: DeviceData): {
 }
 
 // Async version that includes battery info, user profile, and fingerprint hexagons
+let fingerprintScan: ReturnType<typeof scanFingerprints> | null = null;
+const runFingerprintScan = () => (fingerprintScan ??= scanFingerprints());
+const scanFingerprints = () =>
+  Promise.all([
+    detectCanvasFingerprint().catch(() => null),
+    detectWebGLFingerprint().catch(() => null),
+    detectAudioFingerprint().catch(() => null),
+    detectInstalledFonts().catch(() => ({ count: 0, uniqueFonts: [], risk: 'low' as const, technique: 'Fonts' as const })),
+    detectPlugins().catch(() => ({ pluginCount: 0, plugins: [], adBlocker: false, risk: 'low' as const, technique: 'Plugins' as const })),
+    calculateProtectionScore().catch(() => null),
+  ]);
+
 export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonData[]> {
   const baseHexagons = generateHexagons(data);
   
@@ -672,15 +684,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     category: 'profile',
   });
   
-  // Run fingerprint detection in parallel (including protection)
-  const [canvasResult, webglResult, audioResult, fontsResult, pluginsResult, protectionResult] = await Promise.all([
-    detectCanvasFingerprint().catch(() => null),
-    detectWebGLFingerprint().catch(() => null),
-    detectAudioFingerprint().catch(() => null),
-    detectInstalledFonts().catch(() => ({ count: 0, uniqueFonts: [], risk: 'low' as const, technique: 'Fonts' as const })),
-    detectPlugins().catch(() => ({ pluginCount: 0, plugins: [], adBlocker: false, risk: 'low' as const, technique: 'Plugins' as const })),
-    calculateProtectionScore().catch(() => null),
-  ]);
+  // Run fingerprint detection in parallel (including protection). MPC-7200: computed once per page visit;
+  // generateHexagonsAsync is re-invoked on every orientation/motion update and the results cannot change.
+  const [canvasResult, webglResult, audioResult, fontsResult, pluginsResult, protectionResult] = await runFingerprintScan();
   
   // Add fingerprint hexagons
   const fingerprintHexagons: HexagonData[] = [];

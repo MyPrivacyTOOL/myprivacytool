@@ -119,3 +119,30 @@ The riskiest change is the lazy TensorFlow.js load; if predictions misbehave, re
   but missing from `public/` (404 in the console). Needs brand assets, not generated here.
 - `alice-video.mp4` (2.4 MB) is only referenced by `VoiceAI`; check it is not fetched eagerly in production.
 - 20 pre-existing ESLint errors (`no-explicit-any`, `no-empty`) are unchanged.
+
+## Update 2026-10-06 (after PR #76 deployed): production results and home-page CPU fix
+Production PageSpeed Insights (www.myprivacytool.io, run by the owner after deploy):
+
+| Page | Mobile | Desktop |
+|---|---|---|
+| / | 34 | 96 |
+| /scan | 74 | 96 |
+| /blog | 74 | 98 |
+
+Accessibility 95-97, Best Practices 100, SEO 100 on all three. The site domain is myprivacytool.io.
+
+The home page on mobile was the outlier. Earlier local runs missed it because the scan could not run offline (the
+IP-lookup APIs were blocked). With those APIs mocked, the real home page scored 45 locally (TBT 2.1 s). CPU profile:
+- the Matrix rain canvas (`draw`/`resize`) was the single biggest cost, plus per-glyph canvas state changes;
+- font detection read `offsetWidth` ~120 times, forcing a full-page layout each time;
+- `Index.tsx` re-ran the whole fingerprint scan after the first load (and again on every orientation/motion
+  update), although the results cannot change within a visit.
+
+Fixes (no visible change; same 5 hexagons, same rain, identical font results verified head-to-head in Chromium):
+fingerprint scan computed once per visit (`deviceDetection.ts`), canvas `measureText` instead of DOM measuring
+(`fingerprintDetection.ts`), scan and rain start after first paint/idle (`src/lib/idle.ts`), rain drawn trail-major
+(TRAIL state changes per frame instead of one per glyph) and capped at 1x DPR on phones.
+Local result with the scan running: home mobile 45 to about 69, TBT 2,110 ms to about 330 ms.
+Expect a smaller absolute gain in production, where third-party scripts add cost. Re-run PageSpeed after deploy.
+Remaining LCP (~4 s lab) is the render-blocking consent manager and a client-rendered shell; pre-rendering the hero
+is the next step.
