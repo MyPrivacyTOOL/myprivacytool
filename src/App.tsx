@@ -20,6 +20,8 @@ import Faq from "./pages/Faq";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Cookies from "./pages/Cookies";
+import DPA from "./pages/DPA";
+import Trust from "./pages/Trust";
 import OptOutGuides from "./pages/OptOutGuides";
 import OptOutGuide from "./pages/OptOutGuide";
 import Journey from "./pages/Journey";
@@ -58,6 +60,8 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
+            <Route path="/dpa" element={<DPA />} />
+            <Route path="/trust" element={<Trust />} />
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />
             <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />

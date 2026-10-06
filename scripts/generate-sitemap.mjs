@@ -29,6 +29,8 @@ const STATIC_ROUTES = [
   { path: "/privacy", file: "src/pages/Privacy.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/terms", file: "src/pages/Terms.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/cookies", file: "src/pages/Cookies.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/dpa", file: "src/pages/DPA.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/trust", file: "src/pages/Trust.tsx", priority: "0.4", changefreq: "yearly" },
 ];
 
 function gitLastmod(relativeFile) {
