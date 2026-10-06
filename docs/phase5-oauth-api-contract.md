@@ -78,7 +78,7 @@ Scope-gated example of permission scoping. `401 {error:"unauthenticated"}`; `403
 
 ## Supabase link
 
-`public.mpt_find_auth_user_by_email(p_email)` (migration `20261006140000_oauth_find_auth_user.sql`): returns the id of a **confirmed, non-deleted** `auth.users` row matching the email case-insensitively, else `NULL`. `SECURITY DEFINER`, empty `search_path`, `EXECUTE` for `service_role` only, so `anon` and `authenticated` cannot use it to probe which emails have accounts. The Worker only reads; it never creates or edits auth users. Verified locally against a scratch Postgres 16 with a stubbed `auth.users` (case-insensitive match, unconfirmed and deleted rows ignored, `anon`/`authenticated` denied). **Not applied to the live project.**
+`public.mpt_find_auth_user_by_email(p_email)` (migration `20261006140000_oauth_find_auth_user.sql`): returns the id of a **confirmed, non-deleted** `auth.users` row matching the email case-insensitively, else `NULL`. `SECURITY DEFINER`, empty `search_path`, `EXECUTE` for `service_role` only, so `anon` and `authenticated` cannot use it to probe which emails have accounts. The Worker only reads; it never creates or edits auth users. Verified locally against a scratch Postgres 16 with a stubbed `auth.users` (case-insensitive match, unconfirmed and deleted rows ignored, `anon`/`authenticated` denied). Applied to the live project on 2026-10-06 (see Status).
 
 ## Known limits
 
@@ -91,6 +91,6 @@ Scope-gated example of permission scoping. `401 {error:"unauthenticated"}`; `403
 | Item | State |
 |---|---|
 | Worker code, 25 tests, contract | Done on `main`. CI (`npm run test:workers:node`) now runs `api.test.mjs` as well as `oauth.test.mjs`; before, only the deploy workflow ran it. |
-| Migration `mpt_find_auth_user_by_email` | **Not applied.** Read-only check of project `xmdmkumwxpgahmlweuug` on 2026-10-06 found no such function. Apply after review; rollback is the `drop function` line above. |
+| Migration `mpt_find_auth_user_by_email` | **Applied** to project `xmdmkumwxpgahmlweuug` as `20261006150233_oauth_find_auth_user`. Checked 2026-10-06: body matches the repo file, `SECURITY DEFINER`, empty `search_path`, `EXECUTE` for `service_role` only (`anon` and `authenticated` denied), no security advisor finding. Rollback: `drop function if exists public.mpt_find_auth_user_by_email(text);` as a new migration. |
 | `SUPABASE_SERVICE_ROLE_KEY` on the Worker | Not set, by design (MPC-6950). Sessions report `link: "not_configured"`. |
 | Live run of `?mode=session` | Pending: needs a human Google consent (the probe flow was verified live on 2026-10-05). |
