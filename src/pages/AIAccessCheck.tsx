@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Bot, Check, Eye, Lock, ScanLine, ShieldCheck } from "lucide-react";
+import { ArrowRight, Bot, Eye, Lock, ScanLine, ShieldCheck } from "lucide-react";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import SubmitButton from "@/components/SubmitButton";
+import { useLeadSubmit } from "@/hooks/useLeadSubmit";
+import { suggestEmail, validateEmail } from "@/lib/formFeedback";
 import {
   trackAIAccessCheckCta,
   trackAIAccessCheckSignup,
   trackAIAccessCheckView,
+  trackFormSubmitError,
+  trackFormValidationError,
 } from "@/lib/analytics";
 
 // HubSpot form "AI Access Check waitlist" (portal 246502821). Form GUIDs are public
@@ -29,8 +34,12 @@ const CHECKS = [
 export default function AIAccessCheck() {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [consentError, setConsentError] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
+  const consentRef = useRef<HTMLDivElement>(null);
+  const { status, error: errorMsg, submit } = useLeadSubmit("/thank-you?source=ai-access-check");
+  const emailSuggestion = suggestEmail(email);
 
   const utm = useMemo(() => {
     const p = new URLSearchParams(window.location.search);
@@ -54,22 +63,30 @@ export default function AIAccessCheck() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!consent) return;
-    setStatus("loading");
-    setErrorMsg("");
-    try {
-      await submitHubSpotForm({
-        formId: FORM_ID,
-        fields: { email, source_tag: SOURCE_TAG, ...consentFields("ai_access_check") },
-        pageName: "AI Access Check waitlist",
-      });
-      trackAIAccessCheckSignup(utm);
-      setStatus("success");
-    } catch (err) {
-      setStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    if (status === "loading" || status === "success") return;
+    const emailProblem = validateEmail(email);
+    const consentProblem = consent ? "" : "Tick the box to confirm you're happy to hear from us.";
+    setEmailError(emailProblem ?? "");
+    setConsentError(consentProblem);
+    if (emailProblem || consentProblem) {
+      trackFormValidationError("ai_access_check", emailProblem ? "email" : "consent");
+      (emailProblem ? emailRef.current : consentRef.current?.querySelector("input"))?.focus();
+      return;
     }
+    await submit(
+      () =>
+        submitHubSpotForm({
+          formId: FORM_ID,
+          fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("ai_access_check") },
+          pageName: "AI Access Check waitlist",
+        }),
+      () => trackAIAccessCheckSignup(utm),
+    );
   };
+
+  useEffect(() => {
+    if (status === "error") trackFormSubmitError("ai_access_check");
+  }, [status]);
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
@@ -112,53 +129,62 @@ export default function AIAccessCheck() {
             We're building a deeper report on top of the free scan. Join the waitlist for early access.
           </p>
 
-          {status !== "success" ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <label htmlFor="ai-check-email" className="sr-only">Email address</label>
-              <input
-                id="ai-check-email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                disabled={status === "loading"}
-                className="w-full bg-background border border-surface-border rounded-lg px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand disabled:opacity-50 transition-colors"
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <label htmlFor="ai-check-email" className="sr-only">Email address</label>
+            <input
+              id="ai-check-email"
+              ref={emailRef}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError("");
+              }}
+              onBlur={() => email && setEmailError(validateEmail(email) ?? "")}
+              placeholder="your@email.com"
+              disabled={status === "loading" || status === "success"}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? "ai-check-email-error" : undefined}
+              className={`w-full bg-background border rounded-lg px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand disabled:opacity-50 transition-colors ${emailError ? "border-destructive" : "border-surface-border"}`}
+            />
+            {emailError && <p id="ai-check-email-error" role="alert" className="text-destructive text-xs">{emailError}</p>}
+            {!emailError && emailSuggestion && (
+              <p className="text-muted-foreground text-xs">
+                Did you mean{" "}
+                <button type="button" onClick={() => setEmail(emailSuggestion)} className="underline text-foreground">{emailSuggestion}</button>?
+              </p>
+            )}
+            <div ref={consentRef}>
+              <ConsentCheckbox
+                id="ai-check-consent"
+                checked={consent}
+                onChange={(v) => {
+                  setConsent(v);
+                  if (v) setConsentError("");
+                }}
+                disabled={status === "loading" || status === "success"}
+                labelClassName="text-muted-foreground"
               />
-              <ConsentCheckbox id="ai-check-consent" checked={consent} onChange={setConsent} disabled={status === "loading"} labelClassName="text-muted-foreground" />
-              {status === "error" && <p role="alert" className="text-destructive text-xs">{errorMsg}</p>}
-              <button
-                type="submit"
-                disabled={status === "loading"}
-                className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white disabled:opacity-60 text-primary-foreground text-sm font-bold py-3.5 px-6 rounded-lg transition-colors"
-              >
-                {status === "loading" ? <span className="animate-pulse">Joining...</span> : <><ArrowRight size={16} /> Join the waitlist</>}
-              </button>
-              <div className="flex items-start justify-center gap-2">
-                <Lock size={11} className="text-muted-foreground mt-0.5 shrink-0" />
-                <p className="text-muted-foreground text-xs">
-                  We'll email you about the AI Access report only. Unsubscribe anytime. See our{" "}
-                  <Link to="/privacy" className="underline hover:text-muted-foreground">privacy policy</Link>.
-                </p>
-              </div>
-            </form>
-          ) : (
-            <div className="text-center animate-fade-in">
-              <div className="w-12 h-12 rounded-full bg-background border border-brand flex items-center justify-center mx-auto mb-4">
-                <Check className="text-brand" size={22} />
-              </div>
-              <p className="text-brand font-semibold mb-2">You're on the list.</p>
-              <p className="text-muted-foreground text-sm mb-5">While you wait, check your exposure now.</p>
-              <Link
-                to={scanHref}
-                onClick={() => trackAIAccessCheckCta("post_signup")}
-                className="inline-flex items-center gap-2 text-sm text-brand hover:text-foreground transition-colors"
-              >
-                Check My Exposure <ArrowRight size={14} />
-              </Link>
             </div>
-          )}
+            {consentError && <p role="alert" className="text-destructive text-xs">{consentError}</p>}
+            {status === "error" && <p role="alert" className="text-destructive text-xs">{errorMsg}</p>}
+            <SubmitButton
+              status={status}
+              loading="Joining..."
+              success="You're on the list"
+              className="w-full"
+              idle={<><ArrowRight size={16} aria-hidden="true" /> Join the waitlist</>}
+            />
+            <div className="flex items-start justify-center gap-2">
+              <Lock size={11} className="text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-muted-foreground text-xs">
+                We'll email you about the AI Access report only. Unsubscribe anytime. See our{" "}
+                <Link to="/privacy" className="underline hover:text-muted-foreground">privacy policy</Link>.
+              </p>
+            </div>
+          </form>
         </div>
         <p className="text-muted-foreground text-xs text-center mt-8">MyPrivacyTOOL · See it. Control it. Protect it.</p>
       </section>
