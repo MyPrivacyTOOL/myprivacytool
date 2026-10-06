@@ -24,6 +24,7 @@ import OptOutGuides from "./pages/OptOutGuides";
 import OptOutGuide from "./pages/OptOutGuide";
 import Journey from "./pages/Journey";
 import AmIExposed from "./pages/AmIExposed";
+import Developers from "./pages/Developers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +63,8 @@ const App = () => (
             <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />
             <Route path="/journey" element={<Journey />} />
             <Route path="/am-i-exposed" element={<AmIExposed />} />
+            {/* Developer portal (MPC-7250) */}
+            <Route path="/developers" element={<Developers />} />
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
             <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />
             <Route path="/guides/stop-spam" element={<Navigate to="/blog/stop-spam-calls-texts-and-emails" replace />} />
