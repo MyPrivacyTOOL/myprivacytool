@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:workers:node": "node --test workers/github-channel/test/*.test.mjs workers/oauth-poc/oauth.test.mjs workers/oauth-poc/api.test.mjs && node workers/mpt-leads/worker.test.mjs && node workers/scan-report/worker.test.mjs",
+    "test:workers:node": "node --test workers/github-channel/test/*.test.mjs workers/oauth-poc/oauth.test.mjs workers/oauth-poc/api.test.mjs && node workers/mpt-leads/worker.test.mjs && node workers/scan-report/worker.test.mjs && node --test docs/cutover/mpc-6965/verify-cutover.test.mjs",
     "test:db": "bash supabase/tests/run.sh",
     "test:e2e": "playwright test",
     "lint:tests": "eslint e2e src/test \"src/**/*.test.{ts,tsx}\" playwright.config.ts vitest.config.ts",
