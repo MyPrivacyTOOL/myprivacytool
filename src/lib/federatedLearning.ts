@@ -6,7 +6,6 @@
  * Only aggregated gradients (not raw data) would be shared.
  */
 
-import * as tf from '@tensorflow/tfjs';
 import { getModelMetadata, hasTrainedModel } from './languagePredictor';
 import { getAllRewards, type RewardEvent } from './rewardTracking';
 
