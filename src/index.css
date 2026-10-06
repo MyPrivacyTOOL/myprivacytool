@@ -345,3 +345,12 @@
     }
   }
 }
+/* MPC-7200: iOS Safari zooms the page when a focused field has a font-size under 16px. Keep form fields at
+   16px on phones (raw <input>/<select> use text-sm = 14px). !important is needed to beat the utility class. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
