@@ -85,3 +85,12 @@ Scope-gated example of permission scoping. `401 {error:"unauthenticated"}`; `403
 - The email link trusts Google's `email_verified` plus Supabase's `email_confirmed_at`. Linking is informational (`uid` in the session); nothing authorises Supabase data access from it yet. RLS policies keyed to `auth.uid()` still need a real Supabase session, which is a separate decision.
 - No consumer provider API lists other apps' grants, so `grants:*` cannot be granted; the contract exists so adapters (Microsoft first) can add it without changing clients.
 - Session cookie holds the user's own email in a signed, not encrypted, value.
+
+## Status (2026-10-06)
+
+| Item | State |
+|---|---|
+| Worker code, 25 tests, contract | Done on `main`. CI (`npm run test:workers:node`) now runs `api.test.mjs` as well as `oauth.test.mjs`; before, only the deploy workflow ran it. |
+| Migration `mpt_find_auth_user_by_email` | **Not applied.** Read-only check of project `xmdmkumwxpgahmlweuug` on 2026-10-06 found no such function. Apply after review; rollback is the `drop function` line above. |
+| `SUPABASE_SERVICE_ROLE_KEY` on the Worker | Not set, by design (MPC-6950). Sessions report `link: "not_configured"`. |
+| Live run of `?mode=session` | Pending: needs a human Google consent (the probe flow was verified live on 2026-10-05). |
