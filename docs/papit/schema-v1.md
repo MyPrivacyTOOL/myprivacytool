@@ -45,3 +45,23 @@ interface PaPITProfile {
 ## Versioning
 
 Additive changes keep `version: "1.0"`. Removing or re-typing a field bumps the major version.
+
+## Channel data bridge (MPC-113)
+
+`workers/github-channel/lib/bridge.js` sits between channel ingestion and the PaPIT transformer:
+
+1. **Classification** tags each ingested record `core_identity` (bio, repos, languages, employment, education,
+   certifications, org membership), `ephemeral_behavioral` (a star, an event, a like, a post, a comment) or
+   `restricted` (email, name, login, location, company, blog, avatar, profile URL, id, phone, address).
+   Rules are fixed per record type; unknown types default to `ephemeral_behavioral`.
+2. **Sanitization** drops `restricted` records and replaces URLs, emails, @handles, SSNs, card numbers, IPv4
+   addresses and phone numbers in free text with `[redacted:<kind>]`.
+3. **Export** runs `githubToPapit` on the sanitized records only. The PaPIT profile and its
+   `cryptographic_receipt` are unchanged (schema stays v1.0).
+4. **Sanitization receipt**: SHA-256 over the canonical JSON of `{rules_version, records_in/out/dropped,
+   redactions, output_digest, papit_receipt}`. `GET /channels/github/profile` returns it in the
+   `X-PaPIT-Sanitization-Receipt` header; `verifySanitizationReceipt()` re-checks it. It is a hash receipt,
+   not a ZKP.
+
+Rollback: revert `index.js` to call `githubToPapit` directly (the profile body is identical), and treat any
+profile whose receipt header carries a withdrawn `rules_version` as invalid.

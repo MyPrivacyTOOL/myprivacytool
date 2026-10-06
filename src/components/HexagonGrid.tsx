@@ -1,14 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import LanguageIntelligencePanel from './LanguageIntelligencePanel';
 import FingerprintPanel from './FingerprintPanel';
-import StoragePanel from './StoragePanel';
 import SocialAccountsPanel from './SocialAccountsPanel';
 import SecurityPanel from './SecurityPanel';
 import BehaviorPanel from './BehaviorPanel';
-import FinalSummaryPanel from './FinalSummaryPanel';
 import DNSLeakFixGuide from './DNSLeakFixGuide';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
@@ -35,6 +33,10 @@ import {
 import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
+
+// MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
+const StoragePanel = lazy(() => import('./StoragePanel'));
+const FinalSummaryPanel = lazy(() => import('./FinalSummaryPanel'));
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
@@ -585,7 +587,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       <div className="max-w-md mx-auto mb-4 px-4" data-testid="confirmation-progress">
         <div className="flex items-center justify-between text-sm mb-1">
           <span className="text-muted-foreground">Confirmed</span>
-          <span className="font-mono font-semibold text-green-400" aria-live="polite" aria-atomic="true" data-testid="confirmation-counter">{confirmedCount}/{visibleCount}</span>
+          <span className="font-mono font-semibold text-success" aria-live="polite" aria-atomic="true" data-testid="confirmation-counter">{confirmedCount}/{visibleCount}</span>
         </div>
         <div
           role="progressbar"
@@ -691,7 +693,9 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {/* Storage Panel - shown after confirming 3+ storage hexagons */}
       {showStoragePanel && (
         <div className="mt-8 animate-fade-in">
-          <StoragePanel />
+          <Suspense fallback={null}>
+            <StoragePanel />
+          </Suspense>
         </div>
       )}
 
@@ -747,13 +751,15 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {/* Final Summary Panel - shown after all 46 hexagons confirmed */}
       {showFinalSummary && (
         <div className="mt-8 animate-fade-in">
-          <FinalSummaryPanel
-            hexagons={visibleHexagons}
-            confirmedCount={confirmedCount}
-            fingerprint={fingerprintData}
-            languagePrediction={languagePrediction}
-            onStartOver={handleStartOver}
-          />
+          <Suspense fallback={null}>
+            <FinalSummaryPanel
+              hexagons={visibleHexagons}
+              confirmedCount={confirmedCount}
+              fingerprint={fingerprintData}
+              languagePrediction={languagePrediction}
+              onStartOver={handleStartOver}
+            />
+          </Suspense>
         </div>
       )}
     </div>

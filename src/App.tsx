@@ -2,32 +2,37 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Index from "./pages/Index";
-import Scan from "./pages/Scan";
-import Report from "./pages/Report";
-import Business from "./pages/Business";
-import Start from "./pages/Start";
-import AIAccessCheck from "./pages/AIAccessCheck";
-import Newsletter from "./pages/Newsletter";
-import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
-import Pricing from "./pages/Pricing";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
-import Faq from "./pages/Faq";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
-import Cookies from "./pages/Cookies";
-import OptOutGuides from "./pages/OptOutGuides";
-import OptOutGuide from "./pages/OptOutGuide";
-import Journey from "./pages/Journey";
-import AmIExposed from "./pages/AmIExposed";
-import ConnectGitHubPage from "./pages/ConnectGitHub";
-import Developers from "./pages/Developers";
-import NotFound from "./pages/NotFound";
+const Scan = lazy(() => import("./pages/Scan"));
+const Report = lazy(() => import("./pages/Report"));
+const Business = lazy(() => import("./pages/Business"));
+const Start = lazy(() => import("./pages/Start"));
+const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
+const ThankYou = lazy(() => import("./pages/ThankYou"));
+const Newsletter = lazy(() => import("./pages/Newsletter"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Faq = lazy(() => import("./pages/Faq"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Cookies = lazy(() => import("./pages/Cookies"));
+const DPA = lazy(() => import("./pages/DPA"));
+const Trust = lazy(() => import("./pages/Trust"));
+const Developers = lazy(() => import("./pages/Developers"));
+const OptOutGuides = lazy(() => import("./pages/OptOutGuides"));
+const OptOutGuide = lazy(() => import("./pages/OptOutGuide"));
+const Journey = lazy(() => import("./pages/Journey"));
+const AmIExposed = lazy(() => import("./pages/AmIExposed"));
+const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
+// MPC-7200: every route except the home page is code-split so the first paint only downloads what it renders.
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -48,6 +53,7 @@ const App = () => (
             {/* Lead capture */}
             <Route path="/newsletter" element={<Newsletter />} />
             <Route path="/ai-access-check" element={<AIAccessCheck />} />
+            <Route path="/thank-you" element={<ThankYou />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
@@ -59,6 +65,8 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
+            <Route path="/dpa" element={<DPA />} />
+            <Route path="/trust" element={<Trust />} />
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />
             <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />

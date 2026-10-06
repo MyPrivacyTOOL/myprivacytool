@@ -193,6 +193,8 @@ const Index = () => {
             <img 
               src={logoFull} 
               alt="MyPrivacyTOOL" 
+              width={666}
+              height={375}
               className="h-8 object-contain" 
             />
           </div>

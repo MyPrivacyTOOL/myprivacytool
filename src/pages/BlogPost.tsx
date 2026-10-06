@@ -482,6 +482,8 @@ export default function BlogPost() {
             <img
               src={post.image}
               alt={post.title}
+              fetchPriority="high"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           </div>
@@ -556,11 +558,9 @@ export default function BlogPost() {
             <div className="bg-secondary rounded-lg p-6 border border-border">
               <h3 className="font-bold text-foreground mb-2">Ready to reclaim your privacy?</h3>
               <p className="text-muted-foreground mb-4">See where your data is exposed, then take it back.</p>
-              <Link to={scanHref}>
-                <Button>
-                  Check My Exposure →
-                </Button>
-              </Link>
+              <Button asChild>
+                <Link to={scanHref}>Check My Exposure →</Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -585,9 +585,9 @@ export default function BlogPost() {
           <CardContent className="p-8">
             <h3 className="text-2xl font-bold mb-2">Privacy Check</h3>
             <p className="text-muted-foreground mb-4">Privacy Check is our newsletter: new articles on data brokers, AI and your data, and practical protection steps, delivered to your inbox.</p>
-            <Link to="/newsletter">
-              <Button>Subscribe Now</Button>
-            </Link>
+            <Button asChild>
+              <Link to="/newsletter">Subscribe Now</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
