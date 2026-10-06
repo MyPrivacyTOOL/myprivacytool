@@ -29,6 +29,7 @@ const OptOutGuides = lazy(() => import("./pages/OptOutGuides"));
 const OptOutGuide = lazy(() => import("./pages/OptOutGuide"));
 const Journey = lazy(() => import("./pages/Journey"));
 const AmIExposed = lazy(() => import("./pages/AmIExposed"));
+const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // MPC-7200: every route except the home page is code-split so the first paint only downloads what it renders.
@@ -71,6 +72,7 @@ const App = () => (
             <Route path="/opt-out-guides/:slug" element={<OptOutGuide />} />
             <Route path="/journey" element={<Journey />} />
             <Route path="/am-i-exposed" element={<AmIExposed />} />
+            <Route path="/connect/github" element={<ConnectGitHubPage />} />
             {/* Developer portal (MPC-7250) */}
             <Route path="/developers" element={<Developers />} />
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />

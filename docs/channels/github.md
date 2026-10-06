@@ -56,6 +56,25 @@ The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different or
 - **Logs** hold event names and status codes only. The adapter's errors carry the HTTP status, never a URL, token or body.
 - **Cache** holds the sanitized PaPIT snapshot only, never tokens or raw GitHub responses.
 
+## SPA: "Connect GitHub"
+
+`/connect/github` (`src/pages/ConnectGitHub.tsx`, `src/components/ConnectGitHub.tsx`, client in `src/lib/githubChannel.ts`).
+The button is a plain link to the Worker's `/oauth/github/start`; after the GitHub round trip the Worker redirects back to
+`SUCCESS_REDIRECT` (`https://www.myprivacytool.io/?channel=github`). The page then reads `GET /channels/github/profile` with
+`credentials: "include"`, shows the sanitized profile, and offers **Disconnect** (`DELETE /channels/github`). `?channel_error=`
+codes are mapped to friendly copy and the raw code is never shown.
+
+- **Unlisted on purpose:** `noindex`, not in the sitemap or nav. Link to it when the channel is ready to launch.
+- **To land on this page after login**, change `SUCCESS_REDIRECT` in `workers/github-channel/wrangler.toml` to
+  `https://www.myprivacytool.io/connect/github` and redeploy the Worker. Until then a successful login lands on `/?channel=github`
+  and the user opens `/connect/github` manually.
+- Override the Worker URL with `VITE_GITHUB_CHANNEL_URL` (e.g. for a custom domain).
+- **Known limitation: third-party cookies.** The Worker runs on `*.workers.dev`, a different site from `myprivacytool.io`, so its
+  session cookie is a third-party cookie when the SPA calls it. Safari and Firefox (and Chrome with third-party cookies blocked)
+  will not send it, so the page would show "Connect GitHub" even after a successful login. Fix: serve the Worker from a
+  subdomain of the site (e.g. `channels.myprivacytool.io` as a Workers custom domain), then update `REDIRECT_URI`, the GitHub
+  OAuth app's callback URL and `VITE_GITHUB_CHANNEL_URL`. Do this before linking the page publicly.
+
 ## Token expiry and refresh
 
 The OAuth app has GitHub's "expiring user tokens" on, so access tokens last about 8 hours and come with a refresh token
