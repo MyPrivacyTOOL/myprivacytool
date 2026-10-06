@@ -910,18 +910,24 @@ export async function detectPrivacyExtensions(): Promise<PrivacyExtensionsResult
       }
     }
     
-    // Test for uBlock Origin or similar (blocked fetch to tracking domains)
+    // Test for uBlock Origin or similar. MPC-7350: uses a local bait element that content blockers hide, not a
+    // request to google-analytics.com, so no third party is contacted before the visitor has consented.
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 100);
-      
-      await fetch('https://www.google-analytics.com/collect', {
-        method: 'HEAD',
-        mode: 'no-cors',
-        signal: controller.signal,
-      });
-      
-      clearTimeout(timeoutId);
+      const bait = document.createElement('div');
+      bait.className = 'adsbox ad-banner pub_300x250 textAds';
+      bait.style.cssText = 'position: absolute; left: -9999px; height: 10px; width: 10px;';
+      bait.innerHTML = '&nbsp;';
+      document.body.appendChild(bait);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const hidden =
+        bait.offsetHeight === 0 ||
+        !document.body.contains(bait) ||
+        window.getComputedStyle(bait).display === 'none';
+      if (document.body.contains(bait)) document.body.removeChild(bait);
+      if (hidden) {
+        extensions.push('Ad Blocker (uBlock/similar)');
+        blocking = true;
+      }
     } catch {
       // If blocked, likely has ad blocker
       extensions.push('Ad Blocker (uBlock/similar)');
