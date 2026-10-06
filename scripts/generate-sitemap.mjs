@@ -22,6 +22,7 @@ const STATIC_ROUTES = [
   { path: "/opt-out-guides", file: "src/pages/OptOutGuides.tsx", priority: "0.9", changefreq: "weekly" },
   { path: "/journey", file: "src/pages/Journey.tsx", priority: "0.7", changefreq: "monthly" },
   { path: "/am-i-exposed", file: "src/pages/AmIExposed.tsx", priority: "0.8", changefreq: "monthly" },
+  { path: "/developers", file: "src/pages/Developers.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/about", file: "src/pages/About.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/faq", file: "src/pages/Faq.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/contact", file: "src/pages/Contact.tsx", priority: "0.4", changefreq: "yearly" },

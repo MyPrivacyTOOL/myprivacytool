@@ -67,5 +67,9 @@
   "/faq": {
     "title": "FAQ | MyPrivacyTOOL",
     "description": "Answers about MyPrivacyTOOL: how the scan works, what stays in your browser, which third parties are contacted and how to reach us."
+  },
+  "/developers": {
+    "title": "Developers: API Reference & Quick Start | MyPrivacyTOOL",
+    "description": "Request and response examples for the MyPrivacyTOOL endpoints, how access and rate limits work, and JavaScript, Python and Go snippets."
   }
 }
