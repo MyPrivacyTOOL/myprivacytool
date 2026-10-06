@@ -82,10 +82,11 @@ describe('input handling', () => {
     expect(notion['UTM Source'].rich_text[0].text.content).toBe('reddit');
     expect(notion.Phone.phone_number).toBe('+1 555 0100');
   });
-  it('returns 500 with the error message when the body is not valid JSON', async () => {
+  // MPC-7350: unparsable input is a client error and never echoes the parser message.
+  it('returns a generic 400 when the body is not valid JSON', async () => {
     const res = await post(null, { raw: '{not json', headers: { 'content-type': 'application/json' } });
-    expect(res.status).toBe(500);
-    expect(typeof (await res.json()).error).toBe('string');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid request' });
   });
 });
 
