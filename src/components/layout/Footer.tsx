@@ -11,6 +11,7 @@ const COMPANY_LINKS = [
   { label: "About", to: "/about" },
   { label: "FAQ", to: "/faq" },
   { label: "Blog", to: "/blog" },
+  { label: "Developers", to: "/developers" },
   { label: "Contact", to: "/contact" },
 ];
 
