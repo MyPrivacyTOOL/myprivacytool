@@ -18,7 +18,7 @@ describe("Start", () => {
     await user.type(screen.getByPlaceholderText("your@email.com"), " me@example.com ");
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /check my exposure/i }));
-    await screen.findByText("You're in the queue.");
+    await screen.findByRole("button", { name: /you're in/i }); // success state; the page then redirects to /thank-you
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/submit/246502821/22ee30ae-6cf9-419b-aa46-b656b0e7b1bf");
     const fields = Object.fromEntries(JSON.parse(init.body as string).fields.map((x: { name: string; value: string }) => [x.name, x.value]));
@@ -34,7 +34,7 @@ describe("Start", () => {
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /check my exposure/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Rate limited");
-    expect(screen.queryByText("You're in the queue.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /you're in/i })).not.toBeInTheDocument();
   });
 
   it("does not submit when consent is not ticked", async () => {

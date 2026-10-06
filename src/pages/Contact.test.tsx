@@ -24,7 +24,7 @@ describe("Contact (HubSpot form configured)", () => {
     renderPage(<Contact />);
     await fill(user);
     await user.click(screen.getByRole("button", { name: /send message/i }));
-    await screen.findByText("Message sent");
+    await screen.findByRole("button", { name: /message sent/i }); // success state; the page then redirects to /thank-you
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/submit/246502821/contact-guid");
     const fields = Object.fromEntries(JSON.parse(init.body as string).fields.map((x: { name: string; value: string }) => [x.name, x.value]));
@@ -33,7 +33,6 @@ describe("Contact (HubSpot form configured)", () => {
       message: "Hello there", source_tag: "contact-page", consent_source: "contact_page",
     });
     expect(fields.consent_given_at).toMatch(/^\d+$/);
-    expect(screen.getByText(/Thanks, Ada/)).toBeInTheDocument();
   });
 
   it("shows the error and keeps the form when HubSpot rejects", async () => {

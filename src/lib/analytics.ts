@@ -455,3 +455,39 @@ export const trackAliceHDWaitlistSignup = (params?: Record<string, string>) => {
   trackEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
   trackEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
 };
+
+// ---------------------------------------------------------------------------
+// Onboarding funnel + A/B experiments (MPC-7400)
+// ---------------------------------------------------------------------------
+
+// Fired when a visitor first sees the element under test (not on page load), so exposure is the
+// right denominator for conversion rate. Register experiment_id / variant_id as GA4 custom dimensions.
+export const trackExperimentExposure = (experimentId: string, variantId: string, forced = false) => {
+  if (forced) return; // QA overrides must not pollute results
+  trackEvent('experiment_exposure', { experiment_id: experimentId, variant_id: variantId });
+};
+
+export const trackExperimentCta = (experimentId: string, variantId: string, forced = false) => {
+  trackActivity();
+  if (forced) return;
+  trackEvent('experiment_cta_click', { experiment_id: experimentId, variant_id: variantId });
+};
+
+// Client-side validation rejected a submit (no PII: only the form and field names).
+export const trackFormValidationError = (form: string, field: string) => {
+  trackEvent('form_validation_error', { form, field });
+};
+
+// A submit failed after validation passed (network or HubSpot error).
+export const trackFormSubmitError = (form: string) => {
+  trackEvent('form_submit_error', { form });
+};
+
+export const trackThankYouView = (source: string, params?: Record<string, string>) => {
+  trackEvent('thank_you_view', { source, ...params });
+};
+
+export const trackThankYouNextStep = (source: string, destination: string) => {
+  trackActivity();
+  trackEvent('thank_you_next_step_click', { source, destination });
+};

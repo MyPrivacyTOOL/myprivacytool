@@ -11,6 +11,7 @@ const Report = lazy(() => import("./pages/Report"));
 const Business = lazy(() => import("./pages/Business"));
 const Start = lazy(() => import("./pages/Start"));
 const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
+const ThankYou = lazy(() => import("./pages/ThankYou"));
 const Newsletter = lazy(() => import("./pages/Newsletter"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
@@ -51,6 +52,7 @@ const App = () => (
             {/* Lead capture */}
             <Route path="/newsletter" element={<Newsletter />} />
             <Route path="/ai-access-check" element={<AIAccessCheck />} />
+            <Route path="/thank-you" element={<ThankYou />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
