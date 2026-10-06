@@ -70,7 +70,7 @@ codes are mapped to friendly copy and the raw code is never shown.
 - **Served from `channels.myprivacytool.io`** (a Workers custom domain, `routes` in `wrangler.toml`), the same site as
   `www.myprivacytool.io`, so the session cookie is not a third-party cookie and Safari/Firefox send it. The GitHub OAuth app's
   callback URL must equal `REDIRECT_URI` (`https://channels.myprivacytool.io/oauth/github/callback`); GitHub allows only one.
-  `workers_dev` stays on until the custom domain is verified, then set it to `false` to retire the old `*.workers.dev` address.
+  `workers_dev` is `false`: the old `*.workers.dev` address is retired and the Worker is served only from `channels.myprivacytool.io`. Rollback: set `workers_dev = true`, redeploy, and re-add the `workers.dev` redirect URI in the GitHub OAuth app.
 
 ## Token expiry and refresh
 
