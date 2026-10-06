@@ -73,7 +73,7 @@ describe('worker integration', () => {
   it('HubSpot 400 for missing mpt_lead_* properties retries the contact write without them', async () => {
     handlers['hunter.io'] = () => res(hunterBody());
     let n = 0;
-    handlers['api.hubapi.com/crm/v3/objects/contacts'] = (u, o) => (++n === 1 ? res({ message: 'Property "mpt_lead_score" does not exist' }, 400) : res({}));
+    handlers['api.hubapi.com/crm/v3/objects/contacts'] = (u, o) => (++n === 1 ? new Response(JSON.stringify({ message: 'Property "mpt_lead_score" does not exist' }), { status: 400 }) : res({}));
     await post({ email: 'ciso@acme.com' });
     const writes = to('api.hubapi.com/crm/v3/objects/contacts');
     expect(writes).toHaveLength(2);
