@@ -1,35 +1,48 @@
 ---
 status: DRAFT (not published)
-slug: how-github-reddit-become-a-private-profile
-title: How your GitHub and Reddit activity becomes a profile you control
-description: What the Builder & Thinker scan reads, what it throws away, and how you stay in control.
+slug: how-github-becomes-a-private-profile
+title: How your GitHub activity becomes a profile you control
+description: What the Builder profile reads from GitHub, what it never touches, and how you stay in control.
 ---
 
-# How your GitHub and Reddit activity becomes a profile you control
+# How your GitHub activity becomes a profile you control
 
-Most "digital footprint" tools show you what the internet knows about you. The Builder & Thinker scan does something different: with your permission, it reads your own GitHub and Reddit activity and turns it into a small, private profile that **you** own. This post explains exactly what happens to your data.
+Most "digital footprint" tools show you what the internet knows about you. The Builder profile works the other way round: with your permission, it reads your own GitHub activity and turns it into a small, private profile that **you** own. This post explains exactly what happens.
 
 ## Step 1: You connect, and you choose what's shared
-You sign in with GitHub and/or Reddit using the platform's own login (OAuth). We never see your password. We ask for the minimum access needed. For Reddit that is `identity`, `read` and `history`; nothing that lets us post, vote or message as you. You can revoke access at any time from the platform's own settings.
+You sign in with GitHub's own login (OAuth). We never see your password. We request one permission, `read:user`, the minimum needed. You can disconnect from our page at any time, which deletes our stored token and revokes the grant at GitHub. You can also revoke us yourself under GitHub Settings > Applications.
 
-## Step 2: We read signals, not words
-- **GitHub (what you build):** [list final fields, e.g. languages, project topics, activity rhythm — confirm against MPC-115].
-- **Reddit (what you think about):** which communities you take part in, how often, and rough topics. Comment and post text is analysed in memory and **discarded**. It is never stored, logged or returned.
+## Step 2: We read a few public signals
+From your public GitHub data we read:
+- the languages across your own, non-fork public repositories,
+- the topics on the public repositories you've starred,
+- how many public events you made in the last 90 days,
+- your public bio, **only to match role keywords** (it is never copied).
 
-## Step 3: We strip personal details before anything is summarised
-Emails, phone numbers, street addresses, locations you mention in passing, other people's usernames and your own handle are removed before any analysis. What's left is reduced to short topic keywords such as "encryption" or "generics", never sentences you wrote.
+## Step 3: We keep derived values, not details
+The profile never contains your email, name, username, location, company, website, avatar, profile link, numeric ID or bio text. Before anything is exported, a sanitization step drops restricted fields and redacts URLs, emails, handles and phone numbers in free text.
 
 ## Step 4: You get a PaPIT profile
-The output is a PaPIT (Private and Portable Identity Tool) record: communities with an engagement level (lurker, occasional, active, power user), a short list of topics, a rough overall tone and basic activity levels. It declares in plain data what it does not contain:
+PaPIT (Private and Portable Identity Tool) is the format. A profile contains:
+- up to 10 top **skills** (languages),
+- a **primary role** label from fixed keyword rules (no AI model guesses),
+- your public project count,
+- up to 15 **interests** (starred-repo topics),
+- an **activity level**: low, medium or high,
+- a SHA-256 **cryptographic receipt**, so anyone holding the profile can detect if it was edited.
+
+It also states its own limits:
 
 ```json
-"privacy_boundaries": { "data_retention_days": 30, "revocable": true, "raw_content_stored": false }
+"privacy_boundaries": { "data_retention_days": 30, "revocable": true }
 ```
 
-## Step 5: It's yours
-Connection tokens are encrypted at rest. The profile is revocable, and set to be kept for at most 30 days. [Confirm final retention and deletion behaviour before publishing.]
+The 30 days is how long a snapshot is valid. It is not how long we keep your token: the token is kept until you disconnect.
+
+## Step 5: Your token is locked away
+Your GitHub token is encrypted (AES-256-GCM) before it is stored, and the database only holds ciphertext that no one can read without a key we keep separately. Profiles are cached for 24 hours so we don't hit GitHub repeatedly.
 
 ## Why we built it this way
-Seeing your own "digital shadow" is useful, but only if the tool doesn't create a bigger one. So we collect less, keep it for less time, and give you the off switch.
+Seeing your own digital shadow is useful only if the tool doesn't create a bigger one. So we ask for less, derive instead of copy, and give you the off switch.
 
-*Ready to see yours? [CTA link — add at launch]*
+*More channels are planned. Want to see your Builder profile? [CTA link: add at launch]*

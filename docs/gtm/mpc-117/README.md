@@ -1,22 +1,25 @@
-# MPC-117 — GTM launch assets (DRAFTS, NOT PUBLISHED)
+# MPC-117 — GTM launch assets, GitHub-only (DRAFTS, NOT PUBLISHED)
 
 Status: drafts for human review. Nothing here is published, scheduled or live on the site.
 
+Scope decision (2026-10-06): launch **GitHub only**. Reddit (MPC-116) is parked because Reddit app creation is failing; do not mention Reddit in launch copy until it works. An earlier version of these drafts said MPC-115 had no code; that was wrong. MPC-115 shipped as the `workers/github-channel` Cloudflare Worker (PRs #67, #68).
+
 ## Launch gate (do not publish before these are true)
-The copy describes GitHub + Reddit channel scans as available. As of this draft:
-- MPC-115 (GitHub adapter) has no code in this repo.
-- MPC-116 (Reddit) is code-complete on PR #66 but parked: Reddit app creation is failing, so there is no live OAuth.
-So the "Builder & Thinker" scan is **not shippable yet**. Publish only after both channels work end to end.
+1. PR #69 (unlisted `/connect/github` page) merged and deployed, and the manual check from its test plan done: connect, see the profile, disconnect.
+2. Third-party cookie issue fixed: serve the Worker from a `myprivacytool.io` subdomain (e.g. `channels.myprivacytool.io`), update `REDIRECT_URI`, the GitHub OAuth app callback URL and `VITE_GITHUB_CHANNEL_URL`. Without it Safari, Firefox and Chrome with blocked third-party cookies show "Connect GitHub" again after login.
+3. Worker `SUCCESS_REDIRECT` set to the connect page and the Worker redeployed.
+4. `DELETE /channels/github` live-tested (only unit-tested so far).
+5. The `/connect/github` page is linked from somewhere public (it is currently unlisted and noindex).
 
 ## Files
-- `blog-how-it-works.md` — "How it works" blog post draft (not added to `blogPosts.json`, so it cannot go live by accident).
-- `social-posts.md` — LinkedIn, X and Reddit copy (not added to the content calendar or any scheduler).
-- `homepage-badges.md` — spec for the GitHub/Reddit channel badges (no UI change made).
+- `blog-how-it-works.md` — "How it works" blog draft (not in `blogPosts.json`, so it cannot go live by accident).
+- `social-posts.md` — LinkedIn and X copy, plus an optional Reddit-the-site post (not scheduled anywhere).
+- `homepage-badges.md` — spec for a GitHub channel badge (no UI change made).
 
 ## Rollback
 Delete `docs/gtm/mpc-117/`. Nothing else was changed.
 
 ## Open questions for review
-- Confirm the "Builder & Thinker" name is final.
-- Reddit rules: posting announcements to subreddits (e.g. r/privacy) often needs mod approval and disallows self-promotion; check before using the Reddit copy.
-- Confirm retention wording (30 days) matches the final product behaviour and privacy policy.
+- Product name: the task calls it the "Builder & Thinker" scan, but with GitHub only it covers the Builder half. The copy uses "Builder profile"; confirm the name.
+- Reddit rules: posting announcements to subreddits often needs mod approval and bans self-promotion; check before using that copy.
+- Confirm the retention wording (see the blog draft) against the privacy policy.
