@@ -1,0 +1,107 @@
+name: Rollback Worker
+
+# MPC-7300: documented, pipeline-tested rollback for the Cloudflare Workers deployed from this repo.
+# Procedure + the Pages / Supabase equivalents: docs/ci-cd-testing.md#rollback
+#
+#   Manual:    Actions -> "Rollback Worker" -> Run workflow -> pick the Worker.
+#              dry_run=true (default) only LISTS recent versions and proves the credentials and rollback target
+#              exist. Set dry_run=false to actually roll back (optionally to a specific version_id), after which
+#              the live smoke test runs against the rolled-back Worker.
+#   Scheduled: every Monday a dry-run "rollback drill" runs for every Worker, so a broken token, a renamed
+#              Worker or a missing previous version is discovered on a quiet Monday, not during an incident.
+#
+# Secret VALUES are never touched: a Worker rollback restores code + plain-text vars of the previous version;
+# secrets are kept by Cloudflare across versions (verified by the "secret names" check below).
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker:
+        description: Worker to roll back
+        type: choice
+        options: [mpt-leads, oauth-poc, scan-report]
+        required: true
+      dry_run:
+        description: Only list versions and verify credentials (no rollback)
+        type: boolean
+        default: true
+      version_id:
+        description: Version/deployment ID to roll back to (blank = the previous version)
+        type: string
+        required: false
+  schedule:
+    - cron: '23 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rollback-${{ github.event.inputs.worker || 'drill' }}
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: ${{ github.event_name == 'schedule' && 'Rollback drill' || 'Rollback' }} (${{ matrix.worker }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: ${{ github.event_name == 'schedule' && fromJSON('["mpt-leads","oauth-poc","scan-report"]') || fromJSON(format('["{0}"]', github.event.inputs.worker)) }}
+    env:
+      DRY_RUN: ${{ github.event_name == 'schedule' || github.event.inputs.dry_run == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pre-flight (credentials present, Worker config valid)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/${{ matrix.worker }}
+
+      - name: Snapshot secret names
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          name=$(sed -n 's/^name *= *"\(.*\)"/\1/p' workers/${{ matrix.worker }}/wrangler.toml | head -1)
+          echo "WORKER_NAME=$name" >> "$GITHUB_ENV"
+          curl -s --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$name/secrets" \
+            | jq -r '(.result // [])[].name' | sort > /tmp/secrets.before || true
+          echo "secret names before:"; cat /tmp/secrets.before
+
+      - name: List recent deployments (this is the rollback drill)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/${{ matrix.worker }}
+          command: deployments list
+
+      - name: Roll back
+        if: env.DRY_RUN != 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/${{ matrix.worker }}
+          command: rollback ${{ github.event.inputs.version_id }} --yes --message "manual rollback by ${{ github.actor }} (run ${{ github.run_id }})"
+
+      - name: Verify secrets survived the rollback
+        if: env.DRY_RUN != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -s --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER_NAME/secrets" \
+            | jq -r '(.result // [])[].name' | sort > /tmp/secrets.after
+          diff /tmp/secrets.before /tmp/secrets.after || { echo "::error::secret names changed across rollback"; exit 1; }
+
+      - name: Smoke test the live Worker
+        if: env.DRY_RUN != 'true' && matrix.worker != 'scan-report'
+        run: node scripts/ci/smoke-test.mjs ${{ matrix.worker }} --retries 4 --delay-ms 10000

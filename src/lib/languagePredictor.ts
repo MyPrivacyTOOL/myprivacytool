@@ -1,7 +1,12 @@
 // Enhanced Language Predictor with TensorFlow.js
 // Client-side language preference prediction with improved accuracy
 
-import * as tf from '@tensorflow/tfjs';
+import type * as TF from '@tensorflow/tfjs';
+
+// MPC-7200: TensorFlow.js is ~2.5 MB. It is loaded on first use (model init/prediction/training) instead of
+// being bundled into the home-page entry chunk, so first paint and interactivity no longer wait on it.
+let tfPromise: Promise<typeof TF> | null = null;
+const loadTf = (): Promise<typeof TF> => (tfPromise ??= import('@tensorflow/tfjs'));
 import { type SyntheticExample } from './syntheticDataGenerator';
 
 export interface LanguageAnalysis {
@@ -451,12 +456,12 @@ const vpnIndicators: Array<{ lang: string; timezone: string; probability: number
 ];
 
 // TensorFlow model instance
-let model: tf.LayersModel | null = null;
+let model: TF.LayersModel | null = null;
 let modelLoaded = false;
 let isTrainedModel = false;
 
 // Create the model architecture (10 inputs -> [16, 8] hidden -> 4 outputs)
-function createModel(): tf.LayersModel {
+function createModel(tf: typeof TF): TF.LayersModel {
   const newModel = tf.sequential({
     layers: [
       // Input layer: 10 features
@@ -563,6 +568,7 @@ export async function trainModel(
   trainingData: SyntheticExample[],
   onProgress?: (progress: TrainingProgress) => void
 ): Promise<{ accuracy: number; validationAccuracy: number; loss: number }> {
+  const tf = await loadTf();
   console.log(`Starting model training with ${trainingData.length} examples...`);
   
   onProgress?.({ epoch: 0, totalEpochs: 50, loss: 0, accuracy: 0, phase: 'preparing' });
@@ -573,7 +579,7 @@ export async function trainModel(
   }
   
   // Create fresh model
-  model = createModel();
+  model = createModel(tf);
   
   // Shuffle data
   const shuffled = [...trainingData].sort(() => Math.random() - 0.5);
@@ -670,6 +676,7 @@ export async function trainModel(
 // Save model weights to localStorage
 async function saveModelToStorage(): Promise<void> {
   if (!model) return;
+  const tf = await loadTf();
   
   try {
     // Use tf.io.withSaveHandler to save to memory, then store in localStorage
@@ -699,6 +706,7 @@ async function loadModelFromStorage(): Promise<boolean> {
   try {
     const stored = localStorage.getItem(MODEL_WEIGHTS_KEY);
     if (!stored) return false;
+    const tf = await loadTf();
     
     const parsed = JSON.parse(stored);
     const weightData = new Uint8Array(parsed.weightData).buffer;
@@ -759,7 +767,7 @@ export async function initializeModel(): Promise<boolean> {
     }
     
     // Fall back to creating a new model with heuristic weights
-    model = createModel();
+    model = createModel(await loadTf());
     
     // Pre-set weights based on heuristic patterns
     await initializeWeightsWithHeuristics();
@@ -777,6 +785,7 @@ export async function initializeModel(): Promise<boolean> {
 // Initialize weights with heuristic-based values
 async function initializeWeightsWithHeuristics(): Promise<void> {
   if (!model) return;
+  const tf = await loadTf();
   
   // Warm up the model with representative examples (10 features)
   const trainingExamples = tf.tensor2d([
@@ -1056,6 +1065,7 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
   // Run TensorFlow prediction
   if (model) {
     try {
+      const tf = await loadTf(); // already resolved once `model` exists
       const inputTensor = tf.tensor2d([[
         languageCount,
         hasMismatch,
@@ -1069,7 +1079,7 @@ export async function predictLanguagePreference(analysis: LanguageAnalysis): Pro
         totalLangsNormalized,
       ]]);
       
-      const prediction = model.predict(inputTensor) as tf.Tensor;
+      const prediction = model.predict(inputTensor) as TF.Tensor;
       tfProbabilities = await prediction.data();
       
       inputTensor.dispose();

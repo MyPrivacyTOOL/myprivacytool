@@ -51,6 +51,14 @@
     "title": "Cookie Policy | MyPrivacyTOOL",
     "description": "Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
   },
+  "/dpa": {
+    "title": "Data Processing Agreement Summary | MyPrivacyTOOL",
+    "description": "Plain-language summary of how MyPrivacyTOOL processes personal data on behalf of business customers: roles, sub-processors, security, transfers and deletion."
+  },
+  "/trust": {
+    "title": "Trust & Legal | MyPrivacyTOOL",
+    "description": "How MyPrivacyTOOL handles your data: privacy policy, terms, cookie policy and data processing summary in one place."
+  },
   "/pricing": {
     "title": "Pricing",
     "description": "Simple, transparent pricing for individuals and families is on its way.",
@@ -67,5 +75,14 @@
   "/faq": {
     "title": "FAQ | MyPrivacyTOOL",
     "description": "Answers about MyPrivacyTOOL: how the scan works, what stays in your browser, which third parties are contacted and how to reach us."
+  },
+  "/thank-you": {
+    "title": "Thank You",
+    "description": "Thanks for signing up. Here is what happens next and where to go in the meantime.",
+    "noindex": true
+  },
+  "/developers": {
+    "title": "Developers: API Reference & Quick Start | MyPrivacyTOOL",
+    "description": "Request and response examples for the MyPrivacyTOOL endpoints, how access and rate limits work, and JavaScript, Python and Go snippets."
   }
 }

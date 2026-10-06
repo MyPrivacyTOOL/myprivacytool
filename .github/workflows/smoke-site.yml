@@ -1,0 +1,45 @@
+name: Live smoke test
+
+# MPC-7300: confirms the live site and Workers actually serve traffic.
+#   - after every push to main: the marketing site auto-deploys via Cloudflare Pages (not from this repo's
+#     Actions), so we wait for it with retries (up to ~10 minutes) before declaring the deploy healthy
+#   - every 6 hours and on demand: a standing check of the site and both public Workers
+# Read-only: GET requests, a CORS preflight, and the side-effect-free @healthcheck.io probe on mpt-leads.
+# A red run on a push means the deploy needs attention: use the Pages "Rollback to this deployment" button
+# (docs/ci-cd-testing.md#rollback).
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [site, mpt-leads, oauth-poc]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Smoke test ${{ matrix.target }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ matrix.target }}" = "site" ]; then
+            node scripts/ci/smoke-test.mjs site --retries 20 --delay-ms 30000
+          else
+            node scripts/ci/smoke-test.mjs ${{ matrix.target }} --retries 3 --delay-ms 15000
+          fi

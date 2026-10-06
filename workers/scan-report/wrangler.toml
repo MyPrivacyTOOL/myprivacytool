@@ -22,3 +22,11 @@ ALLOW_PARTIAL_REPORT = "true"
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
 enabled = true
+
+# MPC-7350: per-IP rate limit on POST /api/scan (5 requests / 60s). Code fails open if the binding is missing.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "7351"
+  [ratelimits.simple]
+  limit = 5
+  period = 60

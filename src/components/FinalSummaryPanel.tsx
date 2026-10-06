@@ -9,8 +9,6 @@ import {
   Mouse, Keyboard, Users, ShieldAlert, Fingerprint, Database,
   Globe, Smartphone, FileText
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
@@ -372,6 +370,11 @@ export default function FinalSummaryPanel({
     setIsExporting(true);
     
     try {
+      // MPC-7200: jsPDF (+autotable) is ~450 KB; fetch it only when the user exports a PDF.
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ]);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
