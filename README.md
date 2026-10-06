@@ -71,3 +71,16 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+
+## GitHub channel integration (MPC-115)
+
+A Cloudflare Worker in `workers/github-channel` connects a user's GitHub account (OAuth, `read:user` only), stores the token
+AES-256-GCM encrypted in Supabase, and serves a sanitized PaPIT v1 profile at `GET /channels/github/profile` (24h Workers KV cache).
+
+- Setup, flow diagram, rate limits, rollback: [`docs/channels/github.md`](docs/channels/github.md)
+- PaPIT schema: [`docs/papit/schema-v1.md`](docs/papit/schema-v1.md)
+- Config: non-secret vars live in `workers/github-channel/wrangler.toml`; secrets (`GITHUB_CLIENT_SECRET`, `STATE_SIGNING_KEY`,
+  `ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) are set with `wrangler secret put`. For local dev copy `.dev.vars.example` to `.dev.vars`.
+  Never commit real secrets.
+- Tests: `node --test workers/github-channel/test/*.test.mjs`
