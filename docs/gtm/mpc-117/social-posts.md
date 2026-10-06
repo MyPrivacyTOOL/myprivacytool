@@ -1,28 +1,28 @@
-# Social copy — DRAFT, not scheduled
-Add UTM-tagged links (see `docs/content-calendar-mpc-7033.md` convention) at scheduling time. Replace [LINK].
+# Social copy — DRAFT, not scheduled (GitHub-only)
+Add UTM-tagged links per the MPC-7033 convention at scheduling time. Replace [LINK]. Do not mention Reddit until MPC-116 ships.
 
 ## LinkedIn
-We just launched the Builder & Thinker scan.
+We just launched the Builder profile.
 
-Connect GitHub and Reddit (your own login, minimum access) and see the profile your activity paints: what you build, what you think about.
+Connect GitHub (one read-only permission) and see the profile your public activity paints: your top languages, your role, your interests, your activity level.
 
 What makes it different:
-• We read signals, not your words. Post and comment text is analysed in memory, then discarded.
-• Personal details are stripped before anything is summarised.
-• You get a revocable profile you own.
+• It derives, it doesn't copy. No email, name, username or bio text ever leaves GitHub with it.
+• Your token is encrypted at rest, and you can disconnect in one click.
+• The profile carries a cryptographic receipt, so edits are detectable.
 
 See yours: [LINK]
 
 ## X
-Your GitHub + Reddit activity says a lot about you.
+Your GitHub says a lot about you.
 
-The Builder & Thinker scan shows you the profile it paints, without storing a single post. Keywords in, text out. Revocable anytime.
+The Builder profile turns it into a private, portable profile: languages, role, interests, activity. No name, no email, no bio text. Disconnect any time.
 
 [LINK]
 
-## Reddit
-Note: check each subreddit's self-promotion rules and get mod approval first. Suggested as a discussion post, not an ad.
+## Reddit (the site) — optional
+Check each subreddit's self-promotion rules and get mod approval first. Frame as discussion, disclose you're the maker.
 
-Title: We built a tool that summarises your Reddit/GitHub footprint without storing your posts. Here's how it works (and where it could go wrong)
+Title: We built a tool that turns your GitHub into a privacy-first profile without copying anything identifying. Tell us what we missed.
 
-Body: Short explainer of the pipeline (strip PII, keep topic keywords only, discard text, 30-day revocable profile), then ask what privacy people would want from a tool like this. Link to the how-it-works post in a comment if rules allow. Be upfront that you're the maker.
+Body: Short explainer (one OAuth scope, derived values only, restricted fields dropped, encrypted token, one-click disconnect), then ask what privacy guarantees people would want. Link to the how-it-works post only if the rules allow.
