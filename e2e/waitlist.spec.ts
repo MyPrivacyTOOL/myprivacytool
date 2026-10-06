@@ -14,7 +14,9 @@ test.describe("/start signup (First Hexagon report waitlist)", () => {
     await page.getByRole("checkbox").check();
     await submit.click();
 
-    await expect(page.getByText("You're in the queue.")).toBeVisible();
+    // MPC-7400: a successful signup redirects to /thank-you with source-specific copy.
+    await expect(page).toHaveURL(/\/thank-you\?source=start/);
+    await expect(page.getByRole("heading", { name: "You're on the list." })).toBeVisible();
     expect(net.captured.hubspot).toHaveLength(1);
     const { url, body } = net.captured.hubspot[0];
     expect(url).toContain("/submit/246502821/22ee30ae-6cf9-419b-aa46-b656b0e7b1bf");
@@ -31,7 +33,7 @@ test.describe("/start signup (First Hexagon report waitlist)", () => {
     await page.getByPlaceholder("your@email.com").fill("e2e@example.com");
     await expect(page.getByRole("checkbox")).not.toBeChecked();
     await page.getByRole("button", { name: /check my exposure/i }).click();
-    await expect(page.getByText("You're in the queue.")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/thank-you/);
     expect(net.captured.hubspot).toHaveLength(0);
   });
 
