@@ -90,3 +90,8 @@ AES-256-GCM encrypted in Supabase, and serves a sanitized PaPIT v1 profile at `G
 `npm test` runs the unit, component and Worker tests; `npm run test:e2e` runs the Playwright suite; every pull request
 runs the full pipeline (see `.github/workflows/ci.yml`). Test layers, the merge gate, deploy smoke tests and the rollback
 runbook are in [docs/ci-cd-testing.md](docs/ci-cd-testing.md).
+
+## Reddit channel (MPC-116)
+
+The same Worker also serves a Reddit behavioral channel (`/oauth/reddit/*`, `/channels/reddit/*`), off until the Reddit app credentials are set.
+Setup, routes and privacy pipeline: [`docs/channels/reddit.md`](docs/channels/reddit.md).

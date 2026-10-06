@@ -12,6 +12,7 @@
  *    rule set produced the profile and that nothing was changed afterwards.
  */
 import { githubToPapit, canonicalJson, sha256Hex } from './papit.js';
+import { redditToPapit } from './reddit-papit.js';
 
 export const RULES_VERSION = 'bridge-v1';
 export const CORE_IDENTITY = 'core_identity';
@@ -122,16 +123,16 @@ function toRaw(records) {
 const digestRecords = (records) => sha256Hex(canonicalJson(records));
 
 /**
- * Full pipeline for the GitHub channel.
+ * Shared pipeline tail: classify -> sanitize -> build the PaPIT profile from SANITIZED records only -> receipts.
  * @returns {Promise<{papit: object, sanitization: object, sanitization_receipt: string, classification: Record<string,number>}>}
  */
-export async function bridgeGithub(raw, { now = new Date() } = {}) {
-  const classified = githubRecords(raw).map((r) => ({ ...r, class: classify(r) }));
+async function runBridge(rawRecords, buildPapit) {
+  const classified = rawRecords.map((r) => ({ ...r, class: classify(r) }));
   const classification = { [CORE_IDENTITY]: 0, [EPHEMERAL]: 0, [RESTRICTED]: 0 };
   for (const r of classified) classification[r.class]++;
 
   const { records, redactions, dropped } = sanitize(classified);
-  const papit = await githubToPapit(toRaw(records), { now });
+  const papit = await buildPapit(records);
 
   const sanitization = {
     rules_version: RULES_VERSION,
@@ -145,6 +146,48 @@ export async function bridgeGithub(raw, { now = new Date() } = {}) {
   return {
     papit, sanitization, classification, sanitization_receipt: await sha256Hex(canonicalJson(sanitization)),
   };
+}
+
+/** Full pipeline for the GitHub channel. */
+export function bridgeGithub(raw, { now = new Date() } = {}) {
+  return runBridge(githubRecords(raw), (records) => githubToPapit(toRaw(records), { now }));
+}
+
+/**
+ * Flatten raw Reddit activity into typed records. The handle and id are restricted (dropped); comments and
+ * posts are ephemeral behavioral records whose text is sanitized before the transformer sees it.
+ */
+export function redditRecords(raw) {
+  const recs = [];
+  if (raw?.username) recs.push({ type: 'username', text: String(raw.username) });
+  if (raw?.id) recs.push({ type: 'user_id', text: String(raw.id) });
+  recs.push({ type: 'account_stats', created_utc: Number(raw?.accountCreatedUtc ?? 0), karma: Number(raw?.totalKarma ?? 0) });
+  for (const c of raw?.comments ?? []) {
+    recs.push({ type: 'comment', subreddit: c.subreddit, text: c.body, score: c.score, controversiality: c.controversiality, created_utc: c.createdUtc });
+  }
+  for (const s of raw?.submissions ?? []) {
+    recs.push({ type: 'post', subreddit: s.subreddit, text: s.title, score: s.score, created_utc: s.createdUtc });
+  }
+  return recs;
+}
+
+/** Rebuild the raw shape redditToPapit expects, from sanitized records only (no handle, no id). */
+function toRedditRaw(records) {
+  const raw = { accountCreatedUtc: 0, comments: [], submissions: [] };
+  for (const r of records) {
+    if (r.type === 'account_stats') raw.accountCreatedUtc = r.created_utc;
+    else if (r.type === 'comment') {
+      raw.comments.push({ subreddit: r.subreddit, body: r.text, score: r.score, controversiality: r.controversiality, createdUtc: r.created_utc });
+    } else if (r.type === 'post') {
+      raw.submissions.push({ subreddit: r.subreddit, title: r.text, score: r.score, createdUtc: r.created_utc });
+    }
+  }
+  return raw;
+}
+
+/** Full pipeline for the Reddit channel. The handle is passed separately, only to scrub it from free text. */
+export function bridgeReddit(raw, { now = new Date() } = {}) {
+  return runBridge(redditRecords(raw), (records) => redditToPapit(toRedditRaw(records), { now, username: raw?.username }));
 }
 
 /** Recompute the sanitization receipt and check it still points at this PaPIT profile. */
