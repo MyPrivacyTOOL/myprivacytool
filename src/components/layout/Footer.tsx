@@ -11,6 +11,7 @@ const COMPANY_LINKS = [
   { label: "About", to: "/about" },
   { label: "FAQ", to: "/faq" },
   { label: "Blog", to: "/blog" },
+  { label: "Developers", to: "/developers" },
   { label: "Contact", to: "/contact" },
 ];
 
@@ -26,6 +27,8 @@ const LEGAL_LINKS = [
   { label: "Privacy Policy", to: "/privacy" },
   { label: "Terms of Service", to: "/terms" },
   { label: "Cookie Policy", to: "/cookies" },
+  { label: "Data Processing (DPA)", to: "/dpa" },
+  { label: "Trust Centre", to: "/trust" },
 ];
 
 const SOCIAL_ITEMS = [
@@ -44,12 +47,12 @@ const FooterLinkList = ({
 }) => (
   <div>
     <h3 className="text-sm font-semibold text-foreground mb-4">{title}</h3>
-    <ul className="space-y-2.5">
+    <ul className="md:space-y-2.5">
       {links.map((link) => (
         <li key={link.to}>
           <Link
             to={link.to}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors md:min-h-0"
           >
             {link.label}
           </Link>
@@ -85,7 +88,7 @@ const Footer = () => {
                 <button
                   type="button"
                   onClick={openCookiePreferences}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors text-left md:min-h-0"
                 >
                   Manage cookies
                 </button>
@@ -94,7 +97,7 @@ const Footer = () => {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-4">Follow us</h3>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {SOCIAL_ITEMS.map(({ platform, label, url, Icon }) => (
                 <a
                   key={platform}
@@ -103,7 +106,7 @@ const Footer = () => {
                   rel="noopener noreferrer"
                   onClick={() => trackSocialClick(platform, url)}
                   aria-label={label}
-                  className="w-9 h-9 rounded-full bg-secondary hover:bg-secondary/70 flex items-center justify-center transition-colors"
+                  className="w-11 h-11 shrink-0 md:w-9 md:h-9 rounded-full bg-secondary hover:bg-secondary/70 flex items-center justify-center transition-colors"
                 >
                   <Icon className="w-4 h-4 text-foreground/70" aria-hidden="true" />
                 </a>
@@ -114,7 +117,7 @@ const Footer = () => {
 
         <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
           <Link to="/" className="flex items-center" aria-label="MyPrivacyTOOL home">
-            <img src={logoFooter} alt="MyPrivacyTOOL" className="h-14 w-auto min-w-24 -my-3 mx-2 object-contain" loading="lazy" />
+            <img src={logoFooter} alt="MyPrivacyTOOL" width={300} height={169} decoding="async" className="h-14 w-auto min-w-24 -my-3 mx-2 object-contain" loading="lazy" />
           </Link>
           <p className="text-xs text-muted-foreground text-center">
             © {year} MyPrivacyTOOL Ltd, 12E, Block 5, 8 Pak Lai Road, Park Island, Ma Wan, Tsuen Wan District, New Territories, Hong Kong, HK99

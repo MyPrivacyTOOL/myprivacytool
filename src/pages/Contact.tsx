@@ -191,7 +191,7 @@ const Contact = () => {
               <Icon size={18} className="text-primary mt-0.5 shrink-0" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold">{label}</div>
-                <a href={`mailto:${email}`} className="text-sm text-muted-foreground hover:text-foreground break-all">
+                <a href={`mailto:${email}`} className="inline-block py-2 text-sm text-muted-foreground hover:text-foreground break-all">
                   {email}
                 </a>
               </div>

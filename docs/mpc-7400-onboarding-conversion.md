@@ -42,4 +42,4 @@ Inline validation and clearer errors typically cut form abandonment on errors; t
 1. Approve the variant copy "Get early access, free" before enabling `VITE_AB_START_CTA_ENABLED=true`.
 2. The `/start` copy edits overlap MPC-6977 follow-up D (delegated to MyPrivacyToolClaw). Keep them, or let that task own them?
 3. HubSpot: build the welcome workflow (spec in `docs/welcome-email-mpc-7400.md`), then set `VITE_WELCOME_EMAIL_LIVE=true`.
-4. Developer docs URL for `VITE_DEVELOPER_DOCS_URL` once MPC-7250 publishes.
+4. Developer docs and Trust centre links now point at the on-site `/developers` and `/trust` pages (MPC-7250 / MPC-6545).

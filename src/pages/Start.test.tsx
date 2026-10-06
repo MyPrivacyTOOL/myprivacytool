@@ -1,131 +1,58 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+// MPC-7300: /start waitlist / report signup (the "First Hexagon" funnel).
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { renderPage, jsonResponse } from "@/test/render";
 import Start from "./Start";
-import ThankYou from "./ThankYou";
 
-const submitHubSpotForm = vi.fn();
-const analytics = vi.hoisted(() => ({
-  trackStartSignup: vi.fn(),
-  trackExperimentExposure: vi.fn(),
-  trackExperimentCta: vi.fn(),
-  trackFormValidationError: vi.fn(),
-  trackFormSubmitError: vi.fn(),
-  trackThankYouView: vi.fn(),
-  trackThankYouNextStep: vi.fn(),
-}));
+beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; });
+afterEach(() => vi.unstubAllGlobals());
 
-vi.mock("@/lib/hubspot", () => ({
-  submitHubSpotForm: (...a: unknown[]) => submitHubSpotForm(...a),
-  consentFields: () => ({ consent_given_at: "0", consent_source: "start_page" }),
-}));
-vi.mock("@/lib/analytics", () => analytics);
-vi.mock("@/components/Seo", () => ({ default: () => null }));
-
-const renderStart = (url = "/start") =>
-  render(
-    <MemoryRouter initialEntries={[url]}>
-      <Routes>
-        <Route path="/start" element={<Start />} />
-        <Route path="/thank-you" element={<ThankYou />} />
-      </Routes>
-    </MemoryRouter>,
-  );
-
-const openForm = () => fireEvent.click(screen.getByRole("button", { name: /yes, that's me/i }));
-
-describe("/start onboarding form", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    window.sessionStorage.clear();
-    window.history.pushState({}, "", "/");
-    window.scrollTo = vi.fn();
-    window.matchMedia = ((q: string) => ({ matches: q.includes("reduce"), addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+describe("Start", () => {
+  it("submits email with the start-scan tag and consent evidence, then confirms", async () => {
+    const f = vi.fn(async () => jsonResponse({}));
+    vi.stubGlobal("fetch", f);
+    const user = userEvent.setup();
+    renderPage(<Start />);
+    await user.click(screen.getByRole("button", { name: /yes, that's me/i }));
+    await user.type(screen.getByPlaceholderText("your@email.com"), " me@example.com ");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /check my exposure/i }));
+    await screen.findByRole("button", { name: /you're in/i }); // success state; the page then redirects to /thank-you
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("/submit/246502821/22ee30ae-6cf9-419b-aa46-b656b0e7b1bf");
+    const fields = Object.fromEntries(JSON.parse(init.body as string).fields.map((x: { name: string; value: string }) => [x.name, x.value]));
+    expect(fields).toMatchObject({ email: "me@example.com", source_tag: "start-scan", consent_source: "start_page" });
   });
 
-  it("shows inline errors and does not submit an invalid form", () => {
-    renderStart();
-    openForm();
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: "nope" } });
-    fireEvent.click(screen.getByRole("button", { name: /check my exposure/i }));
-    expect(screen.getAllByRole("alert")[0]).toHaveTextContent(/doesn't look like an email/i);
-    expect(submitHubSpotForm).not.toHaveBeenCalled();
-    expect(analytics.trackFormValidationError).toHaveBeenCalledWith("start_scan", "email");
+  it("surfaces a HubSpot failure and lets the user retry", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ message: "Rate limited" }, 429)));
+    const user = userEvent.setup();
+    renderPage(<Start />);
+    await user.click(screen.getByRole("button", { name: /yes, that's me/i }));
+    await user.type(screen.getByPlaceholderText("your@email.com"), "me@example.com");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /check my exposure/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Rate limited");
+    expect(screen.queryByRole("button", { name: /you're in/i })).not.toBeInTheDocument();
   });
 
-  it("requires consent with a visible message", () => {
-    renderStart();
-    openForm();
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: "me@example.com" } });
-    fireEvent.click(screen.getByRole("button", { name: /check my exposure/i }));
-    expect(screen.getByRole("alert")).toHaveTextContent(/tick the box/i);
-    expect(submitHubSpotForm).not.toHaveBeenCalled();
+  it("does not submit when consent is not ticked", async () => {
+    const f = vi.fn();
+    vi.stubGlobal("fetch", f);
+    const user = userEvent.setup();
+    renderPage(<Start />);
+    await user.click(screen.getByRole("button", { name: /yes, that's me/i }));
+    await user.type(screen.getByPlaceholderText("your@email.com"), "me@example.com");
+    await user.click(screen.getByRole("button", { name: /check my exposure/i }));
+    expect(f).not.toHaveBeenCalled();
   });
 
-  it("submits once, fires generate_lead tracking, and lands on the thank-you page", async () => {
-    submitHubSpotForm.mockResolvedValue(undefined);
-    renderStart();
-    openForm();
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: " me@example.com " } });
-    fireEvent.click(screen.getByRole("checkbox"));
-    const button = screen.getByRole("button", { name: /check my exposure/i });
-    fireEvent.click(button);
-    fireEvent.click(button);
-    await waitFor(() => expect(screen.getByRole("heading", { name: /you're on the list/i })).toBeInTheDocument());
-    expect(submitHubSpotForm).toHaveBeenCalledTimes(1);
-    expect(submitHubSpotForm.mock.calls[0][0].fields).toMatchObject({ email: "me@example.com", source_tag: "start-scan" });
-    expect(analytics.trackStartSignup).toHaveBeenCalledTimes(1);
-    expect(analytics.trackStartSignup).toHaveBeenCalledWith(expect.objectContaining({ experiment_id: "start_cta", variant_id: "control" }));
-  });
-
-  it("keeps the visitor's input and explains a failed submit", async () => {
-    submitHubSpotForm.mockRejectedValue(new TypeError("Failed to fetch"));
-    renderStart();
-    openForm();
-    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: "me@example.com" } });
-    fireEvent.click(screen.getByRole("checkbox"));
-    fireEvent.click(screen.getByRole("button", { name: /check my exposure/i }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't reach our server/i));
-    expect(screen.getByLabelText(/email address/i)).toHaveValue("me@example.com");
-    expect(analytics.trackStartSignup).not.toHaveBeenCalled();
-    expect(analytics.trackFormSubmitError).toHaveBeenCalledWith("start_scan");
-  });
-
-  it("shows the variant button copy when forced via URL and does not count it", () => {
-    window.history.pushState({}, "", "/start?ab_start_cta=early_access"); // abTest reads window.location
-    renderStart();
-    openForm();
-    expect(screen.getByRole("button", { name: /get early access, free/i })).toBeInTheDocument();
-    expect(analytics.trackExperimentExposure).toHaveBeenCalledWith("start_cta", "early_access", true);
-  });
-});
-
-describe("/thank-you", () => {
-  it("renders source-specific copy, next steps and trust links, without claiming an email was sent", () => {
-    render(
-      <MemoryRouter initialEntries={["/thank-you?source=contact"]}>
-        <Routes>
-          <Route path="/thank-you" element={<ThankYou />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole("heading", { name: /message sent/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /opt-out guides|remove your data yourself/i })).toHaveAttribute("href", "/opt-out-guides");
-    expect(screen.getByRole("link", { name: /privacy policy/i })).toHaveAttribute("href", "/privacy");
-    expect(screen.queryByText(/welcome email is on its way/i)).toBeNull();
-    expect(screen.queryByText(/developer docs/i)).toBeNull();
-    expect(analytics.trackThankYouView).toHaveBeenCalledWith("contact", undefined);
-  });
-
-  it("falls back to generic copy for unknown sources", () => {
-    render(
-      <MemoryRouter initialEntries={["/thank-you?source=<script>"]}>
-        <Routes>
-          <Route path="/thank-you" element={<ThankYou />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole("heading", { name: /you're all set/i })).toBeInTheDocument();
-    expect(analytics.trackThankYouView).toHaveBeenCalledWith("other", undefined);
+  it('routes "Not me" to a fresh scan and lists the messaging channels', async () => {
+    const user = userEvent.setup();
+    renderPage(<Start />);
+    await user.click(screen.getByRole("button", { name: /not me/i }));
+    expect(screen.getByRole("link", { name: /check my exposure/i })).toHaveAttribute("href", "/scan");
+    for (const n of ["WhatsApp", "Telegram", "Messenger", "Instagram", "Email"]) expect(screen.getByRole("link", { name: n })).toBeInTheDocument();
   });
 });

@@ -12,9 +12,6 @@ import { trackThankYouNextStep, trackThankYouView } from "@/lib/analytics";
 // (docs/welcome-email-mpc-7400.md). Until then the page does not claim an email has been sent.
 const WELCOME_EMAIL_LIVE = import.meta.env.VITE_WELCOME_EMAIL_LIVE === "true";
 
-// Set VITE_DEVELOPER_DOCS_URL when the public developer docs (MPC-7250) have a home; the link is hidden until then.
-const DEVELOPER_DOCS_URL = import.meta.env.VITE_DEVELOPER_DOCS_URL as string | undefined;
-
 interface SourceCopy {
   title: string;
   body: string;
@@ -59,7 +56,9 @@ const TRUST_LINKS = [
   { key: "privacy", to: "/privacy", label: "Privacy Policy" },
   { key: "cookies", to: "/cookies", label: "Cookie Policy" },
   { key: "terms", to: "/terms", label: "Terms" },
+  { key: "trust", to: "/trust", label: "Trust centre" },
   { key: "about", to: "/about", label: "About us" },
+  { key: "developers", to: "/developers", label: "Developer docs" },
 ];
 
 export default function ThankYou() {
@@ -136,23 +135,10 @@ export default function ThankYou() {
             {TRUST_LINKS.map(({ key, to, label }) => (
               <li key={key}>
                 <Link to={to} onClick={onStep(key)} className="underline hover:text-foreground text-muted-foreground inline-flex items-center gap-1">
-                  <FileText size={12} aria-hidden="true" /> {label}
+                  {key === "developers" ? <Code2 size={12} aria-hidden="true" /> : <FileText size={12} aria-hidden="true" />} {label}
                 </Link>
               </li>
             ))}
-            {DEVELOPER_DOCS_URL && (
-              <li>
-                <a
-                  href={DEVELOPER_DOCS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={onStep("developer-docs")}
-                  className="underline hover:text-foreground text-muted-foreground inline-flex items-center gap-1"
-                >
-                  <Code2 size={12} aria-hidden="true" /> Developer docs
-                </a>
-              </li>
-            )}
           </ul>
         </div>
       </section>

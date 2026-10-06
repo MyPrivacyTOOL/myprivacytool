@@ -79,6 +79,9 @@ const Header = () => {
           <img
             src={logoHeader}
             alt="MyPrivacyTOOL"
+            width={300}
+            height={169}
+            fetchPriority="high"
             className="h-14 w-auto min-w-24 -my-4 mx-2 object-contain"
           />
         </Link>

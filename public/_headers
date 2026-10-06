@@ -1,0 +1,37 @@
+# Cloudflare Pages response headers (MPC-7200). Cloudflare compresses text assets (brotli/gzip) at the edge
+# automatically; this file controls browser + edge caching.
+
+# Vite emits content-hashed filenames under /assets, so they can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Pre-rendered route HTML and the SPA shell must revalidate so a deploy is visible immediately
+# (the hashed assets they reference make revalidation cheap).
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Unhashed static files: cache a day at the browser, a week at the edge, serve stale while refreshing.
+/*.jpg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/blog/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/favicon.ico
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/site.webmanifest
+  Cache-Control: public, max-age=86400
+/robots.txt
+  Cache-Control: public, max-age=3600
+/sitemap.xml
+  Cache-Control: public, max-age=3600
+
+# MPC-7350: security response headers for Cloudflare Pages (served on every route).
+# CSP is intentionally NOT enforced here: the site loads GTM and the consentmanager.net CMP, and index.html
+# has inline scripts. Roll out a Content-Security-Policy-Report-Only first (see docs/security-audit-mpc-7350.md).
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), payment=(), usb=(), interest-cohort=()
