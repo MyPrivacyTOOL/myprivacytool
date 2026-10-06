@@ -469,22 +469,20 @@ export async function detectInstalledFonts(): Promise<FontDetectionResult> {
     const testSize = '72px';
     const baseFonts = ['monospace', 'sans-serif', 'serif'];
     
-    // Create a hidden div for testing
-    const testDiv = document.createElement('div');
-    testDiv.style.cssText = 'position: absolute; left: -9999px; visibility: hidden;';
-    document.body.appendChild(testDiv);
-    
-    // Create a span for measuring
-    const span = document.createElement('span');
-    span.style.fontSize = testSize;
-    span.textContent = testString;
-    testDiv.appendChild(span);
+    // MPC-7200: measure with canvas text metrics instead of a DOM span. Reading span.offsetWidth ~120 times
+    // forced a synchronous layout of the whole page each time (hundreds of ms of main-thread work on phones);
+    // measureText gives the same fallback-vs-installed width comparison without touching layout.
+    const ctx = document.createElement('canvas').getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D unavailable');
+    const measure = (family: string) => {
+      ctx.font = `${testSize} ${family}`;
+      return ctx.measureText(testString).width;
+    };
     
     // Get base widths
     const baseWidths: Record<string, number> = {};
     baseFonts.forEach(font => {
-      span.style.fontFamily = font;
-      baseWidths[font] = span.offsetWidth;
+      baseWidths[font] = measure(font);
     });
     
     // Test each font
@@ -494,8 +492,7 @@ export async function detectInstalledFonts(): Promise<FontDetectionResult> {
       let detected = false;
       
       for (const baseFont of baseFonts) {
-        span.style.fontFamily = `'${font}', ${baseFont}`;
-        const width = span.offsetWidth;
+        const width = measure(`'${font}', ${baseFont}`);
         
         if (width !== baseWidths[baseFont]) {
           detected = true;
@@ -507,9 +504,6 @@ export async function detectInstalledFonts(): Promise<FontDetectionResult> {
         detectedFonts.push(font);
       }
     });
-    
-    // Cleanup
-    document.body.removeChild(testDiv);
     
     // Calculate risk based on unique fonts
     let risk: 'low' | 'medium' | 'high' = 'low';
