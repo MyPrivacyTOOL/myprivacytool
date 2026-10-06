@@ -5,11 +5,14 @@ Status: drafts for human review. Nothing here is published, scheduled or live on
 Scope decision (2026-10-06): launch **GitHub only**. Reddit (MPC-116) is parked because Reddit app creation is failing; do not mention Reddit in launch copy until it works. An earlier version of these drafts said MPC-115 had no code; that was wrong. MPC-115 shipped as the `workers/github-channel` Cloudflare Worker (PRs #67, #68).
 
 ## Launch gate (do not publish before these are true)
-1. PR #69 (unlisted `/connect/github` page) merged and deployed, and the manual check from its test plan done: connect, see the profile, disconnect.
-2. Third-party cookie issue fixed: serve the Worker from a `myprivacytool.io` subdomain (e.g. `channels.myprivacytool.io`), update `REDIRECT_URI`, the GitHub OAuth app callback URL and `VITE_GITHUB_CHANNEL_URL`. Without it Safari, Firefox and Chrome with blocked third-party cookies show "Connect GitHub" again after login.
-3. Worker `SUCCESS_REDIRECT` set to the connect page and the Worker redeployed.
-4. `DELETE /channels/github` live-tested (only unit-tested so far).
-5. The `/connect/github` page is linked from somewhere public (it is currently unlisted and noindex).
+Status as of 2026-10-06:
+1. DONE: unlisted `/connect/github` page merged (PR #69) and deployed.
+2. DONE: Worker served from `channels.myprivacytool.io` (PR #84), same-site cookie. Verified live: health, login, profile JSON, "GitHub connected" in Chrome and Safari.
+3. DONE: Worker `SUCCESS_REDIRECT` points at `/connect/github`; GitHub OAuth app has the new redirect URI.
+4. DONE: `DELETE /channels/github` live-tested (disconnect returned the page to "Connect GitHub").
+5. TODO: link `/connect/github` from somewhere public (it is unlisted and noindex today).
+6. TODO: retire the old `workers.dev` address and the old redirect URI (PR #85, manual deploy, then remove the URI in GitHub).
+7. TODO: human review of the copy, fill the placeholders below, then publish.
 
 ## Files
 - `blog-how-it-works.md` — "How it works" blog draft (not in `blogPosts.json`, so it cannot go live by accident).
