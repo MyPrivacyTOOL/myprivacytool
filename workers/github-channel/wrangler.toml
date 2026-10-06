@@ -1,7 +1,11 @@
 name = "myprivacytool-github-channel"
 main = "index.js"
 compatibility_date = "2024-01-01"
-workers_dev = true
+workers_dev = true   # keep the old *.workers.dev address alive until the custom domain is verified, then set to false
+
+# Served from a subdomain of the site so the session cookie is same-site (Safari/Firefox block third-party cookies).
+# `wrangler deploy` creates the DNS record and certificate for a custom_domain route automatically.
+routes = [{ pattern = "channels.myprivacytool.io", custom_domain = true }]
 
 # MPC-115 Phase 1 channel integration: GitHub OAuth (auth code + PKCE) -> encrypted token in Supabase
 # -> PaPIT v1 profile, cached 24h in Workers KV.
@@ -11,10 +15,10 @@ workers_dev = true
 # variables with this file. Placeholder values must be replaced before a real deploy.
 [vars]
 GITHUB_CLIENT_ID = "Ov23liPwVZAmOuXl12Aq"
-REDIRECT_URI = "https://myprivacytool-github-channel.myprivacytool.workers.dev/oauth/github/callback"
+REDIRECT_URI = "https://channels.myprivacytool.io/oauth/github/callback"   # must equal the GitHub OAuth app callback URL
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
 ALLOWED_ORIGIN = "https://www.myprivacytool.io,https://myprivacytool.io"  # SPA origins (comma-separated): CORS + CSRF check
-SUCCESS_REDIRECT = "https://www.myprivacytool.io/?channel=github"  # where the callback sends the browser
+SUCCESS_REDIRECT = "https://www.myprivacytool.io/connect/github"  # where the callback sends the browser
 ENCRYPTION_KEY_VERSION = "1"                       # version that new tokens are encrypted with
 
 # 24h profile cache (MPC-115 decision C). Create with: wrangler kv namespace create PROFILE_CACHE

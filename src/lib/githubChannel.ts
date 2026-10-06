@@ -5,7 +5,7 @@
  */
 export const GITHUB_CHANNEL_URL: string =
   (import.meta.env.VITE_GITHUB_CHANNEL_URL as string | undefined) ??
-  "https://myprivacytool-github-channel.myprivacytool.workers.dev";
+  "https://channels.myprivacytool.io";
 
 export const GITHUB_START_URL = `${GITHUB_CHANNEL_URL}/oauth/github/start`;
 

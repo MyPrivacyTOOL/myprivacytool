@@ -38,7 +38,7 @@ export interface Endpoint {
 export const BASES = {
   leads: "https://mpt-leads.myprivacytool.workers.dev",
   scan: "https://mpt-scan-report.myprivacytool.workers.dev",
-  github: "https://myprivacytool-github-channel.myprivacytool.workers.dev",
+  github: "https://channels.myprivacytool.io",
   oauthPoc: "https://myprivacytool-oauth-poc.myprivacytool.workers.dev",
 } as const;
 
@@ -205,7 +205,7 @@ curl ${BASES.github}/channels/github/profile \\
       { status: "502", description: "GitHub or storage failed.", body: `{ "error": "upstream_error" }` },
     ],
     notes: [
-      "The session cookie is SameSite=None on a workers.dev host, so Safari, Firefox and Chrome with third-party cookies blocked will not send it from myprivacytool.io. A custom domain for the Worker is the planned fix (see docs/channels/github.md).",
+      "The Worker is served from channels.myprivacytool.io, the same site as www.myprivacytool.io, so browsers send its session cookie from the site (Safari and Firefox block it on third-party hosts). Calls from other origins are rejected by CORS (see docs/channels/github.md).",
     ],
   },
   {

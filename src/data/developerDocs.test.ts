@@ -27,7 +27,12 @@ describe("developer docs match the Workers", () => {
     expect(read("workers/scan-report/wrangler.toml")).toContain('name = "mpt-scan-report"');
     expect(read("workers/github-channel/wrangler.toml")).toContain('name = "myprivacytool-github-channel"');
     expect(read("workers/oauth-poc/wrangler.toml")).toContain('name = "myprivacytool-oauth-poc"');
-    for (const base of Object.values(BASES)) expect(base).toMatch(/^https:\/\/[a-z-]+\.myprivacytool\.workers\.dev$/);
+    // The GitHub channel is served from a subdomain of the site (same-site cookies); the others stay on workers.dev.
+    expect(read("workers/github-channel/wrangler.toml")).toContain('pattern = "channels.myprivacytool.io"');
+    for (const [name, base] of Object.entries(BASES)) {
+      if (name === "github") expect(base).toBe("https://channels.myprivacytool.io");
+      else expect(base).toMatch(/^https:\/\/[a-z-]+\.myprivacytool\.workers\.dev$/);
+    }
   });
 
   it("has unique endpoint ids and a response for every endpoint", () => {
