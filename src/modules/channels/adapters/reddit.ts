@@ -11,7 +11,7 @@ export interface RedditActivity {
   submissions: Array<{ subreddit: string; title: string; score: number; createdUtc: number }>;
 }
 
-/** The slice of snoowrap we use — lets tests inject a mock. */
+/** The slice of the Reddit API we use — lets tests inject a mock. */
 export interface RedditClientLike {
   getMe(): PromiseLike<any>;
   getUser(name: string): {
@@ -54,16 +54,26 @@ export class RedditAdapter {
   }
 }
 
-/** Build a real snoowrap client from an OAuth token. Imported lazily (Node-only SDK). */
-export async function createSnoowrapClient(opts: { userAgent: string; clientId: string; clientSecret: string; accessToken?: string; refreshToken?: string }): Promise<RedditClientLike> {
-  const { default: Snoowrap } = await import("snoowrap");
-  const r = new Snoowrap({
-    userAgent: opts.userAgent,
-    clientId: opts.clientId,
-    clientSecret: opts.clientSecret,
-    accessToken: opts.accessToken,
-    refreshToken: opts.refreshToken,
-  } as any);
-  r.config({ requestDelay: 0, continueAfterRatelimitError: false, warnings: false });
-  return r as unknown as RedditClientLike;
+const API = "https://oauth.reddit.com";
+
+/**
+ * Minimal Reddit API client over fetch (replaces the deprecated snoowrap SDK).
+ * Callers must route every call through withRateLimit; the adapter does.
+ */
+export function createRedditClient(opts: { userAgent: string; accessToken: string }): RedditClientLike {
+  const get = async (path: string): Promise<any> => {
+    const res = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${opts.accessToken}`, "User-Agent": opts.userAgent },
+    });
+    if (!res.ok) throw new Error(`Reddit API request failed (${res.status})`); // no body/token in message
+    return res.json();
+  };
+  const listing = async (path: string) => ((await get(path)).data?.children ?? []).map((c: any) => c.data);
+  return {
+    getMe: () => get("/api/v1/me"),
+    getUser: (name: string) => ({
+      getComments: ({ limit }) => listing(`/user/${encodeURIComponent(name)}/comments?limit=${limit}&raw_json=1`),
+      getSubmissions: ({ limit }) => listing(`/user/${encodeURIComponent(name)}/submitted?limit=${limit}&raw_json=1`),
+    }),
+  };
 }

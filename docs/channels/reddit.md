@@ -20,7 +20,7 @@ Extracts behavioral/interest signals from a user's Reddit account and maps them 
 `withRateLimit` (`channels/middleware/rate-limiter.ts`) runs calls strictly sequentially, one start per second (Reddit allows 60/min). Calls queue, never drop; one failure doesn't block the queue. Events log only queue length and wait time.
 
 ## Extraction plan
-`getMe()` → account age/karma; `getUser().getComments({limit:100})`; `getUser().getSubmissions({limit:50})`. Subreddits are ranked by activity count; engagement: <3 lurker, 3–9 occasional, 10–29 active, ≥30 power_user.
+`/api/v1/me` → account age/karma; `/user/{name}/comments?limit=100`; `/user/{name}/submitted?limit=50` via a small fetch client (`createRedditClient`; the deprecated `snoowrap` SDK was dropped). Subreddits are ranked by activity count; engagement: <3 lurker, 3–9 occasional, 10–29 active, ≥30 power_user.
 
 ## Privacy pipeline
 Text is PII-stripped (emails, phones, zips, street addresses, "I live in…" locations, `u/` mentions, the user's own handle), then reduced to ≤5 stopword-filtered keywords per subreddit and ≤20 overall topics. Raw text exists only inside the transformer call.

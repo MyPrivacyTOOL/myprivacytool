@@ -1,4 +1,4 @@
-import { RedditAdapter, createSnoowrapClient, type RedditClientLike } from "@/modules/channels/adapters/reddit";
+import { RedditAdapter, type RedditClientLike } from "@/modules/channels/adapters/reddit";
 import { transformRedditActivity } from "@/modules/papit/transformers/reddit";
 
 /**
@@ -36,4 +36,3 @@ export const GET = createBehaviorHandler({
   getUserId: async () => null,
   getClient: async () => null,
 });
-export { createSnoowrapClient };

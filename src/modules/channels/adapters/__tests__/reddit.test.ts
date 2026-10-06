@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- untyped snoowrap/test payloads */
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { RedditAdapter, type RedditClientLike } from "../reddit";
+import { RedditAdapter, createRedditClient, type RedditClientLike } from "../reddit";
 import { createBehaviorHandler } from "@/app/api/channels/reddit/behavior/route";
 import { generateKeyBase64, importKey, encrypt, decrypt } from "@/modules/storage/encryption";
 import { saveChannelTokens } from "@/modules/channels/token-store";
@@ -18,7 +18,7 @@ const mockClient = (): RedditClientLike => ({
 });
 
 describe("RedditAdapter", () => {
-  it("normalizes snoowrap-shaped responses", async () => {
+  it("normalizes Reddit API responses", async () => {
     const a = await new RedditAdapter(mockClient()).fetchActivity();
     expect(a.username).toBe("tester");
     expect(a.comments[0].subreddit).toBe("privacy");
@@ -70,5 +70,27 @@ describe("token encryption + storage", () => {
     const ct = await encrypt("x", key);
     await expect(decrypt(ct.slice(0, -3) + "AAA", key)).rejects.toBeDefined();
     await expect(importKey(btoa("short"))).rejects.toThrow();
+  });
+});
+
+describe("createRedditClient", () => {
+  it("calls the Reddit API with bearer auth and user agent, unwrapping listings", async () => {
+    const calls: Array<[string, any]> = [];
+    vi.stubGlobal("fetch", async (url: string, init: any) => {
+      calls.push([url, init]);
+      return new Response(JSON.stringify({ data: { children: [{ data: { subreddit: "privacy", body: "x" } }] } }), { status: 200 });
+    });
+    const c = createRedditClient({ userAgent: "UA/1.0", accessToken: "tok" });
+    const comments = await c.getUser("a b").getComments({ limit: 100 });
+    expect(comments).toEqual([{ subreddit: "privacy", body: "x" }]);
+    expect(calls[0][0]).toBe("https://oauth.reddit.com/user/a%20b/comments?limit=100&raw_json=1");
+    expect(calls[0][1].headers).toEqual({ Authorization: "Bearer tok", "User-Agent": "UA/1.0" });
+    vi.unstubAllGlobals();
+  });
+  it("throws a sanitized error on failure", async () => {
+    vi.stubGlobal("fetch", async () => new Response("secret body", { status: 429 }));
+    const c = createRedditClient({ userAgent: "UA", accessToken: "tok" });
+    await expect(c.getMe()).rejects.toThrow("Reddit API request failed (429)");
+    vi.unstubAllGlobals();
   });
 });
