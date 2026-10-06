@@ -75,6 +75,13 @@ describe("smoke-test targets", () => {
     const failed = (await targets.site("https://s", f)).filter((x) => !x.ok).map((x) => x.name);
     expect(failed).toEqual(expect.arrayContaining(["GET /contact -> 200", "GET /start serves the SPA shell", "GET /sitemap.xml -> 200 XML"]));
   });
+  it("site: with expectSha, passes only when /version.json serves that commit", async () => {
+    const mk = (sha) => async (u) => (u.endsWith("sitemap.xml") ? resp(200, { body: "<urlset></urlset>" }) : u.endsWith("version.json") ? resp(200, { json: { sha } }) : resp(200, { body: shell }));
+    const ok = await targets.site("https://s", mk("abc1234"), { expectSha: "abc1234" });
+    expect(ok.every((x) => x.ok)).toBe(true);
+    const stale = (await targets.site("https://s", mk("old9999"), { expectSha: "abc1234" })).filter((x) => !x.ok);
+    expect(stale.map((x) => x.name)).toEqual(["/version.json serves commit abc1234"]);
+  });
   it("mpt-leads: passes against a healthy Worker and only POSTs the healthcheck address", async () => {
     const seen = [];
     const r = await targets["mpt-leads"]("https://w", async (u, o) => { seen.push(o); return leadsOk(u, o); });
@@ -125,6 +132,7 @@ describe("smoke() runner", () => {
   });
   it("parses CLI args", () => {
     expect(parseSmokeArgs(["site", "--base-url", "https://x", "--retries", "2", "--delay-ms", "5"])).toEqual({ target: "site", baseUrl: "https://x", retries: 2, delayMs: 5 });
+    expect(parseSmokeArgs(["site", "--expect-sha", "abc"])).toEqual({ target: "site", expectSha: "abc" });
     expect(() => parseSmokeArgs(["site", "--x"])).toThrow("unknown argument");
   });
   it("CLI exits 1 with ::error:: for a failing target and for bad args", () => {
