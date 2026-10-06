@@ -99,4 +99,12 @@ const call = async (body, e = env) => { const F2 = fake(); globalThis.fetch = F2
 check((await call({ email: 'bad' })).status === 400, 'invalid email => 400');
 check((await call({ email: EMAIL })).status === 400, 'missing consent => 400 (never defaulted)');
 check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submit => 200');
+// MPC-7350: hardening
+{ const mk=(o,body,h={})=>new Request('https://x/api/scan',{method:'POST',headers:{'content-type':'application/json',...(o?{Origin:o}:{}),...h},body});
+  const w=()=>({waitUntil:()=>{}});
+  check((await worker.fetch(mk('https://evil.example',JSON.stringify({email:EMAIL,consent:true})),env,w())).status===403,'foreign browser Origin => 403');
+  check((await worker.fetch(mk('https://myprivacytool.io','{bad'),env,w())).status===400,'bad JSON => 400 (not 500)');
+  check((await worker.fetch(mk('https://myprivacytool.io','[]'),env,w())).status===400,'non-object JSON => 400');
+  check((await worker.fetch(mk('https://myprivacytool.io','{}',{'content-length':'99999'}),env,w())).status===413,'oversized body => 413');
+  check((await worker.fetch(mk('https://myprivacytool.io',JSON.stringify({email:EMAIL,consent:true})),{...env,RATE_LIMITER:{limit:async()=>({success:false})}},w())).status===429,'rate limiter denial => 429'); }
 process.exit(ok ? 0 : 1);

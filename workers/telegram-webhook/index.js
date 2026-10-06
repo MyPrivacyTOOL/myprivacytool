@@ -38,14 +38,14 @@ const CONFIRMED_Y = `✅ *Confirmed.*
 Your full privacy report is being generated now.
 
 👉 Go here to see it and start the removal process:
-https://myprivacytool.com/scan
+https://myprivacytool.io/scan
 
 We'll walk you through every step. It takes about 5 minutes.`;
 
 const CONFIRMED_N = `🔍 *No problem — let's find the right profile.*
 
 Run a fresh scan with your details here:
-https://myprivacytool.com/scan
+https://myprivacytool.io/scan
 
 Takes 30 seconds.`;
 
@@ -100,11 +100,18 @@ async function setConversationState(kv, chatId, state) {
   await kv.put(`tg:${chatId}`, JSON.stringify(state), { expirationTtl: 86400 * 7 }); // 7 days
 }
 
+function constantTimeEqual(a, b) {
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
 export default {
   async fetch(request, env) {
     // Verify secret header (set in Telegram webhook registration)
-    const secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-    if (env.WEBHOOK_SECRET && secret !== env.WEBHOOK_SECRET) {
+    // MPC-7350: fails closed. Previously an unset WEBHOOK_SECRET silently disabled authentication.
+    const secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token") || "";
+    if (!env.WEBHOOK_SECRET || !constantTimeEqual(secret, env.WEBHOOK_SECRET)) {
       return new Response("Unauthorized", { status: 401 });
     }
 
