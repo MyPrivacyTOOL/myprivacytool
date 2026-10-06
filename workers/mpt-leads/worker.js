@@ -259,11 +259,19 @@ export default {
             scored = await enrichAndScore(env, email, country);
             Object.assign(hsProps, scored.props);
           } catch (err) { console.error('Lead scoring error:', String(err)); }
-          const r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ properties: hsProps })
+          const hsHeaders = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
+          let r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+            method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps })
           });
+          // Safety net: if the mpt_lead_* custom properties are not created in HubSpot yet, HubSpot rejects the whole
+          // write with 400 PROPERTY_DOESNT_EXIST. Retry without them so contact sync never regresses.
+          if (r.status === 400 && scored && /mpt_lead_/.test(await r.clone().text())) {
+            console.error('HubSpot missing mpt_lead_* properties; writing contact without score');
+            for (const k of Object.keys(hsProps)) if (k.startsWith('mpt_lead_')) delete hsProps[k];
+            r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+              method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps })
+            });
+          }
           if (r.status === 409) {
             const existing = await r.json();
             const vid = existing?.message?.match(/ID: (\d+)/)?.[1];
