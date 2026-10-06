@@ -27,7 +27,7 @@ Supabase `xmdmkumwxpgahmlweuug`: RLS forced, service_role writes only; pg_cron p
 | Site | repo root (Vite) | Cloudflare Pages auto-build on push to `main`; `postbuild` writes per-route HTML and `sitemap.xml` | `https://www.myprivacytool.io` |
 | `mpt-leads` | `workers/mpt-leads` | `deploy-mpt-leads.yml` on merge | `https://mpt-leads.myprivacytool.workers.dev` |
 | `mpt-scan-report` | `workers/scan-report` | `deploy-scan-report.yml` on merge; cron `*/5 * * * *` | `https://mpt-scan-report.myprivacytool.workers.dev` |
-| `myprivacytool-github-channel` | `workers/github-channel` | `github-channel.yml`: tests on PR/push, deploy on `workflow_dispatch` | `https://myprivacytool-github-channel.myprivacytool.workers.dev` |
+| `myprivacytool-github-channel` | `workers/github-channel` | `deploy-github-channel.yml`: tests on PR/push, deploy on `workflow_dispatch` | `https://channels.myprivacytool.io` (custom domain; `*.workers.dev` retired) |
 | `myprivacytool-oauth-poc` | `workers/oauth-poc` | `deploy-oauth-poc.yml` on merge | `https://myprivacytool-oauth-poc.myprivacytool.workers.dev` |
 | `telegram-webhook`, `webhook-receiver` | `workers/*` | not deployed (the second never was) | — |
 | Database | `supabase/migrations`, `supabase/sql` | applied by a human or connector; **a merge does not apply them** | project `xmdmkumwxpgahmlweuug` |
