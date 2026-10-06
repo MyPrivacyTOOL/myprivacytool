@@ -17,8 +17,9 @@ test.describe("/contact", () => {
     await fill(page);
     await page.getByRole("button", { name: /send message/i }).click();
 
-    await expect(page.getByText("Message sent")).toBeVisible();
-    await expect(page.getByText(/Thanks, Grace/)).toBeVisible();
+    // MPC-7400: a successful submit redirects to /thank-you with the contact copy.
+    await expect(page).toHaveURL(/\/thank-you\?source=contact/);
+    await expect(page.getByRole("heading", { name: "Message sent." })).toBeVisible();
     expect(net.captured.hubspot).toHaveLength(1);
     expect(net.captured.hubspot[0].url).toContain("/submit/246502821/e2e-contact-form");
     const fields = Object.fromEntries(net.captured.hubspot[0].body.fields.map((f) => [f.name, f.value]));
@@ -32,12 +33,12 @@ test.describe("/contact", () => {
   test("required fields and consent gate the submit", async ({ page, net }) => {
     await page.goto("/contact");
     await page.getByRole("button", { name: /send message/i }).click();
-    await expect(page.getByText("Message sent")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/thank-you/);
     await page.getByLabel("Name", { exact: true }).fill("A B");
     await page.getByLabel("Email", { exact: true }).fill("a@b.co");
     await page.getByLabel("Message").fill("hi");
     await page.getByRole("button", { name: /send message/i }).click(); // still no consent
-    await expect(page.getByText("Message sent")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/thank-you/);
     expect(net.captured.hubspot).toHaveLength(0);
   });
 
