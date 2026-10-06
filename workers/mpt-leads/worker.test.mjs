@@ -42,4 +42,17 @@ r=await run({email:'base@line.co',riskScore:25}); check(r.json.baseline?.is_firs
 r=await run({email:'z@z.co'}); check(!('baseline' in r.json)&&bl().length===0,'no riskScore => no baseline write');
 r=await run({email:'z@z.co',riskScore:140}); check(!('baseline' in r.json)&&bl().length===0,'out-of-range score => no baseline write');
 r=await run({email:'z@z.co',riskScore:30},{...env,SUPABASE_SERVICE_ROLE_KEY:undefined}); check(r.status===200&&!('baseline' in r.json),'missing key => lead still succeeds, no baseline');
+// MPC-7350: security hardening
+const raw=async(body,{origin='https://myprivacytool.io',headers={},e=env}={})=>{ calls=[]; const waits=[]; const h={'content-type':'application/json',...headers}; if(origin) h.Origin=origin;
+  const res=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:h,body:typeof body==='string'?body:JSON.stringify(body)}),e,{waitUntil:p=>waits.push(p)}); await Promise.all(waits); return {status:res.status, json:await res.json(), cors:res.headers.get('access-control-allow-origin')}; };
+r=await raw({email:'a@b.co'},{origin:'https://evil.example'}); check(r.status===403&&calls.length===0,'foreign browser Origin => 403, nothing written');
+r=await raw({email:'not-an-email'}); check(r.status===400,'malformed email => 400');
+r=await raw({email:'a@b.co'.padEnd(400,'x')+'.com'}); check(r.status===400,'oversized email => 400');
+r=await raw('{not json'); check(r.status===400&&!JSON.stringify(r.json).includes('JSON'),'bad JSON => generic 400, no parser detail');
+r=await raw({email:'a@b.co'},{headers:{'content-length':'999999'}}); check(r.status===413,'oversized body => 413');
+notionFail=true; r=await raw({email:'n@f.co'}); notionFail=false; check(r.status===500&&!('detail' in r.json),'Notion failure does not leak upstream detail');
+const limited={...env,RATE_LIMITER:{limit:async()=>({success:false})}}; r=await raw({email:'a@b.co'},{e:limited}); check(r.status===429,'rate limiter denial => 429');
+const brokenRl={...env,RATE_LIMITER:{limit:async()=>{throw new Error('x')}}}; r=await raw({email:'a@b.co'},{e:brokenRl}); check(r.status===200,'rate limiter error fails open');
+await raw({email:'a@b.co',name:'<b>x</b> & <https://evil|click>'}); const slack=calls.find(c=>c.url.includes('slack.com')); check(slack&&!/<b>|<https:/.test(JSON.parse(slack.body).text.split('\n').filter(l=>l.startsWith('Name:')).join('')),'Slack text escapes user-supplied < > &');
+r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.find(c=>c.url.includes('api.notion.com/v1/pages')); check(r.status===200&&!JSON.parse(nb.body).properties.Referrer,'non-http(s) referrer dropped');
 process.exit(ok?0:1);

@@ -9,6 +9,11 @@ const MAX_ATTEMPTS = 5;
 const STALE_CLAIM_MS = 15 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const clip = (v, n) => String(v ?? '').slice(0, n);
+// Per-IP limit (wrangler.toml [[ratelimits]]); fails open if the binding is absent or errors.
+async function rateLimited(env, request) {
+  if (!env.RATE_LIMITER) return false;
+  try { return !(await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' })).success; } catch { return false; }
+}
 
 // gmail "+tag" and dots are ignored when matching the allowlist.
 const norm = (e) => { const [l, d] = String(e).toLowerCase().split('@'); return d === 'gmail.com' ? `${l.split('+')[0].replace(/\./g, '')}@${d}` : `${l}@${d}`; };
@@ -22,14 +27,20 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const cors = {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-      'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin',
     };
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
+    // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
+    if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
+    if (Number(request.headers.get('content-length') || 0) > 8 * 1024) return json({ error: 'Payload too large' }, 413);
+    if (await rateLimited(env, request)) return json({ error: 'Too many requests' }, 429);
     try {
-      const b = await request.json();
+      let b;
+      try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+      if (!b || typeof b !== 'object' || Array.isArray(b)) return json({ error: 'Invalid request' }, 400);
       const email = clip(b.email, 255).trim().toLowerCase();
       if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
