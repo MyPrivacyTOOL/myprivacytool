@@ -7,7 +7,7 @@ Worker: `workers/oauth-poc` · Base URL: `https://myprivacytool-oauth-poc.mypriv
 | Field | Value |
 |---|---|
 | Goal | Turn the verified Google PoC into a session, token-validation and permission-scoping API that links to Supabase auth users, with tests and a written contract. |
-| Scope | `workers/oauth-poc/`, `supabase/migrations/20261006130000_oauth_find_auth_user.sql`, this doc. No change to the probe flow's response shape. No provider other than Google. |
+| Scope | `workers/oauth-poc/`, `supabase/migrations/20261006140000_oauth_find_auth_user.sql`, this doc. No change to the probe flow's response shape. No provider other than Google. |
 | Out of scope | Installing `SUPABASE_SERVICE_ROLE_KEY` on the Worker or any key rotation (MPC-6950); Microsoft/GitHub/Slack adapters (tracked in the MPC-6960 follow-up task); the agent cutover (MPC-6965). |
 | Acceptance criteria | (1) `/v1/session` validates a signed session and rejects forged, expired, malformed and wrong-type cookies. (2) Session creation refuses a token with a wrong audience, an unverified email or no email scope, and always revokes MPT's Google token. (3) Scopes are enforced: `/v1/grants` answers 403 `insufficient_scope` for a session without `grants:read`. (4) A verified email links to a confirmed `auth.users` row through a service_role-only function, and sign-in still works when the link is unavailable. (5) 25 tests pass (`node --test workers/oauth-poc/oauth.test.mjs workers/oauth-poc/api.test.mjs`). (6) The contract below matches the code. |
 | Rollback plan | Revert the PR; the Worker redeploys the previous code on merge to `main`. The probe routes are unchanged, so nothing depends on the new routes. If the migration was applied: `drop function if exists public.mpt_find_auth_user_by_email(text);`. Sessions are stateless: to invalidate every issued session at once, rotate `STATE_SIGNING_KEY`. |
@@ -78,7 +78,7 @@ Scope-gated example of permission scoping. `401 {error:"unauthenticated"}`; `403
 
 ## Supabase link
 
-`public.mpt_find_auth_user_by_email(p_email)` (migration `20261006130000_oauth_find_auth_user.sql`): returns the id of a **confirmed, non-deleted** `auth.users` row matching the email case-insensitively, else `NULL`. `SECURITY DEFINER`, empty `search_path`, `EXECUTE` for `service_role` only, so `anon` and `authenticated` cannot use it to probe which emails have accounts. The Worker only reads; it never creates or edits auth users. Verified locally against a scratch Postgres 16 with a stubbed `auth.users` (case-insensitive match, unconfirmed and deleted rows ignored, `anon`/`authenticated` denied). **Not applied to the live project.**
+`public.mpt_find_auth_user_by_email(p_email)` (migration `20261006140000_oauth_find_auth_user.sql`): returns the id of a **confirmed, non-deleted** `auth.users` row matching the email case-insensitively, else `NULL`. `SECURITY DEFINER`, empty `search_path`, `EXECUTE` for `service_role` only, so `anon` and `authenticated` cannot use it to probe which emails have accounts. The Worker only reads; it never creates or edits auth users. Verified locally against a scratch Postgres 16 with a stubbed `auth.users` (case-insensitive match, unconfirmed and deleted rows ignored, `anon`/`authenticated` denied). **Not applied to the live project.**
 
 ## Known limits
 

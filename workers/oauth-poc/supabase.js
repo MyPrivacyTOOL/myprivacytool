@@ -2,7 +2,7 @@
  * MPC-6971 — link an OAuth identity to an existing Supabase auth user.
  *
  * Reads only: calls the SECURITY DEFINER function public.mpt_find_auth_user_by_email (see
- * supabase/migrations/20261006130000_oauth_find_auth_user.sql) with the service_role key. It returns the user's
+ * supabase/migrations/20261006140000_oauth_find_auth_user.sql) with the service_role key. It returns the user's
  * id when a *confirmed* auth.users row has that email, else null. The Worker never creates or edits auth users.
  *
  * Optional: with SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY unset the link state is 'not_configured' and sign-in

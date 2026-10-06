@@ -18,7 +18,10 @@ create table auth.users (
   instance_id uuid,
   aud text,
   role text,
-  email text
+  email text,
+  created_at timestamptz not null default now(),
+  email_confirmed_at timestamptz,
+  deleted_at timestamptz
 );
 create function auth.uid() returns uuid language sql stable as
   $$ select nullif(coalesce(current_setting('request.jwt.claim.sub', true), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')), '')::uuid $$;
