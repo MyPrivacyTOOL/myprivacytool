@@ -10,6 +10,7 @@ import Report from "./pages/Report";
 import Business from "./pages/Business";
 import Start from "./pages/Start";
 import AIAccessCheck from "./pages/AIAccessCheck";
+import ThankYou from "./pages/ThankYou";
 import Newsletter from "./pages/Newsletter";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -46,6 +47,7 @@ const App = () => (
             {/* Lead capture */}
             <Route path="/newsletter" element={<Newsletter />} />
             <Route path="/ai-access-check" element={<AIAccessCheck />} />
+            <Route path="/thank-you" element={<ThankYou />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />

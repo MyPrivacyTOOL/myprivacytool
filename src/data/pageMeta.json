@@ -67,5 +67,10 @@
   "/faq": {
     "title": "FAQ | MyPrivacyTOOL",
     "description": "Answers about MyPrivacyTOOL: how the scan works, what stays in your browser, which third parties are contacted and how to reach us."
+  },
+  "/thank-you": {
+    "title": "Thank You",
+    "description": "Thanks for signing up. Here is what happens next and where to go in the meantime.",
+    "noindex": true
   }
 }
