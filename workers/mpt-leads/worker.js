@@ -1,3 +1,20 @@
+// MPC-7350 input hardening helpers.
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+const MAX_BODY_BYTES = 16 * 1024;
+const clip = (v, n) => (typeof v === 'string' ? v : v == null ? '' : String(v)).slice(0, n);
+// Slack mrkdwn control characters (&, <, >) must be escaped so user text cannot inject links or mentions.
+const slackEsc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const htmlEsc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[ratelimits]]). Fails open if the
+// binding is absent or errors so a platform hiccup never drops a real lead.
+async function rateLimited(env, request) {
+  if (!env.RATE_LIMITER) return false;
+  try {
+    const { success } = await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
+    return !success;
+  } catch (_) { return false; }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const allow = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -8,7 +25,12 @@ export default {
       'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
     };
+    const reject = (status, error) => new Response(JSON.stringify({ error }), {
+      status, headers: { ...cors, 'Content-Type': 'application/json' }
+    });
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: cors });
@@ -16,6 +38,11 @@ export default {
     if (request.method !== 'POST') {
       return new Response('Not found', { status: 404 });
     }
+    // MPC-7350: a browser request from any other site is refused (no cross-site form posts / spam).
+    // Requests with no Origin header (server-to-server, curl) are still handled and rate limited below.
+    if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
+    if (Number(request.headers.get('content-length') || 0) > MAX_BODY_BYTES) return reject(413, 'Payload too large');
+    if (await rateLimited(env, request)) return reject(429, 'Too many requests');
 
     try {
       let name = '', email = '', phone = '';
@@ -42,11 +69,16 @@ export default {
         referrer = fd.get('referrer') || '';
         consentRaw = fd.get('consent'); consentSourceRaw = fd.get('consent_source') || ''; sourceRaw = fd.get('source') || '';
       }
+      // MPC-7350: strings only, bounded lengths (Notion/HubSpot/Slack get nothing unbounded).
+      email = String(email).trim(); name = clip(name, 100).trim(); phone = clip(phone, 32).trim();
+      utm_source = clip(utm_source, 100); utm_medium = clip(utm_medium, 100);
+      utm_campaign = clip(utm_campaign, 100); utm_content = clip(utm_content, 100);
+      referrer = /^https?:\/\//i.test(String(referrer)) ? clip(referrer, 500) : '';
       // MPC-6971: record consent only when the client explicitly says the user gave it. Never default to true.
       const consented = consentRaw === true || consentRaw === 'true' || consentRaw === 'on';
       const consentSource = String(consentSourceRaw || sourceRaw || 'landing_page').replace(/[^a-z0-9_-]/gi, '').slice(0, 64) || 'landing_page';
 
-      if (!email) {
+      if (email.length > 254 || !EMAIL_RE.test(email)) {
         return new Response(JSON.stringify({ error: 'Email required' }), {
           status: 400, headers: { ...cors, 'Content-Type': 'application/json' }
         });
@@ -66,7 +98,7 @@ export default {
       const ua = request.headers.get('user-agent') || '';
       const { browser, os, device } = parseUserAgent(ua);
 
-      const firstName = name ? name.split(' ')[0] : 'there';
+      const firstName = name ? name.split(' ')[0] : 'there';   // raw: HubSpot/Slack paths; email body uses htmlEsc below
 
       // MPC-7120: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement)
       // BEFORE the Notion write and independent of it: a Notion failure must never block the engagement row.
@@ -110,8 +142,8 @@ export default {
 
       if (!nr.ok) {
         const e = await nr.text();
-        console.error('Notion error:', e);
-        return new Response(JSON.stringify({ error: 'Save failed', detail: e }), {
+        console.error('Notion error:', nr.status, e.slice(0, 200));
+        return new Response(JSON.stringify({ error: 'Save failed' }), {
           status: 500, headers: { ...cors, 'Content-Type': 'application/json' }
         });
       }
@@ -176,16 +208,16 @@ export default {
           `${hktTime.fullDate} > ${hktTime.time} HKT`,
           `Total Leads: ${totalLeads}`,
           ``,
-          `Name: ${name || '(not given)'}`,
-          `Email: ${email}`,
-          phone ? `Phone: ${phone}` : null,
+          `Name: ${slackEsc(name) || '(not given)'}`,
+          `Email: ${slackEsc(email)}`,
+          phone ? `Phone: ${slackEsc(phone)}` : null,
           ``,
           `IP: ${ip || '—'} | ${city || '—'}, ${country || '—'}`,
           `Browser: ${browser || '—'} | OS: ${os || '—'} | Device: ${device || '—'}`,
           ``,
-          `Other Info: ${otherInfo}`,
-          `Where they came from ${source}`,
-          `Campaign ${utm_campaign || '—'}`,
+          `Other Info: ${slackEsc(otherInfo)}`,
+          `Where they came from ${slackEsc(source)}`,
+          `Campaign ${slackEsc(utm_campaign) || '—'}`,
           ``,
           `<${notionDbUrl}|Open Notion Leads DB>`,
         ].filter(l => l !== null).join('\n');
@@ -238,7 +270,7 @@ export default {
       // 5. Confirmation email via Resend
       // MPC-6677: when the scan-report Worker owns confirmations, skip this one (no duplicate senders).
       if (env.RESEND_API_KEY && env.CONFIRMATION_OWNER !== 'scan-report') {
-        const emailHtml = buildConfirmationEmail(firstName, source);
+        const emailHtml = buildConfirmationEmail(htmlEsc(firstName), source);
         side.push(
           fetch('https://api.resend.com/emails', {
             method: 'POST',
@@ -246,7 +278,7 @@ export default {
             body: JSON.stringify({
               from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
               to: [email],
-              subject: `${firstName}, your privacy scan is being prepared`,
+              subject: `${firstName.replace(/[\r\n]/g, ' ')}, your privacy scan is being prepared`,
               html: emailHtml,
             })
           }).catch(() => {})
@@ -260,8 +292,10 @@ export default {
       });
 
     } catch (e) {
-      return new Response(JSON.stringify({ error: e.message }), {
-        status: 500, headers: { ...cors, 'Content-Type': 'application/json' }
+      console.error('mpt-leads error:', String(e));
+      const bad = e instanceof SyntaxError || e instanceof TypeError;   // unparsable JSON / form body
+      return new Response(JSON.stringify({ error: bad ? 'Invalid request' : 'Internal error' }), {
+        status: bad ? 400 : 500, headers: { ...cors, 'Content-Type': 'application/json' }
       });
     }
   }

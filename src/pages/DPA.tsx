@@ -1,480 +1,183 @@
+import { Link } from "react-router-dom";
 import Seo from "@/components/Seo";
+
+// MPC-6545: plain-language summary of how MyPrivacyTOOL processes personal data as a processor.
+// Sub-processors below are the services the repo actually calls (workers/, src/lib/, index.html).
+// Keep this list and Privacy.tsx section 5 in sync, and add a provider here BEFORE wiring it in.
+const SUB_PROCESSORS = [
+  { name: "Cloudflare", purpose: "Site hosting (Pages), edge Workers that receive forms and run the scan report" },
+  { name: "Supabase", purpose: "Database for lead, scan-summary and engagement records" },
+  { name: "HubSpot", purpose: "CRM for newsletter, waitlist and business enquiries; marketing email" },
+  { name: "Resend", purpose: "Transactional email (for example the scan summary you request)" },
+  { name: "Notion", purpose: "Internal task and lead log used by our team" },
+  { name: "Slack", purpose: "Internal notifications when a new lead or enquiry arrives" },
+  { name: "Telegram", purpose: "Messaging channel, only if you choose to talk to us there" },
+  { name: "Google (Analytics 4, Cloud APIs)", purpose: "Usage analytics (after consent) and Google-hosted services we use" },
+  { name: "Consentmanager", purpose: "Cookie consent banner and consent records" },
+];
 
 const DPA = () => {
   return (
     <>
-      <Seo title="Data Processing Agreement | MyPrivacyTOOL" description="MyPrivacyTOOL Data Processing Agreement (DPA) for organizations and B2B customers." />
+      <Seo
+        title="Data Processing Agreement Summary | MyPrivacyTOOL"
+        description="Plain-language summary of how MyPrivacyTOOL processes personal data on behalf of business customers: roles, sub-processors, security, transfers and deletion."
+        path="/dpa"
+      />
       <main className="min-h-screen bg-background">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">
             <h1 className="mb-2 text-4xl font-bold text-foreground">
-              Data Processing Agreement (DPA)
+              Data Processing Agreement: Summary
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              For B2B customers and organizations subject to GDPR
+              For business customers and organisations subject to GDPR, UK GDPR, PDPO or PDPA
             </p>
 
             <div className="mb-8 rounded-lg bg-muted p-6">
               <p className="text-muted-foreground">
-                This Data Processing Agreement (DPA) is applicable to B2B customers
-                and organizations that use MyPrivacyTOOL's services and are subject
-                to the General Data Protection Regulation (GDPR) or similar data
-                protection laws.
+                This page summarises how MyPrivacyTOOL Ltd handles personal data
+                when a business uses our services. It is a summary, not a signed
+                contract. If your organisation needs a countersigned Data
+                Processing Agreement (DPA) with Standard Contractual Clauses,
+                email{" "}
+                <a
+                  href="mailto:privacy@myprivacytool.io"
+                  className="text-brand underline hover:text-foreground"
+                >
+                  privacy@myprivacytool.io
+                </a>{" "}
+                and we will send one. It sits alongside our{" "}
+                <Link to="/terms" className="text-brand underline hover:text-foreground">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" className="text-brand underline hover:text-foreground">
+                  Privacy Policy
+                </Link>
+                .
               </p>
-              <p className="mt-4 text-muted-foreground">
-                This agreement is supplementary to our Terms of Service and
-                Privacy Policy.
+              <p className="mt-4 text-sm text-muted-foreground">
+                Last updated: October 2026. Template summary; not legal advice.
               </p>
             </div>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                1. Definitions
-              </h2>
-              <p className="text-muted-foreground">For the purposes of this DPA:</p>
-              <ul className="list-inside list-disc space-y-3 text-muted-foreground mt-4">
+              <h2 className="text-2xl font-bold text-foreground">1. Roles</h2>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
-                  <strong>Controller:</strong> The organization that determines the
-                  purposes and means of processing personal data (you, as the
-                  customer)
+                  <strong>Individuals using the free scan or joining the waitlist:</strong>{" "}
+                  MyPrivacyTOOL Ltd is the controller. See the Privacy Policy.
                 </li>
                 <li>
-                  <strong>Processor:</strong> MyPrivacyTOOL, which processes personal
-                  data on behalf of the Controller
-                </li>
-                <li>
-                  <strong>Data Subject:</strong> The individual to whom the personal
-                  data relates
-                </li>
-                <li>
-                  <strong>Personal Data:</strong> Any information relating to an
-                  identified or identifiable natural person
-                </li>
-                <li>
-                  <strong>Processing:</strong> Any operation performed on personal
-                  data (collection, storage, use, transmission, deletion, etc.)
-                </li>
-                <li>
-                  <strong>Sub-processor:</strong> Any entity engaged by MyPrivacyTOOL
-                  to process personal data on our behalf
+                  <strong>Business customers (for example employee privacy checks):</strong>{" "}
+                  you are the controller and MyPrivacyTOOL Ltd is your processor for
+                  the personal data you ask us to process.
                 </li>
               </ul>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                2. Scope & Applicability
-              </h2>
-              <p className="text-muted-foreground">
-                This DPA applies to the extent that MyPrivacyTOOL processes personal
-                data on your behalf as a data processor under:
-              </p>
+              <h2 className="text-2xl font-bold text-foreground">2. What we process on your behalf</h2>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  The European Union General Data Protection Regulation (GDPR)
-                </li>
-                <li>The UK Data Protection Act 2018</li>
-                <li>The California Consumer Privacy Act (CCPA)</li>
-                <li>Hong Kong Personal Data (Privacy) Ordinance (PDPO)</li>
-                <li>Singapore Personal Data Protection Act (PDPA)</li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                3. Your Responsibilities as Controller
-              </h2>
-              <p className="text-muted-foreground">
-                As the data controller, you are responsible for:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  Determining the purposes and means of processing personal data
-                </li>
-                <li>
-                  Obtaining lawful basis for processing (consent, contract,
-                  legitimate interest, etc.)
-                </li>
-                <li>
-                  Ensuring that data subjects are notified about how their data is
-                  processed
-                </li>
-                <li>Honoring data subjects' rights (access, deletion, portability)</li>
-                <li>Maintaining records of processing activities</li>
-                <li>
-                  Conducting Data Protection Impact Assessments (DPIA) where
-                  necessary
-                </li>
-                <li>
-                  Ensuring that sub-processors comply with data protection laws
-                </li>
-                <li>
-                  Ensuring that third-party contractors and sub-processors sign
-                  equivalent data processing agreements
-                </li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                4. MyPrivacyTOOL's Responsibilities as Processor
-              </h2>
-              <p className="text-muted-foreground">
-                As a data processor, MyPrivacyTOOL commits to:
-              </p>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.1 Processing Only as Directed
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL will process personal data only in accordance with
-                your written instructions, unless processing is required by
-                applicable law or regulation.
-              </p>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.2 Personnel Confidentiality
-              </h3>
-              <p className="text-muted-foreground">
-                All MyPrivacyTOOL employees and contractors who have access to
-                personal data are bound by written confidentiality obligations.
-              </p>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.3 Data Security
-              </h3>
-              <p className="text-muted-foreground">
-                We implement appropriate technical and organizational security
-                measures to protect personal data, including:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>Encryption of data in transit and at rest</li>
-                <li>
-                  Role-based access control and authentication mechanisms
-                </li>
-                <li>Regular security audits and penetration testing</li>
-                <li>Employee data protection training</li>
-                <li>Incident response and breach notification procedures</li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.4 Sub-processors
-              </h3>
-              <p className="text-muted-foreground">
-                We may engage sub-processors for specific functions (e.g., cloud
-                hosting, analytics, payment processing). We maintain a list of
-                current sub-processors and notify you of any changes.
-              </p>
-              <p className="mt-4 text-muted-foreground">
-                You have the right to object to any new sub-processor. We will
-                provide at least 30 days' notice before engaging a new
-                sub-processor.
-              </p>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.5 Data Subject Rights
-              </h3>
-              <p className="text-muted-foreground">
-                Upon your request, we will assist you in fulfilling data subjects'
-                rights, including:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>Right of access (GDPR Article 15)</li>
-                <li>Right to rectification (GDPR Article 16)</li>
-                <li>Right to erasure (GDPR Article 17)</li>
-                <li>Right to restrict processing (GDPR Article 18)</li>
-                <li>Right to data portability (GDPR Article 20)</li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.6 Assistance with Compliance
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL will assist you with:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>Conducting Data Protection Impact Assessments (DPIA)</li>
-                <li>Responding to data subject requests</li>
-                <li>Notifying authorities in case of data breaches</li>
-                <li>
-                  Providing documentation and evidence of our compliance with
-                  applicable law
-                </li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                4.7 Auditing & Monitoring
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL will maintain records of processing activities and
-                provide you with reasonable access to information necessary to
-                verify our compliance with this DPA.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                5. Data Transfers
-              </h2>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                5.1 International Data Transfers
-              </h3>
-              <p className="text-muted-foreground">
-                Personal data may be transferred to and processed in countries
-                outside the EEA, UK, or your jurisdiction. We ensure such transfers
-                are lawful by implementing:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>Standard Contractual Clauses (SCCs)</li>
-                <li>Binding Corporate Rules (BCRs)</li>
-                <li>Adequacy decisions issued by regulators</li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                5.2 Transfers to Sub-processors
-              </h3>
-              <p className="text-muted-foreground">
-                When we engage sub-processors in third countries, we ensure they
-                are subject to appropriate safeguards and that equivalent data
-                processing agreements are in place.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                6. Data Breach Notification
-              </h2>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                6.1 Breach Response
-              </h3>
-              <p className="text-muted-foreground">
-                In the event of a personal data breach, MyPrivacyTOOL will:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  Notify you without undue delay (within 48 hours of discovering
-                  the breach)
-                </li>
-                <li>Provide details of the breach (what data, when, who)</li>
-                <li>
-                  Assist you in notifying affected data subjects and relevant
-                  authorities
-                </li>
-                <li>Cooperate with investigations and remediation efforts</li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                6.2 Cooperation
-              </h3>
-              <p className="text-muted-foreground">
-                You are responsible for notifying affected individuals and
-                regulatory authorities. We will provide all necessary assistance.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                7. Data Retention & Deletion
-              </h2>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                7.1 Retention Period
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL will retain personal data only for as long as
-                necessary to provide the services. Unless you specify a different
-                retention period:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  We retain data for the duration of your subscription plus 30 days
-                </li>
-                <li>
-                  After the retention period, data is deleted or anonymized
-                </li>
-                <li>
-                  Exceptions: data retained to comply with legal obligations
-                </li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                7.2 Deletion Upon Request
-              </h3>
-              <p className="text-muted-foreground">
-                Upon your request or termination of our agreement, we will delete
-                or return all personal data, except where retention is required by
-                law.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                8. Audit & Verification
-              </h2>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                8.1 Audit Rights
-              </h3>
-              <p className="text-muted-foreground">
-                You have the right to audit our processing of your personal data.
-                We will:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  Provide evidence of our compliance with this DPA upon request
-                </li>
-                <li>Allow you to conduct an audit, with reasonable notice</li>
-                <li>
-                  Provide access to relevant systems and documentation (subject to
-                  confidentiality and security constraints)
-                </li>
-              </ul>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                8.2 Certification
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL maintains industry certifications and standards,
-                including:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>ISO 27001 (Information Security Management)</li>
-                <li>SOC 2 Type II (Security and Availability)</li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                9. Liability & Limitation
-              </h2>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                9.1 Liability Caps
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL's liability for data processing violations is limited
-                to the amount you paid for the services in the 12 months preceding
-                the claim.
-              </p>
-
-              <h3 className="mt-6 text-xl font-semibold text-foreground">
-                9.2 Indemnification
-              </h3>
-              <p className="text-muted-foreground">
-                You indemnify MyPrivacyTOOL against claims arising from your
-                processing instructions, use of the services in violation of law,
-                or failure to comply with your own data protection obligations.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                10. Amendments & Updates
-              </h2>
-              <p className="text-muted-foreground">
-                We may amend this DPA to reflect changes in law or our practices.
-                We will notify you of material changes 30 days in advance. Your
-                continued use of the services constitutes acceptance of the updated
-                DPA.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                11. Termination
-              </h2>
-              <p className="text-muted-foreground">
-                This DPA terminates when your service agreement with MyPrivacyTOOL
-                ends. Upon termination:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>We will delete or return your personal data</li>
-                <li>We will cease all processing of your data</li>
-                <li>
-                  Exceptions: where we are legally required to retain the data
-                </li>
-              </ul>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                12. Sub-processors List
-              </h2>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL currently uses the following sub-processors:
-              </p>
-              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
-                <li>
-                  <strong>Amazon Web Services (AWS):</strong> Cloud hosting and data
-                  storage
-                </li>
-                <li>
-                  <strong>Stripe:</strong> Payment processing and billing
-                </li>
-                <li>
-                  <strong>Google Analytics:</strong> Website analytics and
-                  performance monitoring
-                </li>
-                <li>
-                  <strong>SendGrid:</strong> Email delivery and notifications
-                </li>
-                <li>
-                  <strong>Auth0:</strong> Identity and access management
-                </li>
+                <li>Contact details you or your people give us (name, work email, optional mobile number)</li>
+                <li>The email addresses and social handles you ask us to check, and the resulting exposure summary</li>
+                <li>Technical data from the scan: device type, browser, approximate location from IP address</li>
+                <li>Records of consent and of the campaign or page a sign-up came from</li>
               </ul>
               <p className="mt-4 text-muted-foreground">
-                A complete and current list of sub-processors is available at{" "}
-                <a
-                  href="/sub-processors"
-                  className="text-brand underline hover:text-foreground"
-                >
-                  /sub-processors
-                </a>
-                .
+                We process this only to provide the service you asked for, on your
+                documented instructions, and not to sell it or build advertising profiles.
+                Much of the device scan runs in the visitor&rsquo;s own browser; what is sent to
+                our servers is described in the Privacy Policy.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">
-                13. Contact & Inquiries
-              </h2>
+              <h2 className="text-2xl font-bold text-foreground">3. Our commitments as processor</h2>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
+                <li>Process personal data only on your documented instructions, unless the law requires otherwise</li>
+                <li>Keep access limited to people who need it and who are bound by confidentiality</li>
+                <li>Use appropriate technical and organisational measures. Data is encrypted in transit (HTTPS); access to our systems is restricted by credentials held by our team</li>
+                <li>Help you answer data-subject requests (access, correction, deletion, objection) within a reasonable time</li>
+                <li>Tell you without undue delay, and within 72 hours where we can, after confirming a personal data breach affecting your data</li>
+                <li>Impose data protection terms on sub-processors and stay responsible for them</li>
+                <li>Make available the information reasonably needed to show compliance, and allow reasonable audits on notice</li>
+              </ul>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">4. Sub-processors</h2>
               <p className="text-muted-foreground">
-                For questions about this DPA or to discuss your data processing
-                requirements:
+                These providers may handle personal data for us. We update this list
+                before adding a new one that touches customer personal data, and
+                business customers on a signed DPA can object to a change.
               </p>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm text-muted-foreground">
+                  <thead>
+                    <tr className="border-b border-border text-foreground">
+                      <th className="py-2 pr-4 font-semibold">Provider</th>
+                      <th className="py-2 font-semibold">What it does for us</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {SUB_PROCESSORS.map((sp) => (
+                      <tr key={sp.name} className="border-b border-border/60 align-top">
+                        <td className="py-2 pr-4 font-medium text-foreground">{sp.name}</td>
+                        <td className="py-2">{sp.purpose}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-4 text-muted-foreground">
+                We will add a payment provider (planned: Stripe) here before paid
+                plans go live.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">5. International transfers</h2>
+              <p className="text-muted-foreground">
+                We are based in Hong Kong and our providers operate globally, so
+                personal data may be processed outside your country, including in
+                the United States and the EU/EEA. Where GDPR or UK GDPR applies, we
+                rely on Standard Contractual Clauses or the UK Addendum, or another
+                lawful transfer mechanism, and on equivalent terms with our sub-processors.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">6. Retention and deletion</h2>
+              <p className="text-muted-foreground">
+                Retention periods are set out in section 6 of the{" "}
+                <Link to="/privacy" className="text-brand underline hover:text-foreground">
+                  Privacy Policy
+                </Link>
+                . When a business customer relationship ends, or on your written
+                request, we delete or return the personal data we hold for you, except
+                where the law requires us to keep it.
+              </p>
+            </section>
+
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold text-foreground">7. Contact</h2>
               <div className="mt-4 space-y-2 text-muted-foreground">
                 <p>
                   <strong>Email:</strong>{" "}
                   <a
-                    href="mailto:legal@myprivacytool.io"
+                    href="mailto:privacy@myprivacytool.io"
                     className="text-brand underline hover:text-foreground"
                   >
-                    legal@myprivacytool.io
+                    privacy@myprivacytool.io
                   </a>
                 </p>
                 <p>
-                  <strong>Data Protection Officer:</strong>{" "}
-                  <a
-                    href="mailto:dpo@myprivacytool.io"
-                    className="text-brand underline hover:text-foreground"
-                  >
-                    dpo@myprivacytool.io
-                  </a>
+                  <strong>Company:</strong> MyPrivacyTOOL Ltd, 12E, Block 5, 8 Pak Lai
+                  Road, Park Island, Ma Wan, Tsuen Wan District, New Territories, Hong Kong
                 </p>
               </div>
-            </section>
-
-            <section className="mb-12 rounded-lg bg-muted p-6">
-              <h3 className="mb-4 text-lg font-semibold text-foreground">
-                Commitment to Data Protection
-              </h3>
-              <p className="text-muted-foreground">
-                MyPrivacyTOOL is committed to protecting the personal data we
-                process on your behalf. This DPA reflects our adherence to the
-                highest standards of data protection and privacy compliance.
-              </p>
             </section>
           </div>
         </div>

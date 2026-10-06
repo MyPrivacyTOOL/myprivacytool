@@ -1,7 +1,11 @@
 name = "myprivacytool-github-channel"
 main = "index.js"
 compatibility_date = "2024-01-01"
-workers_dev = true
+workers_dev = false   # the old *.workers.dev address is retired; the Worker is served from channels.myprivacytool.io only
+
+# Served from a subdomain of the site so the session cookie is same-site (Safari/Firefox block third-party cookies).
+# `wrangler deploy` creates the DNS record and certificate for a custom_domain route automatically.
+routes = [{ pattern = "channels.myprivacytool.io", custom_domain = true }]
 
 # MPC-115 Phase 1 channel integration: GitHub OAuth (auth code + PKCE) -> encrypted token in Supabase
 # -> PaPIT v1 profile, cached 24h in Workers KV.
@@ -11,11 +15,19 @@ workers_dev = true
 # variables with this file. Placeholder values must be replaced before a real deploy.
 [vars]
 GITHUB_CLIENT_ID = "Ov23liPwVZAmOuXl12Aq"
-REDIRECT_URI = "https://myprivacytool-github-channel.myprivacytool.workers.dev/oauth/github/callback"
+REDIRECT_URI = "https://channels.myprivacytool.io/oauth/github/callback"   # must equal the GitHub OAuth app callback URL
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
 ALLOWED_ORIGIN = "https://www.myprivacytool.io,https://myprivacytool.io"  # SPA origins (comma-separated): CORS + CSRF check
-SUCCESS_REDIRECT = "https://www.myprivacytool.io/?channel=github"  # where the callback sends the browser
+SUCCESS_REDIRECT = "https://www.myprivacytool.io/connect/github"  # where the callback sends the browser
 ENCRYPTION_KEY_VERSION = "1"                       # version that new tokens are encrypted with
+
+# Reddit channel (MPC-116, optional). Routes /oauth/reddit/* and /channels/reddit/* answer 503 until all three are set.
+# Create a "web app" at https://www.reddit.com/prefs/apps with redirect URI = REDDIT_REDIRECT_URI, then uncomment
+# these and run `npx wrangler secret put REDDIT_CLIENT_SECRET`. Reddit requires a descriptive User-Agent.
+# REDDIT_CLIENT_ID = "<the id under the app name>"
+# REDDIT_REDIRECT_URI = "https://channels.myprivacytool.io/oauth/reddit/callback"
+# REDDIT_USER_AGENT = "MyPrivacyTOOL/1.0 (by /u/<your-reddit-username>)"
+# REDDIT_SUCCESS_REDIRECT = "https://www.myprivacytool.io/connect/reddit"   # optional; JSON {ok:true} if unset
 
 # 24h profile cache (MPC-115 decision C). Create with: wrangler kv namespace create PROFILE_CACHE
 [[kv_namespaces]]

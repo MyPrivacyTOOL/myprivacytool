@@ -33,7 +33,7 @@ export default function Blog() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
+              <Link to="/" className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground md:min-h-0">
                 Home
               </Link>
               <span className="text-muted-foreground">/</span>
@@ -81,6 +81,8 @@ export default function Blog() {
                   <img
                     src={post.image}
                     alt={post.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -102,11 +104,9 @@ export default function Blog() {
                     <p>{post.date}</p>
                   </div>
                 </div>
-                <Link to={`/blog/${post.slug}`}>
-                  <Button className="w-full" variant="outline">
-                    Read Article →
-                  </Button>
-                </Link>
+                <Button asChild className="w-full" variant="outline">
+                  <Link to={`/blog/${post.slug}`}>Read Article →</Link>
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -123,9 +123,9 @@ export default function Blog() {
         <div className="mt-16 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
           <h2 className="text-2xl font-bold mb-2">Privacy Check</h2>
           <p className="mb-4 text-muted-foreground">Subscribe to Privacy Check, our newsletter, for privacy insights and practical steps you can act on</p>
-          <Link to="/newsletter">
-            <Button size="lg">Subscribe Now</Button>
-          </Link>
+          <Button asChild size="lg">
+            <Link to="/newsletter">Subscribe Now</Link>
+          </Button>
         </div>
       </div>
     </div>

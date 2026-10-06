@@ -19,6 +19,13 @@ workers_dev = true
 [vars]
 GOOGLE_CLIENT_ID = "170369535424-ter5ocj6pu6aap8s2f06dd5jdjm4ck2h.apps.googleusercontent.com"
 REDIRECT_URI = "https://myprivacytool-oauth-poc.myprivacytool.workers.dev/oauth/google/callback"
+# MPC-6971 session mode (`/oauth/google/start?mode=session`) and the /v1 API. Same values as workers/github-channel.
+ALLOWED_ORIGIN = "https://www.myprivacytool.io,https://myprivacytool.io"  # SPA origins: CORS + CSRF check on DELETE /v1/session
+SUCCESS_REDIRECT = "https://www.myprivacytool.io/?channel=google"  # where a session-mode callback sends the browser
+SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"  # public; links a verified email to auth.users. Needs the optional secret below
+
+# OPTIONAL secret (NOT in EXPECTED_SECRETS.txt on purpose): SUPABASE_SERVICE_ROLE_KEY. Until it is set the
+# Supabase link reports "not_configured" and sign-in still works. Do not set it before the MPC-6950 key rotation.
 
 [observability]
 enabled = true

@@ -28,12 +28,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check required secrets are configured
+      # MPC-7300: pre-deployment checks (secrets present, wrangler.toml valid, EXPECTED_SECRETS.txt names only).
+      - name: Pre-deployment checks (secrets present, Worker config valid)
         env:
-          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          A: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/scan-report
       - name: Generate guides module
         run: node workers/scan-report/scripts/sync-guides.mjs
 

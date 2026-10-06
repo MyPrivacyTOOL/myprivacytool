@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Mic, Zap, Infinity, Heart, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackUpgradeModalClosed, trackWaitlistEmailSubmitted, trackAliceHDWaitlistSignup } from '@/lib/analytics';
@@ -95,7 +96,9 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
 
   if (!isOpen) return null;
 
-  return (
+  // Portal to <body>: the caller (VoiceAI card) has backdrop-filter, which would make this `fixed` overlay
+  // position against the card instead of the viewport and push it off-screen on phones.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
@@ -104,11 +107,12 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-surface/95 border border-risk-low/50 rounded-2xl p-6 shadow-card">
+      <div role="dialog" aria-modal="true" aria-label="Join the Alice HD waitlist" className="relative w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-surface/95 border border-risk-low/50 rounded-2xl p-6 shadow-card">
         {/* Close button */}
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-risk-low transition-colors"
+          aria-label="Close"
+          className="absolute top-1 right-1 flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-risk-low transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -223,6 +227,7 @@ export default function AliceHDModal({ isOpen, onClose, showRateLimitMessage = f
           Currently using Free Voice (Web Speech API)
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
