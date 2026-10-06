@@ -56,6 +56,17 @@ The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different or
 - **Logs** hold event names and status codes only. The adapter's errors carry the HTTP status, never a URL, token or body.
 - **Cache** holds the sanitized PaPIT snapshot only, never tokens or raw GitHub responses.
 
+## Token expiry and refresh
+
+The OAuth app has GitHub's "expiring user tokens" on, so access tokens last about 8 hours and come with a refresh token
+(valid about 6 months). On a profile cache miss the Worker uses the stored access token. If GitHub answers `401` and a refresh
+token is stored, the Worker trades it once for a new pair (`grant_type=refresh_token`), encrypts and saves the new pair
+(refresh tokens rotate: each use invalidates the old one), and retries the request. If there is no refresh token or GitHub
+rejects it (`bad_refresh_token`, e.g. the user revoked the app), the token row is deleted and the endpoint returns
+`401 reauthorize`, so the SPA sends the user back to `/oauth/github/start`. Logs record only `token_refreshed` or the GitHub
+error code. Two requests refreshing at the same moment can race (the second sees `bad_refresh_token`); the 24h profile cache
+makes this rare, and the cost is one extra reconnect.
+
 ## Rate limits
 
 GitHub allows 5,000 requests/hour per user token. A cold profile build costs at most 9 requests
