@@ -45,3 +45,9 @@ create table public.channel_tokens (
   unique (user_id, provider)
 );
 alter table public.channel_tokens enable row level security;
+
+-- public.rls_auto_enable() is a Supabase-managed event-trigger helper that exists in the live project (not in
+-- our repo SQL). Migration 20261006130000_revoke_rls_auto_enable_execute.sql (MPC-7350) revokes EXECUTE on it, so
+-- a stand-in must exist here or that migration fails on a fresh database. Body is a no-op: the tests only need
+-- the function to exist so the REVOKE can be applied and asserted.
+create function public.rls_auto_enable() returns event_trigger language plpgsql as $$ begin null; end $$;
