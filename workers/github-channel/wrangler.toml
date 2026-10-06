@@ -1,7 +1,7 @@
 name = "myprivacytool-github-channel"
 main = "index.js"
 compatibility_date = "2024-01-01"
-workers_dev = true   # keep the old *.workers.dev address alive until the custom domain is verified, then set to false
+workers_dev = false   # the old *.workers.dev address is retired; the Worker is served from channels.myprivacytool.io only
 
 # Served from a subdomain of the site so the session cookie is same-site (Safari/Firefox block third-party cookies).
 # `wrangler deploy` creates the DNS record and certificate for a custom_domain route automatically.
