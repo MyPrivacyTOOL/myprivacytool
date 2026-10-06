@@ -213,3 +213,85 @@ test('both configured origins are accepted for CORS; others are not', async () =
   const other = await handle(new Request('https://w.test/channels/github/profile', { headers: { Cookie: `mpt_gh_session=${session}`, Origin: 'https://evil.test' } }), env, { fetchFn: net.fetchFn, now });
   assert.equal(other.headers.get('Access-Control-Allow-Origin'), null);
 });
+
+// ---- token refresh (GitHub expiring user tokens) ----
+const NEW_ACCESS = 'gho_REFRESHED_ACCESS_TOKEN_abcdef';
+const NEW_REFRESH = 'ghr_REFRESHED_REFRESH_TOKEN_abcdef';
+
+/** Wraps fakeNetwork: the original access token is expired (401); the refresh endpoint is scriptable. */
+function expiringNetwork(refreshResponse) {
+  const net = fakeNetwork();
+  const seen = { refreshBodies: [], githubAuth: [] };
+  const fetchFn = async (u, init = {}) => {
+    u = String(u);
+    if (u === 'https://github.com/login/oauth/access_token' && String(init.body).includes('grant_type=refresh_token')) {
+      seen.refreshBodies.push(String(init.body));
+      return new Response(JSON.stringify(refreshResponse), { status: 200 });
+    }
+    if (u.startsWith('https://api.github.com/') && !u.includes('/applications/')) {
+      const auth = init.headers?.Authorization;
+      seen.githubAuth.push(auth);
+      if (auth !== `Bearer ${NEW_ACCESS}` && seen.connected) return new Response('{}', { status: 401 });
+    }
+    return net.fetchFn(u, init);
+  };
+  return { net, seen, fetchFn };
+}
+
+test('401 with a refresh token: refreshes once, saves the NEW pair encrypted, retries and returns 200', async () => {
+  const env = baseEnv();
+  const { net, seen, fetchFn } = expiringNetwork({ access_token: NEW_ACCESS, refresh_token: NEW_REFRESH, expires_in: 28800, scope: 'read:user' });
+  const { session } = await connect(env, { ...net, fetchFn });
+  seen.connected = true; // from now on the original access token is expired
+  const before = net.rows.get('4242').access_token_enc;
+
+  const res = await handle(profileReq(session), env, { fetchFn, now });
+  assert.equal(res.status, 200);
+  assert.equal(seen.refreshBodies.length, 1, 'refreshed exactly once');
+  assert.ok(seen.refreshBodies[0].includes(encodeURIComponent(REFRESH_TOKEN)), 'used the stored refresh token');
+
+  const row = net.rows.get('4242');
+  assert.notEqual(row.access_token_enc, before, 'row updated');
+  assert.match(row.access_token_enc, /^v1\./);
+  assert.match(row.refresh_token_enc, /^v1\./);
+  assert.ok(row.expires_at, 'expiry recorded');
+  const sent = net.log.bodies.join('\n');
+  assert.ok(!sent.includes(NEW_ACCESS) && !sent.includes(NEW_REFRESH), 'new tokens never sent to the DB in plaintext');
+
+  // Next cache miss uses the NEW access token straight from the DB (no second refresh).
+  await env.PROFILE_CACHE.delete('papit:github:4242');
+  const again = await handle(profileReq(session), env, { fetchFn, now });
+  assert.equal(again.status, 200);
+  assert.equal(seen.refreshBodies.length, 1, 'no second refresh');
+  assert.equal(seen.githubAuth.at(-1), `Bearer ${NEW_ACCESS}`);
+});
+
+test('refresh rejected (bad_refresh_token): row deleted, client told to reauthorize, refresh logged without secrets', async () => {
+  const env = baseEnv();
+  const { net, seen, fetchFn } = expiringNetwork({ error: 'bad_refresh_token' });
+  const { session } = await connect(env, { ...net, fetchFn });
+  seen.connected = true;
+  const lines = []; const orig = console.log; console.log = (...a) => lines.push(a.join(' '));
+  let res;
+  try { res = await handle(profileReq(session), env, { fetchFn, now }); } finally { console.log = orig; }
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, 'reauthorize');
+  assert.equal(net.rows.size, 0);
+  assert.equal(seen.refreshBodies.length, 1);
+  const all = lines.join('\n');
+  assert.ok(all.includes('bad_refresh_token'));
+  assert.ok(!all.includes(REFRESH_TOKEN) && !all.includes('csec'));
+});
+
+test('401 with no refresh token stored: reauthorize without calling the refresh endpoint', async () => {
+  const env = baseEnv();
+  const { net, seen, fetchFn } = expiringNetwork({ access_token: NEW_ACCESS, refresh_token: NEW_REFRESH });
+  const { session } = await connect(env, { ...net, fetchFn });
+  seen.connected = true;
+  net.rows.get('4242').refresh_token_enc = null;
+  const res = await handle(profileReq(session), env, { fetchFn, now });
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, 'reauthorize');
+  assert.equal(seen.refreshBodies.length, 0);
+  assert.equal(net.rows.size, 0);
+});

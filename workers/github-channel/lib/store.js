@@ -43,12 +43,23 @@ export async function saveToken(env, { subjectId, accessToken, refreshToken, sco
     { Prefer: 'resolution=merge-duplicates,return=minimal' });
 }
 
-export async function loadAccessToken(env, subjectId, fetchFn = fetch) {
+/** @returns {Promise<{accessToken: string, refreshToken: string|null}|null>} */
+export async function loadTokens(env, subjectId, fetchFn = fetch) {
   const rows = await sb(env, 'GET',
-    `channel_tokens?provider=eq.${PROVIDER}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,key_version&limit=1`,
+    `channel_tokens?provider=eq.${PROVIDER}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version&limit=1`,
     undefined, fetchFn);
   if (!rows?.length) return null;
-  return decryptToken(rows[0].access_token_enc, keyForVersion(env, rows[0].key_version), { aad: aad(subjectId, 'access') });
+  const key = keyForVersion(env, rows[0].key_version);
+  return {
+    accessToken: await decryptToken(rows[0].access_token_enc, key, { aad: aad(subjectId, 'access') }),
+    refreshToken: rows[0].refresh_token_enc
+      ? await decryptToken(rows[0].refresh_token_enc, key, { aad: aad(subjectId, 'refresh') })
+      : null,
+  };
+}
+
+export async function loadAccessToken(env, subjectId, fetchFn = fetch) {
+  return (await loadTokens(env, subjectId, fetchFn))?.accessToken ?? null;
 }
 
 export function deleteToken(env, subjectId, fetchFn = fetch) {

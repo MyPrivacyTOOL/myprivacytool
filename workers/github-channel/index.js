@@ -11,11 +11,11 @@
  * Rules (MPC-115): scope read:user only; tokens encrypted before they reach Supabase; logs carry event
  * names and status codes only (no tokens, no PII, no raw API bodies).
  */
-import { buildAuthUrl, exchangeCode, randomString, sign, verify, revokeGrant } from './lib/oauth.js';
+import { buildAuthUrl, exchangeCode, randomString, sign, verify, revokeGrant, refreshAccessToken } from './lib/oauth.js';
 import { GitHubAdapter, GitHubAdapterError } from './lib/adapter.js';
 import { githubToPapit } from './lib/papit.js';
 import { getCached, putCached, deleteCached } from './lib/cache.js';
-import { saveToken, loadAccessToken, deleteToken } from './lib/store.js';
+import { saveToken, loadTokens, loadAccessToken, deleteToken } from './lib/store.js';
 
 const STATE_COOKIE = 'mpt_gh_oauth';
 const SESSION_COOKIE = 'mpt_gh_session';
@@ -150,10 +150,31 @@ async function profile(request, env, cors, fetchFn, now) {
     const cached = await getCached(env.PROFILE_CACHE, subjectId, now());
     if (cached) return json(cached, 200, { ...cors, 'X-Cache': 'HIT' });
 
-    const token = await loadAccessToken(env, subjectId, fetchFn);
-    if (!token) return json({ error: 'not_connected' }, 404, cors);
+    const tokens = await loadTokens(env, subjectId, fetchFn);
+    if (!tokens) return json({ error: 'not_connected' }, 404, cors);
 
-    const raw = await new GitHubAdapter({ token, fetchFn }).fetchIdentity();
+    let raw;
+    try {
+      raw = await new GitHubAdapter({ token: tokens.accessToken, fetchFn }).fetchIdentity();
+    } catch (e) {
+      // Expiring user tokens last ~8h. On 401, trade the refresh token for a new pair (once), save it, retry.
+      if (!(e instanceof GitHubAdapterError && e.status === 401) || !tokens.refreshToken) throw e;
+      let fresh;
+      try {
+        fresh = await refreshAccessToken({
+          refreshToken: tokens.refreshToken, clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET,
+        }, fetchFn);
+      } catch (re) {
+        log('token_refresh_failed', { detail: String(re.message).slice(0, 80) });
+        throw e; // falls through to the reauthorize handling below
+      }
+      await saveToken(env, {
+        subjectId, accessToken: fresh.access_token, refreshToken: fresh.refresh_token,
+        scope: fresh.scope, expiresIn: fresh.expires_in,
+      }, fetchFn);
+      log('token_refreshed');
+      raw = await new GitHubAdapter({ token: fresh.access_token, fetchFn }).fetchIdentity();
+    }
     const papit = await githubToPapit(raw, { now: new Date(now()) });
     await putCached(env.PROFILE_CACHE, subjectId, papit, now());
     return json(papit, 200, { ...cors, 'X-Cache': 'MISS' });

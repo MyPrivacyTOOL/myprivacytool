@@ -83,3 +83,21 @@ export async function revokeGrant({ accessToken, clientId, clientSecret }, fetch
   });
   return res.status === 204 || res.status === 404; // 404 = already revoked
 }
+
+/**
+ * Exchange a refresh token for a new access token (GitHub "expiring user tokens"). Refresh tokens ROTATE:
+ * each use returns a new refresh token and invalidates the old one, so the result must be saved.
+ */
+export async function refreshAccessToken({ refreshToken, clientId, clientSecret }, fetchFn = fetch) {
+  const res = await fetchFn(TOKEN_URL, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  const err = new Error(`token refresh failed${data.error ? `: ${data.error}` : ''}`);
+  if (!res.ok || data.error || !data.access_token) throw err;
+  return data; // { access_token, refresh_token, expires_in, refresh_token_expires_in, scope }
+}
