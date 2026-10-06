@@ -82,7 +82,21 @@ All contact-based, re-enrollment ON, and **every one requires `consent_given_at`
 
 Email copy for these sequences needs Chris's approval before publish (per the form-wiring playbook). No sends or spend until then.
 
-## 5. Next steps
+## 5. Segments (not yet created)
+
+Creating these through the connector failed on 2026-10-06: the HubSpot connection lacks `crm.segments.write` and `crm.lists.write`. Reconnect the HubSpot app and tick those scopes (or ask a HubSpot admin to approve them), then re-run, or create them by hand as active lists:
+
+| Segment | Filter |
+|---|---|
+| MPT - Consented leads (nurture pool) | `consent_given_at` is known AND `lifecyclestage` is Subscriber or Lead |
+| MPT - High exposure (hot) | `consent_given_at` is known AND `privacy_risk_score` >= 70 |
+| MPT - Business audit leads | `consent_given_at` is known AND `source_tag` = `business-inquiry` |
+
+The `/business` form sends `source_tag = "business-inquiry"` (`src/pages/Business.tsx`). Sections 3-4 say "business audit tag"; that means this value.
+
+Only 9 contacts carry a `source_tag` today and the ones sampled are test emails, so segment sizes will be near zero until real traffic arrives.
+
+## 6. Next steps
 
 1. Chris confirms the HubSpot tier and workflow-edit permission (section 1).
 2. Create `lead_score_mpt`, fix/confirm `contact_topic`, add the two form fields (section 2).
