@@ -24,9 +24,13 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const log = (event, fields = {}) => console.log(JSON.stringify({ event, ...fields }));
 
+// ALLOWED_ORIGIN may list several origins, comma-separated (apex + www).
+const allowedOrigins = (env) => String(env.ALLOWED_ORIGIN || '').split(',').map((o) => o.trim()).filter(Boolean);
+const originAllowed = (env, origin) => !!origin && allowedOrigins(env).includes(origin);
+
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
-  if (!origin || origin !== env.ALLOWED_ORIGIN) return {};
+  if (!originAllowed(env, origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Credentials': 'true',
@@ -77,14 +81,17 @@ async function start(env, now) {
 
 async function callback(request, url, env, fetchFn, now) {
   const clear = setCookie(STATE_COOKIE, '', 0, '/oauth/github', 'Lax');
-  const fail = (error, status) => {
-    log('oauth_callback_failed', { error, status });
+  // `stage` names which step failed (exchange | github_user | store). `detail` is the sanitized error message:
+  // adapter, exchange, Supabase and crypto errors carry only a status or a generic reason, never a token or body.
+  const fail = (error, status, stage, detail) => {
+    log('oauth_callback_failed', { error, status, stage, detail });
     if (env.SUCCESS_REDIRECT) {
       const to = new URL(env.SUCCESS_REDIRECT);
       to.searchParams.set('channel_error', error);
+      if (stage) to.searchParams.set('stage', stage);
       return new Response(null, { status: 302, headers: { Location: to.toString(), 'Set-Cookie': clear } });
     }
-    return json({ ok: false, error }, status, { 'Set-Cookie': clear });
+    return json({ ok: false, error, stage }, status, { 'Set-Cookie': clear });
   };
 
   if (url.searchParams.get('error')) return fail('access_denied', 400);
@@ -94,6 +101,7 @@ async function callback(request, url, env, fetchFn, now) {
   if (!code) return fail('missing_code', 400);
 
   let accessToken;
+  let stage = 'exchange';
   try {
     const tokens = await exchangeCode({
       code, verifier: saved.verifier, clientId: env.GITHUB_CLIENT_ID,
@@ -101,8 +109,10 @@ async function callback(request, url, env, fetchFn, now) {
     }, fetchFn);
     accessToken = tokens.access_token;
 
+    stage = 'github_user';
     const adapter = new GitHubAdapter({ token: accessToken, fetchFn });
     const me = await adapter.get('/user'); // only .id is kept
+    stage = 'store';
     await saveToken(env, {
       subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope, expiresIn: tokens.expires_in,
     }, fetchFn);
@@ -123,7 +133,7 @@ async function callback(request, url, env, fetchFn, now) {
     if (accessToken) {
       await revokeGrant({ accessToken, clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET }, fetchFn).catch(() => {});
     }
-    return fail('connect_failed', 502);
+    return fail('connect_failed', 502, stage, String(e?.message || 'error').slice(0, 120));
   }
 }
 
@@ -162,7 +172,7 @@ async function profile(request, env, cors, fetchFn, now) {
 
 async function revoke(request, env, cors, fetchFn, now) {
   // CSRF: the session cookie is SameSite=None, so state-changing calls must come from the SPA origin.
-  if (request.headers.get('Origin') !== env.ALLOWED_ORIGIN) return json({ error: 'forbidden_origin' }, 403);
+  if (!originAllowed(env, request.headers.get('Origin'))) return json({ error: 'forbidden_origin' }, 403);
   const subjectId = await session(request, env, now);
   if (!subjectId) return json({ error: 'unauthenticated' }, 401, cors);
 

@@ -13,8 +13,8 @@ workers_dev = true
 GITHUB_CLIENT_ID = "Ov23liPwVZAmOuXl12Aq"
 REDIRECT_URI = "https://myprivacytool-github-channel.myprivacytool.workers.dev/oauth/github/callback"
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
-ALLOWED_ORIGIN = "https://myprivacytool.com"      # SPA origin: CORS + CSRF check
-SUCCESS_REDIRECT = "https://myprivacytool.com/?channel=github"  # where the callback sends the browser
+ALLOWED_ORIGIN = "https://www.myprivacytool.io,https://myprivacytool.io"  # SPA origins (comma-separated): CORS + CSRF check
+SUCCESS_REDIRECT = "https://www.myprivacytool.io/?channel=github"  # where the callback sends the browser
 ENCRYPTION_KEY_VERSION = "1"                       # version that new tokens are encrypted with
 
 # 24h profile cache (MPC-115 decision C). Create with: wrangler kv namespace create PROFILE_CACHE

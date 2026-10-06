@@ -15,7 +15,7 @@ const baseEnv = () => {
     ENCRYPTION_KEY: 'c3'.repeat(32), ENCRYPTION_KEY_VERSION: '1',
     SUPABASE_URL: 'https://sb.test', SUPABASE_SERVICE_ROLE_KEY: 'srk',
     REDIRECT_URI: 'https://w.test/oauth/github/callback',
-    ALLOWED_ORIGIN: 'https://app.test', SUCCESS_REDIRECT: 'https://app.test/?channel=github',
+    ALLOWED_ORIGIN: 'https://app.test,https://www.app.test', SUCCESS_REDIRECT: 'https://app.test/?channel=github',
     PROFILE_CACHE: { get: async (k) => store.get(k) ?? null, put: async (k, v, opts) => { store.set(k, v); ttls.push(opts?.expirationTtl); }, delete: async (k) => { store.delete(k); }, _store: store, _ttls: ttls },
   };
 };
@@ -183,4 +183,33 @@ test('logs never contain tokens or PII', async () => {
   const all = lines.join('\n');
   assert.ok(lines.length > 0);
   for (const s of [ACCESS_TOKEN, REFRESH_TOKEN, 'octo', 'Real Name', 'p@example.com', 'csec']) assert.ok(!all.includes(s), s);
+});
+
+test('callback failure redirect names the failing stage and logs a sanitized reason', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const lines = []; const orig = console.log; console.log = (...a) => lines.push(a.join(' '));
+  try {
+    const state = 'st4te';
+    const stateCookie = await sign({ state, verifier: 'v'.repeat(43), exp: clock.t + 60_000 }, env.STATE_SIGNING_KEY);
+    const req = new Request(`https://w.test/oauth/github/callback?code=c&state=${state}`, { headers: { Cookie: `mpt_gh_oauth=${stateCookie}` } });
+    // GitHub rejects the code exchange (e.g. wrong client secret)
+    const res = await handle(req, env, { fetchFn: async () => new Response(JSON.stringify({ error: 'incorrect_client_credentials' }), { status: 200 }), now });
+    const loc = new URL(res.headers.get('Location'));
+    assert.equal(loc.searchParams.get('channel_error'), 'connect_failed');
+    assert.equal(loc.searchParams.get('stage'), 'exchange');
+  } finally { console.log = orig; }
+  assert.ok(lines.join('\n').includes('incorrect_client_credentials'));
+  assert.ok(!lines.join('\n').includes('csec'));
+  void net;
+});
+
+test('both configured origins are accepted for CORS; others are not', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  for (const origin of ['https://app.test', 'https://www.app.test']) {
+    const res = await handle(new Request('https://w.test/channels/github/profile', { headers: { Cookie: `mpt_gh_session=${session}`, Origin: origin } }), env, { fetchFn: net.fetchFn, now });
+    assert.equal(res.headers.get('Access-Control-Allow-Origin'), origin);
+  }
+  const other = await handle(new Request('https://w.test/channels/github/profile', { headers: { Cookie: `mpt_gh_session=${session}`, Origin: 'https://evil.test' } }), env, { fetchFn: net.fetchFn, now });
+  assert.equal(other.headers.get('Access-Control-Allow-Origin'), null);
 });
