@@ -32,3 +32,12 @@ test('API errors carry the status but never the token or URL', async () => {
     return true;
   });
 });
+
+test('fetch is called unbound (Workers throws "Illegal invocation" if fetch gets a different `this`)', async () => {
+  const strictFetch = function (u) {
+    if (this !== undefined) throw new TypeError('Illegal invocation');
+    return Promise.resolve(ok(String(u).endsWith('/user') ? { login: 'octo' } : []));
+  };
+  const raw = await new GitHubAdapter({ token: 'T', fetchFn: strictFetch }).fetchIdentity();
+  assert.equal(raw.profile.login, 'octo');
+});

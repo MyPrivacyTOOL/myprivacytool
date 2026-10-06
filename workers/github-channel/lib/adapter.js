@@ -27,7 +27,9 @@ export class GitHubAdapter extends SocialPlatformAdapter {
   constructor({ token, fetchFn = fetch }) {
     super();
     this.token = token;
-    this.fetchFn = fetchFn;
+    // Wrap so `fetch` is never invoked as a method of this object: Workers throws "Illegal invocation"
+    // when the global fetch is called with a different `this`.
+    this.fetchFn = (...args) => fetchFn(...args);
   }
 
   async get(path) {
