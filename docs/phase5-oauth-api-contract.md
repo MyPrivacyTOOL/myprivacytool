@@ -93,4 +93,14 @@ Scope-gated example of permission scoping. `401 {error:"unauthenticated"}`; `403
 | Worker code, 25 tests, contract | Done on `main`. CI (`npm run test:workers:node`) now runs `api.test.mjs` as well as `oauth.test.mjs`; before, only the deploy workflow ran it. |
 | Migration `mpt_find_auth_user_by_email` | **Applied** to project `xmdmkumwxpgahmlweuug` as `20261006150233_oauth_find_auth_user`. Checked 2026-10-06: body matches the repo file, `SECURITY DEFINER`, empty `search_path`, `EXECUTE` for `service_role` only (`anon` and `authenticated` denied), no security advisor finding. Rollback: `drop function if exists public.mpt_find_auth_user_by_email(text);` as a new migration. |
 | `SUPABASE_SERVICE_ROLE_KEY` on the Worker | Not set, by design (MPC-6950). Sessions report `link: "not_configured"`. |
-| Live run of `?mode=session` | Pending: needs a human Google consent (the probe flow was verified live on 2026-10-05). |
+| Live run of `?mode=session` | Verified live 2026-10-06 and 2026-10-07 (owner sign-in as the MPT Google account): `/v1/session`, `/v1/permissions`, `/v1/grants` (403 `insufficient_scope`) and `DELETE /v1/session` (cleared the cross-site cookie) all behaved as documented. |
+
+## Site integration (header strip)
+
+`myprivacytool.io` shows a slim strip under the header, **"Connected as <email> · Sign out"**, only while a session exists (`src/components/layout/SessionBadge.tsx`, client in `src/lib/oauthSession.ts`).
+
+- **Sign-in entry:** link or open `<Worker>/oauth/google/start?mode=session` (exported as `OAUTH_START_URL`). The Worker redirects back to `SUCCESS_REDIRECT` (`https://www.myprivacytool.io/?channel=google`). A failed sign-in comes back as `?oauth_error=<code>` and shows nothing. No public page links to sign-in yet, because the Google consent screen is in Testing mode (only listed test users can complete it).
+- **No call for ordinary visitors:** the strip asks `GET /v1/session` only if a `localStorage` hint (`mpt_oauth_hint`) exists. The hint is set when the page loads with `?channel=google` (and no `oauth_error`) and cleared on sign-out, on a 401, or when the session's `expires_at` passes. Without storage the strip simply does not appear.
+- **Sign out:** `DELETE /v1/session` with `credentials: "include"` from an allowed origin; on success the strip disappears and the hint is cleared. On failure the strip stays and says so.
+- **Setting:** `VITE_OAUTH_URL` overrides the Worker base URL (default the workers.dev URL above).
+- **Known limit:** the session cookie is set by the Worker's own domain, so it is a third-party cookie from the site's point of view. Chrome with default settings sends it (verified live); Safari and Firefox block third-party cookies by default, so the strip will not appear there. Fix when needed: serve the Worker from a custom domain under `myprivacytool.io` (as `channels.myprivacytool.io` does for the GitHub channel), which also needs the Google redirect URI and `REDIRECT_URI` updated.
