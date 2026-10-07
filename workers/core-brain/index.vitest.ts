@@ -42,7 +42,9 @@ afterEach(() => vi.unstubAllGlobals());
 describe("auth and validation", () => {
   it("rejects a missing or wrong secret and never calls out", async () => {
     stub({});
-    expect((await post(msg("hi"), {})).status).toBe(401);
+    const noSecret = await post(msg("hi"), {});
+    expect(noSecret.status).toBe(401);
+    expect(noSecret.body.error.code).toBe("unauthorized");
     expect((await post(msg("hi"), { "x-mpt-webhook-secret": "nope" })).status).toBe(401);
     expect(calls).toHaveLength(0);
   });
@@ -51,13 +53,14 @@ describe("auth and validation", () => {
     stub({});
     const r = await post(msg("hi"), undefined, { ...env, WEBHOOK_SECRET: undefined });
     expect(r.status).toBe(503);
+    expect(r.body.error.code).toBe("not_configured");
   });
 
-  it("400 on bad JSON, 422 on bad structure, 405 on GET", async () => {
+  it("400 on bad JSON or bad structure, 405 on GET", async () => {
     stub({});
     expect((await post("{not json")).status).toBe(400);
-    expect((await post({ platform: "telegram" })).status).toBe(422);
-    expect((await post(msg("   "))).status).toBe(422);
+    expect((await post({ platform: "telegram" })).status).toBe(400);
+    expect((await post(msg("   "))).status).toBe(400);
     const get = await worker.fetch(new Request("https://brain.test/webhook"), env);
     expect(get.status).toBe(405);
   });

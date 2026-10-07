@@ -88,7 +88,7 @@ export default function ThankYou() {
         <div className="w-14 h-14 rounded-full bg-background border border-brand flex items-center justify-center mx-auto mb-5 motion-safe:animate-scale-in">
           <Check className="text-brand" size={26} aria-hidden="true" />
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold mb-3" tabIndex={-1} ref={(el) => el?.focus({ preventScroll: true })}>
+        <h1 className="text-3xl md:text-4xl font-bold mb-3 outline-none" tabIndex={-1} ref={(el) => el?.focus({ preventScroll: true })}>
           {copy.title}
         </h1>
         <p className="text-muted-foreground text-base leading-relaxed max-w-xl mx-auto">{copy.body}</p>

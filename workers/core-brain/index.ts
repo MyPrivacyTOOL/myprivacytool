@@ -14,16 +14,17 @@
 // Non-secret vars (wrangler.toml [vars]): QWEN_BASE_URL, QWEN_MODEL.
 // Never log message text, sender ids or keys: log() fields are event metadata only.
 
-import { json, log, missingEnv } from "@mpt/utils";
+import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } from "@mpt/utils";
 
-interface Env {
+type Env = {
   SUPABASE_URL: string;
   SUPABASE_KEY: string;
   QWEN_API_KEY: string;
   WEBHOOK_SECRET: string;
   QWEN_BASE_URL?: string;
   QWEN_MODEL?: string;
-}
+  LOG_LEVEL?: string;
+};
 
 type Intent = "scan" | "help" | "verify" | "unknown";
 type Inbound = { platform: string; senderId: string; text: string; locale: string };
@@ -122,7 +123,7 @@ function ruleIntent(text: string): Intent {
   return "unknown";
 }
 
-async function qwenIntent(text: string, env: Env): Promise<{ intent: Intent; confidence: number } | null> {
+async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent: Intent; confidence: number } | null> {
   const base = (env.QWEN_BASE_URL || DEFAULT_QWEN_BASE_URL).replace(/\/+$/, "");
   try {
     const res = await fetchWithTimeout(`${base}/chat/completions`, {
@@ -146,7 +147,7 @@ async function qwenIntent(text: string, env: Env): Promise<{ intent: Intent; con
       }),
     }, QWEN_TIMEOUT_MS);
     if (!res.ok) {
-      log(WORKER, "qwen_http_error", { status: res.status });
+      log.warn("qwen http error", { status: res.status });
       return null;
     }
     const data: any = await res.json();
@@ -157,14 +158,14 @@ async function qwenIntent(text: string, env: Env): Promise<{ intent: Intent; con
     if (!INTENTS.includes(intent) || !Number.isFinite(confidence)) return null;
     return { intent, confidence: Math.min(1, Math.max(0, confidence)) };
   } catch (err) {
-    log(WORKER, "qwen_failed", { error: (err as Error).name });
+    log.warn("qwen failed", { error: (err as Error).name });
     return null;
   }
 }
 
 // ASSUMPTION: conversation_states has no sender column, so the listener's id is matched on context->>sender_id.
 // Missing row, unsupported platform or any Supabase failure degrade to an anonymous user (trust 0), never an error.
-async function lookupState(msg: Inbound, env: Env): Promise<BrainState> {
+async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainState> {
   const anonymous: BrainState = { trustLevel: 0, state: "new", source: "anonymous" };
   if (!STATE_CHANNELS.includes(msg.platform)) return anonymous;
   const qs = new URLSearchParams({
@@ -179,7 +180,7 @@ async function lookupState(msg: Inbound, env: Env): Promise<BrainState> {
       headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` },
     }, SUPABASE_TIMEOUT_MS);
     if (!res.ok) {
-      log(WORKER, "supabase_http_error", { status: res.status });
+      log.warn("supabase http error", { status: res.status });
       return { ...anonymous, source: "fallback" };
     }
     const rows: any[] = await res.json();
@@ -188,7 +189,7 @@ async function lookupState(msg: Inbound, env: Env): Promise<BrainState> {
     const trustLevel = Number(row.trust_level);
     return { trustLevel: Number.isInteger(trustLevel) ? trustLevel : 0, state: String(row.state ?? "new"), source: "supabase" };
   } catch (err) {
-    log(WORKER, "supabase_failed", { error: (err as Error).name });
+    log.warn("supabase failed", { error: (err as Error).name });
     return { ...anonymous, source: "fallback" };
   }
 }
@@ -205,29 +206,33 @@ function decide(intent: Intent, text: string, st: BrainState): string[] {
   return KEYS.welcome;
 }
 
-async function handleWebhook(request: Request, env: Env): Promise<Response> {
-  if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405, { allow: "POST" });
+async function handleWebhook(request: Request, env: Env, log: Logger): Promise<Response> {
+  if (request.method !== "POST") {
+    return json({ error: { code: "method_not_allowed", message: "Use POST" } }, 405, { allow: "POST" });
+  }
 
   const missing = missingEnv(env, REQUIRED_ENV);
   if (missing.length) {
-    log(WORKER, "misconfigured", { missing }); // names only
-    return json({ ok: false, error: "service_unavailable" }, 503);
+    log.error("misconfigured", { missing }); // names only
+    throw new MptError("not_configured", "Service not configured");
   }
   const secret = request.headers.get("x-mpt-webhook-secret") || "";
-  if (!constantTimeEqual(secret, env.WEBHOOK_SECRET)) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!constantTimeEqual(secret, env.WEBHOOK_SECRET)) throw new MptError("unauthorized", "Unauthorized");
 
   const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) return json({ ok: false, error: "payload_too_large" }, 413);
+  if (raw.length > MAX_BODY_BYTES) {
+    return json({ error: { code: "payload_too_large", message: "Payload too large" } }, 413);
+  }
   let body: unknown;
   try {
     body = JSON.parse(raw);
   } catch {
-    return json({ ok: false, error: "invalid_json" }, 400);
+    throw new MptError("bad_request", "Invalid JSON");
   }
   const msg = parseInbound(body);
-  if (!msg) return json({ ok: false, error: "invalid_payload" }, 422);
+  if (!msg) throw new MptError("bad_request", "Invalid payload");
 
-  const st = await lookupState(msg, env);
+  const st = await lookupState(msg, env, log);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).
   let intent: Intent;
@@ -236,7 +241,7 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
     intent = "verify";
     intentSource = "rules";
   } else {
-    const q = await qwenIntent(msg.text, env);
+    const q = await qwenIntent(msg.text, env, log);
     if (q && q.confidence >= 0.4) {
       intent = q.intent;
       intentSource = "qwen";
@@ -247,7 +252,7 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
   }
 
   const messageKeys = decide(intent, msg.text, st);
-  log(WORKER, "routed", { platform: msg.platform, intent, intentSource, stateSource: st.source, trustLevel: st.trustLevel, key: messageKeys[0] });
+  log.info("routed", { platform: msg.platform, intent, intentSource, stateSource: st.source, trustLevel: st.trustLevel, key: messageKeys[0] });
   return json({
     ok: true,
     intent,
@@ -263,16 +268,17 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const log = createLogger(WORKER, env.LOG_LEVEL).child({ requestId: crypto.randomUUID() });
     const { pathname } = new URL(request.url);
     try {
-      if (pathname === "/webhook") return await handleWebhook(request, env);
+      if (pathname === "/webhook") return await handleWebhook(request, env, log);
       if (pathname === "/health" && request.method === "GET") {
         return json({ ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0 });
       }
-      return json({ ok: false, error: "not_found" }, 404);
+      throw new MptError("not_found", "No such route");
     } catch (err) {
-      log(WORKER, "unhandled", { error: (err as Error).name });
-      return json({ ok: false, error: "internal_error" }, 500);
+      if (!(err instanceof MptError)) log.error("unhandled", { error: (err as Error).name });
+      return errorResponse(err);
     }
   },
 };

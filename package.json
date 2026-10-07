@@ -18,7 +18,8 @@
     "lint:tests": "eslint e2e src/test \"src/**/*.test.{ts,tsx}\" playwright.config.ts vitest.config.ts",
     "check:env": "node scripts/ci/check-env.mjs",
     "smoke": "node scripts/ci/smoke-test.mjs",
-    "dev:core-brain": "npm run dev -w @mpt/core-brain"
+    "dev:core-brain": "npm run dev -w @mpt/core-brain",
+    "typecheck:workspaces": "npm run typecheck --workspaces --if-present"
   },
   "dependencies": {
     "@fontsource/fira-code": "^5.3.0",

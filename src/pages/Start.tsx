@@ -278,7 +278,7 @@ export default function Start() {
             ))}
           </div>
           <p className="text-muted-foreground text-xs text-center mt-4">
-            Send any message to get your First Hexagon report instantly
+            Prefer to chat? Message us on any of these platforms.
           </p>
         </div>
       </div>

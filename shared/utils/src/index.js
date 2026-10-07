@@ -17,3 +17,7 @@ export function log(worker, event, fields = {}) {
 export function missingEnv(env, names) {
   return names.filter((n) => !env[n]);
 }
+
+// CK-007: structured logger + typed errors (TypeScript sources, bundled by wrangler/esbuild).
+export { createLogger } from "./logger.ts";
+export { MptError, errorResponse, toMptError } from "./errors.ts";

@@ -4,7 +4,8 @@
  * Routes (contract: docs/phase5-oauth-api-contract.md)
  *   GET    /oauth/google/start[?mode=session]  redirect to Google consent (auth code + PKCE + signed state cookie)
  *   GET    /oauth/google/callback              exchange code, validate token, revoke MPT's own token, then
- *                                              return the probe JSON (default) or set an MPT session (mode=session)
+ *                                              return the probe JSON (default) or set an MPT session (mode=session;
+ *                                              its failures redirect to SUCCESS_REDIRECT with ?oauth_error=<code>)
  *   GET    /v1/session                         validate the MPT session cookie, return the caller's identity + scopes
  *   DELETE /v1/session                         sign out (clears the cookie)
  *   GET    /v1/permissions                     MPT scope catalogue, the caller's scopes, provider capability table
@@ -94,17 +95,27 @@ async function start(env, url, now) {
 
 export async function callback(request, url, env, fetchFn = fetch, now = () => Date.now()) {
   const clear = `${COOKIE}=; Max-Age=0; Path=/oauth/google; HttpOnly; Secure; SameSite=Lax`;
-  const error = url.searchParams.get('error');
-  if (error) return json({ ok: false, error }, 400, { 'Set-Cookie': clear });
-
+  // Verify the state cookie first: it is the only thing that tells us whether this was a session-mode sign-in
+  // (failures then go back to the site as ?oauth_error=) or the original probe (failures stay JSON, as verified live).
   const saved = await verify(readCookie(request, COOKIE), env.STATE_SIGNING_KEY, now());
+  const sessionMode = saved?.mode === 'session';
+
+  const error = url.searchParams.get('error');
+  if (error) {
+    // Never echo the provider's string into our redirect: map it to a code the site knows.
+    if (sessionMode) return sessionFailure(env, error === 'access_denied' ? 'access_denied' : 'provider_error', 400, clear);
+    return json({ ok: false, error }, 400, { 'Set-Cookie': clear });
+  }
+
   if (!saved || saved.state !== url.searchParams.get('state')) {
     return json({ ok: false, error: 'invalid_state' }, 400, { 'Set-Cookie': clear });
   }
   const code = url.searchParams.get('code');
-  if (!code) return json({ ok: false, error: 'missing_code' }, 400, { 'Set-Cookie': clear });
+  if (!code) {
+    if (sessionMode) return sessionFailure(env, 'missing_code', 400, clear);
+    return json({ ok: false, error: 'missing_code' }, 400, { 'Set-Cookie': clear });
+  }
 
-  const sessionMode = saved.mode === 'session';
   let accessToken;
   try {
     const tokens = await exchangeCode({
@@ -152,6 +163,7 @@ export async function callback(request, url, env, fetchFn = fetch, now = () => D
     return new Response(JSON.stringify({ ok: true, session: true }), { status: 200, headers });
   } catch (e) {
     log('oauth_callback_failed', { detail: String(e?.message || 'error').slice(0, 80) });
+    if (sessionMode) return sessionFailure(env, 'connect_failed', 502, clear);
     return json({ ok: false, error: e.message }, 502, { 'Set-Cookie': clear });
   } finally {
     if (accessToken) await revoke(accessToken, fetchFn).catch(() => {});
