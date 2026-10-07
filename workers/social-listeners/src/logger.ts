@@ -1,7 +1,7 @@
-// Logging seam for social-listeners. The task spec calls for `@mpt/utils`, but no such package exists in
-// this repo yet (no workspaces, no packages/ dir). Everything logs through here so swapping to
-// `import { createLogger } from "@mpt/utils"` is a one-line change once it lands.
-// Never pass message content, tokens or signatures to the logger: metadata only.
+// Structured logging for social-listeners, routed through the shared @mpt/utils `log` (one JSON line per event).
+// Never pass message content, tokens or signatures: metadata only.
+import { log } from "@mpt/utils";
+
 export interface Logger {
   info(event: string, meta?: Record<string, unknown>): void;
   warn(event: string, meta?: Record<string, unknown>): void;
@@ -9,8 +9,7 @@ export interface Logger {
 }
 
 export function createLogger(scope: string): Logger {
-  const emit = (level: "info" | "warn" | "error", event: string, meta: Record<string, unknown> = {}) =>
-    console[level](JSON.stringify({ level, scope, event, ...meta }));
+  const emit = (level: string, event: string, meta: Record<string, unknown> = {}) => log(scope, event, { level, ...meta });
   return {
     info: (e, m) => emit("info", e, m),
     warn: (e, m) => emit("warn", e, m),

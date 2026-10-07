@@ -1,0 +1,19 @@
+{
+  "name": "@mpt/core-brain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@mpt/utils": "*",
+    "@supabase/supabase-js": "^2.117.2",
+    "openai": "^6.0.0",
+    "twilio": "^6.1.2"
+  },
+  "devDependencies": {
+    "wrangler": "^4.148.0"
+  }
+}
