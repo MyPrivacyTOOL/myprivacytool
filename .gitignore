@@ -37,3 +37,4 @@ test-results
 
 # wrangler local dev state
 .wrangler
+supabase/.env

@@ -17,7 +17,7 @@ const toIsoDate = (d: string) => {
 
 const blogContent: { [key: string]: React.ReactNode } = {
   "how-exposed-are-you": (
-      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+      <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand max-w-none">
         <p>Your digital footprint is likely larger than you think. Your personal data is collected, packaged, sold, and used in ways you may not have agreed to, and you can take control of it.</p>
         
         <h2>The 46 Privacy Vectors Exposing Your Data</h2>
@@ -100,7 +100,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
       </div>
   ),
   "25-years-mass-surveillance": (
-      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+      <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand max-w-none">
         <p>A generation has grown up under constant digital surveillance. From CCTV networks to smartphone tracking, we've normalized the abnormal. It's time to ask for a different future.</p>
         
         <h2>The Timeline: How We Got Here</h2>
@@ -199,7 +199,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
       </div>
   ),
   "linkedin-data-brokers": (
-      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+      <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand max-w-none">
         <p>LinkedIn says your profile is yours to control. But companies like Apollo, ZoomInfo, Lusha, and Clearbit are legally scraping your entire profile — every job, school, skill, and connection — and reselling it to thousands of sales teams and recruiters.</p>
         
         <h2>How Your LinkedIn Data Is Collected</h2>
@@ -254,7 +254,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
       </div>
   ),
   "ai-training-data-opt-out": (
-      <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand max-w-none">
+      <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand max-w-none">
         <p>Every tweet, Reddit comment, blog post, and public profile you've ever published is now part of an AI training dataset. OpenAI, Google, Meta, and dozens of startups have already ingested billions of lines of your data into their models. The question is no longer "is my data in AI?" — it's "where can I opt out?"</p>
         
         <h2>How Your Data Became AI Training Material</h2>
@@ -509,7 +509,7 @@ export default function BlogPost() {
             </nav>
           )}
 
-          <div className="prose prose-headings:text-foreground prose-p:text-foreground prose-li:text-foreground prose-strong:text-foreground prose-a:text-brand prose-lg max-w-none">
+          <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand article-lg max-w-none">
             {post.content}
 
             {guide && guide.faqs.length > 0 && (
