@@ -1,0 +1,19 @@
+# MPT (MyPrivacyTOOL) social-listeners: inbound social/webhook listener (MPT-1002, FLEET-TASK-V4.2).
+name = "mpt-social-listeners"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+ENVIRONMENT = "development"
+
+# Microdrama: listeners hand events to the brain over a service binding.
+[[services]]
+binding = "CORE_BRAIN"
+service = "mpt-core-brain"
+
+# Secrets are NOT declared here: `wrangler secret put <NAME>` (names in EXPECTED_SECRETS.txt).
+
+[observability]
+enabled = true

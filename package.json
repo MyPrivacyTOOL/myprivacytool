@@ -17,7 +17,8 @@
     "test:e2e": "playwright test",
     "lint:tests": "eslint e2e src/test \"src/**/*.test.{ts,tsx}\" playwright.config.ts vitest.config.ts",
     "check:env": "node scripts/ci/check-env.mjs",
-    "smoke": "node scripts/ci/smoke-test.mjs"
+    "smoke": "node scripts/ci/smoke-test.mjs",
+    "dev:core-brain": "npm run dev -w @mpt/core-brain"
   },
   "dependencies": {
     "@fontsource/fira-code": "^5.3.0",
@@ -105,5 +106,10 @@
     "vite": "^5.4.19",
     "vitest": "^2.1.9",
     "yaml": "^2.9.1"
-  }
+  },
+  "workspaces": [
+    "workers/core-brain",
+    "workers/social-listeners",
+    "shared/*"
+  ]
 }
