@@ -25,7 +25,7 @@ LinkedIn apps, so Phase 1 gets API-grade scheduling without our own review. At 1
 (`/in/myprivacytool/`). Before the first post a human must:
 1. Confirm or create `linkedin.com/company/myprivacytool` and verify it.
 2. Give at least two people the **Super admin** / **Content admin** role (no single point of failure).
-3. Update `socialLinks.linkedin` to the company URL (separate small PR; the Footer reads it).
+3. ~~Update `socialLinks.linkedin` to the company URL~~ Done: it now points at `/company/myprivacytool/` (the Footer reads it). Keep it matching the page's real URL slug.
 
 ## Workflow (Phase 0)
 1. **Schedule**: [`docs/linkedin-schedule-mpc-7504.csv`](../linkedin-schedule-mpc-7504.csv), 13 rows (Thursdays from 2026-10-08).
