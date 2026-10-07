@@ -113,6 +113,122 @@
     {
       "key": "bot.confirm_prompt",
       "description": "Re-prompt on invalid reply"
+    },
+    {
+      "key": "risk.summary.low.title",
+      "description": "Risk summary header: low"
+    },
+    {
+      "key": "risk.summary.medium.title",
+      "description": "Risk summary header: medium"
+    },
+    {
+      "key": "risk.summary.high.title",
+      "description": "Risk summary header: high"
+    },
+    {
+      "key": "risk.summary.critical.title",
+      "description": "Risk summary header: critical"
+    },
+    {
+      "key": "risk.summary.unknown.title",
+      "description": "Risk summary header: not checked"
+    },
+    {
+      "key": "risk.summary.low.body",
+      "description": "Risk summary body: low"
+    },
+    {
+      "key": "risk.summary.medium.body",
+      "description": "Risk summary body: medium"
+    },
+    {
+      "key": "risk.summary.high.body",
+      "description": "Risk summary body: high"
+    },
+    {
+      "key": "risk.summary.critical.body",
+      "description": "Risk summary body: critical"
+    },
+    {
+      "key": "risk.summary.unknown.body",
+      "description": "Risk summary body: not checked"
+    },
+    {
+      "key": "risk.mirror.header",
+      "description": "Mirror header; {input} = value the user gave us"
+    },
+    {
+      "key": "risk.mirror.breaches_one",
+      "description": "Mirror line: exactly one breach"
+    },
+    {
+      "key": "risk.mirror.breaches_other",
+      "description": "Mirror line: 0 or many breaches"
+    },
+    {
+      "key": "risk.mirror.pastes_one",
+      "description": "Mirror line: exactly one paste"
+    },
+    {
+      "key": "risk.mirror.pastes_other",
+      "description": "Mirror line: many pastes (omitted when 0 or unknown)"
+    },
+    {
+      "key": "risk.mirror.breach_names",
+      "description": "Mirror line: breach names (first few)"
+    },
+    {
+      "key": "risk.mirror.data_classes",
+      "description": "Mirror line: data classes leaked"
+    },
+    {
+      "key": "risk.mirror.score",
+      "description": "Mirror line: score"
+    },
+    {
+      "key": "risk.mirror.not_checked",
+      "description": "Mirror line: why the lookup did not run"
+    },
+    {
+      "key": "risk.mirror.partial",
+      "description": "Mirror line: confidence medium"
+    },
+    {
+      "key": "risk.next.title",
+      "description": "Next steps header"
+    },
+    {
+      "key": "risk.next.change_passwords",
+      "description": "Next step"
+    },
+    {
+      "key": "risk.next.rotate_reused",
+      "description": "Next step"
+    },
+    {
+      "key": "risk.next.enable_2fa",
+      "description": "Next step"
+    },
+    {
+      "key": "risk.next.review_brokers",
+      "description": "Next step"
+    },
+    {
+      "key": "risk.next.scan_cta",
+      "description": "Next step: CTA"
+    },
+    {
+      "key": "risk.next.monitor",
+      "description": "Next step"
+    },
+    {
+      "key": "risk.next.nothing_urgent",
+      "description": "Next step"
+    },
+    {
+      "key": "risk.next.try_email",
+      "description": "Next step: unsupported input type"
     }
   ]
 }

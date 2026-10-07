@@ -23,8 +23,9 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@mpt/utils": ["./shared/utils/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "shared"]
 }

@@ -7,12 +7,12 @@ import path from "path";
 // in place and run separately in CI (npm run test:workers:node).
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: { alias: { "@": path.resolve(__dirname, "./src"), "@mpt/utils": path.resolve(__dirname, "./shared/utils/index.ts") } },
   test: {
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "workers/**/*.vitest.{js,mjs,ts}", "scripts/**/*.vitest.{js,mjs,ts}"],
+    include: ["src/**/*.test.{ts,tsx}", "shared/**/*.test.ts", "workers/**/*.vitest.{js,mjs,ts}", "scripts/**/*.vitest.{js,mjs,ts}"],
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary", "lcov", "json-summary"],
