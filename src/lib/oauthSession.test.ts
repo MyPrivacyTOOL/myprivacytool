@@ -5,7 +5,9 @@ import {
   clearSessionHint,
   fetchSession,
   hasSessionHint,
-  isSignInReturn,
+  friendlySignInError,
+  parseSignInReturn,
+  stripSignInParams,
   setSessionHint,
   signOut,
 } from "./oauthSession";
@@ -95,12 +97,43 @@ describe("oauthSession client", () => {
     });
   });
 
-  describe("isSignInReturn", () => {
-    it("is true only for the success redirect", () => {
-      expect(isSignInReturn("?channel=google")).toBe(true);
-      expect(isSignInReturn("?channel=google&oauth_error=aud_mismatch")).toBe(false);
-      expect(isSignInReturn("?channel=github")).toBe(false);
-      expect(isSignInReturn("")).toBe(false);
+  describe("parseSignInReturn", () => {
+    it("recognises the success redirect", () => {
+      expect(parseSignInReturn("?channel=google")).toEqual({ kind: "success" });
+      expect(parseSignInReturn("?utm_source=x&channel=google")).toEqual({ kind: "success" });
+    });
+
+    it("recognises a failed sign-in and gives a safe message, never the raw code", () => {
+      const r = parseSignInReturn("?channel=google&oauth_error=access_denied");
+      expect(r).toEqual({ kind: "error", message: expect.stringMatching(/cancelled/i) });
+      const unknown = parseSignInReturn("?channel=google&oauth_error=%3Cscript%3E");
+      expect(unknown?.kind).toBe("error");
+      expect(JSON.stringify(unknown)).not.toMatch(/script/);
+    });
+
+    it("ignores anything that is not the Worker's redirect", () => {
+      expect(parseSignInReturn("")).toBeNull();
+      expect(parseSignInReturn("?channel=github")).toBeNull();
+      expect(parseSignInReturn("?oauth_error=access_denied")).toBeNull();
+    });
+  });
+
+  describe("stripSignInParams", () => {
+    it("removes the sign-in markers and keeps everything else", () => {
+      expect(stripSignInParams("?channel=google")).toBe("");
+      expect(stripSignInParams("?channel=google&oauth_error=access_denied")).toBe("");
+      expect(stripSignInParams("?utm_source=x&channel=google&a=1")).toBe("?utm_source=x&a=1");
+      expect(stripSignInParams("")).toBe("");
+    });
+  });
+
+  describe("friendlySignInError", () => {
+    it("has specific copy for the cases a user can act on, and a generic fallback", () => {
+      expect(friendlySignInError("access_denied")).toMatch(/cancelled/i);
+      expect(friendlySignInError("email_not_verified")).toMatch(/isn't verified/i);
+      expect(friendlySignInError("insufficient_provider_scope")).toMatch(/email address/i);
+      expect(friendlySignInError("aud_mismatch")).toBe(friendlySignInError("whatever"));
+      expect(friendlySignInError("connect_failed")).toMatch(/couldn't finish/i);
     });
   });
 });
