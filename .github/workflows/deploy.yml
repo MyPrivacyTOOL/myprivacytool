@@ -5,7 +5,10 @@ name: Deploy core-brain & social-listeners
 #
 # Repo secrets required (Settings -> Secrets and variables -> Actions): see /SECRETS.md
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
-#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, WEBHOOK_SECRET, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET
+#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY (optional), WEBHOOK_SECRET (optional),
+#   TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET, X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN
+#
+# MPC-7257: Optional secrets will be skipped if not set. Deploy will proceed with available secrets.
 
 on:
   push:
@@ -52,7 +55,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/${{ matrix.worker }}
 
-      - name: Deploy core-brain
+      - name: Deploy core-brain (MPC-7257)
         if: matrix.worker == 'core-brain'
         uses: cloudflare/wrangler-action@v3
         with:
@@ -60,16 +63,16 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: workers/core-brain
           command: deploy
-          secrets: |
+          secrets: |-
             SUPABASE_URL
             SUPABASE_KEY
-            QWEN_API_KEY
-            WEBHOOK_SECRET
+            ${{ secrets.QWEN_API_KEY != '' && 'QWEN_API_KEY' || '' }}
+            ${{ secrets.WEBHOOK_SECRET != '' && 'WEBHOOK_SECRET' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY || 'placeholder' }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET || 'placeholder' }}
 
       - name: Deploy social-listeners
         if: matrix.worker == 'social-listeners'
@@ -79,21 +82,21 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: workers/social-listeners
           command: deploy
-          secrets: |
+          secrets: |-
             SUPABASE_URL
             SUPABASE_KEY
-            TWILIO_SID
-            TWILIO_AUTH_TOKEN
-            META_APP_SECRET
-            X_CONSUMER_SECRET
-            TELEGRAM_WEBHOOK_SECRET
-            CORE_BRAIN_TOKEN
+            ${{ secrets.TWILIO_SID != '' && 'TWILIO_SID' || '' }}
+            ${{ secrets.TWILIO_AUTH_TOKEN != '' && 'TWILIO_AUTH_TOKEN' || '' }}
+            ${{ secrets.META_APP_SECRET != '' && 'META_APP_SECRET' || '' }}
+            ${{ secrets.X_CONSUMER_SECRET != '' && 'X_CONSUMER_SECRET' || '' }}
+            ${{ secrets.TELEGRAM_WEBHOOK_SECRET != '' && 'TELEGRAM_WEBHOOK_SECRET' || '' }}
+            ${{ secrets.CORE_BRAIN_TOKEN != '' && 'CORE_BRAIN_TOKEN' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          TWILIO_SID: ${{ secrets.TWILIO_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
-          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
-          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-          CORE_BRAIN_TOKEN: ${{ secrets.CORE_BRAIN_TOKEN }}
+          TWILIO_SID: ${{ secrets.TWILIO_SID || 'placeholder' }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN || 'placeholder' }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET || 'placeholder' }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET || 'placeholder' }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET || 'placeholder' }}
+          CORE_BRAIN_TOKEN: ${{ secrets.CORE_BRAIN_TOKEN || 'placeholder' }}
