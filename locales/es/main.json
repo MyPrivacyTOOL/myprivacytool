@@ -1,0 +1,23 @@
+{
+  "bot.first_hexagon.title": "",
+  "bot.first_hexagon.name": "",
+  "bot.first_hexagon.location": "",
+  "bot.first_hexagon.phone": "",
+  "bot.first_hexagon.email": "",
+  "bot.first_hexagon.social": "",
+  "bot.first_hexagon.brokers": "",
+  "bot.first_hexagon.question": "",
+  "bot.first_hexagon.reply_y": "",
+  "bot.first_hexagon.reply_n": "",
+  "bot.confirmed_y.title": "",
+  "bot.confirmed_y.generating": "",
+  "bot.confirmed_y.cta": "",
+  "bot.confirmed_y.duration": "",
+  "bot.confirmed_n.title": "",
+  "bot.confirmed_n.cta": "",
+  "bot.confirmed_n.duration": "",
+  "bot.unknown.title": "",
+  "bot.unknown.body": "",
+  "bot.unknown.free": "",
+  "bot.confirm_prompt": ""
+}

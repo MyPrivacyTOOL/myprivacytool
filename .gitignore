@@ -28,8 +28,10 @@ coverage
 playwright-report
 test-results
 
-# Local secrets (CK-006): real values stay out of git
+# Secrets (MPT-1004): never commit real values; only .env.example is tracked
 .env
-supabase/.env
 .env.*
 !.env.example
+.dev.vars
+.dev.vars.*
+supabase/.env

@@ -1,0 +1,20 @@
+# MPT (MyPrivacyTOOL) core-brain Worker — MPT-1004. Microdrama: the brain behind the curtain.
+name = "core-brain"
+main = "index.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+# Secrets are NOT declared here: wrangler.toml cannot hold secret values, and `[vars]` would be plain text.
+# They are bound at runtime as `env.<NAME>` after `wrangler secret put <NAME>` (see /SECRETS.md) or after
+# the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
+# Names (also in EXPECTED_SECRETS.txt):
+#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY
+
+[observability]
+enabled = true
+
+# KV Namespace bindings for staging (MPT-1004)
+[[kv_namespaces]]
+binding = "MPT_STAGING_KV"
+id = "kv_staging_mpt_core_v1"
+preview_id = "kv_staging_mpt_core_v1"

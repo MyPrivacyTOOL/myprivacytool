@@ -20,7 +20,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Does the scan contact any third parties?",
-    a: "Yes. To show your IP address and approximate location, your browser requests them from two third-party services, ipify (api.ipify.org) and ipapi.co. Those services necessarily see your IP address when you run the scan.",
+    a: "Not to look up your IP address or location. We do that ourselves, using the approximate location data that our hosting provider, Cloudflare, attaches to every request, so no separate lookup service sees your IP address. Cloudflare necessarily sees your IP address, as it does for any visit to the site. Analytics and sign-up forms are covered in the questions below.",
   },
   {
     q: "What do you receive if I enter my email address?",

@@ -1,15 +1,11 @@
-name: Deploy Supabase migrations
+name: Deploy core-brain & social-listeners
 
-# CK-006 (FLEET-TASK-V4.2): every merge to main runs `supabase db push` against the live MyPrivacyTOOL (MPT)
-# Supabase project, so supabase/migrations/*.sql is the single source of schema truth.
+# MPT (MyPrivacyTOOL) MPT-1004. Microdrama: tests first, curtain up only on green.
+# Push to main -> npm install + npm test -> deploy both Workers with wrangler-action@v3 and sync secrets.
 #
-# Repo secrets required (Settings -> Secrets and variables -> Actions); values are never printed:
-#   SUPABASE_ACCESS_TOKEN  personal access token (supabase.com/dashboard/account/tokens)
-#   SUPABASE_DB_PASSWORD   the project's database password
-#   SUPABASE_PROJECT_ID    project ref (xmdmkumwxpgahmlweuug)
-#
-# Safety: `db push --dry-run` logs the pending migrations first, so the job log shows exactly what will run.
-# `db push` is a no-op when nothing is pending. Rollback notes live at the bottom of each migration file.
+# Repo secrets required (Settings -> Secrets and variables -> Actions): see /SECRETS.md
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
+#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET
 
 on:
   push:
@@ -20,37 +16,76 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-supabase-migrations
+  group: deploy-core-workers
   cancel-in-progress: false
 
 jobs:
-  db-push:
-    name: supabase db push
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm test
 
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        worker: [core-brain, social-listeners]
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Pre-deployment checks (secrets present)
-        run: node scripts/ci/check-env.mjs --require SUPABASE_ACCESS_TOKEN,SUPABASE_DB_PASSWORD,SUPABASE_PROJECT_ID
+      - name: Pre-deployment checks (Cloudflare credentials, Worker config)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/${{ matrix.worker }}
 
-      - uses: supabase/setup-cli@v1
+      - name: Deploy core-brain
+        if: matrix.worker == 'core-brain'
+        uses: cloudflare/wrangler-action@v3
         with:
-          version: latest
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/core-brain
+          command: deploy
+          secrets: |
+            SUPABASE_URL
+            SUPABASE_KEY
+            QWEN_API_KEY
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
 
-      - name: Link project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Pending migrations (dry run)
-        run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Apply migrations
-        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Deploy social-listeners
+        if: matrix.worker == 'social-listeners'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/social-listeners
+          command: deploy
+          secrets: |
+            SUPABASE_URL
+            SUPABASE_KEY
+            TWILIO_SID
+            TWILIO_AUTH_TOKEN
+            META_APP_SECRET
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TWILIO_SID: ${{ secrets.TWILIO_SID }}
+          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}

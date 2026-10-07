@@ -34,3 +34,7 @@ namespace_id = "7350"
   [ratelimits.simple]
   limit = 10
   period = 60
+
+# MPC-7500: retry sweep for leads whose Hunter enrichment failed (keeps B2B enrichment inside 5 minutes).
+[triggers]
+crons = ["*/5 * * * *"]
