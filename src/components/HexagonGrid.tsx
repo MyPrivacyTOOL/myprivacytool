@@ -2,12 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } fro
 import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
-import LanguageIntelligencePanel from './LanguageIntelligencePanel';
-import FingerprintPanel from './FingerprintPanel';
-import SocialAccountsPanel from './SocialAccountsPanel';
-import SecurityPanel from './SecurityPanel';
-import BehaviorPanel from './BehaviorPanel';
-import DNSLeakFixGuide from './DNSLeakFixGuide';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
@@ -36,6 +30,12 @@ import confetti from 'canvas-confetti';
 
 // MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
 const StoragePanel = lazy(() => import('./StoragePanel'));
+const LanguageIntelligencePanel = lazy(() => import('./LanguageIntelligencePanel'));
+const FingerprintPanel = lazy(() => import('./FingerprintPanel'));
+const SocialAccountsPanel = lazy(() => import('./SocialAccountsPanel'));
+const SecurityPanel = lazy(() => import('./SecurityPanel'));
+const BehaviorPanel = lazy(() => import('./BehaviorPanel'));
+const DNSLeakFixGuide = lazy(() => import('./DNSLeakFixGuide'));
 const FinalSummaryPanel = lazy(() => import('./FinalSummaryPanel'));
 
 interface HexagonGridProps {
@@ -92,6 +92,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const [showSecurityPanel, setShowSecurityPanel] = useState(false);
   const [securityConfirmedCount, setSecurityConfirmedCount] = useState(0);
   const [showDNSFixGuide, setShowDNSFixGuide] = useState(false);
+  const dnsGuideMounted = useRef(false);
+  if (showDNSFixGuide) dnsGuideMounted.current = true;
   const [criticalSecurityAlert, setCriticalSecurityAlert] = useState<{
     type: 'dns' | 'webrtc' | null;
     message: string;
@@ -564,11 +566,16 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* DNS Leak Fix Guide Modal */}
-      <DNSLeakFixGuide
-        open={showDNSFixGuide}
-        onOpenChange={setShowDNSFixGuide}
-        currentLeak={dnsLeakData}
-      />
+      {/* Mounted on first open and kept mounted so the dialog's close animation still plays. */}
+      {dnsGuideMounted.current && (
+        <Suspense fallback={null}>
+          <DNSLeakFixGuide
+            open={showDNSFixGuide}
+            onOpenChange={setShowDNSFixGuide}
+            currentLeak={dnsLeakData}
+          />
+        </Suspense>
+      )}
 
       {/* Title Section */}
       <div className={`text-center mb-4 sm:mb-8 ${criticalSecurityAlert ? 'mt-14' : ''}`}>
@@ -675,18 +682,22 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {/* Language Intelligence Panel - shown after 8 confirmations */}
       {showLanguagePanel && (
         <div className="mt-8 animate-fade-in">
-          <LanguageIntelligencePanel
-            analysis={languageAnalysis}
-            prediction={languagePrediction}
-            isLoading={isLoadingPrediction}
-          />
+          <Suspense fallback={null}>
+            <LanguageIntelligencePanel
+              analysis={languageAnalysis}
+              prediction={languagePrediction}
+              isLoading={isLoadingPrediction}
+            />
+          </Suspense>
         </div>
       )}
 
       {/* Fingerprint Panel - shown after confirming 3+ fingerprint hexagons */}
       {showFingerprintPanel && (
         <div className="mt-8 animate-fade-in">
-          <FingerprintPanel />
+          <Suspense fallback={null}>
+            <FingerprintPanel />
+          </Suspense>
         </div>
       )}
 
@@ -702,21 +713,27 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {/* Social Accounts Panel - shown after confirming 3+ social hexagons */}
       {showSocialPanel && (
         <div className="mt-8 animate-fade-in">
-          <SocialAccountsPanel />
+          <Suspense fallback={null}>
+            <SocialAccountsPanel />
+          </Suspense>
         </div>
       )}
 
       {/* Security Panel - shown after confirming 3+ security hexagons */}
       {showSecurityPanel && (
         <div className="mt-8 animate-fade-in">
-          <SecurityPanel onClose={() => setShowSecurityPanel(false)} />
+          <Suspense fallback={null}>
+            <SecurityPanel onClose={() => setShowSecurityPanel(false)} />
+          </Suspense>
         </div>
       )}
 
       {/* Behavior Panel - shown after confirming 3+ behavior hexagons */}
       {showBehaviorPanel && (
         <div className="mt-8 animate-fade-in">
-          <BehaviorPanel onClose={() => setShowBehaviorPanel(false)} />
+          <Suspense fallback={null}>
+            <BehaviorPanel onClose={() => setShowBehaviorPanel(false)} />
+          </Suspense>
         </div>
       )}
 

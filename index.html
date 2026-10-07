@@ -49,8 +49,10 @@
     <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Preconnect to external domains for performance -->
-    <link rel="preconnect" href="https://api.ipify.org" />
-    <link rel="preconnect" href="https://ipapi.co" />
+    <!-- MPC-7200: ipify/ipapi preconnects removed (the scan now asks our own Worker, /whoami); they were unused and
+         opened connections to third parties before any consent choice. Preconnect only what the home page really uses. -->
+    <link rel="preconnect" href="https://mpt-leads.myprivacytool.workers.dev" crossorigin />
+    <link rel="preconnect" href="https://c.delivery.consentmanager.net" crossorigin />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://cdn.consentmanager.net" />
 
