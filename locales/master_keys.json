@@ -26,8 +26,8 @@
       "description",
       "status"
     ],
-    "schema_note": "No `localization` table exists in Supabase project xmdmkumwxpgahmlweuug as of 2026-10-07; row shape above is the proposed schema. Reconcile when the table is created.",
-    "placeholder_policy": "Non-en values are empty strings and status=placeholder until translated."
+    "schema_note": "Matches public.localization (migration 20261007030000_mpt_1003_localization_table.sql, applied 2026-10-07 to xmdmkumwxpgahmlweuug).",
+    "placeholder_policy": "Non-en values are empty strings (not loadable: value is NOT NULL) until translated; load only non-empty values, status=draft."
   },
   "keys": [
     {
