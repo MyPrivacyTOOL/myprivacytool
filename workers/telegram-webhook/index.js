@@ -17,43 +17,7 @@
  *   WEBHOOK_SECRET       — random string for verification
  */
 
-const FIRST_HEXAGON = `🔍 *Here's what's publicly known about you right now:*
-
-✅ Name: visible from your Telegram profile
-✅ Location: city & country estimable from IP
-⚠️ Phone: possibly linked to this account
-⚠️ Email: may be findable via data brokers
-⚠️ Social profiles: cross-platform links detected
-🚨 Data broker exposure: estimated 40+ sites
-
----
-Is this data about you?
-
-Reply *Y* to see your full privacy report and start removing yourself from data broker sites.
-
-Reply *N* if this profile doesn't match you — we'll run a fresh scan.`;
-
-const CONFIRMED_Y = `✅ *Confirmed.*
-
-Your full privacy report is being generated now.
-
-👉 Go here to see it and start the removal process:
-https://myprivacytool.io/scan
-
-We'll walk you through every step. It takes about 5 minutes.`;
-
-const CONFIRMED_N = `🔍 *No problem — let's find the right profile.*
-
-Run a fresh scan with your details here:
-https://myprivacytool.io/scan
-
-Takes 30 seconds.`;
-
-const UNKNOWN = `👋 *Welcome to MyPrivacyTOOL.*
-
-Send me your name or just say *"scan me"* and I'll show you what data brokers know about you right now.
-
-It's free. No signup needed.`;
+import { resolveLocale, firstHexagon, confirmedY, confirmedN, unknown, confirmPrompt } from "./messages.js";
 
 async function sendTelegramMessage(chatId, text, token) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
@@ -134,6 +98,7 @@ export default {
     const from = message.from || {};
     const firstName = from.first_name || "";
     const lastName = from.last_name || "";
+    const locale = resolveLocale(from.language_code);
 
     // Get current conversation state
     const state = await getConversationState(env.MPT_KV, chatId);
@@ -143,7 +108,7 @@ export default {
 
     if (state.stage === "new" || text === "start" || text === "/start" || text === "scan me" || text === "scan") {
       // Send First Hexagon
-      replyText = FIRST_HEXAGON;
+      replyText = firstHexagon(locale);
       nextStage = "awaiting_confirmation";
 
       // Create HubSpot contact (fire and forget)
@@ -151,16 +116,16 @@ export default {
 
     } else if (state.stage === "awaiting_confirmation") {
       if (text === "y" || text === "yes") {
-        replyText = CONFIRMED_Y;
+        replyText = confirmedY(locale);
         nextStage = "confirmed";
       } else if (text === "n" || text === "no") {
-        replyText = CONFIRMED_N;
+        replyText = confirmedN(locale);
         nextStage = "declined";
       } else {
-        replyText = "Reply *Y* to confirm this is you, or *N* if not.";
+        replyText = confirmPrompt(locale);
       }
     } else {
-      replyText = UNKNOWN;
+      replyText = unknown(locale);
       nextStage = "awaiting_confirmation";
     }
 
