@@ -37,8 +37,7 @@ by a newer push via the concurrency group). That proves the site returned 200 an
 
 **Limit of that evidence:** the smoke test does not check *which commit* is being served. Most post-push runs finished
 in about 15 seconds, so it passed against the previous deploy and cannot show the new one went out. A stuck or failed
-Pages build would still be green. Recommended follow-up: stamp the commit SHA into the build (for example
-`/version.json`) and have `smoke-site.yml` wait until it equals `GITHUB_SHA`.
+Pages build would still be green. **Fixed in the follow-up PR:** the build writes `/version.json` (`{sha, builtAt}` from `CF_PAGES_COMMIT_SHA`), served `no-store`, and the post-push smoke run now waits (up to ~10 min) until it equals the pushed commit (`--expect-sha`). A red run now means the new commit is not live.
 
 ## 4. Not verified (needs Cloudflare dashboard access)
 
@@ -49,10 +48,10 @@ Pages build would still be green. Recommended follow-up: stamp the commit SHA in
   is known unset, MPC-7172).
 - Branch protection with required check **CI gate** is a repo setting (`docs/ci-cd-testing.md` s.2); not checked.
 
-## 5. How to verify a merge went live (until the SHA check exists)
+## 5. How to verify a merge went live
 
 1. Merge to `main`; open Cloudflare Pages -> Deployments and confirm a new Production deploy for the merge commit.
-2. Check the "Live smoke test" run on that commit is green.
+2. Check the "Live smoke test" run on that commit is green (it now proves `/version.json` serves that commit). By hand: open `https://www.myprivacytool.io/version.json`.
 3. Open the changed page on `https://www.myprivacytool.io` in a private window (HTML revalidates; hashed assets are immutable per `public/_headers`).
 4. Roll back via Pages -> Deployments -> "Rollback to this deployment", then revert on `main`.
 

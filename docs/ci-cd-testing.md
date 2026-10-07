@@ -64,7 +64,7 @@ typecheck. Clear the backlog, then drop `continue-on-error`.
 | Secrets survive | existing steps in each deploy workflow | Secret names before vs. after the deploy must match (unchanged). |
 | Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads` and `deploy-oauth-poc` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. |
 | Auto-rollback | same workflows | If the smoke step fails, `wrangler rollback` restores the previous version and the smoke test re-runs. The job stays red either way. |
-| Site smoke | `.github/workflows/smoke-site.yml` | After each push to `main` (waits up to ~10 min for Cloudflare Pages), every 6 h, and on demand: 7 conversion routes return 200 with the SPA shell, sitemap is served, plus both public Workers. |
+| Site smoke | `.github/workflows/smoke-site.yml` | After each push to `main` (waits up to ~10 min for Cloudflare Pages until `/version.json` serves the pushed commit SHA), every 6 h, and on demand: 7 conversion routes return 200 with the SPA shell, sitemap is served, plus both public Workers. |
 
 Run any smoke test by hand: `node scripts/ci/smoke-test.mjs <site|mpt-leads|oauth-poc> [--base-url URL]`.
 

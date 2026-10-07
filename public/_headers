@@ -12,6 +12,10 @@
 /
   Cache-Control: public, max-age=0, must-revalidate
 
+# Deploy marker (MPC-7505): the smoke test compares its sha to the pushed commit, so it must never be cached.
+/version.json
+  Cache-Control: no-store
+
 # Unhashed static files: cache a day at the browser, a week at the edge, serve stale while refreshing.
 /*.jpg
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800

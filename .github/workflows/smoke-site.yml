@@ -39,7 +39,7 @@ jobs:
       - name: Smoke test ${{ matrix.target }}
         run: |
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ matrix.target }}" = "site" ]; then
-            node scripts/ci/smoke-test.mjs site --retries 20 --delay-ms 30000
+            node scripts/ci/smoke-test.mjs site --retries 20 --delay-ms 30000 --expect-sha "${{ github.sha }}"
           else
             node scripts/ci/smoke-test.mjs ${{ matrix.target }} --retries 3 --delay-ms 15000
           fi

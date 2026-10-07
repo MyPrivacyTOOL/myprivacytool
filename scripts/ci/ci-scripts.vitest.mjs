@@ -75,6 +75,16 @@ describe("smoke-test targets", () => {
     const failed = (await targets.site("https://s", f)).filter((x) => !x.ok).map((x) => x.name);
     expect(failed).toEqual(expect.arrayContaining(["GET /contact -> 200", "GET /start serves the SPA shell", "GET /sitemap.xml -> 200 XML"]));
   });
+  it("site: with expectSha, passes only when /version.json serves that commit", async () => {
+    const mk = (sha) => async (u) => (u.endsWith("sitemap.xml") ? resp(200, { body: "<urlset></urlset>" }) : u.endsWith("version.json") ? resp(200, { json: { sha } }) : resp(200, { body: shell }));
+    expect((await targets.site("https://s", mk("abc1234"), { expectSha: "abc1234" })).every((x) => x.ok)).toBe(true);
+    const stale = (await targets.site("https://s", mk("old0000"), { expectSha: "abc1234" })).filter((x) => !x.ok);
+    expect(stale.map((x) => x.name)).toEqual(["GET /version.json sha == abc1234"]);
+  });
+  it("site: with expectSha, fails when /version.json is missing (SPA fallback HTML)", async () => {
+    const f = async (u) => (u.endsWith("sitemap.xml") ? resp(200, { body: "<urlset></urlset>" }) : u.endsWith("version.json") ? { ...resp(200, { body: shell }), json: async () => { throw new Error("html"); } } : resp(200, { body: shell }));
+    expect((await targets.site("https://s", f, { expectSha: "abc1234" })).some((x) => !x.ok)).toBe(true);
+  });
   it("mpt-leads: passes against a healthy Worker and only POSTs the healthcheck address", async () => {
     const seen = [];
     const r = await targets["mpt-leads"]("https://w", async (u, o) => { seen.push(o); return leadsOk(u, o); });
