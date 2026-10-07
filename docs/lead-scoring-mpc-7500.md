@@ -21,6 +21,8 @@ In: `workers/mpt-leads` (`lead-scoring.js`, `worker.js`, `wrangler.toml` cron), 
 6. In-Worker alert for High Priority: Slack (existing bot), plus Resend email if `ALERT_EMAIL` is set.
 
 ## HubSpot setup (one-time)
+Properties: `HUBSPOT_TOKEN=<private-app token, scope crm.schemas.contacts.write> node scripts/hubspot-setup-mpc-7500.mjs` creates all five (idempotent). Or create them by hand as below.
+
 Contact properties (group `contactinformation`):
 
 | Internal name | Type | Notes |
