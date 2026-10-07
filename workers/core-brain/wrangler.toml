@@ -12,3 +12,9 @@ workers_dev = true
 
 [observability]
 enabled = true
+
+# KV Namespace bindings for staging (MPT-1004)
+[[kv_namespaces]]
+binding = "MPT_STAGING_KV"
+id = "kv_staging_mpt_core_v1"
+preview_id = "kv_staging_mpt_core_v1"
