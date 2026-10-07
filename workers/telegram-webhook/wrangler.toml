@@ -2,11 +2,10 @@ name = "mpt-telegram-webhook"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
-# KV namespace — create with: wrangler kv:namespace create "MPT_KV"
-# Then paste the resulting id below
+# KV namespace MPT_KV (MPT Cloudflare account, created 2026-10-07). Stores per-chat conversation state.
 [[kv_namespaces]]
 binding = "MPT_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "7471214ae91d4bbebfceefd5bfefc03f"
 
 # Environment variables — set in Cloudflare Dashboard (not committed to git)
 # TELEGRAM_BOT_TOKEN
