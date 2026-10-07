@@ -15,6 +15,24 @@ async function rateLimited(env, request) {
   } catch (_) { return false; }
 }
 
+function whoami(request, cors) {
+  const cf = request.cf || {};
+  let country = cf.country || '';
+  try { if (country) country = new Intl.DisplayNames(['en'], { type: 'region' }).of(country) || country; } catch (_) { /* keep ISO code */ }
+  const body = {
+    ip: request.headers.get('CF-Connecting-IP') || '',
+    city: cf.city || '',
+    region: cf.region || '',
+    country_name: country,
+    latitude: Number(cf.latitude) || 0,
+    longitude: Number(cf.longitude) || 0,
+    org: cf.asOrganization || '',
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const allow = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -23,7 +41,7 @@ export default {
 
     const cors = {
       'Access-Control-Allow-Origin': corsOrigin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
@@ -34,6 +52,13 @@ export default {
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: cors });
+    }
+    // MPC-7350: the visitor's own IP and approximate location, read from Cloudflare's request data, so the browser
+    // no longer has to ask third-party lookup services (ipify, ipapi.co). This route stores nothing.
+    if (request.method === 'GET' && new URL(request.url).pathname === '/whoami') {
+      if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
+      if (await rateLimited(env, request)) return reject(429, 'Too many requests');
+      return whoami(request, cors);
     }
     if (request.method !== 'POST') {
       return new Response('Not found', { status: 404 });
