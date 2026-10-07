@@ -36,6 +36,14 @@ type = "ratelimit"
 namespace_id = "7350"
 simple = { limit = 10, period = 60 }
 
+# TEMPORARY PROBE (MPC-7350): /whoami has its own limiter at 1 request / 10s so enforcement can be proven without touching
+# lead capture. Replace with a normal limit once proven.
+[[unsafe.bindings]]
+name = "RATE_LIMITER_WHOAMI"
+type = "ratelimit"
+namespace_id = "7352"
+simple = { limit = 1, period = 10 }
+
 # MPC-7500: retry sweep for leads whose Hunter enrichment failed (keeps B2B enrichment inside 5 minutes).
 [triggers]
 crons = ["*/5 * * * *"]

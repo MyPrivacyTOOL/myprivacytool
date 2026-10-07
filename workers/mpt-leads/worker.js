@@ -10,10 +10,10 @@ const htmlEsc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 // Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[unsafe.bindings]] type "ratelimit"). Fails open if the
 // binding is absent or errors so a platform hiccup never drops a real lead.
 // Returns 'limited' | 'ok' | 'absent' (no binding) | 'error' (binding threw; request is let through).
-async function rateLimitState(env, request) {
-  if (!env.RATE_LIMITER) return 'absent';
+async function rateLimitState(env, request, limiter = env.RATE_LIMITER) {
+  if (!limiter) return 'absent';
   try {
-    const { success } = await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
+    const { success } = await limiter.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
     return success ? 'ok' : 'limited';
   } catch (e) {
     console.warn('rate limiter error:', String(e && e.message || e).slice(0, 200));
@@ -68,7 +68,7 @@ export default {
     // no longer has to ask third-party lookup services (ipify, ipapi.co). This route stores nothing.
     if (request.method === 'GET' && new URL(request.url).pathname === '/whoami') {
       if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
-      const rl = await rateLimitState(env, request);
+      const rl = await rateLimitState(env, request, env.RATE_LIMITER_WHOAMI || env.RATE_LIMITER);
       if (rl === 'limited') return reject(429, 'Too many requests');
       return whoami(request, cors, rl);
     }
