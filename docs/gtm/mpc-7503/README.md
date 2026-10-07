@@ -2,9 +2,9 @@
 
 Status: scenario built in Make but **inactive**; nothing has been published. It needs three human steps (below) before it can go live.
 
-## What exists in Make (EU1, org "My Organization", team "My Team")
-- Webhook `MPC-7503 blog published` (hook id 3851759). The URL is a secret: store it as `MAKE_DISTRIBUTION_WEBHOOK_URL`, never commit it.
-- Scenario `MPC-7503 Content distribution (Blog → X → Reddit)` (id 7803974), **inactive**: webhook → router → (1) X post via the HTTP module (`POST https://api.x.com/2/tweets`, OAuth 2.0), (2) Reddit link post. The router keeps the two channels independent, so a Reddit failure does not block X.
+## What exists in Make (EU1, org "My Lab" (4179), team "My Team" (5068), owned by the myprivacytool@gmail.com Make account. Do not use the cransford@gmail.com account for this project)
+- Webhook `MPC-7503 blog published` (hook id 3856260). The URL is a secret: store it as `MAKE_DISTRIBUTION_WEBHOOK_URL`, never commit it.
+- Scenario `MPC-7503 Content distribution (Blog → X → Reddit)` (id 7817044), **inactive**: webhook → router → (1) X post via the HTTP module (`POST https://api.x.com/2/tweets`, OAuth 2.0), (2) Reddit link post. The router keeps the two channels independent, so a Reddit failure does not block X.
 - `blueprint.json` is the same scenario, kept for review and rollback.
 
 ## Webhook payload
