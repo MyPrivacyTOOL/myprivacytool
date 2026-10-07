@@ -82,6 +82,6 @@ Method: static review of the repo and the Cloudflare account. I could not query 
 
 - Ad-blocker probe to google-analytics.com before consent: already fixed on main by MPC-7350 (#100).
 - Cookie Policy "Session Recording" line removed (no recorder exists); replaced with a statement that no session recording or heatmap tools are used.
-- Pre-consent IP/location lookups (ipify, ipapi.co) are now disclosed in the Cookie Policy and Privacy 2.2. They are still made before consent; whether they should wait for consent is a product decision for Chris.
+- Pre-consent IP/location lookups (ipify, ipapi.co) are now disclosed in the Cookie Policy and Privacy 2.2. They are still made before consent; Decision (Chris, 2026-10-07): they do NOT wait for consent; disclosure only. Do not gate them without asking.
 - HubSpot: the site never loads the HubSpot tracking script (no `hs-scripts` in `index.html` or `src/`); it only POSTs forms to `api.hsforms.com` on submit and reads `hubspotutk` if present. If a `hubspotutk` cookie exists it must come from the Consentmanager tag configuration; the Cookie Policy wording should be checked against that dashboard.
 - GA4 consent gating is still unverified in a browser (needs the Network screenshot of the first requests on a fresh load).
