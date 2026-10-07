@@ -33,8 +33,9 @@ export function buildConfirmationEmail() {
   return { subject, text, html };
 }
 
-export function buildReportEmail({ scan, breaches, breachStatus, brokers }) {
+export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror }) {
   const s = scan;
+  const mirrorLines = mirror ? mirror.hexagons.map((h) => `- ${h.label}: ${h.status === 'checked' ? `checked, ${h.score}/100` : 'not yet checked'}`) : [];
   const partialNote = s.score === null
     ? 'No privacy score yet: we have not been able to check anything about you automatically, so we will not invent a number.'
     : s.partial
@@ -54,6 +55,7 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers }) {
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
   const text = [
     s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, partialNote, '',
+    ...(mirror ? ['YOUR MIRROR (what we could and could not see)', ...mirrorLines, ''] : []),
     'EMAIL BREACHES', ...breachLines, '',
     'PEOPLE-SEARCH SITES', ...brokerLines, '',
     `More removal guides: ${SITE}/opt-out`, 'Reply to this email to ask a question or have your data deleted.',
@@ -61,6 +63,7 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers }) {
   const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:640px;margin:0 auto;padding:20px;color:#111">
 <h2>${s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 <small style="color:#666">(${esc(s.risk_level)} exposure)</small>`}</h2>
 <p style="background:#f4f4f5;padding:10px;border-radius:6px">${esc(partialNote)}</p>
+${mirror ? `<h3>Your mirror <small style="color:#666">(what we could and could not see)</small></h3><ul>${mirror.hexagons.map((h) => `<li>${esc(h.label)}: ${h.status === 'checked' ? `checked, ${h.score}/100` : 'not yet checked'}</li>`).join('')}</ul>` : ''}
 <h3>Email breaches</h3>${breachStatus !== 'checked' ? '<p>Not yet checked by us. <a href="https://haveibeenpwned.com">Check your own address free at haveibeenpwned.com</a> (10 seconds). If it appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.</p>'
     : breaches.length === 0 ? '<p>Your email address was not found in any breach known to Have I Been Pwned.</p>'
     : `<ul>${breaches.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7))}): ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}</ul><p>Change the password on any listed service, and anywhere you reused it.</p>`}
@@ -74,12 +77,12 @@ ${b.steps ? `<ol>${b.steps.map((st) => `<li>${esc(st)}</li>`).join('')}</ol>` : 
   return { subject, text, html };
 }
 
-export async function sendEmail(env, { to, subject, html, text, idempotencyKey }, fetchImpl = fetch) {
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers }, fetchImpl = fetch) {
   if (!env.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
   const res = await fetchImpl('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ from: env.EMAIL_FROM || 'MyPrivacyTOOL <hello@myprivacytool.io>', to: [to], reply_to: env.EMAIL_REPLY_TO || undefined, subject, html, text }),
+    body: JSON.stringify({ from: env.EMAIL_FROM || 'MyPrivacyTOOL <hello@myprivacytool.io>', to: [to], reply_to: env.EMAIL_REPLY_TO || undefined, subject, html, text, headers: headers || undefined }),
   });
   if (!res.ok) return { sent: false, reason: `Resend HTTP ${res.status}: ${(await res.text()).slice(0, 150)}` };
   const j = await res.json().catch(() => ({}));
