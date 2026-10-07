@@ -9,7 +9,7 @@ Checked 2026-10-06 against GA4 property 515216281 (`G-1BWMDBJSPL`) through the c
 | Event emitted in code | Yes. `trackScanCompleted` (`src/lib/analytics.ts`) fires once per page session from `HexagonGrid.tsx` when all 46+ hexagons are confirmed. Added in MPC-7170 (#56, 2026-10-05). |
 | `privacy_scan_completed` received by GA4 | **Not yet seen.** 0 rows for the last 30 days. |
 | Property is receiving other custom events | Yes: 27 event names in 30 days, e.g. `funnel_step` 117, `hexagon_confirm` 15, `device_profile` 55, `generate_lead` 135. |
-| `analytics.edit` scope active | **Unverified.** The connection can run Data API reports (`analytics.readonly` is enough). Scopes cannot be read from the connector, and proving `analytics.edit` needs an Admin API write (for example creating a custom dimension or key event), which was not done. |
+| `analytics.edit` scope active | **No (confirmed 2026-10-07).** Creating the `step_name` custom dimension returned 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT` (Admin API `CreateCustomDimension`). Reads work; the connection only has read scopes. Property has 0 custom dimensions and 0 custom metrics today. |
 
 ## Reading
 
@@ -21,5 +21,5 @@ Other observation: `generatelead2` (125 events) sits beside `generate_lead` (135
 
 1. Confirm the MPC-7170 deploy is live on production, then complete one full scan with cookies accepted and check GA4 DebugView / Realtime for `privacy_scan_completed` (`hexagon_count`, `funnel_step`).
 2. Re-run the report after 24-48 hours (`eventName = privacy_scan_completed`).
-3. Scope check: with the dashboard-building account, create `hexagon_count` as an event-scoped custom metric or mark the event as a key event. Success proves `analytics.edit`; a 403 means re-authorise with `https://www.googleapis.com/auth/analytics.edit`.
+3. Re-authorise the Google Analytics connection with `https://www.googleapis.com/auth/analytics.edit`, then retry creating the custom dimensions (`step_name`, `hexagon_count`) from the connector. Alternatively create them in the GA4 UI (Admin > Custom definitions).
 4. Register `hexagon_count` as a custom metric before building dashboards on it.
