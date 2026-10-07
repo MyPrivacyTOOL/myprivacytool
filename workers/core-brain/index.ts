@@ -4,6 +4,9 @@
 //                (OpenAI-compatible endpoint), looks up the sender's trust level in Supabase
 //                `conversation_states`, and returns a localized response KEY (MPT-1003 `public.localization`).
 //                The caller resolves the key to text and sends it; this Worker never talks to the platforms.
+// POST /ingest/social  MPC-8301 hand-off from social-listeners: { source: "x"|"telegram", receivedAt, payload }.
+//                Auth: `Authorization: Bearer <WEBHOOK_SECRET>` (social-listeners holds it as CORE_BRAIN_TOKEN), required on
+//                the service-binding path too. Verified events with no user text answer 200 { ignored: true }, no retry.
 // GET  /health   liveness + whether the required bindings are present (booleans only).
 //
 // Payload (JSON): { platform, sender_id, message_text, locale? }
@@ -206,32 +209,31 @@ function decide(intent: Intent, text: string, st: BrainState): string[] {
   return KEYS.welcome;
 }
 
-async function handleWebhook(request: Request, env: Env, log: Logger): Promise<Response> {
+/** Shared front door for the POST routes: method, configuration, auth, size and JSON checks. */
+async function readAuthorizedJson(request: Request, env: Env, log: Logger, authorized: (r: Request) => boolean): Promise<unknown | Response> {
   if (request.method !== "POST") {
     return json({ error: { code: "method_not_allowed", message: "Use POST" } }, 405, { allow: "POST" });
   }
-
   const missing = missingEnv(env, REQUIRED_ENV);
   if (missing.length) {
     log.error("misconfigured", { missing }); // names only
     throw new MptError("not_configured", "Service not configured");
   }
-  const secret = request.headers.get("x-mpt-webhook-secret") || "";
-  if (!constantTimeEqual(secret, env.WEBHOOK_SECRET)) throw new MptError("unauthorized", "Unauthorized");
+  if (!authorized(request)) throw new MptError("unauthorized", "Unauthorized");
 
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) {
     return json({ error: { code: "payload_too_large", message: "Payload too large" } }, 413);
   }
-  let body: unknown;
   try {
-    body = JSON.parse(raw);
+    return JSON.parse(raw);
   } catch {
     throw new MptError("bad_request", "Invalid JSON");
   }
-  const msg = parseInbound(body);
-  if (!msg) throw new MptError("bad_request", "Invalid payload");
+}
 
+/** Intent + state -> localized response keys. Shared by /webhook and /ingest/social. */
+async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
   const st = await lookupState(msg, env, log);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).
@@ -266,12 +268,59 @@ async function handleWebhook(request: Request, env: Env, log: Logger): Promise<R
   });
 }
 
+async function handleWebhook(request: Request, env: Env, log: Logger): Promise<Response> {
+  const body = await readAuthorizedJson(request, env, log, (r) =>
+    constantTimeEqual(r.headers.get("x-mpt-webhook-secret") || "", env.WEBHOOK_SECRET));
+  if (body instanceof Response) return body;
+  const msg = parseInbound(body);
+  if (!msg) throw new MptError("bad_request", "Invalid payload");
+  return respond(msg, env, log);
+}
+
+// MPC-8301 hand-off. social-listeners verifies the platform signature, then forwards
+// { source: "x" | "telegram", receivedAt, payload } here with `Authorization: Bearer <token>`.
+// DECISION: the bearer token is this Worker's WEBHOOK_SECRET (social-listeners holds it as CORE_BRAIN_TOKEN) and is
+// required on the service-binding path too, because the Worker is also reachable on its public workers.dev address.
+function bearerMatches(request: Request, secret: string): boolean {
+  const h = request.headers.get("authorization") || "";
+  return h.startsWith("Bearer ") && constantTimeEqual(h.slice(7), secret);
+}
+
+// X Account Activity API: a DM arrives as direct_message_events[].message_create. Ignore our own echoes.
+function parseXEnvelope(payload: any): Inbound | null {
+  const events: any[] = Array.isArray(payload?.direct_message_events) ? payload.direct_message_events : [];
+  for (const ev of events) {
+    const mc = ev?.type === "message_create" ? ev.message_create : null;
+    const sender = mc?.sender_id;
+    const text = mc?.message_data?.text;
+    if (typeof sender !== "string" || typeof text !== "string" || !text.trim()) continue;
+    if (sender === String(payload?.for_user_id ?? "")) continue;
+    return parseInbound({ platform: "x", sender_id: sender, message_text: text });
+  }
+  return null;
+}
+
+async function handleIngestSocial(request: Request, env: Env, log: Logger): Promise<Response> {
+  const body: any = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
+  if (body instanceof Response) return body;
+  const source = body?.source;
+  if (source !== "x" && source !== "telegram") throw new MptError("bad_request", "Unknown source");
+  const msg = source === "telegram" ? parseInbound(body.payload) : parseXEnvelope(body.payload);
+  if (!msg) {
+    // Verified but carries no user text (follows, likes, edits, our own messages). 200 so the platform does not retry.
+    log.info("ignored", { source });
+    return json({ ok: true, ignored: true });
+  }
+  return respond(msg, env, log);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const log = createLogger(WORKER, env.LOG_LEVEL).child({ requestId: crypto.randomUUID() });
     const { pathname } = new URL(request.url);
     try {
       if (pathname === "/webhook") return await handleWebhook(request, env, log);
+      if (pathname === "/ingest/social") return await handleIngestSocial(request, env, log);
       if (pathname === "/health" && request.method === "GET") {
         return json({ ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0 });
       }

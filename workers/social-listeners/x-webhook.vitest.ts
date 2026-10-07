@@ -51,3 +51,16 @@ describe("Telegram webhook", () => {
     expect((await call("/webhook/telegram", { method: "POST", body: "nope", headers: h("tg") }, env())).status).toBe(400);
   });
 });
+
+describe("core-brain auth (MPC-8601)", () => {
+  it("sends CORE_BRAIN_TOKEN as a bearer token on the service-binding path, and omits it when unset", async () => {
+    const h = { "X-Telegram-Bot-Api-Secret-Token": "tg" };
+    const b = brain();
+    await call("/webhook/telegram", { method: "POST", body: '{"update_id":1}', headers: h }, { ...env(b), CORE_BRAIN_TOKEN: "tok" });
+    expect((b.fetch.mock.calls[0][0] as Request).headers.get("authorization")).toBe("Bearer tok");
+    expect((b.fetch.mock.calls[0][0] as Request).url).toBe("https://core-brain/ingest/social");
+    const b2 = brain();
+    await call("/webhook/telegram", { method: "POST", body: '{"update_id":1}', headers: h }, env(b2));
+    expect((b2.fetch.mock.calls[0][0] as Request).headers.get("authorization")).toBeNull();
+  });
+});
