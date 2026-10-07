@@ -124,7 +124,10 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
                   <strong>Device Information:</strong> Device type, operating
-                  system, browser type, IP address
+                  system, browser type, IP address. To show you your IP address
+                  and approximate location, the scan asks two third-party
+                  services (ipify and ipapi.co) from your browser when the scan
+                  loads, so they receive your IP address
                 </li>
                 <li>
                   <strong>Usage Analytics:</strong> Pages visited, time spent on

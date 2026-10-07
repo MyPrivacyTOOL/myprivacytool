@@ -1,0 +1,118 @@
+{
+  "_meta": {
+    "task": "MPT-1003",
+    "spec": "FLEET-TASK-V4.2",
+    "source": "workers/telegram-webhook/index.js",
+    "default_locale": "en",
+    "locales": [
+      "en",
+      "ja",
+      "zh",
+      "ko",
+      "vi",
+      "es",
+      "de",
+      "fr",
+      "pt",
+      "ar"
+    ],
+    "rtl_locales": [
+      "ar"
+    ],
+    "supabase_localization_row": [
+      "key",
+      "locale",
+      "value",
+      "description",
+      "status"
+    ],
+    "schema_note": "Matches public.localization (migration 20261007030000_mpt_1003_localization_table.sql, applied 2026-10-07 to xmdmkumwxpgahmlweuug).",
+    "placeholder_policy": "Non-en values are empty strings (not loadable: value is NOT NULL) until translated; load only non-empty values, status=draft."
+  },
+  "keys": [
+    {
+      "key": "bot.first_hexagon.title",
+      "description": "First Hexagon reply header"
+    },
+    {
+      "key": "bot.first_hexagon.name",
+      "description": "Exposure line: name"
+    },
+    {
+      "key": "bot.first_hexagon.location",
+      "description": "Exposure line: location"
+    },
+    {
+      "key": "bot.first_hexagon.phone",
+      "description": "Exposure line: phone"
+    },
+    {
+      "key": "bot.first_hexagon.email",
+      "description": "Exposure line: email"
+    },
+    {
+      "key": "bot.first_hexagon.social",
+      "description": "Exposure line: social profiles"
+    },
+    {
+      "key": "bot.first_hexagon.brokers",
+      "description": "Exposure line: data brokers"
+    },
+    {
+      "key": "bot.first_hexagon.question",
+      "description": "Confirmation question"
+    },
+    {
+      "key": "bot.first_hexagon.reply_y",
+      "description": "Prompt: confirm Y"
+    },
+    {
+      "key": "bot.first_hexagon.reply_n",
+      "description": "Prompt: reject N"
+    },
+    {
+      "key": "bot.confirmed_y.title",
+      "description": "Y confirmation header"
+    },
+    {
+      "key": "bot.confirmed_y.generating",
+      "description": "Y confirmation body"
+    },
+    {
+      "key": "bot.confirmed_y.cta",
+      "description": "Y confirmation CTA (URL appended by code)"
+    },
+    {
+      "key": "bot.confirmed_y.duration",
+      "description": "Y confirmation footer"
+    },
+    {
+      "key": "bot.confirmed_n.title",
+      "description": "N confirmation header"
+    },
+    {
+      "key": "bot.confirmed_n.cta",
+      "description": "N confirmation CTA (URL appended by code)"
+    },
+    {
+      "key": "bot.confirmed_n.duration",
+      "description": "N confirmation footer"
+    },
+    {
+      "key": "bot.unknown.title",
+      "description": "Welcome / unknown-input header"
+    },
+    {
+      "key": "bot.unknown.body",
+      "description": "Welcome body"
+    },
+    {
+      "key": "bot.unknown.free",
+      "description": "Welcome footer"
+    },
+    {
+      "key": "bot.confirm_prompt",
+      "description": "Re-prompt on invalid reply"
+    }
+  ]
+}
