@@ -12,7 +12,7 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@mpt/utils": ["./shared/utils/src/index.js"]
+      "@mpt/utils": ["./shared/utils/src/index.d.ts"]
     },
     "baseUrl": "."
   }

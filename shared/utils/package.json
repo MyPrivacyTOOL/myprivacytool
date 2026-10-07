@@ -6,9 +6,13 @@
   "description": "Shared helpers for MyPrivacyTOOL (MPT) Cloudflare Workers",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"
-  }
+  },
+  "types": "src/index.d.ts"
 }
