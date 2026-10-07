@@ -45,9 +45,9 @@ Severity: H high, M medium, L low. Status: **Fixed** (in this PR or applied to S
 
 ## Rate-limit status (2026-10-07)
 
-- Deployed: `mpt-leads` lists `ratelimit: RATE_LIMITER` in its bindings (deploy log), and `/whoami` returns `X-RateLimit-State: ok`, so the binding is present and `limit()` does not throw.
-- Not confirmed: bursts of 14 sequential, 60 parallel and 400 parallel requests (limit 10 per 60 s) all returned 200. Treat rate limiting as **unverified** until a 429 is observed.
-- Next step (open): confirm enforcement with a low-limit probe, or add a Cloudflare WAF rate-limiting rule on the Worker routes (dashboard) as the enforced backstop. `scan-report` binding presence was not read from its deploy log.
+- Proven to enforce, loosely. A temporary 1 request / 10 s limiter on `GET /whoami` returned 28 x 200 and 2 x 429 for a burst of 30 requests from one client; earlier bursts of 14, 60 and 400 requests against 10 / 60 s returned only 200. The binding is attached and `limit()` works (`X-RateLimit-State: ok`), but Cloudflare's Workers Rate Limiting is per-location and approximate, so it is a coarse abuse brake, not a hard cap.
+- Do not count on it alone. Hard caps need a different mechanism (for example a Durable Object counter, or WAF rate-limiting rules on a route under a zone we control; WAF rules do not apply to `*.workers.dev`).
+- `scan-report`: binding declared and deployed; behaviour assumed to match, not separately load-tested.
 
 ## CORS and rate-limit matrix (after this PR)
 
@@ -85,7 +85,7 @@ The `RATE_LIMITER` bindings are declared in the two `wrangler.toml` files and th
 | Criterion | Result |
 |---|---|
 | Worker inputs are validated and sanitised against injection | **Met** for the four in-scope Workers (tests added). OAuth Workers reviewed only. |
-| Public endpoints enforce rate limiting and authentication where required | **Partly met.** Authentication met. Rate limiting is coded and the binding is deployed (`X-RateLimit-State: ok` on `/whoami`), but on 2026-10-07 bursts of 14, 60 and 400 requests to `GET /whoami` (limit 10/60 s) all returned 200, so enforcement is NOT confirmed. See "Rate-limit status". `/webhook/leads`, `oauth-poc`, `github-channel` still lack it. |
+| Public endpoints enforce rate limiting and authentication where required | **Met, loosely.** Authentication met. Rate limiting enforces but only approximately (see "Rate-limit status"); a hard cap would need another mechanism. `/webhook/leads`, `oauth-poc`, `github-channel` still lack it. |
 | PII encrypted at rest and in transit | **Met at platform level** (TLS everywhere, Supabase volume encryption); no column-level encryption for emails/IPs, by design. |
 | CORS correct | **Met** in code; live behaviour unverified from this sandbox. |
 | GDPR/CCPA checklist completed | **Done**, with the gaps above. Not a legal sign-off. |
