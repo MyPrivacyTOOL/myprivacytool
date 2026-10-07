@@ -19,13 +19,26 @@ do $$
 declare t text;
 begin
   foreach t in array array['mpt_api_rate_limits','mpt_channel_metrics','mpt_score_baselines','users','scans','signals',
-                           'hexagon_scores','removal_tasks','leads','channel_tokens'] loop
+                           'hexagon_scores','removal_tasks','leads','channel_tokens',
+                           'osint_results','conversation_states','channel_preferences','translation_queue'] loop
     perform pg_temp.assert(pg_temp.try_as('anon', format('select 1 from public.%I', t)) = '42501', t || ': anon must be denied');
     perform pg_temp.assert(pg_temp.try_as('authenticated', format('select 1 from public.%I', t)) = '42501', t || ': authenticated must be denied');
     perform pg_temp.assert(pg_temp.try_as('service_role', format('select 1 from public.%I', t)) = '', t || ': service_role must read');
     perform pg_temp.assert((select relforcerowsecurity and relrowsecurity from pg_class where oid = ('public.' || t)::regclass), t || ': RLS must be enabled and forced');
   end loop;
 end $$;
+
+-- ===== MPT-1001: leads columns + constraints for Progressive Trust / OSINT ========================
+select pg_temp.assert((select count(*) = 4 from information_schema.columns where table_schema = 'public' and table_name = 'leads'
+  and column_name in ('phone_number','whatsapp_opt_in','locale_code','confidence_score')), 'leads: MPT-1001 columns missing');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.leads (email, phone_number, whatsapp_opt_in, locale_code, confidence_score)
+  values ('mpt1001-ok@example.invalid', '+15550100', true, 'es-MX', 80)$$) = '', 'leads: valid MPT-1001 row must insert');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.leads (email, phone_number) values ('mpt1001-a@example.invalid', '5550100')$$) = '23514', 'leads: non-E.164 phone must be rejected');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.leads (email, confidence_score) values ('mpt1001-b@example.invalid', 101)$$) = '23514', 'leads: confidence_score > 100 must be rejected');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.leads (email, whatsapp_opt_in) values ('mpt1001-c@example.invalid', true)$$) = '23514', 'leads: whatsapp opt-in without phone must be rejected');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.osint_results (lead_id, source, finding_type)
+  select id, 'test', 'breach' from public.leads where email = 'mpt1001-ok@example.invalid'$$) = '', 'osint_results: insert must succeed');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.translation_queue (source_locale, target_locale, source_text) values ('en','en','x')$$) = '23514', 'translation_queue: same locale must be rejected');
 
 -- ===== mpt-leads: engagement row exactly as the Worker writes it ================================
 select pg_temp.assert(pg_temp.try_as('service_role',
