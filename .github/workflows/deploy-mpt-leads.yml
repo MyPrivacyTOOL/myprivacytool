@@ -58,6 +58,10 @@ jobs:
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
+        # The action runs `npm i wrangler@3.90.0` from the repo's npm workspace; a peer-dependency conflict from the
+        # core-brain workspace (wrangler 4 wants workers-types 5) makes that fail with ERESOLVE and blocks every deploy.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
