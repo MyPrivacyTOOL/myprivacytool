@@ -13,8 +13,8 @@
 //   A raw Telegram update ({ message: { chat: { id }, text, from: { language_code } } }) is also accepted.
 //   Auth: header `X-MPT-Webhook-Secret` must equal env.WEBHOOK_SECRET (fails closed when unset).
 //
-// Secrets come from `env` only (see EXPECTED_SECRETS.txt): SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, WEBHOOK_SECRET.
-// Non-secret vars (wrangler.toml [vars]): QWEN_BASE_URL, QWEN_MODEL.
+// Secrets come from `env` only (see EXPECTED_SECRETS.txt): SUPABASE_KEY, WEBHOOK_SECRET (+ optional QWEN_API_KEY).
+// Non-secret vars (wrangler.toml [vars]): SUPABASE_URL, QWEN_BASE_URL, QWEN_MODEL.
 // Never log message text, sender ids or keys: log() fields are event metadata only.
 
 import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } from "@mpt/utils";
@@ -22,7 +22,7 @@ import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } 
 type Env = {
   SUPABASE_URL: string;
   SUPABASE_KEY: string;
-  QWEN_API_KEY: string;
+  QWEN_API_KEY?: string;
   WEBHOOK_SECRET: string;
   QWEN_BASE_URL?: string;
   QWEN_MODEL?: string;
@@ -34,7 +34,8 @@ type Inbound = { platform: string; senderId: string; text: string; locale: strin
 type BrainState = { trustLevel: number; state: string; source: "supabase" | "anonymous" | "fallback" };
 
 const WORKER = "core-brain";
-const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_KEY", "QWEN_API_KEY", "WEBHOOK_SECRET"];
+// QWEN_API_KEY is optional: without it intent falls back to the rules classifier.
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_KEY", "WEBHOOK_SECRET"];
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TEXT_CHARS = 500;
 const QWEN_TIMEOUT_MS = 5000;
@@ -127,6 +128,7 @@ function ruleIntent(text: string): Intent {
 }
 
 async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent: Intent; confidence: number } | null> {
+  if (!env.QWEN_API_KEY) return null;
   const base = (env.QWEN_BASE_URL || DEFAULT_QWEN_BASE_URL).replace(/\/+$/, "");
   try {
     const res = await fetchWithTimeout(`${base}/chat/completions`, {

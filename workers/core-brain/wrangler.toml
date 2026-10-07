@@ -8,7 +8,9 @@ workers_dev = true
 # They are bound at runtime as `env.<NAME>` after `wrangler secret put <NAME>` (see /SECRETS.md) or after
 # the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
 # Names (also in EXPECTED_SECRETS.txt):
-#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, WEBHOOK_SECRET
+#   SUPABASE_URL, SUPABASE_KEY, WEBHOOK_SECRET (required); QWEN_API_KEY (optional: rules-based intent without it)
+# The KV binding from MPT-1004 was removed: core-brain does not use KV and its
+# namespace id never existed in the account, which made `wrangler deploy` fail.
 
 # MPC-8601: @mpt/utils is resolved from the repo until the npm workspaces land (MPT-1002 / PR #111).
 [alias]
@@ -21,9 +23,3 @@ QWEN_MODEL = "qwen-plus"
 
 [observability]
 enabled = true
-
-# KV Namespace bindings for staging (MPT-1004)
-[[kv_namespaces]]
-binding = "MPT_STAGING_KV"
-id = "kv_staging_mpt_core_v1"
-preview_id = "kv_staging_mpt_core_v1"

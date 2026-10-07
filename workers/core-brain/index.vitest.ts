@@ -147,6 +147,15 @@ describe("degradation and privacy", () => {
     expect((await post(msg("help please"))).body).toMatchObject({ intent: "help", intent_source: "rules" });
   });
 
+  it("works without a Qwen key: rules classify, and Qwen is never called", async () => {
+    stub({ qwen: { intent: "help", confidence: 1 } });
+    const { QWEN_API_KEY: _omit, ...noQwen } = env;
+    const r = await post(msg("scan me"), undefined, noQwen);
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ intent: "scan", intent_source: "rules" });
+    expect(calls.some((c) => c.url.includes("/chat/completions"))).toBe(false);
+  });
+
   it("Supabase outage degrades to an anonymous user, never an error", async () => {
     stub({ qwen: { intent: "scan", confidence: 0.9 }, stateFail: true });
     const r = await post(msg("scan"));
