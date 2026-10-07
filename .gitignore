@@ -34,3 +34,6 @@ test-results
 !.env.example
 .dev.vars
 .dev.vars.*
+
+# Wrangler local state (CK-007)
+.wrangler

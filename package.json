@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "workers/core-brain",
+    "workers/social-listeners",
+    "shared/utils"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,7 +22,8 @@
     "test:e2e": "playwright test",
     "lint:tests": "eslint e2e src/test \"src/**/*.test.{ts,tsx}\" playwright.config.ts vitest.config.ts",
     "check:env": "node scripts/ci/check-env.mjs",
-    "smoke": "node scripts/ci/smoke-test.mjs"
+    "smoke": "node scripts/ci/smoke-test.mjs",
+    "typecheck:workspaces": "npm run typecheck --workspaces --if-present"
   },
   "dependencies": {
     "@fontsource/fira-code": "^5.3.0",
