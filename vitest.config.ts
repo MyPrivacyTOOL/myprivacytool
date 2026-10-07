@@ -7,7 +7,13 @@ import path from "path";
 // in place and run separately in CI (npm run test:workers:node).
 export default defineConfig({
   plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      // MPC-8601: workers import the shared package before npm workspaces exist (MPT-1002).
+      "@mpt/utils": path.resolve(__dirname, "./shared/utils/src/index.js"),
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,

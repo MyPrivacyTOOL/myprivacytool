@@ -1,6 +1,6 @@
 # MPT (MyPrivacyTOOL) core-brain Worker — MPT-1004. Microdrama: the brain behind the curtain.
 name = "core-brain"
-main = "index.js"
+main = "index.ts"
 compatibility_date = "2024-09-23"
 workers_dev = true
 
@@ -8,7 +8,16 @@ workers_dev = true
 # They are bound at runtime as `env.<NAME>` after `wrangler secret put <NAME>` (see /SECRETS.md) or after
 # the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
 # Names (also in EXPECTED_SECRETS.txt):
-#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY
+#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, WEBHOOK_SECRET
+
+# MPC-8601: @mpt/utils is resolved from the repo until the npm workspaces land (MPT-1002 / PR #111).
+[alias]
+"@mpt/utils" = "../../shared/utils/src/index.js"
+
+# Non-secret config only. Qwen is called through its OpenAI-compatible endpoint.
+[vars]
+QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+QWEN_MODEL = "qwen-plus"
 
 [observability]
 enabled = true

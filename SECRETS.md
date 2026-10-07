@@ -7,6 +7,7 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `SUPABASE_URL` | ✅ | ✅ |
 | `SUPABASE_KEY` | ✅ | ✅ |
 | `QWEN_API_KEY` | ✅ | |
+| `WEBHOOK_SECRET` | ✅ | |
 | `TWILIO_SID` | | ✅ |
 | `TWILIO_AUTH_TOKEN` | | ✅ |
 | `META_APP_SECRET` | | ✅ |
@@ -32,6 +33,7 @@ cd workers/core-brain
 npx wrangler secret put SUPABASE_URL
 npx wrangler secret put SUPABASE_KEY
 npx wrangler secret put QWEN_API_KEY
+npx wrangler secret put WEBHOOK_SECRET
 
 cd ../social-listeners
 npx wrangler secret put SUPABASE_URL
@@ -48,7 +50,7 @@ Check names (not values) with `npx wrangler secret list`.
 Add under **Settings → Secrets and variables → Actions → New repository secret**:
 
 - `CLOUDFLARE_API_TOKEN` (Account → Workers Scripts → Edit), `CLOUDFLARE_ACCOUNT_ID`
-- `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`
+- `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `WEBHOOK_SECRET`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`
 
 On every push to `main`, `.github/workflows/deploy.yml` runs `npm install` + `npm test`, then deploys both
 Workers with `cloudflare/wrangler-action@v3` and syncs these secrets to each Worker.
