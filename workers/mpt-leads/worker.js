@@ -9,15 +9,20 @@ const slackEsc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&l
 const htmlEsc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[unsafe.bindings]] type "ratelimit"). Fails open if the
 // binding is absent or errors so a platform hiccup never drops a real lead.
-async function rateLimited(env, request) {
-  if (!env.RATE_LIMITER) return false;
+// Returns 'limited' | 'ok' | 'absent' (no binding) | 'error' (binding threw; request is let through).
+async function rateLimitState(env, request) {
+  if (!env.RATE_LIMITER) return 'absent';
   try {
     const { success } = await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
-    return !success;
-  } catch (_) { return false; }
+    return success ? 'ok' : 'limited';
+  } catch (e) {
+    console.warn('rate limiter error:', String(e && e.message || e).slice(0, 200));
+    return 'error';
+  }
 }
+const rateLimited = async (env, request) => (await rateLimitState(env, request)) === 'limited';
 
-function whoami(request, cors) {
+function whoami(request, cors, rlState) {
   const cf = request.cf || {};
   let country = cf.country || '';
   try { if (country) country = new Intl.DisplayNames(['en'], { type: 'region' }).of(country) || country; } catch (_) { /* keep ISO code */ }
@@ -31,7 +36,7 @@ function whoami(request, cors) {
     org: cf.asOrganization || '',
   };
   return new Response(JSON.stringify(body), {
-    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-RateLimit-State': rlState },
   });
 }
 
@@ -63,8 +68,9 @@ export default {
     // no longer has to ask third-party lookup services (ipify, ipapi.co). This route stores nothing.
     if (request.method === 'GET' && new URL(request.url).pathname === '/whoami') {
       if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
-      if (await rateLimited(env, request)) return reject(429, 'Too many requests');
-      return whoami(request, cors);
+      const rl = await rateLimitState(env, request);
+      if (rl === 'limited') return reject(429, 'Too many requests');
+      return whoami(request, cors, rl);
     }
     if (request.method !== 'POST') {
       return new Response('Not found', { status: 404 });

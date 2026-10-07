@@ -280,6 +280,14 @@ describe('GET /whoami', () => {
     });
   });
 
+  it('reports the rate-limiter state in X-RateLimit-State (absent, ok, error)', async () => {
+    expect((await get('/whoami')).headers.get('x-ratelimit-state')).toBe('absent');
+    const ok = { ...env, RATE_LIMITER: { limit: async () => ({ success: true }) } };
+    expect((await get('/whoami', { e: ok })).headers.get('x-ratelimit-state')).toBe('ok');
+    const bad = { ...env, RATE_LIMITER: { limit: async () => { throw new Error('boom'); } } };
+    expect((await get('/whoami', { e: bad })).headers.get('x-ratelimit-state')).toBe('error');
+  });
+
   it('returns empty strings and zeros when Cloudflare supplies no location', async () => {
     const res = await get('/whoami');
     expect(await res.json()).toEqual({ ip: '203.0.113.7', city: '', region: '', country_name: '', latitude: 0, longitude: 0, org: '' });
