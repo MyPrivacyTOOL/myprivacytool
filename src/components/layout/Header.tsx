@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import logoHeader from "@/assets/logo-header.png";
+import SessionBadge from "@/components/layout/SessionBadge";
 
 interface NavItem {
   label: string;
@@ -119,6 +120,7 @@ const Header = () => {
           </SheetContent>
         </Sheet>
       </nav>
+      <SessionBadge />
     </header>
   );
 };
