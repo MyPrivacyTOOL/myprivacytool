@@ -182,3 +182,64 @@ describe("degradation and privacy", () => {
     }
   });
 });
+
+describe("POST /ingest/social (MPC-8301 hand-off)", () => {
+  const bearer = { authorization: `Bearer ${env.WEBHOOK_SECRET}` };
+  const ingest = async (body: unknown, headers: Record<string, string> = bearer) => {
+    const res = await worker.fetch(
+      new Request("https://brain.test/ingest/social", { method: "POST", headers, body: JSON.stringify(body) }),
+      env,
+    );
+    return { status: res.status, body: (await res.json()) as any };
+  };
+  const tg = (text: string) => ({ source: "telegram", receivedAt: "2026-10-07T00:00:00Z", payload: { message: { chat: { id: 5 }, text } } });
+  const xdm = (sender: string, text: string, forUser = "999") => ({
+    source: "x",
+    receivedAt: "2026-10-07T00:00:00Z",
+    payload: { for_user_id: forUser, direct_message_events: [{ type: "message_create", message_create: { sender_id: sender, message_data: { text } } }] },
+  });
+
+  it("requires the bearer token (service-binding callers included) and never calls out without it", async () => {
+    stub({});
+    expect((await ingest(tg("hi"), {})).status).toBe(401);
+    expect((await ingest(tg("hi"), { authorization: "Bearer nope" })).status).toBe(401);
+    expect((await ingest(tg("hi"), { "x-mpt-webhook-secret": env.WEBHOOK_SECRET })).status).toBe(401);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("routes a Telegram envelope and looks the sender up on the telegram channel", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const r = await ingest(tg("scan me"));
+    expect(r.body).toMatchObject({ ok: true, intent: "scan", response_key: "bot.first_hexagon.title" });
+    const q = new URL(calls.find((c) => c.url.includes("conversation_states"))!.url).searchParams;
+    expect(q.get("channel")).toBe("eq.telegram");
+    expect(q.get("context->>sender_id")).toBe("eq.5");
+  });
+
+  it("routes an X DM as an anonymous user (no X state channel yet)", async () => {
+    stub({ qwen: { intent: "help", confidence: 0.9 } });
+    const r = await ingest(xdm("123", "how does this work?"));
+    expect(r.body).toMatchObject({ ok: true, intent: "help", state_source: "anonymous", response_key: "bot.unknown.title" });
+    expect(calls.some((c) => c.url.includes("conversation_states"))).toBe(false);
+  });
+
+  it("acknowledges verified events with no user text, and our own messages, with 200 ignored (no retry storm)", async () => {
+    stub({});
+    for (const body of [
+      { source: "x", payload: { favorite_events: [{}] } },
+      { source: "x", payload: { direct_message_events: [] } },
+      xdm("999", "echo of our own reply"),
+      { source: "telegram", payload: { edited_message: { chat: { id: 1 }, text: "x" } } },
+    ]) {
+      const r = await ingest(body);
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({ ok: true, ignored: true });
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("400 on an unknown source", async () => {
+    stub({});
+    expect((await ingest({ source: "myspace", payload: {} })).status).toBe(400);
+  });
+});

@@ -9,7 +9,7 @@ workers_dev = true
 # the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
 # Names (also in EXPECTED_SECRETS.txt):
 #   SUPABASE_URL, SUPABASE_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
-#   X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (only if using HTTP fallback)
+#   X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward)
 
 [observability]
 enabled = true
@@ -17,7 +17,7 @@ enabled = true
 # MPC-8301: inbound webhook routes, served by src/index.ts:
 #   /webhook/x         -> src/x-webhook.ts        (CRC GET + signed POST)
 #   /webhook/telegram  -> src/telegram-webhook.ts (secret-token POST)
-# Both forward verified payloads to core-brain (MPC-8601) at POST /ingest/social.
+# Both forward verified payloads to core-brain (MPC-8601) at POST /ingest/social with `Authorization: Bearer CORE_BRAIN_TOKEN`.
 [[services]]
 binding = "CORE_BRAIN"
 service = "core-brain"

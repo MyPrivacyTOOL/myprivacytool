@@ -45,6 +45,9 @@ export interface ForwardEnvelope {
 /** Forwards to core-brain via service binding, else HTTP. Returns true when core-brain accepted it. */
 export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<boolean> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+  // MPC-8601: core-brain is also reachable on its public workers.dev address, so it authenticates every caller,
+  // service binding included. CORE_BRAIN_TOKEN must equal core-brain's WEBHOOK_SECRET.
+  if (env.CORE_BRAIN_TOKEN) headers.Authorization = `Bearer ${env.CORE_BRAIN_TOKEN}`;
   let target: { fetch(r: Request): Promise<Response> };
   let url: string;
   if (env.CORE_BRAIN) {
@@ -53,7 +56,6 @@ export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, lo
   } else if (env.CORE_BRAIN_URL) {
     target = { fetch: (r) => fetch(r) };
     url = new URL("/ingest/social", env.CORE_BRAIN_URL).toString();
-    if (env.CORE_BRAIN_TOKEN) headers.Authorization = `Bearer ${env.CORE_BRAIN_TOKEN}`;
   } else {
     log.error("core_brain_unconfigured", { source: envelope.source });
     return false;
