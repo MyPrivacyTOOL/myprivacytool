@@ -85,9 +85,13 @@ jobs:
             TWILIO_SID
             TWILIO_AUTH_TOKEN
             META_APP_SECRET
+            X_CONSUMER_SECRET
+            TELEGRAM_WEBHOOK_SECRET
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TWILIO_SID: ${{ secrets.TWILIO_SID }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}

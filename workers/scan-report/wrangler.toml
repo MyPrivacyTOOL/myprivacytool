@@ -24,9 +24,9 @@ ALLOW_PARTIAL_REPORT = "true"
 enabled = true
 
 # MPC-7350: per-IP rate limit on POST /api/scan (5 requests / 60s). Code fails open if the binding is missing.
-[[ratelimits]]
+# Syntax: [[unsafe.bindings]] because wrangler 3.90.0 (installed by the deploy action) ignores [[ratelimits]].
+[[unsafe.bindings]]
 name = "RATE_LIMITER"
+type = "ratelimit"
 namespace_id = "7351"
-  [ratelimits.simple]
-  limit = 5
-  period = 60
+simple = { limit = 5, period = 60 }
