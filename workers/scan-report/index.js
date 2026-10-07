@@ -3,6 +3,8 @@ import { checkBreaches } from './lib/hibp.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, sendEmail } from './lib/email.js';
+import { buildMirrorReport } from './lib/mirror.js';
+import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
 const MAX_ATTEMPTS = 5;
@@ -32,6 +34,7 @@ export default {
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    if (request.method === 'GET' && url.pathname === '/api/unsubscribe') return handleUnsubscribe(env, url);
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -57,7 +60,7 @@ export default {
     }
   },
 
-  async scheduled(_event, env, ctx) { ctx.waitUntil(runReportJob(env)); },
+  async scheduled(_event, env, ctx) { ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env))); },
 };
 
 // ------------------------------------------------------------------ submit path
@@ -161,13 +164,65 @@ async function processScan(env, sb, job, fetchImpl) {
   await sb.insertMany('hexagon_scores', result.hexagons.map((h) => ({ scan_id: job.id, category: h.category, score: h.score, signals_count: h.signals_count, risk_multiplier: h.risk_multiplier, color: h.color, checked: h.checked })));
   // Removal tasks only track brokers confirmed present; "not yet checked" brokers get none.
 
-  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers });
+  const mirror = buildMirrorReport({ scan: result, breaches, breachStatus: hibp.status, brokers });
+  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers, mirror });
   const sent = await sendEmail(env, { to: email, ...mail, idempotencyKey: `report-${job.id}` }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
     privacy_score: result.score, risk_level: result.risk_level, signals_found: result.signals_found,
     categories_checked: result.categories_checked, categories_unchecked: result.categories_unchecked,
-    data_freshness: new Date().toISOString(), report_status: 'sent', report_sent_at: new Date().toISOString(), resend_message_id: sent.id, report_last_error: null,
+    mirror_report: mirror, data_freshness: new Date().toISOString(), report_status: 'sent', report_sent_at: new Date().toISOString(), resend_message_id: sent.id, report_last_error: null,
   });
+  await claimCohort(env, sb, job.user_id);
   return { sent: true, signals: inserted.length };
+}
+
+// MPC-7261: the first 100 real users get a cohort number when their report is delivered. While RECIPIENT_ALLOWLIST is
+// set only test inboxes are mailed, so they must not use up real slots. Never lets onboarding break the report.
+async function claimCohort(env, sb, userId) {
+  if (String(env.RECIPIENT_ALLOWLIST || '').trim()) return null;
+  try { return await sb.rpc('claim_onboarding_cohort', { p_user_id: userId }); }
+  catch (e) { console.error('cohort claim failed', String(e)); return null; }
+}
+
+// ------------------------------------------------------------------ follow-up emails (MPC-7261)
+// Day 3 "next step" and day 7 "feedback" emails after the report. Off unless UNSUBSCRIBE_SECRET is set, so we never send
+// marketing-style mail without a working unsubscribe link. Stage is claimed before sending (at most once per stage).
+export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY || !env.UNSUBSCRIBE_SECRET) return { skipped: 'follow-ups need SUPABASE_SERVICE_ROLE_KEY and UNSUBSCRIBE_SECRET' };
+  const sb = db(env, fetchImpl);
+  const testMode = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
+  const cutoff = new Date(Date.now() - FOLLOWUP_DELAYS_MS[0]).toISOString();
+  const queue = await sb.select(`scans?select=id,user_id,email_scanned,report_sent_at,followup_stage,mirror_report&report_status=eq.sent&followup_stage=lt.2&report_sent_at=lt.${encodeURIComponent(cutoff)}&order=report_sent_at.asc&limit=${limit}`);
+  const out = { sent: 0, skipped: 0, failed: 0 };
+  for (const job of queue) {
+    try {
+      const stage = nextFollowUp(job);
+      if (!stage || !recipientAllowed(env, job.email_scanned)) { out.skipped++; continue; }
+      const user = (await sb.select(`users?id=eq.${job.user_id}&select=id,cohort_number,email_opt_out_at&limit=1`))[0];
+      // Cohort members only; in allowlist test mode the test inboxes stand in for the cohort.
+      if (!user || user.email_opt_out_at || (!user.cohort_number && !testMode)) { out.skipped++; continue; }
+      const claimed = await sb.patch(`scans?id=eq.${job.id}&followup_stage=eq.${job.followup_stage ?? 0}`, { followup_stage: stage, followup_last_sent_at: new Date().toISOString() });
+      if (!claimed.length) continue;
+      const link = await unsubscribeUrl(env, job.email_scanned);
+      const mail = buildFollowUpEmail({ stage, mirror: job.mirror_report, cohortNumber: user.cohort_number, unsubscribeLink: link });
+      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: { 'List-Unsubscribe': `<${link}>` } }, fetchImpl);
+      if (!r.sent) {                                   // release the stage so the next run retries (Resend key keeps it single-send)
+        await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: job.followup_stage ?? 0 });
+        throw new Error(`follow-up email not sent: ${r.reason}`);
+      }
+      out.sent++;
+    } catch (e) { out.failed++; console.error(`follow-up failed for scan ${job.id}:`, String(e)); }
+  }
+  return out;
+}
+
+async function handleUnsubscribe(env, url) {
+  const page = (status, msg) => new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto"><p>${msg}</p></body></html>`, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+  const email = (url.searchParams.get('e') || '').trim().toLowerCase();
+  if (!(await verifyUnsubscribe(env.UNSUBSCRIBE_SECRET, email, url.searchParams.get('t')))) return page(400, 'This unsubscribe link is not valid.');
+  try {
+    await db(env).patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
+    return page(200, 'You are unsubscribed. We will not send you any more follow-up emails.');
+  } catch (e) { console.error('unsubscribe failed', String(e)); return page(500, 'Something went wrong. Reply to any of our emails and we will remove you by hand.'); }
 }
