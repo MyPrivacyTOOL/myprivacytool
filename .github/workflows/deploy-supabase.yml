@@ -39,18 +39,33 @@ jobs:
         with:
           node-version: 22
 
-      - name: Pre-deployment checks (secrets present)
-        run: node scripts/ci/check-env.mjs --require SUPABASE_ACCESS_TOKEN,SUPABASE_DB_PASSWORD,SUPABASE_PROJECT_ID
+      # Until the three secrets exist, skip with a visible warning instead of failing every merge to main.
+      # A manual run (workflow_dispatch) still fails hard so a missing secret cannot be ignored when deploying on purpose.
+      - name: Check secrets
+        id: secrets
+        run: |
+          if node scripts/ci/check-env.mjs --require SUPABASE_ACCESS_TOKEN,SUPABASE_DB_PASSWORD,SUPABASE_PROJECT_ID; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            exit 1
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Supabase migrations NOT deployed: repo secrets SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD / SUPABASE_PROJECT_ID are not set (CK-006)."
+          fi
 
       - uses: supabase/setup-cli@v1
+        if: steps.secrets.outputs.ready == 'true'
         with:
           version: latest
 
       - name: Link project
+        if: steps.secrets.outputs.ready == 'true'
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
 
       - name: Pending migrations (dry run)
+        if: steps.secrets.outputs.ready == 'true'
         run: supabase db push --dry-run --password "$SUPABASE_DB_PASSWORD"
 
       - name: Apply migrations
+        if: steps.secrets.outputs.ready == 'true'
         run: supabase db push --password "$SUPABASE_DB_PASSWORD"
