@@ -1,0 +1,18 @@
+{
+  "name": "mpt-core-brain",
+  "version": "1.0.0",
+  "description": "MyPrivacyTOOL Core Brain — Central orchestrator for social bot routing and intent recognition",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "jest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^3.42.0",
+    "@types/node": "^20.10.0"
+  }
+}

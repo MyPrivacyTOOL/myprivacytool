@@ -1,14 +1,26 @@
-# MPT (MyPrivacyTOOL) core-brain Worker — MPT-1004. Microdrama: the brain behind the curtain.
+# MPT (MyPrivacyTOOL) Core Brain Worker — MPC-8601 / MPC-7257. Microdrama: the brain behind the curtain.
+# Secrets are NOT declared here: set them with `wrangler secret put <NAME>` (names in .env.example and
+# EXPECTED_SECRETS.txt). Never commit values.
 name = "core-brain"
 main = "index.js"
 compatibility_date = "2024-09-23"
 workers_dev = true
 
-# Secrets are NOT declared here: wrangler.toml cannot hold secret values, and `[vars]` would be plain text.
-# They are bound at runtime as `env.<NAME>` after `wrangler secret put <NAME>` (see /SECRETS.md) or after
-# the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
-# Names (also in EXPECTED_SECRETS.txt):
-#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY
-
 [observability]
 enabled = true
+
+# Staging. Deploy with: npx wrangler deploy --env staging
+# BLOCKER (needs Chris): KV bindings are NOT inherited by environments, and the id below is a placeholder.
+# Create the namespace, then paste the ids (never deploy with the placeholder):
+#   npx wrangler kv namespace create CORE_BRAIN_KV --env staging
+#   npx wrangler kv namespace create CORE_BRAIN_KV --env staging --preview
+# The top-level (default) Worker deliberately has no KV binding so the existing push-to-main deploy of
+# `core-brain` is not broken by a placeholder id.
+[env.staging]
+name = "mpt-core-brain-staging"
+vars = { ENVIRONMENT = "staging", LOG_LEVEL = "debug" }
+
+[[env.staging.kv_namespaces]]
+binding = "CORE_BRAIN_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
