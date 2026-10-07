@@ -12,5 +12,5 @@
   added before their dates, otherwise the links 404. Titles are working titles.
 - X and Reddit rows are topic prompts, not final copy.
 - 13 full weeks from Wed 2026-10-07 end Tue 2027-01-05; the spec's 156-piece count was kept rather than truncating at Dec 31.
-- Publishing is not done here. LinkedIn/X/Reddit posting is blocked on the MPC-6594 decision (Make.com broadcaster vs manual)
+- Publishing is not done here. LinkedIn: see `channels/linkedin-publishing.md` (MPC-7504). X/Reddit posting is blocked on the MPC-6594 decision (Make.com broadcaster vs manual)
   and on confirming X/Reddit account access.
