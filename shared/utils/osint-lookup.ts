@@ -105,7 +105,8 @@ export function createMemoryCache(now: () => number = Date.now): LookupCache {
 const defaultCache = createMemoryCache();
 
 // ---------------------------------------------------------------- HIBP (read-only GETs)
-type HibpOutcome<T> = { ok: true; data: T } | { ok: false; reason: string };
+// Flat shape (not a discriminated union): the app tsconfig is non-strict, so union narrowing on `ok` does not work.
+type HibpOutcome<T> = { ok: boolean; data?: T; reason?: string };
 
 async function hibpGet<T>(path: string, empty: T, d: Required<Pick<OsintDeps, "fetchImpl" | "timeoutMs">> & { key: string }): Promise<HibpOutcome<T>> {
   const url = `https://haveibeenpwned.com/api/v3/${path}`;
@@ -143,8 +144,8 @@ async function lookupEmail(email: string, deps: OsintDeps): Promise<LookupResult
   if (!b.ok) return { status: "not_checked", reason: b.reason, breaches: [], pastes: null };
   return {
     status: "checked",
-    breaches: b.data.map((x) => ({ name: x.Name, date: x.BreachDate ?? null, data_classes: x.DataClasses ?? [] })),
-    pastes: p.ok ? p.data.length : null,
+    breaches: b.data!.map((x) => ({ name: x.Name, date: x.BreachDate ?? null, data_classes: x.DataClasses ?? [] })),
+    pastes: p.ok ? p.data!.length : null,
   };
 }
 
