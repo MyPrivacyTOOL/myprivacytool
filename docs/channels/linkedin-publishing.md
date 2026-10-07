@@ -20,12 +20,12 @@ Management / Marketing Developer Platform access review, which is slow and can b
 LinkedIn apps, so Phase 1 gets API-grade scheduling without our own review. At 1 post per week the manual route costs about
 10 minutes weekly and has no approval risk.
 
-## Open item (blocks everything)
-`src/lib/socialLinks.ts` notes that no verified company page exists and the site links a personal profile
-(`/in/myprivacytool/`). Before the first post a human must:
-1. Confirm or create `linkedin.com/company/myprivacytool` and verify it.
+## Open items (as of 2026-10-07)
+The Company Page exists (`linkedin.com/company/myprivacytool/`, confirmed live by the owner) and the site links to it
+(`src/lib/socialLinks.ts`, PR #129). Before the first post a human must:
+1. Finish the Page's company-domain email verification (see the Mail & DNS page in Notion).
 2. Give at least two people the **Super admin** / **Content admin** role (no single point of failure).
-3. Update `socialLinks.linkedin` to the company URL (separate small PR; the Footer reads it).
+3. Fix the Page details (description typo, industry, size, location) and name the poster and a backup.
 
 ## Workflow (Phase 0)
 1. **Schedule**: [`docs/linkedin-schedule-mpc-7504.csv`](../linkedin-schedule-mpc-7504.csv), 13 rows (Thursdays from 2026-10-08).
