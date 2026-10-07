@@ -43,6 +43,12 @@ Severity: H high, M medium, L low. Status: **Fixed** (in this PR or applied to S
 - **Encryption at rest:** Supabase encrypts the database volume (AES-256) at platform level. OAuth tokens get an additional application-level AES-256-GCM layer. Emails and IPs in `users` / `leads` / `subscribers` are plaintext columns, protected by RLS and volume encryption only.
 - **CORS:** `mpt-leads`, `scan-report`, `github-channel` use exact-origin allowlists (apex + www). `github-channel` credentials mode only for allowed origins.
 
+## Rate-limit status (2026-10-07)
+
+- Deployed: `mpt-leads` lists `ratelimit: RATE_LIMITER` in its bindings (deploy log), and `/whoami` returns `X-RateLimit-State: ok`, so the binding is present and `limit()` does not throw.
+- Not confirmed: bursts of 14 sequential, 60 parallel and 400 parallel requests (limit 10 per 60 s) all returned 200. Treat rate limiting as **unverified** until a 429 is observed.
+- Next step (open): confirm enforcement with a low-limit probe, or add a Cloudflare WAF rate-limiting rule on the Worker routes (dashboard) as the enforced backstop. `scan-report` binding presence was not read from its deploy log.
+
 ## CORS and rate-limit matrix (after this PR)
 
 | Worker / route | CORS | Foreign Origin | Auth | Rate limit |
@@ -79,7 +85,7 @@ The `RATE_LIMITER` bindings are declared in the two `wrangler.toml` files and th
 | Criterion | Result |
 |---|---|
 | Worker inputs are validated and sanitised against injection | **Met** for the four in-scope Workers (tests added). OAuth Workers reviewed only. |
-| Public endpoints enforce rate limiting and authentication where required | **Partly met.** Authentication met; rate limiting is coded and declared but only takes effect once the binding is deployed. `/webhook/leads`, `oauth-poc`, `github-channel` still lack it. |
+| Public endpoints enforce rate limiting and authentication where required | **Partly met.** Authentication met. Rate limiting is coded and the binding is deployed (`X-RateLimit-State: ok` on `/whoami`), but on 2026-10-07 bursts of 14, 60 and 400 requests to `GET /whoami` (limit 10/60 s) all returned 200, so enforcement is NOT confirmed. See "Rate-limit status". `/webhook/leads`, `oauth-poc`, `github-channel` still lack it. |
 | PII encrypted at rest and in transit | **Met at platform level** (TLS everywhere, Supabase volume encryption); no column-level encryption for emails/IPs, by design. |
 | CORS correct | **Met** in code; live behaviour unverified from this sandbox. |
 | GDPR/CCPA checklist completed | **Done**, with the gaps above. Not a legal sign-off. |
@@ -112,7 +118,7 @@ New behaviour is fail-closed, so these secrets must exist or the route returns 4
 |---|---|
 | Worker code (4 Workers) | Revert the PR commit and redeploy. The previous code is unchanged apart from this diff. |
 | Fail-closed webhooks cause unexpected 401s | Set the missing secret (preferred), or redeploy the previous Worker version from the Cloudflare dashboard (Versions). |
-| Rate-limit bindings | Remove the `[[ratelimits]]` block; code fails open. |
+| Rate-limit bindings | Remove the `[[unsafe.bindings]]` block; code fails open. |
 | `public/_headers` | Delete the file and redeploy Pages. |
 | Supabase revoke (applied) | `grant execute on function public.rls_auto_enable() to public, anon, authenticated;` |
 | DSAR functions | Not applied; nothing to roll back. If applied later: `drop function public.mpt_dsar_export(text), public.mpt_dsar_erase(text);` |
