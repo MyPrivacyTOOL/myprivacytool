@@ -45,10 +45,42 @@ export function clearSessionHint(): void {
   }
 }
 
-/** True when the URL is the Worker's success redirect (`?channel=google`) and not a failure (`?oauth_error=`). */
-export function isSignInReturn(search: string): boolean {
+export type SignInReturn = { kind: "success" } | { kind: "error"; message: string };
+
+/** Maps the Worker's `?oauth_error=` codes to copy that is safe to show a visitor. Never echoes the raw code. */
+export function friendlySignInError(code: string): string {
+  switch (code) {
+    case "access_denied":
+      return "You cancelled the Google sign-in. Nothing was saved.";
+    case "email_not_verified":
+      return "That Google account's email isn't verified, so we couldn't sign you in.";
+    case "insufficient_provider_scope":
+      return "We need permission to see your email address to sign you in. Please try again and allow it.";
+    case "missing_code":
+      return "That sign-in link expired. Please try signing in again.";
+    default:
+      return "We couldn't finish signing you in. Please try again.";
+  }
+}
+
+/**
+ * Reads the Worker's redirect back to the site: `?channel=google` on success, plus `&oauth_error=<code>` on failure.
+ * Both need `channel=google`, so an unrelated page that happens to carry `oauth_error` is ignored.
+ */
+export function parseSignInReturn(search: string): SignInReturn | null {
   const p = new URLSearchParams(search);
-  return p.get("channel") === "google" && !p.get("oauth_error");
+  if (p.get("channel") !== "google") return null;
+  const code = p.get("oauth_error");
+  return code ? { kind: "error", message: friendlySignInError(code) } : { kind: "success" };
+}
+
+/** The same query string without the sign-in markers, keeping every other parameter (e.g. UTM tags). */
+export function stripSignInParams(search: string): string {
+  const p = new URLSearchParams(search);
+  p.delete("channel");
+  p.delete("oauth_error");
+  const rest = p.toString();
+  return rest ? `?${rest}` : "";
 }
 
 export async function fetchSession(fetchFn: FetchFn = fetch): Promise<SessionResult> {

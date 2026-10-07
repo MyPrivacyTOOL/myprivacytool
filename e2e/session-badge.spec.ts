@@ -43,6 +43,8 @@ test("after the sign-in redirect the header shows who is connected, and Sign out
   await page.goto("/?channel=google");
   await expect(page.getByText("Connected as")).toBeVisible();
   await expect(page.getByText("ann@example.com")).toBeVisible();
+  // The sign-in marker is removed from the address bar once read.
+  await expect.poll(() => new URL(page.url()).search).toBe("");
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByText("Connected as")).toHaveCount(0);
@@ -56,12 +58,22 @@ test("after the sign-in redirect the header shows who is connected, and Sign out
   expect(calls.length).toBe(before);
 });
 
-test("a failed sign-in redirect (?oauth_error=) shows no badge and asks nothing", async ({ page }) => {
+test("a failed sign-in shows a friendly message, no badge, asks the Worker nothing, and tidies the address bar", async ({ page }) => {
   const calls = await mockWorker(page, { signedIn: true });
   await page.goto("/?channel=google&oauth_error=email_not_verified");
-  await expect(page.locator("#root")).not.toBeEmpty();
+  await expect(page.getByRole("alert")).toContainText(/isn't verified/i);
   await expect(page.getByText("Connected as")).toHaveCount(0);
+  await expect.poll(() => new URL(page.url()).search).toBe("");
   expect(calls).toEqual([]);
+  await page.getByRole("button", { name: "Dismiss message" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("cancelling Google's consent says so and saves nothing", async ({ page }) => {
+  await mockWorker(page, { signedIn: false });
+  await page.goto("/?channel=google&oauth_error=access_denied");
+  await expect(page.getByRole("alert")).toContainText(/cancelled the Google sign-in/i);
+  await expect(page.getByRole("alert")).not.toContainText("access_denied");
 });
 
 test("on a phone the badge is visible without opening the menu and fits the screen", async ({ page }) => {

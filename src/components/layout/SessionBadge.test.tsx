@@ -4,6 +4,20 @@ import userEvent from "@testing-library/user-event";
 import SessionBadge from "./SessionBadge";
 import * as api from "@/lib/oauthSession";
 import { renderPage } from "@/test/render";
+import { useLocation } from "react-router-dom";
+
+const LocationProbe = () => {
+  const l = useLocation();
+  return <output data-testid="loc">{`${l.pathname}${l.search}${l.hash}`}</output>;
+};
+const renderWithProbe = (route: string) =>
+  renderPage(
+    <>
+      <SessionBadge />
+      <LocationProbe />
+    </>,
+    route,
+  );
 
 vi.mock("@/lib/oauthSession", async () => {
   const actual = await vi.importActual<typeof import("@/lib/oauthSession")>("@/lib/oauthSession");
@@ -41,12 +55,35 @@ describe("<SessionBadge />", () => {
     expect(api.hasSessionHint()).toBe(true);
   });
 
-  it("does not remember a failed sign-in return (?oauth_error=)", async () => {
-    const { container } = renderPage(<SessionBadge />, "/?channel=google&oauth_error=email_not_verified");
-    await Promise.resolve();
-    expect(container).toBeEmptyDOMElement();
+  it("a failed sign-in shows a friendly dismissible message, remembers nothing, and asks nothing", async () => {
+    renderPage(<SessionBadge />, "/?channel=google&oauth_error=access_denied");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/cancelled the google sign-in/i);
+    expect(document.body.textContent).not.toContain("access_denied");
     expect(api.hasSessionHint()).toBe(false);
     expect(api.fetchSession).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /dismiss message/i }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("removes the sign-in marker from the address bar but keeps other parameters and the hash", async () => {
+    vi.mocked(api.fetchSession).mockResolvedValue(connected());
+    renderWithProbe("/pricing?utm_source=ad&channel=google#plans");
+    await screen.findByText("ann@example.com");
+    expect(screen.getByTestId("loc")).toHaveTextContent("/pricing?utm_source=ad#plans");
+  });
+
+  it("also tidies the address bar after a failed sign-in, keeping the message", async () => {
+    renderWithProbe("/?channel=google&oauth_error=email_not_verified");
+    await screen.findByRole("alert");
+    expect(screen.getByTestId("loc")).toHaveTextContent(/^\/$/);
+    expect(screen.getByRole("alert")).toHaveTextContent(/isn't verified/i);
+  });
+
+  it("checks the session once after a sign-in return, not twice", async () => {
+    vi.mocked(api.fetchSession).mockResolvedValue(connected());
+    renderPage(<SessionBadge />, "/?channel=google");
+    await screen.findByText("ann@example.com");
+    expect(api.fetchSession).toHaveBeenCalledTimes(1);
   });
 
   it("hides the badge and forgets the hint when the Worker says there is no session", async () => {
