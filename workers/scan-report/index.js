@@ -9,7 +9,7 @@ const MAX_ATTEMPTS = 5;
 const STALE_CLAIM_MS = 15 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const clip = (v, n) => String(v ?? '').slice(0, n);
-// Per-IP limit (wrangler.toml [[ratelimits]]); fails open if the binding is absent or errors.
+// Per-IP limit (wrangler.toml [[unsafe.bindings]] type "ratelimit"); fails open if the binding is absent or errors.
 async function rateLimited(env, request) {
   if (!env.RATE_LIMITER) return false;
   try { return !(await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' })).success; } catch { return false; }
