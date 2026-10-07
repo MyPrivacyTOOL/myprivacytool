@@ -10,6 +10,8 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `TWILIO_SID` | | ✅ |
 | `TWILIO_AUTH_TOKEN` | | ✅ |
 | `META_APP_SECRET` | | ✅ |
+| `X_CONSUMER_SECRET` (MPC-8301) | | ✅ |
+| `TELEGRAM_WEBHOOK_SECRET` (MPC-8301) | | ✅ |
 
 Each Worker only receives the secrets it needs (least privilege). Secrets are read in code as `env.NAME`.
 `wrangler.toml` cannot hold secret values, so it lists the names in comments and `EXPECTED_SECRETS.txt`.
@@ -39,6 +41,8 @@ npx wrangler secret put SUPABASE_KEY
 npx wrangler secret put TWILIO_SID
 npx wrangler secret put TWILIO_AUTH_TOKEN
 npx wrangler secret put META_APP_SECRET
+npx wrangler secret put X_CONSUMER_SECRET
+npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 ```
 
 Check names (not values) with `npx wrangler secret list`.
@@ -48,7 +52,7 @@ Check names (not values) with `npx wrangler secret list`.
 Add under **Settings → Secrets and variables → Actions → New repository secret**:
 
 - `CLOUDFLARE_API_TOKEN` (Account → Workers Scripts → Edit), `CLOUDFLARE_ACCOUNT_ID`
-- `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`
+- `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `TELEGRAM_WEBHOOK_SECRET`
 
 On every push to `main`, `.github/workflows/deploy.yml` runs `npm install` + `npm test`, then deploys both
 Workers with `cloudflare/wrangler-action@v3` and syncs these secrets to each Worker.
