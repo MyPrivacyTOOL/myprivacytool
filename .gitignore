@@ -27,3 +27,10 @@ dist-ssr
 coverage
 playwright-report
 test-results
+
+# Secrets (MPT-1004): never commit real values; only .env.example is tracked
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
