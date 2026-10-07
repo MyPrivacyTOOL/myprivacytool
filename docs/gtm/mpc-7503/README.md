@@ -20,3 +20,6 @@ Trigger it with `node scripts/notify-make-distribution.mjs <slug> [subreddit] [c
 - Reddit link posts are limited to ~1 per 9 minutes, and subreddits (r/privacy, r/cybersecurity) restrict self-promotion; check rules before enabling. The Reddit app creation problem noted in MPC-117 may block the connection.
 - X posts are the title plus link; titles over 200 characters are cut. The X API write tier requires a paid/credited developer plan; check current pricing.
 - Rollback: deactivate/delete the scenario and webhook in Make; delete `docs/gtm/mpc-7503/` and the script.
+
+## Update 2026-10-07: Reddit paused
+Make no longer offers a default Reddit connection; Reddit must manually approve a new app (Responsible Builder Policy + Developer Support form) before you can create the Client ID and Secret. The live scenario (id 7817044) therefore runs **webhook → X only** so it can be activated. `blueprint.json` keeps the full webhook → router → X + Reddit version; re-add the Reddit module once an approved Reddit app exists. The pending Make credential request for Reddit can stay open or be deleted.
