@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "currency": "USD",
+  "period": "monthly",
+  "adjustable": true,
+  "default_monthly_cap_per_platform": 500,
+  "platforms": {
+    "google_ads": { "monthly_cap": 500 },
+    "meta_ads": { "monthly_cap": 500 },
+    "linkedin_ads": { "monthly_cap": 500 },
+    "x_ads": { "monthly_cap": 500 },
+    "tiktok_ads": { "monthly_cap": 500 }
+  },
+  "notes": "Per-platform caps default to default_monthly_cap_per_platform. Any change needs Chris's approval."
+}
