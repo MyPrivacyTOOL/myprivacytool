@@ -176,18 +176,6 @@ const Index = () => {
     window.location.reload();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
-        <div className="relative mb-6">
-          <div className="w-20 h-20 border-4 border-primary/30 border-t-primary rounded-full animate-spin-slow" />
-        </div>
-        <p className="text-lg text-foreground font-medium mb-2">Scanning your digital shadow...</p>
-        <p className="text-sm text-muted-foreground">This only takes a few seconds</p>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
@@ -253,7 +241,24 @@ const Index = () => {
 
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
-          <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+          {/* MPC-7200: the hero, intro and device icon do not depend on the scan, so the page renders at once and only
+              this area waits. The old full-screen "Scanning..." view was swapped for the whole page when the scan
+              finished, which moved the footer and cost a layout shift of ~0.93 on every visit (also delayed LCP). */}
+          {loading ? (
+            <div
+              className="flex min-h-[70vh] flex-col items-center justify-center px-4"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="relative mb-6">
+                <div className="w-20 h-20 border-4 border-primary/30 border-t-primary rounded-full animate-spin-slow" />
+              </div>
+              <p className="text-lg text-foreground font-medium mb-2">Scanning your digital shadow...</p>
+              <p className="text-sm text-muted-foreground">This only takes a few seconds</p>
+            </div>
+          ) : (
+            <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+          )}
         </section>
 
         {/* Journey teaser */}
