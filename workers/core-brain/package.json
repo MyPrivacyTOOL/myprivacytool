@@ -4,7 +4,7 @@
   "private": true,
   "description": "MPT (MyPrivacyTOOL) core brain Worker",
   "type": "module",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
     "dev": "wrangler dev",
     "typecheck": "tsc -p tsconfig.json --noEmit",

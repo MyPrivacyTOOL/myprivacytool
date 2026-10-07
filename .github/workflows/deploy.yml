@@ -5,7 +5,7 @@ name: Deploy core-brain & social-listeners
 #
 # Repo secrets required (Settings -> Secrets and variables -> Actions): see /SECRETS.md
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
-#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET
+#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY, WEBHOOK_SECRET, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET
 
 on:
   push:
@@ -64,10 +64,12 @@ jobs:
             SUPABASE_URL
             SUPABASE_KEY
             QWEN_API_KEY
+            WEBHOOK_SECRET
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
 
       - name: Deploy social-listeners
         if: matrix.worker == 'social-listeners'
