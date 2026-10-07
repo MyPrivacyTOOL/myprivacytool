@@ -7,7 +7,7 @@ const clip = (v, n) => (typeof v === 'string' ? v : v == null ? '' : String(v)).
 // Slack mrkdwn control characters (&, <, >) must be escaped so user text cannot inject links or mentions.
 const slackEsc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const htmlEsc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[ratelimits]]). Fails open if the
+// Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[unsafe.bindings]] type "ratelimit"). Fails open if the
 // binding is absent or errors so a platform hiccup never drops a real lead.
 async function rateLimited(env, request) {
   if (!env.RATE_LIMITER) return false;

@@ -1,6 +1,6 @@
 # MPT (MyPrivacyTOOL) social-listeners Worker — MPT-1004. Microdrama: ears on every channel.
 name = "social-listeners"
-main = "index.js"
+main = "src/index.ts"
 compatibility_date = "2024-09-23"
 workers_dev = true
 
@@ -8,7 +8,20 @@ workers_dev = true
 # They are bound at runtime as `env.<NAME>` after `wrangler secret put <NAME>` (see /SECRETS.md) or after
 # the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
 # Names (also in EXPECTED_SECRETS.txt):
-#   SUPABASE_URL, SUPABASE_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET
+#   SUPABASE_URL, SUPABASE_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
+#   X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (only if using HTTP fallback)
 
 [observability]
 enabled = true
+
+# MPC-8301: inbound webhook routes, served by src/index.ts:
+#   /webhook/x         -> src/x-webhook.ts        (CRC GET + signed POST)
+#   /webhook/telegram  -> src/telegram-webhook.ts (secret-token POST)
+# Both forward verified payloads to core-brain (MPC-8601) at POST /ingest/social.
+[[services]]
+binding = "CORE_BRAIN"
+service = "core-brain"
+
+# HTTP fallback instead of the service binding: remove [[services]] above and set CORE_BRAIN_URL here.
+# [vars]
+# CORE_BRAIN_URL = "https://core-brain.<account>.workers.dev"
