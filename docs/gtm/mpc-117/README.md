@@ -12,11 +12,13 @@ Status as of 2026-10-06:
 4. DONE: `DELETE /channels/github` live-tested (disconnect returned the page to "Connect GitHub").
 5. TODO: link `/connect/github` from somewhere public (it is unlisted and noindex today).
 6. TODO: retire the old `workers.dev` address and the old redirect URI (PR #85, manual deploy, then remove the URI in GitHub).
-7. TODO: human review of the copy, fill the placeholders below, then publish.
+7. DONE 2026-10-07: blog post published (PR #112, with the styling fix PR #114).
+8. TODO: human review of the social copy in `social-posts.md`, name a LinkedIn Page admin, then post.
 
 ## Files
 - `blog-how-it-works.md` — "How it works" blog draft (not in `blogPosts.json`, so it cannot go live by accident).
-- `social-posts.md` — LinkedIn and X copy, plus an optional Reddit-the-site post (not scheduled anywhere).
+- `social-posts.md` — final-draft LinkedIn, X (two variants) and Reddit-the-site copy with UTM links, a pre-post checklist and suggested timing. Not posted or scheduled anywhere.
+- `social-schedule.csv` — 3 suggested slots, all `status = draft` (nothing posts from draft).
 - `homepage-badges.md` — spec for a GitHub channel badge (no UI change made).
 
 ## Rollback
