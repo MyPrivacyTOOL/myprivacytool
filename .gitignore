@@ -35,5 +35,6 @@ test-results
 .dev.vars
 .dev.vars.*
 
-# Wrangler local state (CK-007)
+# wrangler local dev state
 .wrangler
+supabase/.env

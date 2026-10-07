@@ -3,11 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "workspaces": [
-    "workers/core-brain",
-    "workers/social-listeners",
-    "shared/utils"
-  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -23,6 +18,7 @@
     "lint:tests": "eslint e2e src/test \"src/**/*.test.{ts,tsx}\" playwright.config.ts vitest.config.ts",
     "check:env": "node scripts/ci/check-env.mjs",
     "smoke": "node scripts/ci/smoke-test.mjs",
+    "dev:core-brain": "npm run dev -w @mpt/core-brain",
     "typecheck:workspaces": "npm run typecheck --workspaces --if-present"
   },
   "dependencies": {
@@ -111,5 +107,10 @@
     "vite": "^5.4.19",
     "vitest": "^2.1.9",
     "yaml": "^2.9.1"
-  }
+  },
+  "workspaces": [
+    "workers/core-brain",
+    "workers/social-listeners",
+    "shared/*"
+  ]
 }

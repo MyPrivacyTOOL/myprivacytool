@@ -5,7 +5,11 @@
   "description": "MPT (MyPrivacyTOOL) core brain Worker",
   "type": "module",
   "main": "index.js",
-  "scripts": { "dev": "wrangler dev", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "deploy": "wrangler deploy"
+  },
   "dependencies": {
     "@mpt/utils": "*",
     "@supabase/supabase-js": "2.117.2",
