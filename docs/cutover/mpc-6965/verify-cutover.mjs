@@ -4,7 +4,7 @@
  *
  *   SUPABASE_URL=https://xmdmkumwxpgahmlweuug.supabase.co \
  *   SUPABASE_SERVICE_ROLE_KEY=...  SUPABASE_ANON_KEY=... \
- *   [NOTION_TOKEN=... NOTION_SCAN_DB=<MPT OSINT Scan Results data source id>] \
+ *   [NOTION_TOKEN=... NOTION_SCAN_DB=<MPT OSINT Scan Results DATABASE id (not the data source id; the 2022-06-28 API takes a database id)>] \
  *   node verify-cutover.mjs --since 2026-10-07T00:00:00Z [--phase cutover|rollback] [--allow-skip]
  *
  * Keys come from the environment at run time and are never printed. Run it from a human's terminal after the
@@ -15,6 +15,9 @@
  *
  * Exit codes: 0 all PASS (SKIPPED allowed only with --allow-skip), 1 any FAIL, 2 SKIPPED without --allow-skip.
  */
+
+import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
 
 const TABLES = ['mpt_osint_scan_results', 'mpt_api_rate_limits', 'mpt_channel_metrics', 'mpt_user_engagement'];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -118,7 +121,7 @@ export async function run({ env, since, phase = 'cutover', now = Date.now() }, {
         headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}` },
       });
       if (res.ok) { const rows = await res.json().catch(() => null); if (!Array.isArray(rows) || rows.length) leaks.push(t); }
-      else if (![401, 403, 404].includes(res.status)) leaks.push(`${t} (unexpected HTTP ${res.status})`);
+      else if (![401, 403].includes(res.status)) leaks.push(`${t} (unexpected HTTP ${res.status})`);
     }
     return leaks.length ? fail('AC4', 'anon key returns 0 rows on all four mpt_* tables', `rows visible or unexpected status: ${leaks.join(', ')}`)
       : pass('AC4', 'anon key returns 0 rows on all four mpt_* tables', '4/4 tables closed to anon');
@@ -142,7 +145,7 @@ function parseArgs(argv) {
   return a;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const a = parseArgs(process.argv.slice(2));
   if (!a.since || Number.isNaN(Date.parse(a.since)) || !['cutover', 'rollback'].includes(a.phase)) {
     console.error('usage: node verify-cutover.mjs --since <ISO time of cutover or rollback> [--phase cutover|rollback] [--allow-skip]');

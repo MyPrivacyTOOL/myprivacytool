@@ -58,6 +58,11 @@ test('anon visibility fails AC4; an empty 200 and 401 both pass', async () => {
   assert.equal(byId(await go(full, net({ anon: 'empty' }))).AC4, 'PASS');
 });
 
+test('anon 404 (table missing or misnamed) fails AC4 instead of passing', async () => {
+  const n = { fn: async (u, init = {}) => init.headers?.apikey === 'anon' ? new Response('{}', { status: 404 }) : new Response('[]', { status: 206, headers: { 'content-range': '0-0/1' } }) };
+  assert.equal(byId(await go(full, n)).AC4, 'FAIL');
+});
+
 test('missing credentials are SKIPPED, never PASS; exit 2 unless --allow-skip', async () => {
   const rs = await go({ SUPABASE_URL: full.SUPABASE_URL }, net());
   assert.ok(Object.values(byId(rs)).every((s) => s === 'SKIPPED'));
