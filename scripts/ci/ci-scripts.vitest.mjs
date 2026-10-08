@@ -102,6 +102,24 @@ describe("smoke-test targets", () => {
     const f = async (u) => (u.endsWith("/health") ? { ...resp(502), json: async () => { throw new Error("html"); } } : resp(404, { headers: {} }));
     expect((await targets["oauth-poc"]("https://o", f)).some((x) => !x.ok)).toBe(true);
   });
+  // MPC-7260: core-brain is probed without the secret; nothing is classified.
+  const brainOk = (health = { ok: true, worker: "core-brain", configured: true }) => async (u, o = {}) =>
+    u.endsWith("/health") ? resp(200, { json: health })
+      : u.endsWith("/webhook") ? resp(o.method === "POST" ? 401 : 405) : resp(404);
+  it("core-brain: passes against a configured Worker that rejects unauthenticated calls", async () => {
+    expect((await targets["core-brain"]("https://b", brainOk())).every((x) => x.ok)).toBe(true);
+  });
+  it("core-brain: fails when /health reports configured:false", async () => {
+    const failed = (await targets["core-brain"]("https://b", brainOk({ ok: true, worker: "core-brain", configured: false }))).filter((x) => !x.ok);
+    expect(failed.map((x) => x.name)).toEqual(["/health -> {ok, worker:core-brain, configured:true}"]);
+  });
+  it("core-brain: fails if /webhook accepts an unauthenticated POST", async () => {
+    const f = async (u, o = {}) => (u.endsWith("/health") ? resp(200, { json: { ok: true, worker: "core-brain", configured: true } }) : u.endsWith("/webhook") ? resp(o.method === "POST" ? 200 : 405) : resp(404));
+    expect((await targets["core-brain"]("https://b", f)).filter((x) => !x.ok).map((x) => x.name)).toEqual(["POST /webhook without the secret -> 401"]);
+  });
+  it("core-brain: defaults to the production custom domain", () => {
+    expect(DEFAULTS["core-brain"]).toBe("https://brain.myprivacytool.io");
+  });
 });
 
 describe("smoke() runner", () => {

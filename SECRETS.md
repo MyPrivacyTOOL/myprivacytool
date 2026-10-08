@@ -7,7 +7,7 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `SUPABASE_URL` | ✅ | ✅ |
 | `SUPABASE_KEY` | ✅ | ✅ |
 | `QWEN_API_KEY` | ✅ | |
-| `WEBHOOK_SECRET` | ✅ | |
+| `WEBHOOK_SECRET` (required: the deploy fails without it) | ✅ | |
 | `TWILIO_SID` | | ✅ |
 | `TWILIO_AUTH_TOKEN` | | ✅ |
 | `META_APP_SECRET` | | ✅ |

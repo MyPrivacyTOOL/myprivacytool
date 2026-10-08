@@ -1,5 +1,13 @@
 # Core Brain Production Promotion & DNS Cutover Plan — MPC-7284
 
+> **Superseded in part (MPC-7260, 2026-10-08).** The owner approved `brain.myprivacytool.io` as the production hostname
+> (matching `channels.myprivacytool.io`); hostnames below were updated to it. Where this plan disagrees with
+> `/DEPLOYMENT_RUNBOOK.md`, the runbook wins: the Worker is attached with a `custom_domain` route in `wrangler.toml`
+> (no manual CNAME), the real routes are `/webhook` and `/ingest/social` (not `/webhook/x`, `/webhook/telegram`),
+> the staging address is `core-brain.myprivacytool.workers.dev`, the `webhooks.` alias was **not** approved, and a
+> live Qwen classification (`intent_source: "qwen"`) is a launch gate. Read-only launch is approved: state write-back
+> and `interaction_log` are Phase 2.
+
 **Document Status:** Ready for Review (CK Approval Required)  
 **Effective Date:** 2026-10-08  
 **Owner:** MyPrivacyToolClaw  
@@ -36,8 +44,8 @@ This plan defines the complete DNS cutover, production promotion, and go-live pr
 | Environment | Endpoint | DNS Target | Purpose | Status |
 |---|---|---|---|---|
 | **Staging** | `core-brain-staging.mpt.workers.dev` | Cloudflare Workers routing | Testing + QA | ✅ Live |
-| **Production** | `core-brain.api.myprivacytool.io` | Cloudflare Workers routing | Live social integrations | ⏳ To configure |
-| **Alias** | `webhooks.myprivacytool.io` | → `core-brain.api.myprivacytool.io` | Platform documentation | ⏳ To configure |
+| **Production** | `brain.myprivacytool.io` | Cloudflare Workers routing | Live social integrations | ⏳ To configure |
+| **Alias** | `webhooks.myprivacytool.io` | → `brain.myprivacytool.io` | Platform documentation | ⏳ To configure |
 
 ### 2.2 DNS Records Required (Cloudflare)
 
@@ -54,7 +62,7 @@ Proxy:   ✅ Proxied (Cloudflare only, not DNS only)
 ```
 Type:    CNAME
 Name:    webhooks
-Target:  core-brain.api.myprivacytool.io
+Target:  brain.myprivacytool.io
 TTL:     1 hour (during cutover week, extend to 3600 after stabilization)
 Proxy:   ✅ Proxied
 ```
@@ -136,13 +144,13 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 
 - [ ] **X Platform Webhook Setup:**
   - [ ] X Dev Portal → Account Activity API → create Webhook subscription
-  - [ ] Webhook URL: `https://core-brain.api.myprivacytool.io/webhook/x`
+  - [ ] Webhook URL: `https://brain.myprivacytool.io/webhook/x`
   - [ ] Signature verification: Enabled
   - [ ] Webhook events subscribed: tweets (replies), direct messages, mentions
   - [ ] Test with sample event to verify 202 Accepted response
 - [ ] **Telegram Bot Webhook Setup:**
   - [ ] BotFather → `/setwebhook` command with production URL
-  - [ ] Webhook URL: `https://core-brain.api.myprivacytool.io/webhook/telegram`
+  - [ ] Webhook URL: `https://brain.myprivacytool.io/webhook/telegram`
   - [ ] Verify: `getWebhookInfo` returns the production endpoint
   - [ ] Test with `@BotFather /debug` to verify message delivery
 
@@ -152,7 +160,7 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
   - Target: 100 requests/second (X webhooks) + 50 requests/second (Telegram)
   - Duration: 5 minutes sustained
   - Result: <250ms p99 latency, <1% errors
-  - Tool: `artillery quick --count 150 --num 1000 https://core-brain.api.myprivacytool.io/webhook/x`
+  - Tool: `artillery quick --count 150 --num 1000 https://brain.myprivacytool.io/webhook/x`
 - [ ] **Auto-scaling Configured** (Cloudflare Workers auto-scales; no action needed)
 - [ ] **Rate Limiting Configured** (optional, for abuse prevention):
   - Limit: 100 requests per IP per minute
@@ -166,7 +174,7 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 
 **Phase 1: DNS Pre-Staging (0 hours before cutover)**
 - Add DNS CNAME records to Cloudflare (TTL = 1 hour)
-- Records: `core-brain.api.myprivacytool.io` and `webhooks.myprivacytool.io`
+- Records: `brain.myprivacytool.io` and `webhooks.myprivacytool.io`
 - Status: DNS resolves but Worker not yet active on this domain
 
 **Phase 2: Worker Deployment (0 hours at cutover)**
@@ -202,8 +210,8 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 - [ ] Pull latest code and confirm no uncommitted changes on `main`
 
 **At cutover (T+0):**
-- [ ] Add DNS CNAME records (`core-brain.api.myprivacytool.io`, `webhooks.myprivacytool.io`)
-- [ ] Confirm DNS resolves (wait 30s): `nslookup core-brain.api.myprivacytool.io`
+- [ ] Add DNS CNAME records (`brain.myprivacytool.io`, `webhooks.myprivacytool.io`)
+- [ ] Confirm DNS resolves (wait 30s): `nslookup brain.myprivacytool.io`
 - [ ] Deploy Worker to production:
   ```bash
   git checkout main
@@ -211,20 +219,20 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
   wrangler deploy --env production
   ```
 - [ ] Verify deployment succeeded: Check GitHub Actions log (should complete in <2m)
-- [ ] Health check (T+1m): `curl -X GET https://core-brain.api.myprivacytool.io/health`
+- [ ] Health check (T+1m): `curl -X GET https://brain.myprivacytool.io/health`
   - Expected: HTTP 200, body: `{"configured": true, "version": "1.0.0", ...}`
   - If 404 or timeout: Roll back immediately (see Section 5)
 
 **T+30 minutes (X Cutover):**
 - [ ] Log into X Developer Portal → Account Activity API
-- [ ] Update webhook subscription URL: `https://core-brain.api.myprivacytool.io/webhook/x`
+- [ ] Update webhook subscription URL: `https://brain.myprivacytool.io/webhook/x`
 - [ ] X Platform validates (should see "Subscription enabled")
 - [ ] Send test event via X (post a mention or DM to the bot account)
 - [ ] Verify event received in production logs: `wrangler tail --format pretty | grep "X webhook"`
 - [ ] Expected log: `"POST /webhook/x HTTP/1.1" 202 Accepted`
 
 **T+1 hour (Telegram Cutover):**
-- [ ] Send Telegram command to BotFather: `/setwebhook https://core-brain.api.myprivacytool.io/webhook/telegram`
+- [ ] Send Telegram command to BotFather: `/setwebhook https://brain.myprivacytool.io/webhook/telegram`
 - [ ] Verify response: `getWebhookInfo` should return the production URL
 - [ ] Send test message to the bot account
 - [ ] Verify event received in production logs: `wrangler tail --format pretty | grep "Telegram"`
@@ -259,7 +267,7 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 **Steps:**
 1. **Revert DNS (fastest):**
    ```
-   Delete CNAME records: core-brain.api.myprivacytool.io and webhooks.myprivacytool.io
+   Delete CNAME records: brain.myprivacytool.io and webhooks.myprivacytool.io
    Restore old A/CNAME records if they existed (typically none for staging)
    ```
    - Time to propagate: 30 seconds – 1 minute (TTL = 1 hour)
@@ -330,7 +338,7 @@ npm run test:staging
 **Smoke Test (Production Endpoint):**
 ```bash
 # After deployment, before DNS cutover
-curl -X GET https://core-brain.api.myprivacytool.io/health \
+curl -X GET https://brain.myprivacytool.io/health \
   -H "Authorization: Bearer <test-token>"
 # Expected: 200 OK, configured=true
 ```
@@ -339,7 +347,7 @@ curl -X GET https://core-brain.api.myprivacytool.io/health \
 
 **Health Check (T+1m):**
 ```bash
-curl -X GET https://core-brain.api.myprivacytool.io/health
+curl -X GET https://brain.myprivacytool.io/health
 # Expected: 200, response time <100ms
 ```
 
@@ -349,7 +357,7 @@ curl -X GET https://core-brain.api.myprivacytool.io/health
 PAYLOAD='{"for_user_id":"test","data":{"id":"test-1","text":"test"}}'
 SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | cut -d' ' -f2)
 
-curl -X POST https://core-brain.api.myprivacytool.io/webhook/x \
+curl -X POST https://brain.myprivacytool.io/webhook/x \
   -H "Content-Type: application/json" \
   -H "X-Signature: $SIG" \
   -d "$PAYLOAD"
@@ -358,7 +366,7 @@ curl -X POST https://core-brain.api.myprivacytool.io/webhook/x \
 
 **Telegram Webhook Test (T+1h):**
 ```bash
-curl -X POST https://core-brain.api.myprivacytool.io/webhook/telegram \
+curl -X POST https://brain.myprivacytool.io/webhook/telegram \
   -H "Content-Type: application/json" \
   -H "X-Telegram-Bot-Api-Secret-Token: $WEBHOOK_SECRET" \
   -d '{"update_id":1,"message":{"message_id":1,"chat":{"id":123},"text":"test"}}'
@@ -535,7 +543,7 @@ If production is stable for 1 week:
 
 **Check DNS:**
 ```bash
-nslookup core-brain.api.myprivacytool.io
+nslookup brain.myprivacytool.io
 # Expected: Non-NXDOMAIN, points to Cloudflare
 ```
 
@@ -554,7 +562,7 @@ wrangler tail --format pretty
 ```bash
 PAYLOAD='{"for_user_id":"123","data":{"id":"evt-1","text":"test"}}'
 SIG=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "test-secret" | cut -d' ' -f2)
-curl -X POST https://core-brain.api.myprivacytool.io/webhook/x \
+curl -X POST https://brain.myprivacytool.io/webhook/x \
   -H "Content-Type: application/json" \
   -H "X-Signature: $SIG" \
   -d "$PAYLOAD"
@@ -576,8 +584,8 @@ SELECT * FROM mpt_classifications ORDER BY created_at DESC LIMIT 10;
 - `WEBHOOK_SECRET` = HMAC signing key
 
 **Social Platform Configurations:**
-- **X:** Dev Portal → Webhook URL → https://core-brain.api.myprivacytool.io/webhook/x
-- **Telegram:** `/setwebhook https://core-brain.api.myprivacytool.io/webhook/telegram`
+- **X:** Dev Portal → Webhook URL → https://brain.myprivacytool.io/webhook/x
+- **Telegram:** `/setwebhook https://brain.myprivacytool.io/webhook/telegram`
 
 ### 12.3 References
 

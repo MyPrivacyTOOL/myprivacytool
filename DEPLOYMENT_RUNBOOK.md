@@ -1,356 +1,102 @@
-# Core Brain Staging Deployment Runbook — MPC-7257
+# Core Brain Deployment Runbook (MPC-7257, production promotion MPC-7260)
 
-## Overview
-This runbook covers the end-to-end deployment of **Core Brain** (privacy analysis orchestrator) to Cloudflare staging, including webhook integration (X/Telegram), intent classification (Mirror & Risk Engine), response templating, and logging.
+Deploys the **core-brain** Cloudflare Worker (`workers/core-brain`, behaviour in `docs/core-brain.md`).
 
-**Status:** Ready to deploy
-**Target:** Cloudflare Workers staging (`*.staging.workers.dev`)
-**Components:** core-brain Worker + Supabase Edge Functions + Qwen API integration
+| | URL | Notes |
+|---|---|---|
+| **Production** | `https://brain.myprivacytool.io` | Custom domain route in `wrangler.toml`. `wrangler deploy` creates the DNS record and certificate; no manual DNS record. |
+| Pre-production (workers.dev) | `https://core-brain.myprivacytool.workers.dev` | Same Worker, still enabled until traffic has moved; then set `workers_dev = false`. |
 
----
+There is **one** Worker. There is no separate staging Worker or `*.staging.workers.dev` address: "staging" was the first
+workers.dev deployment of the same script. Every push to `main` redeploys it (`.github/workflows/deploy.yml`).
 
-## Pre-Deployment Checklist
+Routes (all JSON; see `docs/core-brain.md` for bodies):
 
-### 1. GitHub Secrets Configured
-Verify these secrets exist in the repo (Settings → Secrets and variables → Actions):
-
-- ✅ `CLOUDFLARE_API_TOKEN` — Account-level Cloudflare API token (all permissions)
-- ✅ `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account ID (32-char hex)
-- ✅ `SUPABASE_URL` — Staging Supabase project URL
-- ✅ `SUPABASE_KEY` — Supabase staging anon key
-- ⚠️ `QWEN_API_KEY` (optional) — Alibaba Qwen API key (rules-based intent works without it)
-- ⚠️ `WEBHOOK_SECRET` (optional) — HMAC-SHA256 key for X/Telegram webhooks
-
-**Check:** `git push` will fail at the "Pre-deployment checks" step if CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID are missing.
-
-### 2. Cloudflare Staging Environment Ready
-Before deploying, verify staging is reachable:
-
-```bash
-# Check staging endpoint (replace with your subdomain)
-curl https://core-brain-staging.mpt.workers.dev/health
-
-# Expected response (before first deploy):
-# 404 (Worker not deployed yet) — this is fine
-```
-
-### 3. Supabase Staging Database Ready
-Verify the staging Supabase project has the required tables:
-
-```sql
--- Run in Supabase SQL editor (staging project)
-SELECT table_name FROM information_schema.tables 
-WHERE table_schema = 'public';
-
--- Expected tables:
--- - mpt_scan_events (webhook events)
--- - mpt_classifications (intent + risk scoring)
--- - mpt_responses (templated responses)
--- - mpt_firestore_logs (event logging)
-```
+| Route | Auth |
+|---|---|
+| `GET /health` | none; returns `{ ok, worker, configured }` |
+| `POST /webhook` | header `X-MPT-Webhook-Secret: <WEBHOOK_SECRET>` |
+| `POST /ingest/social` | header `Authorization: Bearer <WEBHOOK_SECRET>` (social-listeners sends it as `CORE_BRAIN_TOKEN`) |
 
 ---
 
-## Deployment Steps
+## 1. Before you merge to `main`
 
-### Step 1: Review & Merge MPC-7257 PR
+GitHub repo secrets (Settings → Secrets and variables → Actions). Names only; see `SECRETS.md`.
 
-```bash
-# View the PR diff
-git show feat/mpc-7257-staging-deploy
+| Secret | Required | Notes |
+|---|:-:|---|
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | yes | The token must be able to edit Workers and the `myprivacytool.io` zone DNS / Workers custom domains (the same permission `channels.myprivacytool.io` already needed). |
+| `SUPABASE_URL`, `SUPABASE_KEY` | yes | The deploy fails before anything ships if either is missing or blank. |
+| `WEBHOOK_SECRET` | yes | A long random value. **No stand-in is ever used**: a guessable secret would let anyone call `/webhook`. Set `CORE_BRAIN_TOKEN` (social-listeners) to the same value. |
+| `QWEN_API_KEY` | no | Without it intent classification uses the rules engine (`intent_source: "rules"`). Needed for the Qwen gate below. |
 
-# Key changes:
-# - .github/workflows/deploy.yml: Optional secret handling for staging
-# - workers/core-brain/: Worker + intent classification logic
-# - tests/integration/staging.test.ts: Full integration test suite
-```
+If a required secret is missing, `deploy.yml` fails at **Require core-brain secrets**; the running Worker is untouched.
 
-**Checklist:**
-- [ ] All CI tests pass (npm test)
-- [ ] Linting passes
-- [ ] No unresolved merge conflicts
+## 2. Deploy
 
-### Step 2: Trigger Deployment via GitHub Actions
+Merging to `main` runs `deploy.yml` (tests, then deploy). To redeploy without a commit: Actions → *Deploy core-brain &
+social-listeners* → *Run workflow*. Expect 3 to 6 minutes. `smoke-site.yml` then probes `brain.myprivacytool.io`
+(retrying for up to 10 minutes while DNS and the certificate settle).
 
-**Option A: Merge to main (auto-deploy)**
-```bash
-git push origin feat/mpc-7257-staging-deploy
-# Create PR → approve → merge to main
-# GitHub Actions automatically deploys on push to main
-```
-
-**Option B: Manual workflow_dispatch (for testing)**
-```bash
-# From the GitHub UI:
-# 1. Go to Actions → "Deploy core-brain & social-listeners"
-# 2. Click "Run workflow" → select branch → "Run workflow"
-# This bypasses the commit push and runs the workflow immediately
-```
-
-### Step 3: Monitor Deployment Progress
-
-1. **Navigate to GitHub Actions:**
-   - Repo → Actions → "Deploy core-brain & social-listeners"
-   - Watch the run for your commit
-
-2. **Expected workflow steps:**
-   ```
-   ✅ test (ubuntu-latest)
-      └─ npm install
-      └─ npm test (should complete in <2m)
-   
-   ✅ deploy (matrix strategy: [core-brain, social-listeners])
-      └─ Pre-deployment checks (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
-      └─ Deploy core-brain
-         └─ Sync secrets (SUPABASE_URL, SUPABASE_KEY, optional: QWEN_API_KEY, WEBHOOK_SECRET)
-         └─ wrangler deploy (publish to *.staging.workers.dev)
-      └─ Deploy social-listeners
-         └─ wrangler deploy
-   ```
-
-3. **Expected total time:** 5–10 minutes
-
-### Step 4: Verify Staging Deployment
-
-Once GitHub Actions completes, verify the Worker is live:
+## 3. Production gates (all must pass before any platform webhook points at `brain.myprivacytool.io`)
 
 ```bash
-# Get the staging endpoint (check Cloudflare dashboard or wrangler output)
-STAGING_URL="https://core-brain-staging.mpt.workers.dev"
+BASE=https://brain.myprivacytool.io
 
-# Health check
-curl -X GET "${STAGING_URL}/health" \
-  -H "Content-Type: application/json"
+# 3a. Configured, and auth is enforced
+curl -s "$BASE/health"                                   # expect {"ok":true,"worker":"core-brain","configured":true}
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$BASE/webhook" -d '{}'   # expect 401
 
-# Expected response:
-{
-  "configured": true,
-  "version": "1.0.0",
-  "timestamp": "2026-10-07T15:20:00.000Z"
-}
+# 3b. LIVE QWEN GATE: at least one intent must be classified by Qwen. Run with the real secret.
+curl -s -X POST "$BASE/webhook" \
+  -H 'Content-Type: application/json' -H "X-MPT-Webhook-Secret: $WEBHOOK_SECRET" \
+  -d '{"platform":"telegram","sender_id":"gate-test","message_text":"I want to scan my email for data leaks"}'
+# expect 200 with "intent_source":"qwen". "rules" means Qwen was not reached: check QWEN_API_KEY and the
+# DashScope account, fix, and repeat. Do NOT go live until one response says "qwen".
+
+# 3c. Graceful fallback (no crash when Qwen is down) is covered by the unit tests:
+npx vitest run workers/core-brain
 ```
+
+Read-only launch: state write-back and `interaction_log` are intentionally not built (Phase 2). The Worker reads trust
+level from Supabase and falls back to anonymous; it never writes `conversation_states`.
+
+## 4. Cut traffic over
+
+One platform at a time, with a test message after each:
+
+1. Telegram: set the bot webhook to `https://brain.myprivacytool.io/...` through social-listeners (it forwards to core-brain with the bearer token; confirm social-listeners' `CORE_BRAIN_TOKEN` equals `WEBHOOK_SECRET`).
+2. X: update the Account Activity webhook URL on social-listeners the same way.
+3. After about a week with no requests on the workers.dev address, set `workers_dev = false` in `wrangler.toml` and redeploy.
+
+DNS: nothing to edit by hand. The apex, `www` (Pages), `channels` and the `send.` mail records are untouched. Do not deploy
+during an Email Routing record change on the same zone, so a failure has one obvious cause.
+
+## 5. Rollback
+
+| Layer | Action |
+|---|---|
+| Worker code | Actions → *Rollback Worker* → `core-brain` (leave `dry_run` on first to list versions; untick it to roll back, optionally with a `version_id`). It snapshots secret names, rolls back, verifies they are unchanged and smoke-tests `brain.myprivacytool.io`. CLI: `cd workers/core-brain && npx wrangler rollback`. Dashboard: Workers → core-brain → Deployments. |
+| Callers | Point the platform webhooks back at the workers.dev address (still live until step 4.3). |
+| Domain | Remove the `routes` line from `wrangler.toml` and redeploy, or delete the custom domain in Cloudflare → Workers → core-brain → Settings → Domains. Nothing else in the zone changed. |
+| Bad commit | `git revert <sha>` on `main`; the revert PR must pass CI and redeploys automatically. |
+
+The rollback drill (`rollback.yml`, Mondays 06:23 UTC, dry run) now includes `core-brain`.
+
+## 6. Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| `deploy.yml` fails at *Require core-brain secrets* | A required secret is unset or blank (names only are printed). Set it and re-run. |
+| `/health` shows `configured:false`, POST routes answer 503 | `SUPABASE_URL`, `SUPABASE_KEY` or `WEBHOOK_SECRET` did not reach the Worker. Re-run the deploy. |
+| 401 from `/webhook` or `/ingest/social` | Wrong secret. `/webhook` uses `X-MPT-Webhook-Secret`; `/ingest/social` uses `Authorization: Bearer`. social-listeners' `CORE_BRAIN_TOKEN` must equal `WEBHOOK_SECRET`. |
+| `intent_source` is always `rules` | `QWEN_API_KEY` unset or rejected. The Worker logs `qwen http error` / `qwen failed` (no message text) and falls back; it does not error. |
+| `brain.myprivacytool.io` does not resolve right after deploy | Custom domain and certificate can take a few minutes. Check Cloudflare → Workers → core-brain → Domains. The token needs zone DNS / custom-domain permission. |
+
+Stream logs: `cd workers/core-brain && npx wrangler tail --format pretty`. Logs carry event metadata only.
 
 ---
 
-## Integration Testing
-
-### Run Full Integration Test Suite
-
-```bash
-# Install dependencies
-npm install
-
-# Run staging integration tests
-npm run test:staging
-
-# Expected output:
-# ✓ Health check (passed)
-# ✓ X webhook ingestion (passed)
-# ✓ X intent classification (passed)
-# ✓ X invalid signature rejection (passed)
-# ✓ Telegram webhook ingestion (passed)
-# ✓ Telegram intent classification (passed)
-# ✓ Response templating (passed)
-# ✓ Risk escalation (passed)
-# ✓ Error handling — malformed JSON (passed)
-# ✓ Error handling — missing fields (passed)
-# ✓ Error handling — long payloads (passed)
-# ✓ Firestore logging (passed)
-#
-# 12 tests passed in 45s
-```
-
-### Manual Test: X Webhook
-
-```bash
-# Generate webhook signature
-PAYLOAD='{"for_user_id":"12345","data":{"id":"test-1","text":"I want to remove my data","author_id":"98765","created_at":"2026-10-07T15:20:00Z"}}'
-SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "test-secret" | sed 's/^.* //')
-
-# Send webhook to staging
-curl -X POST "https://core-brain-staging.mpt.workers.dev/webhook/x" \
-  -H "Content-Type: application/json" \
-  -H "X-Signature: ${SIGNATURE}" \
-  -d "$PAYLOAD"
-
-# Expected response:
-{
-  "event_id": "evt-20261007-xyz123",
-  "intent": "REMOVAL_REQUEST",
-  "confidence": 0.87,
-  "risk_score": 62,
-  "response_template": {
-    "type": "REMOVAL_INSTRUCTIONS",
-    "personalized_message": "Hi there, thank you for reaching out..."
-  }
-}
-```
-
-### Manual Test: Telegram Webhook
-
-```bash
-PAYLOAD='{"update_id":123456789,"message":{"message_id":1,"date":'$(date +%s)',"chat":{"id":987654321,"type":"private"},"text":"How do I remove my data?"}}'
-SIGNATURE=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "test-secret" | sed 's/^.* //')
-
-curl -X POST "https://core-brain-staging.mpt.workers.dev/webhook/telegram" \
-  -H "Content-Type: application/json" \
-  -H "X-Telegram-Bot-Api-Secret-Token: ${SIGNATURE}" \
-  -d "$PAYLOAD"
-
-# Expected response: 202 Accepted + intent classification
-```
-
----
-
-## Validation Checklist
-
-After successful deployment, verify:
-
-- [ ] Health check returns `configured: true` with no errors
-- [ ] X webhook accepts valid signatures and rejects invalid ones (401)
-- [ ] Telegram webhook ingests messages and classifies intent
-- [ ] Intent classification produces: intent, confidence, risk_score
-- [ ] Risk scoring correctly escalates high-risk queries (identity theft, fraud keywords)
-- [ ] Response templating personalizes messages (name substitution, platform-specific formatting)
-- [ ] Long payloads (10KB+) are handled gracefully (202 or 413, not 500)
-- [ ] Malformed JSON is rejected (400, not 500)
-- [ ] All integration tests pass (`npm run test:staging`)
-
-**Validation checklist passed? ✅ Ready for production promotion.**
-
----
-
-## Rollback Procedure
-
-If the staging deployment has a critical issue, rollback to the previous version:
-
-### Quick Rollback (Cloudflare Dashboard)
-1. **Cloudflare Dashboard** → Workers → core-brain
-2. **Deployments** tab → select the previous (green) deployment
-3. **Rollback** → confirm
-
-### Git Rollback (Safest)
-```bash
-# Find the last known-good commit
-git log --oneline | head -20
-
-# Revert the problematic commit
-git revert <commit-sha-of-mpc-7257>
-
-# Push to main to auto-deploy the revert
-git push origin main
-```
-
-**Estimated time:** 2–5 minutes for Cloudflare to propagate
-
----
-
-## Troubleshooting
-
-### Issue: Deployment fails at "Pre-deployment checks"
-**Cause:** Missing `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` secret
-
-**Fix:**
-```bash
-# Add missing secret to GitHub
-# Settings → Secrets and variables → Actions → New repository secret
-# Name: CLOUDFLARE_API_TOKEN
-# Value: <your-account-level-token>
-```
-
-### Issue: Worker responds with 500 on webhook POST
-**Cause:** Supabase connection failed or Worker runtime error
-
-**Check:**
-1. Worker logs in Cloudflare Real-Time Logs:
-   ```bash
-   wrangler tail --format pretty
-   ```
-2. Verify Supabase credentials in GitHub secrets
-3. Check Supabase Edge Functions logs (if applicable)
-
-### Issue: Webhook signature validation fails (401)
-**Cause:** Signature mismatch (payload encoding or secret key)
-
-**Check:**
-1. Confirm `WEBHOOK_SECRET` matches the signing key used in webhook generation
-2. Verify payload encoding (JSON must be compact, no whitespace)
-3. Test with the included `generateWebhookSignature()` helper in integration tests
-
-### Issue: Intent classification returns unexpected intent
-**Cause:** Qwen model not responding (if QWEN_API_KEY missing, falls back to rules-based)
-
-**Check:**
-1. If `QWEN_API_KEY` is set, verify the key is active on Alibaba Dashboard
-2. Verify text is in supported language (English supported; others may fail)
-3. Review rule-based fallback in `index.ts` (should always return an intent)
-
----
-
-## Monitoring & Observability
-
-### Real-Time Logs (Cloudflare)
-```bash
-# Stream logs from the Worker
-wrangler tail --format pretty
-
-# Expected output:
-# "POST /webhook/x HTTP/1.1" 202 Accepted
-# "Classification: REMOVAL_REQUEST, confidence=0.87"
-```
-
-### Firestore Event Logging
-Once deployed, all webhook events are logged to Firestore (`mpt_classifications` collection):
-
-```js
-// Query logged classifications
-const classifications = await db.collection('mpt_classifications')
-  .where('timestamp', '>=', new Date(Date.now() - 3600000)) // Last hour
-  .get();
-
-classifications.forEach(doc => {
-  console.log(doc.data());
-  // { event_id, intent, confidence, risk_score, timestamp }
-});
-```
-
-### Grafana Dashboard (Optional)
-If Grafana is configured, add a panel:
-```sql
-SELECT
-  COUNT(*) as event_count,
-  intent,
-  AVG(risk_score) as avg_risk
-FROM mpt_classifications
-WHERE timestamp >= now() - interval '1 hour'
-GROUP BY intent
-```
-
----
-
-## Success Criteria
-
-✅ **Deployment successful when:**
-1. GitHub Actions run completes with all steps green
-2. Health check endpoint responds with `configured: true`
-3. All integration tests pass (npm run test:staging)
-4. Webhook POST requests are accepted (202 Accepted)
-5. Intent classification produces expected intents + confidence scores
-6. Firestore logging is capturing events
-
-**Next step:** Promote staging to production (via separate MPC task).
-
----
-
-## Contacts & Escalation
-
-- **Deployment issues:** Check GitHub Actions logs → file MPC task
-- **Cloudflare issues:** Cloudflare Support (Settings → Support)
-- **Supabase issues:** Supabase Support dashboard
-- **Qwen API issues:** Alibaba DashScope support
-
----
-
-**Runbook version:** MPC-7257 v1.0  
-**Last updated:** 2026-10-07  
-**Owner:** MyPrivacyToolClaw
+**Runbook version:** MPC-7260 v2 (replaces the MPC-7257 v1 draft, which described `*.mpt.workers.dev` URLs, `/webhook/x` and
+`/webhook/telegram` routes, Firestore logging and `npm run test:staging`, none of which exist).
