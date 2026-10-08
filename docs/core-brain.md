@@ -45,6 +45,8 @@ payload, 401 bad token, 503 not configured (retryable), 405/413.
 ## Deploy
 
 `.github/workflows/deploy.yml` deploys both Workers on push to `main` and needs these GitHub Actions secrets (names in
-`SECRETS.md`): `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `WEBHOOK_SECRET`,
-`CORE_BRAIN_TOKEN` (same value as `WEBHOOK_SECRET`), and the social-listeners ones. While any is missing the workflow fails at
-"Uploading secrets" and nothing ships; until `WEBHOOK_SECRET` is set the Worker answers 503 on both POST routes.
+`SECRETS.md`): `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_KEY`, `WEBHOOK_SECRET`
+(all required for core-brain; the deploy fails before shipping if one is missing, and no stand-in value is ever used),
+`QWEN_API_KEY` (optional: rules-based intent without it), `CORE_BRAIN_TOKEN` (same value as `WEBHOOK_SECRET`), and the
+social-listeners ones. Production is `https://brain.myprivacytool.io` (custom domain route in `wrangler.toml`, MPC-7260);
+the steps, the live-Qwen gate and rollback are in `/DEPLOYMENT_RUNBOOK.md`.

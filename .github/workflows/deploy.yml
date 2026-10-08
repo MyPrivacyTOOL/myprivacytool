@@ -5,10 +5,14 @@ name: Deploy core-brain & social-listeners
 #
 # Repo secrets required (Settings -> Secrets and variables -> Actions): see /SECRETS.md
 #   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
-#   SUPABASE_URL, SUPABASE_KEY, QWEN_API_KEY (optional), WEBHOOK_SECRET (optional),
-#   TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET, X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN
+#   core-brain (REQUIRED, the deploy fails before anything ships if one is missing or blank):
+#     SUPABASE_URL, SUPABASE_KEY, WEBHOOK_SECRET
+#   core-brain (optional): QWEN_API_KEY. Without it intent classification uses the rules engine.
+#   social-listeners: SUPABASE_URL, SUPABASE_KEY, plus TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
+#     X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain WEBHOOK_SECRET)
 #
-# MPC-7257: Optional secrets will be skipped if not set. Deploy will proceed with available secrets.
+# MPC-7260: core-brain is served from https://brain.myprivacytool.io (custom domain route in wrangler.toml).
+# No secret is ever replaced by a literal stand-in: a guessable WEBHOOK_SECRET would let anyone call /webhook.
 
 on:
   push:
@@ -55,6 +59,14 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/${{ matrix.worker }}
 
+      - name: Require core-brain secrets (MPC-7260)
+        if: matrix.worker == 'core-brain'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: node scripts/ci/check-env.mjs --require SUPABASE_URL,SUPABASE_KEY,WEBHOOK_SECRET
+
       - name: Deploy core-brain (MPC-7257)
         if: matrix.worker == 'core-brain'
         uses: cloudflare/wrangler-action@v3
@@ -66,13 +78,13 @@ jobs:
           secrets: |-
             SUPABASE_URL
             SUPABASE_KEY
+            WEBHOOK_SECRET
             ${{ secrets.QWEN_API_KEY != '' && 'QWEN_API_KEY' || '' }}
-            ${{ secrets.WEBHOOK_SECRET != '' && 'WEBHOOK_SECRET' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY || 'placeholder' }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET || 'placeholder' }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
 
       - name: Deploy social-listeners
         if: matrix.worker == 'social-listeners'

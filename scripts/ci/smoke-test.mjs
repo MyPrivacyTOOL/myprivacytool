@@ -3,9 +3,11 @@
 //   - mpt-leads is probed with CORS preflight and the watchdog "@healthcheck.io" email, which the Worker
 //     short-circuits without writing to Notion, Supabase, HubSpot, Slack or Resend.
 //   - oauth-poc is probed at /health and /oauth/google/start (a redirect; nothing is exchanged or stored).
+//   - core-brain is probed at /health (must report configured:true) and for auth: POST /webhook without the
+//     secret must be 401. No secret is needed and no message is classified, so nothing reaches Qwen or Supabase.
 //   - the site is probed for HTTP 200 + the SPA shell on the conversion routes.
 //
-//   node scripts/ci/smoke-test.mjs <site|mpt-leads|oauth-poc> [--base-url URL] [--retries N] [--delay-ms MS] [--expect-sha SHA]
+//   node scripts/ci/smoke-test.mjs <site|mpt-leads|oauth-poc|core-brain> [--base-url URL] [--retries N] [--delay-ms MS] [--expect-sha SHA]
 // Retries cover Cloudflare propagation after a deploy. Exits 1 with ::error:: annotations on failure.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +16,7 @@ export const DEFAULTS = {
   site: "https://www.myprivacytool.io",
   "mpt-leads": "https://mpt-leads.myprivacytool.workers.dev",
   "oauth-poc": "https://myprivacytool-oauth-poc.myprivacytool.workers.dev",
+  "core-brain": "https://brain.myprivacytool.io", // MPC-7260 production custom domain
 };
 export const SITE_ROUTES = ["/", "/scan", "/start", "/contact", "/newsletter", "/pricing", "/privacy"];
 
@@ -72,6 +75,20 @@ export const targets = {
       check("unknown path -> 404", nf.status === 404, `status ${nf.status}`),
     ];
   },
+};
+
+targets["core-brain"] = async (base, f = fetch) => {
+  const health = await f(`${base}/health`);
+  const hb = await health.json().catch(() => ({}));
+  const anon = await f(`${base}/webhook`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const get = await f(`${base}/webhook`, { method: "GET" });
+  const nf = await f(`${base}/nope`);
+  return [
+    check("/health -> {ok, worker:core-brain, configured:true}", health.status === 200 && hb.ok === true && hb.worker === "core-brain" && hb.configured === true, `status ${health.status} ${JSON.stringify(hb)}`),
+    check("POST /webhook without the secret -> 401", anon.status === 401, `status ${anon.status}`),
+    check("GET /webhook -> 405 (POST-only)", get.status === 405, `status ${get.status}`),
+    check("unknown path -> 404", nf.status === 404, `status ${nf.status}`),
+  ];
 };
 
 export async function smoke(target, { baseUrl, retries = 5, delayMs = 15000, fetchFn = fetch, expectSha, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), log = console.log } = {}) {

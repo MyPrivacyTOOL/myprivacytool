@@ -19,7 +19,7 @@ on:
       worker:
         description: Worker to roll back
         type: choice
-        options: [mpt-leads, oauth-poc, scan-report]
+        options: [mpt-leads, oauth-poc, scan-report, core-brain]
         required: true
       dry_run:
         description: Only list versions and verify credentials (no rollback)
@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        worker: ${{ github.event_name == 'schedule' && fromJSON('["mpt-leads","oauth-poc","scan-report"]') || fromJSON(format('["{0}"]', github.event.inputs.worker)) }}
+        worker: ${{ github.event_name == 'schedule' && fromJSON('["mpt-leads","oauth-poc","scan-report","core-brain"]') || fromJSON(format('["{0}"]', github.event.inputs.worker)) }}
     env:
       DRY_RUN: ${{ github.event_name == 'schedule' || github.event.inputs.dry_run == 'true' }}
     steps:
