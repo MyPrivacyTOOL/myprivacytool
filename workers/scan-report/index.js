@@ -160,7 +160,9 @@ async function processScan(env, sb, job, fetchImpl) {
     ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
     ...brokers.map((b) => ({ scan_id: job.id, category: 'broker', signal_type: `${b.key}_profile`, severity: 'high', data_source: b.name, check_status: 'not_checked', details: clip(b.reason, 300), removal_status: 'manual_only', removal_url: b.removal_url, removal_instructions: b.steps ? b.steps.join('\n') : null })),
   ];
-  const inserted = await sb.insertMany('signals', rows);
+  // PostgREST bulk insert rejects rows with different key sets (PGRST102), so give every signal row the same columns.
+  const SIGNAL_DEFAULTS = { details: null, removal_status: 'not_started', removal_url: null, removal_instructions: null };
+  const inserted = await sb.insertMany('signals', rows.map((r) => ({ ...SIGNAL_DEFAULTS, ...r })));
   await sb.insertMany('hexagon_scores', result.hexagons.map((h) => ({ scan_id: job.id, category: h.category, score: h.score, signals_count: h.signals_count, risk_multiplier: h.risk_multiplier, color: h.color, checked: h.checked })));
   // Removal tasks only track brokers confirmed present; "not yet checked" brokers get none.
 
