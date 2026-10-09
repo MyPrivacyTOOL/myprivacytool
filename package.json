@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/prerender-meta.mjs && node scripts/generate-sitemap.mjs && node scripts/write-version.mjs",
+    "postbuild": "node scripts/prerender-meta.mjs && node scripts/generate-sitemap.mjs && node scripts/generate-feed.mjs && node scripts/write-version.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
