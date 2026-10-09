@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import blogPosts from '@/data/blogPosts.json';
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { trackBlogListView, trackBlogPostClick } from "@/lib/analytics";
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-secondary text-foreground",
@@ -18,6 +19,10 @@ const categoryColors: { [key: string]: string } = {
 
 export default function Blog() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    trackBlogListView(blogPosts.length);
+  }, []);
 
   const filteredPosts = selectedCategory
     ? blogPosts.filter(post => post.category === selectedCategory)
@@ -74,7 +79,7 @@ export default function Blog() {
 
         {/* Blog Posts Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredPosts.map(post => (
+          {filteredPosts.map((post, index) => (
             <Card key={post.slug} className="overflow-hidden hover:shadow-lg transition-shadow">
               {post.image && (
                 <div className="h-48 bg-muted overflow-hidden">
@@ -105,7 +110,7 @@ export default function Blog() {
                   </div>
                 </div>
                 <Button asChild className="w-full" variant="outline">
-                  <Link to={`/blog/${post.slug}`}>Read Article →</Link>
+                  <Link to={`/blog/${post.slug}`} onClick={() => trackBlogPostClick(post.slug, post.category, index + 1)}>Read Article →</Link>
                 </Button>
               </CardContent>
             </Card>

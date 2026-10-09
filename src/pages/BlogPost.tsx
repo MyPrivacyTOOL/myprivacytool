@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
 import blogPosts from '@/data/blogPosts.json';
 import { guides } from '@/content/guides';
+import { trackBlogCtaClick, trackBlogPostView, trackBlogScrollDepth } from '@/lib/analytics';
+import { blogCtaDestination, newlyReachedThresholds, scrollDepthPercent } from '@/lib/blogTracking';
 
 const SITE_URL = 'https://www.myprivacytool.io';
 
@@ -358,6 +360,41 @@ export default function BlogPost() {
 
   const guide = slug ? guides[slug] : undefined;
 
+  const articleRef = useRef<HTMLDivElement>(null);
+
+  // Blog funnel tracking (runbook step 6): one view per post, then scroll depth at 25/50/75/100%.
+  useEffect(() => {
+    if (!slug || !meta) return;
+    trackBlogPostView(slug, meta.category, Number(meta.readTime) || 0);
+  }, [slug, meta]);
+
+  useEffect(() => {
+    if (!slug) return;
+    const fired = new Set<number>();
+    const onScroll = () => {
+      const el = articleRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const percent = scrollDepthPercent(rect.top, rect.height, window.innerHeight);
+      for (const threshold of newlyReachedThresholds(percent, fired)) {
+        fired.add(threshold);
+        trackBlogScrollDepth(slug, threshold);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [slug]);
+
+  // One delegated handler counts every call-to-action link (scan, pricing, newsletter, other posts).
+  const handleContentClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (!slug) return;
+    const anchor = (e.target as HTMLElement).closest('a');
+    const destination = blogCtaDestination(anchor?.getAttribute('href'));
+    if (!anchor || !destination) return;
+    const location = anchor.closest('[data-cta-location]')?.getAttribute('data-cta-location') ?? 'in_content';
+    trackBlogCtaClick(slug, location, destination);
+  };
+
   if (!slug || !meta || (!blogContent[slug] && !guide)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -491,7 +528,7 @@ export default function BlogPost() {
       )}
 
       {/* Article Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12" onClick={handleContentClick}>
         <div className="bg-card rounded-lg p-8 mb-8 shadow-sm">
           {guide && (
             <nav aria-label="Table of contents" className="mb-8 rounded-lg border border-border bg-secondary p-5">
@@ -509,7 +546,7 @@ export default function BlogPost() {
             </nav>
           )}
 
-          <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand article-lg max-w-none">
+          <div ref={articleRef} className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand article-lg max-w-none">
             {post.content}
 
             {guide && guide.faqs.length > 0 && (
@@ -555,7 +592,7 @@ export default function BlogPost() {
             </div>
 
             {/* CTA Box */}
-            <div className="bg-secondary rounded-lg p-6 border border-border">
+            <div className="bg-secondary rounded-lg p-6 border border-border" data-cta-location="end_of_post">
               <h3 className="font-bold text-foreground mb-2">Ready to reclaim your privacy?</h3>
               <p className="text-muted-foreground mb-4">See where your data is exposed, then take it back.</p>
               <Button asChild>
@@ -566,7 +603,7 @@ export default function BlogPost() {
         </div>
 
         {relatedGuides.length > 0 && (
-          <Card className="mb-8">
+          <Card className="mb-8" data-cta-location="related_guides">
             <CardContent className="p-8">
               <h3 className="text-xl font-bold text-foreground mb-3">More privacy guides</h3>
               <ul className="space-y-2">
@@ -581,7 +618,7 @@ export default function BlogPost() {
         )}
 
         {/* Related Content CTA */}
-        <Card className="bg-brand-soft border-surface-border text-foreground">
+        <Card className="bg-brand-soft border-surface-border text-foreground" data-cta-location="newsletter_card">
           <CardContent className="p-8">
             <h3 className="text-2xl font-bold mb-2">Privacy Check</h3>
             <p className="text-muted-foreground mb-4">Privacy Check is our newsletter: new articles on data brokers, AI and your data, and practical protection steps, delivered to your inbox.</p>
