@@ -2,8 +2,8 @@
 name = "core-brain"
 main = "index.ts"
 compatibility_date = "2024-09-23"
-# MPC-7260: workers_dev stays on until traffic has moved to the custom domain; then set it to false (as github-channel did).
-workers_dev = true
+# MPC-7260: workers_dev is off: core-brain is served only from brain.myprivacytool.io (as github-channel did). social-listeners reaches it through a service binding, which does not need workers.dev. Rollback: set it back to true and redeploy.
+workers_dev = false
 
 # Production hostname. `wrangler deploy` creates the DNS record and certificate for a custom_domain route
 # automatically (same pattern as workers/github-channel -> channels.myprivacytool.io). No manual DNS record.
