@@ -276,6 +276,20 @@ const Index = () => {
           </div>
         </section>
 
+        {/* Trust strip (MPC-6545): links only, no claims beyond what /trust and /privacy already state */}
+        <nav
+          className="pb-4 px-4 text-center text-xs text-muted-foreground"
+          aria-label="Trust and legal"
+        >
+          <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <li><Link to="/trust" className="underline hover:text-foreground">Trust Centre</Link></li>
+            <li><Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link></li>
+            <li><Link to="/cookies" className="underline hover:text-foreground">Cookie Policy</Link></li>
+            <li><Link to="/terms" className="underline hover:text-foreground">Terms</Link></li>
+            <li><Link to="/dpa" className="underline hover:text-foreground">DPA</Link></li>
+          </ul>
+        </nav>
+
         {/* Newsletter Sign-Up */}
         <section ref={footerRef} className="py-4 mt-12" aria-label="Newsletter sign-up">
           <div className="container mx-auto px-4 text-center">

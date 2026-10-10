@@ -85,3 +85,25 @@ Method: static review of the repo and the Cloudflare account. I could not query 
 - Pre-consent IP/location lookups (ipify, ipapi.co) are now disclosed in the Cookie Policy and Privacy 2.2. They are still made before consent; Decision (Chris, 2026-10-07): they do NOT wait for consent; disclosure only. Do not gate them without asking.
 - HubSpot: the site never loads the HubSpot tracking script (no `hs-scripts` in `index.html` or `src/`); it only POSTs forms to `api.hsforms.com` on submit and reads `hubspotutk` if present. If a `hubspotutk` cookie exists it must come from the Consentmanager tag configuration; the Cookie Policy wording should be checked against that dashboard.
 - GA4 consent gating is still unverified in a browser (needs the Network screenshot of the first requests on a fresh load).
+
+## Status update 2026-10-10
+
+Done in this change
+- Homepage trust strip: a link-only row (Trust Centre, Privacy, Cookies, Terms, DPA) above the newsletter block in `src/pages/Index.tsx`. It makes no claims beyond what `/trust` and `/privacy` already say.
+
+Still open (needs a person, not code)
+| Item | Owner | What is needed |
+|---|---|---|
+| Legal review (MPC-6798) | Chris / counsel | Approve or mark up Privacy, Terms, Cookies, DPA. The open claims listed above stay open until then. |
+| `/pricing` | Chris | Decide: ship real pricing, or keep the noindex `ComingSoonPage` stub. Nothing is built because no pricing has been decided. |
+| GA4 consent gating | Anyone with a browser | See checklist below. The cloud sandbox cannot reach myprivacytool.io (proxy 403), so this could not be tested here. |
+| Mailboxes | Chris | Confirm each address below receives mail. |
+
+GA4 consent-gating check (about 5 minutes, clean/incognito browser, DevTools Network tab, filter `google|gtm|collect`)
+1. Load `https://www.myprivacytool.io/` and do not touch the banner: no request to `googletagmanager.com/gtag/js` or `google-analytics.com/g/collect` may fire.
+2. Choose "Reject": still none.
+3. Reopen via footer "Manage cookies", accept analytics: requests now fire.
+4. Reject again after accepting: no further `collect` requests.
+Known separate gap (security audit finding): `fingerprintDetection.ts` pings `google-analytics.com`, and `deviceDetection.ts` calls ipify/ipapi, without a consent gate.
+
+Mailboxes to confirm (all appear in the site): `privacy@` (20 references), `support@`, `dpo@`, `legal@`, `accessibility@`, `scan@`, `chris@` at `myprivacytool.io`. Send a test to each and note where it lands.
