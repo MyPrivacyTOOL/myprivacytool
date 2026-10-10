@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Globe2, ShieldCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
+import EnterpriseIncludes from "@/components/EnterpriseIncludes";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
@@ -147,31 +147,7 @@ const Enterprise = () => {
 
       <section className="max-w-4xl mx-auto px-6 pb-16">
         <h2 className="text-2xl font-bold text-center mb-10">What enterprise includes</h2>
-        <div className="grid md:grid-cols-3 gap-4">
-          {[
-            {
-              icon: Globe2,
-              title: "APAC coverage",
-              desc: "Our removal workflows focus on Hong Kong, Singapore and Australia, alongside major US data brokers, so regional staff are not an afterthought.",
-            },
-            {
-              icon: ShieldCheck,
-              title: "Privacy Score and reporting",
-              desc: "A per-organisation exposure report and Privacy Score show who is exposed, what is visible and how it changes after removals. Service levels are agreed in your contract.",
-            },
-            {
-              icon: Users,
-              title: "Named contact and onboarding",
-              desc: "A dedicated contact, executive and high-risk-role prioritisation, and help rolling out to your workforce.",
-            },
-          ].map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="p-6 rounded-xl bg-card border border-border">
-              <div className="mb-4"><Icon className="w-6 h-6 text-brand" aria-hidden="true" /></div>
-              <div className="font-bold mb-2">{title}</div>
-              <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
-            </div>
-          ))}
-        </div>
+        <EnterpriseIncludes />
       </section>
 
       <section className="border-t border-border py-16 px-6 text-center">
