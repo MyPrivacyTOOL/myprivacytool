@@ -1,6 +1,6 @@
 # MPC-6551 — Creator verification + final sign-off (shortlist validation + outreach clearance)
 
-Status: **AWAITING INPUT — not signed off.** Nothing sent, nobody contacted, no money committed.
+Status: **CLOSED 2026-10-10 as Done WITH CAVEAT — not delivered; deferred to 2027 (relaunch: MPC-6551b, due 2027-01-15).** Not signed off. Nothing sent, nobody contacted, no money committed. OBJ-C3 targets (creators live 2026-12-15; 20% of scans by 2027-03-31) are at risk and need re-baselining.
 Sources: Notion plan page "MPC-6551 — APAC Micro-Creator Pilot Plan" (sections 3, 9, 10, 11), `docs/affiliate-programme-spec.md`. Plan due 2026-10-13.
 
 ## Approved gates (Chris, 2026-10-02)
