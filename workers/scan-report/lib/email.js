@@ -93,41 +93,44 @@ ${para('<br>If you did not ask for this, ignore this email and nothing changes.'
 
 export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror, unsubscribeLink }) {
   const s = scan;
-  const mirrorLines = mirror ? mirror.hexagons.map((h) => `- ${h.label}: ${h.status === 'checked' ? `checked, ${h.score}/100` : 'not yet checked'}`) : [];
+  // Only checked areas are listed one by one. Everything else is one honest line, not eight "not yet checked" rows.
+  const checkedHex = mirror ? mirror.hexagons.filter((h) => h.status === 'checked') : [];
+  const unsearched = mirror ? mirror.hexagons.filter((h) => h.status !== 'checked').map((h) => h.label) : [];
   const partialNote = s.score === null
-    ? 'No privacy score yet: we have not been able to check anything about you automatically, so we will not invent a number.'
+    ? 'No privacy score yet: we have not checked anything about you automatically, so we will not invent a number. Here is what we can already give you.'
     : s.partial
     ? `Partial score: based on ${s.categories_checked.length} of 8 categories (${s.categories_checked.join(', ') || 'none'}). Not yet checked: ${s.hexagons.filter((h) => !h.checked).map((h) => h.label).join('; ')}.`
     : 'Score covers all 8 categories.';
   const breachLines = breachStatus !== 'checked'
-    ? ['Breach check: not yet checked by us. Check your own address free at https://haveibeenpwned.com (10 seconds). If it appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.']
+    ? ['We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds: https://haveibeenpwned.com', 'If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.']
     : breaches.length === 0
       ? ['Good news: your email address was not found in any breach known to Have I Been Pwned.']
       : breaches.map((b) => `- ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`);
   const brokerLines = brokers.map((b) => {
-    const head = `${b.name}: not yet checked. ${b.reason}.`;
-    if (!b.removal_url && !b.steps) return `${head}\n  We have not yet written a verified removal guide for ${b.name}.`;
-    return `${head}\n  Remove yourself: ${b.removal_url} (${b.time_needed || 'a few minutes'}; ${b.processing_time || 'timing varies'})\n` +
+    if (!b.removal_url && !b.steps) return `${b.name}\n  We have not yet written a verified removal guide for ${b.name}.`;
+    return `${b.name}  (${b.time_needed || 'a few minutes'}; ${b.processing_time || 'timing varies'})\n  Official opt-out page: ${b.removal_url}\n` +
       (b.steps ? b.steps.map((st, i) => `   ${i + 1}. ${st}`).join('\n') : '');
   });
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
   const text = [
     s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, partialNote, '',
-    ...(mirror ? ['YOUR MIRROR (what we could and could not see)', ...mirrorLines, ''] : []),
+    ...(mirror ? ['YOUR MIRROR (what we could and could not see)',
+      ...(checkedHex.length ? checkedHex.map((h) => `- ${h.label}: checked, ${h.score}/100`) : []),
+      ...(unsearched.length ? [`Not searched for you yet: ${unsearched.join('; ')}.`] : []), ''] : []),
     'EMAIL BREACHES', ...breachLines, '',
-    'PEOPLE-SEARCH SITES', ...brokerLines, '',
-    `More removal guides: ${SITE}/opt-out`, 'Reply to this email to ask a question or have your data deleted.',
+    'PEOPLE-SEARCH SITES',
+    'We have not searched these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.', '',
+    ...brokerLines.flatMap((l) => [l, '']),
+    `More removal guides: ${SITE}/opt-out`, '',
+    'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
     ...(unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
   ].join('\n');
-  const status = (h) => h.status === 'checked'
-    ? `<span style="color:#15803d;font-weight:600">${h.score}/100</span>`
-    : '<span style="color:#6b7280">Not yet checked</span>';
-  const mirrorCells = mirror ? mirror.hexagons.map((h) => `<td width="50%" valign="top" style="padding:0 6px 12px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;line-height:19px"><div style="color:#111827;font-weight:600">${esc(h.label)}</div><div>${status(h)}</div></td></tr></table></td>`) : [];
+  const mirrorCells = checkedHex.map((h) => `<td width="50%" valign="top" style="padding:0 6px 12px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;line-height:19px"><div style="color:#111827;font-weight:600">${esc(h.label)}</div><div><span style="color:#15803d;font-weight:600">${h.score}/100</span></div></td></tr></table></td>`);
   const mirrorRows = [];
   for (let k = 0; k < mirrorCells.length; k += 2) mirrorRows.push(`<tr>${mirrorCells[k]}${mirrorCells[k + 1] || '<td width="50%"></td>'}</tr>`);
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
   const brokerCards = brokers.map((b) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px 0"><tr><td style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px">
-<div style="font-size:15px;font-weight:700;color:#111827">${esc(b.name)} <span style="margin-left:6px;background:#f3f4f6;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;color:#6b7280">Not yet checked</span></div>
+<div style="font-size:15px;font-weight:700;color:#111827">${esc(b.name)}</div>
 ${b.removal_url ? `<div style="margin:6px 0 4px 0;font-size:13px;color:#6b7280">${esc(b.time_needed || '')}${b.time_needed && b.processing_time ? ' &middot; ' : ''}${esc(b.processing_time || '')}</div>
 ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${b.steps.map((st) => `<li style="margin-bottom:4px">${esc(st)}</li>`).join('')}</ol>` : ''}${button(b.removal_url, 'Open the official opt-out page')}`
     : `<div style="margin-top:6px;font-size:14px;color:#6b7280">We have not yet written a verified removal guide for ${esc(b.name)}.</div>`}
@@ -135,13 +138,14 @@ ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;lin
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
     `<h1 style="margin:0 0 14px 0;font-size:24px;line-height:30px;color:#111827">${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}</h1>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${esc(partialNote)}</td></tr></table>
-${mirror ? `${h2('Your mirror <span style="font-size:13px;font-weight:500;color:#6b7280">what we could and could not see</span>')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 -6px;width:calc(100% + 12px)">${mirrorRows.join('')}</table>` : ''}
-${h2('Email breaches')}${breachStatus !== 'checked' ? `${para('Not yet checked by us. Check your own address free (about 10 seconds). If it appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.')}${button('https://haveibeenpwned.com', 'Check on haveibeenpwned.com')}`
+${mirror ? `${h2('Your mirror <span style="font-size:13px;font-weight:500;color:#6b7280">what we could and could not see</span>')}${mirrorRows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 -6px;width:calc(100% + 12px)">${mirrorRows.join('')}</table>` : ''}${unsearched.length ? para(`<span style="color:#6b7280">Not searched for you yet: ${esc(unsearched.join('; '))}.</span>`) : ''}` : ''}
+${h2('Email breaches')}${breachStatus !== 'checked' ? `${para('We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds. If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.')}${button('https://haveibeenpwned.com', 'Check on haveibeenpwned.com')}`
     : breaches.length === 0 ? para('Good news: your email address was not found in any breach known to Have I Been Pwned.')
     : `<ul style="margin:0 0 12px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${breaches.map((b) => `<li style="margin-bottom:4px"><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}</ul>${para('Change the password on any listed service, and anywhere you reused it.')}`}
-${h2('People-search sites')}${para('We have <strong>not yet checked</strong> these sites for you. Search for yourself and remove your listing:')}
+${h2('People-search sites')}${para('We have <strong>not searched</strong> these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.')}
 ${brokerCards}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
+${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
 ${unsubscribeLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Then you do not need to hear from us again. <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">Unsubscribe</a> and we will send you no more follow-up or marketing emails.</td></tr></table>` : ''}`, unsubscribeLink);
   return { subject, text, html };
 }
