@@ -8,6 +8,7 @@ import logoFooter from "@/assets/logo-footer.png";
 const COMPANY_LINKS = [
   { label: "Pricing", to: "/pricing" },
   { label: "For Business", to: "/business" },
+  { label: "Enterprise", to: "/enterprise" },
   { label: "About", to: "/about" },
   { label: "FAQ", to: "/faq" },
   { label: "Blog", to: "/blog" },

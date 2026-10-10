@@ -11,6 +11,7 @@ export const CTA_DESTINATIONS = [
   "/pricing",
   "/newsletter",
   "/business",
+  "/enterprise",
   "/am-i-exposed",
   "/ai-access-check",
 ] as const;
