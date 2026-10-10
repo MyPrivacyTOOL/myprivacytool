@@ -107,7 +107,7 @@ check(res.status === 200 && (await res.json()).results.length === 2 && pages.len
 reset(); const waits = []; const inserted = [];
 const f2 = globalThis.fetch; globalThis.fetch = async (u, o = {}) => (String(u).endsWith('/rest/v1/mpt_raw_metrics') && o.method === 'POST' ? (inserted.push(1), { ok: true, status: 201 }) : String(u).includes('/rest/v1/') && o.method === 'HEAD' ? { ok: true, status: 200, headers: new Headers({ 'content-range': '0-0/1' }) } : f2(u, o));
 await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits);
-check(inserted.length === 1 && pages.length >= 1, 'scheduled run collects, then publishes to Notion');
+check(inserted.length === 2 && pages.length >= 1, 'scheduled run collects every source, then publishes to Notion');
 reset(); const w2 = []; pages = [];
 await worker.scheduled({}, { ...env, NOTION_TOKEN: undefined }, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
 check(pages.length === 0, 'without NOTION_TOKEN the publish step is skipped');

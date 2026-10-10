@@ -2,14 +2,15 @@
 // to public.mpt_raw_metrics (append-only). Collectors are pluggable: add a module to collectors/ and list it below.
 // A failing source writes a status=error row and never stops the others. No secret value is ever logged or stored.
 import supabaseCounts from './collectors/supabase-counts.js';
+import cloudflareAnalytics from './collectors/cloudflare-analytics.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -38,6 +39,8 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
     };
     try {
       const out = await c.collect(env);
+      if (out.period_start) row.period_start = out.period_start;
+      if (out.period_end) row.period_end = out.period_end;
       row.payload = out.payload ?? {};
       if (out.error) { row.status = 'error'; row.error = SAFE(out.error, env); }
     } catch (e) {

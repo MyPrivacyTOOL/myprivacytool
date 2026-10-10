@@ -1,5 +1,6 @@
 -- MPC-7376: MPT analytics raw metrics store and rollup views (strategy sections 4 and 5).
--- Target: Supabase project xmdmkumwxpgahmlweuug ("MyPrivacyTOOL Project2"). NOT YET APPLIED.
+-- Target: Supabase project xmdmkumwxpgahmlweuug ("MyPrivacyTOOL Project2").
+-- Applied 2026-10-10 as migrations mpc_7376_mpt_raw_metrics and mpc_7376_views_select_only.
 --
 -- Model (same as the other aggregate mpt_ tables, see mpt-operational-rls.sql):
 --   RLS enabled + FORCED, no policies, all grants revoked from anon/authenticated, service_role only.
@@ -203,5 +204,5 @@ left join latest_week_count xt on xt.source = 'x' and xt.week_of = weeks.week_of
 comment on view public.mpt_weekly_metrics is
   'MPC-7376. One row per Monday-start UTC week. Notion tracker mapping: week_of=Week Of, cumulative_scans=Cumulative Scans, weekly_new_scans=Weekly New Scans, conversion_rate_pct=Conversion Rate %, current_mrr=Current MRR, ga4_active_users=GA4 Active Users, blog_posts_published=Blog Posts Published, x_threads_posted=X Threads Posted. cumulative_scans = rows in public.scans as of week end (or now) per D5. engagement_* and ga4_scan_events are separate signals. NULL = not collected. service_role only.';
 
-revoke all on public.mpt_daily_metrics, public.mpt_weekly_metrics from public, anon, authenticated;
+revoke all on public.mpt_daily_metrics, public.mpt_weekly_metrics from public, anon, authenticated, service_role;
 grant select on public.mpt_daily_metrics, public.mpt_weekly_metrics to service_role;
