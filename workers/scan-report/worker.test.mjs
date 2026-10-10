@@ -36,11 +36,12 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(/48 hours/.test(conf.text) && /does not do yet/i.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation promises 48h, removal steps, states gaps; no score/breach-lookup promise');
+check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Alice, our AI guide, will search/.test(conf.text) && !/AI Bot/.test(conf.text) && conf.html.includes('/email/alice-curtain.jpg') && /Usernames/.test(conf.text) && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 8 && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
-check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /not yet checked/i.test(rep.text), 'free report: no score, self-check HIBP link, not yet checked');
+check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
 check(/Partial score/.test(rep2.text) && rep2.subject.includes('(partial)'), 'with HIBP: partial score labelled');
+check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includes('/email/alice-curtain.jpg') && /AI guide/.test(rep.html), 'report email: Alice hero, tagline and image');
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
@@ -97,7 +98,7 @@ F = fake(); await handleScan({ ...env, HIBP_API_KEY: undefined }, null, input, F
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'false' }, F.f);
 check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.calls.filter((c) => c.url.includes('resend')).length === 1, 'no HIBP key + ALLOW_PARTIAL_REPORT=false => report held (pending)');
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'true' }, F.f);
-check(res.sent === 1 && /not yet checked/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not yet checked; privacy_score stays null');
+check(res.sent === 1 && /have not checked your email/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not checked; privacy_score stays null');
 
 // allowlist blocks real users
 F = fake(); await handleScan({ ...env, RECIPIENT_ALLOWLIST: 'someone@else.com' }, null, input, F.f);
@@ -126,7 +127,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
   check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
   const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, mirror: free });
-  check(/YOUR MIRROR/.test(repM.text) && /Data broker profiles: not yet checked/.test(repM.text) && !/\/100/.test(repM.text), 'report email renders the mirror, still no invented score');
+  check(/YOUR HEXAGONS \(0 of 8 filled in/.test(repM.text) && /Empty hexagons \(we have not searched these yet\): .*Data broker profiles/.test(repM.text) && !/\/100/.test(repM.text) && repM.html.includes('/email/hex/broker-empty.png') && !repM.html.includes('-found.png'), 'report email renders hexagon images: all empty when nothing is checked, empty ones on one line in text, still no invented score');
 
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 2 * 864e5).toISOString(), followup_stage: 0 }) === 0, 'follow-up: not due before day 3');
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 4 * 864e5).toISOString(), followup_stage: 0 }) === 1, 'follow-up: stage 1 due after day 3');
