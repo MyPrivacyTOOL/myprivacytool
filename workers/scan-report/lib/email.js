@@ -25,6 +25,16 @@ const hexGrid = (tiles) => {
   for (let k = 0; k < tiles.length; k += 4) rows.push(`<tr>${tiles.slice(k, k + 4).join('')}${'<td width="25%"></td>'.repeat(Math.max(0, k + 4 - tiles.length))}</tr>`);
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px 0">${rows.join('')}</table>`;
 };
+// Alice, MyPrivacyTOOL's AI guide (artwork from the YouTube stills). Hosted from the site's public/email folder.
+const ALICE_IMG = `${SITE}/email/alice-curtain.jpg`;
+const ALICE_TAGLINE = 'Alice looks behind the digital curtain, then shows you what to change.';
+const aliceHero = (titleHtml) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px 0"><tr>
+<td valign="middle" style="padding-right:14px"><h1 style="margin:0 0 8px 0;font-size:26px;line-height:31px;color:#111827">${titleHtml}</h1>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px 0"><tr><td width="64" height="4" style="background:${BRAND};font-size:0;line-height:0">&nbsp;</td></tr></table>
+<div style="font-size:15px;line-height:22px;color:#374151">${esc(ALICE_TAGLINE)}</div>
+<div style="margin-top:8px;font-size:12px;line-height:16px;font-weight:700;color:#111827">With Alice, MyPrivacyTOOL&rsquo;s AI guide</div></td>
+<td width="140" valign="middle" align="right"><img src="${ALICE_IMG}" width="140" height="155" alt="Alice, MyPrivacyTOOL&rsquo;s AI guide, pulling back a curtain to reveal green code" style="display:block;width:140px;height:auto;border:0"></td></tr></table>
+`;
 const h2 = (t) => `<h2 style="margin:28px 0 10px 0;font-size:18px;line-height:24px;color:#111827">${t}</h2>`;
 const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
 const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
@@ -36,6 +46,8 @@ const button = (href, label) => `<table role="presentation" cellpadding="0" cell
 export function buildConfirmationEmail({ unsubscribeLink } = {}) {
   const subject = 'Your privacy scan is starting';
   const text = [
+    ALICE_TAGLINE,
+    '',
     'Hi,',
     '',
     'You asked us to look at your privacy exposure — so we’re starting right now.',
@@ -44,14 +56,14 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     '',
     'Here’s what happens next.',
     '',
-    'Now that we have your email, our AI Bot will search publicly available, open-source data and look for things connected to it, such as:',
+    'Now that we have your email, Alice, our AI guide, will search publicly available, open-source data and look for things connected to it, such as:',
     '',
     '  - Usernames',
     '  - Phone numbers',
     '  - Physical addresses',
     '  - Other personal details that may be exposed',
     '',
-    'Everything it finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases — only information that is already public.',
+    'Everything Alice finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases — only information that is already public.',
     '',
     'Our goal is simple: First we “mirror” what you look like from the outside and explain the risk in plain language. Then we help you start removing what’s out there.',
     '',
@@ -67,18 +79,18 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     ...(unsubscribeLink ? [`Unsubscribe from further emails: ${unsubscribeLink}`] : []),
   ].join('\n');
   const html = shell(subject, 'We are starting your privacy scan now.',
-    `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">Your privacy scan is starting</h1>
+    `${aliceHero('Your privacy scan is starting')}
 ${para('Hi,')}
 ${para('You asked us to look at your privacy exposure &mdash; so we&rsquo;re starting right now.')}
 ${para('Most people don&rsquo;t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.')}
 ${h2('Here&rsquo;s what happens next.')}
-${para('Now that we have your email, our AI Bot will search publicly available, open-source data and look for things connected to it, such as:')}
+${para('Now that we have your email, Alice, our AI guide, will search publicly available, open-source data and look for things connected to it, such as:')}
 <ul style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
 <li style="margin-bottom:6px">Usernames</li>
 <li style="margin-bottom:6px">Phone numbers</li>
 <li style="margin-bottom:6px">Physical addresses</li>
 <li>Other personal details that may be exposed</li></ul>
-${para('Everything it finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases &mdash; only information that is already public.')}
+${para('Everything Alice finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases &mdash; only information that is already public.')}
 ${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like from the outside and explain the risk in plain language. Then we help you start removing what&rsquo;s out there.')}
 ${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the hexagons below, and we&rsquo;ll continue the conversation right here.')}
 ${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
@@ -129,7 +141,7 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror
   });
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
   const text = [
-    s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, partialNote, '',
+    s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, ALICE_TAGLINE, '', partialNote, '',
     ...(mirror ? [`YOUR HEXAGONS (${checkedHex.length} of ${mirror.hexagons.length} filled in; each fills in when we find out a bit of data)`,
       ...checkedHex.map((h) => `${HEX_ON} ${h.label}: ${h.score}/100`),
       ...(unsearched.length ? [`${HEX_OFF} Empty hexagons (we have not searched these yet): ${unsearched.join('; ')}.`] : []), ''] : []),
@@ -153,7 +165,7 @@ ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;lin
     : `<div style="margin-top:6px;font-size:14px;color:#6b7280">We have not yet written a verified removal guide for ${esc(b.name)}.</div>`}
 </td></tr></table>`).join('');
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
-    `<h1 style="margin:0 0 14px 0;font-size:24px;line-height:30px;color:#111827">${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}</h1>
+    `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${esc(partialNote)}</td></tr></table>
 ${mirror ? `${h2(`Your hexagons <span style="font-size:13px;font-weight:500;color:#6b7280">${checkedHex.length} of ${mirror.hexagons.length} filled in</span>`)}${para('Each hexagon fills in when we find out a bit of data about you. Empty ones are areas we have not searched yet.')}${hexGrid(hexTiles)}` : ''}
 ${h2('Email breaches')}${breachStatus !== 'checked' ? `${para('We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds. If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.')}${button('https://haveibeenpwned.com', 'Check on haveibeenpwned.com')}`

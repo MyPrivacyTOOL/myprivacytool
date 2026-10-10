@@ -36,11 +36,12 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Usernames/.test(conf.text) && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
+check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Alice, our AI guide, will search/.test(conf.text) && !/AI Bot/.test(conf.text) && conf.html.includes('/email/alice-curtain.jpg') && /Usernames/.test(conf.text) && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
 check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
 check(/Partial score/.test(rep2.text) && rep2.subject.includes('(partial)'), 'with HIBP: partial score labelled');
+check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includes('/email/alice-curtain.jpg') && /AI guide/.test(rep.html), 'report email: Alice hero, tagline and image');
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
