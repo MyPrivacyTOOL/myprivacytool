@@ -1,11 +1,24 @@
 import worker, { runAll, COLLECTORS } from './worker.js';
 import supabaseCounts, { TABLES } from './collectors/supabase-counts.js';
 import cloudflare, { previousDay, WORKERS } from './collectors/cloudflare-analytics.js';
+import youtube, { DEFAULT_CHANNEL_ID } from './collectors/youtube.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
-const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', CLOUDFLARE_ANALYTICS_TOKEN: 'cfro', CLOUDFLARE_ZONE_ID: 'zone1' };
-let inserts = [], failTable = null, failInsertFor = null, cfCalls = [], cfFail = null;
+const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', CLOUDFLARE_ANALYTICS_TOKEN: 'cfro', CLOUDFLARE_ZONE_ID: 'zone1', YOUTUBE_API_KEY: 'ytkey' };
+let inserts = [], failTable = null, failInsertFor = null, cfCalls = [], cfFail = null, ytCalls = [], ytStatus = {}, ytUploads = true;
+const YT_VIDEOS = { items: [
+  { id: 'v1', snippet: { title: 'Intro', publishedAt: '2026-10-09T08:00:00Z' }, statistics: { viewCount: '12', likeCount: '3', commentCount: '1' } },
+  { id: 'v2', snippet: { title: 'Old', publishedAt: '2026-10-01T08:00:00Z' }, statistics: { viewCount: '5' } } ] };
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
+  if (url.startsWith('https://www.googleapis.com/youtube/v3/')) {
+    const path = /v3\/([a-zA-Z]+)\?/.exec(url)[1];
+    ytCalls.push({ url, headers: opts.headers });
+    if (ytStatus[path]) return { ok: false, status: ytStatus[path], json: async () => ({}) };
+    const body = path === 'channels' ? { items: [{ statistics: { subscriberCount: '0', viewCount: '24', videoCount: ytUploads ? '2' : '0' }, contentDetails: { relatedPlaylists: ytUploads ? { uploads: 'UU123' } : {} } }] }
+      : path === 'playlistItems' ? { items: [{ contentDetails: { videoId: 'v1' } }, { contentDetails: { videoId: 'v2' } }] }
+      : YT_VIDEOS;
+    return { ok: true, status: 200, json: async () => body };
+  }
   if (url === 'https://api.cloudflare.com/client/v4/graphql') {
     const b = JSON.parse(opts.body); cfCalls.push({ auth: opts.headers.Authorization, b });
     const kind = b.query.includes('httpRequests1dGroups') ? 'zone' : 'workers';
@@ -57,13 +70,13 @@ check((await call('/run', 'POST')).status === 401, 'POST /run without token => 4
 check((await call('/run', 'POST', { authorization: 'Bearer wrong' })).status === 401, 'wrong token => 401');
 check((await call('/run', 'POST', {}, { ...env, COLLECTOR_TRIGGER_TOKEN: undefined })).status === 401, 'no token configured => 401');
 inserts = []; const ran = await call('/run', 'POST', { authorization: 'Bearer tok' });
-check(ran.status === 200 && inserts.length === 2, 'authorised POST /run collects every source');
+check(ran.status === 200 && inserts.length === 3, 'authorised POST /run collects every source');
 check((await call('/nope')).status === 404, 'unknown path 404');
 
 // scheduled
 inserts = []; const waits = [];
 await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits);
-check(inserts.length === 2 && inserts.map((i) => i.row.source).sort().join() === 'cloudflare,supabase', 'scheduled run appends a row per source');
+check(inserts.length === 3 && inserts.map((i) => i.row.source).sort().join() === 'cloudflare,supabase,youtube', 'scheduled run appends a row per source');
 check(COLLECTORS.includes(supabaseCounts), 'supabase collector registered');
 
 // Cloudflare collector (MPC-7381)
@@ -85,5 +98,26 @@ cfFail = 'workers-gql'; row = await rowFor(); cfFail = null;
 check(row.status === 'error' && /workers: GraphQL: authz/.test(row.error) && row.payload.workers === null && row.payload.zone !== null, 'GraphQL errors => status=error, workers blank');
 row = await rowFor({ ...env, CLOUDFLARE_ANALYTICS_TOKEN: undefined });
 check(row.status === 'error' && row.payload.zone === null && row.payload.workers === null && cfCalls.length === 0, 'missing token => error row, blank cells, no API call');
+
+
+// YouTube collector (MPC-7380)
+const ytRow = async (e = env) => { inserts = []; ytCalls = []; await runAll(e, [youtube], new Date('2026-10-10T00:15:00Z')); return inserts[0].row; };
+row = await ytRow(); const sm = row.payload.summary;
+check(COLLECTORS.includes(youtube), 'youtube collector registered');
+check(row.source === 'youtube' && row.report === 'channel_daily' && row.status === 'ok', 'youtube row ok');
+check(row.period_start === '2026-10-09T00:00:00.000Z' && row.period_end === '2026-10-10T00:00:00.000Z' && row.payload.day === '2026-10-09', 'period is the previous full UTC day');
+check(row.payload.channel_id === DEFAULT_CHANNEL_ID && sm.subscribers === 0 && sm.total_views === 24 && sm.total_videos === 2, 'channel counts');
+check(sm.videos_published_on_day === 1 && sm.videos.length === 2 && sm.videos[0].views === 12 && sm.videos[0].likes === 3, 'per-video stats; only the 9 Oct upload counts for the day');
+check(row.payload.raw.channels.items.length === 1 && row.payload.raw.videos.items.length === 2 && row.payload.impressions === null, 'untouched responses in payload.raw; impressions null (needs OAuth)');
+check(ytCalls.length === 3 && ytCalls.every((c) => c.headers['x-goog-api-key'] === 'ytkey' && !c.url.includes('ytkey')), 'API key sent as header, never in URL');
+check(!JSON.stringify(row).includes('ytkey'), 'api key not in stored row');
+ytUploads = false; row = await ytRow(); ytUploads = true;
+check(row.status === 'ok' && row.payload.summary.videos_published_on_day === 0 && ytCalls.length === 1, 'channel with no uploads => ok, zero videos, no extra calls');
+ytStatus = { playlistItems: 404 }; row = await ytRow(); ytStatus = {};
+check(row.status === 'ok' && row.payload.summary.videos.length === 0, 'empty uploads playlist (404) tolerated');
+ytStatus = { channels: 403 }; row = await ytRow(); ytStatus = {};
+check(row.status === 'error' && /HTTP 403/.test(row.error) && !row.error.includes('ytkey'), 'API failure => status=error row without the key');
+row = await ytRow({ ...env, YOUTUBE_API_KEY: undefined });
+check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'missing key => status=error row');
 
 process.exit(ok ? 0 : 1);
