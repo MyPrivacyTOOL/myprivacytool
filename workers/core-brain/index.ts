@@ -4,6 +4,8 @@
 //                (OpenAI-compatible endpoint), looks up the sender's trust level in Supabase
 //                `conversation_states`, and returns a localized response KEY (MPT-1003 `public.localization`).
 //                The caller resolves the key to text and sends it; this Worker never talks to the platforms.
+//                After deciding, it records the sender's next state and one `interaction_log` row through the
+//                `mpt_brain_record` RPC (best effort: a failed write never blocks or changes the reply).
 // POST /ingest/social  MPC-8301 hand-off from social-listeners: { source: "x"|"telegram", receivedAt, payload }.
 //                Auth: `Authorization: Bearer <WEBHOOK_SECRET>` (social-listeners holds it as CORE_BRAIN_TOKEN), required on
 //                the service-binding path too. Verified events with no user text answer 200 { ignored: true }, no retry.
@@ -32,6 +34,10 @@ type Env = {
 type Intent = "scan" | "help" | "verify" | "unknown";
 type Inbound = { platform: string; senderId: string; text: string; locale: string };
 type BrainState = { trustLevel: number; state: string; source: "supabase" | "anonymous" | "fallback" };
+// What the conversation becomes after this message. trustFloor only ever RAISES trust (the database applies
+// greatest(existing, floor)), so a message can never lower it. state null = keep whatever is stored.
+type NextState = { state: string | null; trustFloor: number };
+type Decision = { keys: string[]; next: NextState };
 
 const WORKER = "core-brain";
 // QWEN_API_KEY is optional: without it intent falls back to the rules classifier.
@@ -168,7 +174,7 @@ async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent
   }
 }
 
-// ASSUMPTION: conversation_states has no sender column, so the listener's id is matched on context->>sender_id.
+// The sender is matched on conversation_states.sender_id (the platform's id as text) within its channel.
 // Missing row, unsupported platform or any Supabase failure degrade to an anonymous user (trust 0), never an error.
 async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainState> {
   const anonymous: BrainState = { trustLevel: 0, state: "new", source: "anonymous" };
@@ -176,7 +182,7 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
   const qs = new URLSearchParams({
     select: "trust_level,state",
     channel: `eq.${msg.platform}`,
-    "context->>sender_id": `eq.${msg.senderId}`,
+    sender_id: `eq.${msg.senderId}`,
     order: "updated_at.desc",
     limit: "1",
   });
@@ -199,16 +205,54 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
   }
 }
 
-function decide(intent: Intent, text: string, st: BrainState): string[] {
+// State machine (conversation_states.state): new -> awaiting_confirmation -> confirmed | declined.
+//   First Hexagon teaser sent            -> awaiting_confirmation (it ends with a Y/N question)
+//   "yes" while awaiting_confirmation    -> confirmed, trust raised to CONFIRMED_TRUST_LEVEL
+//   "no"  while awaiting_confirmation    -> declined (trust unchanged)
+//   anything else leaves the state as it was.
+function decide(intent: Intent, text: string, st: BrainState): Decision {
+  const stay: NextState = { state: st.state, trustFloor: 0 };
   if (intent === "verify" && st.state === "awaiting_confirmation") {
     const t = text.trim();
-    if (YES.test(t)) return KEYS.confirmedYes;
-    if (NO.test(t)) return KEYS.confirmedNo;
-    return KEYS.confirmPrompt;
+    if (YES.test(t)) return { keys: KEYS.confirmedYes, next: { state: "confirmed", trustFloor: CONFIRMED_TRUST_LEVEL } };
+    if (NO.test(t)) return { keys: KEYS.confirmedNo, next: { state: "declined", trustFloor: 0 } };
+    return { keys: KEYS.confirmPrompt, next: stay };
   }
   // "verify" with nothing pending has nothing to confirm: treat it as a scan.
-  if (intent === "scan" || intent === "verify") return st.trustLevel >= CONFIRMED_TRUST_LEVEL ? KEYS.confirmedYes : KEYS.firstHexagon;
-  return KEYS.welcome;
+  if (intent === "scan" || intent === "verify") {
+    return st.trustLevel >= CONFIRMED_TRUST_LEVEL
+      ? { keys: KEYS.confirmedYes, next: { state: "confirmed", trustFloor: 0 } }
+      : { keys: KEYS.firstHexagon, next: { state: "awaiting_confirmation", trustFloor: 0 } };
+  }
+  return { keys: KEYS.welcome, next: stay };
+}
+
+// Records the sender's next state and one interaction_log row in a single atomic RPC (public.mpt_brain_record).
+// Best effort: this runs after the reply is decided, so any failure (Supabase down, migration not applied yet) is
+// logged as a warning and never reaches the user. Sends no message text; the sender id goes to the database only.
+async function recordInteraction(
+  msg: Inbound, intent: Intent, intentSource: string, responseKey: string, next: NextState, env: Env, log: Logger,
+): Promise<void> {
+  // Platforms outside conversation_states' channel check (X) are log-only: no sender, no state change.
+  const stateful = STATE_CHANNELS.includes(msg.platform);
+  try {
+    const res = await fetchWithTimeout(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_brain_record`, {
+      method: "POST",
+      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        p_channel: msg.platform,
+        p_sender_id: stateful ? msg.senderId : null,
+        p_intent: intent,
+        p_intent_source: intentSource,
+        p_response_key: responseKey,
+        p_new_state: next.state,
+        p_trust_floor: next.trustFloor,
+      }),
+    }, SUPABASE_TIMEOUT_MS);
+    if (!res.ok) log.warn("state write failed", { status: res.status });
+  } catch (err) {
+    log.warn("state write failed", { error: (err as Error).name });
+  }
 }
 
 /** Shared front door for the POST routes: method, configuration, auth, size and JSON checks. */
@@ -235,7 +279,7 @@ async function readAuthorizedJson(request: Request, env: Env, log: Logger, autho
 }
 
 /** Intent + state -> localized response keys. Shared by /webhook and /ingest/social. */
-async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
+async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
   const st = await lookupState(msg, env, log);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).
@@ -255,8 +299,25 @@ async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
     }
   }
 
-  const messageKeys = decide(intent, msg.text, st);
-  log.info("routed", { platform: msg.platform, intent, intentSource, stateSource: st.source, trustLevel: st.trustLevel, key: messageKeys[0] });
+  const { keys: messageKeys, next } = decide(intent, msg.text, st);
+  // Never move the state when we cannot be sure what it is: X has no state channel, and after a failed lookup we only
+  // *assume* "new", so writing from that guess could reset a confirmed conversation. null keeps the stored state.
+  const nextState: NextState = !STATE_CHANNELS.includes(msg.platform)
+    ? { state: st.state, trustFloor: 0 }
+    : st.source === "fallback"
+      ? { state: null, trustFloor: 0 }
+      : next;
+
+  // Write back after the decision. In production the write runs after the reply is sent (waitUntil); without an
+  // ExecutionContext (tests) it is awaited so the outcome is deterministic.
+  const write = recordInteraction(msg, intent, intentSource, messageKeys[0], nextState, env, log);
+  if (ctx?.waitUntil) ctx.waitUntil(write);
+  else await write;
+
+  log.info("routed", {
+    platform: msg.platform, intent, intentSource, stateSource: st.source, trustLevel: st.trustLevel,
+    state: st.state, nextState: nextState.state ?? "unchanged", key: messageKeys[0],
+  });
   return json({
     ok: true,
     intent,
@@ -264,19 +325,20 @@ async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
     trust_level: st.trustLevel,
     state: st.state,
     state_source: st.source,
+    next_state: nextState.state,
     locale: msg.locale,
     response_key: messageKeys[0],
     message_keys: messageKeys,
   });
 }
 
-async function handleWebhook(request: Request, env: Env, log: Logger): Promise<Response> {
+async function handleWebhook(request: Request, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
   const body = await readAuthorizedJson(request, env, log, (r) =>
     constantTimeEqual(r.headers.get("x-mpt-webhook-secret") || "", env.WEBHOOK_SECRET));
   if (body instanceof Response) return body;
   const msg = parseInbound(body);
   if (!msg) throw new MptError("bad_request", "Invalid payload");
-  return respond(msg, env, log);
+  return respond(msg, env, log, ctx);
 }
 
 // MPC-8301 hand-off. social-listeners verifies the platform signature, then forwards
@@ -302,7 +364,7 @@ function parseXEnvelope(payload: any): Inbound | null {
   return null;
 }
 
-async function handleIngestSocial(request: Request, env: Env, log: Logger): Promise<Response> {
+async function handleIngestSocial(request: Request, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
   const body: any = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
   if (body instanceof Response) return body;
   const source = body?.source;
@@ -313,16 +375,16 @@ async function handleIngestSocial(request: Request, env: Env, log: Logger): Prom
     log.info("ignored", { source });
     return json({ ok: true, ignored: true });
   }
-  return respond(msg, env, log);
+  return respond(msg, env, log, ctx);
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const log = createLogger(WORKER, env.LOG_LEVEL).child({ requestId: crypto.randomUUID() });
     const { pathname } = new URL(request.url);
     try {
-      if (pathname === "/webhook") return await handleWebhook(request, env, log);
-      if (pathname === "/ingest/social") return await handleIngestSocial(request, env, log);
+      if (pathname === "/webhook") return await handleWebhook(request, env, log, ctx);
+      if (pathname === "/ingest/social") return await handleIngestSocial(request, env, log, ctx);
       if (pathname === "/health" && request.method === "GET") {
         return json({ ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0 });
       }

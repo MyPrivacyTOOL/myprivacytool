@@ -175,5 +175,90 @@ delete from public.leads where id = '00000000-0000-0000-0000-0000000000c1';
 select pg_temp.assert((select count(*) = 0 from public.osint_results) and (select count(*) = 0 from public.conversation_states)
   and (select count(*) = 0 from public.channel_preferences) and (select count(*) = 0 from public.translation_queue), 'deleting a lead erases its OSINT/trust/channel/translation rows');
 
+-- ===== MPC-8601: core-brain state write-back + interaction_log ====================================
+select pg_temp.assert(to_regclass('public.interaction_log') is not null, 'interaction_log: table exists');
+select pg_temp.assert(pg_temp.try_as('anon', 'select 1 from public.interaction_log') = '42501', 'interaction_log: anon must be denied');
+select pg_temp.assert(pg_temp.try_as('authenticated', 'select 1 from public.interaction_log') = '42501', 'interaction_log: authenticated must be denied');
+select pg_temp.assert(pg_temp.try_as('service_role', 'select 1 from public.interaction_log') = '', 'interaction_log: service_role must read');
+select pg_temp.assert((select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.interaction_log'::regclass), 'interaction_log: RLS must be enabled and forced');
+select pg_temp.assert((select count(*) = 0 from information_schema.columns where table_schema = 'public' and table_name = 'interaction_log'
+  and column_name in ('message_text','message','text','body','sender_id')), 'interaction_log: carries no message text and no sender id');
+
+-- the write-back functions are service_role only (checked on the privilege itself: the functions run as the caller, so a
+-- SQLSTATE test would also pass through the tables' own denial)
+do $$
+declare f text;
+begin
+  foreach f in array array['public.mpt_brain_record(text,text,text,text,text,text,smallint)',
+                           'public.mpt_erase_chat_sender(text,text)',
+                           'public.mpt_purge_expired_interaction_log()'] loop
+    perform pg_temp.assert(not has_function_privilege('anon', f, 'execute'), f || ': anon must not execute');
+    perform pg_temp.assert(not has_function_privilege('authenticated', f, 'execute'), f || ': authenticated must not execute');
+    perform pg_temp.assert(has_function_privilege('service_role', f, 'execute'), f || ': service_role must execute');
+  end loop;
+end $$;
+
+-- a state row needs a lead or a sender
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.conversation_states (channel) values ('telegram')$$) = '23514', 'conversation_states: a row needs a lead_id or a sender_id');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.conversation_states (channel, sender_id) values ('telegram', '')$$) = '23514', 'conversation_states: empty sender_id rejected');
+
+-- first scan: creates the sender's row (no lead), state awaiting_confirmation, trust 0
+select pg_temp.assert((select public.mpt_brain_record('telegram','sender-1','scan','qwen','bot.first_hexagon.title','awaiting_confirmation',0::smallint))
+  = '{"state":"awaiting_confirmation","trust_level":0,"persisted":true}'::jsonb, 'brain_record: first scan result');
+select pg_temp.assert((select count(*) = 1 and bool_and(lead_id is null) and bool_and(state = 'awaiting_confirmation') and bool_and(trust_level = 0)
+  and bool_and(last_message_at is not null) from public.conversation_states where channel = 'telegram' and sender_id = 'sender-1'),
+  'brain_record: a chat sender gets one state row without a lead');
+-- "yes": confirmed, trust rises to the floor
+select pg_temp.assert((select public.mpt_brain_record('telegram','sender-1','verify','rules','bot.confirmed_y.title','confirmed',1::smallint))
+  = '{"state":"confirmed","trust_level":1,"persisted":true}'::jsonb, 'brain_record: confirmation raises trust to 1');
+-- a later message can never lower trust, even with a lower floor and another state
+select pg_temp.assert((select public.mpt_brain_record('telegram','sender-1','help','rules','bot.unknown.title','confirmed',0::smallint))
+  = '{"state":"confirmed","trust_level":1,"persisted":true}'::jsonb, 'brain_record: trust never decreases');
+select pg_temp.assert((select count(*) = 1 from public.conversation_states where channel = 'telegram' and sender_id = 'sender-1'), 'brain_record: repeated calls keep one row per sender');
+select pg_temp.assert((select count(*) = 3 and bool_and(conversation_state_id is not null) from public.interaction_log l
+  join public.conversation_states c on c.id = l.conversation_state_id where c.sender_id = 'sender-1'), 'interaction_log: one row per routed message, linked to the state row');
+select pg_temp.assert((select state_before = 'awaiting_confirmation' and state_after = 'confirmed' and trust_before = 0 and trust_after = 1 and intent = 'verify'
+  from public.interaction_log l join public.conversation_states c on c.id = l.conversation_state_id
+  where c.sender_id = 'sender-1' and l.response_key = 'bot.confirmed_y.title'), 'interaction_log: records the before/after state and trust');
+
+-- a NULL state keeps the current state (the Worker sends it when it could not read the sender's state)
+select pg_temp.assert((select public.mpt_brain_record('telegram','sender-1','scan','rules','bot.first_hexagon.title', null, 0::smallint))
+  = '{"state":"confirmed","trust_level":1,"persisted":true}'::jsonb, 'brain_record: a NULL state keeps the stored state and trust');
+select pg_temp.assert((select count(*) = 1 and bool_and(state_after = 'confirmed' and trust_before = 1 and trust_after = 1)
+  from public.interaction_log l join public.conversation_states c on c.id = l.conversation_state_id
+  where c.sender_id = 'sender-1' and l.intent = 'scan' and l.state_before = 'confirmed'), 'interaction_log: a NULL-state call logs an unchanged state');
+
+-- input validation
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_brain_record('telegram','s2','scan','qwen','k','bogus_state',0::smallint)$$) = '22023', 'brain_record: unknown state rejected');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_brain_record('telegram','s2','scan','qwen','k','new',6::smallint)$$) = '22023', 'brain_record: trust floor above 5 rejected');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_brain_record('telegram','s2','bogus','qwen','k','new',0::smallint)$$) = '23514', 'brain_record: unknown intent rejected');
+select pg_temp.assert((select count(*) = 0 from public.conversation_states where sender_id = 's2'), 'brain_record: a rejected call leaves no state row behind');
+
+-- channels without a state row (X) and calls without a sender are log-only
+select pg_temp.assert((select public.mpt_brain_record('x', null, 'help', 'rules', 'bot.unknown.title', 'new', 0::smallint))
+  = '{"state":"new","trust_level":0,"persisted":false}'::jsonb, 'brain_record: X is log-only');
+select pg_temp.assert((select count(*) = 0 from public.conversation_states where channel = 'x'), 'brain_record: no state row for X');
+select pg_temp.assert((select count(*) = 1 and bool_and(conversation_state_id is null) from public.interaction_log where channel = 'x'), 'interaction_log: X row is logged without a state link');
+
+-- erasing a chat sender removes its state and its log rows, and only those
+select pg_temp.assert((select public.mpt_erase_chat_sender('telegram', 'sender-1')) = 1, 'mpt_erase_chat_sender: removes the sender row');
+select pg_temp.assert((select count(*) = 0 from public.interaction_log where channel = 'telegram'), 'mpt_erase_chat_sender: log rows cascade');
+select pg_temp.assert((select count(*) = 1 from public.interaction_log where channel = 'x'), 'mpt_erase_chat_sender: other log rows stay');
+select pg_temp.assert((select public.mpt_erase_chat_sender('telegram', 'sender-1')) = 0, 'mpt_erase_chat_sender: erasing twice is a no-op');
+
+-- retention purge
+update public.interaction_log set retain_until = now() - interval '1 day';
+select pg_temp.assert((select public.mpt_purge_expired_interaction_log()) = 1, 'mpt_purge_expired_interaction_log: removes expired rows');
+select pg_temp.assert((select count(*) = 0 from public.interaction_log), 'mpt_purge_expired_interaction_log: table is empty after purge');
+
+-- an existing lead-owned row still works next to sender-owned rows, and deleting the lead still erases it
+insert into public.leads (id, email) values ('00000000-0000-0000-0000-0000000000c8', 'mpc8601@example.com');
+insert into public.conversation_states (lead_id, channel, sender_id) values ('00000000-0000-0000-0000-0000000000c8', 'telegram', 'sender-lead');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.conversation_states (channel, sender_id) values ('telegram', 'sender-lead')$$) = '23505', 'conversation_states: one row per channel and sender');
+select pg_temp.assert(public.mpt_brain_record('telegram','sender-lead','scan','qwen','bot.first_hexagon.title','awaiting_confirmation',0::smallint) is not null, 'brain_record: works for a sender that also has a lead');
+delete from public.leads where id = '00000000-0000-0000-0000-0000000000c8';
+select pg_temp.assert((select count(*) = 0 from public.conversation_states where sender_id = 'sender-lead') and (select count(*) = 0 from public.interaction_log where channel = 'telegram'),
+  'deleting a lead erases its sender-linked state and log rows');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

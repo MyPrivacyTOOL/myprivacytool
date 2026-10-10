@@ -5,8 +5,8 @@
 > `/DEPLOYMENT_RUNBOOK.md`, the runbook wins: the Worker is attached with a `custom_domain` route in `wrangler.toml`
 > (no manual CNAME), the real routes are `/webhook` and `/ingest/social` (not `/webhook/x`, `/webhook/telegram`),
 > the staging address is `core-brain.myprivacytool.workers.dev`, the `webhooks.` alias was **not** approved, and a
-> live Qwen classification (`intent_source: "qwen"`) is a launch gate. Read-only launch is approved: state write-back
-> and `interaction_log` are Phase 2.
+> live Qwen classification (`intent_source: "qwen"`) is a launch gate. Read-only launch was approved; state write-back
+> and `interaction_log` followed (MPC-8601 follow-up, `docs/core-brain.md`).
 
 **Document Status:** Ready for Review (CK Approval Required)  
 **Effective Date:** 2026-10-08  
