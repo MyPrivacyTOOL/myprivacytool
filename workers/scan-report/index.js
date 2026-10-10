@@ -113,18 +113,34 @@ async function confirm(env, sb, scanId, email, fetchImpl) {
 }
 
 // ------------------------------------------------------------------ report job
+// MPC-7406: scans held by RECIPIENT_ALLOWLIST stay pending and untouched, so they must never take up the per-run limit.
+// Reads the pending queue oldest-first in pages and keeps the first `limit` allowed scans; with no allowlist that is just the first `limit` rows.
+const REPORT_PAGE = 1000;
+async function nextReportJobs(env, sb, limit) {
+  const stale = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  const gated = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
+  const size = gated ? REPORT_PAGE : limit;
+  const queue = []; let held = 0;
+  for (let offset = 0; ; offset += size) {
+    const page = await sb.select(
+      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at` +
+      `&or=(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))` +
+      `&report_attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc,id.asc&limit=${size}&offset=${offset}`);
+    for (const job of page) {
+      if (!recipientAllowed(env, job.email_scanned)) { held++; continue; }
+      if (queue.push(job) >= limit) return { queue, held };
+    }
+    if (page.length < size) return { queue, held };
+  }
+}
+
 export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) return { skipped: 'no supabase key' };
   const sb = db(env, fetchImpl);
-  const stale = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
-  const queue = await sb.select(
-    `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at` +
-    `&or=(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))` +
-    `&report_attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=${limit}`);
-  const out = { sent: 0, held: 0, failed: 0 };
+  const { queue, held } = await nextReportJobs(env, sb, limit);
+  const out = { sent: 0, held, failed: 0 };
   for (const job of queue) {
     try {
-      if (!recipientAllowed(env, job.email_scanned)) { out.held++; continue; }
       if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl);     // catch up a missed confirmation
       const claimed = await sb.patch(`scans?id=eq.${job.id}&report_status=eq.${job.report_status}`, { report_status: 'processing', report_claimed_at: new Date().toISOString(), report_attempts: job.report_attempts + 1 });
       if (!claimed.length) continue;                                                                    // another run took it
