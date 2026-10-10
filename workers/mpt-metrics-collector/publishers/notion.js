@@ -32,7 +32,7 @@ const cfg = (env) => ({
 });
 export const notionConfigured = (env) => Boolean(env.NOTION_TOKEN && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
-async function notion(env, method, path, body) {
+export async function notion(env, method, path, body) {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`https://api.notion.com/v1${path}`, {
       method,

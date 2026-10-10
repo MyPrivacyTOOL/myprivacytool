@@ -8,13 +8,14 @@ import ga4Reports from './collectors/ga4.js';
 import hubspot from './collectors/hubspot.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
+import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
 export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON', 'HUBSPOT_READONLY_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON', 'HUBSPOT_READONLY_TOKEN', 'SLACK_BOT_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -60,7 +61,13 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
 const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default {
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
+    // Monday 09:00 HKT digest (MPC-7383): reads the tracker only, no collection. Failure never affects the daily run.
+    if (event?.cron === DIGEST_CRON) {
+      if (!digestConfigured(env)) { console.error('mpt-metrics-collector: digest skipped, NOTION_TOKEN / SLACK_BOT_TOKEN / SLACK_CHANNEL_ID not set'); return; }
+      ctx.waitUntil(postDigest(env).then((r) => console.log(JSON.stringify({ digest: 'posted', permalink: r.permalink, ts: r.ts }))).catch((e) => console.error(`mpt-metrics-collector: digest failed: ${SAFE(e?.message, env)}`)));
+      return;
+    }
     if (!configured(env)) { console.error('mpt-metrics-collector: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set'); return; }
     // Collect first, then publish the summaries to Notion (MPC-7382). A Notion failure never affects collection.
     ctx.waitUntil((async () => {
@@ -88,6 +95,16 @@ export default {
       const weekOf = url.searchParams.get('week') || undefined;
       if ([day, weekOf].some((v) => v && !/^\d{4}-\d{2}-\d{2}$/.test(v))) return json({ error: 'bad date' }, 400);
       return json({ results: await publishAll(env, new Date(), { day, weekOf }) });
+    }
+    // Manual digest for verification: POST /digest (posts to Slack, returns the permalink) or POST /digest?dry=1 (returns the text only).
+    if (url.pathname === '/digest' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (url.searchParams.get('dry') === '1') {
+        if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
+        return json({ text: await buildDigestText(env) });
+      }
+      if (!digestConfigured(env)) return json({ error: 'not configured' }, 500);
+      try { return json(await postDigest(env)); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
     }
     return json({ error: 'not found' }, 404);
   },
