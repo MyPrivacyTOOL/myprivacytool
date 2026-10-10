@@ -125,4 +125,11 @@ check(row.status === 'error' && /HTTP 403/.test(row.error) && !row.error.include
 row = await ytRow({ ...env, YOUTUBE_API_KEY: undefined });
 check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'missing key => status=error row');
 
+// MPC-7383: the Monday digest cron is routed to the digest and never runs collection.
+{
+  const before = inserts.length; const waits = [];
+  await worker.scheduled({ cron: '0 1 * * 1' }, env, { waitUntil: (p) => waits.push(p) });
+  check(inserts.length === before && waits.length === 0, 'digest cron without NOTION_TOKEN/SLACK_BOT_TOKEN: skipped, no collection');
+}
+
 process.exit(ok ? 0 : 1);

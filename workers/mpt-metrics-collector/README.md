@@ -46,3 +46,6 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 - Impressions are `null`: they need the YouTube Analytics API with OAuth from the channel owner (follow-up).
 - X is not collected: the paid API tier is not approved.
 - `supabase/sql/mpt-youtube-daily-metrics.sql`: view `mpt_youtube_daily` (not yet applied).
+
+## Monday Slack digest (MPC-7383)
+The Monday cron (`0 1 * * 1` UTC = 09:00 HKT) posts a digest of at most five lines to `#proj-myprivacytool` (`SLACK_CHANNEL_ID` in `wrangler.toml`), built from the latest two rows of the weekly tracker (`digest/`). Needs secrets `NOTION_TOKEN` (already set) and `SLACK_BOT_TOKEN`. Blank cells stay blank; a failed source is named; an unreadable tracker posts an error line with no figures. Optional `Agent Insights` lines: `Plan: ...`, `Decision: ...`, `Failed sources: ga4, hubspot`.

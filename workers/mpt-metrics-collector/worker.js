@@ -7,13 +7,16 @@ import youtube from './collectors/youtube.js';
 import ga4Reports from './collectors/ga4.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
+import { runDigest } from './digest/run.js';
+
+export const DIGEST_CRON = '0 1 * * 1'; // Monday 09:00 Hong Kong (MPC-7383)
 
 export const COLLECTOR_VERSION = '1.0.0';
 export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON', 'SLACK_BOT_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -59,7 +62,13 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
 const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default {
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
+    if (event.cron === DIGEST_CRON) {
+      // Monday digest to Slack. Never touches collection; failures are logged without secrets.
+      if (!env.NOTION_TOKEN || !env.SLACK_BOT_TOKEN) { console.error('mpt-metrics-collector: NOTION_TOKEN / SLACK_BOT_TOKEN not set, digest skipped'); return; }
+      ctx.waitUntil(runDigest(env).then((r) => console.log(JSON.stringify({ digest: 'posted', ts: r.ts, channel: r.channel })), (e) => console.error(`digest failed: ${String(e?.message).slice(0, 200)}`)));
+      return;
+    }
     if (!configured(env)) { console.error('mpt-metrics-collector: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set'); return; }
     // Collect first, then publish the summaries to Notion (MPC-7382). A Notion failure never affects collection.
     ctx.waitUntil((async () => {

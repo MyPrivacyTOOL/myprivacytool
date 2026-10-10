@@ -1,7 +1,8 @@
-// MPC-7383: Monday digest Worker. Cron fires Monday 01:00 UTC = 09:00 Hong Kong.
+// MPC-7383: Monday digest, run by mpt-metrics-collector's Monday cron (01:00 UTC = 09:00 Hong Kong).
 // Reads the latest two rows of the MPT weekly tracker (written by MPC-7382) and posts <=5 lines to Slack.
-// Secrets (EXPECTED_SECRETS.txt): NOTION_TOKEN, SLACK_BOT_TOKEN. Var: SLACK_CHANNEL_ID, TRACKER_DATA_SOURCE_ID.
+// Secrets: NOTION_TOKEN (shared with the publisher), SLACK_BOT_TOKEN. Var: SLACK_CHANNEL_ID. TRACKER_DATA_SOURCE_ID is optional.
 import { buildDigest } from './digest.js';
+import { DEFAULT_WEEKLY_DS } from '../publishers/notion.js';
 
 const NOTION_VERSION = '2025-09-03';
 
@@ -39,7 +40,7 @@ export function rowFromPage(page) {
 }
 
 async function notionQuery(env, fetchImpl) {
-  const res = await fetchImpl(`https://api.notion.com/v1/data_sources/${env.TRACKER_DATA_SOURCE_ID}/query`, {
+  const res = await fetchImpl(`https://api.notion.com/v1/data_sources/${env.TRACKER_DATA_SOURCE_ID || DEFAULT_WEEKLY_DS}/query`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${env.NOTION_TOKEN}`,
@@ -75,9 +76,3 @@ export async function runDigest(env, fetchImpl = fetch) {
   }
   return slackPost(env, text, fetchImpl);
 }
-
-export default {
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(runDigest(env));
-  },
-};

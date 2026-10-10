@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildDigest, movers } from './digest.js';
-import { rowFromPage, runDigest } from './worker.js';
+import { rowFromPage, runDigest } from './run.js';
 
 const cur = { cumulativeScans: 120, targetScans: 200, paceGapPct: -40, paceStatus: '🔴 Behind', ga4ActiveUsers: 90, currentMrr: 0, conversionRate: 2, blogPosts: 3, xThreads: 4 };
 const prev = { cumulativeScans: 100, ga4ActiveUsers: 120, currentMrr: 0, conversionRate: 2, blogPosts: 3, xThreads: 4 };
