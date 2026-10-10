@@ -46,3 +46,13 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 - Impressions are `null`: they need the YouTube Analytics API with OAuth from the channel owner (follow-up).
 - X is not collected: the paid API tier is not approved.
 - `supabase/sql/mpt-youtube-daily-metrics.sql`: view `mpt_youtube_daily` (not yet applied).
+
+## HubSpot collector (MPC-7379, task 4/9)
+
+`collectors/hubspot.js` stores one `source=hubspot, report=portal_daily` row per run for MPT's portal **246502821** (constant `HUBSPOT_PORTAL_ID`). Counts and aggregates only: total contacts, contacts created on the previous Hong Kong day, contacts per lifecycle stage (plus `(none)`), deals per pipeline/stage with count and amount sum. No emails, names, phone numbers or deal names are requested or stored; searches ask for one record with only `hs_object_id` and keep just `total`.
+
+- **Portal guard:** the first call is `GET /account-info/v3/details`. If the portal ID differs from 246502821, or cannot be read, the row is `status=error` and nothing else is read (`payload.guard`).
+- **Read-only:** secret `HUBSPOT_READONLY_TOKEN` (a read-only private-app token; not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY` other Workers hold). `hubspotRead()` only allows GET and the contact/deal search endpoints. The token is redacted from error text, and error text carries the HTTP status only.
+- Scopes needed on the private app: `crm.objects.contacts.read`, `crm.objects.deals.read`, `crm.schemas.contacts.read`, `crm.schemas.deals.read` (pipelines, lifecycle options).
+- `supabase/sql/mpt-hubspot-daily.sql`: view `mpt_hubspot_daily` and `hubspot_total_contacts` / `hubspot_new_contacts` appended to `mpt_daily_metrics`. Total contacts is the count when the run happened; new contacts is for the Hong Kong day in `payload.day`.
+- Test: `node workers/mpt-metrics-collector/hubspot.test.mjs`.
