@@ -3,7 +3,7 @@
 Daily raw-metrics collector for MPT analytics (MPC-7377, task 2/9; strategy: Notion "MPT Data & Analytics Strategy").
 Appends one row per source per run to `public.mpt_raw_metrics` (created by MPC-7376, `supabase/sql/`).
 
-- Cron: `15 0 * * *` (00:15 UTC). Manual run: `POST /run` with `Authorization: Bearer <COLLECTOR_TRIGGER_TOKEN>`. `GET /health` reports `configured`.
+- Cron: `15 9 * * *` (09:15 UTC, 17:15 Hong Kong; after the GA4 property's America/Los_Angeles day has ended, so GA4 "yesterday" is complete). Manual run: `POST /run` with `Authorization: Bearer <COLLECTOR_TRIGGER_TOKEN>`. `GET /health` reports `configured`.
 - Collectors are modules in `collectors/` exporting `{source, report, collect(env) -> {payload, error?}}`; register them in `worker.js`.
   A failing collector writes a `status=error` row and the others still run.
 - `collectors/supabase-counts.js`: row counts of scans, users, leads, subscribers, mpt_user_engagement, interaction_log (counts only, no personal data).

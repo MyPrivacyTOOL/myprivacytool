@@ -1,6 +1,7 @@
 // GA4 Data API collector (MPC-7378). One runReport per report, stored untouched as its own mpt_raw_metrics row.
 // Auth: Google service account (read-only Viewer on the property); the JSON key is the Worker secret GA4_SERVICE_ACCOUNT_JSON.
-// Only the MPT property is ever queried. Reports cover the last complete UTC day (the run happens at 00:15 UTC).
+// Only the MPT property is ever queried. Reports cover the last complete UTC day. GA4 reads dates in the property's timezone (America/Los_Angeles),
+// so the cron must run after that day ends (09:15 UTC, see wrangler.toml) for the day to be complete.
 export const GA4_PROPERTY_ID = '515216281';
 const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
