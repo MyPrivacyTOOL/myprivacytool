@@ -1,3 +1,5 @@
+import { CATEGORIES } from './score.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SITE = 'https://myprivacytool.io';
 
@@ -14,6 +16,15 @@ const shell = (title, preheader, inner, unsubscribeLink) => `<!DOCTYPE html><htm
 <tr><td style="padding:28px 28px 8px 28px">${inner}</td></tr>
 <tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:12px;line-height:18px;color:#6b7280">Questions, or want your data deleted? Reply to this email or write to <a href="mailto:${CONTACT}" style="color:#6b7280">${CONTACT}</a>. We never sell your data.<br>${unsubscribeLink ? `<a href="${esc(unsubscribeLink)}" style="color:#6b7280">Unsubscribe</a> from further emails &middot; ` : ''}MyPrivacyTOOL &middot; <a href="${SITE}/" style="color:#6b7280">myprivacytool.io</a></td></tr>
 </table></td></tr></table></body></html>`;
+// Hexagons: the site draws one each time a bit of data is found out. Email clients strip SVG, so these use the Unicode
+// hexagon glyphs: filled = found, outline = nothing found out yet. Same green as the site brand.
+const HEX_ON = '\u2B22', HEX_OFF = '\u2B21';
+const hexGlyph = (on) => `<span style="font-size:34px;line-height:38px;color:${on ? BRAND : '#9ca3af'}">${on ? HEX_ON : HEX_OFF}</span>`;
+const hexGrid = (tiles) => {
+  const rows = [];
+  for (let k = 0; k < tiles.length; k += 4) rows.push(`<tr>${tiles.slice(k, k + 4).join('')}${'<td width="25%"></td>'.repeat(Math.max(0, k + 4 - tiles.length))}</tr>`);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px 0">${rows.join('')}</table>`;
+};
 const h2 = (t) => `<h2 style="margin:28px 0 10px 0;font-size:18px;line-height:24px;color:#111827">${t}</h2>`;
 const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
 const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
@@ -44,7 +55,10 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     '',
     'Our goal is simple: First we “mirror” what you look like from the outside and explain the risk in plain language. Then we help you start removing what’s out there.',
     '',
-    'This email is now our open channel. You can reply anytime with a question, or simply click any of the image tiles below, and we’ll continue the conversation right here.',
+    'This email is now our open channel. You can reply anytime with a question, or simply reply with the name of any hexagon below, and we’ll continue the conversation right here.',
+    '',
+    'Your hexagons — each one fills in when we find out a bit of data about you:',
+    ...Object.values(CATEGORIES).map((c) => `  ${HEX_OFF} ${c.label}`),
     '',
     'Talk soon,',
     'The MyPrivacyTOOL team',
@@ -66,7 +80,9 @@ ${para('Now that we have your email, our AI Bot will search publicly available, 
 <li>Other personal details that may be exposed</li></ul>
 ${para('Everything it finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases &mdash; only information that is already public.')}
 ${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like from the outside and explain the risk in plain language. Then we help you start removing what&rsquo;s out there.')}
-${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the image tiles below, and we&rsquo;ll continue the conversation right here.')}
+${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the hexagons below, and we&rsquo;ll continue the conversation right here.')}
+${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
+${hexGrid(Object.values(CATEGORIES).map((c) => `<td width="25%" align="center" valign="top" style="padding:0 4px 14px 4px"><a href="${esc(`mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}`)}" style="text-decoration:none;color:#374151"><div>${hexGlyph(false)}</div><div style="font-size:12px;line-height:16px">${esc(c.label)}</div></a></td>`))}
 ${para('Talk soon,<br>The MyPrivacyTOOL team')}`, unsubscribeLink);
   return { subject, text, html };
 }
@@ -99,8 +115,8 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror
   const partialNote = s.score === null
     ? 'No privacy score yet: we have not checked anything about you automatically, so we will not invent a number. Here is what we can already give you.'
     : s.partial
-    ? `Partial score: based on ${s.categories_checked.length} of 8 categories (${s.categories_checked.join(', ') || 'none'}). Not yet checked: ${s.hexagons.filter((h) => !h.checked).map((h) => h.label).join('; ')}.`
-    : 'Score covers all 8 categories.';
+    ? `Partial score: based on ${s.categories_checked.length} of 8 hexagons (${s.categories_checked.join(', ') || 'none'}). Not yet checked: ${s.hexagons.filter((h) => !h.checked).map((h) => h.label).join('; ')}.`
+    : 'Score covers all 8 hexagons.';
   const breachLines = breachStatus !== 'checked'
     ? ['We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds: https://haveibeenpwned.com', 'If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.']
     : breaches.length === 0
@@ -114,9 +130,9 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
   const text = [
     s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, partialNote, '',
-    ...(mirror ? ['YOUR MIRROR (what we could and could not see)',
-      ...(checkedHex.length ? checkedHex.map((h) => `- ${h.label}: checked, ${h.score}/100`) : []),
-      ...(unsearched.length ? [`Not searched for you yet: ${unsearched.join('; ')}.`] : []), ''] : []),
+    ...(mirror ? [`YOUR HEXAGONS (${checkedHex.length} of ${mirror.hexagons.length} filled in; each fills in when we find out a bit of data)`,
+      ...checkedHex.map((h) => `${HEX_ON} ${h.label}: ${h.score}/100`),
+      ...(unsearched.length ? [`${HEX_OFF} Empty hexagons (we have not searched these yet): ${unsearched.join('; ')}.`] : []), ''] : []),
     'EMAIL BREACHES', ...breachLines, '',
     'PEOPLE-SEARCH SITES',
     'We have not searched these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.', '',
@@ -125,9 +141,10 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror
     'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
     ...(unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
   ].join('\n');
-  const mirrorCells = checkedHex.map((h) => `<td width="50%" valign="top" style="padding:0 6px 12px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:13px;line-height:19px"><div style="color:#111827;font-weight:600">${esc(h.label)}</div><div><span style="color:#15803d;font-weight:600">${h.score}/100</span></div></td></tr></table></td>`);
-  const mirrorRows = [];
-  for (let k = 0; k < mirrorCells.length; k += 2) mirrorRows.push(`<tr>${mirrorCells[k]}${mirrorCells[k + 1] || '<td width="50%"></td>'}</tr>`);
+  const hexTiles = mirror ? mirror.hexagons.map((h) => {
+    const on = h.status === 'checked';
+    return `<td width="25%" align="center" valign="top" style="padding:0 4px 14px 4px"><div>${hexGlyph(on)}</div><div style="font-size:12px;line-height:16px;color:#374151">${esc(h.label)}</div><div style="font-size:12px;line-height:16px;font-weight:600;color:${on ? BRAND : '#9ca3af'}">${on ? `${h.score}/100` : 'empty'}</div></td>`;
+  }) : [];
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
   const brokerCards = brokers.map((b) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px 0"><tr><td style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px">
 <div style="font-size:15px;font-weight:700;color:#111827">${esc(b.name)}</div>
@@ -138,7 +155,7 @@ ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;lin
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
     `<h1 style="margin:0 0 14px 0;font-size:24px;line-height:30px;color:#111827">${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}</h1>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${esc(partialNote)}</td></tr></table>
-${mirror ? `${h2('Your mirror <span style="font-size:13px;font-weight:500;color:#6b7280">what we could and could not see</span>')}${mirrorRows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 -6px;width:calc(100% + 12px)">${mirrorRows.join('')}</table>` : ''}${unsearched.length ? para(`<span style="color:#6b7280">Not searched for you yet: ${esc(unsearched.join('; '))}.</span>`) : ''}` : ''}
+${mirror ? `${h2(`Your hexagons <span style="font-size:13px;font-weight:500;color:#6b7280">${checkedHex.length} of ${mirror.hexagons.length} filled in</span>`)}${para('Each hexagon fills in when we find out a bit of data about you. Empty ones are areas we have not searched yet.')}${hexGrid(hexTiles)}` : ''}
 ${h2('Email breaches')}${breachStatus !== 'checked' ? `${para('We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds. If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.')}${button('https://haveibeenpwned.com', 'Check on haveibeenpwned.com')}`
     : breaches.length === 0 ? para('Good news: your email address was not found in any breach known to Have I Been Pwned.')
     : `<ul style="margin:0 0 12px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${breaches.map((b) => `<li style="margin-bottom:4px"><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}</ul>${para('Change the password on any listed service, and anywhere you reused it.')}`}

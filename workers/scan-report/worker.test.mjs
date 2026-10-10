@@ -36,7 +36,7 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Usernames/.test(conf.text) && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
+check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Usernames/.test(conf.text) && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
 check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
@@ -125,7 +125,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
   check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
   const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, mirror: free });
-  check(/YOUR MIRROR/.test(repM.text) && /Not searched for you yet: .*Data broker profiles/.test(repM.text) && !/\/100/.test(repM.text), 'report email renders the mirror, unchecked areas on one line, still no invented score');
+  check(/YOUR HEXAGONS \(0 of 8 filled in/.test(repM.text) && /Empty hexagons \(we have not searched these yet\): .*Data broker profiles/.test(repM.text) && !/\/100/.test(repM.text) && repM.html.includes('\u2B21'), 'report email renders hexagons: empty ones on one line, still no invented score');
 
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 2 * 864e5).toISOString(), followup_stage: 0 }) === 0, 'follow-up: not due before day 3');
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 4 * 864e5).toISOString(), followup_stage: 0 }) === 1, 'follow-up: stage 1 due after day 3');
