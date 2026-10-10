@@ -14,3 +14,8 @@ crons = ["15 0 * * *"]
 
 # Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
 # Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).
+
+# Notion publisher (MPC-7382). Data source ids are not secret. NOTION_TOKEN is a secret (EXPECTED_SECRETS.txt).
+[vars]
+NOTION_DAILY_DATA_SOURCE_ID = "5bf43eae-1da1-438e-859d-56b241b5b1ac"
+NOTION_WEEKLY_DATA_SOURCE_ID = "49361779-2050-4d96-8f69-ad1da1636810"

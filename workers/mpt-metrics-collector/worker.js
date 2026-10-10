@@ -2,13 +2,14 @@
 // to public.mpt_raw_metrics (append-only). Collectors are pluggable: add a module to collectors/ and list it below.
 // A failing source writes a status=error row and never stops the others. No secret value is ever logged or stored.
 import supabaseCounts from './collectors/supabase-counts.js';
+import { publishAll, notionConfigured } from './publishers/notion.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
 export const COLLECTORS = [supabaseCounts];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'NOTION_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -48,12 +49,19 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
   return results;
 }
 
+// Collect, then publish to Notion (MPC-7382). Publishing never blocks or fails the collection.
+export async function runAndPublish(env, opts = {}) {
+  const results = await runAll(env);
+  const published = notionConfigured(env) ? await publishAll(env, new Date(), opts) : [{ kind: 'notion', status: 'skipped', reason: 'NOTION_TOKEN / data source ids not set' }];
+  return { results, published };
+}
+
 const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default {
   async scheduled(_event, env, ctx) {
     if (!configured(env)) { console.error('mpt-metrics-collector: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set'); return; }
-    ctx.waitUntil(runAll(env).then((r) => console.log(JSON.stringify(r))));
+    ctx.waitUntil(runAndPublish(env).then((r) => console.log(JSON.stringify(r))));
   },
 
   async fetch(request, env) {
@@ -64,7 +72,7 @@ export default {
     if (url.pathname === '/run' && request.method === 'POST') {
       if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
       if (!configured(env)) return json({ error: 'not configured' }, 500);
-      return json({ results: await runAll(env) });
+      return json(await runAndPublish(env, { forceWeekly: url.searchParams.get('weekly') === '1' }));
     }
     return json({ error: 'not found' }, 404);
   },
