@@ -43,4 +43,15 @@ describe("Enterprise page", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("boom"));
     expect(track).not.toHaveBeenCalled();
   });
+
+  it("opens a card to show the visual guide, answers and a tick-box checklist", () => {
+    render(<MemoryRouter><Enterprise /></MemoryRouter>);
+    expect(screen.queryByText("Visual guide")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /APAC coverage/ }));
+    expect(screen.getByText("Visual guide")).toBeTruthy();
+    expect(screen.getByText("Questions and answers")).toBeTruthy();
+    expect(screen.getByText(/0 of 3 done/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("List the regions your staff are based in"));
+    expect(screen.getByText(/1 of 3 done/)).toBeTruthy();
+  });
 });
