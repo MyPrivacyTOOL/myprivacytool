@@ -34,7 +34,7 @@ export default {
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (request.method === 'GET' && url.pathname === '/api/unsubscribe') return handleUnsubscribe(env, url);
+    if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST');
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -106,7 +106,7 @@ async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
 // Sends the confirmation exactly once per scan (Resend Idempotency-Key + confirmation_sent_at).
 // Signed one-click unsubscribe link for the Worker's own /api/unsubscribe; null when UNSUBSCRIBE_SECRET is not set.
 const unsubLink = async (env, email) => (env.UNSUBSCRIBE_SECRET ? unsubscribeUrl(env, email) : null);
-const unsubHeaders = (link) => (link ? { 'List-Unsubscribe': `<${link}>` } : undefined);
+const unsubHeaders = (link) => (link ? { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined);
 
 async function confirm(env, sb, scanId, email, fetchImpl) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
@@ -230,7 +230,7 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
       if (!claimed.length) continue;
       const link = await unsubscribeUrl(env, job.email_scanned);
       const mail = buildFollowUpEmail({ stage, mirror: job.mirror_report, cohortNumber: user.cohort_number, unsubscribeLink: link });
-      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: { 'List-Unsubscribe': `<${link}>` } }, fetchImpl);
+      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(link) }, fetchImpl);
       if (!r.sent) {                                   // release the stage so the next run retries (Resend key keeps it single-send)
         await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: job.followup_stage ?? 0 });
         throw new Error(`follow-up email not sent: ${r.reason}`);
@@ -241,12 +241,27 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
   return out;
 }
 
-async function handleUnsubscribe(env, url) {
-  const page = (status, msg) => new Response(`<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:480px;margin:40px auto"><p>${msg}</p></body></html>`, { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
+// GET only shows a confirmation page: mail scanners and link previewers open links automatically, so a GET must never opt anyone out.
+// The opt-out itself is a POST (the page's button, or a mail app's one-click List-Unsubscribe-Post).
+async function handleUnsubscribe(env, url, confirmed) {
+  const view = (status, heading, body, extra = '') => new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${heading} | MyPrivacyTOOL</title></head>
+<body style="margin:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">
+<div style="max-width:520px;margin:48px auto;padding:0 16px"><div style="background:#fff;border-radius:12px;overflow:hidden">
+<div style="background:#15803d;color:#fff;padding:18px 28px;font-size:18px;font-weight:700">MyPrivacyTOOL</div>
+<div style="padding:28px"><h1 style="margin:0 0 12px;font-size:22px;line-height:28px">${heading}</h1><p style="margin:0 0 16px;font-size:15px;line-height:23px;color:#374151">${body}</p>${extra}
+<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">Questions, or want your data deleted? Write to <a href="mailto:hello@myprivacytool.io" style="color:#6b7280">hello@myprivacytool.io</a>. <a href="https://myprivacytool.io/" style="color:#6b7280">myprivacytool.io</a></p></div></div></div></body></html>`,
+    { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
   const email = (url.searchParams.get('e') || '').trim().toLowerCase();
-  if (!(await verifyUnsubscribe(env.UNSUBSCRIBE_SECRET, email, url.searchParams.get('t')))) return page(400, 'This unsubscribe link is not valid.');
+  if (!(await verifyUnsubscribe(env.UNSUBSCRIBE_SECRET, email, url.searchParams.get('t')))) {
+    return view(400, 'This link is not valid', 'The unsubscribe link may be incomplete or out of date. Reply to any of our emails and we will remove you by hand.');
+  }
+  if (!confirmed) {
+    const action = `/api/unsubscribe?e=${encodeURIComponent(email)}&amp;t=${encodeURIComponent(url.searchParams.get('t'))}`;
+    return view(200, 'Unsubscribe from MyPrivacyTOOL emails?', 'Fixed what was in your report? Then you do not need to hear from us again. Confirm and we will send you no more follow-up or marketing emails.',
+      `<form method="POST" action="${action}"><button type="submit" style="background:#15803d;color:#fff;border:0;border-radius:8px;padding:11px 20px;font-size:15px;font-weight:600;cursor:pointer">Yes, unsubscribe me</button></form>`);
+  }
   try {
     await db(env).patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
-    return page(200, 'You are unsubscribed. We will not send you any more follow-up emails.');
-  } catch (e) { console.error('unsubscribe failed', String(e)); return page(500, 'Something went wrong. Reply to any of our emails and we will remove you by hand.'); }
+    return view(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails. You can run a new scan on our site whenever you like.');
+  } catch (e) { console.error('unsubscribe failed', String(e)); return view(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
 }
