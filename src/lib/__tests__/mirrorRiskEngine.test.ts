@@ -48,71 +48,34 @@ describe('Mirror & Risk Engine - MPC-7252', () => {
     });
   });
 
-  describe('osintLookup: Phone Validation', () => {
-    it('should accept E.164 and common phone formats', () => {
-      const validPhones = [
-        '+1-555-0123',
-        '+86 10 1234 5678',
-        '555-123-4567',
-        '(555) 123-4567',
-      ];
+  describe('osintLookup: phone / handle / domain validation', () => {
+    const accepted: Array<['phone' | 'handle' | 'domain', string]> = [
+      ['phone', '+1-555-0123'],
+      ['phone', '+86 10 1234 5678'],
+      ['phone', '(555) 123-4567'],
+      ['handle', 'john_doe'],
+      ['handle', 'alice-smith'],
+      ['domain', 'example.com'],
+      ['domain', 'sub.example.co.uk'],
+    ];
+    const rejected: Array<['phone' | 'handle' | 'domain', string, string]> = [
+      ['phone', '123', 'INVALID_PHONE'],
+      ['phone', 'not-a-phone', 'INVALID_PHONE'],
+      ['handle', 'ab', 'INVALID_HANDLE'],
+      ['handle', 'user@domain', 'INVALID_HANDLE'],
+      ['handle', 'user.name', 'INVALID_HANDLE'],
+      ['domain', '.com', 'INVALID_DOMAIN'],
+      ['domain', 'example.', 'INVALID_DOMAIN'],
+      ['domain', 'example .com', 'INVALID_DOMAIN'],
+    ];
 
-      // Validate format
-      const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
-      validPhones.forEach(phone => {
-        expect(phoneRegex.test(phone.replace(/\s/g, ''))).toBe(true);
-      });
+    it.each(accepted)('accepts %s "%s" (and reports it as not_checked)', async (type, value) => {
+      const r = await osintLookup(value, type);
+      expect(r.status).toBe('not_checked');
     });
 
-    it('should reject invalid phone numbers', () => {
-      const invalidPhones = ['', '123', 'not-a-phone'];
-      const phoneRegex = /^[\d\s\-\+\(\)]{7,}$/;
-
-      invalidPhones.forEach(phone => {
-        expect(phoneRegex.test(phone.replace(/\s/g, ''))).toBe(false);
-      });
-    });
-  });
-
-  describe('osintLookup: Handle Validation', () => {
-    it('should accept valid handles', () => {
-      const validHandles = ['john_doe', 'alice-smith', 'user123'];
-      const handleRegex = /^[a-zA-Z0-9_\-]{3,50}$/;
-
-      validHandles.forEach(handle => {
-        expect(handleRegex.test(handle)).toBe(true);
-      });
-    });
-
-    it('should reject invalid handles', () => {
-      const invalidHandles = ['ab', 'user@domain', 'user.name'];
-      const handleRegex = /^[a-zA-Z0-9_\-]{3,50}$/;
-
-      invalidHandles.forEach(handle => {
-        expect(handleRegex.test(handle)).toBe(false);
-      });
-    });
-  });
-
-  describe('osintLookup: Domain Validation', () => {
-    it('should accept valid domains', () => {
-      const validDomains = ['example.com', 'sub.example.co.uk', 'my-domain.org'];
-      const domainRegex =
-        /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-
-      validDomains.forEach(domain => {
-        expect(domainRegex.test(domain)).toBe(true);
-      });
-    });
-
-    it('should reject invalid domains', () => {
-      const invalidDomains = ['', '.com', 'example.', 'example-', 'example .com'];
-      const domainRegex =
-        /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-
-      invalidDomains.forEach(domain => {
-        expect(domainRegex.test(domain)).toBe(false);
-      });
+    it.each(rejected)('rejects %s "%s" with %s', async (type, value, code) => {
+      await expect(osintLookup(value, type)).rejects.toMatchObject({ code });
     });
   });
 
