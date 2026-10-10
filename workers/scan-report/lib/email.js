@@ -19,11 +19,19 @@ const shell = (title, preheader, inner, unsubscribeLink) => `<!DOCTYPE html><htm
 // Hexagons: the site draws one each time a bit of data is found out. Email clients strip SVG, so these use the Unicode
 // hexagon glyphs: filled = found, outline = nothing found out yet. Same green as the site brand.
 const HEX_ON = '\u2B22', HEX_OFF = '\u2B21';
-const hexGlyph = (on) => `<span style="font-size:34px;line-height:38px;color:${on ? BRAND : '#9ca3af'}">${on ? HEX_ON : HEX_OFF}</span>`;
-const hexGrid = (tiles) => {
-  const rows = [];
-  for (let k = 0; k < tiles.length; k += 4) rows.push(`<tr>${tiles.slice(k, k + 4).join('')}${'<td width="25%"></td>'.repeat(Math.max(0, k + 4 - tiles.length))}</tr>`);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px 0">${rows.join('')}</table>`;
+// Hexagon tiles are PNGs hosted next to the Alice artwork (public/email/hex/, built by scripts/hexagon-tiles.html) because mail clients
+// strip SVG. Plain-text versions keep the Unicode glyphs above.
+const hexSrc = (key, found) => `${SITE}/email/hex/${key}-${found ? 'found' : 'empty'}.png`;
+const hexTile = ({ key, label, found = false, href, caption }) => {
+  const img = `<img src="${hexSrc(key, found)}" width="150" alt="${esc(label)} hexagon${found ? ' (filled in)' : ''}" style="display:block;width:100%;max-width:150px;height:auto;border:0;margin:0 auto">`;
+  return `<td width="33%" align="center" valign="top" style="padding:0 3px 10px 3px">${href ? `<a href="${esc(href)}" style="text-decoration:none">${img}</a>` : img}${caption ? `<div style="margin-top:2px;font-size:12px;line-height:16px;font-weight:600;color:${BRAND}">${caption}</div>` : ''}</td>`;
+};
+// Staggered honeycomb like the site: rows of 3, 2, 3. Each row is its own table (mixed column counts break table layout), the middle
+// row is two thirds wide and centred, and rows 2 and 3 pull up a little so the hexagons nest (clients that ignore negative margins just show a small gap).
+const honeycomb = (tiles) => {
+  const row = (cells, width, nest) => `<table role="presentation" width="${width}" align="center" cellpadding="0" cellspacing="0" style="width:${width};margin:${nest ? '-22px' : '0'} auto 0 auto"><tr>${cells.join('')}</tr></table>`;
+  const cell = (t, w) => t.replace('<td width="33%"', `<td width="${w}"`);
+  return `<div style="margin:6px 0 14px 0">${row(tiles.slice(0, 3).map((t) => cell(t, '33%')), '100%', false)}${row(tiles.slice(3, 5).map((t) => cell(t, '50%')), '67%', true)}${row(tiles.slice(5, 8).map((t) => cell(t, '33%')), '100%', true)}</div>`;
 };
 // Alice, MyPrivacyTOOL's AI guide (artwork from the YouTube stills). Hosted from the site's public/email folder.
 const ALICE_IMG = `${SITE}/email/alice-curtain.jpg`;
@@ -94,7 +102,7 @@ ${para('Everything Alice finds will be collected and sent back to you in a clear
 ${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like from the outside and explain the risk in plain language. Then we help you start removing what&rsquo;s out there.')}
 ${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the hexagons below, and we&rsquo;ll continue the conversation right here.')}
 ${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
-${hexGrid(Object.values(CATEGORIES).map((c) => `<td width="25%" align="center" valign="top" style="padding:0 4px 14px 4px"><a href="${esc(`mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}`)}" style="text-decoration:none;color:#374151"><div>${hexGlyph(false)}</div><div style="font-size:12px;line-height:16px">${esc(c.label)}</div></a></td>`))}
+${honeycomb(Object.entries(CATEGORIES).map(([key, c]) => hexTile({ key, label: c.label, href: `mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}` })))}
 ${para('Talk soon,<br>The MyPrivacyTOOL team')}`, unsubscribeLink);
   return { subject, text, html };
 }
@@ -153,10 +161,7 @@ export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror
     'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
     ...(unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
   ].join('\n');
-  const hexTiles = mirror ? mirror.hexagons.map((h) => {
-    const on = h.status === 'checked';
-    return `<td width="25%" align="center" valign="top" style="padding:0 4px 14px 4px"><div>${hexGlyph(on)}</div><div style="font-size:12px;line-height:16px;color:#374151">${esc(h.label)}</div><div style="font-size:12px;line-height:16px;font-weight:600;color:${on ? BRAND : '#9ca3af'}">${on ? `${h.score}/100` : 'empty'}</div></td>`;
-  }) : [];
+  const hexTiles = mirror ? mirror.hexagons.map((h) => hexTile({ key: h.category, label: h.label, found: h.status === 'checked', caption: h.status === 'checked' ? `${h.score}/100` : '' })) : [];
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
   const brokerCards = brokers.map((b) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px 0"><tr><td style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px">
 <div style="font-size:15px;font-weight:700;color:#111827">${esc(b.name)}</div>
@@ -167,7 +172,7 @@ ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;lin
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
     `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`)}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${esc(partialNote)}</td></tr></table>
-${mirror ? `${h2(`Your hexagons <span style="font-size:13px;font-weight:500;color:#6b7280">${checkedHex.length} of ${mirror.hexagons.length} filled in</span>`)}${para('Each hexagon fills in when we find out a bit of data about you. Empty ones are areas we have not searched yet.')}${hexGrid(hexTiles)}` : ''}
+${mirror ? `${h2(`Your hexagons <span style="font-size:13px;font-weight:500;color:#6b7280">${checkedHex.length} of ${mirror.hexagons.length} filled in</span>`)}${para('Each hexagon fills in when we find out a bit of data about you. Empty ones are areas we have not searched yet.')}${honeycomb(hexTiles)}` : ''}
 ${h2('Email breaches')}${breachStatus !== 'checked' ? `${para('We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds. If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.')}${button('https://haveibeenpwned.com', 'Check on haveibeenpwned.com')}`
     : breaches.length === 0 ? para('Good news: your email address was not found in any breach known to Have I Been Pwned.')
     : `<ul style="margin:0 0 12px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${breaches.map((b) => `<li style="margin-bottom:4px"><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}</ul>${para('Change the password on any listed service, and anywhere you reused it.')}`}

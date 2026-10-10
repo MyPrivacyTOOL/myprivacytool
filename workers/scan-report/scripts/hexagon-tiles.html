@@ -1,26 +1,65 @@
 <!doctype html>
-<!-- Source for public/email/hex/*.png (the hexagon tiles used in the scan emails). Mirrors the site's Hexagon.tsx look:
-     pointy-top path, deep-green outline, white-to-soft-green fill, emoji icon, check badge when found, spaced caps label.
-     Render: chromium --headless --default-background-color=00000000 --force-device-scale-factor=2 --window-size=900,1040 --screenshot=sheet.png hexagon-tiles.html
-     then crop each 220x250 cell (4 columns, found/empty pairs) and trim to the alpha bounding box. -->
+<!-- Source for public/email/hex/*.png (the hexagon tiles in the scan emails). Same look as the site's Hexagon.tsx: pointy-top path,
+     deep-green outline, white-to-soft-green fill, spaced caps label, check badge when found. The art in each hexagon is a hand-drawn
+     duotone line illustration (deep green ink, matrix-green accent) for each of the eight score categories.
+     Render: chromium --headless --hide-scrollbars --default-background-color=00000000 --force-device-scale-factor=2 --window-size=900,1200 --screenshot=sheet.png hexagon-tiles.html
+     then crop each 220x250 cell (4 columns, found/empty pairs per category) and trim to the alpha bounding box. -->
 <html><head><meta charset="utf-8"><style>
 html,body{margin:0;background:transparent;overflow:hidden}
 .t{position:absolute;width:220px;height:250px;font-family:Inter,"Helvetica Neue",Arial,sans-serif}
-.t svg{position:absolute;left:10px;top:10px;width:200px;height:200px;overflow:visible}
-.ic{position:absolute;left:0;width:220px;top:52px;text-align:center;font-size:38px;line-height:44px;font-family:"Noto Color Emoji",sans-serif}
-.lb{position:absolute;left:34px;width:152px;top:104px;text-align:center;font-size:11.5px;line-height:15px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.t svg.h{position:absolute;left:10px;top:10px;width:200px;height:200px;overflow:visible}
+.ico{position:absolute;left:60px;top:22px;width:100px;height:100px}
+.lb{position:absolute;left:35px;width:150px;top:126px;text-align:center;font-size:11px;line-height:14px;font-weight:700;letter-spacing:.9px;text-transform:uppercase}
 </style></head><body>
 <script>
-const CATS=[['broker','📇','Data broker profiles'],['search','🔍','Search engines & public records'],['social','💬','Social media exposure'],['email','✉️','Email & breaches'],['device','💻','Device & browser fingerprinting'],['network','🌐','Network & location'],['professional','💼','Professional & LinkedIn data'],['ai_threat','🤖','AI & emerging threats']];
+const INK='#14532d',G='#22c55e',GL='#bbf7d0',GP='#ecfdf3',W='#ffffff';
+const S=`fill="none" stroke="${INK}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"`;
+const ICONS={
+broker:`<rect x="14" y="10" width="40" height="30" rx="5" transform="rotate(-8 34 25)" fill="${GL}" ${S.replace('fill="none"','')}/>
+<rect x="9" y="17" width="42" height="32" rx="5" fill="${W}" ${S.replace('fill="none"','')}/>
+<circle cx="23" cy="29" r="5" fill="${GL}" ${S.replace('fill="none"','')}/><path d="M14.5 43c1.2-5 4.6-7.5 8.5-7.5s7.3 2.5 8.5 7.5" ${S}/>
+<path d="M36 27h10M36 33h8M36 39h10" ${S}/>
+<circle cx="52" cy="50" r="8" fill="${G}" stroke="${INK}" stroke-width="2.4"/><path d="M52 45.5v9M54.6 47.5c-.8-1-5.2-1.2-5.2 1.1 0 2.6 5.2 1.4 5.2 4-.2 2.4-4.6 2-5.4.7" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>`,
+search:`<path d="M12 8h24l10 10v30a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V12a4 4 0 0 1 4-4z" fill="${W}" ${S.replace('fill="none"','')}/>
+<path d="M36 8v10h10" ${S}/><path d="M15 22h14M15 29h9M15 36h8" ${S}/>
+<circle cx="40" cy="38" r="12" fill="${GL}" fill-opacity=".85" ${S.replace('fill="none"','')}/>
+<path d="M33.5 34.5a7.5 7.5 0 0 1 6-3.6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M49 47l9 9" stroke="${INK}" stroke-width="5" stroke-linecap="round"/><circle cx="40" cy="38" r="3" fill="${G}"/>`,
+social:`<path d="M10 12h30a5 5 0 0 1 5 5v13a5 5 0 0 1-5 5H24l-9 8v-8h-5a5 5 0 0 1-5-5V17a5 5 0 0 1 5-5z" fill="${W}" ${S.replace('fill="none"','')}/>
+<circle cx="17" cy="23.5" r="2" fill="${INK}"/><circle cx="25" cy="23.5" r="2" fill="${INK}"/><circle cx="33" cy="23.5" r="2" fill="${INK}"/>
+<path d="M30 36h21a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5h-2v7l-8-7H30a5 5 0 0 1-5-5v-8a5 5 0 0 1 5-5z" fill="${G}" ${S.replace('fill="none"','')}/>
+<path d="M43 49.5s-5-3-5-6.2a2.9 2.9 0 0 1 5-1.6 2.9 2.9 0 0 1 5 1.6c0 3.2-5 6.2-5 6.2z" fill="#fff" stroke="none"/>`,
+email:`<rect x="6" y="16" width="46" height="34" rx="5" fill="${W}" ${S.replace('fill="none"','')}/>
+<path d="M7 19l22 17 22-17" ${S}/><path d="M7 48l15-14M51 48L36 34" stroke="${INK}" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+<circle cx="50" cy="16" r="10" fill="${G}" stroke="${INK}" stroke-width="2.6"/><path d="M50 10.5v6.5" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="50" cy="21.2" r="1.7" fill="#fff"/>`,
+device:`<rect x="12" y="10" width="40" height="29" rx="4" fill="${W}" ${S.replace('fill="none"','')}/>
+<path d="M6 46h52l-3 6a3 3 0 0 1-2.7 1.7H11.7A3 3 0 0 1 9 52z" fill="${GL}" ${S.replace('fill="none"','')}/>
+<g fill="none" stroke="${G}" stroke-width="2.6" stroke-linecap="round"><path d="M23 33c0-6 4-10 9-10s9 4 9 10"/><path d="M27 33c0-3.6 2.2-6 5-6s5 2.4 5 6"/><path d="M32 33v-3"/><path d="M19 32c0-8 5-13.6 13-13.6S45 24 45 32" stroke="${INK}" stroke-width="2"/></g>`,
+network:`<circle cx="29" cy="35" r="19" fill="${GP}" ${S.replace('fill="none"','')}/>
+<ellipse cx="29" cy="35" rx="8" ry="19" ${S}/><path d="M10 35h38M13 25h32M13 45h32" ${S}/>
+<path d="M48 6c-6.6 0-11 4.9-11 10.8 0 7.4 11 18.2 11 18.2s11-10.8 11-18.2C59 10.900 54.600 6 48 6z" fill="${G}" stroke="${INK}" stroke-width="2.6" stroke-linejoin="round"/><circle cx="48" cy="17" r="4.2" fill="#fff"/>`,
+professional:`<path d="M24 20v-5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v5" ${S}/>
+<rect x="8" y="20" width="48" height="32" rx="6" fill="${W}" ${S.replace('fill="none"','')}/>
+<path d="M8 34h48" ${S}/><rect x="27" y="30" width="10" height="9" rx="2.5" fill="${G}" stroke="${INK}" stroke-width="2.4"/>
+<path d="M14 26h6M44 26h6" stroke="${GL}" stroke-width="3" stroke-linecap="round"/>`,
+ai_threat:`<path d="M32 6v8" ${S}/><circle cx="32" cy="5.500" r="3.200" fill="${G}" stroke="${INK}" stroke-width="2.2"/>
+<rect x="12" y="14" width="40" height="34" rx="11" fill="${W}" ${S.replace('fill="none"','')}/>
+<path d="M12 28H7v9h5M52 28h5v9h-5" ${S}/>
+<circle cx="24" cy="30" r="5.500" fill="${GL}" stroke="${INK}" stroke-width="2.4"/><circle cx="40" cy="30" r="5.500" fill="${GL}" stroke="${INK}" stroke-width="2.4"/>
+<circle cx="24" cy="30" r="2.200" fill="${INK}"/><circle cx="40" cy="30" r="2.200" fill="${INK}"/>
+<path d="M23 41h18" ${S}/><path d="M28 41v3M32 41v3M36 41v3" stroke="${G}" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M26 56l6-6 6 6" fill="none" stroke="${G}" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>`
+};
+const CATS=[['broker','Data broker profiles'],['search','Search engines & public records'],['social','Social media exposure'],['email','Email & breaches'],['device','Device & browser fingerprinting'],['network','Network & location'],['professional','Professional & LinkedIn data'],['ai_threat','AI & emerging threats']];
 const P='M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z';
 let i=0;
-for(const [key,emoji,label] of CATS){for(const found of [true,false]){
+for(const [key,label] of CATS){for(const found of [true,false]){
   const col=i%4,row=Math.floor(i/4);i++;
-  const stroke=found?'#15803d':'#8fb99d',txt=found?'#15803d':'#5c8f6e',id='g'+i;
+  const stroke=found?'#15803d':'#8fb99d',txt=found?'#15803d':'#4f8a64',id='g'+i;
   document.body.insertAdjacentHTML('beforeend',`<div class="t" id="${key}-${found?'found':'empty'}" style="left:${col*220}px;top:${row*250}px">
-  <svg viewBox="0 0 100 100"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="${found?'#dcf0e2':'#f1f8f3'}"/></linearGradient></defs>
-  <path d="${P}" fill="url(#${id})" stroke="${stroke}" stroke-width="${found?3.4:2.6}" stroke-linejoin="miter"/>
+  <svg class="h" viewBox="0 0 100 100"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0.5" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="${found?'#d3eedb':'#eef7f1'}"/></linearGradient>
+  <filter id="s${i}" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="1.6" stdDeviation="2.2" flood-color="#15803d" flood-opacity=".22"/></filter></defs>
+  <path d="${P}" fill="url(#${id})" stroke="${stroke}" stroke-width="${found?3.4:2.8}" stroke-linejoin="miter" filter="url(#s${i})"/>
   ${found?'<circle cx="82" cy="17" r="11" fill="#15803d" stroke="#fff" stroke-width="1.6"/><path d="M76.5 17.2 L80.6 21.3 L88 13" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>':''}</svg>
-  <div class="ic" style="${found?'':'opacity:.55'}">${emoji}</div><div class="lb" style="color:${txt}">${label}</div></div>`);
+  <svg class="ico" viewBox="0 0 64 64" style="${found?'':'opacity:.8'}">${ICONS[key]}</svg><div class="lb" style="color:${txt}">${label}</div></div>`);
 }}
 </script></body></html>
