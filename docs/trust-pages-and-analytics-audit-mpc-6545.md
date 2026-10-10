@@ -94,10 +94,10 @@ Done in this change
 Still open (needs a person, not code)
 | Item | Owner | What is needed |
 |---|---|---|
-| Legal review (MPC-6798) | Chris / counsel | Approve or mark up Privacy, Terms, Cookies, DPA. The open claims listed above stay open until then. |
+| Legal review (MPC-6798) | Chris / counsel | Done: signed off 2026-10-10. |
 | `/pricing` | Chris | Decide: ship real pricing, or keep the noindex `ComingSoonPage` stub. Nothing is built because no pricing has been decided. |
-| GA4 consent gating | Anyone with a browser | See checklist below. The cloud sandbox cannot reach myprivacytool.io (proxy 403), so this could not be tested here. |
-| Mailboxes | Chris | Confirm each address below receives mail. |
+| GA4 consent gating | Anyone with a browser | Not a blocker; moved to a follow-up task. See checklist below. The cloud sandbox cannot reach myprivacytool.io (proxy 403), so this could not be tested here. |
+| Mailboxes | Chris | Not a blocker; moved to the same follow-up task. Confirm each address below receives mail. |
 
 GA4 consent-gating check (about 5 minutes, clean/incognito browser, DevTools Network tab, filter `google|gtm|collect`)
 1. Load `https://www.myprivacytool.io/` and do not touch the banner: no request to `googletagmanager.com/gtag/js` or `google-analytics.com/g/collect` may fire.
