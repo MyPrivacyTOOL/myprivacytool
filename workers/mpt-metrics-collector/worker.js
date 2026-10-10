@@ -2,13 +2,14 @@
 // to public.mpt_raw_metrics (append-only). Collectors are pluggable: add a module to collectors/ and list it below.
 // A failing source writes a status=error row and never stops the others. No secret value is ever logged or stored.
 import supabaseCounts from './collectors/supabase-counts.js';
+import ga4Reports from './collectors/ga4.js';
 
-export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts];
+export const COLLECTOR_VERSION = '1.1.0';
+export const COLLECTORS = [supabaseCounts, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'GA4_SERVICE_ACCOUNT_JSON']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -30,13 +31,16 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
   const results = [];
   const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   for (const c of collectors) {
+    if (c.skip?.(now)) continue;
+    // A collector may report on another period (GA4: the last complete UTC day/week); the default is today so far.
+    const period = c.period?.(now);
     const row = {
       source: c.source, report: c.report, captured_at: now.toISOString(),
-      period_start: dayStart.toISOString(), period_end: now.toISOString(),
+      period_start: (period?.start ?? dayStart).toISOString(), period_end: (period?.end ?? now).toISOString(),
       payload: {}, collector_version: COLLECTOR_VERSION, status: 'ok', error: null,
     };
     try {
-      const out = await c.collect(env);
+      const out = await c.collect(env, now);
       row.payload = out.payload ?? {};
       if (out.error) { row.status = 'error'; row.error = SAFE(out.error, env); }
     } catch (e) {

@@ -18,7 +18,7 @@ globalThis.fetch = async (url, opts = {}) => {
   return { ok: false, status: 404 };
 };
 
-let r = await runAll(env);
+let r = await runAll(env, [supabaseCounts]);
 check(r.length === 1 && r[0].stored && inserts.length === 1, 'one supabase row appended');
 let row = inserts[0].row;
 check(row.source === 'supabase' && row.status === 'ok' && row.error === null, 'source=supabase status=ok');
@@ -27,7 +27,7 @@ check(['id', 'email'].every((k) => !JSON.stringify(row).includes(`"${k}"`)), 'no
 check(!JSON.stringify(row).includes('sekret'), 'secret value not in row');
 check(inserts[0].headers.apikey === 'sekret', 'service role key used for insert');
 
-inserts = []; failTable = 'leads'; r = await runAll(env); row = inserts[0].row; failTable = null;
+inserts = []; failTable = 'leads'; r = await runAll(env, [supabaseCounts]); row = inserts[0].row; failTable = null;
 check(row.status === 'error' && /leads: HTTP 500/.test(row.error) && row.payload.counts.leads === null && row.payload.counts.scans === 10, 'one failed table => status=error, other counts kept');
 
 // pluggable + isolation: a throwing collector does not stop the next one
@@ -47,12 +47,12 @@ check((await call('/run', 'POST')).status === 401, 'POST /run without token => 4
 check((await call('/run', 'POST', { authorization: 'Bearer wrong' })).status === 401, 'wrong token => 401');
 check((await call('/run', 'POST', {}, { ...env, COLLECTOR_TRIGGER_TOKEN: undefined })).status === 401, 'no token configured => 401');
 inserts = []; const ran = await call('/run', 'POST', { authorization: 'Bearer tok' });
-check(ran.status === 200 && inserts.length === 1, 'authorised POST /run collects');
+check(ran.status === 200 && inserts.some((i) => i.row.source === 'supabase'), 'authorised POST /run collects');
 check((await call('/nope')).status === 404, 'unknown path 404');
 
 // scheduled
 inserts = []; const waits = [];
 await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits);
-check(inserts.length === 1, 'scheduled run appends a row');
+check(inserts.length === COLLECTORS.filter((c) => !c.skip?.(new Date())).length && inserts.some((i) => i.row.source === 'supabase'), 'scheduled run appends a row per collector');
 check(COLLECTORS.includes(supabaseCounts), 'supabase collector registered');
 process.exit(ok ? 0 : 1);
