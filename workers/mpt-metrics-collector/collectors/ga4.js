@@ -1,25 +1,25 @@
 // GA4 Data API collector (MPC-7378). One runReport per report, stored untouched as its own mpt_raw_metrics row.
 // Auth: Google service account (read-only Viewer on the property); the JSON key is the Worker secret GA4_SERVICE_ACCOUNT_JSON.
-// Only the MPT property is ever queried. Reports cover the last complete UTC day. GA4 reads dates in the property's timezone (America/Los_Angeles),
-// so the cron must run after that day ends (09:15 UTC, see wrangler.toml) for the day to be complete.
+// Only the MPT property is ever queried. Reports cover the last complete Hong Kong day (00:00-24:00 HKT).
+// GA4 reads dates in the PROPERTY's reporting timezone, which must be Asia/Hong_Kong; every response carries
+// metadata.timeZone and a report from a property in any other timezone is rejected (status=error, nothing stored).
+import { previousHkDay, previousHkWeek, hkWeekday } from '../lib/hk.js';
+
 export const GA4_PROPERTY_ID = '515216281';
 const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-const DAY_MS = 86400000;
-const iso = (d) => d.toISOString().slice(0, 10);
-const utcDay = (now) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+const GA4_TIMEZONE = 'Asia/Hong_Kong';
 
-// Yesterday (UTC) as the reporting day.
+// Yesterday (HKT): the previous complete Hong Kong day.
 export function yesterday(now) {
-  const start = new Date(utcDay(now).getTime() - DAY_MS);
-  return { start, end: new Date(start.getTime() + DAY_MS - 1), startDate: iso(start), endDate: iso(start) };
+  const p = previousHkDay(now);
+  return { start: p.start, end: new Date(p.end.getTime() - 1), startDate: p.day, endDate: p.day };
 }
-// Previous Monday..Sunday; only meaningful when `now` is a Monday.
+// Previous Monday..Sunday (HKT); only meaningful when `now` is a Monday in Hong Kong.
 export function lastWeek(now) {
-  const start = new Date(utcDay(now).getTime() - 7 * DAY_MS);
-  const end = new Date(start.getTime() + 7 * DAY_MS - 1);
-  return { start, end, startDate: iso(start), endDate: iso(new Date(start.getTime() + 6 * DAY_MS)) };
+  const w = previousHkWeek(now);
+  return { start: w.start, end: new Date(w.end.getTime() - 1), startDate: w.startDay, endDate: w.endDay };
 }
 
 const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -69,13 +69,17 @@ export async function runReport(env, request) {
   if (!res.ok) throw new Error(`GA4 runReport failed: HTTP ${res.status}`);
   const data = await res.json();
   if (!data || !Array.isArray(data.metricHeaders ?? [])) throw new Error('GA4 runReport returned an unexpected shape');
+  // GA4 buckets days in the property's timezone. A property not on Hong Kong time would store another day's numbers under a
+  // Hong Kong date, so refuse (error row, blank cells) until the property timezone is changed in GA4 Admin.
+  const tz = data.metadata?.timeZone;
+  if (tz !== GA4_TIMEZONE) throw new Error(`GA4 property timezone is ${tz ?? 'unknown'}, expected ${GA4_TIMEZONE}; set Reporting time zone in GA4 Admin > Property details`);
   return data;
 }
 
 const metrics = (...n) => n.map((name) => ({ name }));
 const dims = (...n) => n.map((name) => ({ name }));
 
-// Each report: payload is the untouched API response; the period tells the worker which UTC day/week it covers.
+// Each report: payload is the untouched API response; the period tells the worker which Hong Kong day/week it covers.
 function report(name, build, { period = yesterday, only } = {}) {
   return {
     source: 'ga4',
@@ -96,8 +100,8 @@ export const reports = [
   report('daily_source_medium', (p) => ({ dateRanges: range(p), dimensions: dims('sessionSource', 'sessionMedium'), metrics: metrics('sessions'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   report('daily_country', (p) => ({ dateRanges: range(p), dimensions: dims('country'), metrics: metrics('sessions', 'activeUsers'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   report('daily_landing_page', (p) => ({ dateRanges: range(p), dimensions: dims('landingPage'), metrics: metrics('sessions'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
-  // Mondays only: previous Mon..Sun active users (the weekly view reads this).
-  report('weekly_overview', (p) => ({ dateRanges: range(p), metrics: metrics('activeUsers') }), { period: lastWeek, only: (now) => now.getUTCDay() === 1 }),
+  // Mondays (HKT) only: previous Mon..Sun active users (the weekly view reads this).
+  report('weekly_overview', (p) => ({ dateRanges: range(p), metrics: metrics('activeUsers') }), { period: lastWeek, only: (now) => hkWeekday(now) === 1 }),
 ];
 
 export default reports;

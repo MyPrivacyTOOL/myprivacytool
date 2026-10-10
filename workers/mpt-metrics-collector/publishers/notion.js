@@ -2,6 +2,8 @@
 // Counts and summaries only, no personal data. Re-running a day or week updates the same row (never duplicates).
 // A number the views report as NULL (source missing or status=error) is left blank, never estimated.
 // Rows this publisher did not create (no MARKER in Notes / Agent Insights) are left untouched.
+import { hkDate, hkDayStartOf } from '../lib/hk.js';
+
 export const NOTION_VERSION = '2025-09-03';
 export const DEFAULT_DAILY_DS = '5bf43eae-1da1-438e-859d-56b241b5b1ac'; // Management & Data Analytics MPT Hub
 export const DEFAULT_WEEKLY_DS = '49361779-2050-4d96-8f69-ad1da1636810'; // MPT Total Project Channel Analytics and Metrics
@@ -73,7 +75,7 @@ async function upsert(env, ds, { key, keyProperty, markerProperty, titleProperty
 
 export function dailyProperties(day, v, totalLeads, readAt) {
   const lines = [
-    `${MARKER} ${day} (UTC day). Read ${readAt} from Supabase mpt_daily_metrics unless noted.`,
+    `${MARKER} ${day} (Hong Kong day, 00:00-24:00 HKT). Read ${readAt} from Supabase mpt_daily_metrics unless noted.`,
     `GA4 Sessions: ga4 daily_overview (activeUsers also -> Website Visitors). Supabase Signups: public.users created that day. Newsletter Signups: public.subscribers created that day.`,
     `Total Leads: supabase table_counts count of public.leads, latest pull that day. Blank = not collected or source error; nothing is estimated.`,
   ];
@@ -91,7 +93,7 @@ export function dailyProperties(day, v, totalLeads, readAt) {
 export async function publishDaily(env, day, now = new Date()) {
   const readAt = now.toISOString();
   const [view] = await supa(env, `mpt_daily_metrics?day=eq.${day}&select=*`);
-  const [raw] = await supa(env, `mpt_raw_metrics?source=eq.supabase&report=eq.table_counts&captured_at=gte.${day}T00:00:00Z&captured_at=lt.${addDays(day, 1)}T00:00:00Z&order=captured_at.desc&limit=1&select=payload`);
+  const [raw] = await supa(env, `mpt_raw_metrics?source=eq.supabase&report=eq.table_counts&captured_at=gte.${hkDayStartOf(day).toISOString()}&captured_at=lt.${hkDayStartOf(addDays(day, 1)).toISOString()}&order=captured_at.desc&limit=1&select=payload`);
   const properties = dailyProperties(day, view, raw?.payload?.counts?.leads, readAt);
   const r = await upsert(env, cfg(env).daily, { key: day, keyProperty: 'Date', markerProperty: 'Notes', titleProperty: 'Name', title: day, properties });
   return { kind: 'daily', day, action: r.action, url: r.page.url };
@@ -147,9 +149,9 @@ export async function publishWeekly(env, weekOf, now = new Date()) {
   return { kind: 'weekly', weekOf, action: r.action, url: r.page.url, paceStatus: status };
 }
 
-// Daily cron: publish yesterday's complete UTC day; on Mondays also the week that just ended.
+// Daily cron: publish yesterday's complete Hong Kong day; on Mondays (HKT) also the week that just ended.
 export async function publishAll(env, now = new Date(), { day, weekOf } = {}) {
-  const today = isoDay(now);
+  const today = hkDate(now); // Hong Kong calendar date; weekday logic below runs on this date string
   const out = [];
   const run = async (label, fn) => { try { out.push(await fn()); } catch (e) { out.push({ kind: label, action: 'error', error: String(e?.message ?? e).split(env.NOTION_TOKEN).join('[redacted]').slice(0, 300) }); } };
   const d = day || addDays(today, -1);
