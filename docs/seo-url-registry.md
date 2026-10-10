@@ -65,7 +65,7 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | #17 data broker removal Hong Kong Singapore | landing page (currently only covered by the registry guides) |
 
 ### Intentionally excluded
-- Noindex placeholders (`ComingSoonPage`): `/pricing`, `/contact` (`/about` and `/faq` shipped in MPC-6545 and are in the sitemap). Add each to `STATIC_ROUTES` and remove `ComingSoonPage` when the real page ships.
+- Noindex placeholders (`ComingSoonPage`): `/contact` (`/pricing`, `/about` and `/faq` shipped in MPC-6545 and are in the sitemap). Add each to `STATIC_ROUTES` and remove `ComingSoonPage` when the real page ships.
 - Redirect-only routes (not in the sitemap, correctly): `/guides/remove-my-info-from-internet`, `/guides/remove-from-google`, `/guides/stop-spam`. **Caveat:** these are client-side redirects, not HTTP 301s; search engines may not treat them as permanent. Prefer host-level 301s if the host supports them.
 - `NotFound` is noindex.
 

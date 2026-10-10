@@ -64,9 +64,8 @@
     "description": "How MyPrivacyTOOL handles your data: privacy policy, terms, cookie policy and data processing summary in one place."
   },
   "/pricing": {
-    "title": "Pricing",
-    "description": "Simple, transparent pricing for individuals and families is on its way.",
-    "noindex": true
+    "title": "Pricing | MyPrivacyTOOL",
+    "description": "Free exposure scan, plus Guardian from $9.99/month and Sentinel from $19.99/month to remove your data from brokers and keep it off."
   },
   "/about": {
     "title": "About | MyPrivacyTOOL",
