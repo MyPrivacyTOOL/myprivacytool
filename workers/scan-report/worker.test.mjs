@@ -163,8 +163,14 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const t = await unsubscribeToken('s3cret', EMAIL);
   const bad = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`), OB, {});
   check(bad.status === 400 && !F.db.users[0].email_opt_out_at, 'unsubscribe: bad token => 400, nothing changed');
-  const good = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=${t}`), OB, {});
-  check(good.status === 200 && F.db.users[0].email_opt_out_at, 'unsubscribe: valid link opts the user out');
+  const qs = `e=${encodeURIComponent(EMAIL)}&t=${t}`;
+  const peek = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`), OB, {});
+  const peekHtml = await peek.text();
+  check(peek.status === 200 && !F.db.users[0].email_opt_out_at && /<form method="POST"/.test(peekHtml) && /noindex/.test(peekHtml) && !peekHtml.includes(EMAIL), 'unsubscribe: GET (what a mail scanner does) only shows a confirm page, opts nobody out, does not print the address');
+  const good = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
+  check(good.status === 200 && F.db.users[0].email_opt_out_at && /You are unsubscribed/.test(await good.text()), 'unsubscribe: POST (button or one-click) opts the user out');
+  const badPost = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`, { method: 'POST' }), OB, {});
+  check(badPost.status === 400, 'unsubscribe: POST with a bad token => 400');
   check((await runFollowUpJob(OB, F.f)).skipped === 1 && resendCount(F) === 2, 'opted-out user gets no follow-up');
 
   // Real launch (empty allowlist): cohort slots are claimed in order; non-members get no follow-ups; full cohort => null.
@@ -221,12 +227,12 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const [conf, rep] = sent(F);
   const linkRe = /https:\/\/[^\s"<]+\/api\/unsubscribe\?e=[^&\s"<]+(?:&amp;|&)t=[0-9a-f]{64}/;   // html escapes & as &amp;
   check(linkRe.test(conf.text) && linkRe.test(conf.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(conf.hdr['List-Unsubscribe']), 'confirmation email: signed unsubscribe link in text, html and List-Unsubscribe header');
-  check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']), 'report email: signed unsubscribe link in text, html and List-Unsubscribe header');
+  check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']) && rep.hdr['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'report email: signed unsubscribe link in text, html and List-Unsubscribe (+ one-click) header');
   check(/Fixed what is in this report/.test(rep.text) && /Fixed what is in this report/.test(rep.html) && /no more follow-up or marketing/.test(rep.text), 'report email invites unsubscribing once the findings are fixed');
   check(rep.html.includes('mailto:hello@myprivacytool.io') && rep.html.includes('href="https://myprivacytool.io/"'), 'report email footer: contact address and site link');
   globalThis.fetch = F.f;
   const m = rep.text.match(/unsubscribe\?e=([^&\s]+)&t=([0-9a-f]{64})/);
-  const ok = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${m[1]}&t=${m[2]}`), OB, {});
+  const ok = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${m[1]}&t=${m[2]}`, { method: 'POST' }), OB, {});
   check(ok.status === 200 && F.db.users[0].email_opt_out_at, 'the link in the report email really opts the user out');
   F = fake(); await handleScan(env, null, input, F.f); await runReportJob(env, F.f);
   const [c2, r2] = sent(F);
