@@ -2,7 +2,7 @@ import worker from './worker.js';
 import { buildDigest, movers } from './lib/digest.js';
 import { rowFromPage, failedSources, buildDigestText, postDigest, digestConfigured, DIGEST_CRON } from './publishers/slack-digest.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
-const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', NOTION_TOKEN: 'ntn_secret', SLACK_BOT_TOKEN: 'xoxb-secret', SLACK_CHANNEL_ID: 'C1' };
+const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', NOTION_TOKEN: 'ntn_secret', SLACK_BOT_TOKEN: 'xoxb-secret', MPTSLACK_CHANNEL_ID: 'C1' };
 
 // ---- pure builder
 const cur = { cumulativeScans: 120, targetScans: 200, paceGapPct: -40, paceStatus: '🔴 Behind', ga4ActiveUsers: 90, currentMrr: 0, conversionRate: 2, blogPosts: 3, xThreads: 4 };
@@ -58,7 +58,7 @@ reset();
 const posted = await postDigest(env);
 const pm = calls.find((c) => c.url.endsWith('/chat.postMessage'));
 check(pm.body.channel === 'C1' && pm.body.text.split('\n').length <= 5 && posted.permalink === 'https://slack.example/p1700', 'postDigest posts <=5 lines to the channel and returns the permalink');
-check(digestConfigured(env) && !digestConfigured({ ...env, SLACK_CHANNEL_ID: undefined }), 'digestConfigured needs the Slack token and channel');
+check(digestConfigured(env) && !digestConfigured({ ...env, MPTSLACK_CHANNEL_ID: undefined }), 'digestConfigured needs the Slack token and channel');
 
 // ---- worker wiring
 const waits = [];

@@ -5,7 +5,7 @@ import { notion, NOTION_VERSION, DEFAULT_WEEKLY_DS } from './notion.js';
 
 export { NOTION_VERSION };
 export const DIGEST_CRON = '0 1 * * 1'; // 01:00 UTC Monday = 09:00 Hong Kong (UTC+8, no DST)
-export const digestConfigured = (env) => Boolean(env.NOTION_TOKEN && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SLACK_BOT_TOKEN && env.SLACK_CHANNEL_ID);
+export const digestConfigured = (env) => Boolean(env.NOTION_TOKEN && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID);
 
 const numProp = (p) => {
   if (!p) return null;
@@ -81,7 +81,7 @@ export async function buildDigestText(env, now = new Date()) {
 /** Post the digest to Slack; returns { ts, channel, permalink }. */
 export async function postDigest(env, now = new Date()) {
   const text = await buildDigestText(env, now);
-  const posted = await slack(env, 'chat.postMessage', { channel: env.SLACK_CHANNEL_ID, text });
+  const posted = await slack(env, 'chat.postMessage', { channel: env.MPTSLACK_CHANNEL_ID, text });
   let permalink = null;
   try { permalink = (await slack(env, 'chat.getPermalink', { channel: posted.channel, message_ts: posted.ts })).permalink; } catch { /* permalink is best effort */ }
   return { ts: posted.ts, channel: posted.channel, permalink };

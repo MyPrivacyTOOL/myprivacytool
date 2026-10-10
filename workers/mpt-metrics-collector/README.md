@@ -64,7 +64,7 @@ scans against target, pace status, biggest mover up and down (week on week), the
 
 - **Never an estimate.** A blank cell stays blank and is not used as a mover. Failed sources are named (`DATA GAP: ga4, hubspot failed`): any source whose latest pull per report in the last 48h is `status=error` in `mpt_raw_metrics`. If the tracker cannot be read, the message says so and shows no figures.
 - **Agent plan / decision:** read from `Plan:` and `Decision:` lines in the row's `Agent Insights` (written by the agent, task 9/9). Missing => "none recorded" / "nothing".
-- **Secrets (set by a human in Cloudflare; names only here):** `SLACK_BOT_TOKEN` (bot token with `chat:write`, bot invited to the channel or allowed to DM) and `SLACK_CHANNEL_ID` (Chris's DM or the channel). Until both are set the digest cron logs "digest skipped" and does nothing; the daily run is unaffected.
+- **Secrets (set by a human in Cloudflare; names only here):** `SLACK_BOT_TOKEN` (bot token with `chat:write`, bot invited to the channel or allowed to DM) and `MPTSLACK_CHANNEL_ID` (Chris's DM or the channel). Until both are set the digest cron logs "digest skipped" and does nothing; the daily run is unaffected.
 - **Manual / verification:** `POST /digest?dry=1` returns the text without posting; `POST /digest` posts and returns `{ts, channel, permalink}` (same bearer token as `/run`). Record the permalink as evidence.
 - Test: `node workers/mpt-metrics-collector/digest.test.mjs`.
 - Chris's page: **MPT Dashboard** under the MyPrivacyTOOL hub (linked views only, no copied data): https://app.notion.com/p/3f528547eaa78102917edbc1acc368ee
