@@ -59,6 +59,10 @@ curl -s -X POST "$BASE/webhook" \
 npx vitest run workers/core-brain
 ```
 
+3a and 3b can also be run without handling the secret: Actions → *Core Brain production gates* → *Run workflow*
+(`core-brain-gates.yml`, CK-7318). It reads `WEBHOOK_SECRET` from the repo secret and prints only pass/fail, status codes
+and `intent_source`; the same check runs locally with `WEBHOOK_SECRET=... node scripts/ci/core-brain-gates.mjs`.
+
 State write-back and `interaction_log` (see `docs/core-brain.md`): apply `supabase/migrations/20261010120000_mpc_8601_core_brain_state_writeback.sql`
 before relying on them. Until it is applied the Worker still answers correctly (reads trust from Supabase, falls back to
 anonymous) and logs `state write failed` warnings. Once applied, each routed message upserts `conversation_states` and appends an
