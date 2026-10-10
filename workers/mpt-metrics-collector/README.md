@@ -46,3 +46,25 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 - Impressions are `null`: they need the YouTube Analytics API with OAuth from the channel owner (follow-up).
 - X is not collected: the paid API tier is not approved.
 - `supabase/sql/mpt-youtube-daily-metrics.sql`: view `mpt_youtube_daily` (not yet applied).
+
+## HubSpot collector (MPC-7379, task 4/9)
+
+`collectors/hubspot.js` stores one `source=hubspot, report=portal_daily` row per run for MPT's portal **246502821** (constant `HUBSPOT_PORTAL_ID`). Counts and aggregates only: total contacts, contacts created on the previous Hong Kong day, contacts per lifecycle stage (plus `(none)`), deals per pipeline/stage with count and amount sum. No emails, names, phone numbers or deal names are requested or stored; searches ask for one record with only `hs_object_id` and keep just `total`.
+
+- **Portal guard:** the first call is `GET /account-info/v3/details`. If the portal ID differs from 246502821, or cannot be read, the row is `status=error` and nothing else is read (`payload.guard`).
+- **Read-only:** secret `HUBSPOT_READONLY_TOKEN` (a read-only private-app token; not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY` other Workers hold). `hubspotRead()` only allows GET and the contact/deal search endpoints. The token is redacted from error text, and error text carries the HTTP status only.
+- Scopes needed on the private app: `crm.objects.contacts.read`, `crm.objects.deals.read`, `crm.schemas.contacts.read`, `crm.schemas.deals.read` (pipelines, lifecycle options).
+- `supabase/sql/mpt-hubspot-daily.sql`: view `mpt_hubspot_daily` and `hubspot_total_contacts` / `hubspot_new_contacts` appended to `mpt_daily_metrics`. Total contacts is the count when the run happened; new contacts is for the Hong Kong day in `payload.day`.
+- Test: `node workers/mpt-metrics-collector/hubspot.test.mjs`.
+
+## Monday Slack digest (MPC-7383, task 8/9)
+
+`publishers/slack-digest.js` + `lib/digest.js`. Second cron `0 1 * * 1` = Monday 01:00 UTC = **09:00 Hong Kong**. It reads the latest two rows of the weekly tracker (the Monday 00:15 HKT publish has just written the week that ended) and posts **at most five lines** to Chris:
+scans against target, pace status, biggest mover up and down (week on week), the agent's plan, and failed sources plus anything needing his decision.
+
+- **Never an estimate.** A blank cell stays blank and is not used as a mover. Failed sources are named (`DATA GAP: ga4, hubspot failed`): any source whose latest pull per report in the last 48h is `status=error` in `mpt_raw_metrics`. If the tracker cannot be read, the message says so and shows no figures.
+- **Agent plan / decision:** read from `Plan:` and `Decision:` lines in the row's `Agent Insights` (written by the agent, task 9/9). Missing => "none recorded" / "nothing".
+- **Secrets (set by a human in Cloudflare; names only here):** `SLACK_BOT_TOKEN` (bot token with `chat:write`, bot invited to the channel or allowed to DM) and `SLACK_CHANNEL_ID` (Chris's DM or the channel). Until both are set the digest cron logs "digest skipped" and does nothing; the daily run is unaffected.
+- **Manual / verification:** `POST /digest?dry=1` returns the text without posting; `POST /digest` posts and returns `{ts, channel, permalink}` (same bearer token as `/run`). Record the permalink as evidence.
+- Test: `node workers/mpt-metrics-collector/digest.test.mjs`.
+- Chris's page: **MPT Dashboard** under the MyPrivacyTOOL hub (linked views only, no copied data): https://app.notion.com/p/3f528547eaa78102917edbc1acc368ee

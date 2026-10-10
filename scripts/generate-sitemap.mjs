@@ -15,6 +15,7 @@ const STATIC_ROUTES = [
   { path: "/scan", file: "src/pages/Scan.tsx", priority: "0.8", changefreq: "weekly" },
   { path: "/report", file: "src/pages/Report.tsx", priority: "0.6", changefreq: "monthly" },
   { path: "/business", file: "src/pages/Business.tsx", priority: "0.8", changefreq: "weekly" },
+  { path: "/enterprise", file: "src/pages/Enterprise.tsx", priority: "0.7", changefreq: "monthly" },
   { path: "/start", file: "src/pages/Start.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/newsletter", file: "src/pages/Newsletter.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/ai-access-check", file: "src/pages/AIAccessCheck.tsx", priority: "0.5", changefreq: "monthly" },

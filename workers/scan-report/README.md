@@ -21,7 +21,7 @@ HIBP's Core plan only searches domains you have proven you own, so it cannot loo
 - Score 0-100 per MPC-076 v1.0, over checked categories only, labelled partial. Multipliers for email (1.5) and search (1.2) are our interpolation; broker/AI/social come from the spec.
 
 ## Safety gates
-- `RECIPIENT_ALLOWLIST` (wrangler.toml) limits sends to test inboxes until the privacy policy (MPC-6545) is live and Chris approves a real-user send. Empty = open to everyone.
+- `RECIPIENT_ALLOWLIST` (wrangler.toml) limits sends to test inboxes until the privacy policy (MPC-6545) is live and Chris approves a real-user send. Empty = open to everyone. Scans for other addresses stay `pending` and untouched (no email, no attempt counted) and never count against the per-run limit of 5, so they cannot block allowlisted scans; once the allowlist is emptied they are reported oldest first, 5 per run (MPC-7406).
 - Consent must be `true` in the request; it is never defaulted. One scan per address per 24h.
 - To avoid duplicate senders set `CONFIRMATION_OWNER=scan-report` as a var on `mpt-leads`, and turn off any HubSpot workflow that sends "Scan confirmed".
 

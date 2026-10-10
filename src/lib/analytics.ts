@@ -438,6 +438,11 @@ export const trackBusinessLead = (params?: Record<string, string>) => {
   trackEvent('generate_lead', { method: 'business_inquiry', ...params });
 };
 
+export const trackEnterpriseLead = (params?: Record<string, string>) => {
+  trackEvent('enterprise_demo_request', { form: 'enterprise_demo', ...params });
+  trackEvent('generate_lead', { method: 'enterprise_demo', ...params });
+};
+
 // ---------------------------------------------------------------------------
 // Start page email capture (MPC-6977 follow-up B). Fire only after a confirmed
 // successful HubSpot submit.

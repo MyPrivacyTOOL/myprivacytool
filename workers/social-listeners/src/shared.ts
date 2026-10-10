@@ -3,6 +3,8 @@ import type { Logger } from "./logger";
 export interface Env {
   X_CONSUMER_SECRET?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
+  TELEGRAM_BOT_TOKEN?: string;
   /** Preferred: service binding to the core-brain Worker (MPC-8601). */
   CORE_BRAIN?: { fetch(request: Request): Promise<Response> };
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */
@@ -42,8 +44,8 @@ export interface ForwardEnvelope {
   payload: unknown;
 }
 
-/** Forwards to core-brain via service binding, else HTTP. Returns true when core-brain accepted it. */
-export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<boolean> {
+/** Forwards to core-brain via service binding, else HTTP. Returns the response when core-brain accepted it, else null. */
+export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<Response | null> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   // MPC-8601: core-brain is also reachable on its public workers.dev address, so it authenticates every caller,
   // service binding included. CORE_BRAIN_TOKEN must equal core-brain's WEBHOOK_SECRET.
@@ -58,16 +60,21 @@ export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, lo
     url = new URL("/ingest/social", env.CORE_BRAIN_URL).toString();
   } else {
     log.error("core_brain_unconfigured", { source: envelope.source });
-    return false;
+    return null;
   }
   try {
     const res = await target.fetch(new Request(url, { method: "POST", headers, body: JSON.stringify(envelope) }));
     if (!res.ok) log.error("core_brain_rejected", { source: envelope.source, status: res.status });
-    return res.ok;
+    return res.ok ? res : null;
   } catch (err) {
     log.error("core_brain_unreachable", { source: envelope.source, error: err instanceof Error ? err.message : "unknown" });
-    return false;
+    return null;
   }
+}
+
+/** Same as callCoreBrain for callers that only need to know whether core-brain accepted the event. */
+export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<boolean> {
+  return (await callCoreBrain(env, envelope, log)) !== null;
 }
 
 /** Parses JSON (already signature-verified). Null on malformed input. */

@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 const Scan = lazy(() => import("./pages/Scan"));
 const Report = lazy(() => import("./pages/Report"));
 const Business = lazy(() => import("./pages/Business"));
+const Enterprise = lazy(() => import("./pages/Enterprise"));
 const Start = lazy(() => import("./pages/Start"));
 const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
 const ThankYou = lazy(() => import("./pages/ThankYou"));
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/scan" element={<Scan />} />
             <Route path="/report" element={<Report />} />
             <Route path="/business" element={<Business />} />
+            <Route path="/enterprise" element={<Enterprise />} />
             {/* Messaging / First Hexagon entry point */}
             <Route path="/start" element={<Start />} />
             {/* Lead capture */}

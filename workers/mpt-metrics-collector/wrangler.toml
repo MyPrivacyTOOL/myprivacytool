@@ -10,8 +10,9 @@ enabled = true
 
 # Daily at 16:15 UTC = 00:15 HKT: just after each Hong Kong day ends, so "yesterday" (HKT) is complete.
 # The GA4 property must report in Asia/Hong_Kong (the GA4 collector refuses any other timezone).
+# Mondays 01:00 UTC = 09:00 HKT: Slack digest for Chris (MPC-7383), five lines max, reads the tracker only.
 [triggers]
-crons = ["15 16 * * *"]
+crons = ["15 16 * * *", "0 1 * * 1"]
 
 # Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
 # Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).

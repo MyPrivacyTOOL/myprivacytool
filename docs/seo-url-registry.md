@@ -43,6 +43,7 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | `/am-i-exposed` | Exposure check landing page | how to check if your data is on data brokers (#3) | what information do data brokers have on me (#9), am i exposed | 0.8 |
 | `/scan` | Product: free scan | privacy exposure score (#4) | free data exposure scan | 0.8 |
 | `/business` | B2B lead form | employee privacy protection | data broker removal for business | 0.8 |
+| `/enterprise` | Enterprise demo request (MPC-102) | enterprise privacy monitoring | employee data broker exposure APAC | 0.7 |
 | `/blog` | Blog index | privacy blog | data privacy tips | 0.7 |
 | `/blog/remove-personal-information-from-internet` | How-to pillar (redirect target of `/guides/remove-my-info-from-internet`) | how to remove personal information from internet free (#1) | how to delete yourself from the internet (#10) | 0.6 |
 | `/blog/remove-your-name-and-info-from-google` | How-to (target of `/guides/remove-from-google`) | remove my name from Google search results (#14) | | 0.6 |
@@ -95,6 +96,7 @@ Priority / changefreq are the values in `scripts/generate-sitemap.mjs`. Keywords
 | `/newsletter`, home-page embed | yes (embed on `/`) | `newsletter` (home embed fires via HubSpot `onFormSubmitted` message, `source: home_embed`) |
 | `/ai-access-check` | yes | `ai_access_check_waitlist` |
 | `/business` | yes | `business_inquiry` |
+| `/enterprise` | yes (reuses the Business Inquiry form, `source_tag=enterprise-demo`) | `enterprise_demo` |
 | `/start`, `/scan` | yes | `start_scan` |
 | Alice HD voice waitlist modal | yes (reuses the Start Scan form, `source_tag=alice-hd-waitlist`; previously localStorage only) | `alice_hd_waitlist` |
 | `EmailCaptureModal` | not rendered anywhere; posts to a placeholder worker URL. Wire or delete before use. | none |
