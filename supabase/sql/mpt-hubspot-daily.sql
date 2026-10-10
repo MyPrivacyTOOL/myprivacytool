@@ -18,7 +18,7 @@ where source = 'hubspot' and report = 'portal_daily'
   and payload #>> '{guard,ok}' = 'true' and payload #>> '{portal_id}' = '246502821'
 order by (payload->>'day')::date, captured_at desc;
 
-revoke all on public.mpt_hubspot_daily from public, anon, authenticated;
+revoke all on public.mpt_hubspot_daily from public, anon, authenticated, service_role;
 grant select on public.mpt_hubspot_daily to service_role;
 
 create or replace view public.mpt_daily_metrics with (security_invoker = true) as
