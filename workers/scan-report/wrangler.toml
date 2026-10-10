@@ -12,9 +12,9 @@ crons = ["*/5 * * * *"]
 [vars]
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
 HUBSPOT_LEAD_SOURCE = "web_scan"
-# Safety gate until the privacy policy (MPC-6545) is live and Chris approves a real-user send:
-# only these addresses (gmail "+tag" ignored) get emails. Remove/empty to open to everyone.
-RECIPIENT_ALLOWLIST = "testingnt69@gmail.com,testingnt7@gmail.com"
+# MPC-7261 GO LIVE: empty = open to everyone (privacy pages live, Chris content sign-off 2026-10-07, email copy approved).
+# Rollback: put the test addresses back (comma separated; gmail "+tag" ignored) and redeploy to restrict sends again.
+RECIPIENT_ALLOWLIST = ""
 # Free mode: send the report even without a HIBP key (breaches shown as "not yet checked" + self-check link).
 # With HIBP_API_KEY set, breaches are checked for real. Set "false" to HOLD reports until HIBP works.
 ALLOW_PARTIAL_REPORT = "true"
