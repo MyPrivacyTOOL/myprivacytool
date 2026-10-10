@@ -59,8 +59,10 @@ curl -s -X POST "$BASE/webhook" \
 npx vitest run workers/core-brain
 ```
 
-Read-only launch: state write-back and `interaction_log` are intentionally not built (Phase 2). The Worker reads trust
-level from Supabase and falls back to anonymous; it never writes `conversation_states`.
+State write-back and `interaction_log` (see `docs/core-brain.md`): apply `supabase/migrations/20261010120000_mpc_8601_core_brain_state_writeback.sql`
+before relying on them. Until it is applied the Worker still answers correctly (reads trust from Supabase, falls back to
+anonymous) and logs `state write failed` warnings. Once applied, each routed message upserts `conversation_states` and appends an
+`interaction_log` row; trust only ever goes up.
 
 ## 4. Cut traffic over
 
