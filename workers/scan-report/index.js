@@ -104,10 +104,15 @@ async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
 }
 
 // Sends the confirmation exactly once per scan (Resend Idempotency-Key + confirmation_sent_at).
+// Signed one-click unsubscribe link for the Worker's own /api/unsubscribe; null when UNSUBSCRIBE_SECRET is not set.
+const unsubLink = async (env, email) => (env.UNSUBSCRIBE_SECRET ? unsubscribeUrl(env, email) : null);
+const unsubHeaders = (link) => (link ? { 'List-Unsubscribe': `<${link}>` } : undefined);
+
 async function confirm(env, sb, scanId, email, fetchImpl) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
-  const m = buildConfirmationEmail();
-  const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}` }, fetchImpl);
+  const link = await unsubLink(env, email);
+  const m = buildConfirmationEmail({ unsubscribeLink: link });
+  const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(link) }, fetchImpl);
   if (r.sent) await sb.patch(`scans?id=eq.${scanId}`, { confirmation_sent_at: new Date().toISOString() });
   else console.error('confirmation not sent:', r.reason);
 }
@@ -183,8 +188,9 @@ async function processScan(env, sb, job, fetchImpl) {
   // Removal tasks only track brokers confirmed present; "not yet checked" brokers get none.
 
   const mirror = buildMirrorReport({ scan: result, breaches, breachStatus: hibp.status, brokers });
-  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers, mirror });
-  const sent = await sendEmail(env, { to: email, ...mail, idempotencyKey: `report-${job.id}` }, fetchImpl);
+  const link = await unsubLink(env, email);
+  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers, mirror, unsubscribeLink: link });
+  const sent = await sendEmail(env, { to: email, ...mail, idempotencyKey: `report-${job.id}`, headers: unsubHeaders(link) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
     privacy_score: result.score, risk_level: result.risk_level, signals_found: result.signals_found,

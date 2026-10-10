@@ -214,4 +214,22 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   await runReportJob(open, F.f);
   check(sentIds().length === 12 && F.db.scans.every((x) => x.report_status === 'sent' && x.report_attempts === 1), 'drain: queue empties, each scan attempted exactly once');
 }
+// ---- unsubscribe link in the confirmation and report emails
+{
+  const sent = (F) => F.calls.filter((c) => c.url.includes('resend')).map((c) => ({ ...JSON.parse(c.body), hdr: JSON.parse(c.body).headers }));
+  let F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f);
+  const [conf, rep] = sent(F);
+  const linkRe = /https:\/\/[^\s"<]+\/api\/unsubscribe\?e=[^&\s"<]+(?:&amp;|&)t=[0-9a-f]{64}/;   // html escapes & as &amp;
+  check(linkRe.test(conf.text) && linkRe.test(conf.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(conf.hdr['List-Unsubscribe']), 'confirmation email: signed unsubscribe link in text, html and List-Unsubscribe header');
+  check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']), 'report email: signed unsubscribe link in text, html and List-Unsubscribe header');
+  check(/Fixed what is in this report/.test(rep.text) && /Fixed what is in this report/.test(rep.html) && /no more follow-up or marketing/.test(rep.text), 'report email invites unsubscribing once the findings are fixed');
+  check(rep.html.includes('mailto:hello@myprivacytool.io') && rep.html.includes('href="https://myprivacytool.io/"'), 'report email footer: contact address and site link');
+  globalThis.fetch = F.f;
+  const m = rep.text.match(/unsubscribe\?e=([^&\s]+)&t=([0-9a-f]{64})/);
+  const ok = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${m[1]}&t=${m[2]}`), OB, {});
+  check(ok.status === 200 && F.db.users[0].email_opt_out_at, 'the link in the report email really opts the user out');
+  F = fake(); await handleScan(env, null, input, F.f); await runReportJob(env, F.f);
+  const [c2, r2] = sent(F);
+  check(!/unsubscribe/i.test(c2.html + r2.html) && !c2.hdr && !r2.hdr, 'no UNSUBSCRIBE_SECRET: emails carry no broken unsubscribe link or header');
+}
 process.exit(ok ? 0 : 1);
