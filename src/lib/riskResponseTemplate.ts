@@ -28,9 +28,15 @@ export interface NextStep {
   localization_key: string;
 }
 
+export type ResponseLevel = 'low' | 'medium' | 'high' | 'critical' | 'not_checked';
+
 export interface RiskSummaryResponse {
-  score: number;
-  level: 'low' | 'medium' | 'high' | 'critical';
+  /** "checked" lookups carry a score; "not_checked" ones never do (we do not guess). */
+  status: 'checked' | 'not_checked';
+  /** Why nothing was checked (unsupported_type | no_api_key | rate_limited | timeout | upstream_error). */
+  reason?: string;
+  score: number | null;
+  level: ResponseLevel;
   confidence: 'high' | 'medium' | 'low';
   summary: string;
   explanation: string;
@@ -154,6 +160,25 @@ function formatExposureTypes(lookup: OsintLookupResult): string[] {
     : ['Email address', 'Account information'];
 }
 
+function generateNotCheckedResponse(lookup: OsintLookupResult): RiskSummaryResponse {
+  return {
+    status: 'not_checked',
+    reason: lookup.reason,
+    score: null,
+    level: 'not_checked',
+    confidence: 'low',
+    summary: `We could not check your ${lookup.inputType} right now, so we have no score for it.`,
+    explanation:
+      'This is not a clean result. The check did not run, so we are not saying anything about your exposure.',
+    next_steps: [],
+    exposure_types: [],
+    exposure_count: { breaches: 0, pastes: 0, total: 0 },
+    temporal_info: { risk: 'old', last_checked: lookup.timestamp },
+    localization_keys: RISK_LOCALIZATION_KEYS,
+    state_transition: { currentState: 'new', shouldEscalate: false, shouldReassure: false, messageTone: 'neutral' },
+  };
+}
+
 /**
  * Generate the full risk response
  * Main entry point for response template engine
@@ -161,6 +186,7 @@ function formatExposureTypes(lookup: OsintLookupResult): string[] {
 export function generateRiskResponse(
   lookup: OsintLookupResult
 ): RiskSummaryResponse {
+  if (lookup.status === 'not_checked') return generateNotCheckedResponse(lookup);
   const score = calculateExposureScore(lookup);
   const metrics = extractRiskMetrics(lookup);
   const stateTransition = getStateTransition(score);
@@ -172,6 +198,7 @@ export function generateRiskResponse(
   );
 
   return {
+    status: 'checked',
     score: score.score,
     level: score.riskLevel,
     confidence: score.confidence,
@@ -198,8 +225,8 @@ export function generateRiskResponse(
  */
 export interface RiskCard {
   title: string;
-  score: number;
-  level: 'low' | 'medium' | 'high' | 'critical';
+  score: number | null;
+  level: ResponseLevel;
   color: string;
   icon: string;
   primaryCTA: string;
@@ -212,6 +239,7 @@ export function generateRiskCard(response: RiskSummaryResponse): RiskCard {
     medium: '#f59e0b',
     high: '#ef4444',
     critical: '#7f1d1d',
+    not_checked: '#6b7280',
   };
 
   const iconMap: Record<string, string> = {
@@ -219,6 +247,7 @@ export function generateRiskCard(response: RiskSummaryResponse): RiskCard {
     medium: '⚠️',
     high: '🔴',
     critical: '🔴',
+    not_checked: '?',
   };
 
   const ctaMap: Record<string, string> = {
@@ -226,16 +255,17 @@ export function generateRiskCard(response: RiskSummaryResponse): RiskCard {
     medium: 'Review',
     high: 'Take Action',
     critical: 'Act Now',
+    not_checked: 'Try Again',
   };
 
   return {
-    title: `Exposure: ${response.level.charAt(0).toUpperCase() + response.level.slice(1)}`,
+    title: response.level === 'not_checked' ? 'Not checked' : `Exposure: ${response.level.charAt(0).toUpperCase() + response.level.slice(1)}`,
     score: response.score,
     level: response.level,
     color: colorMap[response.level],
     icon: iconMap[response.level],
     primaryCTA: ctaMap[response.level],
-    secondaryCTA: response.level === 'low' ? undefined : 'View Details',
+    secondaryCTA: response.level === 'low' || response.level === 'not_checked' ? undefined : 'View Details',
   };
 }
 
@@ -247,8 +277,9 @@ export function validateRiskResponse(response: unknown): response is RiskSummary
 
   const r = response as Record<string, unknown>;
   return (
-    typeof r.score === 'number' &&
-    ['low', 'medium', 'high', 'critical'].includes(r.level as string) &&
+    ['checked', 'not_checked'].includes(r.status as string) &&
+    (typeof r.score === 'number' || (r.status === 'not_checked' && r.score === null)) &&
+    ['low', 'medium', 'high', 'critical', 'not_checked'].includes(r.level as string) &&
     ['high', 'medium', 'low'].includes(r.confidence as string) &&
     typeof r.summary === 'string' &&
     typeof r.explanation === 'string' &&

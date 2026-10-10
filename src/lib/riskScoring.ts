@@ -5,11 +5,13 @@
  * Formula:
  * exposure_score = min(100, breach_count * 10 + paste_count * 5)
  * 
- * Interpretation:
- * - 0-20: Low risk (green)
- * - 21-50: Medium risk (yellow)
- * - 51-80: High risk (orange)
- * - 81-100: Critical risk (red)
+ * Bands (same as the MPC-8302 spec):
+ * - 0: Low
+ * - 1-29: Medium
+ * - 30-59: High
+ * - 60-100: Critical
+ *
+ * Only call this for lookups with status "checked"; "not_checked" lookups carry no score.
  */
 
 import { OsintLookupResult } from './osintLookup';
@@ -53,13 +55,10 @@ export function calculateExposureScore(lookup: OsintLookupResult): ExposureScore
   if (score === 0) {
     riskLevel = 'low';
     explanation = 'No breaches or pastes detected for this value.';
-  } else if (score <= 20) {
-    riskLevel = 'low';
-    explanation = `Low exposure: ${lookup.breachCount} breach(es) found. Monitor for changes.`;
-  } else if (score <= 50) {
+  } else if (score <= 29) {
     riskLevel = 'medium';
     explanation = `Medium exposure: ${lookup.breachCount} breach(es) and ${lookup.pasteCount} paste(s) detected. Consider action.`;
-  } else if (score <= 80) {
+  } else if (score <= 59) {
     riskLevel = 'high';
     explanation = `High exposure: Significant number of breaches (${lookup.breachCount}) and pastes (${lookup.pasteCount}). Action recommended.`;
   } else {
@@ -240,6 +239,6 @@ export const RISK_LOCALIZATION_KEYS = [
  * Validate localization keys
  */
 export function validateLocalizationKeys(keys: string[]): boolean {
-  const validKeys = new Set(RISK_LOCALIZATION_KEYS);
+  const validKeys = new Set<string>(RISK_LOCALIZATION_KEYS);
   return keys.every(key => validKeys.has(key));
 }

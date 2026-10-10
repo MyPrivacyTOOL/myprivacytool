@@ -1,4 +1,4 @@
-# Mirror & Risk Engine — MPC-8302 Integration Guide
+# Mirror & Risk Engine — MPC-7252 Integration Guide
 
 ## Overview
 
@@ -33,7 +33,8 @@ JSON Response (RiskSummaryResponse)
 | `src/lib/riskScoring.ts` | Deterministic risk formula + state transitions |
 | `src/lib/riskResponseTemplate.ts` | Templated JSON responses + next steps |
 | `src/lib/mirrorRiskOrchestrator.ts` | **Single entry point** for the full workflow |
-| `src/lib/__tests__/mirrorRiskEngine.test.ts` | 50+ tests covering all modules |
+| `src/lib/mirrorRiskApi.ts` | Fetch-API HTTP handler: `/api/v1/scan`, `/api/v1/scan/batch`, `/api/v1/health` |
+| `src/lib/__tests__/mirrorRiskEngine.test.ts`, `mirrorRiskApi.test.ts` | Vitest suites (HIBP faked, no network) |
 
 ## Quick Start
 
@@ -104,7 +105,9 @@ for await (const result of executeStreamRiskAnalysis({
 }
 ```
 
-## API Endpoints (Proposed)
+## API Endpoints
+
+Implemented by `handleRiskRequest(request, env)` in `src/lib/mirrorRiskApi.ts`. It enforces the origin allowlist, an 8 KB body limit, an optional `RATE_LIMITER` binding, and a batch cap of 10. **It is not yet mounted in any deployed Worker**; mounting it (and the `HIBP_API_KEY` secret) is a deploy decision.
 
 ### POST /api/v1/scan
 
@@ -242,12 +245,16 @@ exposure_score = min(100, (breach_count × 10) + (paste_count × 5))
 
 ### Risk Bands
 
-| Score | Level | Color | Action |
-|-------|-------|-------|--------|
-| 0–20 | Low | 🟢 | Monitor |
-| 21–50 | Medium | 🟡 | Review |
-| 51–80 | High | 🔴 | Act |
-| 81–100 | Critical | 🔴 | Urgent |
+| Score | Level | Action |
+|-------|-------|--------|
+| 0 | Low | Monitor |
+| 1–29 | Medium | Review |
+| 30–59 | High | Act |
+| 60–100 | Critical | Urgent |
+
+### What is never scored
+
+Only **email** can be answered (HIBP). `phone`, `handle` and `domain`, and any email lookup that could not run (no API key, timeout, HTTP 429/401/5xx), return `status: "not_checked"` with `score: null` and `level: "not_checked"`. A failed or unsupported check is never presented as low risk or reassuring. `reason` is one of `unsupported_type | no_api_key | rate_limited | timeout | upstream_error`.
 
 ## Localization Keys (29 total)
 
@@ -288,21 +295,22 @@ The engine tracks user awareness state:
 | `INVALID_PHONE` | Phone format validation failed | Check E.164 format |
 | `INVALID_HANDLE` | Handle format validation failed | 3–50 alphanumeric chars |
 | `INVALID_DOMAIN` | Domain validation failed | Check DNS format |
-| `API_ERROR` | HIBP API returned error | Retry after delay |
-| `TIMEOUT` | Request exceeded timeout | Increase timeout, retry |
-| `CACHE_ERROR` | Redis/cache layer failed | Check cache backend |
+| `UNKNOWN_ERROR` | Unexpected failure (message is generic, no PII) | Retry |
+
+Upstream HIBP problems are **not** errors: they return success with `status: "not_checked"`.
 
 ## Caching Strategy
 
 - **Cache hit:** ~50ms (return cached result)
 - **Cache miss:** ~2–5s (API call + parse + cache write)
 - **TTL:** 24 hours (configurable)
-- **Keys:** `osint:{inputType}:{hash(value)}`
+- **Keys:** SHA-256 of `type:value`; the raw value is never stored. Failures are not cached.
+- **Scope:** in-memory per Worker isolate (best effort). A shared store (KV/Supabase) is future work.
 
 ## Integration Checklist
 
 - [ ] Install dependencies: `npm install`
-- [ ] Set `HIBP_API_KEY` in `.env`
+- [ ] Set `HIBP_API_KEY` as a Worker secret (`wrangler secret put HIBP_API_KEY`); it is passed in as `env.HIBP_API_KEY`, never read from `process.env` or a client bundle
 - [ ] Run tests: `npm test -- mirrorRiskEngine.test`
 - [ ] Add health check to monitoring (GET /api/v1/health)
 - [ ] Configure rate limiting (per IP, per user)
@@ -354,7 +362,7 @@ Expected coverage:
 
 ### High error rate
 - Verify `HIBP_API_KEY` is set and valid
-- Check network connectivity to api.pwnedpasswords.com
+- Check network connectivity to haveibeenpwned.com
 - Review error codes (see "Error Codes" table)
 
 ### Memory usage
@@ -372,7 +380,7 @@ Expected coverage:
 
 ---
 
-**Status:** ✅ Ready for production
+**Status:** Draft. Not run against live HIBP (needs a key-holder run with 3 real data points). Not mounted in a Worker yet.
 **Version:** 1.0.0
-**Last Updated:** 2026-10-09
+**Last Updated:** 2026-10-10
 **Branch:** feat/mpc-7252-mirror-risk-engine

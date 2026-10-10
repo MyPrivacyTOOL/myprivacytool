@@ -1,10 +1,12 @@
+// @vitest-environment node
 /**
  * Mirror & Risk Engine — Comprehensive Test Suite
  * Tests: OSINT lookup, risk scoring, response templates
- * Status: Ready for Jest/Vitest execution
  */
 
-import { osintLookup, OsintLookupResult } from '../osintLookup';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { osintLookup, clearOsintCache, type OsintLookupResult } from '../osintLookup';
+import { executeRiskAnalysis } from '../mirrorRiskOrchestrator';
 import {
   calculateExposureScore,
   extractRiskMetrics,
@@ -19,7 +21,9 @@ import {
   deserializeRiskResponse,
 } from '../riskResponseTemplate';
 
-describe('Mirror & Risk Engine - MPC-8302', () => {
+describe('Mirror & Risk Engine - MPC-7252', () => {
+  beforeEach(() => clearOsintCache());
+
   // ============ OSINT Lookup Tests ============
 
   describe('osintLookup: Email Validation', () => {
@@ -39,22 +43,8 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       }
     });
 
-    it('should accept valid email formats', async () => {
-      const validEmails = [
-        'user@example.com',
-        'john.doe@company.co.uk',
-        'alice+tag@subdomain.org',
-      ];
-
-      // This will fail in test unless HIBP API key is set or mocked
-      // So we'll just verify the validation passes
-      for (const email of validEmails) {
-        expect(() => {
-          // Validate function would be extracted, but testing format here
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          return emailRegex.test(email);
-        }).not.toThrow();
-      }
+    it('should not echo the raw value in validation errors', async () => {
+      await expect(osintLookup('secret person@', 'email')).rejects.toThrow(/^Invalid email format$/);
     });
   });
 
@@ -135,6 +125,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
     ): OsintLookupResult => ({
       inputValue: 'test@example.com',
       inputType: 'email',
+      status: 'checked',
       breaches: Array(breachCount).fill({
         name: 'TestBreach',
         date: '2024-01-01',
@@ -153,28 +144,28 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       confidence: 'high',
     });
 
-    it('should calculate low risk (0-20)', () => {
+    it('should calculate medium risk (1-29)', () => {
       // 1 breach = 10, 0 pastes = 0, total = 10
       const result = calculateExposureScore(mockLookup(1, 0));
       expect(result.score).toBe(10);
-      expect(result.riskLevel).toBe('low');
-    });
-
-    it('should calculate medium risk (21-50)', () => {
-      // 3 breaches = 30, 2 pastes = 10, total = 40
-      const result = calculateExposureScore(mockLookup(3, 2));
-      expect(result.score).toBe(40);
       expect(result.riskLevel).toBe('medium');
     });
 
-    it('should calculate high risk (51-80)', () => {
-      // 6 breaches = 60, 3 pastes = 15, total = 75
-      const result = calculateExposureScore(mockLookup(6, 3));
-      expect(result.score).toBe(75);
+    it('should calculate high risk (30-59)', () => {
+      // 3 breaches = 30, 2 pastes = 10, total = 40
+      const result = calculateExposureScore(mockLookup(3, 2));
+      expect(result.score).toBe(40);
       expect(result.riskLevel).toBe('high');
     });
 
-    it('should calculate critical risk (81-100)', () => {
+    it('should calculate critical risk (60+)', () => {
+      // 6 breaches = 60, 3 pastes = 15, total = 75
+      const result = calculateExposureScore(mockLookup(6, 3));
+      expect(result.score).toBe(75);
+      expect(result.riskLevel).toBe('critical');
+    });
+
+    it('should calculate critical risk at the cap', () => {
       // 8 breaches = 80, 4 pastes = 20, total = 100 (capped)
       const result = calculateExposureScore(mockLookup(8, 4));
       expect(result.score).toBe(100);
@@ -198,6 +189,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: Array(5).fill({
           name: 'TestBreach',
           date: '2024-01-01',
@@ -228,6 +220,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: [
           {
             name: 'Breach1',
@@ -260,6 +253,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: [
           {
             name: 'RecentBreach',
@@ -287,6 +281,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: Array(2).fill({
           name: 'TestBreach',
           date: '2024-01-01',
@@ -304,7 +299,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
 
       expect(validateRiskResponse(response)).toBe(true);
       expect(response.score).toBe(20);
-      expect(response.level).toBe('low');
+      expect(response.level).toBe('medium');
       expect(response.next_steps).toBeDefined();
       expect(response.next_steps.length).toBeGreaterThan(0);
     });
@@ -313,6 +308,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: [],
         pastes: [],
         breachCount: 0,
@@ -332,6 +328,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: Array(10).fill({
           name: 'TestBreach',
           date: '2024-01-01',
@@ -358,6 +355,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: [],
         pastes: [],
         breachCount: 0,
@@ -384,6 +382,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: Array(1).fill({
           name: 'TestBreach',
           date: '2024-01-01',
@@ -419,6 +418,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: Array(6).fill({
           name: 'TestBreach',
           date: '2024-01-01',
@@ -444,6 +444,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const lookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: [],
         pastes: [],
         breachCount: 0,
@@ -464,6 +465,7 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
       const currentLookup: OsintLookupResult = {
         inputValue: 'test@example.com',
         inputType: 'email',
+      status: 'checked',
         breaches: Array(2).fill({
           name: 'TestBreach',
           date: '2024-01-01',
@@ -488,6 +490,123 @@ describe('Mirror & Risk Engine - MPC-8302', () => {
 
       expect(transition.currentState).toBe('recovering');
       expect(transition.shouldReassure).toBe(true);
+    });
+  });
+  // ============ Lookup behaviour (HIBP faked, no network) ============
+
+  describe('osintLookup: HIBP behaviour', () => {
+    const json = (status: number, body: unknown = []) => new Response(JSON.stringify(body), { status });
+
+    it('sends the key in the hibp-api-key header, not the user-agent', async () => {
+      const fetchImpl = vi.fn(async () => json(404)) as unknown as typeof fetch;
+      await osintLookup('user@example.com', 'email', { apiKey: 'k3y', fetchImpl });
+      const calls = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls as unknown as [string, RequestInit][];
+      expect(calls).toHaveLength(2);
+      for (const [, init] of calls) {
+        const headers = init.headers as Record<string, string>;
+        expect(headers['hibp-api-key']).toBe('k3y');
+        expect(headers['user-agent']).not.toContain('k3y');
+      }
+    });
+
+    it('treats 404 as checked with zero findings', async () => {
+      const fetchImpl = (async () => json(404)) as unknown as typeof fetch;
+      const r = await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      expect(r.status).toBe('checked');
+      expect(r.breachCount).toBe(0);
+    });
+
+    it('parses breaches and pastes', async () => {
+      const fetchImpl = (async (url: string) =>
+        url.includes('breachedaccount')
+          ? json(200, [{ Name: 'Adobe', BreachDate: '2013-10-04', DataClasses: ['Passwords'] }])
+          : json(200, [{ Id: 'p1', Date: '2020-01-01', EmailCount: 3, Source: 'Pastebin' }])) as unknown as typeof fetch;
+      const r = await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      expect(r.breachCount).toBe(1);
+      expect(r.pasteCount).toBe(1);
+      expect(r.breaches[0].name).toBe('Adobe');
+    });
+
+    it.each([429, 401, 500])('returns not_checked (never a clean result) on HTTP %i', async (status) => {
+      const fetchImpl = (async () => json(status)) as unknown as typeof fetch;
+      const r = await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      expect(r.status).toBe('not_checked');
+      expect(r.breachCount).toBe(0);
+    });
+
+    it('returns not_checked without a key and does not call HIBP', async () => {
+      const fetchImpl = vi.fn() as unknown as typeof fetch;
+      const r = await osintLookup('user@example.com', 'email', { fetchImpl });
+      expect(r.status).toBe('not_checked');
+      expect(r.reason).toBe('no_api_key');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['phone', '+1 555 123 4567'],
+      ['handle', 'some_handle'],
+      ['domain', 'example.com'],
+    ] as const)('returns not_checked for %s (HIBP cannot answer it)', async (type, value) => {
+      const fetchImpl = vi.fn() as unknown as typeof fetch;
+      const r = await osintLookup(value, type, { apiKey: 'k', fetchImpl });
+      expect(r.status).toBe('not_checked');
+      expect(r.reason).toBe('unsupported_type');
+      expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('caches checked results for 24h', async () => {
+      const fetchImpl = vi.fn(async () => json(404)) as unknown as typeof fetch;
+      await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      const again = await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      expect(again.cached).toBe(true);
+      expect(again.inputValue).toBe('user@example.com');
+      expect(fetchImpl).toHaveBeenCalledTimes(2); // 2 GETs for the first lookup only
+    });
+
+    it('does not cache failures', async () => {
+      let status = 500;
+      const fetchImpl = vi.fn(async () => json(status)) as unknown as typeof fetch;
+      await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      status = 404;
+      const r = await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl });
+      expect(r.status).toBe('checked');
+    });
+  });
+
+  describe('not_checked responses carry no score', () => {
+    it('template: null score, not_checked level, no reassurance', () => {
+      const response = generateRiskResponse({
+        inputValue: '+15551234567',
+        inputType: 'phone',
+        status: 'not_checked',
+        reason: 'unsupported_type',
+        breaches: [],
+        pastes: [],
+        breachCount: 0,
+        pasteCount: 0,
+        timestamp: new Date().toISOString(),
+        cached: false,
+        confidence: 'low',
+      });
+      expect(response.score).toBeNull();
+      expect(response.level).toBe('not_checked');
+      expect(response.state_transition.shouldReassure).toBe(false);
+      expect(validateRiskResponse(response)).toBe(true);
+      expect(generateRiskCard(response).title).toBe('Not checked');
+    });
+
+    it('orchestrator: phone lookup succeeds as not_checked, never "low"', async () => {
+      const r = await executeRiskAnalysis({ value: '+1 555 123 4567', type: 'phone', apiKey: 'k' });
+      expect(r.success).toBe(true);
+      expect(r.data?.level).toBe('not_checked');
+      expect(r.data?.score).toBeNull();
+    });
+
+    it('orchestrator: invalid input returns a coded error without echoing the value', async () => {
+      const r = await executeRiskAnalysis({ value: 'not an email', type: 'email' });
+      expect(r.success).toBe(false);
+      expect(r.error?.code).toBe('INVALID_EMAIL');
+      expect(JSON.stringify(r)).not.toContain('not an email');
     });
   });
 });

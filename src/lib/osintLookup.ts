@@ -1,17 +1,16 @@
 /**
- * OSINT Lookup Module — MPC-8302
- * Performs rapid breach/exposure lookups via Have I Been Pwned API
- * 
- * Features:
- * - HIBP breach + paste lookups (real API, not mocked)
- * - Input validation (email, phone, handle, domain)
- * - 24h SHA-256 based caching (no raw PII stored)
- * - Graceful error handling (timeouts, rate limits, invalid input)
- * - <5s latency on first call, <2s on cached
+ * OSINT Lookup Module — MPC-7252
+ * Passive breach/paste lookup via Have I Been Pwned (read-only GETs).
+ *
+ * - Only email is answerable by HIBP. phone/handle/domain return status "not_checked" (never a guessed score).
+ * - Missing key, timeout, 429, 401/403 and 5xx also return "not_checked" so a failed check is never shown as "safe".
+ * - The API key is passed in by the caller (Worker env); this module never reads process.env.
+ * - 24h cache keyed by SHA-256 of type+value; the raw value is never stored or echoed in errors.
  */
 
 // Types
 export type InputType = 'email' | 'phone' | 'handle' | 'domain';
+export type LookupStatus = 'checked' | 'not_checked';
 
 export interface HibpBreach {
   name: string;
@@ -31,6 +30,9 @@ export interface HibpPaste {
 export interface OsintLookupResult {
   inputValue: string;
   inputType: InputType;
+  status: LookupStatus;
+  /** Why a lookup is "not_checked": unsupported_type | no_api_key | rate_limited | timeout | upstream_error */
+  reason?: string;
   breaches: HibpBreach[];
   pastes: HibpPaste[];
   breachCount: number;
@@ -40,311 +42,210 @@ export interface OsintLookupResult {
   confidence: 'high' | 'medium' | 'low';
 }
 
+export interface OsintLookupOptions {
+  skipCache?: boolean;
+  /** HIBP API key (paid). Without it, email lookups return "not_checked". */
+  apiKey?: string;
+  fetchImpl?: typeof fetch;
+}
+
+export class OsintValidationError extends Error {
+  code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.code = code;
+    this.name = 'OsintValidationError';
+  }
+}
+
 // Configuration
 const HIBP_API_BASE = 'https://haveibeenpwned.com/api/v3';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const API_TIMEOUT_MS = 5000;
 const CACHE_KEY_PREFIX = 'mpt_osint_';
+const USER_AGENT = 'MyPrivacyTOOL-Mirror/1.0 (+https://myprivacytool.io)';
 
-// In-memory cache (can be replaced with Redis/Supabase for production)
+// In-memory, per-isolate cache. Stores results WITHOUT the raw input value.
 interface CacheEntry {
-  result: OsintLookupResult;
+  result: Omit<OsintLookupResult, 'inputValue'>;
   timestamp: number;
 }
 const osintCache = new Map<string, CacheEntry>();
 
-/**
- * Generate cache key: SHA-256 hash of input to avoid storing raw PII
- */
-async function generateCacheKey(value: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(value);
+async function generateCacheKey(value: string, type: InputType): Promise<string> {
+  const data = new TextEncoder().encode(`${type}:${value.trim().toLowerCase()}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('');
   return `${CACHE_KEY_PREFIX}${hashHex}`;
 }
 
-/**
- * Check cache for existing result
- */
-async function getCached(inputValue: string): Promise<OsintLookupResult | null> {
+async function getCached(inputValue: string, inputType: InputType): Promise<OsintLookupResult | null> {
   try {
-    const key = await generateCacheKey(inputValue);
+    const key = await generateCacheKey(inputValue, inputType);
     const cached = osintCache.get(key);
-    
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return { ...cached.result, cached: true };
+      return { ...cached.result, inputValue, cached: true };
     }
-    
-    // Expired or not found
     if (cached) osintCache.delete(key);
     return null;
-  } catch (err) {
-    console.error('Cache retrieval error:', err);
+  } catch {
     return null;
   }
 }
 
-/**
- * Store result in cache
- */
 async function setCached(result: OsintLookupResult): Promise<void> {
   try {
-    const key = await generateCacheKey(result.inputValue);
-    osintCache.set(key, {
-      result,
-      timestamp: Date.now(),
-    });
-  } catch (err) {
-    console.error('Cache storage error:', err);
-    // Fail silently — cache is optimization, not critical path
+    const key = await generateCacheKey(result.inputValue, result.inputType);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { inputValue: _omit, ...rest } = result;
+    osintCache.set(key, { result: rest, timestamp: Date.now() });
+  } catch {
+    // cache is an optimisation, not the critical path
   }
 }
 
-/**
- * Validate input format
- */
 function validateInput(value: string, type: InputType): boolean {
   if (!value || value.trim().length === 0) return false;
-  
   switch (type) {
     case 'email':
-      // Basic email validation
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
     case 'phone':
-      // E.164 format or common variations
-      return /^[\d\s\-\+\(\)]{7,}$/.test(value.replace(/\s/g, ''));
+      return /^[\d\s\-+()]{7,}$/.test(value.replace(/\s/g, ''));
     case 'handle':
-      // Alphanumeric, underscore, dash, 3-50 chars
-      return /^[a-zA-Z0-9_\-]{3,50}$/.test(value);
+      return /^[a-zA-Z0-9_-]{3,50}$/.test(value);
     case 'domain':
-      // Basic domain validation
-      return /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/.test(value);
+      return /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/.test(value);
     default:
       return false;
   }
 }
 
-/**
- * Fetch breach data from HIBP
- * Note: HIBP requires User-Agent header; we set a descriptive one
- */
-async function fetchHibpBreaches(email: string): Promise<HibpBreach[]> {
-  try {
-    // For testing without live API, return mock if HIBP_API_KEY is not set
-    const apiKey = process.env.REACT_APP_HIBP_API_KEY || process.env.HIBP_API_KEY;
-    
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-    
-    const response = await fetch(
-      `${HIBP_API_BASE}/breachedaccount/${encodeURIComponent(email)}`,
-      {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'MyPrivacyTOOL-Mirror/1.0 (+https://myprivacytool.io)',
-          ...(apiKey && { 'User-Agent': `MyPrivacyTOOL-Mirror/1.0 (${apiKey})` }),
-        },
-        signal: controller.signal,
-      }
-    );
-    
-    clearTimeout(timeout);
-    
-    if (response.status === 404) {
-      return []; // No breaches found
-    }
-    
-    if (response.status === 429) {
-      throw new Error('HIBP API rate limit exceeded');
-    }
-    
-    if (!response.ok) {
-      throw new Error(`HIBP API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data.map((breach: any) => ({
-      name: breach.Name,
-      date: breach.BreachDate,
-      dataClasses: breach.DataClasses || [],
-      pwnCount: breach.PwnCount,
-      description: breach.Description,
-    }));
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('HIBP API timeout (5s)');
-    }
-    throw err;
+class NotCheckedError extends Error {
+  reason: string;
+  constructor(reason: string) {
+    super(reason);
+    this.reason = reason;
   }
 }
 
-/**
- * Fetch paste data from HIBP
- */
-async function fetchHibpPastes(email: string): Promise<HibpPaste[]> {
+/** One read-only HIBP GET. 404 means "nothing found". Anything else that is not 200 means "not checked". */
+async function hibpGet(path: string, email: string, apiKey: string, fetchImpl: typeof fetch): Promise<any[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
-    const apiKey = process.env.REACT_APP_HIBP_API_KEY || process.env.HIBP_API_KEY;
-    
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-    
-    const response = await fetch(
-      `${HIBP_API_BASE}/pasteaccount/${encodeURIComponent(email)}`,
-      {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'MyPrivacyTOOL-Mirror/1.0 (+https://myprivacytool.io)',
-          ...(apiKey && { 'User-Agent': `MyPrivacyTOOL-Mirror/1.0 (${apiKey})` }),
-        },
-        signal: controller.signal,
-      }
-    );
-    
-    clearTimeout(timeout);
-    
-    if (response.status === 404) {
-      return []; // No pastes found
-    }
-    
-    if (response.status === 429) {
-      throw new Error('HIBP API rate limit exceeded');
-    }
-    
-    if (!response.ok) {
-      throw new Error(`HIBP API error: ${response.status}`);
-    }
-    
+    const response = await fetchImpl(`${HIBP_API_BASE}/${path}/${encodeURIComponent(email)}?truncateResponse=false`, {
+      method: 'GET',
+      headers: { 'user-agent': USER_AGENT, 'hibp-api-key': apiKey },
+      signal: controller.signal,
+    });
+    if (response.status === 404) return [];
+    if (response.status === 429) throw new NotCheckedError('rate_limited');
+    if (!response.ok) throw new NotCheckedError('upstream_error');
     const data = await response.json();
-    return data.map((paste: any) => ({
-      id: paste.Id,
-      date: paste.Date,
-      count: paste.Count,
-      source: paste.Source,
-    }));
+    return Array.isArray(data) ? data : [];
   } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('HIBP API timeout (5s)');
-    }
-    throw err;
+    if (err instanceof NotCheckedError) throw err;
+    if (err instanceof Error && err.name === 'AbortError') throw new NotCheckedError('timeout');
+    throw new NotCheckedError('upstream_error');
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
-/**
- * Determine confidence level based on data quality
- */
-function calculateConfidence(
-  inputType: InputType,
-  breachesFound: boolean,
-  pastesFound: boolean
-): 'high' | 'medium' | 'low' {
-  // Email searches are most reliable
-  if (inputType === 'email') return 'high';
-  
-  // Phone and domain searches are medium confidence
-  if (inputType === 'phone' || inputType === 'domain') return 'medium';
-  
-  // Handle searches depend on uniqueness (we assume medium)
-  return 'medium';
+function notChecked(inputValue: string, inputType: InputType, reason: string): OsintLookupResult {
+  return {
+    inputValue,
+    inputType,
+    status: 'not_checked',
+    reason,
+    breaches: [],
+    pastes: [],
+    breachCount: 0,
+    pasteCount: 0,
+    timestamp: new Date().toISOString(),
+    cached: false,
+    confidence: 'low',
+  };
 }
 
 /**
- * Main OSINT lookup function
- * Entry point: call with (inputValue, inputType)
- * Returns: OsintLookupResult with breach/paste data
+ * Main OSINT lookup. Throws OsintValidationError on malformed input (message never echoes the value).
+ * Never throws for upstream problems: those return status "not_checked".
  */
 export async function osintLookup(
   inputValue: string,
-  inputType: InputType
+  inputType: InputType,
+  options: OsintLookupOptions = {}
 ): Promise<OsintLookupResult> {
-  // Input validation
-  if (!validateInput(inputValue, inputType)) {
-    throw new Error(
-      `Invalid ${inputType} format: "${inputValue}". ` +
-      `Expected: ${inputType === 'email' ? 'user@example.com' : 'valid format for ' + inputType}`
-    );
-  }
-  
-  // Check cache first
-  const cached = await getCached(inputValue);
-  if (cached) {
-    return cached;
-  }
-  
-  // For non-email types, we only query HIBP if it's email-like
-  // Other types require mapping (not in scope for V1, return mock)
-  let breaches: HibpBreach[] = [];
-  let pastes: HibpPaste[] = [];
-  
-  if (inputType === 'email') {
-    try {
-      [breaches, pastes] = await Promise.all([
-        fetchHibpBreaches(inputValue),
-        fetchHibpPastes(inputValue),
-      ]);
-    } catch (err) {
-      console.error('HIBP lookup error:', err);
-      throw new Error(
-        `OSINT lookup failed: ${err instanceof Error ? err.message : 'Unknown error'}`
-      );
-    }
-  } else {
-    // For V1, non-email types return empty (can be extended with Hunter.io, RocketReach, etc.)
-    console.warn(
-      `OSINT lookup for ${inputType} not yet implemented. ` +
-      `Returning empty result. Email lookups only in V1.`
-    );
-  }
-  
-  // Build result
-  const result: OsintLookupResult = {
-    inputValue,
-    inputType,
-    breaches,
-    pastes,
-    breachCount: breaches.length,
-    pasteCount: pastes.length,
-    timestamp: new Date().toISOString(),
-    cached: false,
-    confidence: calculateConfidence(
-      inputType,
-      breaches.length > 0,
-      pastes.length > 0
-    ),
+  const codes: Record<InputType, string> = {
+    email: 'INVALID_EMAIL',
+    phone: 'INVALID_PHONE',
+    handle: 'INVALID_HANDLE',
+    domain: 'INVALID_DOMAIN',
   };
-  
-  // Cache for future lookups
+  if (!validateInput(inputValue, inputType)) {
+    throw new OsintValidationError(codes[inputType] ?? 'INVALID_INPUT', `Invalid ${inputType} format`);
+  }
+
+  // HIBP cannot answer phone/handle/domain: say so instead of guessing.
+  if (inputType !== 'email') return notChecked(inputValue, inputType, 'unsupported_type');
+  if (!options.apiKey) return notChecked(inputValue, inputType, 'no_api_key');
+
+  if (!options.skipCache) {
+    const cached = await getCached(inputValue, inputType);
+    if (cached) return cached;
+  }
+
+  const fetchImpl = options.fetchImpl ?? fetch;
+  let result: OsintLookupResult;
+  try {
+    const [rawBreaches, rawPastes] = await Promise.all([
+      hibpGet('breachedaccount', inputValue, options.apiKey, fetchImpl),
+      hibpGet('pasteaccount', inputValue, options.apiKey, fetchImpl),
+    ]);
+    const breaches: HibpBreach[] = rawBreaches.map((b) => ({
+      name: b.Name,
+      date: b.BreachDate,
+      dataClasses: b.DataClasses || [],
+      pwnCount: b.PwnCount,
+      description: b.Description,
+    }));
+    const pastes: HibpPaste[] = rawPastes.map((p) => ({ id: p.Id, date: p.Date, count: p.EmailCount ?? p.Count, source: p.Source }));
+    result = {
+      inputValue,
+      inputType,
+      status: 'checked',
+      breaches,
+      pastes,
+      breachCount: breaches.length,
+      pasteCount: pastes.length,
+      timestamp: new Date().toISOString(),
+      cached: false,
+      confidence: 'high',
+    };
+  } catch (err) {
+    // Failures are not cached, so a retry can succeed.
+    return notChecked(inputValue, inputType, err instanceof NotCheckedError ? err.reason : 'upstream_error');
+  }
+
   await setCached(result);
-  
   return result;
 }
 
-/**
- * Bulk lookup for multiple values
- */
+/** Bulk lookup for multiple values */
 export async function osintLookupBulk(
-  inputs: Array<{ value: string; type: InputType }>
+  inputs: Array<{ value: string; type: InputType }>,
+  options: OsintLookupOptions = {}
 ): Promise<OsintLookupResult[]> {
-  return Promise.all(
-    inputs.map(({ value, type }) => osintLookup(value, type))
-  );
+  return Promise.all(inputs.map(({ value, type }) => osintLookup(value, type, options)));
 }
 
-/**
- * Clear cache (useful for testing or manual refresh)
- */
+/** Clear cache (testing / manual refresh) */
 export function clearOsintCache(): void {
   osintCache.clear();
-  console.log('OSINT cache cleared');
 }
 
-/**
- * Get cache stats (for monitoring)
- */
+/** Cache stats (monitoring) */
 export function getOsintCacheStats() {
-  return {
-    entriesCount: osintCache.size,
-    maxAge: CACHE_TTL_MS,
-  };
+  return { entriesCount: osintCache.size, maxAge: CACHE_TTL_MS };
 }

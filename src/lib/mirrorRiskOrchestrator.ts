@@ -13,16 +13,18 @@
  * - UI: real-time exposure check
  */
 
-import { osintLookup, OsintLookupResult } from './osintLookup';
+import { osintLookup, OsintValidationError, type InputType } from './osintLookup';
 import { generateRiskResponse, RiskSummaryResponse } from './riskResponseTemplate';
 
-export type InputType = 'email' | 'phone' | 'handle' | 'domain';
+export type { InputType };
 
 export interface OrchestratorRequest {
   value: string;
   type: InputType;
   userId?: string; // For logging/audit
   skipCache?: boolean; // Force fresh lookup
+  apiKey?: string; // HIBP key from the Worker env; without it lookups return not_checked
+  fetchImpl?: typeof fetch;
 }
 
 export interface OrchestratorResponse {
@@ -63,6 +65,8 @@ export async function executeRiskAnalysis(
     // Execute OSINT lookup
     const lookup = await osintLookup(request.value, request.type, {
       skipCache: request.skipCache,
+      apiKey: request.apiKey,
+      fetchImpl: request.fetchImpl,
     });
 
     // Generate risk response
@@ -79,13 +83,15 @@ export async function executeRiskAnalysis(
       },
     };
   } catch (error) {
+    // Only validation errors carry a caller-safe message; anything else is generic (no PII, no stack).
+    const known = error instanceof ValidationError || error instanceof OsintValidationError;
     const err = error as Error & { code?: string };
     return {
       success: false,
       error: {
-        code: err.code || 'UNKNOWN_ERROR',
-        message: err.message,
-        details: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        code: known ? err.code || 'INVALID_INPUT' : 'UNKNOWN_ERROR',
+        message: known ? err.message : 'Risk analysis failed',
+        details: undefined,
       },
       metadata: {
         processingTime: Date.now() - startTime,
@@ -167,7 +173,6 @@ export async function executeBatchRiskAnalysis(
       }
     }
   } catch (error) {
-    const err = error as Error;
     return {
       success: false,
       results: [],
@@ -274,29 +279,20 @@ export class ValidationError extends Error {
 }
 
 /**
- * Export types for external use
- */
-export type { OrchestratorRequest, OrchestratorResponse, BatchRequest, BatchResponse, StreamRequest };
-
-/**
  * Health check endpoint
  */
-export async function healthCheck(): Promise<{
+export async function healthCheck(apiKey?: string): Promise<{
   status: 'healthy' | 'degraded' | 'unhealthy';
   osintApi: 'ok' | 'error';
   timestamp: string;
 }> {
   try {
-    // Try a simple, cacheable lookup
-    const result = await osintLookup(
-      'test@myprivacytool.local',
-      'email',
-      { skipCache: true }
-    );
+    // Probe HIBP with a throwaway address (no user data). not_checked means the upstream is not answering.
+    const result = await osintLookup('healthcheck@example.com', 'email', { skipCache: true, apiKey });
 
     return {
-      status: result ? 'healthy' : 'degraded',
-      osintApi: 'ok',
+      status: result.status === 'checked' ? 'healthy' : 'degraded',
+      osintApi: result.status === 'checked' ? 'ok' : 'error',
       timestamp: new Date().toISOString(),
     };
   } catch {
