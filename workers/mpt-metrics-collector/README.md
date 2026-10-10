@@ -34,3 +34,11 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 - Secret `NOTION_TOKEN` (internal integration token). Chris must share both databases with that integration. Optional vars `NOTION_DAILY_DATA_SOURCE_ID`, `NOTION_WEEKLY_DATA_SOURCE_ID` override the defaults above.
 - Manual run: `POST /publish?day=YYYY-MM-DD&week=YYYY-MM-DD` with the same bearer token as `/run`.
 - Test: `node workers/mpt-metrics-collector/publisher.test.mjs`.
+
+## YouTube collector (MPC-7380, task 5/9)
+
+`collectors/youtube.js` pulls the previous full UTC day from the YouTube Data API v3 with `YOUTUBE_API_KEY` (sent as the `x-goog-api-key` header, never in the URL). Stores subscribers, total views and videos, videos published that day, per-video views/likes/comments in `payload.summary`, and the untouched responses in `payload.raw`. Channel `UC-chigimJFz4Rs8ulbDUeFQ` (override with `YOUTUBE_CHANNEL_ID`).
+
+- Impressions are `null`: they need the YouTube Analytics API with OAuth from the channel owner (follow-up).
+- X is not collected: the paid API tier is not approved.
+- `supabase/sql/mpt-youtube-daily-metrics.sql`: view `mpt_youtube_daily` (not yet applied).
