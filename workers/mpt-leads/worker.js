@@ -391,15 +391,25 @@ async function alertHighPriority(env, lead) {
 // ('pending'), so every B2B signup is enriched within ~5 minutes even if Hunter had a blip. Bounded and fail-soft.
 const SWEEP_LIMIT = 25;
 async function sweepPending(env) {
-  if (!env.HUBSPOT_TOKEN || !env.HUNTER_API_KEY) return { retried: 0 };
+  // MPC-102: no HUNTER_API_KEY is fine here: enrichAndScore then scores on domain and geo only.
+  if (!env.HUBSPOT_TOKEN) return { retried: 0 };
   const hs = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
   const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
     method: 'POST', headers: hs,
     body: JSON.stringify({
-      filterGroups: [{ filters: [
-        { propertyName: 'mpt_lead_enrich_status', operator: 'EQ', value: 'pending' },
-        { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
-      ] }],
+      filterGroups: [
+        { filters: [
+          { propertyName: 'mpt_lead_enrich_status', operator: 'EQ', value: 'pending' },
+          { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
+        ] },
+        // MPC-102: /enterprise demo requests are submitted straight to the HubSpot form (consent evidence and the
+        // form conversion stay intact), so they arrive unscored. Pick them up here, within 5 minutes.
+        { filters: [
+          { propertyName: 'source_tag', operator: 'EQ', value: 'enterprise-demo' },
+          { propertyName: 'mpt_lead_enrich_status', operator: 'NOT_HAS_PROPERTY' },
+          { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
+        ] },
+      ],
       properties: ['email', 'firstname', 'lastname'], limit: SWEEP_LIMIT,
     }),
   });

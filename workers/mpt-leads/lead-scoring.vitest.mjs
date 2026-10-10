@@ -94,4 +94,17 @@ describe('worker integration', () => {
     const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/contacts/42'));
     expect(JSON.parse(patch.body).properties.mpt_lead_enrich_status).toBe('scored');
   });
+  it('cron sweep also picks up unscored enterprise-demo contacts, and works without HUNTER_API_KEY', async () => {
+    handlers['contacts/search'] = () => res({ results: [{ id: '77', properties: { email: 'someone@gmail.com', firstname: 'S' } }] });
+    const { HUNTER_API_KEY, ...noKey } = env;
+    const waits = [];
+    await worker.scheduled({}, noKey, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits);
+    const search = JSON.parse(to('contacts/search')[0].body);
+    expect(search.filterGroups).toHaveLength(2);
+    expect(search.filterGroups[1].filters).toContainEqual({ propertyName: 'source_tag', operator: 'EQ', value: 'enterprise-demo' });
+    expect(search.filterGroups[1].filters).toContainEqual({ propertyName: 'mpt_lead_enrich_status', operator: 'NOT_HAS_PROPERTY' });
+    const patch = calls.find((c) => c.method === 'PATCH' && c.url.endsWith('/contacts/77'));
+    expect(JSON.parse(patch.body).properties).toMatchObject({ mpt_lead_segment: 'B2C', mpt_lead_enrich_status: 'scored' });
+    expect(to('hunter.io')).toHaveLength(0);
+  });
 });
