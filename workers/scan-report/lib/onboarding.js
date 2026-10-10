@@ -18,6 +18,12 @@ export async function verifyUnsubscribe(secret, email, token) {
   let d = 0; for (let i = 0; i < want.length; i++) d |= want.charCodeAt(i) ^ String(token).charCodeAt(i);   // constant-time compare
   return d === 0;
 }
+// Link shown in email bodies: the branded unsubscribe page on the main site (same signed token as the Worker link below).
+export async function unsubscribePageUrl(env, email) {
+  const base = env.SITE_URL || 'https://myprivacytool.io';
+  return `${base}/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email)}`;
+}
+// Worker endpoint used by the List-Unsubscribe one-click header (mail apps POST to it directly).
 export async function unsubscribeUrl(env, email) {
   const base = env.PUBLIC_URL || 'https://mpt-scan-report.myprivacytool.workers.dev';
   return `${base}/api/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email)}`;

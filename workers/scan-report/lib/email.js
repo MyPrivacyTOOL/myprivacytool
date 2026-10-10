@@ -50,6 +50,26 @@ ${para('The MyPrivacyTOOL team')}`, unsubscribeLink);
   return { subject, text, html };
 }
 
+// Sent when someone asks for an unsubscribe link on the website (so only the address owner can opt out).
+export function buildUnsubscribeRequestEmail({ link }) {
+  const subject = 'Confirm that you want to unsubscribe';
+  const text = [
+    'You asked to unsubscribe from MyPrivacyTOOL emails.',
+    '',
+    `Confirm here: ${link}`,
+    '',
+    'If you did not ask for this, ignore this email and nothing changes.',
+    '',
+    'The MyPrivacyTOOL team',
+  ].join('\n');
+  const html = shell(subject, 'Confirm to stop MyPrivacyTOOL emails.',
+    `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">Confirm that you want to unsubscribe</h1>
+${para('You asked to unsubscribe from MyPrivacyTOOL emails. Confirm below and we will send you no more follow-up or marketing emails.')}
+${button(link, 'Yes, unsubscribe me')}
+${para('<br>If you did not ask for this, ignore this email and nothing changes.')}`);
+  return { subject, text, html };
+}
+
 export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror, unsubscribeLink }) {
   const s = scan;
   const mirrorLines = mirror ? mirror.hexagons.map((h) => `- ${h.label}: ${h.status === 'checked' ? `checked, ${h.score}/100` : 'not yet checked'}`) : [];
