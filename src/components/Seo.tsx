@@ -3,6 +3,9 @@ import { Helmet } from "react-helmet";
 export const SITE_URL = "https://www.myprivacytool.io";
 export const SITE_NAME = "MyPrivacyTOOL.IO";
 export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.jpg`;
+/** Share-tag attribution for blog articles (what LinkedIn Post Inspector reads as Author). */
+export const ARTICLE_AUTHOR = "Alice";
+export const ARTICLE_PUBLISHER = "Wonderland";
 
 interface SeoProps {
   title: string;
@@ -37,6 +40,9 @@ const Seo = ({ title, description, path, image = DEFAULT_OG_IMAGE, type = "websi
       <meta property="og:image" content={image} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
+      {type === "article" && <meta name="author" content={ARTICLE_AUTHOR} />}
+      {type === "article" && <meta property="article:author" content={ARTICLE_AUTHOR} />}
+      {type === "article" && <meta property="article:publisher" content={ARTICLE_PUBLISHER} />}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
