@@ -87,5 +87,10 @@
   "/developers": {
     "title": "Developers: API Reference & Quick Start | MyPrivacyTOOL",
     "description": "Request and response examples for the MyPrivacyTOOL endpoints, how access and rate limits work, and JavaScript, Python and Go snippets."
+  },
+  "/unsubscribe": {
+    "title": "Unsubscribe",
+    "description": "Stop MyPrivacyTOOL scan report and follow-up emails. Confirm from the link in your email, or ask for a confirmation link.",
+    "noindex": true
   }
 }

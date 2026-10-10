@@ -30,6 +30,7 @@ const LEGAL_LINKS = [
   { label: "Cookie Policy", to: "/cookies" },
   { label: "Data Processing (DPA)", to: "/dpa" },
   { label: "Trust Centre", to: "/trust" },
+  { label: "Unsubscribe", to: "/unsubscribe" },
 ];
 
 const SOCIAL_ITEMS = [

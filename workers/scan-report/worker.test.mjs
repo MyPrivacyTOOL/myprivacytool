@@ -225,9 +225,9 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const sent = (F) => F.calls.filter((c) => c.url.includes('resend')).map((c) => ({ ...JSON.parse(c.body), hdr: JSON.parse(c.body).headers }));
   let F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f);
   const [conf, rep] = sent(F);
-  const linkRe = /https:\/\/[^\s"<]+\/api\/unsubscribe\?e=[^&\s"<]+(?:&amp;|&)t=[0-9a-f]{64}/;   // html escapes & as &amp;
-  check(linkRe.test(conf.text) && linkRe.test(conf.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(conf.hdr['List-Unsubscribe']), 'confirmation email: signed unsubscribe link in text, html and List-Unsubscribe header');
-  check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']) && rep.hdr['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'report email: signed unsubscribe link in text, html and List-Unsubscribe (+ one-click) header');
+  const linkRe = /https:\/\/myprivacytool\.io\/unsubscribe\?e=[^&\s"<]+(?:&amp;|&)t=[0-9a-f]{64}/;   // email bodies link to the branded site page (html escapes & as &amp;)
+  check(linkRe.test(conf.text) && linkRe.test(conf.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(conf.hdr['List-Unsubscribe']), 'confirmation email: signed site-page unsubscribe link in text and html, Worker link in the List-Unsubscribe header');
+  check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']) && rep.hdr['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'report email: signed site-page unsubscribe link in text and html, Worker link + one-click in the header');
   check(/Fixed what is in this report/.test(rep.text) && /Fixed what is in this report/.test(rep.html) && /no more follow-up or marketing/.test(rep.text), 'report email invites unsubscribing once the findings are fixed');
   check(rep.html.includes('mailto:hello@myprivacytool.io') && rep.html.includes('href="https://myprivacytool.io/"'), 'report email footer: contact address and site link');
   globalThis.fetch = F.f;
@@ -237,5 +237,39 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   F = fake(); await handleScan(env, null, input, F.f); await runReportJob(env, F.f);
   const [c2, r2] = sent(F);
   check(!/unsubscribe/i.test(c2.html + r2.html) && !c2.hdr && !r2.hdr, 'no UNSUBSCRIBE_SECRET: emails carry no broken unsubscribe link or header');
+}
+// ---- website unsubscribe page: JSON opt-out and the emailed confirmation link
+{
+  const origin = 'https://myprivacytool.io';
+  const mk = (path, init = {}) => new Request(`https://x${path}`, init);
+  let F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f);
+  globalThis.fetch = F.f;
+  const t = await unsubscribeToken('s3cret', EMAIL);
+  const qs = `e=${encodeURIComponent(EMAIL)}&t=${t}`;
+  const bad = await worker.fetch(mk(`/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`, { method: 'POST', headers: { Accept: 'application/json', Origin: origin } }), OB, {});
+  check(bad.status === 400 && (await bad.json()).ok === false && !F.db.users[0].email_opt_out_at, 'website opt-out: bad token => 400 JSON, nothing changed');
+  const done = await worker.fetch(mk(`/api/unsubscribe?${qs}`, { method: 'POST', headers: { Accept: 'application/json', Origin: origin } }), OB, {});
+  check(done.status === 200 && (await done.json()).ok === true && done.headers.get('Access-Control-Allow-Origin') === origin && F.db.users[0].email_opt_out_at, 'website opt-out: POST with Accept JSON opts out, answers JSON with CORS for the site origin');
+
+  // request form: emails a confirmation link to that address only, never reveals whether the address is known
+  const reqUnsub = (F2, email, o = origin, extra = {}) => worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: o }, body: JSON.stringify({ email }), ...extra }), OB, {});
+  const sentTo = (F2) => F2.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));
+  F = fake(); await handleScan(OB, null, input, F.f); globalThis.fetch = F.f;
+  const before = sentTo(F).length;
+  let r = await reqUnsub(F, EMAIL);
+  const mails = sentTo(F).slice(before);
+  check(r.status === 200 && (await r.json()).ok === true && mails.length === 1 && mails[0].to[0] === EMAIL && /https:\/\/myprivacytool\.io\/unsubscribe\?e=[^\s]+&t=[0-9a-f]{64}/.test(mails[0].text) && /Confirm that you want to unsubscribe/.test(mails[0].subject), 'unsubscribe request: known address gets one confirmation email with a signed site link');
+  r = await reqUnsub(F, 'stranger@example.com');
+  const strangerBody = await r.json();
+  check(r.status === 200 && strangerBody.ok === true && sentTo(F).length === before + 1, 'unsubscribe request: unknown address gets the same answer and no email (no lookup oracle)');
+  F.db.users[0].email_opt_out_at = new Date().toISOString();
+  await reqUnsub(F, EMAIL);
+  check(sentTo(F).length === before + 1, 'unsubscribe request: already-unsubscribed address gets no email');
+  check((await reqUnsub(F, 'not-an-email')).status === 400, 'unsubscribe request: invalid email => 400');
+  check((await reqUnsub(F, EMAIL, 'https://evil.example')).status === 403, 'unsubscribe request: foreign browser origin => 403');
+  const limited = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, RATE_LIMITER: { limit: async () => ({ success: false }) } }, {});
+  check(limited.status === 429, 'unsubscribe request: rate limiter denial => 429');
+  const noSecret = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, UNSUBSCRIBE_SECRET: undefined }, {});
+  check(noSecret.status === 503, 'unsubscribe request: not configured => 503, no email');
 }
 process.exit(ok ? 0 : 1);
