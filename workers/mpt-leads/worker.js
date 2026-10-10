@@ -1,3 +1,5 @@
+import { enrichAndScore, HIGH_PRIORITY_THRESHOLD } from './lead-scoring.js';
+
 // MPC-7350 input hardening helpers.
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const MAX_BODY_BYTES = 16 * 1024;
@@ -5,17 +7,44 @@ const clip = (v, n) => (typeof v === 'string' ? v : v == null ? '' : String(v)).
 // Slack mrkdwn control characters (&, <, >) must be escaped so user text cannot inject links or mentions.
 const slackEsc = (v) => String(v || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const htmlEsc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[ratelimits]]). Fails open if the
+// Per-IP limit via the Workers Rate Limiting binding (wrangler.toml [[unsafe.bindings]] type "ratelimit"). Fails open if the
 // binding is absent or errors so a platform hiccup never drops a real lead.
-async function rateLimited(env, request) {
-  if (!env.RATE_LIMITER) return false;
+// Returns 'limited' | 'ok' | 'absent' (no binding) | 'error' (binding threw; request is let through).
+async function rateLimitState(env, request) {
+  if (!env.RATE_LIMITER) return 'absent';
   try {
     const { success } = await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' });
-    return !success;
-  } catch (_) { return false; }
+    return success ? 'ok' : 'limited';
+  } catch (e) {
+    console.warn('rate limiter error:', String(e && e.message || e).slice(0, 200));
+    return 'error';
+  }
+}
+const rateLimited = async (env, request) => (await rateLimitState(env, request)) === 'limited';
+
+function whoami(request, cors, rlState) {
+  const cf = request.cf || {};
+  let country = cf.country || '';
+  try { if (country) country = new Intl.DisplayNames(['en'], { type: 'region' }).of(country) || country; } catch (_) { /* keep ISO code */ }
+  const body = {
+    ip: request.headers.get('CF-Connecting-IP') || '',
+    city: cf.city || '',
+    region: cf.region || '',
+    country_name: country,
+    latitude: Number(cf.latitude) || 0,
+    longitude: Number(cf.longitude) || 0,
+    org: cf.asOrganization || '',
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-RateLimit-State': rlState },
+  });
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sweepPending(env).catch((e) => console.error('Sweep error:', String(e))));
+  },
+
   async fetch(request, env, ctx) {
     const allow = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
     const origin = request.headers.get('Origin') || '';
@@ -23,7 +52,7 @@ export default {
 
     const cors = {
       'Access-Control-Allow-Origin': corsOrigin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
@@ -34,6 +63,14 @@ export default {
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: cors });
+    }
+    // MPC-7350: the visitor's own IP and approximate location, read from Cloudflare's request data, so the browser
+    // no longer has to ask third-party lookup services (ipify, ipapi.co). This route stores nothing.
+    if (request.method === 'GET' && new URL(request.url).pathname === '/whoami') {
+      if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
+      const rl = await rateLimitState(env, request);
+      if (rl === 'limited') return reject(429, 'Too many requests');
+      return whoami(request, cors, rl);
     }
     if (request.method !== 'POST') {
       return new Response('Not found', { status: 404 });
@@ -231,7 +268,7 @@ export default {
         );
       }
 
-      // 4. HubSpot CRM sync
+      // 4. HubSpot CRM sync (MPC-7500: enriched with Hunter + a readiness score before the write)
       if (env.HUBSPOT_TOKEN) {
         const nameParts = (name || '').trim().split(/\s+/);
         const hsProps = {
@@ -246,25 +283,39 @@ export default {
           hsProps.consent_source = consentSource;
         }
 
-        side.push(
-          fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ properties: hsProps })
-          }).then(async r => {
-            if (r.status === 409) {
-              const existing = await r.json();
-              const vid = existing?.message?.match(/ID: (\d+)/)?.[1];
-              if (vid) {
-                return fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${vid}`, {
-                  method: 'PATCH',
-                  headers: { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ properties: hsProps })
-                });
-              }
+        side.push((async () => {
+          // Fail-soft: an enrichment problem never blocks the contact write; the 5-minute cron sweep retries 'pending'.
+          let scored = null;
+          try {
+            scored = await enrichAndScore(env, email, country);
+            Object.assign(hsProps, scored.props);
+          } catch (err) { console.error('Lead scoring error:', String(err)); }
+          const hsHeaders = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
+          let r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+            method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps })
+          });
+          // Safety net: if the mpt_lead_* custom properties are not created in HubSpot yet, HubSpot rejects the whole
+          // write with 400 PROPERTY_DOESNT_EXIST. Retry without them so contact sync never regresses.
+          if (r.status === 400 && scored && /mpt_lead_/.test(await r.clone().text())) {
+            console.error('HubSpot missing mpt_lead_* properties; writing contact without score');
+            for (const k of Object.keys(hsProps)) if (k.startsWith('mpt_lead_')) delete hsProps[k];
+            r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
+              method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps })
+            });
+          }
+          if (r.status === 409) {
+            const existing = await r.json();
+            const vid = existing?.message?.match(/ID: (\d+)/)?.[1];
+            if (vid) {
+              await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${vid}`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ properties: hsProps })
+              });
             }
-          }).catch(() => {})
-        );
+          }
+          if (scored) await alertHighPriority(env, { email, name, ...scored.result, props: scored.props });
+        })().catch(() => {}));
       }
 
       // 5. Confirmation email via Resend
@@ -300,6 +351,79 @@ export default {
     }
   }
 };
+
+// MPC-7500: High Priority (score > 80) alert. Slack always (existing bot); email via Resend only when
+// ALERT_EMAIL is set. The HubSpot workflow (docs/lead-scoring-mpc-7500.md) is the system of record for alerts;
+// this is the in-Worker path that fires within seconds. Never throws.
+async function alertHighPriority(env, lead) {
+  if (!(lead.score > HIGH_PRIORITY_THRESHOLD)) return;
+  const text = [
+    `:fire: *High Priority lead* (score ${lead.score}/100)`,
+    `Name: ${slackEsc(lead.name) || '(not given)'}`,
+    `Email: ${slackEsc(lead.email)}`,
+    lead.props?.jobtitle ? `Role: ${slackEsc(lead.props.jobtitle)}${lead.props.company ? ' @ ' + slackEsc(lead.props.company) : ''}` : null,
+    `Breakdown: domain ${lead.parts.domain} / role ${lead.parts.role} / geo ${lead.parts.geo}`,
+  ].filter(Boolean).join('\n');
+  const sends = [];
+  if (env.SLACK_BOT_TOKEN) {
+    sends.push(fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text, unfurl_links: false }),
+    }));
+  }
+  if (env.RESEND_API_KEY && env.ALERT_EMAIL) {
+    sends.push(fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
+        to: [env.ALERT_EMAIL],
+        subject: `High Priority lead (${lead.score}): ${String(lead.email).replace(/[\r\n]/g, ' ')}`,
+        html: `<pre>${htmlEsc(text.replace(/[*:]fire:/g, ''))}</pre>`,
+      }),
+    }));
+  }
+  await Promise.allSettled(sends);
+}
+
+// MPC-7500: cron sweep (every 5 min). Retries contacts created in the last 24h whose enrichment failed
+// ('pending'), so every B2B signup is enriched within ~5 minutes even if Hunter had a blip. Bounded and fail-soft.
+const SWEEP_LIMIT = 25;
+async function sweepPending(env) {
+  if (!env.HUBSPOT_TOKEN || !env.HUNTER_API_KEY) return { retried: 0 };
+  const hs = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
+  const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
+    method: 'POST', headers: hs,
+    body: JSON.stringify({
+      filterGroups: [{ filters: [
+        { propertyName: 'mpt_lead_enrich_status', operator: 'EQ', value: 'pending' },
+        { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
+      ] }],
+      properties: ['email', 'firstname', 'lastname'], limit: SWEEP_LIMIT,
+    }),
+  });
+  if (!res.ok) { console.error('Sweep search failed:', res.status); return { retried: 0 }; }
+  const { results = [] } = await res.json();
+  let retried = 0;
+  for (const c of results) {
+    const email = c.properties?.email;
+    if (!email) continue;
+    try {
+      const { result, props } = await enrichAndScore(env, email, '');
+      const up = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${c.id}`, {
+        method: 'PATCH', headers: hs, body: JSON.stringify({ properties: props }),
+      });
+      if (up.ok) {
+        retried++;
+        if (props.mpt_lead_enrich_status === 'scored') {
+          await alertHighPriority(env, { email, name: [c.properties.firstname, c.properties.lastname].filter(Boolean).join(' '), ...result, props });
+        }
+      }
+    } catch (err) { console.error('Sweep contact error:', String(err)); }
+  }
+  return { retried };
+}
 
 // MPC-6956: insert one row into public.mpt_user_engagement using the service_role key
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:

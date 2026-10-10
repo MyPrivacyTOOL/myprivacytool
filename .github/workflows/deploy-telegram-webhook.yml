@@ -1,0 +1,70 @@
+name: Deploy telegram-webhook Worker
+
+# MPT-1003: deploys workers/telegram-webhook to the MyPrivacyTOOL Cloudflare account. MANUAL (workflow_dispatch):
+# the Worker fails closed (401) until its secrets exist, so the order is deploy -> set secrets -> register the
+# Telegram webhook. Secret VALUES (names in EXPECTED_SECRETS.txt) are only ever set by a human in the Cloudflare
+# dashboard or with `wrangler secret put`; this workflow never sees them.
+#
+# Repo secrets required (already used by deploy-mpt-leads.yml):
+#   CLOUDFLARE_API_TOKEN   MPT account token, permission: Account > Workers Scripts > Edit
+#   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-telegram-webhook
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Fails BEFORE anything ships if repo secrets are missing, wrangler.toml has REPLACE_* placeholders,
+      # or EXPECTED_SECRETS.txt holds anything but secret NAMES.
+      - name: Pre-deployment checks (secrets present, Worker config valid)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/telegram-webhook
+
+      - name: Snapshot secret names before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # The Worker does not exist before the first deploy, so a 404 here just means "no secrets yet".
+          curl -s --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-telegram-webhook/secrets" \
+            | jq -r '(.result // [])[].name' 2>/dev/null | sort > /tmp/secrets.before || true
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        # Same peer-dependency workaround as deploy-mpt-leads.yml (wrangler-action runs `npm i wrangler` in the workspace).
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/telegram-webhook
+          command: deploy
+
+      - name: Verify secrets survived the deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-telegram-webhook/secrets" \
+            | jq -r '(.result // [])[].name' | sort > /tmp/secrets.after
+          if ! diff -q /tmp/secrets.before /tmp/secrets.after >/dev/null; then echo "::error::secret names changed across deploy"; diff /tmp/secrets.before /tmp/secrets.after; exit 1; fi
+          sort workers/telegram-webhook/EXPECTED_SECRETS.txt > /tmp/secrets.expected
+          missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
+          if [ -n "$missing" ]; then echo "::warning::expected secrets not set yet (Worker answers 401 until they are): $missing"; else echo "OK: all expected secrets present"; fi

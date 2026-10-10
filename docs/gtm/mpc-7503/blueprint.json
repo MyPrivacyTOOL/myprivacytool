@@ -1,0 +1,95 @@
+{
+  "name": "MPC-7503 Content distribution (Blog → X → Reddit)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": 3856260,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "http:MakeRequest",
+              "version": 4,
+              "parameters": {
+                "authenticationType": "oAuth"
+              },
+              "mapper": {
+                "url": "https://api.x.com/2/tweets",
+                "method": "post",
+                "contentType": "json",
+                "inputMethod": "jsonString",
+                "jsonStringBodyContent": "{\"text\": \"{{replace(replace(substring(1.title; 0; 200); \"\\\\\"; \"\\\\\\\\\"); \"\\\"\"; \"\\\\\\\"\")}}\\n\\n{{1.url}}?utm_source=x&utm_medium=social&utm_campaign={{1.campaign}}\"}",
+                "parseResponse": true
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": -150
+                }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "reddit:SubmitPost",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "title": "{{1.title}}",
+                "srName": "{{ifempty(1.subreddit; \"privacy\")}}",
+                "kind": "link",
+                "url": "{{1.url}}?utm_source=reddit&utm_medium=social&utm_campaign={{1.campaign}}",
+                "resubmit": false
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 150
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "sequential": true,
+      "confidential": false,
+      "dlq": false
+    }
+  }
+}

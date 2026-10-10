@@ -1,9 +1,11 @@
 // Stubbed-fetch tests: no network, no secrets. Run: node workers/scan-report/worker.test.mjs
-import worker, { handleScan, runReportJob, recipientAllowed } from './index.js';
+import worker, { handleScan, runReportJob, runFollowUpJob, recipientAllowed } from './index.js';
 import { computeScore, breachRisk } from './lib/score.js';
 import { checkBreaches } from './lib/hibp.js';
 import { checkBrokers } from './lib/brokers.js';
 import { buildConfirmationEmail, buildReportEmail } from './lib/email.js';
+import { buildMirrorReport } from './lib/mirror.js';
+import { buildFollowUpEmail, nextFollowUp, unsubscribeToken, verifyUnsubscribe } from './lib/onboarding.js';
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const EMAIL = 'testingnt69@gmail.com';
@@ -49,14 +51,19 @@ function fake(opts = {}) {
     if (url.includes('api.resend.com')) return opts.resendFail ? res(500, 'x') : res(200, { id: `msg_${++n}` });
     if (url.includes('api.hubapi.com')) return res(200, {});
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
+    if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, ...x }));
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
+      if (rows.length > 1 && new Set(rows.map((x) => Object.keys(x).filter((k) => !['id', 'report_status', 'report_attempts'].includes(k)).sort().join(','))).size > 1) return res(400, { code: 'PGRST102', message: 'All object keys must match' });   // PostgREST bulk-insert rule
       db[t].push(...rows); return res(201, rows); }
     if (o.method === 'PATCH') { const id = q.get('id')?.replace('eq.', ''); const st = q.get('report_status')?.replace('eq.', '');
-      const hit = db[t].filter((x) => (!id || x.id === id) && (!st || x.report_status === st)); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
-    let rows = db[t]; const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
+      const fs = q.get('followup_stage')?.replace('eq.', ''); const em = q.get('email')?.replace('eq.', '');
+      const hit = db[t].filter((x) => (!id || x.id === id) && (!st || x.report_status === st) && (fs === undefined || String(x.followup_stage ?? 0) === fs) && (!em || x.email === decodeURIComponent(em))); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
+    let rows = db[t]; const uid = q.get('id')?.replace('eq.', ''); if (uid) rows = rows.filter((x) => x.id === uid);
+    if (t === 'scans' && q.get('report_status') === 'eq.sent') rows = rows.filter((x) => x.report_status === 'sent' && (x.followup_stage ?? 0) < 2 && x.report_sent_at && new Date(x.report_sent_at) < new Date(decodeURIComponent(q.get('report_sent_at').replace('lt.', ''))));
+    const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     return res(200, rows);
@@ -107,4 +114,75 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   check((await worker.fetch(mk('https://myprivacytool.io','[]'),env,w())).status===400,'non-object JSON => 400');
   check((await worker.fetch(mk('https://myprivacytool.io','{}',{'content-length':'99999'}),env,w())).status===413,'oversized body => 413');
   check((await worker.fetch(mk('https://myprivacytool.io',JSON.stringify({email:EMAIL,consent:true})),{...env,RATE_LIMITER:{limit:async()=>({success:false})}},w())).status===429,'rate limiter denial => 429'); }
+
+// ---- MPC-7261: Mirror Report + first-100 onboarding
+{
+  const brk = await checkBrokers(EMAIL, {});
+  const free = buildMirrorReport({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk });
+  check(free.score === null && free.coverage.checked === 0 && free.coverage.total === 8 && free.hexagons.every((h) => h.status === 'not_checked' && h.score === null), 'mirror: nothing checked => no score, every hexagon not_checked');
+  check(free.next_steps[0].id === 'check-breaches' && free.next_steps.some((s) => s.id === 'opt-out-spokeo') && !free.next_steps.some((s) => s.id === 'opt-out-mylife'), 'mirror: HIBP self-check first; opt-out steps only where a verified guide exists');
+  const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
+  check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
+  const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, mirror: free });
+  check(/YOUR MIRROR/.test(repM.text) && /Data broker profiles: not yet checked/.test(repM.text) && !/\/100/.test(repM.text), 'report email renders the mirror, still no invented score');
+
+  check(nextFollowUp({ report_sent_at: new Date(Date.now() - 2 * 864e5).toISOString(), followup_stage: 0 }) === 0, 'follow-up: not due before day 3');
+  check(nextFollowUp({ report_sent_at: new Date(Date.now() - 4 * 864e5).toISOString(), followup_stage: 0 }) === 1, 'follow-up: stage 1 due after day 3');
+  check(nextFollowUp({ report_sent_at: new Date(Date.now() - 20 * 864e5).toISOString(), followup_stage: 1 }) === 2 && nextFollowUp({ report_sent_at: new Date(Date.now() - 20 * 864e5).toISOString(), followup_stage: 2 }) === 0, 'follow-up: stage 2 only after stage 1; nothing after stage 2');
+  const f1 = buildFollowUpEmail({ stage: 1, mirror: hit, cohortNumber: 7, unsubscribeLink: 'https://x/u' });
+  const f2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: 'https://x/u' });
+  check(/Change the password/.test(f1.text) && /first 100/.test(f1.text) && /not yet checked/.test(f1.text) && f1.html.includes('https://x/u') && f1.text.includes('https://x/u'), 'follow-up 1: next steps from the mirror, cohort line, unsubscribe in text + html');
+  check(/Reply to this email/.test(f2.text) && !/first 100/.test(f2.text) && !/removed|we will remove|automatic/i.test(f1.text + f2.text.replace('remove you', '')), 'follow-up 2: feedback ask; no cohort line outside cohort; no fulfilment claims');
+  const tok = await unsubscribeToken('s3cret', 'A@B.co');
+  check(await verifyUnsubscribe('s3cret', 'a@b.co', tok) && !(await verifyUnsubscribe('s3cret', 'a@b.co', tok.replace(/.$/, tok.endsWith('0') ? '1' : '0'))) && !(await verifyUnsubscribe('other', 'a@b.co', tok)) && !(await verifyUnsubscribe('', 'a@b.co', tok)), 'unsubscribe token: case-insensitive email, rejects tampering, wrong secret, missing secret');
+}
+
+const OB = { ...env, UNSUBSCRIBE_SECRET: 's3cret' };
+const ageReport = (F, days) => { F.db.scans[0].report_sent_at = new Date(Date.now() - days * 864e5).toISOString(); };
+const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).length;
+{
+  // Test mode (allowlist set): report stores the mirror but burns no cohort slot.
+  let F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f);
+  check(F.db.scans[0].mirror_report?.version === 1 && F.db.scans[0].mirror_report.hexagons.length === 8 && !F.db.users[0].cohort_number, 'report stores mirror_report; allowlist test mode does not claim a cohort slot');
+  check((await runFollowUpJob(OB, F.f)).sent === 0 && resendCount(F) === 2, 'follow-up: nothing before day 3');
+  check((await runFollowUpJob({ ...OB, UNSUBSCRIBE_SECRET: undefined }, F.f)).skipped && resendCount(F) === 2, 'follow-up: off without UNSUBSCRIBE_SECRET');
+  ageReport(F, 4);
+  let o = await runFollowUpJob(OB, F.f);
+  const fm = JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body);
+  const fh = F.calls.filter((c) => c.url.includes('resend')).pop().headers;
+  check(o.sent === 1 && F.db.scans[0].followup_stage === 1 && fh['Idempotency-Key'] === `followup-${F.db.scans[0].id}-1` && /List-Unsubscribe/.test(JSON.stringify(fm.headers)) && fm.subject === 'Your next privacy step', 'day 3: follow-up sent once, stage advanced, idempotency key + List-Unsubscribe header');
+  check((await runFollowUpJob(OB, F.f)).sent === 0 && resendCount(F) === 3, 'day 3 follow-up is not sent twice');
+  ageReport(F, 8); o = await runFollowUpJob(OB, F.f);
+  check(o.sent === 1 && F.db.scans[0].followup_stage === 2 && JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).subject === 'Was your privacy report useful?', 'day 7: feedback email sent, stage 2');
+  check((await runFollowUpJob(OB, F.f)).sent === 0 && resendCount(F) === 4, 'sequence ends after stage 2');
+
+  // Unsubscribe link stops the sequence.
+  F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f); ageReport(F, 4);
+  globalThis.fetch = F.f;
+  const t = await unsubscribeToken('s3cret', EMAIL);
+  const bad = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`), OB, {});
+  check(bad.status === 400 && !F.db.users[0].email_opt_out_at, 'unsubscribe: bad token => 400, nothing changed');
+  const good = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=${t}`), OB, {});
+  check(good.status === 200 && F.db.users[0].email_opt_out_at, 'unsubscribe: valid link opts the user out');
+  check((await runFollowUpJob(OB, F.f)).skipped === 1 && resendCount(F) === 2, 'opted-out user gets no follow-up');
+
+  // Real launch (empty allowlist): cohort slots are claimed in order; non-members get no follow-ups; full cohort => null.
+  const open = { ...OB, RECIPIENT_ALLOWLIST: '' };
+  F = fake(); await handleScan(open, null, { ...input, email: 'first@example.com' }, F.f); await runReportJob(open, F.f);
+  check(F.db.users[0].cohort_number === 1, 'open mode: first delivered report claims cohort #1');
+  ageReport(F, 4); F.db.users[0].cohort_number = null;
+  check((await runFollowUpJob(open, F.f)).skipped === 1 && resendCount(F) === 2, 'open mode: user outside the cohort gets no follow-up');
+  F.db.users[0].cohort_number = 1; o = await runFollowUpJob(open, F.f);
+  check(o.sent === 1 && /first 100/.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text), 'open mode: cohort member gets follow-up with cohort line');
+  F = fake(); F.db.users.push(...Array.from({ length: 100 }, (_, i) => ({ id: `u${i}`, email: `u${i}@x.co`, cohort_number: i + 1 })));
+  await handleScan(open, null, { ...input, email: 'late@example.com' }, F.f); await runReportJob(open, F.f);
+  check(F.db.users.find((u) => u.email === 'late@example.com').cohort_number === undefined && F.db.scans[0].report_status === 'sent', 'cohort full: 101st user still gets their report, no cohort number');
+  F = fake({ rpcFail: true }); await handleScan(open, null, input, F.f); await runReportJob(open, F.f);
+  check(F.db.scans[0].report_status === 'sent', 'cohort claim failure never blocks the report');
+  // Failed send releases the stage for retry.
+  F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f); ageReport(F, 4);
+  const F2r = fake({ resendFail: true }); F2r.db.users = F.db.users; F2r.db.scans = F.db.scans;
+  o = await runFollowUpJob(OB, F2r.f);
+  check(o.failed === 1 && F.db.scans[0].followup_stage === 0, 'follow-up send failure releases the stage for retry');
+}
 process.exit(ok ? 0 : 1);

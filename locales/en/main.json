@@ -1,0 +1,23 @@
+{
+  "bot.first_hexagon.title": "🔍 *Here's what's publicly known about you right now:*",
+  "bot.first_hexagon.name": "✅ Name: visible from your Telegram profile",
+  "bot.first_hexagon.location": "✅ Location: city & country estimable from IP",
+  "bot.first_hexagon.phone": "⚠️ Phone: possibly linked to this account",
+  "bot.first_hexagon.email": "⚠️ Email: may be findable via data brokers",
+  "bot.first_hexagon.social": "⚠️ Social profiles: cross-platform links detected",
+  "bot.first_hexagon.brokers": "🚨 Data broker exposure: estimated 40+ sites",
+  "bot.first_hexagon.question": "Is this data about you?",
+  "bot.first_hexagon.reply_y": "Reply *Y* to see your full privacy report and start removing yourself from data broker sites.",
+  "bot.first_hexagon.reply_n": "Reply *N* if this profile doesn't match you — we'll run a fresh scan.",
+  "bot.confirmed_y.title": "✅ *Confirmed.*",
+  "bot.confirmed_y.generating": "Your full privacy report is being generated now.",
+  "bot.confirmed_y.cta": "👉 Go here to see it and start the removal process:",
+  "bot.confirmed_y.duration": "We'll walk you through every step. It takes about 5 minutes.",
+  "bot.confirmed_n.title": "🔍 *No problem — let's find the right profile.*",
+  "bot.confirmed_n.cta": "Run a fresh scan with your details here:",
+  "bot.confirmed_n.duration": "Takes 30 seconds.",
+  "bot.unknown.title": "👋 *Welcome to MyPrivacyTOOL.*",
+  "bot.unknown.body": "Send me your name or just say *\"scan me\"* and I'll show you what data brokers know about you right now.",
+  "bot.unknown.free": "It's free. No signup needed.",
+  "bot.confirm_prompt": "Reply *Y* to confirm this is you, or *N* if not."
+}

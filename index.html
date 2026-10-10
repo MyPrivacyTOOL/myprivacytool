@@ -47,10 +47,13 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" type="application/rss+xml" title="MyPrivacyTOOL Blog" href="/feed.xml" />
 
     <!-- Preconnect to external domains for performance -->
-    <link rel="preconnect" href="https://api.ipify.org" />
-    <link rel="preconnect" href="https://ipapi.co" />
+    <!-- MPC-7200: ipify/ipapi preconnects removed (the scan now asks our own Worker, /whoami); they were unused and
+         opened connections to third parties before any consent choice. Preconnect only what the home page really uses. -->
+    <link rel="preconnect" href="https://mpt-leads.myprivacytool.workers.dev" crossorigin />
+    <link rel="preconnect" href="https://c.delivery.consentmanager.net" crossorigin />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://cdn.consentmanager.net" />
 

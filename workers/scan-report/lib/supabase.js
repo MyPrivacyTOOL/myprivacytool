@@ -22,5 +22,6 @@ export function db(env, fetchImpl = fetch) {
     insert: (table, row) => call('POST', table, row, 'return=representation').then((r) => (Array.isArray(r) ? r[0] : r)),
     insertMany: (table, rows) => (rows.length ? call('POST', table, rows, 'return=representation') : Promise.resolve([])),
     patch: (path, row) => call('PATCH', path, row, 'return=representation'),
+    rpc: (fn, args) => call('POST', `rpc/${fn}`, args),
   };
 }

@@ -12,6 +12,9 @@ Cloudflare account `35cb17172c65a20f5cf1baf131485382`). Accepts a POST on any pa
   NOTION_TOKEN, RESEND_API_KEY, SLACK_BOT_TOKEN, SLACK_CHANNEL_ID, SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL.
 
+- MPC-7500: Hunter enrichment + readiness score (0-100) written to HubSpot, High Priority (> 80) alerts, and a
+  5-minute cron retry sweep. See `docs/lead-scoring-mpc-7500.md`. Optional secrets: `HUNTER_API_KEY`, `ALERT_EMAIL`.
+
 ## Deploy
 Merging to `main` deploys automatically: `.github/workflows/deploy-mpt-leads.yml` runs the stub
 tests, snapshots the Worker's secret NAMES, runs `wrangler deploy` (secrets are not touched), and

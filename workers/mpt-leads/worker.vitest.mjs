@@ -256,3 +256,60 @@ describe('consent', () => {
     expect(props()).not.toHaveProperty('consent_given_at');
   });
 });
+
+// MPC-7350: GET /whoami returns the visitor's IP and approximate location from Cloudflare request data,
+// so the browser does not need third-party lookup services (ipify, ipapi.co).
+describe('GET /whoami', () => {
+  const get = (path, { origin = ORIGIN, cf, ip = '203.0.113.7', e = env } = {}) => {
+    const headers = { 'CF-Connecting-IP': ip };
+    if (origin) headers.Origin = origin;
+    const req = new Request(`https://x${path}`, { method: 'GET', headers });
+    if (cf) Object.defineProperty(req, 'cf', { value: cf });
+    return worker.fetch(req, e, {});
+  };
+  const cf = { country: 'GB', city: 'London', region: 'England', latitude: '51.5', longitude: '-0.12', asOrganization: 'Example ISP' };
+
+  it('returns IP and location fields in the shape the front end expects', async () => {
+    const res = await get('/whoami', { cf });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('access-control-allow-origin')).toBe(ORIGIN);
+    expect(await res.json()).toEqual({
+      ip: '203.0.113.7', city: 'London', region: 'England', country_name: 'United Kingdom',
+      latitude: 51.5, longitude: -0.12, org: 'Example ISP',
+    });
+  });
+
+  it('reports the rate-limiter state in X-RateLimit-State (absent, ok, error)', async () => {
+    expect((await get('/whoami')).headers.get('x-ratelimit-state')).toBe('absent');
+    const ok = { ...env, RATE_LIMITER: { limit: async () => ({ success: true }) } };
+    expect((await get('/whoami', { e: ok })).headers.get('x-ratelimit-state')).toBe('ok');
+    const bad = { ...env, RATE_LIMITER: { limit: async () => { throw new Error('boom'); } } };
+    expect((await get('/whoami', { e: bad })).headers.get('x-ratelimit-state')).toBe('error');
+  });
+
+  it('returns empty strings and zeros when Cloudflare supplies no location', async () => {
+    const res = await get('/whoami');
+    expect(await res.json()).toEqual({ ip: '203.0.113.7', city: '', region: '', country_name: '', latitude: 0, longitude: 0, org: '' });
+  });
+
+  it('makes no outbound request (no third-party lookup)', async () => {
+    await get('/whoami', { cf });
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses a foreign browser origin', async () => {
+    const res = await get('/whoami', { origin: 'https://evil.example', cf });
+    expect(res.status).toBe(403);
+  });
+
+  it('is rate limited like the POST route', async () => {
+    const limited = { ...env, RATE_LIMITER: { limit: async () => ({ success: false }) } };
+    expect((await get('/whoami', { cf, e: limited })).status).toBe(429);
+  });
+
+  it('leaves every other GET path as 404', async () => {
+    expect((await get('/anything-else')).status).toBe(404);
+    expect((await get('/')).status).toBe(404);
+  });
+});

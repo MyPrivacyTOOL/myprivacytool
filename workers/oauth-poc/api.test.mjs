@@ -255,3 +255,66 @@ test('unknown routes and methods are 404; /health needs no secrets', async () =>
   assert.equal((await handle(new Request('https://x.test/v1/session', { method: 'POST' }), env, { now })).status, 404);
   assert.deepEqual(await (await handle(new Request('https://x.test/health'), {}, { now })).json(), { status: 'ok' });
 });
+
+// ---- session-mode failures go back to the site (probe mode keeps its JSON) ----
+
+const withRedirect = { ...env, SUCCESS_REDIRECT: `${ORIGIN}/?channel=google` };
+const cbWith = async (e, query, mode, net = fakeNet()) => {
+  const state = await sign({ state: 's1', verifier: 'v', mode, exp: NOW + 1000 }, KEY);
+  const req = new Request(`https://x.test/oauth/google/callback?${query}`, { headers: { Cookie: `mpt_oauth=${state}` } });
+  return { res: await handle(req, e, { fetchFn: net.fn, now }), net };
+};
+const errorOf = (res) => new URL(res.headers.get('Location')).searchParams.get('oauth_error');
+
+test('session mode: the user cancelling Google consent redirects to the site with oauth_error=access_denied', async () => {
+  const { res } = await cbWith(withRedirect, 'error=access_denied&state=s1', 'session');
+  assert.equal(res.status, 302);
+  assert.equal(errorOf(res), 'access_denied');
+  assert.equal(new URL(res.headers.get('Location')).searchParams.get('channel'), 'google');
+  assert.match(res.headers.getSetCookie().join(';'), /mpt_oauth=;[^;]*Max-Age=0|Max-Age=0/);
+  assert.equal(cookieValue(res, SESSION_COOKIE), null);
+});
+
+test('session mode: any other provider error is mapped, never echoed into the redirect', async () => {
+  const { res } = await cbWith(withRedirect, 'error=%3Cscript%3Ealert(1)%3C%2Fscript%3E', 'session');
+  assert.equal(res.status, 302);
+  assert.equal(errorOf(res), 'provider_error');
+  assert.ok(!res.headers.get('Location').includes('script'));
+});
+
+test('session mode: a missing code redirects with oauth_error=missing_code', async () => {
+  const { res } = await cbWith(withRedirect, 'state=s1', 'session');
+  assert.equal(errorOf(res), 'missing_code');
+});
+
+test('session mode: a failed code exchange redirects with oauth_error=connect_failed and leaks no detail', async () => {
+  const net = fakeNet();
+  const failing = async (u, init) => (String(u).endsWith('/token') ? new Response('{}', { status: 400 }) : net.fn(u, init));
+  const state = await sign({ state: 's1', verifier: 'v', mode: 'session', exp: NOW + 1000 }, KEY);
+  const req = new Request('https://x.test/oauth/google/callback?state=s1&code=c', { headers: { Cookie: `mpt_oauth=${state}` } });
+  const res = await handle(req, withRedirect, { fetchFn: failing, now });
+  assert.equal(res.status, 302);
+  assert.equal(errorOf(res), 'connect_failed');
+  assert.ok(!res.headers.get('Location').includes('400'));
+});
+
+test('session mode without SUCCESS_REDIRECT still answers JSON for these failures', async () => {
+  const { res } = await cbWith(env, 'error=access_denied', 'session');
+  assert.equal(res.status, 400);
+  assert.deepEqual(await res.json(), { ok: false, error: 'access_denied' });
+});
+
+test('probe mode failures are unchanged: JSON, never a redirect, even with SUCCESS_REDIRECT set', async () => {
+  for (const [query, status, error] of [['error=access_denied', 400, 'access_denied'], ['state=s1', 400, 'missing_code']]) {
+    const { res } = await cbWith(withRedirect, query, 'poc');
+    assert.equal(res.status, status);
+    assert.equal((await res.json()).error, error);
+  }
+});
+
+test('without a valid state cookie the mode is unknown, so failures stay JSON (nothing is trusted)', async () => {
+  const req = new Request('https://x.test/oauth/google/callback?error=access_denied');
+  const res = await handle(req, withRedirect, { fetchFn: fakeNet().fn, now });
+  assert.equal(res.status, 400);
+  assert.deepEqual(await res.json(), { ok: false, error: 'access_denied' });
+});

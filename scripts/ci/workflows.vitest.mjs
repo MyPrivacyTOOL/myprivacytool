@@ -98,6 +98,7 @@ describe("rollback.yml", () => {
   it("offers every Worker that has a deploy workflow", () => {
     const options = wf.on.workflow_dispatch.inputs.worker.options;
     const deployed = readdirSync(wfDir).filter((f) => /^deploy-(mpt-leads|oauth-poc|scan-report)\.yml$/.test(f)).map((f) => f.replace(/^deploy-|\.yml$/g, ""));
+    deployed.push("core-brain"); // MPC-7260: deployed by deploy.yml (shared with social-listeners), not a deploy-<name>.yml
     expect(options.sort()).toEqual(deployed.sort());
     for (const w of options) expect(existsSync(path.join(repo, "workers", w, "wrangler.toml")), w).toBe(true);
   });
@@ -111,6 +112,24 @@ describe("rollback.yml", () => {
     expect(s.find((x) => /rollback/.test(x.with?.command ?? "") && !/list/.test(x.with.command)).if).toBe("env.DRY_RUN != 'true'");
     expect(s.some((x) => /secret names changed across rollback/.test(x.run ?? ""))).toBe(true);
     expect(s.some((x) => /smoke-test\.mjs/.test(x.run ?? ""))).toBe(true);
+  });
+});
+
+describe("deploy.yml (core-brain secrets, MPC-7260)", () => {
+  const text = raw("deploy.yml");
+  it("never replaces a secret with a literal stand-in for core-brain", () => {
+    const brain = text.slice(text.indexOf("Deploy core-brain"), text.indexOf("Deploy social-listeners"));
+    expect(brain).not.toMatch(/\|\|\s*'placeholder'/);
+  });
+  it("requires SUPABASE_URL, SUPABASE_KEY and WEBHOOK_SECRET before the core-brain deploy", () => {
+    const s = steps(load("deploy.yml"), "deploy");
+    const gate = s.findIndex((x) => /check-env\.mjs --require SUPABASE_URL,SUPABASE_KEY,WEBHOOK_SECRET/.test(x.run ?? ""));
+    expect(gate).toBeGreaterThanOrEqual(0);
+    expect(gate).toBeLessThan(s.findIndex((x) => /^Deploy core-brain/.test(x.name ?? "")));
+  });
+  it("core-brain is served from the brain.myprivacytool.io custom domain", () => {
+    const toml = readFileSync(path.join(repo, "workers/core-brain/wrangler.toml"), "utf8");
+    expect(toml).toMatch(/routes\s*=\s*\[\{\s*pattern\s*=\s*"brain\.myprivacytool\.io",\s*custom_domain\s*=\s*true\s*\}\]/);
   });
 });
 

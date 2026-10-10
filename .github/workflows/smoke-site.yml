@@ -3,7 +3,7 @@ name: Live smoke test
 # MPC-7300: confirms the live site and Workers actually serve traffic.
 #   - after every push to main: the marketing site auto-deploys via Cloudflare Pages (not from this repo's
 #     Actions), so we wait for it with retries (up to ~10 minutes) before declaring the deploy healthy
-#   - every 6 hours and on demand: a standing check of the site and both public Workers
+#   - every 6 hours and on demand: a standing check of the site and the public Workers (mpt-leads, oauth-poc, core-brain)
 # Read-only: GET requests, a CORS preflight, and the side-effect-free @healthcheck.io probe on mpt-leads.
 # A red run on a push means the deploy needs attention: use the Pages "Rollback to this deployment" button
 # (docs/ci-cd-testing.md#rollback).
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [site, mpt-leads, oauth-poc]
+        target: [site, mpt-leads, oauth-poc, core-brain]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +39,10 @@ jobs:
       - name: Smoke test ${{ matrix.target }}
         run: |
           if [ "${{ github.event_name }}" = "push" ] && [ "${{ matrix.target }}" = "site" ]; then
-            node scripts/ci/smoke-test.mjs site --retries 20 --delay-ms 30000
+            node scripts/ci/smoke-test.mjs site --retries 20 --delay-ms 30000 --expect-sha "$GITHUB_SHA"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ matrix.target }}" = "core-brain" ]; then
+            # MPC-7260: deploy.yml ships core-brain in parallel (tests first), so wait for it like the site.
+            node scripts/ci/smoke-test.mjs core-brain --retries 20 --delay-ms 30000
           else
             node scripts/ci/smoke-test.mjs ${{ matrix.target }} --retries 3 --delay-ms 15000
           fi

@@ -75,6 +75,13 @@ describe("smoke-test targets", () => {
     const failed = (await targets.site("https://s", f)).filter((x) => !x.ok).map((x) => x.name);
     expect(failed).toEqual(expect.arrayContaining(["GET /contact -> 200", "GET /start serves the SPA shell", "GET /sitemap.xml -> 200 XML"]));
   });
+  it("site: with expectSha, passes only when /version.json serves that commit", async () => {
+    const mk = (sha) => async (u) => (u.endsWith("sitemap.xml") ? resp(200, { body: "<urlset></urlset>" }) : u.endsWith("version.json") ? resp(200, { json: { sha } }) : resp(200, { body: shell }));
+    const ok = await targets.site("https://s", mk("abc1234"), { expectSha: "abc1234" });
+    expect(ok.every((x) => x.ok)).toBe(true);
+    const stale = (await targets.site("https://s", mk("old9999"), { expectSha: "abc1234" })).filter((x) => !x.ok);
+    expect(stale.map((x) => x.name)).toEqual(["/version.json serves commit abc1234"]);
+  });
   it("mpt-leads: passes against a healthy Worker and only POSTs the healthcheck address", async () => {
     const seen = [];
     const r = await targets["mpt-leads"]("https://w", async (u, o) => { seen.push(o); return leadsOk(u, o); });
@@ -94,6 +101,24 @@ describe("smoke-test targets", () => {
   it("oauth-poc: fails on a non-JSON health body", async () => {
     const f = async (u) => (u.endsWith("/health") ? { ...resp(502), json: async () => { throw new Error("html"); } } : resp(404, { headers: {} }));
     expect((await targets["oauth-poc"]("https://o", f)).some((x) => !x.ok)).toBe(true);
+  });
+  // MPC-7260: core-brain is probed without the secret; nothing is classified.
+  const brainOk = (health = { ok: true, worker: "core-brain", configured: true }) => async (u, o = {}) =>
+    u.endsWith("/health") ? resp(200, { json: health })
+      : u.endsWith("/webhook") ? resp(o.method === "POST" ? 401 : 405) : resp(404);
+  it("core-brain: passes against a configured Worker that rejects unauthenticated calls", async () => {
+    expect((await targets["core-brain"]("https://b", brainOk())).every((x) => x.ok)).toBe(true);
+  });
+  it("core-brain: fails when /health reports configured:false", async () => {
+    const failed = (await targets["core-brain"]("https://b", brainOk({ ok: true, worker: "core-brain", configured: false }))).filter((x) => !x.ok);
+    expect(failed.map((x) => x.name)).toEqual(["/health -> {ok, worker:core-brain, configured:true}"]);
+  });
+  it("core-brain: fails if /webhook accepts an unauthenticated POST", async () => {
+    const f = async (u, o = {}) => (u.endsWith("/health") ? resp(200, { json: { ok: true, worker: "core-brain", configured: true } }) : u.endsWith("/webhook") ? resp(o.method === "POST" ? 200 : 405) : resp(404));
+    expect((await targets["core-brain"]("https://b", f)).filter((x) => !x.ok).map((x) => x.name)).toEqual(["POST /webhook without the secret -> 401"]);
+  });
+  it("core-brain: defaults to the production custom domain", () => {
+    expect(DEFAULTS["core-brain"]).toBe("https://brain.myprivacytool.io");
   });
 });
 
@@ -125,6 +150,7 @@ describe("smoke() runner", () => {
   });
   it("parses CLI args", () => {
     expect(parseSmokeArgs(["site", "--base-url", "https://x", "--retries", "2", "--delay-ms", "5"])).toEqual({ target: "site", baseUrl: "https://x", retries: 2, delayMs: 5 });
+    expect(parseSmokeArgs(["site", "--expect-sha", "abc"])).toEqual({ target: "site", expectSha: "abc" });
     expect(() => parseSmokeArgs(["site", "--x"])).toThrow("unknown argument");
   });
   it("CLI exits 1 with ::error:: for a failing target and for bad args", () => {

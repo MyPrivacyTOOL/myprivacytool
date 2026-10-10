@@ -1,0 +1,30 @@
+# MPT (MyPrivacyTOOL) core-brain Worker — MPT-1004. Microdrama: the brain behind the curtain.
+name = "core-brain"
+main = "index.ts"
+compatibility_date = "2024-09-23"
+# MPC-7260: workers_dev is off: core-brain is served only from brain.myprivacytool.io (as github-channel did). social-listeners reaches it through a service binding, which does not need workers.dev. Rollback: set it back to true and redeploy.
+workers_dev = false
+
+# Production hostname. `wrangler deploy` creates the DNS record and certificate for a custom_domain route
+# automatically (same pattern as workers/github-channel -> channels.myprivacytool.io). No manual DNS record.
+routes = [{ pattern = "brain.myprivacytool.io", custom_domain = true }]
+
+# Secrets are NOT declared here: wrangler.toml cannot hold secret values, and `[vars]` would be plain text.
+# They are bound at runtime as `env.<NAME>` after `wrangler secret put <NAME>` (see /SECRETS.md) or after
+# the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
+# Names (also in EXPECTED_SECRETS.txt):
+#   SUPABASE_URL, SUPABASE_KEY, WEBHOOK_SECRET (required); QWEN_API_KEY (optional: rules-based intent without it)
+# The KV binding from MPT-1004 was removed: core-brain does not use KV and its
+# namespace id never existed in the account, which made `wrangler deploy` fail.
+
+# MPC-8601: @mpt/utils is resolved from the repo until the npm workspaces land (MPT-1002 / PR #111).
+[alias]
+"@mpt/utils" = "../../shared/utils/src/index.js"
+
+# Non-secret config only. Qwen is called through its OpenAI-compatible endpoint.
+[vars]
+QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+QWEN_MODEL = "qwen-plus"
+
+[observability]
+enabled = true

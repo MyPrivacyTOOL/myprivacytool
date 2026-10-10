@@ -25,6 +25,9 @@ HIBP's Core plan only searches domains you have proven you own, so it cannot loo
 - Consent must be `true` in the request; it is never defaulted. One scan per address per 24h.
 - To avoid duplicate senders set `CONFIRMATION_OWNER=scan-report` as a var on `mpt-leads`, and turn off any HubSpot workflow that sends "Scan confirmed".
 
+## First-100 onboarding (MPC-7261)
+Mirror Report, cohort numbers and day 3 / day 7 follow-ups: see `docs/first-100-onboarding-mpc-7261.md`. Follow-ups stay off until the optional `UNSUBSCRIBE_SECRET` secret is set.
+
 ## Secrets (names only; set with `wrangler secret put`)
 `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`.
 
