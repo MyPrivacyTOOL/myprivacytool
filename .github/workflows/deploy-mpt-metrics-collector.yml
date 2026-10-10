@@ -1,0 +1,77 @@
+name: Deploy mpt-metrics-collector Worker
+
+# MPC-7377: daily raw-metrics collector (MPT analytics 2/9). Modelled on deploy-mpt-leads.yml.
+#
+# Repo secrets required (already used by deploy-mpt-leads.yml):
+#   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
+#   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
+#
+# Safety: runs the pre-deploy config checks and the Worker tests first; after deploy it lists the Worker's secret
+# NAMES via the API and FAILS if any name in workers/mpt-metrics-collector/EXPECTED_SECRETS.txt is missing.
+# Secret values never appear in this workflow, the repo or the logs. On the very first deploy the check is expected
+# to go red until a human has set the three secrets in Cloudflare; re-run the workflow afterwards.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/mpt-metrics-collector/**'
+      - '.github/workflows/deploy-mpt-metrics-collector.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mpt-metrics-collector
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pre-deployment checks (secrets present, Worker config valid)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-metrics-collector
+
+      - name: Test Worker (stubbed fetch)
+        run: node workers/mpt-metrics-collector/worker.test.mjs
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-metrics-collector
+          command: deploy
+
+      - name: Verify expected secret names are present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-metrics-collector/secrets" \
+            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
+          echo "secret names present:"; cat /tmp/secrets.after
+          sort workers/mpt-metrics-collector/EXPECTED_SECRETS.txt > /tmp/secrets.expected
+          missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
+          [ -z "$missing" ] || { echo "::error::expected secrets missing: $missing"; exit 1; }
+          echo "OK: all expected secrets present"
+
+      - name: Health check live Worker
+        run: |
+          for i in 1 2 3 4; do
+            body=$(curl -sf https://mpt-metrics-collector.myprivacytool.workers.dev/health) && break
+            sleep 10
+          done
+          echo "$body"
+          echo "$body" | python3 -c 'import sys,json;d=json.load(sys.stdin);sys.exit(0 if d.get("ok") and d.get("configured") else 1)'
