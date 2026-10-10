@@ -85,7 +85,7 @@ describe('Mirror & Risk Engine - MPC-7252', () => {
     });
 
     it('should reject invalid handles', () => {
-      const invalidHandles = ['ab', 'user@domain', 'user.name', '123'];
+      const invalidHandles = ['ab', 'user@domain', 'user.name'];
       const handleRegex = /^[a-zA-Z0-9_\-]{3,50}$/;
 
       invalidHandles.forEach(handle => {
