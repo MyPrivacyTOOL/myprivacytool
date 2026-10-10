@@ -1,6 +1,6 @@
 -- MPC-7378 follow-up: report in Hong Kong time. Every day is a Hong Kong day (00:00-24:00 HKT, Asia/Hong_Kong, no DST) and every
 -- week starts on Monday HKT. Replaces the UTC-date bucketing of mpt_daily_metrics and mpt_weekly_metrics (same columns, so
--- `create or replace` keeps grants and dependants). NOT YET APPLIED to project xmdmkumwxpgahmlweuug when this file was written.
+-- `create or replace` keeps grants and dependants). APPLIED 2026-10-10 17:3x HKT to project xmdmkumwxpgahmlweuug (migration mpc_7378_hong_kong_days).
 --
 -- Safe to apply BEFORE the Worker switches to Hong Kong days: a UTC-midnight period_start (what the old Worker wrote) is
 -- 08:00 HKT the same date, so existing raw rows keep their dates; the new Worker writes HKT-midnight instants (16:00 UTC the
