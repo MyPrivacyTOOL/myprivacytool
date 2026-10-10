@@ -9,7 +9,8 @@ workers_dev = true
 # the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
 # Names (also in EXPECTED_SECRETS.txt):
 #   SUPABASE_URL, SUPABASE_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
-#   X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward)
+#   X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward),
+#   TELEGRAM_BOT_TOKEN (BotFather token; sends the reply core-brain chose. Without it Telegram messages are ingested but not answered)
 
 [observability]
 enabled = true

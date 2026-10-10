@@ -9,7 +9,8 @@ name: Deploy core-brain & social-listeners
 #     SUPABASE_URL, SUPABASE_KEY, WEBHOOK_SECRET
 #   core-brain (optional): QWEN_API_KEY. Without it intent classification uses the rules engine.
 #   social-listeners: SUPABASE_URL, SUPABASE_KEY, plus TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
-#     X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain WEBHOOK_SECRET)
+#     X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain WEBHOOK_SECRET),
+#     TELEGRAM_BOT_TOKEN (BotFather token; replies are not sent without it)
 #
 # MPC-7260: core-brain is served from https://brain.myprivacytool.io (custom domain route in wrangler.toml).
 # No secret is ever replaced by a literal stand-in: a guessable WEBHOOK_SECRET would let anyone call /webhook.
@@ -103,6 +104,7 @@ jobs:
             ${{ secrets.X_CONSUMER_SECRET != '' && 'X_CONSUMER_SECRET' || '' }}
             ${{ secrets.TELEGRAM_WEBHOOK_SECRET != '' && 'TELEGRAM_WEBHOOK_SECRET' || '' }}
             ${{ secrets.CORE_BRAIN_TOKEN != '' && 'CORE_BRAIN_TOKEN' || '' }}
+            ${{ secrets.TELEGRAM_BOT_TOKEN != '' && 'TELEGRAM_BOT_TOKEN' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
@@ -112,3 +114,4 @@ jobs:
           X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET || 'placeholder' }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET || 'placeholder' }}
           CORE_BRAIN_TOKEN: ${{ secrets.CORE_BRAIN_TOKEN || 'placeholder' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || 'placeholder' }}
