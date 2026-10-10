@@ -2,9 +2,9 @@ import { db } from './lib/supabase.js';
 import { checkBreaches } from './lib/hibp.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
-import { buildConfirmationEmail, buildReportEmail, sendEmail } from './lib/email.js';
+import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
 import { buildMirrorReport } from './lib/mirror.js';
-import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
+import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
 const MAX_ATTEMPTS = 5;
@@ -34,7 +34,8 @@ export default {
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST');
+    if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST', request, cors);
+    if (request.method === 'POST' && url.pathname === '/api/unsubscribe-request') return handleUnsubscribeRequest(env, request, cors, json);
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -105,14 +106,15 @@ async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
 
 // Sends the confirmation exactly once per scan (Resend Idempotency-Key + confirmation_sent_at).
 // Signed one-click unsubscribe link for the Worker's own /api/unsubscribe; null when UNSUBSCRIBE_SECRET is not set.
-const unsubLink = async (env, email) => (env.UNSUBSCRIBE_SECRET ? unsubscribeUrl(env, email) : null);
-const unsubHeaders = (link) => (link ? { 'List-Unsubscribe': `<${link}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined);
+// page = branded page on the main site (email bodies); oneClick = Worker endpoint for the List-Unsubscribe header.
+const unsubLinks = async (env, email) => (env.UNSUBSCRIBE_SECRET ? { page: await unsubscribePageUrl(env, email), oneClick: await unsubscribeUrl(env, email) } : null);
+const unsubHeaders = (links) => (links ? { 'List-Unsubscribe': `<${links.oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined);
 
 async function confirm(env, sb, scanId, email, fetchImpl) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
-  const link = await unsubLink(env, email);
-  const m = buildConfirmationEmail({ unsubscribeLink: link });
-  const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(link) }, fetchImpl);
+  const links = await unsubLinks(env, email);
+  const m = buildConfirmationEmail({ unsubscribeLink: links?.page });
+  const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(links) }, fetchImpl);
   if (r.sent) await sb.patch(`scans?id=eq.${scanId}`, { confirmation_sent_at: new Date().toISOString() });
   else console.error('confirmation not sent:', r.reason);
 }
@@ -121,29 +123,36 @@ async function confirm(env, sb, scanId, email, fetchImpl) {
 // MPC-7406: scans held by RECIPIENT_ALLOWLIST stay pending and untouched, so they must never take up the per-run limit.
 // Reads the pending queue oldest-first in pages and keeps the first `limit` allowed scans; with no allowlist that is just the first `limit` rows.
 const REPORT_PAGE = 1000;
+// Someone who unsubscribed after requesting this scan gets no report: the unsubscribe page promises no more scan report emails.
+// (A scan requested after they unsubscribed is a fresh request and still gets its report; follow-ups stay off for them.)
+const unsubscribedSince = (job) => { const t = job.users?.email_opt_out_at; return Boolean(t) && Date.parse(t) > Date.parse(job.created_at); };
 async function nextReportJobs(env, sb, limit) {
   const stale = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
   const gated = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
   const size = gated ? REPORT_PAGE : limit;
-  const queue = []; let held = 0;
+  const queue = []; const cancelled = []; let held = 0;
   for (let offset = 0; ; offset += size) {
     const page = await sb.select(
-      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at` +
+      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at,created_at,users(email_opt_out_at)` +
       `&or=(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))` +
       `&report_attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc,id.asc&limit=${size}&offset=${offset}`);
     for (const job of page) {
       if (!recipientAllowed(env, job.email_scanned)) { held++; continue; }
-      if (queue.push(job) >= limit) return { queue, held };
+      if (unsubscribedSince(job)) { cancelled.push(job.id); continue; }
+      if (queue.push(job) >= limit) return { queue, held, cancelled };
     }
-    if (page.length < size) return { queue, held };
+    if (page.length < size) return { queue, held, cancelled };
   }
 }
 
 export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) return { skipped: 'no supabase key' };
   const sb = db(env, fetchImpl);
-  const { queue, held } = await nextReportJobs(env, sb, limit);
-  const out = { sent: 0, held, failed: 0 };
+  const { queue, held, cancelled } = await nextReportJobs(env, sb, limit);
+  const out = { sent: 0, held, failed: 0, cancelled: cancelled.length };
+  for (const id of cancelled) {   // take them out of the queue for good: nothing is sent and the reason is on the row
+    await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
+  }
   for (const job of queue) {
     try {
       if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl);     // catch up a missed confirmation
@@ -188,9 +197,9 @@ async function processScan(env, sb, job, fetchImpl) {
   // Removal tasks only track brokers confirmed present; "not yet checked" brokers get none.
 
   const mirror = buildMirrorReport({ scan: result, breaches, breachStatus: hibp.status, brokers });
-  const link = await unsubLink(env, email);
-  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers, mirror, unsubscribeLink: link });
-  const sent = await sendEmail(env, { to: email, ...mail, idempotencyKey: `report-${job.id}`, headers: unsubHeaders(link) }, fetchImpl);
+  const links = await unsubLinks(env, email);
+  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers, mirror, unsubscribeLink: links?.page });
+  const sent = await sendEmail(env, { to: email, ...mail, idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
     privacy_score: result.score, risk_level: result.risk_level, signals_found: result.signals_found,
@@ -228,9 +237,9 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
       if (!user || user.email_opt_out_at || (!user.cohort_number && !testMode)) { out.skipped++; continue; }
       const claimed = await sb.patch(`scans?id=eq.${job.id}&followup_stage=eq.${job.followup_stage ?? 0}`, { followup_stage: stage, followup_last_sent_at: new Date().toISOString() });
       if (!claimed.length) continue;
-      const link = await unsubscribeUrl(env, job.email_scanned);
-      const mail = buildFollowUpEmail({ stage, mirror: job.mirror_report, cohortNumber: user.cohort_number, unsubscribeLink: link });
-      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(link) }, fetchImpl);
+      const links = await unsubLinks(env, job.email_scanned);
+      const mail = buildFollowUpEmail({ stage, mirror: job.mirror_report, cohortNumber: user.cohort_number, unsubscribeLink: links.page });
+      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(links) }, fetchImpl);
       if (!r.sent) {                                   // release the stage so the next run retries (Resend key keeps it single-send)
         await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: job.followup_stage ?? 0 });
         throw new Error(`follow-up email not sent: ${r.reason}`);
@@ -243,7 +252,8 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
 
 // GET only shows a confirmation page: mail scanners and link previewers open links automatically, so a GET must never opt anyone out.
 // The opt-out itself is a POST (the page's button, or a mail app's one-click List-Unsubscribe-Post).
-async function handleUnsubscribe(env, url, confirmed) {
+async function handleUnsubscribe(env, url, confirmed, request, cors) {
+  const wantsJson = String(request.headers.get('Accept') || '').includes('application/json');   // the website page calls this with fetch()
   const view = (status, heading, body, extra = '') => new Response(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${heading} | MyPrivacyTOOL</title></head>
 <body style="margin:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">
 <div style="max-width:520px;margin:48px auto;padding:0 16px"><div style="background:#fff;border-radius:12px;overflow:hidden">
@@ -251,17 +261,43 @@ async function handleUnsubscribe(env, url, confirmed) {
 <div style="padding:28px"><h1 style="margin:0 0 12px;font-size:22px;line-height:28px">${heading}</h1><p style="margin:0 0 16px;font-size:15px;line-height:23px;color:#374151">${body}</p>${extra}
 <p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#6b7280">Questions, or want your data deleted? Write to <a href="mailto:hello@myprivacytool.io" style="color:#6b7280">hello@myprivacytool.io</a>. <a href="https://myprivacytool.io/" style="color:#6b7280">myprivacytool.io</a></p></div></div></div></body></html>`,
     { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
+  const reply = (status, heading, body, extra) => (wantsJson
+    ? new Response(JSON.stringify({ ok: status === 200 }), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
+    : view(status, heading, body, extra));
   const email = (url.searchParams.get('e') || '').trim().toLowerCase();
   if (!(await verifyUnsubscribe(env.UNSUBSCRIBE_SECRET, email, url.searchParams.get('t')))) {
-    return view(400, 'This link is not valid', 'The unsubscribe link may be incomplete or out of date. Reply to any of our emails and we will remove you by hand.');
+    return reply(400, 'This link is not valid', 'The unsubscribe link may be incomplete or out of date. Reply to any of our emails and we will remove you by hand.');
   }
   if (!confirmed) {
     const action = `/api/unsubscribe?e=${encodeURIComponent(email)}&amp;t=${encodeURIComponent(url.searchParams.get('t'))}`;
-    return view(200, 'Unsubscribe from MyPrivacyTOOL emails?', 'Fixed what was in your report? Then you do not need to hear from us again. Confirm and we will send you no more follow-up or marketing emails.',
+    return reply(200, 'Unsubscribe from MyPrivacyTOOL emails?', 'Fixed what was in your report? Then you do not need to hear from us again. Confirm and we will send you no more follow-up or marketing emails.',
       `<form method="POST" action="${action}"><button type="submit" style="background:#15803d;color:#fff;border:0;border-radius:8px;padding:11px 20px;font-size:15px;font-weight:600;cursor:pointer">Yes, unsubscribe me</button></form>`);
   }
   try {
     await db(env).patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
-    return view(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails. You can run a new scan on our site whenever you like.');
-  } catch (e) { console.error('unsubscribe failed', String(e)); return view(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
+    return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails. You can run a new scan on our site whenever you like.');
+  } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
+}
+
+// POST /api/unsubscribe-request {email}: the website's "unsubscribe me" form. Emails a signed confirmation link to that address only,
+// and answers the same way whether or not the address is on our list, so the form cannot be used to look people up.
+async function handleUnsubscribeRequest(env, request, cors, json) {
+  const origin = request.headers.get('Origin') || '';
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
+  if (Number(request.headers.get('content-length') || 0) > 2 * 1024) return json({ error: 'Payload too large' }, 413);
+  if (await rateLimited(env, request)) return json({ error: 'Too many requests' }, 429);
+  let b;
+  try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+  const email = clip(b && typeof b === 'object' ? b.email : '', 255).trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
+  if (!env.UNSUBSCRIBE_SECRET || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Unavailable' }, 503);
+  try {
+    const user = (await db(env).select(`users?email=eq.${encodeURIComponent(email)}&select=id,email_opt_out_at&limit=1`))[0];
+    if (user && !user.email_opt_out_at && recipientAllowed(env, email)) {
+      const mail = buildUnsubscribeRequestEmail({ link: await unsubscribePageUrl(env, email) });
+      const r = await sendEmail(env, { to: email, ...mail, idempotencyKey: `unsubreq-${user.id}-${new Date().toISOString().slice(0, 13)}` });
+      if (!r.sent) console.error('unsubscribe request email not sent:', r.reason);
+    }
+  } catch (e) { console.error('unsubscribe request failed', String(e)); }
+  return json({ ok: true });
 }

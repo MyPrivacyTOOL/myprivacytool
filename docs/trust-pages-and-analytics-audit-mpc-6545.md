@@ -88,6 +88,28 @@ Method: static review of the repo and the Cloudflare account. I could not query 
 
 ## Status update 2026-10-10
 
+Done in this change
+- Homepage trust strip: a link-only row (Trust Centre, Privacy, Cookies, Terms, DPA) above the newsletter block in `src/pages/Index.tsx`. It makes no claims beyond what `/trust` and `/privacy` already say.
+
+Still open (needs a person, not code)
+| Item | Owner | What is needed |
+|---|---|---|
+| Legal review (MPC-6798) | Chris / counsel | Done: signed off 2026-10-10. |
+| `/pricing` | Chris | Decide: ship real pricing, or keep the noindex `ComingSoonPage` stub. Nothing is built because no pricing has been decided. |
+| GA4 consent gating | Anyone with a browser | Not a blocker; moved to a follow-up task. See checklist below. The cloud sandbox cannot reach myprivacytool.io (proxy 403), so this could not be tested here. |
+| Mailboxes | Chris | Not a blocker; moved to the same follow-up task. Confirm each address below receives mail. |
+
+GA4 consent-gating check (about 5 minutes, clean/incognito browser, DevTools Network tab, filter `google|gtm|collect`)
+1. Load `https://www.myprivacytool.io/` and do not touch the banner: no request to `googletagmanager.com/gtag/js` or `google-analytics.com/g/collect` may fire.
+2. Choose "Reject": still none.
+3. Reopen via footer "Manage cookies", accept analytics: requests now fire.
+4. Reject again after accepting: no further `collect` requests.
+Known separate gap (security audit finding): `fingerprintDetection.ts` pings `google-analytics.com`, and `deviceDetection.ts` calls ipify/ipapi, without a consent gate.
+
+Mailboxes to confirm (all appear in the site): `privacy@` (20 references), `support@`, `dpo@`, `legal@`, `accessibility@`, `scan@`, `chris@` at `myprivacytool.io`. Send a test to each and note where it lands.
+
+### Follow-up task progress (GA4 gating + mailboxes)
+
 Follow-up to MPC-6545 (not a blocker). Two human checks remain; neither can run from the cloud sandbox (myprivacytool.io returns proxy 403).
 
 | Check | Status | Result / where it lands |
