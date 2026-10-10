@@ -2,14 +2,16 @@
 // to public.mpt_raw_metrics (append-only). Collectors are pluggable: add a module to collectors/ and list it below.
 // A failing source writes a status=error row and never stops the others. No secret value is ever logged or stored.
 import supabaseCounts from './collectors/supabase-counts.js';
+import cloudflareAnalytics from './collectors/cloudflare-analytics.js';
 import ga4Reports from './collectors/ga4.js';
+import { publishAll, notionConfigured } from './publishers/notion.js';
 
-export const COLLECTOR_VERSION = '1.1.0';
-export const COLLECTORS = [supabaseCounts, ...ga4Reports];
+export const COLLECTOR_VERSION = '1.0.0';
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'GA4_SERVICE_ACCOUNT_JSON']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'GA4_SERVICE_ACCOUNT_JSON']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -31,16 +33,16 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
   const results = [];
   const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   for (const c of collectors) {
-    if (c.skip?.(now)) continue;
-    // A collector may report on another period (GA4: the last complete UTC day/week); the default is today so far.
-    const period = c.period?.(now);
+    if (c.skip?.(now)) continue; // e.g. GA4 weekly report runs on Mondays only
     const row = {
       source: c.source, report: c.report, captured_at: now.toISOString(),
-      period_start: (period?.start ?? dayStart).toISOString(), period_end: (period?.end ?? now).toISOString(),
+      period_start: dayStart.toISOString(), period_end: now.toISOString(),
       payload: {}, collector_version: COLLECTOR_VERSION, status: 'ok', error: null,
     };
     try {
       const out = await c.collect(env, now);
+      if (out.period_start) row.period_start = out.period_start;
+      if (out.period_end) row.period_end = out.period_end;
       row.payload = out.payload ?? {};
       if (out.error) { row.status = 'error'; row.error = SAFE(out.error, env); }
     } catch (e) {
@@ -57,7 +59,12 @@ const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROL
 export default {
   async scheduled(_event, env, ctx) {
     if (!configured(env)) { console.error('mpt-metrics-collector: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set'); return; }
-    ctx.waitUntil(runAll(env).then((r) => console.log(JSON.stringify(r))));
+    // Collect first, then publish the summaries to Notion (MPC-7382). A Notion failure never affects collection.
+    ctx.waitUntil((async () => {
+      console.log(JSON.stringify(await runAll(env)));
+      if (notionConfigured(env)) console.log(JSON.stringify(await publishAll(env)));
+      else console.error('mpt-metrics-collector: NOTION_TOKEN not set, Notion publish skipped');
+    })());
   },
 
   async fetch(request, env) {
@@ -69,6 +76,15 @@ export default {
       if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
       if (!configured(env)) return json({ error: 'not configured' }, 500);
       return json({ results: await runAll(env) });
+    }
+    // Manual publish for verification: POST /publish?day=YYYY-MM-DD&week=YYYY-MM-DD (Monday), same bearer token.
+    if (url.pathname === '/publish' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
+      const day = url.searchParams.get('day') || undefined;
+      const weekOf = url.searchParams.get('week') || undefined;
+      if ([day, weekOf].some((v) => v && !/^\d{4}-\d{2}-\d{2}$/.test(v))) return json({ error: 'bad date' }, 400);
+      return json({ results: await publishAll(env, new Date(), { day, weekOf }) });
     }
     return json({ error: 'not found' }, 404);
   },

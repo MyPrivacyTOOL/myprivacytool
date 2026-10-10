@@ -83,7 +83,7 @@ function report(name, build, { period = yesterday, only } = {}) {
     skip: only ? (now) => !only(now) : undefined,
     async collect(env, now = new Date()) {
       const p = period(now);
-      return { payload: await runReport(env, build(p)) };
+      return { payload: await runReport(env, build(p)), period_start: p.start.toISOString(), period_end: p.end.toISOString() };
     },
   };
 }

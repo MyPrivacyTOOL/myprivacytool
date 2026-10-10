@@ -9,7 +9,7 @@ name: Deploy mpt-metrics-collector Worker
 # Safety: runs the pre-deploy config checks and the Worker tests first; after deploy it lists the Worker's secret
 # NAMES via the API and FAILS if any name in workers/mpt-metrics-collector/EXPECTED_SECRETS.txt is missing.
 # Secret values never appear in this workflow, the repo or the logs. On the very first deploy the check is expected
-# to go red until a human has set the four secrets in Cloudflare; re-run the workflow afterwards.
+# to go red until a human has set the three secrets in Cloudflare; re-run the workflow afterwards.
 
 on:
   push:
@@ -41,9 +41,7 @@ jobs:
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-metrics-collector
 
       - name: Test Worker (stubbed fetch)
-        run: |
-          node workers/mpt-metrics-collector/worker.test.mjs
-          node workers/mpt-metrics-collector/ga4.test.mjs
+        run: node workers/mpt-metrics-collector/worker.test.mjs && node workers/mpt-metrics-collector/publisher.test.mjs && node workers/mpt-metrics-collector/ga4.test.mjs
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
