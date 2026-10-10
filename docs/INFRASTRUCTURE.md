@@ -53,5 +53,5 @@ To rotate: Cloudflare dashboard -> Workers & Pages -> the Worker -> Settings -> 
 | Log `401 ... 42501 permission denied` | The anon key was pasted; use the legacy `service_role` key. |
 | Worker returns success but no row | The Supabase write is fail-soft and only logs: read the Worker log (Dashboard -> Worker -> Observability). |
 | Worker deploy: `No such module ...json` or `Expected ";" but found "with"` | JSON imported with import attributes. Wrangler 3.x cannot bundle them; use a generated JS module (see `workers/scan-report/scripts/sync-guides.mjs`). |
-| Scan-report feature does nothing | Needs the Worker deployed, the migration applied, and `VITE_SCAN_API_URL` set in the Pages project. |
+| Scan-report feature does nothing | Needs the Worker deployed and the migration applied. The site posts to the Worker by default (MPC-7385); check `VITE_SCAN_API_URL` is not set to an empty string in the Pages project, and that the address is in `RECIPIENT_ALLOWLIST` while the allowlist is in place. |
 | Push 403 / repo not found in a Claude session | Session is attached to the other GitHub owner. |
