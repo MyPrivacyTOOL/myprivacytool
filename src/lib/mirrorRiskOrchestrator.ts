@@ -13,7 +13,7 @@
  * - UI: real-time exposure check
  */
 
-import { osintLookup, OsintValidationError, type InputType } from './osintLookup';
+import { osintLookup, OsintValidationError, type BreachProvider, type InputType } from './osintLookup';
 import { generateRiskResponse, RiskSummaryResponse } from './riskResponseTemplate';
 
 export type { InputType };
@@ -23,7 +23,8 @@ export interface OrchestratorRequest {
   type: InputType;
   userId?: string; // For logging/audit
   skipCache?: boolean; // Force fresh lookup
-  apiKey?: string; // HIBP key from the Worker env; without it lookups return not_checked
+  apiKey?: string; // HIBP key from the Worker env (only used by the 'hibp' provider)
+  provider?: BreachProvider; // 'xposedornot' = free, no key. Without any provider lookups return not_checked
   fetchImpl?: typeof fetch;
 }
 
@@ -66,6 +67,7 @@ export async function executeRiskAnalysis(
     const lookup = await osintLookup(request.value, request.type, {
       skipCache: request.skipCache,
       apiKey: request.apiKey,
+      provider: request.provider,
       fetchImpl: request.fetchImpl,
     });
 
@@ -281,14 +283,14 @@ export class ValidationError extends Error {
 /**
  * Health check endpoint
  */
-export async function healthCheck(apiKey?: string): Promise<{
+export async function healthCheck(apiKey?: string, provider?: BreachProvider): Promise<{
   status: 'healthy' | 'degraded' | 'unhealthy';
   osintApi: 'ok' | 'error';
   timestamp: string;
 }> {
   try {
     // Probe HIBP with a throwaway address (no user data). not_checked means the upstream is not answering.
-    const result = await osintLookup('healthcheck@example.com', 'email', { skipCache: true, apiKey });
+    const result = await osintLookup('healthcheck@example.com', 'email', { skipCache: true, apiKey, provider });
 
     return {
       status: result.status === 'checked' ? 'healthy' : 'degraded',

@@ -11,10 +11,13 @@
  */
 
 import { executeBatchRiskAnalysis, executeRiskAnalysis, healthCheck } from './mirrorRiskOrchestrator';
-import type { InputType } from './osintLookup';
+import type { BreachProvider, InputType } from './osintLookup';
 
 export interface MirrorRiskEnv {
+  /** Paid HIBP key (Worker secret). Parked until revenue; optional. */
   HIBP_API_KEY?: string;
+  /** 'xposedornot' (free, no key) or 'hibp'. Unset + no key => every email lookup is not_checked. */
+  BREACH_PROVIDER?: string;
   /** Optional per-IP limiter (Cloudflare ratelimit binding). Fails open if absent or erroring. */
   RATE_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
@@ -22,6 +25,10 @@ export interface MirrorRiskEnv {
 export const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
 export const MAX_BODY_BYTES = 8 * 1024;
 export const MAX_BATCH = 10;
+function providerOf(env: MirrorRiskEnv): BreachProvider | undefined {
+  return env.BREACH_PROVIDER === 'xposedornot' || env.BREACH_PROVIDER === 'hibp' ? env.BREACH_PROVIDER : undefined;
+}
+
 const TYPES: readonly string[] = ['email', 'phone', 'handle', 'domain'];
 
 function respond(body: unknown, status: number, origin: string): Response {
@@ -54,7 +61,7 @@ export async function handleRiskRequest(request: Request, env: MirrorRiskEnv = {
   if (origin && !ALLOWED_ORIGINS.includes(origin)) return respond({ error: 'Forbidden origin' }, 403, origin);
 
   if (request.method === 'GET' && url.pathname === '/api/v1/health') {
-    return respond(await healthCheck(env.HIBP_API_KEY), 200, origin);
+    return respond(await healthCheck(env.HIBP_API_KEY, providerOf(env)), 200, origin);
   }
 
   const isScan = url.pathname === '/api/v1/scan';
@@ -84,7 +91,7 @@ export async function handleRiskRequest(request: Request, env: MirrorRiskEnv = {
   if (isScan) {
     const item = parseItem(body);
     if (!item) return respond({ error: 'value and type (email|phone|handle|domain) required' }, 400, origin);
-    const result = await executeRiskAnalysis({ ...item, apiKey: env.HIBP_API_KEY });
+    const result = await executeRiskAnalysis({ ...item, apiKey: env.HIBP_API_KEY, provider: providerOf(env) });
     return respond(result, result.success ? 200 : 400, origin);
   }
 
@@ -95,7 +102,7 @@ export async function handleRiskRequest(request: Request, env: MirrorRiskEnv = {
   const items = raw.map(parseItem);
   if (items.some((i) => i === null)) return respond({ error: 'Every item needs value and type' }, 400, origin);
   const result = await executeBatchRiskAnalysis({
-    values: (items as { value: string; type: InputType }[]).map((i) => ({ ...i, apiKey: env.HIBP_API_KEY })),
+    values: (items as { value: string; type: InputType }[]).map((i) => ({ ...i, apiKey: env.HIBP_API_KEY, provider: providerOf(env) })),
     parallel: true,
   });
   return respond(result, 200, origin);

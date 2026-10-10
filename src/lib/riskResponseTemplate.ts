@@ -33,7 +33,7 @@ export type ResponseLevel = 'low' | 'medium' | 'high' | 'critical' | 'not_checke
 export interface RiskSummaryResponse {
   /** "checked" lookups carry a score; "not_checked" ones never do (we do not guess). */
   status: 'checked' | 'not_checked';
-  /** Why nothing was checked (unsupported_type | no_api_key | rate_limited | timeout | upstream_error). */
+  /** Why nothing was checked (unsupported_type | no_provider | no_api_key | rate_limited | timeout | upstream_error). */
   reason?: string;
   score: number | null;
   level: ResponseLevel;
@@ -42,6 +42,8 @@ export interface RiskSummaryResponse {
   explanation: string;
   next_steps: NextStep[];
   exposure_types: string[];
+  /** Names of the breaches the provider reported (the Mirror: what we found, nothing guessed). */
+  breach_names: string[];
   exposure_count: {
     breaches: number;
     pastes: number;
@@ -155,9 +157,8 @@ function generateNextSteps(
  */
 function formatExposureTypes(lookup: OsintLookupResult): string[] {
   const metrics = extractRiskMetrics(lookup);
-  return metrics.commonDataClasses.length > 0
-    ? metrics.commonDataClasses
-    : ['Email address', 'Account information'];
+  // Only report what the provider actually told us; free providers give breach names but no data classes.
+  return metrics.commonDataClasses;
 }
 
 function generateNotCheckedResponse(lookup: OsintLookupResult): RiskSummaryResponse {
@@ -172,6 +173,7 @@ function generateNotCheckedResponse(lookup: OsintLookupResult): RiskSummaryRespo
       'This is not a clean result. The check did not run, so we are not saying anything about your exposure.',
     next_steps: [],
     exposure_types: [],
+    breach_names: [],
     exposure_count: { breaches: 0, pastes: 0, total: 0 },
     temporal_info: { risk: 'old', last_checked: lookup.timestamp },
     localization_keys: RISK_LOCALIZATION_KEYS,
@@ -206,6 +208,7 @@ export function generateRiskResponse(
     explanation: score.explanation,
     next_steps: nextSteps,
     exposure_types: formatExposureTypes(lookup),
+    breach_names: lookup.breaches.map((b) => b.name).slice(0, 50),
     exposure_count: {
       breaches: lookup.breachCount,
       pastes: lookup.pasteCount,

@@ -5,6 +5,11 @@ main = "worker.ts"
 compatibility_date = "2024-09-23"
 workers_dev = true
 
+[vars]
+# Free breach source (no key). Switch to "hibp" + `wrangler secret put HIBP_API_KEY` after revenue (Phase 5).
+# TODO(owner): confirm XposedOrNot's terms allow commercial use, and that the privacy policy says the email is sent to it.
+BREACH_PROVIDER = "xposedornot"
+
 [observability]
 enabled = true
 

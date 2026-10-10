@@ -26,7 +26,17 @@ describe('Mirror & Risk API (MPC-7252)', () => {
     const res = await handleRiskRequest(post('/api/v1/scan', { value: 'a@b.co', type: 'email' }), {});
     const json = await res.json();
     expect(json.data.status).toBe('not_checked');
-    expect(json.data.reason).toBe('no_api_key');
+    expect(json.data.reason).toBe('no_provider');
+  });
+
+  it('BREACH_PROVIDER=xposedornot is passed through (phone still not_checked, no network call)', async () => {
+    const res = await handleRiskRequest(post('/api/v1/scan', { value: '+1 555 123 4567', type: 'phone' }), { BREACH_PROVIDER: 'xposedornot' });
+    expect((await res.json()).data.reason).toBe('unsupported_type');
+  });
+
+  it('ignores an unknown BREACH_PROVIDER value (=> no_provider)', async () => {
+    const res = await handleRiskRequest(post('/api/v1/scan', { value: 'a@b.co', type: 'email' }), { BREACH_PROVIDER: 'nope' });
+    expect((await res.json()).data.reason).toBe('no_provider');
   });
 
   it('rejects bad type, bad JSON and arrays with 400', async () => {

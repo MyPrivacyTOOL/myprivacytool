@@ -254,7 +254,7 @@ exposure_score = min(100, (breach_count × 10) + (paste_count × 5))
 
 ### What is never scored
 
-Only **email** can be answered (HIBP). `phone`, `handle` and `domain`, and any email lookup that could not run (no API key, timeout, HTTP 429/401/5xx), return `status: "not_checked"` with `score: null` and `level: "not_checked"`. A failed or unsupported check is never presented as low risk or reassuring. `reason` is one of `unsupported_type | no_api_key | rate_limited | timeout | upstream_error`.
+Only **email** can be answered, by a pluggable provider: `xposedornot` (free, no key, breach names only) or `hibp` (paid key, adds data classes and pastes; parked until revenue). With no provider configured every lookup is `not_checked`. `phone`, `handle` and `domain`, and any email lookup that could not run (no API key, timeout, HTTP 429/401/5xx), return `status: "not_checked"` with `score: null` and `level: "not_checked"`. A failed or unsupported check is never presented as low risk or reassuring. `reason` is one of `unsupported_type | no_provider | no_api_key | rate_limited | timeout | upstream_error`.
 
 ## Localization Keys (29 total)
 
@@ -310,7 +310,7 @@ Upstream HIBP problems are **not** errors: they return success with `status: "no
 ## Integration Checklist
 
 - [ ] Install dependencies: `npm install`
-- [ ] Set `HIBP_API_KEY` as a Worker secret (`wrangler secret put HIBP_API_KEY`); it is passed in as `env.HIBP_API_KEY`, never read from `process.env` or a client bundle
+- [ ] Free mode: set `BREACH_PROVIDER=xposedornot` (no key). Paid mode (after revenue): `BREACH_PROVIDER=hibp` and set `HIBP_API_KEY` as a Worker secret (`wrangler secret put HIBP_API_KEY`); it is passed in as `env.HIBP_API_KEY`, never read from `process.env` or a client bundle
 - [ ] Run tests: `npm test -- mirrorRiskEngine.test`
 - [ ] Add health check to monitoring (GET /api/v1/health)
 - [ ] Configure rate limiting (per IP, per user)
@@ -380,7 +380,7 @@ Expected coverage:
 
 ---
 
-**Status:** Draft. Not run against live HIBP (needs a key-holder run with 3 real data points). Not mounted in a Worker yet.
+**Status:** Draft. Free provider (XposedOrNot) coded from public SDK docs, unverified against the live API; HIBP path parked until revenue. Not mounted in a Worker yet.
 **Version:** 1.0.0
 **Last Updated:** 2026-10-10
 **Branch:** feat/mpc-7252-mirror-risk-engine
