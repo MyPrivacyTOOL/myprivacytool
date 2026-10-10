@@ -54,7 +54,7 @@ function fake(opts = {}) {
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
-    if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, ...x }));
+    if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (rows.length > 1 && new Set(rows.map((x) => Object.keys(x).filter((k) => !['id', 'report_status', 'report_attempts'].includes(k)).sort().join(','))).size > 1) return res(400, { code: 'PGRST102', message: 'All object keys must match' });   // PostgREST bulk-insert rule
@@ -67,6 +67,7 @@ function fake(opts = {}) {
     const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
+    if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
     if (t === 'scans' && q.get('or')) rows = rows.slice(Number(q.get('offset') || 0), Number(q.get('offset') || 0) + Number(q.get('limit') || rows.length));   // oldest first = insertion order
     return res(200, rows);
   };
@@ -272,5 +273,37 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(limited.status === 429, 'unsubscribe request: rate limiter denial => 429');
   const noSecret = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, UNSUBSCRIBE_SECRET: undefined }, {});
   check(noSecret.status === 503, 'unsubscribe request: not configured => 503, no email');
+}
+// ---- unsubscribe before the report: no report is sent (found live 2026-10-10: report went out 2 min after an unsubscribe)
+{
+  const resends = (F) => F.calls.filter((c) => c.url.includes('resend'));
+  const later = (ms) => new Date(Date.now() + ms).toISOString();
+  // unsubscribed after requesting the scan, before the report job ran
+  let F = fake(); await handleScan(OB, null, input, F.f);
+  const sentBefore = resends(F).length;
+  F.db.users[0].email_opt_out_at = later(1000);
+  let o = await runReportJob(OB, F.f);
+  check(o.sent === 0 && o.cancelled === 1 && resends(F).length === sentBefore, 'unsubscribed before the report: no report email is sent');
+  check(F.db.scans[0].report_status === 'failed' && /unsubscribed/.test(F.db.scans[0].report_last_error) && F.db.scans[0].report_attempts === 0, 'unsubscribed before the report: scan is taken out of the queue with the reason on the row, no attempt counted');
+  o = await runReportJob(OB, F.f);
+  check(o.cancelled === 0 && resends(F).length === sentBefore, 'cancelled scan is not looked at again');
+
+  // a new scan requested AFTER unsubscribing is a fresh request: it still gets its report; follow-ups stay off
+  F = fake(); await handleScan(OB, null, input, F.f);
+  F.db.users[0].email_opt_out_at = new Date(Date.now() - 60000).toISOString();
+  o = await runReportJob(OB, F.f);
+  check(o.sent === 1 && F.db.scans[0].report_status === 'sent', 'scan requested after an earlier unsubscribe still gets its report');
+  F.db.scans[0].report_sent_at = new Date(Date.now() - 4 * 864e5).toISOString();
+  const beforeFollow = resends(F).length;
+  check((await runFollowUpJob(OB, F.f)).sent === 0 && resends(F).length === beforeFollow, 'and the opted-out user still gets no follow-up');
+
+  // six cancelled scans ahead must not block the next real scan (same shape as the held-scan bug), no allowlist
+  const open = { ...OB, RECIPIENT_ALLOWLIST: '' };
+  F = fake();
+  F.db.users.push(...Array.from({ length: 6 }, (_, i) => ({ id: `ou${i}`, email: `optout${i}@example.com`, email_opt_out_at: later(60000) })));
+  F.db.scans.push(...Array.from({ length: 6 }, (_, i) => ({ id: `old${i}`, user_id: `ou${i}`, email_scanned: `optout${i}@example.com`, confirmation_sent_at: new Date().toISOString(), report_status: 'pending', report_attempts: 0, report_due_at: later(864e5), created_at: new Date(Date.now() - 3600e3).toISOString() })));
+  await handleScan(open, null, { ...input, email: 'real@example.com' }, F.f);
+  o = await runReportJob(open, F.f);
+  check(o.cancelled === 6 && o.sent === 1 && F.db.scans.find((x) => x.email_scanned === 'real@example.com').report_status === 'sent' && resends(F).every((c) => JSON.parse(c.body).to[0] === 'real@example.com'), 'six cancelled scans ahead do not block the next real scan, and nothing is mailed to them');
 }
 process.exit(ok ? 0 : 1);

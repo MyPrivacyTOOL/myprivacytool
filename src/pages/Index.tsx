@@ -18,6 +18,7 @@ import {
   trackNewsletterSignup
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
+import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -130,16 +131,21 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Load HubSpot embed script dynamically
+  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
-    if (document.getElementById(scriptId)) return;
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
-    script.defer = true;
-    document.body.appendChild(script);
+    const load = () => {
+      if (!hasConsent() || document.getElementById(scriptId)) return;
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
+      script.defer = true;
+      document.body.appendChild(script);
+    };
+    load();
+    const unsubscribe = onConsentChange(load);
     return () => {
+      unsubscribe();
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };

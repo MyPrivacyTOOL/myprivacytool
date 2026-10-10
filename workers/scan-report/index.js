@@ -123,29 +123,36 @@ async function confirm(env, sb, scanId, email, fetchImpl) {
 // MPC-7406: scans held by RECIPIENT_ALLOWLIST stay pending and untouched, so they must never take up the per-run limit.
 // Reads the pending queue oldest-first in pages and keeps the first `limit` allowed scans; with no allowlist that is just the first `limit` rows.
 const REPORT_PAGE = 1000;
+// Someone who unsubscribed after requesting this scan gets no report: the unsubscribe page promises no more scan report emails.
+// (A scan requested after they unsubscribed is a fresh request and still gets its report; follow-ups stay off for them.)
+const unsubscribedSince = (job) => { const t = job.users?.email_opt_out_at; return Boolean(t) && Date.parse(t) > Date.parse(job.created_at); };
 async function nextReportJobs(env, sb, limit) {
   const stale = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
   const gated = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
   const size = gated ? REPORT_PAGE : limit;
-  const queue = []; let held = 0;
+  const queue = []; const cancelled = []; let held = 0;
   for (let offset = 0; ; offset += size) {
     const page = await sb.select(
-      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at` +
+      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at,created_at,users(email_opt_out_at)` +
       `&or=(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))` +
       `&report_attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc,id.asc&limit=${size}&offset=${offset}`);
     for (const job of page) {
       if (!recipientAllowed(env, job.email_scanned)) { held++; continue; }
-      if (queue.push(job) >= limit) return { queue, held };
+      if (unsubscribedSince(job)) { cancelled.push(job.id); continue; }
+      if (queue.push(job) >= limit) return { queue, held, cancelled };
     }
-    if (page.length < size) return { queue, held };
+    if (page.length < size) return { queue, held, cancelled };
   }
 }
 
 export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) return { skipped: 'no supabase key' };
   const sb = db(env, fetchImpl);
-  const { queue, held } = await nextReportJobs(env, sb, limit);
-  const out = { sent: 0, held, failed: 0 };
+  const { queue, held, cancelled } = await nextReportJobs(env, sb, limit);
+  const out = { sent: 0, held, failed: 0, cancelled: cancelled.length };
+  for (const id of cancelled) {   // take them out of the queue for good: nothing is sent and the reason is on the row
+    await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
+  }
   for (const job of queue) {
     try {
       if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl);     // catch up a missed confirmation
