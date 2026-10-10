@@ -5,8 +5,8 @@
 > `/DEPLOYMENT_RUNBOOK.md`, the runbook wins: the Worker is attached with a `custom_domain` route in `wrangler.toml`
 > (no manual CNAME), the real routes are `/webhook` and `/ingest/social` (not `/webhook/x`, `/webhook/telegram`),
 > the staging address is `core-brain.myprivacytool.workers.dev`, the `webhooks.` alias was **not** approved, and a
-> live Qwen classification (`intent_source: "qwen"`) is a launch gate. Read-only launch is approved: state write-back
-> and `interaction_log` are Phase 2.
+> live Qwen classification (`intent_source: "qwen"`) is a launch gate. Read-only launch was approved; state write-back
+> and `interaction_log` followed (MPC-8601 follow-up, `docs/core-brain.md`).
 
 **Document Status:** Ready for Review (CK Approval Required)  
 **Effective Date:** 2026-10-08  
@@ -144,15 +144,17 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 
 - [ ] **X Platform Webhook Setup:**
   - [ ] X Dev Portal → Account Activity API → create Webhook subscription
-  - [ ] Webhook URL: `https://brain.myprivacytool.io/webhook/x`
+  - [ ] Webhook URL: set on the social-listeners Worker per `DEPLOYMENT_RUNBOOK.md` section 4; core-brain itself only serves `/webhook` and `/ingest/social` (CK-7318)
   - [ ] Signature verification: Enabled
   - [ ] Webhook events subscribed: tweets (replies), direct messages, mentions
   - [ ] Test with sample event to verify 202 Accepted response
 - [ ] **Telegram Bot Webhook Setup:**
   - [ ] BotFather → `/setwebhook` command with production URL
-  - [ ] Webhook URL: `https://brain.myprivacytool.io/webhook/telegram`
+  - [ ] Webhook URL: set via social-listeners per `DEPLOYMENT_RUNBOOK.md` section 4, not a `/webhook/telegram` route on core-brain (CK-7318)
   - [ ] Verify: `getWebhookInfo` returns the production endpoint
   - [ ] Test with `@BotFather /debug` to verify message delivery
+
+> **CK-7318:** `/webhook/x` and `/webhook/telegram` do not exist on core-brain; the curl and load-test examples below that use them are illustrative only and will return 404. Real routes: `POST /webhook` (header `X-MPT-Webhook-Secret`) and `POST /ingest/social` (bearer token); gates are in `DEPLOYMENT_RUNBOOK.md` section 3.
 
 ### 3.5 Capacity & Load Testing
 
@@ -225,18 +227,18 @@ Compatibility Flags: nodejs_compat (for Buffer, crypto APIs)
 
 **T+30 minutes (X Cutover):**
 - [ ] Log into X Developer Portal → Account Activity API
-- [ ] Update webhook subscription URL: `https://brain.myprivacytool.io/webhook/x`
+- [ ] Update the X webhook subscription URL on social-listeners per `DEPLOYMENT_RUNBOOK.md` section 4 (no `/webhook/x` route exists on core-brain)
 - [ ] X Platform validates (should see "Subscription enabled")
 - [ ] Send test event via X (post a mention or DM to the bot account)
 - [ ] Verify event received in production logs: `wrangler tail --format pretty | grep "X webhook"`
-- [ ] Expected log: `"POST /webhook/x HTTP/1.1" 202 Accepted`
+- [ ] Expected: the test event is forwarded and handled; core-brain logs event metadata only (no message text). The 202 and access-log format shown in older drafts were never verified
 
 **T+1 hour (Telegram Cutover):**
-- [ ] Send Telegram command to BotFather: `/setwebhook https://brain.myprivacytool.io/webhook/telegram`
+- [ ] Point the Telegram bot webhook at social-listeners per `DEPLOYMENT_RUNBOOK.md` section 4 (no `/webhook/telegram` route exists on core-brain)
 - [ ] Verify response: `getWebhookInfo` should return the production URL
 - [ ] Send test message to the bot account
 - [ ] Verify event received in production logs: `wrangler tail --format pretty | grep "Telegram"`
-- [ ] Expected log: `"POST /webhook/telegram HTTP/1.1" 202 Accepted`
+- [ ] Expected: the test message is forwarded and handled; metadata-only logs. The 202 and access-log format shown in older drafts were never verified
 
 **T+2 hours (Stabilization):**
 - [ ] Check error rate: Should be <1% (query Supabase or Firestore)
@@ -584,8 +586,8 @@ SELECT * FROM mpt_classifications ORDER BY created_at DESC LIMIT 10;
 - `WEBHOOK_SECRET` = HMAC signing key
 
 **Social Platform Configurations:**
-- **X:** Dev Portal → Webhook URL → https://brain.myprivacytool.io/webhook/x
-- **Telegram:** `/setwebhook https://brain.myprivacytool.io/webhook/telegram`
+- **X:** Dev Portal → Webhook URL → the social-listeners URL from `DEPLOYMENT_RUNBOOK.md` section 4 (not `/webhook/x` on core-brain)
+- **Telegram:** `/setwebhook` with the social-listeners URL from `DEPLOYMENT_RUNBOOK.md` section 4 (not `/webhook/telegram` on core-brain)
 
 ### 12.3 References
 

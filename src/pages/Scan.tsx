@@ -13,8 +13,12 @@ const FORM_ID =
   import.meta.env.VITE_HUBSPOT_START_FORM_ID || "22ee30ae-6cf9-419b-aa46-b656b0e7b1bf";
 const SOURCE_TAG = "scan-page";
 
-// MPC-6677: scan-report Worker (confirmation email + 48h report). Unset = feature off, HubSpot-only as before.
-const SCAN_API_URL = import.meta.env.VITE_SCAN_API_URL as string | undefined;
+// MPC-6677: scan-report Worker (confirmation email + 48h report).
+// MPC-7385: defaults to the production Worker, like the other Worker endpoints in this app, so the site no longer
+// depends on a Pages build variable. Set VITE_SCAN_API_URL to an empty string to turn the feature off (HubSpot-only).
+// Who actually receives emails is still gated by RECIPIENT_ALLOWLIST on the Worker.
+const SCAN_API_URL =
+  (import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev";
 
 async function requestScanReport(email: string): Promise<void> {
   if (!SCAN_API_URL) return;

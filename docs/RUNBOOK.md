@@ -65,7 +65,7 @@ Secret names per Worker are in `workers/<name>/EXPECTED_SECRETS.txt`. Non-secret
 `github-channel` is deployed manually: Actions → *GitHub channel Worker* → Run workflow (the workflow refuses to deploy placeholder `REPLACE_*` config).
 
 ### 3.2 Site
-Merge to `main`; Cloudflare Pages builds `npm run build` (+ `postbuild`: `prerender-meta.mjs`, `generate-sitemap.mjs`). Check the Pages deployment is green, then load the changed route. The Pages project needs `VITE_WORKER_ENDPOINT` (= the `mpt-leads` URL) and optionally `VITE_SCAN_API_URL` (scan-report) and `VITE_GITHUB_CHANNEL_URL`.
+Merge to `main`; Cloudflare Pages builds `npm run build` (+ `postbuild`: `prerender-meta.mjs`, `generate-sitemap.mjs`). Check the Pages deployment is green, then load the changed route. The Pages project needs `VITE_WORKER_ENDPOINT` (= the `mpt-leads` URL) and optionally `VITE_GITHUB_CHANNEL_URL`. `VITE_SCAN_API_URL` is only an override now: the scan-report Worker address is the built-in default (MPC-7385).
 
 ### 3.3 Database change
 1. Add `supabase/migrations/<timestamp>_<name>.sql`, additive only, with its rollback written in the header comment.

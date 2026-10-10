@@ -1,0 +1,17 @@
+# mpt-metrics-collector: daily raw-metrics collector (MPC-7377, MPT analytics 2/9).
+# MyPrivacyTOOL Cloudflare account 35cb17172c65a20f5cf1baf131485382.
+name = "mpt-metrics-collector"
+main = "worker.js"
+workers_dev = true
+compatibility_date = "2024-09-23"
+
+[observability]
+enabled = true
+
+# Daily at 16:15 UTC = 00:15 HKT: just after each Hong Kong day ends, so "yesterday" (HKT) is complete.
+# The GA4 property must report in Asia/Hong_Kong (the GA4 collector refuses any other timezone).
+[triggers]
+crons = ["15 16 * * *"]
+
+# Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
+# Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).

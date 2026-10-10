@@ -491,3 +491,33 @@ export const trackThankYouNextStep = (source: string, destination: string) => {
   trackActivity();
   trackEvent('thank_you_next_step_click', { source, destination });
 };
+
+// ---------------------------------------------------------------------------
+// Blog funnel (Blog Deployment Runbook step 6):
+// blog_list_view -> blog_post_click -> blog_post_view -> blog_scroll_depth -> blog_cta_click
+// -> (existing) privacy_scan_completed. Register blog_cta_click as a GA4 key event.
+// No PII: slugs, categories and percentages only. Consent is enforced by GA4 Consent Mode.
+// ---------------------------------------------------------------------------
+export const trackBlogListView = (postCount: number) => {
+  trackEvent('blog_list_view', { post_count: postCount });
+};
+
+export const trackBlogPostClick = (postSlug: string, category: string, position: number) => {
+  trackActivity();
+  trackEvent('blog_post_click', { post_slug: postSlug, category, position });
+};
+
+export const trackBlogPostView = (postSlug: string, category: string, readTimeMinutes: number) => {
+  trackEvent('blog_post_view', { post_slug: postSlug, category, read_time_minutes: readTimeMinutes });
+};
+
+// Fires once per threshold (25/50/75/100) per post view; the caller de-duplicates.
+export const trackBlogScrollDepth = (postSlug: string, percentScrolled: number) => {
+  trackActivity();
+  trackEvent('blog_scroll_depth', { post_slug: postSlug, percent_scrolled: percentScrolled });
+};
+
+export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destination: string) => {
+  trackActivity();
+  trackEvent('blog_cta_click', { post_slug: postSlug, cta_location: ctaLocation, destination });
+};

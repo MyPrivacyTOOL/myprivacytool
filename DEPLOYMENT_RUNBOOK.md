@@ -5,7 +5,7 @@ Deploys the **core-brain** Cloudflare Worker (`workers/core-brain`, behaviour in
 | | URL | Notes |
 |---|---|---|
 | **Production** | `https://brain.myprivacytool.io` | Custom domain route in `wrangler.toml`. `wrangler deploy` creates the DNS record and certificate; no manual DNS record. |
-| Pre-production (workers.dev) | `https://core-brain.myprivacytool.workers.dev` | Same Worker, still enabled until traffic has moved; then set `workers_dev = false`. |
+| Pre-production (workers.dev) | `https://core-brain.myprivacytool.workers.dev` | Retired: `workers_dev = false`. Rollback: set it to `true` and redeploy. |
 
 There is **one** Worker. There is no separate staging Worker or `*.staging.workers.dev` address: "staging" was the first
 workers.dev deployment of the same script. Every push to `main` redeploys it (`.github/workflows/deploy.yml`).
@@ -59,16 +59,26 @@ curl -s -X POST "$BASE/webhook" \
 npx vitest run workers/core-brain
 ```
 
-Read-only launch: state write-back and `interaction_log` are intentionally not built (Phase 2). The Worker reads trust
-level from Supabase and falls back to anonymous; it never writes `conversation_states`.
+3a and 3b can also be run without handling the secret: Actions → *Core Brain production gates* → *Run workflow*
+(`core-brain-gates.yml`, CK-7318). It reads `WEBHOOK_SECRET` from the repo secret and prints only pass/fail, status codes
+and `intent_source`; the same check runs locally with `WEBHOOK_SECRET=... node scripts/ci/core-brain-gates.mjs`.
+
+State write-back and `interaction_log` (see `docs/core-brain.md`): apply `supabase/migrations/20261010120000_mpc_8601_core_brain_state_writeback.sql`
+before relying on them. Until it is applied the Worker still answers correctly (reads trust from Supabase, falls back to
+anonymous) and logs `state write failed` warnings. Once applied, each routed message upserts `conversation_states` and appends an
+`interaction_log` row; trust only ever goes up.
 
 ## 4. Cut traffic over
 
-One platform at a time, with a test message after each:
+Platforms never call core-brain directly: it accepts only `POST /webhook` (header `X-MPT-Webhook-Secret`) and `POST /ingest/social`
+(Bearer token), which Telegram and X cannot send. They call the **social-listeners** Worker, which verifies the platform
+signature and forwards to core-brain over the `CORE_BRAIN` service binding with `Authorization: Bearer <CORE_BRAIN_TOKEN>`
+(`CORE_BRAIN_TOKEN` must equal core-brain's `WEBHOOK_SECRET`). Take social-listeners' public address from Cloudflare
+(Workers & Pages -> social-listeners); it is not recorded in this repo. Tracked under MPC-7251. Cut over one platform at a time, with a test message after each:
 
-1. Telegram: set the bot webhook to `https://brain.myprivacytool.io/...` through social-listeners (it forwards to core-brain with the bearer token; confirm social-listeners' `CORE_BRAIN_TOKEN` equals `WEBHOOK_SECRET`).
-2. X: update the Account Activity webhook URL on social-listeners the same way.
-3. After about a week with no requests on the workers.dev address, set `workers_dev = false` in `wrangler.toml` and redeploy.
+1. Telegram: set the bot webhook to social-listeners `/webhook/telegram` (secret token = `TELEGRAM_WEBHOOK_SECRET`).
+2. X: set the Account Activity webhook URL to social-listeners `/webhook/x` (CRC check, signed POST).
+3. core-brain's workers.dev address is already retired (`workers_dev = false`, PR #159). Rollback is in section 5.
 
 DNS: nothing to edit by hand. The apex, `www` (Pages), `channels` and the `send.` mail records are untouched. Do not deploy
 during an Email Routing record change on the same zone, so a failure has one obvious cause.
@@ -78,7 +88,7 @@ during an Email Routing record change on the same zone, so a failure has one obv
 | Layer | Action |
 |---|---|
 | Worker code | Actions → *Rollback Worker* → `core-brain` (leave `dry_run` on first to list versions; untick it to roll back, optionally with a `version_id`). It snapshots secret names, rolls back, verifies they are unchanged and smoke-tests `brain.myprivacytool.io`. CLI: `cd workers/core-brain && npx wrangler rollback`. Dashboard: Workers → core-brain → Deployments. |
-| Callers | Point the platform webhooks back at the workers.dev address (still live until step 4.3). |
+| Callers | Platforms only talk to social-listeners: point the Telegram and X webhooks back at their previous URLs if needed. In an emergency core-brain can be given a direct address again (`workers_dev = true` in `wrangler.toml` and redeploy). |
 | Domain | Remove the `routes` line from `wrangler.toml` and redeploy, or delete the custom domain in Cloudflare → Workers → core-brain → Settings → Domains. Nothing else in the zone changed. |
 | Bad commit | `git revert <sha>` on `main`; the revert PR must pass CI and redeploys automatically. |
 
