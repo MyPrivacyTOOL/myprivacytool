@@ -5,7 +5,7 @@ Deploys the **core-brain** Cloudflare Worker (`workers/core-brain`, behaviour in
 | | URL | Notes |
 |---|---|---|
 | **Production** | `https://brain.myprivacytool.io` | Custom domain route in `wrangler.toml`. `wrangler deploy` creates the DNS record and certificate; no manual DNS record. |
-| Pre-production (workers.dev) | `https://core-brain.myprivacytool.workers.dev` | Same Worker, still enabled until traffic has moved; then set `workers_dev = false`. |
+| Pre-production (workers.dev) | `https://core-brain.myprivacytool.workers.dev` | Retired: `workers_dev = false`. Rollback: set it to `true` and redeploy. |
 
 There is **one** Worker. There is no separate staging Worker or `*.staging.workers.dev` address: "staging" was the first
 workers.dev deployment of the same script. Every push to `main` redeploys it (`.github/workflows/deploy.yml`).
@@ -68,7 +68,7 @@ One platform at a time, with a test message after each:
 
 1. Telegram: set the bot webhook to `https://brain.myprivacytool.io/...` through social-listeners (it forwards to core-brain with the bearer token; confirm social-listeners' `CORE_BRAIN_TOKEN` equals `WEBHOOK_SECRET`).
 2. X: update the Account Activity webhook URL on social-listeners the same way.
-3. After about a week with no requests on the workers.dev address, set `workers_dev = false` in `wrangler.toml` and redeploy.
+3. After about a week with no requests on the workers.dev address, `workers_dev = false` (done in MPC-7257 follow-up; rollback in section 5).
 
 DNS: nothing to edit by hand. The apex, `www` (Pages), `channels` and the `send.` mail records are untouched. Do not deploy
 during an Email Routing record change on the same zone, so a failure has one obvious cause.
