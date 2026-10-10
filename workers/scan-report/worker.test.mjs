@@ -66,6 +66,7 @@ function fake(opts = {}) {
     const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
+    if (t === 'scans' && q.get('or')) rows = rows.slice(Number(q.get('offset') || 0), Number(q.get('offset') || 0) + Number(q.get('limit') || rows.length));   // oldest first = insertion order
     return res(200, rows);
   };
   return { f, db, calls };
@@ -184,5 +185,33 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const F2r = fake({ resendFail: true }); F2r.db.users = F.db.users; F2r.db.scans = F.db.scans;
   o = await runFollowUpJob(OB, F2r.f);
   check(o.failed === 1 && F.db.scans[0].followup_stage === 0, 'follow-up send failure releases the stage for retry');
+}
+// ---- MPC-7406: held scans must not block the report queue
+{
+  const held = (n) => Array.from({ length: n }, (_, i) => ({ id: `held${i}`, user_id: `hu${i}`, email_scanned: `visitor${i}@example.com`, confirmation_sent_at: null, report_status: 'pending', report_attempts: 0, report_due_at: new Date(Date.now() + 864e5).toISOString() }));
+  const sendTo = (F) => F.calls.filter((c) => c.url.includes('resend')).flatMap((c) => JSON.parse(c.body).to);
+  // 12 older held scans, then one allowlisted scan: it is reported in the next run, held scans are untouched.
+  let F = fake(); F.db.scans.push(...held(12)); await handleScan(env, null, input, F.f);
+  const before = JSON.stringify(F.db.scans.slice(0, 12));
+  let o = await runReportJob(env, F.f);
+  const mine = F.db.scans.find((x) => x.email_scanned === EMAIL);
+  check(o.sent === 1 && o.held === 12 && mine.report_status === 'sent', 'queue: 12 older held scans do not block the allowlisted scan');
+  check(JSON.stringify(F.db.scans.slice(0, 12)) === before && sendTo(F).every((to) => to === EMAIL), 'queue: held scans untouched (still pending, 0 attempts) and nothing mailed outside the allowlist');
+  check(F.calls.filter((c) => c.method === 'PATCH' && !c.url.includes(mine.id)).length === 0, 'queue: no write of any kind to a held scan');
+  // Spans several pages (page size 1000): 1,200 held scans first.
+  F = fake(); F.db.scans.push(...held(1200)); await handleScan(env, null, input, F.f);
+  o = await runReportJob(env, F.f);
+  check(o.sent === 1 && F.db.scans.find((x) => x.email_scanned === EMAIL).report_status === 'sent' && sendTo(F).every((to) => to === EMAIL), 'queue: allowlisted scan found behind 1,200 held scans');
+
+  // Drain: allowlist emptied => held scans are reported oldest first, at most 5 per run.
+  F = fake(); F.db.scans.push(...held(12));
+  const open = { ...env, RECIPIENT_ALLOWLIST: '' };
+  o = await runReportJob(open, F.f);
+  const sentIds = () => F.db.scans.filter((x) => x.report_status === 'sent').map((x) => x.id);
+  check(o.sent === 5 && sendTo(F).length === 10 && sentIds().join() === 'held0,held1,held2,held3,held4', 'drain: first run reports the 5 oldest only (5 confirmations + 5 reports)');
+  await runReportJob(open, F.f);
+  check(sentIds().length === 10 && sentIds().at(-1) === 'held9', 'drain: second run reports the next 5 oldest');
+  await runReportJob(open, F.f);
+  check(sentIds().length === 12 && F.db.scans.every((x) => x.report_status === 'sent' && x.report_attempts === 1), 'drain: queue empties, each scan attempted exactly once');
 }
 process.exit(ok ? 0 : 1);
