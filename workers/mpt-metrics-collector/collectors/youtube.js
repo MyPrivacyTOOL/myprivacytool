@@ -18,11 +18,11 @@ const num = (v) => (v === undefined || v === null ? null : Number(v));
 export default {
   source: 'youtube',
   report: 'channel_daily',
-  async collect(env) {
+  async collect(env, now = new Date()) {
     if (!env.YOUTUBE_API_KEY) throw new Error('YOUTUBE_API_KEY not set');
     const channelId = env.YOUTUBE_CHANNEL_ID || DEFAULT_CHANNEL_ID;
-    // "That day" = the UTC day before this run (the cron fires just after 00:00 UTC).
-    const { start: dayStart, end: dayEnd } = previousDay();
+    // "That day" = the Hong Kong day before this run (the cron fires just after 00:00 HKT).
+    const { start: dayStart, end: dayEnd, day } = previousDay(now);
 
     const channels = await yt(env, 'channels', { part: 'statistics,contentDetails', id: channelId });
     const ch = channels.items?.[0];
@@ -49,7 +49,7 @@ export default {
       period_end: dayEnd.toISOString(),
       payload: {
         channel_id: channelId,
-        day: dayStart.toISOString().slice(0, 10),
+        day,
         summary: {
           subscribers: stats.hiddenSubscriberCount ? null : num(stats.subscriberCount),
           subscribers_hidden: Boolean(stats.hiddenSubscriberCount),

@@ -8,10 +8,10 @@ compatibility_date = "2024-09-23"
 [observability]
 enabled = true
 
-# Daily at 09:15 UTC (17:15 Hong Kong). Not earlier: the GA4 property reports in America/Los_Angeles, and that day
-# only ends at 07:00 UTC (PDT) / 08:00 UTC (PST), so an earlier run would store a partial "yesterday" (MPC-7378).
+# Daily at 16:15 UTC = 00:15 HKT: just after each Hong Kong day ends, so "yesterday" (HKT) is complete.
+# The GA4 property must report in Asia/Hong_Kong (the GA4 collector refuses any other timezone).
 [triggers]
-crons = ["15 9 * * *"]
+crons = ["15 16 * * *"]
 
 # Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
 # Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).

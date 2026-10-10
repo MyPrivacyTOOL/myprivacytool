@@ -1,4 +1,5 @@
 import worker, { runAll, COLLECTORS } from './worker.js';
+import { hkDate, hkWeekday, previousHkWeek } from './lib/hk.js';
 import supabaseCounts, { TABLES } from './collectors/supabase-counts.js';
 import cloudflare, { previousDay, WORKERS } from './collectors/cloudflare-analytics.js';
 import { COLLECTORS as ALL } from './worker.js';
@@ -82,17 +83,19 @@ check(inserts.length === ROWS() && ['cloudflare', 'supabase', 'youtube', 'ga4'].
 check(COLLECTORS.includes(supabaseCounts), 'supabase collector registered');
 
 // Cloudflare collector (MPC-7381)
-const rowFor = async (e = env) => { inserts = []; cfCalls = []; await runAll(e, [cloudflare], new Date('2026-10-10T00:15:00Z')); return inserts[0].row; };
+const rowFor = async (e = env) => { inserts = []; cfCalls = []; await runAll(e, [cloudflare], new Date('2026-10-09T16:15:00Z')); return inserts[0].row; };
 row = await rowFor();
 check(COLLECTORS.includes(cloudflare), 'cloudflare collector registered');
 check(row.source === 'cloudflare' && row.status === 'ok' && row.error === null, 'cloudflare row ok');
-check(row.period_start === '2026-10-09T00:00:00.000Z' && row.period_end === '2026-10-10T00:00:00.000Z', 'period is the previous full UTC day');
+check(row.period_start === '2026-10-08T16:00:00.000Z' && row.period_end === '2026-10-09T16:00:00.000Z', 'period is the previous full Hong Kong day (00:00-24:00 HKT)');
 check(row.payload.day === '2026-10-09' && cfCalls[0].b.variables.day === '2026-10-09' && cfCalls[0].b.variables.zoneTag === 'zone1', 'zone queried for that day');
 check(row.payload.zone.data.viewer.zones[0].httpRequests1dGroups[0].sum.requests === 1234 && row.payload.zone.data.viewer.zones[0].httpRequests1dGroups[0].uniq.uniques === 56, 'zone response stored untouched');
 check(row.payload.workers.data.viewer.accounts[0].workersInvocationsAdaptive.length === 3 && cfCalls[1].b.variables.scripts.join() === 'mpt-leads,core-brain,social-listeners', 'three Workers requested and stored untouched');
 check(cfCalls.every((c) => c.auth === 'Bearer cfro'), 'read-only analytics token used (not the deploy token)');
 check(!JSON.stringify(row).includes('cfro'), 'analytics token not in row');
 check(previousDay(new Date('2026-03-01T05:00:00Z')).day === '2026-02-28', 'previous-day rollover');
+check(previousDay(new Date('2026-10-09T15:59:59Z')).day === '2026-10-08' && previousDay(new Date('2026-10-09T16:00:00Z')).day === '2026-10-09', 'day flips exactly at 00:00 HKT (16:00 UTC)');
+check(hkDate(new Date('2026-10-09T16:00:00Z')) === '2026-10-10' && hkWeekday(new Date('2026-10-11T16:00:00Z')) === 1 && previousHkWeek(new Date('2026-10-11T16:30:00Z')).startDay === '2026-10-05', 'HK date, Monday and week helpers');
 
 cfFail = 'zone-http'; row = await rowFor(); cfFail = null;
 check(row.status === 'error' && /zone: HTTP 403/.test(row.error) && row.payload.zone === null && row.payload.workers !== null, 'zone HTTP failure => status=error, zone blank, workers kept');
@@ -103,11 +106,11 @@ check(row.status === 'error' && row.payload.zone === null && row.payload.workers
 
 
 // YouTube collector (MPC-7380)
-const ytRow = async (e = env) => { inserts = []; ytCalls = []; await runAll(e, [youtube], new Date('2026-10-10T00:15:00Z')); return inserts[0].row; };
+const ytRow = async (e = env) => { inserts = []; ytCalls = []; await runAll(e, [youtube], new Date('2026-10-09T16:15:00Z')); return inserts[0].row; };
 row = await ytRow(); const sm = row.payload.summary;
 check(COLLECTORS.includes(youtube), 'youtube collector registered');
 check(row.source === 'youtube' && row.report === 'channel_daily' && row.status === 'ok', 'youtube row ok');
-check(row.period_start === '2026-10-09T00:00:00.000Z' && row.period_end === '2026-10-10T00:00:00.000Z' && row.payload.day === '2026-10-09', 'period is the previous full UTC day');
+check(row.period_start === '2026-10-08T16:00:00.000Z' && row.period_end === '2026-10-09T16:00:00.000Z' && row.payload.day === '2026-10-09', 'period is the previous full Hong Kong day');
 check(row.payload.channel_id === DEFAULT_CHANNEL_ID && sm.subscribers === 0 && sm.total_views === 24 && sm.total_videos === 2, 'channel counts');
 check(sm.videos_published_on_day === 1 && sm.videos.length === 2 && sm.videos[0].views === 12 && sm.videos[0].likes === 3, 'per-video stats; only the 9 Oct upload counts for the day');
 check(row.payload.raw.channels.items.length === 1 && row.payload.raw.videos.items.length === 2 && row.payload.impressions === null, 'untouched responses in payload.raw; impressions null (needs OAuth)');

@@ -1,3 +1,5 @@
+import { previousHkDay } from '../lib/hk.js';
+
 // Cloudflare GraphQL Analytics pull: a cross-check on GA4 (which undercounts behind consent banners and ad blockers).
 // Zone: requests + unique visitors for myprivacytool.io. Workers: invocations + errors for the MPT Workers.
 // Auth: CLOUDFLARE_ANALYTICS_TOKEN, a read-only token (Analytics Read only). Never reuse the deploy token here.
@@ -21,11 +23,11 @@ const WORKERS_QUERY = `query($accountTag: string!, $start: Time!, $end: Time!, $
   } }
 }`;
 
-// The previous full UTC day: the day's Cloudflare numbers are complete once it has ended.
+// The previous complete Hong Kong day (00:00-24:00 HKT). Worker invocations use this exact window.
+// The zone dataset (httpRequests1dGroups) only buckets by UTC date, so the zone numbers are read for the UTC date
+// with the same calendar date (complete by the time the HKT day has ended) and labelled as such: payload.zone_utc_day.
 export function previousDay(now = new Date()) {
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const start = new Date(end.getTime() - 86400000);
-  return { start, end, day: start.toISOString().slice(0, 10) };
+  return previousHkDay(now);
 }
 
 async function graphql(env, query, variables) {
@@ -49,7 +51,7 @@ export default {
     if (!env.CLOUDFLARE_ANALYTICS_TOKEN || !env.CLOUDFLARE_ZONE_ID) {
       return { ...period, payload: { day, zone_name: ZONE_NAME, zone: null, workers: null }, error: 'CLOUDFLARE_ANALYTICS_TOKEN / CLOUDFLARE_ZONE_ID not set' };
     }
-    const payload = { day, zone_name: ZONE_NAME, zone: null, workers: null };
+    const payload = { day, zone_utc_day: day, zone_name: ZONE_NAME, zone: null, workers: null };
     const failures = [];
     try { payload.zone = await graphql(env, ZONE_QUERY, { zoneTag: env.CLOUDFLARE_ZONE_ID, day }); }
     catch (e) { failures.push(`zone: ${e.message}`); }

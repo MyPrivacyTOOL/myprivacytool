@@ -92,6 +92,11 @@ reset(); let out = await publishAll(env, now);
 check(out.length === 2 && out[0].day === '2026-10-11' && out[1].weekOf === '2026-10-05', 'Monday => daily for yesterday + weekly for the week just ended');
 reset(); out = await publishAll(env, new Date('2026-10-13T00:20:00Z'));
 check(out.length === 1 && out[0].kind === 'daily', 'other days => daily only');
+// Hong Kong calendar: 15:59 UTC Sunday is still Sunday in HK (daily only, for Saturday); 16:00 UTC is Monday 00:00 HKT
+reset(); out = await publishAll(env, new Date('2026-10-11T15:59:00Z'));
+check(out.length === 1 && out[0].day === '2026-10-10', 'Sunday 23:59 HKT => daily for Saturday only');
+reset(); out = await publishAll(env, new Date('2026-10-11T16:15:00Z'));
+check(out.length === 2 && out[0].day === '2026-10-11' && out[1].weekOf === '2026-10-05', '00:15 HKT Monday (16:15 UTC Sunday) => daily + weekly');
 reset(); const realFetch = globalThis.fetch; globalThis.fetch = async (u, o) => (String(u).includes('api.notion.com') ? { ok: false, status: 500, headers: new Headers() } : realFetch(u, o));
 out = await publishAll(env, now); globalThis.fetch = realFetch;
 check(out.length === 2 && out.every((x) => x.action === 'error') && !JSON.stringify(out).includes('ntn_secret'), 'Notion failure is reported per row, not thrown');

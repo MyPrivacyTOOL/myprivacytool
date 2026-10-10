@@ -5,6 +5,7 @@ import supabaseCounts from './collectors/supabase-counts.js';
 import cloudflareAnalytics from './collectors/cloudflare-analytics.js';
 import youtube from './collectors/youtube.js';
 import ga4Reports from './collectors/ga4.js';
+import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
@@ -32,7 +33,7 @@ async function insertRow(env, row) {
 
 export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
   const results = [];
-  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dayStart = hkDayStart(now); // default period: today so far, Hong Kong day
   for (const c of collectors) {
     if (c.skip?.(now)) continue; // e.g. GA4 weekly report runs on Mondays only
     const row = {
