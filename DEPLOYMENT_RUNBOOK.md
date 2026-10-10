@@ -68,11 +68,57 @@ level from Supabase and falls back to anonymous; it never writes `conversation_s
 
 ## 4. Cut traffic over
 
-One platform at a time, with a test message after each:
+**Telegram and X never call core-brain directly.** Each platform calls the **social-listeners** Worker, which checks the
+platform's own proof and forwards the event to core-brain (`POST /ingest/social`, over a service binding, with
+`Authorization: Bearer <CORE_BRAIN_TOKEN>`). core-brain only accepts `/webhook` (secret header) and `/ingest/social` (bearer
+token), neither of which a platform can send, so a webhook pointed at `brain.myprivacytool.io` would be rejected.
 
-1. Telegram: set the bot webhook to `https://brain.myprivacytool.io/...` through social-listeners (it forwards to core-brain with the bearer token; confirm social-listeners' `CORE_BRAIN_TOKEN` equals `WEBHOOK_SECRET`).
-2. X: update the Account Activity webhook URL on social-listeners the same way.
-3. After about a week with no requests on the workers.dev address, `workers_dev = false` (done in MPC-7257 follow-up; rollback in section 5).
+| Platform | URL to register on the platform | What the platform sends | Secret held by social-listeners |
+|---|---|---|---|
+| Telegram | `https://<social-listeners address>/webhook/telegram` | header `X-Telegram-Bot-Api-Secret-Token`, equal to the `secret_token` given to `setWebhook` | `TELEGRAM_WEBHOOK_SECRET` |
+| X | `https://<social-listeners address>/webhook/x` | a CRC `GET` (answered with the consumer secret), then signed `POST`s (`X-Twitter-Webhooks-Signature`) | `X_CONSUMER_SECRET` |
+
+`<social-listeners address>` is the Worker's own address. Its `wrangler.toml` has `workers_dev = true` and no custom route, so it
+is the `workers.dev` address shown in Cloudflare, Workers, social-listeners (`GET /` there answers `{"worker":"social-listeners","ok":true}`).
+Do **not** set `workers_dev = false` on social-listeners: the platforms need that address. (core-brain is different: it is served
+from `brain.myprivacytool.io` and its `workers.dev` address is off.)
+
+**Before repointing, check each of these:**
+
+1. The core-brain gates in section 3 pass.
+2. The social-listeners secrets are real values. `deploy.yml` substitutes the literal `placeholder` for any that is unset, so a
+   green deploy does not prove they are set. Names only: `cd workers/social-listeners && npx wrangler secret list`.
+   `CORE_BRAIN_TOKEN` must equal core-brain's `WEBHOOK_SECRET`; rotate the two together.
+3. The forward path works without involving a platform (use a recognisable test id, not a real chat id):
+   ```bash
+   SL=https://<social-listeners address>
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST "$SL/webhook/telegram" \
+     -H 'Content-Type: application/json' -H "X-Telegram-Bot-Api-Secret-Token: $TELEGRAM_WEBHOOK_SECRET" \
+     -d '{"message":{"chat":{"id":999000111},"text":"/start"}}'
+   # 200 = forwarded and accepted by core-brain. 401 = wrong Telegram secret. 502 = core-brain rejected or was unreachable
+   # (check CORE_BRAIN_TOKEN against WEBHOOK_SECRET). Without the header the answer must be 401.
+   ```
+   Once state write-back is deployed (`docs/core-brain.md`), this creates a state row for that test id; remove it afterwards with
+   `select public.mpt_erase_chat_sender('telegram', '999000111');`.
+
+**One platform at a time, a test message after each:**
+
+1. Telegram: register the webhook with the same value in `secret_token` as `TELEGRAM_WEBHOOK_SECRET`, then confirm with
+   `getWebhookInfo` (no `last_error_message`):
+   ```bash
+   curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
+     -d url="https://<social-listeners address>/webhook/telegram" -d secret_token="$TELEGRAM_WEBHOOK_SECRET"
+   ```
+2. X: in the X developer portal register `https://<social-listeners address>/webhook/x` for the Account Activity API (X sends
+   the CRC `GET` immediately and the registration fails unless `X_CONSUMER_SECRET` is correct), then subscribe the account.
+3. After about a week with no requests on the core-brain `workers.dev` address, `workers_dev = false` on core-brain
+   (done in the MPC-7257 follow-up; rollback in section 5).
+
+**No reply reaches the user yet.** social-listeners only checks that core-brain accepted the event and ignores the response keys,
+and core-brain never contacts the platforms (`docs/core-brain.md`). So a test message is confirmed in logs, **not** by a bot
+reply: core-brain logs a `routed` event for each message (Cloudflare, Workers, Logs; social-listeners logs only failures, such as
+`core_brain_rejected` or `core_brain_unreachable`), and, once state write-back is deployed, one `interaction_log` row appears per message. Real users will see silence until a reply path is built; decide whether
+that is acceptable before repointing a live bot.
 
 DNS: nothing to edit by hand. The apex, `www` (Pages), `channels` and the `send.` mail records are untouched. Do not deploy
 during an Email Routing record change on the same zone, so a failure has one obvious cause.
