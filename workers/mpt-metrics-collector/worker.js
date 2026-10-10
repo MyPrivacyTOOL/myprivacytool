@@ -4,14 +4,15 @@
 import supabaseCounts from './collectors/supabase-counts.js';
 import cloudflareAnalytics from './collectors/cloudflare-analytics.js';
 import youtube from './collectors/youtube.js';
+import ga4Reports from './collectors/ga4.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
@@ -33,13 +34,14 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
   const results = [];
   const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   for (const c of collectors) {
+    if (c.skip?.(now)) continue; // e.g. GA4 weekly report runs on Mondays only
     const row = {
       source: c.source, report: c.report, captured_at: now.toISOString(),
       period_start: dayStart.toISOString(), period_end: now.toISOString(),
       payload: {}, collector_version: COLLECTOR_VERSION, status: 'ok', error: null,
     };
     try {
-      const out = await c.collect(env);
+      const out = await c.collect(env, now);
       if (out.period_start) row.period_start = out.period_start;
       if (out.period_end) row.period_end = out.period_end;
       row.payload = out.payload ?? {};

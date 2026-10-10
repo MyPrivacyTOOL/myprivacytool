@@ -1,6 +1,8 @@
 import worker, { runAll, COLLECTORS } from './worker.js';
 import supabaseCounts, { TABLES } from './collectors/supabase-counts.js';
 import cloudflare, { previousDay, WORKERS } from './collectors/cloudflare-analytics.js';
+import { COLLECTORS as ALL } from './worker.js';
+const ROWS = () => ALL.filter((c) => !c.skip?.(new Date())).length; // GA4 weekly report is skipped except on Mondays
 import youtube, { DEFAULT_CHANNEL_ID } from './collectors/youtube.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', CLOUDFLARE_ANALYTICS_TOKEN: 'cfro', CLOUDFLARE_ZONE_ID: 'zone1', YOUTUBE_API_KEY: 'ytkey' };
@@ -70,13 +72,13 @@ check((await call('/run', 'POST')).status === 401, 'POST /run without token => 4
 check((await call('/run', 'POST', { authorization: 'Bearer wrong' })).status === 401, 'wrong token => 401');
 check((await call('/run', 'POST', {}, { ...env, COLLECTOR_TRIGGER_TOKEN: undefined })).status === 401, 'no token configured => 401');
 inserts = []; const ran = await call('/run', 'POST', { authorization: 'Bearer tok' });
-check(ran.status === 200 && inserts.length === 3, 'authorised POST /run collects every source');
+check(ran.status === 200 && inserts.length === ROWS(), 'authorised POST /run collects every source');
 check((await call('/nope')).status === 404, 'unknown path 404');
 
 // scheduled
 inserts = []; const waits = [];
 await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits);
-check(inserts.length === 3 && inserts.map((i) => i.row.source).sort().join() === 'cloudflare,supabase,youtube', 'scheduled run appends a row per source');
+check(inserts.length === ROWS() && ['cloudflare', 'supabase', 'youtube', 'ga4'].every((x) => inserts.some((i) => i.row.source === x)), 'scheduled run appends a row per source');
 check(COLLECTORS.includes(supabaseCounts), 'supabase collector registered');
 
 // Cloudflare collector (MPC-7381)
