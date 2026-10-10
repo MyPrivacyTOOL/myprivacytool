@@ -18,35 +18,56 @@ const h2 = (t) => `<h2 style="margin:28px 0 10px 0;font-size:18px;line-height:24
 const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
 const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
 
-// The confirmation may only promise what buildReportEmail delivers. Keep the two in sync.
-// DRAFT COPY (free version, no paid breach API): Chris must approve before any real-user send.
+// DRAFT COPY: Chris must approve before any real-user send.
+// CK 2026-10-11: copy rewritten to the "Your privacy scan is starting" version. It describes an automated search of public,
+// open-source data for usernames, phone numbers and addresses linked to the email. The report job (buildReportEmail) does NOT do
+// that lookup yet, so keep RECIPIENT_ALLOWLIST set until the pipeline matches this email (see the PR description).
 export function buildConfirmationEmail({ unsubscribeLink } = {}) {
-  const subject = 'We received your privacy scan request';
+  const subject = 'Your privacy scan is starting';
   const text = [
-    'Thanks for requesting a privacy scan from MyPrivacyTOOL.',
+    'Hi,',
     '',
-    'Within 48 hours we will email you a report that includes:',
-    '  - Step-by-step removal instructions for five people-search sites: Spokeo, Whitepages, BeenVerified, MyLife and Intelius',
-    '  - A link and short guide to check, free, whether your email address appears in known data breaches',
+    'You asked us to look at your privacy exposure — so we’re starting right now.',
     '',
-    'What the report does not do yet: we do not look you up on those sites or in breach databases for you,',
-    'and we do not give a privacy score until we can check something about you. Where we have not checked,',
-    'the report says "not yet checked" rather than guess.',
+    'Most people don’t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.',
     '',
-    'You can reply to this email with any questions, or ask us to delete your data at any time.',
+    'Here’s what happens next.',
     '',
+    'Now that we have your email, our AI Bot will search publicly available, open-source data and look for things connected to it, such as:',
+    '',
+    '  - Usernames',
+    '  - Phone numbers',
+    '  - Physical addresses',
+    '  - Other personal details that may be exposed',
+    '',
+    'Everything it finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases — only information that is already public.',
+    '',
+    'Our goal is simple: First we “mirror” what you look like from the outside and explain the risk in plain language. Then we help you start removing what’s out there.',
+    '',
+    'This email is now our open channel. You can reply anytime with a question, or simply click any of the image tiles below, and we’ll continue the conversation right here.',
+    '',
+    'Talk soon,',
     'The MyPrivacyTOOL team',
-    ...(unsubscribeLink ? ['', `Unsubscribe from further emails: ${unsubscribeLink}`] : []),
+    '',
+    `${CONTACT}  We never sell your data.`,
+    ...(unsubscribeLink ? [`Unsubscribe from further emails: ${unsubscribeLink}`] : []),
   ].join('\n');
-  const html = shell(subject, 'We will email your report within 48 hours.',
-    `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">We received your privacy scan request</h1>
-${para('Within <strong>48 hours</strong> we will email you a report that includes:')}
+  const html = shell(subject, 'We are starting your privacy scan now.',
+    `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">Your privacy scan is starting</h1>
+${para('Hi,')}
+${para('You asked us to look at your privacy exposure &mdash; so we&rsquo;re starting right now.')}
+${para('Most people don&rsquo;t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.')}
+${h2('Here&rsquo;s what happens next.')}
+${para('Now that we have your email, our AI Bot will search publicly available, open-source data and look for things connected to it, such as:')}
 <ul style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
-<li style="margin-bottom:6px">Step-by-step removal instructions for five people-search sites: Spokeo, Whitepages, BeenVerified, MyLife and Intelius</li>
-<li>A link and short guide to check, free, whether your email address appears in known data breaches</li></ul>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;font-size:14px;line-height:21px;color:#374151"><strong>What the report does not do yet:</strong> we do not look you up on those sites or in breach databases for you, and we do not give a privacy score until we can check something about you. Where we have not checked, the report says &ldquo;not yet checked&rdquo; rather than guess.</td></tr></table>
-${para('<br>Reply to this email with any questions, or to ask us to delete your data.')}
-${para('The MyPrivacyTOOL team')}`, unsubscribeLink);
+<li style="margin-bottom:6px">Usernames</li>
+<li style="margin-bottom:6px">Phone numbers</li>
+<li style="margin-bottom:6px">Physical addresses</li>
+<li>Other personal details that may be exposed</li></ul>
+${para('Everything it finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases &mdash; only information that is already public.')}
+${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like from the outside and explain the risk in plain language. Then we help you start removing what&rsquo;s out there.')}
+${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the image tiles below, and we&rsquo;ll continue the conversation right here.')}
+${para('Talk soon,<br>The MyPrivacyTOOL team')}`, unsubscribeLink);
   return { subject, text, html };
 }
 

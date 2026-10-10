@@ -36,7 +36,7 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(/48 hours/.test(conf.text) && /does not do yet/i.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation promises 48h, removal steps, states gaps; no score/breach-lookup promise');
+check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Usernames/.test(conf.text) && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
 check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /not yet checked/i.test(rep.text), 'free report: no score, self-check HIBP link, not yet checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
