@@ -2,13 +2,15 @@
 // sequences (MPC-7450). The landing page (MPC-7446) and the day-10 email (MPC-7448) read from here only.
 //
 // !! IVR_VERIFIED = false !!  The hotline, the 1357 caller-ID prefix and the 10-working-day rule come from the
-// OFCA public FAQ. The IVR menu itself (which key picks the language, which key picks the register, which key
-// confirms) has NOT been confirmed by a real call. Every key below is an UNVERIFIED PLACEHOLDER until MPC-7445
-// records the real menu (docs/hk-dnc-ivr-procedure.md). While IVR_VERIFIED is false the page must stay noindex,
+// OFCA public FAQ. The key presses live in hkDncIvr.json: the language keys and the "register a number" key were
+// REPORTED on one call (2026-10-11); the register and confirm keys are still guesses. They need a trilingual
+// speaker (MPC-7445 / MPC-7450-A2; docs/hk-dnc-ivr-procedure.md). While IVR_VERIFIED is false the page must stay noindex,
 // unlinked and without paid traffic, and must not claim that the keys auto-send correctly.
 //
 // OFCA cannot register on the user's behalf: the call has to come from the number being registered, so the
 // "engine" only builds the tap-to-dial string and the on-screen script.
+
+import ivrJson from "./hkDncIvr.json";
 
 export const HK_DNC_HOTLINE = "1835000";
 /** Dial before the hotline when outgoing caller ID is withheld; harmless when it is already shown. */
@@ -21,57 +23,47 @@ export type HkRegister = "sms" | "prerecorded" | "fax" | "all";
 export type HkLanguage = "en" | "yue";
 export type HkPlatform = "android" | "ios" | "other";
 
+export type IvrStatus = "UNVERIFIED" | "REPORTED" | "VERIFIED";
+
 export interface IvrKey {
   /** DTMF character: 0-9, * or #. */
   key: string;
   /** What the key is for, shown on screen (iOS / desktop) as the manual script. */
-  purpose: "language" | "register" | "confirm";
-  /** Every key is UNVERIFIED until MPC-7445. */
-  status: "UNVERIFIED";
+  purpose: "language" | "menu" | "register" | "confirm";
+  /** UNVERIFIED = guess, REPORTED = heard once, VERIFIED = confirmed. */
+  status: IvrStatus;
 }
 
 export const HK_REGISTERS: readonly HkRegister[] = ["sms", "prerecorded", "fax", "all"];
 
-// UNVERIFIED placeholders (MPC-7445): menu language option for English / Cantonese.
-export const LANGUAGE_KEYS: Record<HkLanguage, IvrKey> = {
-  en: { key: "1", purpose: "language", status: "UNVERIFIED" },
-  yue: { key: "2", purpose: "language", status: "UNVERIFIED" },
-};
-
-// UNVERIFIED placeholders (MPC-7445): register menu option and confirmation key, per register.
-const REGISTER_KEYS: Record<HkRegister, readonly IvrKey[]> = {
-  sms: [
-    { key: "1", purpose: "register", status: "UNVERIFIED" },
-    { key: "1", purpose: "confirm", status: "UNVERIFIED" },
-  ],
-  prerecorded: [
-    { key: "2", purpose: "register", status: "UNVERIFIED" },
-    { key: "1", purpose: "confirm", status: "UNVERIFIED" },
-  ],
-  fax: [
-    { key: "3", purpose: "register", status: "UNVERIFIED" },
-    { key: "1", purpose: "confirm", status: "UNVERIFIED" },
-  ],
-  all: [
-    { key: "4", purpose: "register", status: "UNVERIFIED" },
-    { key: "1", purpose: "confirm", status: "UNVERIFIED" },
-  ],
-};
+// The keys and pauses live in hkDncIvr.json so they can be changed later without touching code.
+interface KeyEntry {
+  key: string;
+  status: IvrStatus;
+}
+interface IvrData {
+  pauses: { beforeFirstKey: number; betweenKeys: number };
+  language: Record<HkLanguage, KeyEntry>;
+  menu: KeyEntry;
+  registers: Record<HkRegister, [KeyEntry, KeyEntry]>;
+}
+export const IVR_DATA: IvrData = ivrJson as unknown as IvrData;
 
 /**
- * Android dialers treat "," as a ~2 second pause. UNVERIFIED: the real IVR greeting length is unknown until
- * MPC-7445, so these are deliberately generous.
+ * Android dialers treat "," as a ~2 second pause. UNVERIFIED: the real greeting and prompt lengths are only
+ * roughly known (about 10-12 s before the language menu), so these are deliberately generous.
  */
-export const PAUSES = {
-  /** Wait for the IVR greeting before the first key. */
-  beforeFirstKey: 4,
-  /** Wait for each following prompt. */
-  betweenKeys: 3,
-} as const;
+export const PAUSES = IVR_DATA.pauses;
 
-/** The ordered keys to press for a language and register. */
+/** The ordered keys to press for a language and register: language, menu, register choice, confirm. */
 export function getIvrKeys(register: HkRegister, language: HkLanguage = "en"): IvrKey[] {
-  return [LANGUAGE_KEYS[language], ...REGISTER_KEYS[register]];
+  const [choice, confirm] = IVR_DATA.registers[register];
+  return [
+    { ...IVR_DATA.language[language], purpose: "language" },
+    { ...IVR_DATA.menu, purpose: "menu" },
+    { ...choice, purpose: "register" },
+    { ...confirm, purpose: "confirm" },
+  ];
 }
 
 export interface DialOptions {

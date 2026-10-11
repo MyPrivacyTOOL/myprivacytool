@@ -33,7 +33,7 @@ export interface HkCopy {
     keysHidden: HkStep;
     finish: HkStep;
   };
-  keyPurpose: { language: string; register: string; confirm: string };
+  keyPurpose: { language: string; menu: string; register: string; confirm: string };
   press: string;
   keysFallback: string;
   doneTitle: string;
@@ -111,7 +111,7 @@ export const EN: HkCopy = {
     keysHidden: { title: "Follow the spoken menu", body: "Listen to the recording, choose the option to register this number (all registers if offered) and confirm when asked." },
     finish: { title: "Hang up, then tap Done", body: "Hang up after the confirmation message, come back to this page and tap Done to see your protection date." },
   },
-  keyPurpose: { language: "language", register: "register", confirm: "confirm" },
+  keyPurpose: { language: "language", menu: "register a number", register: "register", confirm: "confirm" },
   press: "Press",
   keysFallback: "Keys on screen",
   doneTitle: "Finished the call?",
@@ -219,7 +219,7 @@ export const ZH: HkCopy = {
     keysHidden: { title: "跟隨語音選單", body: "留心收聽錄音，選擇登記此號碼的選項（如有提供，請選擇所有登記冊），並在提示時確認。" },
     finish: { title: "掛線，然後按「完成」", body: "聽到確認訊息後掛線，返回本頁並按「完成」，便可看到保障生效日期。" },
   },
-  keyPurpose: { language: "語言", register: "登記冊", confirm: "確認" },
+  keyPurpose: { language: "語言", menu: "登記號碼", register: "登記冊", confirm: "確認" },
   press: "按",
   keysFallback: "畫面顯示的按鍵",
   doneTitle: "通話完成了嗎？",

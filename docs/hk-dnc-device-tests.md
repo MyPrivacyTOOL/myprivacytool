@@ -4,12 +4,12 @@
 
 **Status of this matrix:** the dial strings are exact (unit-tested). The sandbox that built this has no phone, no browser on a handset and no network route to a hotline, so **no cell below has been run on a real device**. "Expected" is what the platforms are documented/commonly reported to do; each one needs confirming on the handset named.
 
-## What the function returns (register `all`, language `en`, placeholder keys)
+## What the function returns (register `all`, language `en`; keys from `src/config/hkDncIvr.json`, language and menu keys reported once, register and confirm keys still guesses)
 
 | Platform | `dial` | `manualKeys` | `autoKeys` |
 |----------|--------|--------------|------------|
-| `android` | `tel:13571835000,,,,1,,,4,,,1` | `[]` | true |
-| `ios` | `tel:13571835000` | `[en, all, confirm]` shown on screen | false |
+| `android` | `tel:13571835000,,,,,,3,,,1,,,1,,,1` | `[]` | true |
+| `ios` | `tel:13571835000` | `[language, menu, register, confirm]` shown on screen | false |
 | `other` (desktop, unknown) | `tel:13571835000` | same as iOS | false |
 
 `,` = pause (about 2 s on Android; `PAUSES` in the config). `#` and `*`, if the real menu needs them, are percent-encoded (`%23`, `%2A`). `tel:1835000` without the 1357 prefix is available with `forceCallerId: false`.
@@ -22,7 +22,7 @@ Run each row on the real handset from the landing page's dial button. Record the
 |---|------------------|------------------|-----------------------------------|----------------------------|--------------------------|--------|
 | 1 | iPhone, Safari | bare `tel:13571835000` | Yes, after the system "Call" confirmation sheet | n/a (no pauses sent) | No. User presses keys from the on-screen list | needs real device |
 | 2 | iPhone, Chrome | bare `tel:13571835000` | Yes, Chrome hands `tel:` to the system dialer (confirmation sheet) | n/a | No | needs real device |
-| 3 | Android, Chrome | `tel:13571835000,,,,1,,,4,,,1` | Yes, opens the dialer pre-filled | Yes, `,` becomes a pause in the dialer | Yes, once the call connects, if the dialer honours pauses | needs real device |
+| 3 | Android, Chrome | `tel:13571835000,,,,,,3,,,1,,,1,,,1` | Yes, opens the dialer pre-filled | Yes, `,` becomes a pause in the dialer | Yes, once the call connects, if the dialer honours pauses | needs real device |
 | 4 | Android, Samsung Internet | same as row 3 | Yes, opens the Samsung dialer | Expected yes (Samsung dialer shows `,` as a 2 s pause) | Expected yes | needs real device |
 | 5 | Android, Chrome, non-Samsung dialer (Pixel / Google Phone) | same as row 3 | Yes | Expected yes | Expected yes | needs real device |
 | 6 | Desktop Chrome / Safari | bare `tel:` | Depends on a registered handler (FaceTime, Teams, Skype or nothing) | n/a | No | needs real device |

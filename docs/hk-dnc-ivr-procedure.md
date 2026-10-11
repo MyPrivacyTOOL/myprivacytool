@@ -37,8 +37,11 @@ Register selection keys: SMS `__`  pre-recorded `__`  fax `__`  all three `__` (
 Anything unexpected (call-back offer, spoken confirmation of the number, how it says "registered"): `____`
 
 ## Then update the config
-1. In `src/config/hkDnc.ts` replace the placeholder keys in `LANGUAGE_KEYS` and `REGISTER_KEYS` with the recorded ones. If the real flow has a different number of steps, change the arrays: `getIvrKeys()` order is the press order.
-2. Tune `PAUSES` (each `,` is about 2 seconds on Android) from the "seconds until ready" column.
-3. Change each key's `status` from `"UNVERIFIED"` to `"VERIFIED"` (widen the `status` type) only for keys you actually heard.
-4. Set `IVR_VERIFIED = true`, update `src/config/hkDnc.test.ts` (it currently asserts the flag is `false`), and run the device tests in `docs/hk-dnc-device-tests.md`.
+All key presses and pause lengths live in **`src/config/hkDncIvr.json`** (no code change needed to edit them).
+1. Replace the `key` values with the recorded ones. Sequence pressed: language, menu ("register a number"), register choice, confirm. Language menu as reported 2026-10-11: 1 Cantonese, 2 Putonghua (Mandarin), 3 English.
+2. Tune `pauses` (each unit is one `,`, about 2 seconds on Android) from the "seconds until ready" column.
+3. Set `status` to `VERIFIED` only for keys confirmed on a real call by someone who understood the menu in that language.
+4. When every key is `VERIFIED`, set `IVR_VERIFIED = true` in `src/config/hkDnc.ts` (a unit test checks the two agree), then run the device tests in `docs/hk-dnc-device-tests.md`.
 5. Tell MPC-7446 the gate is clear.
+
+**Who can do the call:** ideally someone who understands Cantonese, Putonghua and English, so each language path and the register wording can be checked. Parked for now (2026-10-11); the tool works with the current values and the page stays noindex until `IVR_VERIFIED` is true.
