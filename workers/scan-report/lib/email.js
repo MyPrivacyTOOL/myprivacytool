@@ -80,7 +80,15 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     '',
     'Hi,',
     '',
-    'I’m Alice, MyPrivacyTOOL’s AI guide. From now on I’m your personal point of contact for your privacy: I’ll explain what’s exposed, show you what to fix first, and answer your replies. A person on our team can step in whenever you ask.',
+    'I’m Alice, MyPrivacyTOOL’s AI guide. From now on I’m your personal point of contact for your privacy concerns.',
+    '',
+    'MyPrivacyTOOL is a growing suite of AI tools and services for the places you communicate: social networks and other channels. We’re starting with your email address and people-search sites, and adding more channels over time.',
+    '',
+    'My job is to show you what you look like from the outside on those channels. I’ll explain what’s exposed, show you what to fix first, answer your questions and concerns, and help you understand how information like this gets out there, what risk it poses to you, and how to fix it going forward.',
+    '',
+    'As more data builds up across platforms, I’ll show you what it means for your privacy and risk.',
+    '',
+    'A real person on our team can step in whenever you ask.',
     '',
     'You asked us to look at your privacy exposure — so we’re starting right now.',
     '',
@@ -112,7 +120,11 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
   const html = shell(subject, 'We are starting your privacy scan now.',
     `${aliceHero('Your privacy scan is starting', 'wave')}
 ${para('Hi,')}
-${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m your personal point of contact for your privacy: I&rsquo;ll explain what&rsquo;s exposed, show you what to fix first, and answer your replies. A person on our team can step in whenever you ask.')}
+${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m your personal point of contact for your privacy concerns.')}
+${para('MyPrivacyTOOL is a growing suite of AI tools and services for the places you communicate: social networks and other channels. We&rsquo;re starting with your email address and people-search sites, and adding more channels over time.')}
+${para('My job is to show you what you look like from the outside on those channels. I&rsquo;ll explain what&rsquo;s exposed, show you what to fix first, answer your questions and concerns, and help you understand how information like this gets out there, what risk it poses to you, and how to fix it going forward.')}
+${para('As more data builds up across platforms, I&rsquo;ll show you what it means for your privacy and risk.')}
+${para('A real person on our team can step in whenever you ask.')}
 ${para('You asked us to look at your privacy exposure &mdash; so we&rsquo;re starting right now.')}
 ${para('Most people don&rsquo;t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.')}
 ${h2('Here&rsquo;s what happens next.')}
