@@ -77,7 +77,7 @@ describe("hero, CTA and steps", () => {
     renderEn();
     expect(screen.getByTestId("hk-unverified")).toHaveTextContent(/UNVERIFIED/);
     expect(dialLink().getAttribute("href")).toBe("tel:13571835000");
-    expect(within(screen.getByTestId("hk-keys")).getAllByRole("listitem")).toHaveLength(3);
+    expect(within(screen.getByTestId("hk-keys")).getAllByRole("listitem")).toHaveLength(4);
     expect(screen.getByText("Press the keys shown")).toBeInTheDocument();
   });
 
