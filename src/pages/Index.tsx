@@ -7,6 +7,7 @@ import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } fro
 import { RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import HkStopSpamCard from '@/components/HkStopSpamCard';
 import logoFull from '@/assets/logo-full.png';
 import {
   trackFunnelStep,
@@ -266,6 +267,9 @@ const Index = () => {
             <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
           )}
         </section>
+
+        {/* MPC-7446: Hong Kong visitors only; hidden until the /HongKongSpam launch flag is on */}
+        <HkStopSpamCard placement="home" />
 
         {/* Journey teaser */}
         <section className="pb-12 px-4" aria-labelledby="journey-teaser-heading">
