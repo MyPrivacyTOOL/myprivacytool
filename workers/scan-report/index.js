@@ -10,7 +10,7 @@ import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUr
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
 const MAX_ATTEMPTS = 5;
-const STALE_CLAIM_MS = 15 * 60 * 1000;
+const STALE_CLAIM_MS = 30 * 60 * 1000;   // MPC-7406: a scan 'processing' longer than this was abandoned (Worker timeout/crash) and goes back to pending
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const clip = (v, n) => String(v ?? '').slice(0, n);
 // Per-IP limit (wrangler.toml [[unsafe.bindings]] type "ratelimit"); fails open if the binding is absent or errors.
@@ -66,7 +66,7 @@ export default {
   async scheduled(event, env, ctx) {
     // MPC-7448: the HK Spam day-10 email has its own cron; every other trigger runs the report + follow-up jobs as before.
     if (event?.cron === HK_SPAM_CRON) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
-    else ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env)));
+    else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
   },
 };
 
@@ -154,11 +154,24 @@ async function nextReportJobs(env, sb, limit) {
   }
 }
 
+// MPC-7406: a Worker killed mid-scan never reaches its catch block, leaving the row 'processing' forever. Put such rows
+// back to 'pending' (retry) or, once attempts are used up, to 'failed' with the reason, so none is stuck silently.
+// Uses the same atomic claim filter (status + claimed_at) as the claim, so a live run's row is never touched.
+async function resetStaleClaims(sb) {
+  const stale = encodeURIComponent(new Date(Date.now() - STALE_CLAIM_MS).toISOString());
+  const base = `scans?report_status=eq.processing&report_claimed_at=lt.${stale}`;
+  const exhausted = await sb.patch(`${base}&report_attempts=gte.${MAX_ATTEMPTS}`, { report_status: 'failed', report_last_error: 'stale: stuck in processing past the retry limit' });
+  const retried = await sb.patch(`${base}&report_attempts=lt.${MAX_ATTEMPTS}`, { report_status: 'pending', report_last_error: 'stale: processing timed out, reset for retry' });
+  if (exhausted.length || retried.length) console.warn(`scan queue: reset ${retried.length} stale scan(s) to pending, failed ${exhausted.length} past the retry limit`);
+}
+
 export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return { skipped: 'no supabase key' };
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.error('scan queue: SUPABASE_SERVICE_ROLE_KEY is not set, nothing can be processed'); return { skipped: 'no supabase key' }; }
   const sb = db(env, fetchImpl);
+  await resetStaleClaims(sb).catch((e) => console.error('scan queue: stale reset failed:', String(e)));
   const { queue, held, cancelled } = await nextReportJobs(env, sb, limit);
   const out = { sent: 0, held, failed: 0, cancelled: cancelled.length };
+  console.log(`scan queue: ${queue.length} to process, ${held} held by allowlist, ${cancelled.length} cancelled`);
   for (const id of cancelled) {   // take them out of the queue for good: nothing is sent and the reason is on the row
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
   }
@@ -166,15 +179,16 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
     try {
       if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl);     // catch up a missed confirmation
       const claimed = await sb.patch(`scans?id=eq.${job.id}&report_status=eq.${job.report_status}`, { report_status: 'processing', report_claimed_at: new Date().toISOString(), report_attempts: job.report_attempts + 1 });
-      if (!claimed.length) continue;                                                                    // another run took it
+      if (!claimed.length) { console.log(`scan ${job.id}: already claimed by another run, skipping`); continue; }   // another run took it
+      console.log(`scan ${job.id}: processing (attempt ${job.report_attempts + 1}/${MAX_ATTEMPTS})`);
       const r = await processScan(env, sb, job, fetchImpl);
-      if (r.held) { await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
-      else out.sent++;
+      if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
+      else { out.sent++; console.log(`scan ${job.id}: sent`); }
     } catch (e) {
       out.failed++;
       const attempts = job.report_attempts + 1;
       console.error(`report failed for scan ${job.id} (attempt ${attempts}):`, String(e));
-      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch(() => {});
+      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch((e2) => console.error(`scan ${job.id}: could not record failure (row may stay processing until the stale reset):`, String(e2)));
     }
   }
   const overdue = queue.filter((j) => new Date(j.report_due_at) < new Date()).length;
