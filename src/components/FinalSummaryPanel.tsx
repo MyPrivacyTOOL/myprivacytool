@@ -13,6 +13,7 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
+import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
@@ -423,7 +424,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted); // Gray
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      pdf.text('Complete Privacy Analysis - 46 Data Points', margin, 28);
+      pdf.text(`Complete Privacy Analysis - ${HEXAGON_COUNT} Data Points`, margin, 28);
       pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 35);
       
       yPos = 55;
@@ -441,7 +442,7 @@ export default function FinalSummaryPanel({
       
       // Data Points
       pdf.setTextColor(...PDF.brand);
-      pdf.text('46', margin + colWidth * 0 + 10, statsY);
+      pdf.text(String(HEXAGON_COUNT), margin + colWidth * 0 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Data Points', margin + colWidth * 0 + 10, statsY + 8);
@@ -465,7 +466,7 @@ export default function FinalSummaryPanel({
       // Exposure
       pdf.setFontSize(18);
       pdf.setTextColor(...PDF.cyan);
-      pdf.text(`${Math.round((confirmedCount / 46) * 100)}%`, margin + colWidth * 3 + 10, statsY);
+      pdf.text(`${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`, margin + colWidth * 3 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Exposure', margin + colWidth * 3 + 10, statsY + 8);
@@ -692,7 +693,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text('All 46 data points were analyzed in your browser. Nothing was transmitted to any server.', margin, yPos + 12);
+      pdf.text(`All ${HEXAGON_COUNT} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
       pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
 
       // Save the PDF
@@ -709,12 +710,12 @@ export default function FinalSummaryPanel({
     const report = {
       generatedAt: new Date().toISOString(),
       summary: {
-        totalDataPoints: 46,
+        totalDataPoints: HEXAGON_COUNT,
         confirmedDataPoints: confirmedCount,
         overallPrivacyRisk: overallRisk,
         riskLevel: getRiskLabel(overallRisk),
         uniqueness: `1 in ${uniquenessEstimate.toLocaleString()} browsers`,
-        trackingExposure: `${Math.round((confirmedCount / 46) * 100)}%`,
+        trackingExposure: `${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`,
       },
       categories: categoryStats.map((cat) => ({
         name: cat.name,
@@ -768,8 +769,8 @@ export default function FinalSummaryPanel({
   const handleShare = () => {
     const shareText = `🎯 My Complete Digital Shadow - Final Report
 
-📊 46 data points analyzed
-🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / 46) * 100)}%)
+📊 ${HEXAGON_COUNT} data points analyzed
+🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%)
 Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
 🔍 Uniqueness: 1 in ${uniquenessEstimate.toLocaleString()} browsers
 ${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
@@ -804,7 +805,7 @@ Test yours at: ${window.location.origin}`;
               </Badge>
             </CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
-              Complete analysis of 46 data points across 8 categories
+              Complete analysis of {HEXAGON_COUNT} data points across {HEXAGON_GROUP_COUNT} categories
             </p>
           </div>
         </div>
@@ -814,7 +815,7 @@ Test yours at: ${window.location.origin}`;
         {/* Overall Statistics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-risk-low">46</p>
+            <p className="text-2xl font-bold text-risk-low">{HEXAGON_COUNT}</p>
             <p className="text-xs text-muted-foreground">Data Points</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
@@ -826,7 +827,7 @@ Test yours at: ${window.location.origin}`;
             <p className="text-xs text-muted-foreground">Uniqueness</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / 46) * 100)}%</p>
+            <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%</p>
             <p className="text-xs text-muted-foreground">Exposure</p>
           </div>
         </div>
@@ -1002,7 +1003,7 @@ Test yours at: ${window.location.origin}`;
         <div className="flex items-center gap-3 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
           <span className="text-xl">🔒</span>
           <p className="text-xs text-risk-low">
-            <strong>100% Local:</strong> All 46 data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.
+            <strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.
           </p>
         </div>
       </CardContent>
