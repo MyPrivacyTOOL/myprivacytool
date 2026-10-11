@@ -51,6 +51,15 @@ const funnelSteps: Record<string, number> = {
   'deep_scan_triggered': 6,
   'all_hexagons_confirmed': 7,
   'scroll_to_footer': 8,
+  // Wave steps previously reported step_number 0. New numbers only; 1-8 keep their historical meaning (MPC-7376).
+  'language_scan_triggered': 9,
+  'orientation_scan_triggered': 10,
+  'fingerprint_scan_triggered': 11,
+  'advanced_fingerprint_scan_triggered': 12,
+  'storage_scan_triggered': 13,
+  'social_scan_triggered': 14,
+  'security_scan_triggered': 15,
+  'behavior_scan_triggered': 16,
 };
 
 export const trackFunnelStep = (step: string, metadata?: Record<string, string | number | boolean>) => {
@@ -59,6 +68,16 @@ export const trackFunnelStep = (step: string, metadata?: Record<string, string |
     step_number: funnelSteps[step] || 0,
     ...metadata,
   });
+};
+
+// A scan "starts" at the first hexagon interaction, so it can be told apart from a bare page load (MPC-7376).
+// Fires once per page session.
+let scanStartedTracked = false;
+
+export const trackScanStarted = () => {
+  if (scanStartedTracked) return;
+  scanStartedTracked = true;
+  attributedEvent('scan_started', {});
 };
 
 // Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
