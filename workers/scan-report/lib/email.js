@@ -2,6 +2,8 @@ import { CATEGORIES } from './score.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SITE = 'https://myprivacytool.io';
+// Sign-off for the scan, report and follow-up emails: Alice, the AI guide, not an anonymous team.
+export const SIGN_OFF = ['Alice', 'Your Dedicated MyPrivacyTOOL AI'];
 
 // MPC-7406 follow-up: shared HTML shell for the transactional emails. Table layout with inline styles only (mail apps strip <style>
 // and scripts), 600px max width, system fonts, light/dark safe colours. The plain-text parts are unchanged.
@@ -78,20 +80,29 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     '',
     'Hi,',
     '',
+    'I’m Alice, MyPrivacyTOOL’s AI guide. From now on I’m your personal point of contact for your privacy concerns.',
+    '',
+    'MyPrivacyTOOL is a growing suite of AI tools and services for the places you communicate: social networks and other channels. We’re starting with your email address and people-search sites, and adding more channels over time.',
+    '',
+    'My job is to show you what you look like from the outside on those channels. I’ll explain what’s exposed, show you what to fix first, answer your questions and concerns, and help you understand how information like this gets out there, what risk it poses to you, and how to fix it going forward.',
+    '',
+    'As more data builds up across platforms, I’ll show you what it means for your privacy and risk.',
+    '',
+    'A real person on our team can step in whenever you ask.',
+    '',
     'You asked us to look at your privacy exposure — so we’re starting right now.',
     '',
     'Most people don’t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.',
     '',
     'Here’s what happens next.',
     '',
-    'Now that we have your email, Alice, our AI guide, will search publicly available, open-source data and look for things connected to it, such as:',
+    'Within 48 hours I’ll send you your report. In this first version I don’t search databases for you yet, so I’ll be clear about what I have and haven’t checked. You’ll get:',
     '',
-    '  - Usernames',
-    '  - Phone numbers',
-    '  - Physical addresses',
-    '  - Other personal details that may be exposed',
+    '  - A map of the 8 areas where your information can be exposed, each marked as checked or not yet checked',
+    '  - A link to check your email for known data breaches yourself',
+    '  - Step-by-step opt-out guides for the people-search sites where we have a verified guide',
     '',
-    'Everything Alice finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases — only information that is already public.',
+    'At this stage we are not using any paid tools or private databases — only publicly available, open-source data.',
     '',
     'Our goal is simple: First we “mirror” what you look like from the outside and explain the risk in plain language. Then we help you start removing what’s out there.',
     '',
@@ -101,7 +112,7 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     ...Object.values(CATEGORIES).map((c) => `  ${HEX_OFF} ${c.label}`),
     '',
     'Talk soon,',
-    'The MyPrivacyTOOL team',
+    ...SIGN_OFF,
     '',
     `${CONTACT}  We never sell your data.`,
     ...(unsubscribeLink ? [`Unsubscribe from further emails: ${unsubscribeLink}`] : []),
@@ -109,21 +120,25 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
   const html = shell(subject, 'We are starting your privacy scan now.',
     `${aliceHero('Your privacy scan is starting', 'wave')}
 ${para('Hi,')}
+${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m your personal point of contact for your privacy concerns.')}
+${para('MyPrivacyTOOL is a growing suite of AI tools and services for the places you communicate: social networks and other channels. We&rsquo;re starting with your email address and people-search sites, and adding more channels over time.')}
+${para('My job is to show you what you look like from the outside on those channels. I&rsquo;ll explain what&rsquo;s exposed, show you what to fix first, answer your questions and concerns, and help you understand how information like this gets out there, what risk it poses to you, and how to fix it going forward.')}
+${para('As more data builds up across platforms, I&rsquo;ll show you what it means for your privacy and risk.')}
+${para('A real person on our team can step in whenever you ask.')}
 ${para('You asked us to look at your privacy exposure &mdash; so we&rsquo;re starting right now.')}
 ${para('Most people don&rsquo;t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.')}
 ${h2('Here&rsquo;s what happens next.')}
-${para('Now that we have your email, Alice, our AI guide, will search publicly available, open-source data and look for things connected to it, such as:')}
+${para('Within 48 hours I&rsquo;ll send you your report. In this first version I don&rsquo;t search databases for you yet, so I&rsquo;ll be clear about what I have and haven&rsquo;t checked. You&rsquo;ll get:')}
 <ul style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
-<li style="margin-bottom:6px">Usernames</li>
-<li style="margin-bottom:6px">Phone numbers</li>
-<li style="margin-bottom:6px">Physical addresses</li>
-<li>Other personal details that may be exposed</li></ul>
-${para('Everything Alice finds will be collected and sent back to you in a clear report so you can see exactly how you currently appear online. At this stage we are not using any paid tools or private databases &mdash; only information that is already public.')}
+<li style="margin-bottom:6px">A map of the 8 areas where your information can be exposed, each marked as checked or not yet checked</li>
+<li style="margin-bottom:6px">A link to check your email for known data breaches yourself</li>
+<li>Step-by-step opt-out guides for the people-search sites where we have a verified guide</li></ul>
+${para('At this stage we are not using any paid tools or private databases &mdash; only publicly available, open-source data.')}
 ${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like from the outside and explain the risk in plain language. Then we help you start removing what&rsquo;s out there.')}
 ${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the hexagons below, and we&rsquo;ll continue the conversation right here.')}
 ${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
 ${honeycomb(Object.entries(CATEGORIES).map(([key, c]) => hexTile({ key, label: c.label, href: `mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}` })))}
-${para('Talk soon,<br>The MyPrivacyTOOL team')}`, unsubscribeLink);
+${para(`Talk soon,<br><strong>${SIGN_OFF[0]}</strong><br>${SIGN_OFF[1]}`)}`, unsubscribeLink);
   return tagged('scan-confirmation', { subject, text, html });
 }
 
