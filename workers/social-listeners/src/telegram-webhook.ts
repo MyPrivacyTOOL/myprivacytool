@@ -1,7 +1,7 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { createLogger } from "./logger";
 import { sendTelegramReply } from "./reply";
-import { type Env, callCoreBrain, parseJson, readRawBody, timingSafeEqual } from "./shared";
+import { type Env, RATE_LIMITED, callCoreBrain, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
 const log = createLogger("social-listeners:telegram");
 
@@ -23,6 +23,7 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
 
   const brain = await callCoreBrain(env, { source: "telegram", receivedAt: new Date().toISOString(), payload }, log);
+  if (brain === RATE_LIMITED) return new Response("OK"); // throttled sender: acknowledge so Telegram does not retry
   if (!brain) return new Response("Upstream Unavailable", { status: 502 });
   // Answer Telegram right away; sending the reply must never delay or fail the webhook (a non-2xx makes Telegram retry).
   const send = sendTelegramReply(env, payload, brain, log);

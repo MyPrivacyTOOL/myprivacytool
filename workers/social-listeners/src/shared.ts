@@ -44,8 +44,14 @@ export interface ForwardEnvelope {
   payload: unknown;
 }
 
-/** Forwards to core-brain via service binding, else HTTP. Returns the response when core-brain accepted it, else null. */
-export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<Response | null> {
+/**
+ * Forwards to core-brain via service binding, else HTTP. Returns the response when core-brain accepted it, null when it
+ * could not be reached or refused it, and RATE_LIMITED when core-brain throttled the sender (429). A throttled event must
+ * be acknowledged and dropped, not retried: platforms resend on a non-2xx, which would only feed the limiter (MPC-7257).
+ */
+export const RATE_LIMITED = Symbol("core-brain-rate-limited");
+
+export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<Response | typeof RATE_LIMITED | null> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   // MPC-8601: core-brain is also reachable on its public workers.dev address, so it authenticates every caller,
   // service binding included. CORE_BRAIN_TOKEN must equal core-brain's WEBHOOK_SECRET.
@@ -64,6 +70,10 @@ export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Lo
   }
   try {
     const res = await target.fetch(new Request(url, { method: "POST", headers, body: JSON.stringify(envelope) }));
+    if (res.status === 429) {
+      log.warn("core_brain_rate_limited", { source: envelope.source });
+      return RATE_LIMITED;
+    }
     if (!res.ok) log.error("core_brain_rejected", { source: envelope.source, status: res.status });
     return res.ok ? res : null;
   } catch (err) {
@@ -72,9 +82,9 @@ export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Lo
   }
 }
 
-/** Same as callCoreBrain for callers that only need to know whether core-brain accepted the event. */
+/** Same as callCoreBrain for callers that only need to know whether the event is done: accepted, or throttled and dropped. */
 export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, log: Logger): Promise<boolean> {
-  return (await callCoreBrain(env, envelope, log)) !== null;
+  return (await callCoreBrain(env, envelope, log)) !== null; // RATE_LIMITED counts as done: acknowledge, do not retry
 }
 
 /** Parses JSON (already signature-verified). Null on malformed input. */
