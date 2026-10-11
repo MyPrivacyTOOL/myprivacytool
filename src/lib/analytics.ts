@@ -535,3 +535,15 @@ export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destina
   trackActivity();
   attributedEvent('blog_cta_click', { post_slug: postSlug, cta_location: ctaLocation, destination });
 };
+
+// ---------------------------------------------------------------------------
+// Pricing page (MPC-7376). No checkout exists yet, so plan buttons are the conversion signal.
+// ---------------------------------------------------------------------------
+export const trackPricingView = () => {
+  trackEvent('pricing_view');
+};
+
+export const trackPricingPlanClick = (plan: string, destination: string) => {
+  trackActivity();
+  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination });
+};

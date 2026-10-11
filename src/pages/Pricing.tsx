@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { trackPricingPlanClick, trackPricingView } from "@/lib/analytics";
 
 // MPC-7460: locked pricing approved Sep 23 2026 (Free / Basic / Pro / Executive). Scan allowances are
 // placeholder defaults pending review.
@@ -21,7 +23,12 @@ const PLANS: Plan[] = [
   { name: "Executive", scans: "Unlimited scans", monthly: "$49.99", cta: { label: "Get launch updates", to: "/newsletter" } },
 ];
 
-const Pricing = () => (
+const Pricing = () => {
+  useEffect(() => {
+    trackPricingView();
+  }, []);
+
+  return (
   <>
     <Seo {...pageMeta["/pricing"]} path="/pricing" />
     <main className="min-h-screen bg-background">
@@ -54,7 +61,9 @@ const Pricing = () => (
                 {plan.note && <li>{plan.note}</li>}
               </ul>
               <Button asChild variant="outline">
-                <Link to={plan.cta.to}>{plan.cta.label}</Link>
+                <Link to={plan.cta.to} onClick={() => trackPricingPlanClick(plan.name.toLowerCase(), plan.cta.to)}>
+                  {plan.cta.label}
+                </Link>
               </Button>
             </section>
           ))}
@@ -77,6 +86,7 @@ const Pricing = () => (
       </div>
     </main>
   </>
-);
+  );
+};
 
 export default Pricing;
