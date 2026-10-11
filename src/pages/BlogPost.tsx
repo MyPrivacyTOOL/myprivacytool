@@ -8,7 +8,7 @@ import { ArrowLeft, Share2, Copy } from 'lucide-react';
 import blogPosts from '@/data/blogPosts.json';
 import { guides } from '@/content/guides';
 import { trackBlogCtaClick, trackBlogPostView, trackBlogScrollDepth } from '@/lib/analytics';
-import { blogCtaDestination, newlyReachedThresholds, scrollDepthPercent } from '@/lib/blogTracking';
+import { blogCtaDestination, blogCtaHref, newlyReachedThresholds, scrollDepthPercent } from '@/lib/blogTracking';
 
 const SITE_URL = 'https://www.myprivacytool.io';
 
@@ -412,7 +412,7 @@ export default function BlogPost() {
   const post = { ...meta, content: GuideContent ? <GuideContent /> : blogContent[slug] };
   const updated = 'updated' in meta ? (meta as { updated?: string }).updated : undefined;
   const canonical = `${SITE_URL}/blog/${slug}`;
-  const scanHref = `/scan?utm_source=blog&utm_medium=${slug}`;
+  const scanHref = blogCtaHref(slug);
   const relatedGuides = guide
     ? blogPosts.filter((p) => p.slug !== slug && guides[p.slug])
     : [];

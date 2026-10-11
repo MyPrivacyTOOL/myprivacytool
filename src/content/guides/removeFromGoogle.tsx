@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { blogCtaHref } from "@/lib/blogTracking";
 
 export const sections = [
   { id: "what-google-does", title: "What Google does and does not do" },
@@ -60,7 +61,7 @@ const Content = () => (
     </p>
     <p>
       If you would like a quick view of where your details are exposed before you begin, you can run a{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=remove-your-name-and-info-from-google">free scan with MyPrivacyTOOL</Link>.
+      <Link to={blogCtaHref("remove-your-name-and-info-from-google")}>free scan with MyPrivacyTOOL</Link>.
       For the wider picture beyond search results, see our guide on how to{" "}
       <Link to="/blog/remove-personal-information-from-internet">remove personal information from the internet</Link>.
     </p>
@@ -553,7 +554,7 @@ const Content = () => (
     <p>
       Results reappear more often than people expect, because many broker sites refresh their data from public
       records and marketing lists. If you would rather not run the searches yourself, MyPrivacyTOOL&apos;s{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=remove-your-name-and-info-from-google">free scan</Link> shows
+      <Link to={blogCtaHref("remove-your-name-and-info-from-google")}>free scan</Link> shows
       where your details appear, and monitoring can flag when they show up again.
     </p>
     <p>
