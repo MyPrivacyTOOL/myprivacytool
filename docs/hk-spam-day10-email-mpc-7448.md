@@ -9,7 +9,7 @@ the cron reads only the ids of today's due rows, logs the count (`{"event":"hk_s
 and sends and claims nothing. Nothing was sent to a real address while building this; only stubbed tests ran.
 
 ## How it works
-- Cron `5 1-4 * * *` UTC (09:05 to 12:05 HKT, hourly) calls `runHkSpamReminderJob` (`lib/hkSpam.js`). The other cron (`*/5`) still runs the report and follow-up jobs, unchanged.
+- The `*/5` cron's ticks at 01:05, 02:05, 03:05 and 04:05 UTC (09:05 to 12:05 HKT) call `runHkSpamReminderJob` (`lib/hkSpam.js`, `isHkSpamSlot`) instead of the report and follow-up jobs; every other tick runs those as before. There is no separate cron because Workers Free allows only 5 per account (deploy error 10072).
 - The view lists rows whose `protection_date` is today in Hong Kong, with an email, `reminder_consent = true`, and `reminder_sent_at is null`.
 - Per run at most 20 rows (2 subrequests each, stays under the free-plan limit of 50). Later hourly runs drain any rest; each row is claimed first, so extra runs never double-send. Override with `HK_SPAM_BATCH` (max 20).
 - Per row: skip if suppressed, then **claim** (`PATCH ... reminder_sent_at=is.null`, atomic), then send via Resend with idempotency key `hk-spam-day10-<registration id>`. If the send fails the claim is released and the next run retries.

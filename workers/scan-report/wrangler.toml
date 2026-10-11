@@ -7,7 +7,7 @@ workers_dev = true
 
 # Cron fallback + report runner: every 5 minutes. Each scan is due within 48h (report_due_at).
 [triggers]
-crons = ["*/5 * * * *", "5 1-4 * * *"]
+crons = ["*/5 * * * *"]
 
 [vars]
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
@@ -20,7 +20,7 @@ RECIPIENT_ALLOWLIST = ""
 ALLOW_PARTIAL_REPORT = "true"
 
 # MPC-7448: HK Spam day-10 "you are now protected" email. OFF: anything but "true" is a dry run that only counts what is due.
-# Switch on only after Chris's go-live word (see docs/hk-spam-day10-email-mpc-7448.md). The cron "5 1-4 * * *" (09:05-12:05 HKT) must match HK_SPAM_CRON in lib/hkSpam.js.
+# Switch on only after Chris's go-live word (see docs/hk-spam-day10-email-mpc-7448.md). It runs on the */5 trigger at 01:05-04:05 UTC (09:05-12:05 HKT), see isHkSpamSlot in lib/hkSpam.js; no separate cron (Workers Free allows 5 per account).
 HK_SPAM_EMAIL_ENABLED = "false"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt

@@ -4,7 +4,7 @@ import { pushScanActivity } from './lib/hubspot.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
-import { runHkSpamReminderJob, HK_SPAM_CRON } from './lib/hkSpam.js';
+import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
@@ -65,8 +65,10 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    // MPC-7448: the HK Spam day-10 email has its own cron; every other trigger runs the report + follow-up jobs as before.
-    if (event?.cron === HK_SPAM_CRON) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
+    // MPC-7448: the HK Spam day-10 email shares the 5-minute trigger (the free plan allows only 5 crons per account). On its four daily
+    // slots (01:05 to 04:05 UTC) that tick runs only the HK job, to keep within the 50-subrequest limit; the report and follow-up jobs
+    // run on every other tick, so a report waits at most 5 minutes longer.
+    if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
     else ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env)));
   },
 };

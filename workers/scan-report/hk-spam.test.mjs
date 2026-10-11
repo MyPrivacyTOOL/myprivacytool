@@ -1,6 +1,6 @@
 // MPC-7448: HK Spam day-10 email. Stubbed fetch, no network, no secrets. Run: node workers/scan-report/hk-spam.test.mjs
 import worker, { runHkSpamJob } from './index.js';
-import { buildHkSpamEmail, HK_SPAM_CRON, HK_SPAM_SCAN_URL } from './lib/hkSpam.js';
+import { buildHkSpamEmail, isHkSpamSlot, HK_SPAM_SCAN_URL } from './lib/hkSpam.js';
 import { emailHash } from './lib/suppression.js';
 import { unsubscribeToken } from './lib/onboarding.js';
 
@@ -136,9 +136,14 @@ for (const flag of [undefined, '', 'false', 'TRUE', '1', 'yes']) {
 {
   const ran = []; const ctx = { waitUntil: (p) => ran.push(p) };
   const F = fake({ regs: [reg('r1', 'a@example.com')] }); globalThis.fetch = F.f;
-  await quiet(async () => { await worker.scheduled({ cron: HK_SPAM_CRON }, SECRET_ENV, ctx); await Promise.all(ran); });
-  check(F.calls.length === 1 && F.calls[0].url.includes('hk_spam_due_reminders') && F.sends().length === 0, 'HK cron => HK job only (dry run here), flag off sends nothing');
+  await quiet(async () => { await worker.scheduled({ cron: '*/5 * * * *', scheduledTime: Date.UTC(2026, 9, 11, 2, 5) }, SECRET_ENV, ctx); await Promise.all(ran); });
+  check(F.calls.length === 1 && F.calls[0].url.includes('hk_spam_due_reminders') && F.sends().length === 0, 'HK slot tick (02:05 UTC) => HK job only (dry run here), flag off sends nothing');
   const wrangler = (await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
-  check(wrangler.includes(`"${HK_SPAM_CRON}"`) && /HK_SPAM_EMAIL_ENABLED = "false"/.test(wrangler) && wrangler.includes('"*/5 * * * *"'), 'wrangler.toml: HK cron registered next to the 5-minute cron, flag committed OFF');
+  check(/crons = \["\*\/5 \* \* \* \*"\]/.test(wrangler) && /HK_SPAM_EMAIL_ENABLED = "false"/.test(wrangler), 'wrangler.toml: only the 5-minute cron (Workers Free allows 5 crons per account), HK flag committed OFF');
+  check([[1, 5], [2, 5], [3, 5], [4, 5]].every(([h, m]) => isHkSpamSlot(Date.UTC(2026, 9, 11, h, m))) && ![[0, 5], [5, 5], [2, 10], [2, 0], [13, 5]].some(([h, m]) => isHkSpamSlot(Date.UTC(2026, 9, 11, h, m))), 'HK slots are exactly 01:05-04:05 UTC (the old 5 1-4 * * * moments)');
+  const ran2 = []; const ctx2 = { waitUntil: (p) => ran2.push(p) };
+  const G = fake({ regs: [reg('r1', 'a@example.com')] }); globalThis.fetch = G.f;
+  await quiet(async () => { await worker.scheduled({ cron: '*/5 * * * *', scheduledTime: Date.UTC(2026, 9, 11, 6, 5) }, SECRET_ENV, ctx2); await Promise.allSettled(ran2); });
+  check(!G.calls.some((c) => c.url.includes('hk_spam_due_reminders')), 'ordinary tick (06:05 UTC) does not run the HK job');
 }
 process.exit(ok ? 0 : 1);
