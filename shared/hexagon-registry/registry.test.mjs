@@ -23,3 +23,29 @@ test('trust score is empty everywhere; unclear hexagons default to NOT_CHECKED a
   assert.equal(getHexagon('google-services').truth.level, 'cannot_be_checked');
   assert.equal(getHexagon('demographic').truth.level, 'estimated');
 });
+
+// MPC-7487
+import { EMAIL_HEXAGONS } from './registry.js';
+import { captureStatus } from './status.js';
+
+test('four email hexagons are in the shared registry, outside the 54 web hexagons', () => {
+  assert.deepEqual(EMAIL_HEXAGONS.map((h) => h.id), ['email-breaches', 'email-name', 'email-provider', 'email-profile']);
+  assert.ok(EMAIL_HEXAGONS.every((h) => h.trust_score === null && !isKnownHexagonId(h.id)));
+});
+
+test('capture status: the 7 cannot-be-checked are always NOT_CHECKED; placeholders are NOT_CHECKED; CLEAR only where allowed', () => {
+  const seven = HEXAGONS.filter((h) => h.truth.level === 'cannot_be_checked');
+  assert.equal(seven.length, 7);
+  for (const h of seven) assert.equal(captureStatus(h.id, '5 services'), 'not_checked');
+  assert.equal(captureStatus('location', 'Location detected'), 'not_checked');
+  assert.equal(captureStatus('location', 'Springfield, Exampleshire'), 'found');
+  assert.equal(captureStatus('screen', 'Empty'), 'found');          // informational: never CLEAR
+  assert.equal(captureStatus('cookies-status', 'Empty'), 'clear');
+  assert.equal(captureStatus('indexeddb-status', 'Not Used'), 'not_checked'); // the registry does not allow CLEAR here
+  assert.equal(captureStatus('not-a-hexagon', 'x'), 'not_checked');
+  for (const h of HEXAGONS) {
+    for (const v of ['Empty', 'None', 'Secure (HTTPS)', 'Disabled', 'Example 1']) {
+      if (captureStatus(h.id, v) === 'clear') assert.ok(h.status.allowed.includes('CHECKED_AND_CLEAR'), `${h.id} must not be CLEAR`);
+    }
+  }
+});

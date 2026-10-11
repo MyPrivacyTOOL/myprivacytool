@@ -17,6 +17,8 @@ const FIELDS = {
   risk: (v) => typeof v === 'string' && v.length <= 32,
   confirmed: (v) => typeof v === 'boolean',
   category: (v) => typeof v === 'string' && v.length <= 32,
+  status: (v) => v === 'found' || v === 'clear' || v === 'not_checked',   // MPC-7487: set by the site at capture; the report re-checks it against the registry
+  estimate: (v) => typeof v === 'boolean',
 };
 const REQUIRED = ['id', 'label', 'value'];
 // eslint-disable-next-line no-control-regex

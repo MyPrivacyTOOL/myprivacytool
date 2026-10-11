@@ -35,7 +35,26 @@ export interface HexagonRegistryEntry {
   source: string;
 }
 
+export interface EmailHexagonEntry {
+  id: string;
+  label: string;
+  group: string;
+  category: string;
+  order: number;
+  artwork: { file: string | null; emoji: string; note: string };
+  captures: string;
+  value_type: string;
+  presence: 'always' | 'conditional';
+  example_value: string;
+  truth: { level: TruthLevel; sensitivity: string; note: string };
+  status: { kind: string; allowed: HexagonStatus[]; found: string; clear: string; not_checked: string };
+  trust_score: null;
+  source: string;
+  build_status: string;
+}
+
 export const HEXAGONS: HexagonRegistryEntry[];
+export const EMAIL_HEXAGONS: EmailHexagonEntry[];
 export const STATUSES: HexagonStatus[];
 export const TRUTH_LEVELS: TruthLevel[];
 export const HEXAGON_COUNT: number;

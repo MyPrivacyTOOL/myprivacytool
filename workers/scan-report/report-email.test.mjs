@@ -5,6 +5,7 @@ import { buildReportEmail, BRIDGE } from './lib/email.js';
 import { computeScore } from './lib/score.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, MAX_VALUE } from './lib/reportHex.js';
 import { loadWebScan } from './lib/webScanLoader.js';
+import { captureStatus, isEstimate } from '../../shared/hexagon-registry/status.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
@@ -107,6 +108,40 @@ check(bh.screen.status === 'found' && bh.screen.value === '1920x1080' && bh.scre
 check(bh.location.status === 'not_checked' && bh.browser.status === 'not_checked' && bh.device.status === 'not_checked' && bh['google-services'].status === 'not_checked', 'browser-shaped scan: placeholders, empty values and the "cannot tell" hexagons are NOT CHECKED, never clear');
 check(bh['google-services'].reported_value === 'Not signed in' && bh['google-services'].value === null, 'a NOT CHECKED hexagon keeps what the browser reported in the JSON only');
 check(browser.report.web_scan.hexagons.every((h) => h.status !== 'clear'), 'a browser-shaped scan never produces CLEAR (the code cannot tell)');
+
+// MPC-7487: the site records a status per hexagon at capture; the report uses it. A realistic desktop scan, values exactly as the detectors show them
+// (some are placeholders: the location lookup and the DNS leak test did not finish, no sensors, the user never typed or scrolled).
+const SCAN_VALUES = {
+  location: 'Location detected', device: 'Desktop (macOS)', browser: 'Chrome 129', isp: 'Unknown ISP', time: 'Sun 02:41 PM', screen: '1920x1080', privacy: 'DNT Disabled',
+  connection: 'WiFi', referrer: 'Google Search', 'primary-language': 'English (US)', 'language-fallbacks': 'English, French', demographic: 'Tech professional', 'user-profile': 'Local',
+  orientation: 'Landscape', 'rotation-angle': '0°', 'tilt-beta': 'N/A', 'tilt-gamma': 'N/A', 'motion-sensors': 'Inactive',
+  'canvas-fingerprint': 'a1b2c3d4...', 'webgl-fingerprint': 'ANGLE (Appl...', 'audio-fingerprint': 'e5f6a7b8...', 'font-detection': '212 fonts', 'extension-detection': 'Ad Blocker: Yes',
+  'fingerprint-protection': 'None Detected', 'webrtc-leak': 'VPN Protected', 'hardware-profile': '10 cores / 8GB', 'screen-fingerprint': '1920x1080 @2x', 'timezone-locale': 'Hong_Kong (en-US)',
+  'battery-fingerprint': 'API Blocked', 'media-devices': '1 cam, 1 mic, 2 spk', 'cookies-status': '14 cookies (3 tracking)', 'localstorage-status': '9 items (24 KB)', 'sessionstorage-status': 'Empty',
+  'indexeddb-status': '2 databases (1.5 MB)', 'cache-status': 'Not Active', 'google-services': '4 services', 'meta-services': 'Not Detected', 'microsoft-services': 'Not Detected',
+  'social-platforms': '2 platforms', 'cross-site-identity': 'Not Linked', 'dns-leak': 'Checking...', 'https-status': 'Secure (HTTPS) + HSTS', 'mixed-content': 'None', 'security-headers': 'Strong',
+  'browser-security': 'Up to date', 'tls-config': 'TLS 1.3', 'mouse-tracking': '312 movements', 'typing-patterns': 'No input yet', 'click-patterns': '6 clicks', 'scroll-behavior': '40% depth',
+  'session-duration': '1m 12s', 'engagement-map': '3 hotspots',
+};
+const UNRATED = WEB_HEXAGONS.filter((h) => h.unrated).map((h) => h.id);
+check(UNRATED.length === 7 && ['google-services', 'meta-services', 'microsoft-services', 'social-platforms', 'cross-site-identity', 'dns-leak', 'security-headers'].every((i) => UNRATED.includes(i)), 'MPC-7487: the registry marks exactly 7 hexagons as cannot be checked');
+const scanItems = (withStatus) => WEB_HEXAGONS.filter((h) => h.id in SCAN_VALUES).map((h) => ({ id: h.id, label: h.label, value: SCAN_VALUES[h.id], confirmed: true, ...(withStatus ? { status: captureStatus(h.id, SCAN_VALUES[h.id], { connectionIsMeasured: false }), ...(isEstimate(h.id) ? { estimate: true } : {}) } : {}) }));
+const foundOf = (items) => buildReportEmail({ scan, breaches: [], breachStatus: 'checked', webScan: { id: 'r', hexagons: items } }).report.web_scan;
+const beforeScan = foundOf(scanItems(false)), afterScan = foundOf(scanItems(true));
+console.log(`MPC-7487 realistic scan FOUND count: before ${beforeScan.summary.found}, after ${afterScan.summary.found} (clear ${afterScan.summary.clear}, not checked ${afterScan.summary.not_checked}, of ${afterScan.summary.total})`);
+check(beforeScan.summary.found === 22 && afterScan.summary.found === 30 && afterScan.summary.clear === 3, 'MPC-7487: realistic scan, FOUND count 22 before -> 30 after; 3 CHECKED AND CLEAR');
+const ah = Object.fromEntries(afterScan.hexagons.map((h) => [h.id, h]));
+check(ah.isp.status === 'not_checked' && ah.location.status === 'not_checked' && ah.connection.status === 'not_checked' && ah['dns-leak'].status === 'not_checked' && ah['tilt-beta'].status === 'not_checked' && ah['typing-patterns'].status === 'not_checked', 'MPC-7487: placeholders and failures are NOT CHECKED (Location detected, Unknown ISP, assumed WiFi, Checking..., N/A, No input yet)');
+check(ah['canvas-fingerprint'].status === 'found' && ah['webrtc-leak'].status === 'found' && ah['webrtc-leak'].value === 'VPN Protected' && ah['cookies-status'].status === 'found' && ah['sessionstorage-status'].status === 'clear' && ah['https-status'].status === 'clear' && ah['mixed-content'].status === 'clear', 'MPC-7487: fingerprints, VPN leak test and storage show FOUND with their value; empty storage, HTTPS and no mixed content are CLEAR');
+check(UNRATED.every((i) => ah[i]?.status === 'not_checked' || !(i in SCAN_VALUES)) && ah['google-services'].status === 'not_checked' && ah['google-services'].reported_value === '4 services', 'MPC-7487: the 7 cannot-be-checked hexagons are NOT CHECKED even with a value (kept in the JSON only)');
+check(ah.demographic.status === 'found' && ah.demographic.estimate === true && ah.isp.estimate === true, 'MPC-7487: estimates can be FOUND and are labelled as estimates');
+// a hostile or buggy browser cannot override the registry
+const forged = foundOf([{ id: 'google-services', label: 'x', value: '9 services', status: 'found' }, { id: 'screen', label: 'x', value: '1x1', status: 'clear' }, { id: 'device', label: 'x', value: 'Unknown', status: 'found' }, { id: 'cookies-status', label: 'x', value: 'Empty', status: 'clear' }, { id: 'browser', label: 'x', value: 'Chrome 1', status: 'bogus' }]);
+const fh = Object.fromEntries(forged.hexagons.map((h) => [h.id, h.status]));
+check(fh['google-services'] === 'not_checked' && fh.screen === 'not_checked' && fh.device === 'not_checked' && fh['cookies-status'] === 'clear' && fh.browser === 'not_checked', 'MPC-7487: report re-checks the saved status against the registry (forced FOUND on the 7, CLEAR on an informational hexagon, FOUND on a placeholder, an unknown status)');
+// worst case with statuses: every hexagon the site can rate is FOUND with the longest value
+const worstRated = buildReportEmail({ scan, breaches: manyBreaches, breachStatus: 'checked', brokers: BROKERS, webScan: { id: 'w3', hexagons: WEB_HEXAGONS.map((h) => ({ id: h.id, label: h.label, value: EVIL, status: 'found', estimate: true, confirmed: true, confidence: 100, risk: 'x'.repeat(200), icon: 'x' })) }, emailChecks: worstEmail, unsubscribeLink: UNSUB });
+check(bytes(worstRated.html) < HARD_LIMIT, `MPC-7487: worst case with saved statuses (${bytes(worstRated.html)} B) is under the ${HARD_LIMIT} byte limit`);
 
 if (process.env.REPORT_RENDER_DIR) {
   mkdirSync(process.env.REPORT_RENDER_DIR, { recursive: true });
