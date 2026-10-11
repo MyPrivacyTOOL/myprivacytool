@@ -260,5 +260,33 @@ delete from public.leads where id = '00000000-0000-0000-0000-0000000000c8';
 select pg_temp.assert((select count(*) = 0 from public.conversation_states where sender_id = 'sender-lead') and (select count(*) = 0 from public.interaction_log where channel = 'telegram'),
   'deleting a lead erases its sender-linked state and log rows');
 
+-- ===== MPC-7450: hk_spam_registrations is anon INSERT-only, no phone column, day-10 view for service_role ====
+select pg_temp.assert(not exists (select 1 from information_schema.columns where table_schema = 'public'
+  and table_name = 'hk_spam_registrations' and column_name ilike any (array['%phone%', '%mobile%', '%msisdn%', '%number%'])),
+  'hk_spam_registrations must not have a phone number column');
+select pg_temp.assert(pg_temp.try_as('anon',
+  $$insert into public.hk_spam_registrations (platform, language, protection_date) values ('ios', 'en', '2026-10-23')$$) = '',
+  'hk_spam_registrations: anon may insert');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_registrations$$) = '42501', 'hk_spam_registrations: anon must not select');
+select pg_temp.assert(pg_temp.try_as('anon', $$update public.hk_spam_registrations set email = 'x@y.zz'$$) = '42501', 'hk_spam_registrations: anon must not update');
+select pg_temp.assert(pg_temp.try_as('anon', $$delete from public.hk_spam_registrations$$) = '42501', 'hk_spam_registrations: anon must not delete');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$insert into public.hk_spam_registrations (platform, language, protection_date) values ('ios', 'en', '2026-10-23')$$) = '42501',
+  'hk_spam_registrations: authenticated has no insert');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date) values ('windows', 'en', '2026-10-23')$$) = '23514', 'platform is constrained');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, reminder_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514', 'consent needs an email');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email) values ('ios', 'en', '2026-10-23', 'not-an-email')$$) = '23514', 'email shape is checked');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_due_reminders$$) = '42501', 'hk_spam_due_reminders: anon must not read');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.hk_spam_due_reminders$$) = '', 'hk_spam_due_reminders: service_role reads');
+
+set local role service_role;
+insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent) values
+  ('android', 'yue', (now() at time zone 'Asia/Hong_Kong')::date, 'due@example.com', true),                       -- due
+  ('android', 'en',  (now() at time zone 'Asia/Hong_Kong')::date, 'noconsent@example.com', false),                -- no consent
+  ('ios',     'en',  (now() at time zone 'Asia/Hong_Kong')::date, null, false),                                   -- no email
+  ('ios',     'en',  (now() at time zone 'Asia/Hong_Kong')::date + 1, 'tomorrow@example.com', true);              -- not today
+select pg_temp.assert((select count(*) from public.hk_spam_due_reminders) = 1 and (select email from public.hk_spam_due_reminders) = 'due@example.com',
+  'hk_spam_due_reminders: only today + email + consent');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
