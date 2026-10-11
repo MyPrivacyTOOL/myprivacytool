@@ -70,8 +70,12 @@
       (function () {
         var GA_ID = 'G-1BWMDBJSPL';
         var loaded = false;
+        // Production only: localhost and *.pages.dev previews must never send hits to the production property (MPC-7376).
+        var h = location.hostname;
+        var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
         window['ga-disable-' + GA_ID] = true;
         function allowed() {
+          if (!isProd) return false;
           try {
             var d = window.__cmp && window.__cmp('getCMPData');
             var p = d && d.purposeConsents;
