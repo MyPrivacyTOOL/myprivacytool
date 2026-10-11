@@ -1,0 +1,1440 @@
+{
+  "_meta": {
+    "task": "MPC-7461",
+    "generated_from_commit": "e6f2e02",
+    "status": "DRAFT, read-only inventory. Not wired to any code.",
+    "source_of_truth": "src/lib/deviceDetection.ts generateHexagons() and generateHexagonsAsync(); order here is the code order after the category sort used by HexagonGrid.",
+    "counts": {
+      "max_generated": 54,
+      "always_present": 41,
+      "conditional": 13,
+      "categories_in_code": 11
+    },
+    "artwork_note": "No hexagon artwork file exists for any web scan hexagon. Each is drawn at runtime as an inline SVG (src/components/Hexagon.tsx) with an emoji character from HexagonData.icon. The only hexagon image files in the repo are 16 PNGs for the report email's 8 categories (public/email/hex/<category>-found|empty.png, 216 KB). \"artwork\" below records the emoji and states file: null.",
+    "status_model": {
+      "FOUND": "detector ran and returned a value about the person; the value is shown.",
+      "CLEAR": "CHECKED AND CLEAR: detector ran successfully and positively found nothing. Only meaningful for status_kind \"risk-check\".",
+      "NOT_CHECKED": "detector did not run, was blocked, timed out, is unsupported, produced a placeholder, the user never interacted, or the hexagon was never produced. Always shown, with what is needed."
+    },
+    "example_values_note": "All example values are made up (IPs use the 203.0.113.0/24 documentation range)."
+  },
+  "hexagons": [
+    {
+      "id": "location",
+      "label": "Location",
+      "category": "device",
+      "order": 1,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📍"
+      },
+      "detection": "IP geolocation from our own Worker mpt-leads GET /whoami (Cloudflare request data), city + region.",
+      "detection_in_browser": "no: server lookup via /whoami, called from the browser (captureDeviceData)",
+      "value_type": "text: \"City, Region\"",
+      "example_value": "Springfield, Exampleshire",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "city is known (not \"Unknown\"): show \"City, Region\".",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "/whoami failed or returned no city: code then shows the placeholder \"Location detected\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Code cannot tell a real result from a failed lookup: on failure it still emits the string \"Location detected\" and the hexagon looks FOUND. Must be changed to carry an explicit status.",
+      "source": "src/lib/deviceDetection.ts:374"
+    },
+    {
+      "id": "device",
+      "label": "Device Type",
+      "category": "device",
+      "order": 2,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "💻"
+      },
+      "detection": "navigator.userAgent parsed by detectDeviceType() and detectOS().",
+      "detection_in_browser": "yes",
+      "value_type": "text: \"Type (OS)\"",
+      "example_value": "Desktop (Windows 11)",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always, from the user agent string.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "only if the user agent is empty (OS shows \"Unknown\")."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:386"
+    },
+    {
+      "id": "browser",
+      "label": "Browser",
+      "category": "device",
+      "order": 3,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🌐"
+      },
+      "detection": "navigator.userAgent parsed by detectBrowser(): name + major version.",
+      "detection_in_browser": "yes",
+      "value_type": "text: \"Name MajorVersion\"",
+      "example_value": "Chrome 141",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "only if the user agent is not recognised."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:396"
+    },
+    {
+      "id": "isp",
+      "label": "Internet Provider",
+      "category": "network",
+      "order": 4,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📡"
+      },
+      "detection": "\"org\" field from Worker /whoami, first two words.",
+      "detection_in_browser": "no: server lookup via /whoami",
+      "value_type": "text: provider name",
+      "example_value": "Example Broadband",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "org returned by /whoami.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "/whoami failed."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "On failure the code sets \"Unknown ISP\" and the hexagon shows \"Unknown\": the value cannot be told apart from a result without a status flag.",
+      "source": "src/lib/deviceDetection.ts:406"
+    },
+    {
+      "id": "time",
+      "label": "Time Pattern",
+      "category": "device",
+      "order": 5,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⏰"
+      },
+      "detection": "new Date().toLocaleTimeString() at the moment the hexagons are generated; recomputed on every regeneration.",
+      "detection_in_browser": "yes",
+      "value_type": "text: weekday + time",
+      "example_value": "Sun, 02:14 PM",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Value changes on every regeneration, so the email would show the time of the last render, not of the scan. Capture once.",
+      "source": "src/lib/deviceDetection.ts:416"
+    },
+    {
+      "id": "screen",
+      "label": "Screen Resolution",
+      "category": "device",
+      "order": 6,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🖥️"
+      },
+      "detection": "screen.width x screen.height.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "1920×1080",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:434"
+    },
+    {
+      "id": "privacy",
+      "label": "Privacy Settings",
+      "category": "privacy",
+      "order": 7,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🛡️"
+      },
+      "detection": "navigator.doNotTrack === \"1\".",
+      "detection_in_browser": "yes",
+      "value_type": "text: DNT Enabled | DNT Disabled",
+      "example_value": "DNT Disabled",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "DNT disabled (tracking not signalled): show the value.",
+        "clear": "DNT enabled: report as CLEAR with the note that many sites ignore it.",
+        "not_checked": "never (property always readable, may be null on some browsers: null counts as \"disabled\" today)."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "navigator.doNotTrack === null (unsupported) is reported as \"DNT Disabled\", which is indistinguishable from the user having chosen it. Treat null as NOT CHECKED.",
+      "source": "src/lib/deviceDetection.ts:444"
+    },
+    {
+      "id": "connection",
+      "label": "Connection Type",
+      "category": "network",
+      "order": 8,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📶"
+      },
+      "detection": "navigator.connection.effectiveType / type via getConnectionDisplay().",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Fast (4G/5G)",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "effectiveType is \"4g\", \"3g\" or \"2g\", or type is \"wifi\".",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "API missing (Safari, Firefox)."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "The fallback returns \"WiFi\" as a default assumption when the API is missing (deviceDetection.ts, getConnectionDisplay). That is a guess shown as a value. Treat as NOT CHECKED.",
+      "source": "src/lib/deviceDetection.ts:456"
+    },
+    {
+      "id": "referrer",
+      "label": "How You Found Us",
+      "category": "privacy",
+      "order": 9,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔍"
+      },
+      "detection": "document.referrer matched against google / facebook / twitter / x.com / linkedin; empty = \"Direct Visit\".",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Google Search",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "referrer matched or is an external link.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "empty referrer cannot be told apart from a stripped one; show \"Direct Visit\" as FOUND only with that wording."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Empty referrer = direct visit OR referrer stripped by privacy settings.",
+      "source": "src/lib/deviceDetection.ts:466"
+    },
+    {
+      "id": "battery",
+      "label": "Device Status",
+      "category": "device",
+      "order": 10,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔋"
+      },
+      "detection": "navigator.getBattery() level and charging.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Battery 64%",
+      "presence": "conditional",
+      "presence_condition": "only added when navigator.getBattery() works (getBatteryInfo returns non-null): Chromium, mostly desktop/Android. Absent on Safari and Firefox.",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "Battery API available.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "hexagon is not generated at all when the API is missing: registry must still list it as NOT CHECKED."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Absence is silent. The web scan has no \"not checked\" hexagon for it.",
+      "source": "src/lib/deviceDetection.ts:658"
+    },
+    {
+      "id": "primary-language",
+      "label": "Primary Language",
+      "category": "language",
+      "order": 11,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🗣️"
+      },
+      "detection": "navigator.languages[0] mapped through getLanguageName().",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "English (UK)",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:490"
+    },
+    {
+      "id": "language-fallbacks",
+      "label": "Language Fallbacks",
+      "category": "language",
+      "order": 12,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔄"
+      },
+      "detection": "navigator.languages[1..2].",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "French, German",
+      "presence": "conditional",
+      "presence_condition": "only when navigator.languages has more than one entry.",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "two or more languages set.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "one language only: nothing to show (this is effectively CLEAR, but the code simply omits the hexagon)."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Omitted when absent, so the web scan cannot say \"checked, only one language\".",
+      "source": "src/lib/deviceDetection.ts:500"
+    },
+    {
+      "id": "language-mismatch",
+      "label": "Locale Mismatch",
+      "category": "language",
+      "order": 13,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⚠️"
+      },
+      "detection": "language list compared with the timezone.",
+      "detection_in_browser": "yes",
+      "value_type": "text: \"Detected\"",
+      "example_value": "Detected",
+      "presence": "conditional",
+      "presence_condition": "only when analyzeLanguageSettings() finds a language/timezone mismatch.",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "mismatch detected (value \"Detected\").",
+        "clear": "detector ran, no mismatch.",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "The code only emits the hexagon when a mismatch exists, so CLEAR is invisible today. The registry can treat omission as CLEAR because the detector always runs (verified: runs inside captureDeviceData).",
+      "source": "src/lib/deviceDetection.ts:510"
+    },
+    {
+      "id": "demographic",
+      "label": "Estimated Profile",
+      "category": "profile",
+      "order": 14,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "👤"
+      },
+      "detection": "estimateDemographic(): a fixed rule of thumb using the hour of day, OS and browser. Not a measurement.",
+      "detection_in_browser": "yes",
+      "value_type": "text: age band guess",
+      "example_value": "Adult (30-55)",
+      "presence": "always",
+      "sensitivity": "high",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "never as a fact. Confidence is hard-coded at 60.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "recommended: always label as \"estimate\" or drop from the email."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "It is invented from the clock (the expression `os.includes(\"android\") && hour >= 22 || hour <= 6` has an operator-precedence slip, so any OS can return \"Young Adult\" before 07:00). Showing an age band to a person in an email as a finding is risky.",
+      "source": "src/lib/deviceDetection.ts:520"
+    },
+    {
+      "id": "user-profile",
+      "label": "User Profile",
+      "category": "profile",
+      "order": 15,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🏠"
+      },
+      "detection": "determineUserProfile(): local | expatriate | traveler | multilingual from languages and mismatch.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Traveler",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always (default \"Local\").",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "n/a."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Inferred label with fixed confidence (70 to 85). Present as \"our inference\".",
+      "source": "src/lib/deviceDetection.ts:678"
+    },
+    {
+      "id": "orientation",
+      "label": "Orientation",
+      "category": "orientation",
+      "order": 16,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔄"
+      },
+      "detection": "screen.orientation / window.matchMedia portrait check.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Landscape",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:534"
+    },
+    {
+      "id": "rotation-angle",
+      "label": "Rotation",
+      "category": "orientation",
+      "order": 17,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "↻"
+      },
+      "detection": "screen.orientation.angle.",
+      "detection_in_browser": "yes",
+      "value_type": "text: degrees",
+      "example_value": "0°",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:544"
+    },
+    {
+      "id": "tilt-beta",
+      "label": "Tilt Forward/Back",
+      "category": "orientation",
+      "order": 18,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⬆️"
+      },
+      "detection": "DeviceOrientationEvent beta. Needs a motion sensor and, on iOS, permission.",
+      "detection_in_browser": "yes",
+      "value_type": "text: degrees or \"N/A\"",
+      "example_value": "12°",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "sensor gave a reading.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "value \"N/A\" and confidence 0: no sensor or no permission."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Code does encode \"N/A\", but only in the value string.",
+      "source": "src/lib/deviceDetection.ts:554"
+    },
+    {
+      "id": "tilt-gamma",
+      "label": "Tilt Left/Right",
+      "category": "orientation",
+      "order": 19,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⬅️"
+      },
+      "detection": "DeviceOrientationEvent gamma.",
+      "detection_in_browser": "yes",
+      "value_type": "text: degrees or \"N/A\"",
+      "example_value": "-4°",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "sensor gave a reading.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"N/A\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Same as tilt-beta.",
+      "source": "src/lib/deviceDetection.ts:564"
+    },
+    {
+      "id": "motion-sensors",
+      "label": "Motion Sensors",
+      "category": "orientation",
+      "order": 20,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📊"
+      },
+      "detection": "detectSensors().gyroscope.",
+      "detection_in_browser": "yes",
+      "value_type": "text: Active | Inactive",
+      "example_value": "Inactive",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "gyroscope present: \"Active\".",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"Inactive\" means not detected, not proven absent."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "\"Inactive\" is both \"no sensor\" and \"no permission\".",
+      "source": "src/lib/deviceDetection.ts:574"
+    },
+    {
+      "id": "canvas-fingerprint",
+      "label": "Canvas Fingerprint",
+      "category": "fingerprint",
+      "order": 21,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🎨"
+      },
+      "detection": "draws to an off-screen canvas and hashes the pixels (src/lib/fingerprintDetection.ts).",
+      "detection_in_browser": "yes",
+      "value_type": "text: first 8 hex chars of a hash + \"...\"",
+      "example_value": "a3f9c21e...",
+      "presence": "conditional",
+      "presence_condition": "detectCanvasFingerprint() returned a result (not null).",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "hash computed.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "detector threw or canvas blocked: hexagon omitted."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Omission = blocked or failed; a blocked canvas is itself a protection signal, which the code cannot distinguish.",
+      "source": "src/lib/deviceDetection.ts:698"
+    },
+    {
+      "id": "webgl-fingerprint",
+      "label": "WebGL Signature",
+      "category": "fingerprint",
+      "order": 22,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🎮"
+      },
+      "detection": "WebGL renderer/vendor string.",
+      "detection_in_browser": "yes",
+      "value_type": "text: GPU name, cut to 12 chars + \"...\"",
+      "example_value": "ANGLE (Exam...",
+      "presence": "conditional",
+      "presence_condition": "WebGL result not null.",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "renderer read.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "WebGL unavailable/blocked: omitted."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Same as canvas.",
+      "source": "src/lib/deviceDetection.ts:717"
+    },
+    {
+      "id": "audio-fingerprint",
+      "label": "Audio Signature",
+      "category": "fingerprint",
+      "order": 23,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔊"
+      },
+      "detection": "OfflineAudioContext render hashed.",
+      "detection_in_browser": "yes",
+      "value_type": "text: 8 hex + \"...\"",
+      "example_value": "7be04d11...",
+      "presence": "conditional",
+      "presence_condition": "Audio result not null.",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "hash computed.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "unsupported/blocked: omitted."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Same as canvas.",
+      "source": "src/lib/deviceDetection.ts:731"
+    },
+    {
+      "id": "font-detection",
+      "label": "Installed Fonts",
+      "category": "fingerprint",
+      "order": 24,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔤"
+      },
+      "detection": "measures text width for a list of fonts.",
+      "detection_in_browser": "yes",
+      "value_type": "text: \"N fonts\"",
+      "example_value": "38 fonts",
+      "presence": "conditional",
+      "presence_condition": "fontsResult.count > 0.",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "count above 0.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "count 0 (detector failed or fonts blocked): omitted."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Count 0 can be real or a failure; the failure default in the code is also count 0.",
+      "source": "src/lib/deviceDetection.ts:745"
+    },
+    {
+      "id": "extension-detection",
+      "label": "Extensions",
+      "category": "fingerprint",
+      "order": 25,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🧩"
+      },
+      "detection": "detectPlugins(): navigator.plugins count and ad-blocker bait test. Failure falls back to a default object, so the hexagon always appears.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Ad Blocker: Yes",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "ad blocker or plugins detected: show value.",
+        "clear": "\"None detected\" with the detector having run.",
+        "not_checked": "cannot be told from \"None detected\" because the failure fallback is the same object."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES. Failure default { pluginCount:0, adBlocker:false } renders \"None detected\", i.e. a failed check shows as CLEAR.",
+      "source": "src/lib/deviceDetection.ts:764"
+    },
+    {
+      "id": "fingerprint-protection",
+      "label": "Fingerprint Protection",
+      "category": "fingerprint",
+      "order": 26,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🛡️"
+      },
+      "detection": "looks for Tor, Brave shields, Firefox resistFingerprinting, blocking extensions.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "None Detected",
+      "presence": "conditional",
+      "presence_condition": "calculateProtectionScore() returned non-null.",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "a protection is detected (positive finding).",
+        "clear": "n/a in the usual sense; \"None Detected\" is a finding that the user is unprotected, treat as FOUND (exposed).",
+        "not_checked": "detector failed: omitted."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "\"None Detected\" is the default also when detection partly fails.",
+      "source": "src/lib/deviceDetection.ts:805"
+    },
+    {
+      "id": "webrtc-leak",
+      "label": "WebRTC Leak",
+      "category": "fingerprint",
+      "order": 27,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🌐"
+      },
+      "detection": "RTCPeerConnection with Google STUN servers, 3 second timeout, reads ICE candidate IPs (fingerprintDetection.ts).",
+      "detection_in_browser": "yes (contacts stun.l.google.com from the browser)",
+      "value_type": "text: \"Leaking: <ip>\" or a status phrase",
+      "example_value": "Leaking: 203.0.113.7",
+      "presence": "conditional",
+      "presence_condition": "detectWebRTCLeak() not null.",
+      "sensitivity": "high",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "a public IP is exposed: value would contain an IP address. Do not put the raw IP in the email (see risks).",
+        "clear": "candidates gathered and none public.",
+        "not_checked": "WebRTC blocked or timed out."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES. When WebRTC is blocked, or the 3 s timeout fires, there are no candidates and the code returns \"No Leak Detected\". A blocked or failed test shows as CLEAR.",
+      "source": "src/lib/deviceDetection.ts:849"
+    },
+    {
+      "id": "hardware-profile",
+      "label": "CPU Cores",
+      "category": "fingerprint",
+      "order": 28,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🖥️"
+      },
+      "detection": "navigator.hardwareConcurrency and navigator.deviceMemory.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "8 cores / 8GB",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "memory missing on Firefox/Safari (value shows cores only)."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:862"
+    },
+    {
+      "id": "screen-fingerprint",
+      "label": "Display Profile",
+      "category": "fingerprint",
+      "order": 29,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📺"
+      },
+      "detection": "screen size and devicePixelRatio.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "1920×1080 @1x",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Overlaps the \"screen\" hexagon (same resolution).",
+      "source": "src/lib/deviceDetection.ts:874"
+    },
+    {
+      "id": "timezone-locale",
+      "label": "Timezone/Locale",
+      "category": "fingerprint",
+      "order": 30,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🌍"
+      },
+      "detection": "Intl.DateTimeFormat timezone + navigator.language.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "London (en-GB)",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Overlaps primary-language and the DeviceData timezone.",
+      "source": "src/lib/deviceDetection.ts:886"
+    },
+    {
+      "id": "battery-fingerprint",
+      "label": "Battery Status",
+      "category": "fingerprint",
+      "order": 31,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔋"
+      },
+      "detection": "navigator.getBattery().",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "64% Discharging",
+      "presence": "conditional",
+      "presence_condition": "detectBatteryStatus() not null.",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "API available: show level.",
+        "clear": "API blocked/unavailable is reported as \"Not Available\"; this is a protection signal rather than a clear result.",
+        "not_checked": "detector failed."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "\"Not Available\" means unsupported browser OR blocked; both identical. Overlaps the \"battery\" hexagon.",
+      "source": "src/lib/deviceDetection.ts:910"
+    },
+    {
+      "id": "media-devices",
+      "label": "Connected Devices",
+      "category": "fingerprint",
+      "order": 32,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🎥"
+      },
+      "detection": "navigator.mediaDevices.enumerateDevices() counts (no labels without permission).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "1 cam, 1 mic, 2 spk",
+      "presence": "conditional",
+      "presence_condition": "detectMediaDevices() not null.",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "at least one device counted.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"Permission Required\" or \"No Devices\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "\"No Devices\" is both \"none exist\" and \"access blocked\".",
+      "source": "src/lib/deviceDetection.ts:935"
+    },
+    {
+      "id": "cookies-status",
+      "label": "Cookies",
+      "category": "storage",
+      "order": 33,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🍪"
+      },
+      "detection": "document.cookie of the site origin, counts, \"tracking\" if a name matches a known list (src/lib/storageDetection.ts).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "4 cookies (1 tracking)",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "count above 0 (note tracking count).",
+        "clear": "\"Empty\" or \"Disabled\".",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Only sees cookies for myprivacytool.io itself; it says nothing about the rest of the web. Wording must say \"on this site\".",
+      "source": "src/lib/deviceDetection.ts:973"
+    },
+    {
+      "id": "localstorage-status",
+      "label": "Local Storage",
+      "category": "storage",
+      "order": 34,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "💾"
+      },
+      "detection": "localStorage keys of the site origin (our own 3 keys filtered out).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "6 items (2 KB)",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "items present.",
+        "clear": "\"Empty\".",
+        "not_checked": "\"Blocked\" means the read threw."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Site origin only.",
+      "source": "src/lib/deviceDetection.ts:999"
+    },
+    {
+      "id": "sessionstorage-status",
+      "label": "Session Storage",
+      "category": "storage",
+      "order": 35,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⏱️"
+      },
+      "detection": "sessionStorage items of the site origin.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Empty",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "items present.",
+        "clear": "\"Empty\".",
+        "not_checked": "\"Blocked\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Site origin only.",
+      "source": "src/lib/deviceDetection.ts:1021"
+    },
+    {
+      "id": "indexeddb-status",
+      "label": "IndexedDB",
+      "category": "storage",
+      "order": 36,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🗄️"
+      },
+      "detection": "indexedDB.databases() for the site origin.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Not Used",
+      "presence": "conditional",
+      "presence_condition": "detectIndexedDB() not null.",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "databases present.",
+        "clear": "\"Not Used\".",
+        "not_checked": "\"Blocked\", or the hexagon omitted on failure."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "indexedDB.databases() is missing in some browsers.",
+      "source": "src/lib/deviceDetection.ts:1040"
+    },
+    {
+      "id": "cache-status",
+      "label": "Cache & SW",
+      "category": "storage",
+      "order": 37,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📦"
+      },
+      "detection": "caches.keys() and service worker registrations for the site origin.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Not Active",
+      "presence": "conditional",
+      "presence_condition": "detectCacheStorage() not null.",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "cache or service worker present.",
+        "clear": "\"Not Active\".",
+        "not_checked": "detector failed: omitted."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Site origin only.",
+      "source": "src/lib/deviceDetection.ts:1067"
+    },
+    {
+      "id": "google-services",
+      "label": "Google Account",
+      "category": "social",
+      "order": 38,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔍"
+      },
+      "detection": "Google auth cookie names (SID, HSID, NID ...) read from document.cookie by src/lib/socialDetection.ts (cookie NAMES only).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Not Detected",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "cookie names present in document.cookie: show count.",
+        "clear": "NOT SUPPORTED by the method (see ambiguity).",
+        "not_checked": "always, in practice."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES, and serious. A page on myprivacytool.io can only read cookies set for myprivacytool.io. It cannot see google.com, facebook.com, microsoft.com or other sites' cookies (same-origin rule; browsers enforce it). So \"Not Detected\" / \"No Platforms\" / \"Not Linked\" will be shown to nearly everyone whether or not they are logged in. This is NOT CHECKED in truth, not CLEAR. Not verified in a live browser; based on how document.cookie works and on the code reading document.cookie only (socialDetection.ts, getCookiePresence).",
+      "source": "src/lib/deviceDetection.ts:1110"
+    },
+    {
+      "id": "meta-services",
+      "label": "Meta Services",
+      "category": "social",
+      "order": 39,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📘"
+      },
+      "detection": "Meta cookie names read from document.cookie by src/lib/socialDetection.ts (cookie NAMES only).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Not Detected",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "cookie names present in document.cookie: show count.",
+        "clear": "NOT SUPPORTED by the method (see ambiguity).",
+        "not_checked": "always, in practice."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES, and serious. A page on myprivacytool.io can only read cookies set for myprivacytool.io. It cannot see google.com, facebook.com, microsoft.com or other sites' cookies (same-origin rule; browsers enforce it). So \"Not Detected\" / \"No Platforms\" / \"Not Linked\" will be shown to nearly everyone whether or not they are logged in. This is NOT CHECKED in truth, not CLEAR. Not verified in a live browser; based on how document.cookie works and on the code reading document.cookie only (socialDetection.ts, getCookiePresence).",
+      "source": "src/lib/deviceDetection.ts:1130"
+    },
+    {
+      "id": "microsoft-services",
+      "label": "Microsoft Account",
+      "category": "social",
+      "order": 40,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🪟"
+      },
+      "detection": "Microsoft cookie names read from document.cookie by src/lib/socialDetection.ts (cookie NAMES only).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Not Detected",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "cookie names present in document.cookie: show count.",
+        "clear": "NOT SUPPORTED by the method (see ambiguity).",
+        "not_checked": "always, in practice."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES, and serious. A page on myprivacytool.io can only read cookies set for myprivacytool.io. It cannot see google.com, facebook.com, microsoft.com or other sites' cookies (same-origin rule; browsers enforce it). So \"Not Detected\" / \"No Platforms\" / \"Not Linked\" will be shown to nearly everyone whether or not they are logged in. This is NOT CHECKED in truth, not CLEAR. Not verified in a live browser; based on how document.cookie works and on the code reading document.cookie only (socialDetection.ts, getCookiePresence).",
+      "source": "src/lib/deviceDetection.ts:1150"
+    },
+    {
+      "id": "social-platforms",
+      "label": "Social Platforms",
+      "category": "social",
+      "order": 41,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📱"
+      },
+      "detection": "cookie names per social platform read from document.cookie by src/lib/socialDetection.ts (cookie NAMES only).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "No Platforms",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "cookie names present in document.cookie: show count.",
+        "clear": "NOT SUPPORTED by the method (see ambiguity).",
+        "not_checked": "always, in practice."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES, and serious. A page on myprivacytool.io can only read cookies set for myprivacytool.io. It cannot see google.com, facebook.com, microsoft.com or other sites' cookies (same-origin rule; browsers enforce it). So \"Not Detected\" / \"No Platforms\" / \"Not Linked\" will be shown to nearly everyone whether or not they are logged in. This is NOT CHECKED in truth, not CLEAR. Not verified in a live browser; based on how document.cookie works and on the code reading document.cookie only (socialDetection.ts, getCookiePresence).",
+      "source": "src/lib/deviceDetection.ts:1169"
+    },
+    {
+      "id": "cross-site-identity",
+      "label": "Cross-Site Identity",
+      "category": "social",
+      "order": 42,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔗"
+      },
+      "detection": "SSO-related cookie names read from document.cookie by src/lib/socialDetection.ts (cookie NAMES only).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Not Linked",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "cookie names present in document.cookie: show count.",
+        "clear": "NOT SUPPORTED by the method (see ambiguity).",
+        "not_checked": "always, in practice."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES, and serious. A page on myprivacytool.io can only read cookies set for myprivacytool.io. It cannot see google.com, facebook.com, microsoft.com or other sites' cookies (same-origin rule; browsers enforce it). So \"Not Detected\" / \"No Platforms\" / \"Not Linked\" will be shown to nearly everyone whether or not they are logged in. This is NOT CHECKED in truth, not CLEAR. Not verified in a live browser; based on how document.cookie works and on the code reading document.cookie only (socialDetection.ts, getCookiePresence).",
+      "source": "src/lib/deviceDetection.ts:1189"
+    },
+    {
+      "id": "dns-leak",
+      "label": "DNS Leak",
+      "category": "security",
+      "order": 43,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔓"
+      },
+      "detection": "detectDNSLeak(): despite the name, it runs the same WebRTC probe as webrtc-leak (STUN) and a user-agent check for DoH support. No DNS query is made (securityDetection.ts).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "No Leak Detected",
+      "presence": "always",
+      "sensitivity": "high",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "\"Leaking (...)\": would show part of a public IP.",
+        "clear": "\"No Leak Detected\" only if WebRTC returned candidates and none were public.",
+        "not_checked": "initial placeholder \"Checking...\" (the value is overwritten asynchronously, after the hexagon list is first returned); \"Check Failed\" on error; also when WebRTC is blocked."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "YES. Value starts as \"Checking...\" and is mutated in place later, so whatever is read at report time depends on timing. A blocked WebRTC gives \"No Leak Detected\". The label overstates what is measured (it is a WebRTC heuristic, not a DNS test).",
+      "source": "src/lib/deviceDetection.ts:1225"
+    },
+    {
+      "id": "https-status",
+      "label": "Connection Security",
+      "category": "security",
+      "order": 44,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔒"
+      },
+      "detection": "window.location.protocol and isSecureContext. hstsEnabled is assumed from secure context, not read from a header.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Secure (HTTPS) + HSTS",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "page served over HTTP (problem).",
+        "clear": "HTTPS.",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "\"+ HSTS\" is inferred, not measured.",
+      "source": "src/lib/deviceDetection.ts:1241"
+    },
+    {
+      "id": "mixed-content",
+      "label": "Mixed Content",
+      "category": "security",
+      "order": 45,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⚠️"
+      },
+      "detection": "DOM query for http: resources on OUR page.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "None",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "insecure resources on the page.",
+        "clear": "\"None\".",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Describes our site, not the user. It will be CLEAR for everybody. Low value for a personal report.",
+      "source": "src/lib/deviceDetection.ts:1259"
+    },
+    {
+      "id": "security-headers",
+      "label": "Security Headers",
+      "category": "security",
+      "order": 46,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🛡️"
+      },
+      "detection": "Inferred from browser features (document.referrer, isSecureContext, \"permissions\" in navigator). Response headers are not read (code comment: \"inferred\").",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Strong",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "weak score.",
+        "clear": "strong score.",
+        "not_checked": "would be the honest status: headers are not actually read."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Not a real header check; reports a guess. Describes our site, not the user.",
+      "source": "src/lib/deviceDetection.ts:1279"
+    },
+    {
+      "id": "browser-security",
+      "label": "Browser Status",
+      "category": "security",
+      "order": 47,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🌐"
+      },
+      "detection": "user agent major version compared with a hard-coded minimum (VULNERABLE_VERSIONS in securityDetection.ts).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "Up to date",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "outdated or vulnerable version.",
+        "clear": "version at or above the minimum.",
+        "not_checked": "unknown browser (version 0): shows \"Outdated\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Hard-coded thresholds go stale; unknown browsers show \"Outdated\" (should be NOT CHECKED).",
+      "source": "src/lib/deviceDetection.ts:1299"
+    },
+    {
+      "id": "tls-config",
+      "label": "Encryption",
+      "category": "security",
+      "order": 48,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔐"
+      },
+      "detection": "protocol check plus a user agent guess: \"TLS 1.3 (likely)\" for Chrome 70+ / Firefox 63+, else \"TLS 1.2 (minimum)\". The negotiated TLS version is not readable from a page.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "TLS 1.3 (likely)",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "plain HTTP.",
+        "clear": "HTTPS.",
+        "not_checked": "the exact version is never measured."
+      },
+      "code_cannot_tell_clear_from_not_checked": true,
+      "note": "Guess presented as value.",
+      "source": "src/lib/deviceDetection.ts:1319"
+    },
+    {
+      "id": "mouse-tracking",
+      "label": "Mouse Tracking",
+      "category": "behavior",
+      "order": 49,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🖱️"
+      },
+      "detection": "mousemove listener on our page (src/lib/behaviorDetection.ts), started when HexagonGrid mounts.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "212 movements",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "movements recorded.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"Collecting...\" / \"Collecting data...\" (no movement, or touch device)."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Value depends on when it is read; zero = not interacted yet, not \"clear\".",
+      "source": "src/lib/deviceDetection.ts:1390"
+    },
+    {
+      "id": "typing-patterns",
+      "label": "Keystroke Dynamics",
+      "category": "behavior",
+      "order": 50,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⌨️"
+      },
+      "detection": "keydown timing on our page (only counts and timing, no key content).",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "No input yet",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "keystrokes recorded.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"No input yet\": the user has not typed. Most users never type during the scan."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Zero is not clear; it means not observed.",
+      "source": "src/lib/deviceDetection.ts:1408"
+    },
+    {
+      "id": "click-patterns",
+      "label": "Click Patterns",
+      "category": "behavior",
+      "order": 51,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "👆"
+      },
+      "detection": "click listener on our page.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "47 clicks",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "clicks recorded (always above 0 by the time the user finishes).",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"No clicks yet\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:1428"
+    },
+    {
+      "id": "scroll-behavior",
+      "label": "Scroll Behavior",
+      "category": "behavior",
+      "order": 52,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "📜"
+      },
+      "detection": "scroll depth on our page.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "62% depth",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "depth above 0.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"No scrolling yet\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:1446"
+    },
+    {
+      "id": "session-duration",
+      "label": "Session Duration",
+      "category": "behavior",
+      "order": 53,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "⏱️"
+      },
+      "detection": "seconds since startSessionTimer() on page load.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "6m 12s",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "always.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "never."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": "Changes every second until captured; capture at request time.",
+      "source": "src/lib/deviceDetection.ts:1464"
+    },
+    {
+      "id": "engagement-map",
+      "label": "Engagement Map",
+      "category": "behavior",
+      "order": 54,
+      "artwork": {
+        "file": null,
+        "type": "emoji in inline SVG",
+        "emoji": "🔥"
+      },
+      "detection": "click/mouse hotspots on our page.",
+      "detection_in_browser": "yes",
+      "value_type": "text",
+      "example_value": "5 hotspots",
+      "presence": "always",
+      "sensitivity": "low",
+      "status_kind": "informational",
+      "status_rule": {
+        "found": "hotspots above 0.",
+        "clear": "n/a: an informational hexagon, there is nothing to be clear of",
+        "not_checked": "\"Building...\"."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "note": null,
+      "source": "src/lib/deviceDetection.ts:1480"
+    }
+  ]
+}
