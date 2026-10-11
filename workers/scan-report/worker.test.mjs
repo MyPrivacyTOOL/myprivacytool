@@ -3,7 +3,7 @@ import worker, { handleScan, runReportJob, runFollowUpJob, recipientAllowed } fr
 import { computeScore, breachRisk } from './lib/score.js';
 import { checkBreaches } from './lib/hibp.js';
 import { checkBrokers } from './lib/brokers.js';
-import { buildConfirmationEmail, buildReportEmail } from './lib/email.js';
+import { buildConfirmationEmail, buildReportEmail, tagLinks } from './lib/email.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { buildFollowUpEmail, nextFollowUp, unsubscribeToken, verifyUnsubscribe } from './lib/onboarding.js';
 
@@ -136,6 +136,14 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const f2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: 'https://x/u' });
   check(/Change the password/.test(f1.text) && /first 100/.test(f1.text) && /not yet checked/.test(f1.text) && f1.html.includes('https://x/u') && f1.text.includes('https://x/u'), 'follow-up 1: next steps from the mirror, cohort line, unsubscribe in text + html');
   check(/Reply to this email/.test(f2.text) && !/first 100/.test(f2.text) && !/removed|we will remove|automatic/i.test(f1.text + f2.text.replace('remove you', '')), 'follow-up 2: feedback ask; no cohort line outside cohort; no fulfilment claims');
+  const UNSUB = 'https://myprivacytool.io/unsubscribe?e=a%40b.co&t=abc';
+  const g1 = buildFollowUpEmail({ stage: 1, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });
+  const g2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });
+  const gc = buildConfirmationEmail({ unsubscribeLink: UNSUB });
+  check(g1.html.includes('utm_campaign=followup-3d') && g2.html.includes('utm_campaign=followup-7d') && gc.html.includes('utm_campaign=scan-confirmation'), 'email links to our site carry utm_source/medium/campaign (confirmation html, follow-up day 3 and day 7)');
+  const UNSUB_HTML = UNSUB.replace(/&/g, '&amp;');
+  check(g1.html.includes(UNSUB_HTML) && g1.text.includes(UNSUB) && gc.html.includes(UNSUB_HTML) && gc.text.includes(UNSUB), 'unsubscribe links are never tagged');
+  check(tagLinks('x https://myprivacytool.io/opt-out.', 'c') === 'x https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=c.' && tagLinks('https://myprivacytool.io/email/a.png', 'c') === 'https://myprivacytool.io/email/a.png' && tagLinks('https://myprivacytool.io/p?utm_source=z', 'c') === 'https://myprivacytool.io/p?utm_source=z' && tagLinks('<a href="https://myprivacytool.io/a?b=1">', 'c', { html: true }).includes('b=1&amp;utm_source=email&amp;utm_medium=email&amp;utm_campaign=c'), 'tagLinks: keeps trailing punctuation, skips images and already-tagged links, uses &amp; in HTML');
   const tok = await unsubscribeToken('s3cret', 'A@B.co');
   check(await verifyUnsubscribe('s3cret', 'a@b.co', tok) && !(await verifyUnsubscribe('s3cret', 'a@b.co', tok.replace(/.$/, tok.endsWith('0') ? '1' : '0'))) && !(await verifyUnsubscribe('other', 'a@b.co', tok)) && !(await verifyUnsubscribe('', 'a@b.co', tok)), 'unsubscribe token: case-insensitive email, rejects tampering, wrong secret, missing secret');
 }
@@ -231,7 +239,7 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(linkRe.test(conf.text) && linkRe.test(conf.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(conf.hdr['List-Unsubscribe']), 'confirmation email: signed site-page unsubscribe link in text and html, Worker link in the List-Unsubscribe header');
   check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']) && rep.hdr['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'report email: signed site-page unsubscribe link in text and html, Worker link + one-click in the header');
   check(/Fixed what is in this report/.test(rep.text) && /Fixed what is in this report/.test(rep.html) && /no more follow-up or marketing/.test(rep.text), 'report email invites unsubscribing once the findings are fixed');
-  check(rep.html.includes('mailto:hello@myprivacytool.io') && rep.html.includes('href="https://myprivacytool.io/"'), 'report email footer: contact address and site link');
+  check(rep.html.includes('mailto:hello@myprivacytool.io') && rep.html.includes('href="https://myprivacytool.io/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=scan-report"'), 'report email footer: contact address and tagged site link');
   globalThis.fetch = F.f;
   const m = rep.text.match(/unsubscribe\?e=([^&\s]+)&t=([0-9a-f]{64})/);
   const ok = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${m[1]}&t=${m[2]}`, { method: 'POST' }), OB, {});

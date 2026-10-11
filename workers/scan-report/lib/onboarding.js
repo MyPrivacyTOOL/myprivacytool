@@ -1,5 +1,7 @@
 // MPC-7261: first-100 onboarding follow-ups. Copy is DRAFT for Chris to approve; every line is true today
 // (same rule as the confirmation email: do not promise anything the report does not deliver).
+import { shell, para, tagLinks } from './email.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 24 * 3600 * 1000;
 export const FOLLOWUP_DELAYS_MS = [3 * DAY, 7 * DAY];      // stage 1 at +3 days, stage 2 at +7 days after the report
@@ -59,8 +61,13 @@ export function buildFollowUpEmail({ stage, mirror, cohortNumber, unsubscribeLin
 <p>Reply to this email with one thing that was useful and one thing that was missing. A person reads every reply.</p>${founding ? `<p>${esc(founding)}</p>` : ''}`;
   }
   const text = [...lines, '', 'The MyPrivacyTOOL team', '', foot].join('\n').replace(/\n{3,}/g, '\n\n');
-  const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#111">${htmlBody}
-<p>The MyPrivacyTOOL team</p><hr style="border:none;border-top:1px solid #eee">
-<p style="font-size:12px;color:#999">You are getting this because you requested a privacy scan. <a href="${esc(unsubscribeLink)}">Unsubscribe</a> &middot; MyPrivacyTOOL &middot; myprivacytool.io</p></body></html>`;
-  return { subject, text, html };
+  const styled = htmlBody
+    .replace(/<p>/g, '<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">')
+    .replace(/<ol>/g, '<ol style="margin:0 0 12px 0;padding-left:22px;font-size:15px;line-height:23px;color:#374151">')
+    .replace(/<li>/g, '<li style="margin-bottom:6px">');
+  const html = shell(subject, subject, `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">${esc(subject)}</h1>
+${styled}
+${para('The MyPrivacyTOOL team')}`, unsubscribeLink);
+  const campaign = `followup-${stage === 1 ? '3d' : '7d'}`;
+  return { subject, text: tagLinks(text, campaign), html: tagLinks(html, campaign, { html: true }) };
 }

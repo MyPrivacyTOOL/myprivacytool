@@ -5,9 +5,23 @@ const SITE = 'https://myprivacytool.io';
 
 // MPC-7406 follow-up: shared HTML shell for the transactional emails. Table layout with inline styles only (mail apps strip <style>
 // and scripts), 600px max width, system fonts, light/dark safe colours. The plain-text parts are unchanged.
+
+// Campaign tags on links back to our own site, so GA4 can attribute visits to the email that drove them (only for visitors who accept
+// cookies; no tracking pixel, no third-party redirect). Skips unsubscribe links, images and anything already tagged. Plain text and HTML.
+const OWN_URL = /https:\/\/(?:www\.)?myprivacytool\.io[^\s"'<>)]*/g;
+const SKIP_TAG = /\/(?:api\/)?unsubscribe|\/email\/|\.(?:png|jpe?g|gif|svg)(?:[?#]|$)|[?&]utm_/;
+export const tagLinks = (str, campaign, { html = false } = {}) => String(str).replace(OWN_URL, (m) => {
+  const trail = (m.match(/[.,;:!]+$/) || [''])[0];
+  const url = trail ? m.slice(0, -trail.length) : m;
+  if (SKIP_TAG.test(url)) return m;
+  const [base, hash] = url.split('#');
+  const sep = base.includes('?') ? (html ? '&amp;' : '&') : '?';
+  return `${base}${sep}utm_source=email${html ? '&amp;' : '&'}utm_medium=email${html ? '&amp;' : '&'}utm_campaign=${campaign}${hash ? `#${hash}` : ''}${trail}`;
+});
+const tagged = (campaign, { subject, text, html }) => ({ subject, text: tagLinks(text, campaign), html: tagLinks(html, campaign, { html: true }) });
 const BRAND = '#15803d';
 const CONTACT = 'hello@myprivacytool.io';
-const shell = (title, preheader, inner, unsubscribeLink) => `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(title)}</title></head>
+export const shell = (title, preheader, inner, unsubscribeLink) => `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(title)}</title></head>
 <body style="margin:0;padding:0;background:#f3f4f6;-webkit-text-size-adjust:100%">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px">
@@ -50,8 +64,8 @@ const aliceHero = (titleHtml, pose = 'wave') => `<table role="presentation" widt
 <td width="140" valign="middle" align="right"><img src="${SITE}/email/alice/${ALICE_POSES[pose].file}" width="140" height="140" alt="${esc(ALICE_POSES[pose].alt)}" style="display:block;width:140px;height:auto;border:0"></td></tr></table>
 `;
 const h2 = (t) => `<h2 style="margin:28px 0 10px 0;font-size:18px;line-height:24px;color:#111827">${t}</h2>`;
-const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
-const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
+export const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
+export const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
 
 // DRAFT COPY: Chris must approve before any real-user send.
 // CK 2026-10-11: copy rewritten to the "Your privacy scan is starting" version. It describes an automated search of public,
@@ -110,7 +124,7 @@ ${para('This email is now our open channel. You can reply anytime with a questio
 ${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
 ${honeycomb(Object.entries(CATEGORIES).map(([key, c]) => hexTile({ key, label: c.label, href: `mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}` })))}
 ${para('Talk soon,<br>The MyPrivacyTOOL team')}`, unsubscribeLink);
-  return { subject, text, html };
+  return tagged('scan-confirmation', { subject, text, html });
 }
 
 // Sent when someone asks for an unsubscribe link on the website (so only the address owner can opt out).
@@ -130,7 +144,7 @@ export function buildUnsubscribeRequestEmail({ link }) {
 ${para('You asked to unsubscribe from MyPrivacyTOOL emails. Confirm below and we will send you no more follow-up or marketing emails.')}
 ${button(link, 'Yes, unsubscribe me')}
 ${para('<br>If you did not ask for this, ignore this email and nothing changes.')}`);
-  return { subject, text, html };
+  return tagged('unsubscribe-confirm', { subject, text, html });
 }
 
 export function buildReportEmail({ scan, breaches, breachStatus, brokers, mirror, unsubscribeLink }) {
@@ -187,7 +201,7 @@ ${brokerCards}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
 ${unsubscribeLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Then you do not need to hear from us again. <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">Unsubscribe</a> and we will send you no more follow-up or marketing emails.</td></tr></table>` : ''}`, unsubscribeLink);
-  return { subject, text, html };
+  return tagged('scan-report', { subject, text, html });
 }
 
 export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers }, fetchImpl = fetch) {
