@@ -49,3 +49,9 @@ On by default since MPC-7385: `src/pages/Scan.tsx` posts to `https://mpt-scan-re
 
 ## Test
 `node workers/scan-report/worker.test.mjs` (stubbed fetch, no network).
+
+## Web scan saving (MPC-7465)
+
+`POST /api/web-scan` `{consent:true, hexagons:[{id,label,value,...}]}` saves a completed home-page scan to `web_scans` and returns `{saved:true, scan_number}`.
+`POST /api/scan` may carry `scan_number`; the Worker then links that scan to the new email request in `web_scan_contacts` (`channel='email'`, `contact_id=scans.id`). Other channels later = new `channel` values, no schema change.
+Switch: Worker var `WEB_SCAN_SAVE_ENABLED` (default `"false"`; only `"true"` saves) and site build flag `VITE_SAVE_WEB_SCANS`. Off, the endpoint answers `{saved:false}`. Drop-off: `select * from web_scan_funnel`.

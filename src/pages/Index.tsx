@@ -20,6 +20,7 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
+import { saveCompletedScan } from '@/lib/webScan';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -32,6 +33,24 @@ const Index = () => {
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
+
+  // MPC-7465: save the scan once, when it first completes (not on every live orientation refresh). Needs cookie consent; if the
+  // visitor accepts after the scan finished, the consent listener tries again. Off unless VITE_SAVE_WEB_SCANS is "true".
+  const scanSaveStarted = useRef(false);
+  const latestHexagons = useRef<HexagonData[]>([]);
+  latestHexagons.current = hexagons;
+  useEffect(() => {
+    if (loading || hexagons.length === 0) return;
+    const trySave = () => {
+      if (scanSaveStarted.current || !hasConsent() || latestHexagons.current.length === 0) return;
+      scanSaveStarted.current = true;
+      saveCompletedScan(latestHexagons.current).then((n) => {
+        if (!n) scanSaveStarted.current = false;
+      });
+    };
+    trySave();
+    return onConsentChange(trySave);
+  }, [loading, hexagons.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
