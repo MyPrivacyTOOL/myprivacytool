@@ -1,6 +1,6 @@
 // MPC-7261: first-100 onboarding follow-ups. Copy is DRAFT for Chris to approve; every line is true today
 // (same rule as the confirmation email: do not promise anything the report does not deliver).
-import { shell, para } from './email.js';
+import { shell, para, tagLinks } from './email.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 24 * 3600 * 1000;
@@ -68,5 +68,6 @@ export function buildFollowUpEmail({ stage, mirror, cohortNumber, unsubscribeLin
   const html = shell(subject, subject, `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">${esc(subject)}</h1>
 ${styled}
 ${para('The MyPrivacyTOOL team')}`, unsubscribeLink);
-  return { subject, text, html };
+  const campaign = `followup-${stage === 1 ? '3d' : '7d'}`;
+  return { subject, text: tagLinks(text, campaign), html: tagLinks(html, campaign, { html: true }) };
 }

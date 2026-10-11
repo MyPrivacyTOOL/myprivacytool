@@ -618,6 +618,6 @@ ${p('We&rsquo;re preparing your free privacy exposure scan across 46 data catego
 ${p('You&rsquo;ll hear from us shortly with your full report.')}
 ${p('In the meantime, if you have any questions, just reply to this email.')}
 ${p('Stay private,<br><strong>The MyPrivacyTOOL Team</strong>')}</td></tr>
-<tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:12px;line-height:18px;color:#6b7280">Questions, or want your data deleted? Reply to this email or write to <a href="mailto:hello@myprivacytool.io" style="color:#6b7280">hello@myprivacytool.io</a>. We never sell your data. To stop hearing from us, reply with &ldquo;unsubscribe&rdquo; and we will remove you.<br>MyPrivacyTOOL &middot; <a href="https://myprivacytool.io/" style="color:#6b7280">myprivacytool.io</a></td></tr>
+<tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:12px;line-height:18px;color:#6b7280">Questions, or want your data deleted? Reply to this email or write to <a href="mailto:hello@myprivacytool.io" style="color:#6b7280">hello@myprivacytool.io</a>. We never sell your data. To stop hearing from us, reply with &ldquo;unsubscribe&rdquo; and we will remove you.<br>MyPrivacyTOOL &middot; <a href="https://myprivacytool.io/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=lead-confirmation" style="color:#6b7280">myprivacytool.io</a></td></tr>
 </table></td></tr></table></body></html>`;
 }
