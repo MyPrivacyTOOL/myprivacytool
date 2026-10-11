@@ -2,7 +2,7 @@ name: Core Brain rate-limit probe
 
 # MPC-7257: proves the live per-sender rate limit (10 requests / 60s, the 11th gets 429) against
 # https://brain.myprivacytool.io on demand. Manual only: Actions -> "Core Brain rate-limit probe" -> Run workflow.
-# Costs about 11 live Qwen calls per run, so it is deliberately NOT part of "Core Brain production gates".
+# Costs about 11 to 14 live Qwen calls per run (the 429s do not reach Qwen), so it is deliberately NOT part of "Core Brain production gates".
 # WEBHOOK_SECRET is read from the repo secret by this runner; it is never printed and never has to be handed to a
 # person or an agent. Senders are synthetic (rl-probe-<time>). Output is limited to pass/fail and status codes.
 
@@ -10,8 +10,8 @@ on:
   workflow_dispatch:
     inputs:
       count:
-        description: "Requests to send for the one sender (11 to 30). More requests tell an approximate limiter from a missing one."
-        default: "15"
+        description: "Requests to send for the one sender (11 to 30). Only about 11 reach Qwen; the rest are cheap 429s."
+        default: "30"
 
 permissions:
   contents: read
@@ -29,8 +29,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Core Brain rate-limit probe (429 on request 11)
+      - name: Core Brain rate-limit probe (first 429 by request 15)
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           COUNT: ${{ inputs.count }}
-        run: node scripts/ci/core-brain-rate-limit-probe.mjs --count "${COUNT:-15}"
+        run: node scripts/ci/core-brain-rate-limit-probe.mjs --count "${COUNT:-30}"
