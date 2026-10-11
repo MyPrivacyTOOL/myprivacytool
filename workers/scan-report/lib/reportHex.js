@@ -1,7 +1,7 @@
 // MPC-7468: the two-part report. Part 1 replays every hexagon of the user's saved web scan, Part 2 shows the hexagons about their email
 // address. One compact block (hexRow) renders every hexagon. Honest status per hexagon: FOUND (real value) / CHECKED AND CLEAR / NOT CHECKED.
 // Everything that reaches the HTML is escaped here: values come from a browser, so they are untrusted text.
-import HEX from './hexagons.generated.js';
+import HEX, { EMAIL } from './hexagons.generated.js';
 
 const SITE = 'https://myprivacytool.io';
 const BRAND = '#15803d';
@@ -17,13 +17,8 @@ const clean = (v, max) => Array.from(String(v ?? '').replace(/[\u0000-\u001f\u00
 // ---- definitions -----------------------------------------------------------------------------------------------------------------
 // Web hexagons come from the registry (generated from docs/hexagon-registry-draft.json until MPC-7466 promotes the final one).
 export const WEB_HEXAGONS = HEX.map(([id, label, category, kind, emoji, art]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art }));
-// Email hexagons (MPC-7467 owns the checks; the ids here are the contract the adapter expects from it).
-export const EMAIL_HEXAGONS = [
-  { id: 'email-breaches', label: 'Data breaches', category: 'email', kind: 'risk', emoji: '🔓', art: '' },
-  { id: 'email-name', label: 'Name in your address', category: 'email', kind: 'risk', emoji: '🪪', art: '' },
-  { id: 'email-provider', label: 'Mail provider and domain', category: 'email', kind: 'risk', emoji: '📬', art: '' },
-  { id: 'email-profile', label: 'Public profile', category: 'email', kind: 'risk', emoji: '🖼️', art: '' },
-];
+// Email hexagons: the registry's email_hexagons (MPC-7467 owns the checks).
+export const EMAIL_HEXAGONS = EMAIL.map(([id, label, category, kind, emoji, art]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art }));
 // Hexagons whose value is a guess, not a measurement. Registry truth levels (MPC-7466) replace this; a saved item may also say estimate:true.
 const ESTIMATES = new Set(['demographic']);
 
@@ -64,7 +59,7 @@ export function normaliseHexagons(defs, items) {
 }
 
 // Email hexagons from what the Worker already knows. Breaches come from the HIBP check; the other three arrive from MPC-7467 in `extra`
-// (same item shape) and are NOT CHECKED until then.
+// (same item shape).
 export function emailItems({ breachStatus, breaches = [], extra = [] }) {
   const names = breaches.map((b) => clean(b.Name, 60)).filter(Boolean);
   const br = breachStatus !== 'checked' ? { id: 'email-breaches', status: 'not_checked' }

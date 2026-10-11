@@ -52,3 +52,6 @@ On by default since MPC-7385: `src/pages/Scan.tsx` posts to `https://mpt-scan-re
 
 ## Test
 `node workers/scan-report/worker.test.mjs` (stubbed fetch, no network).
+
+## Email hexagons (MPC-7467)
+Name in address, mail provider and domain, public profile (Gravatar) run per scan; results are `signals` rows (`email-name`, `email-provider`, `email-profile`), never block the report, and do not affect the score. Services that receive the address or a hash of it, and the held breach check: `docs/email-hexagons-mpc-7467.md`. Test: `node workers/scan-report/email-hexagons.test.mjs`.
