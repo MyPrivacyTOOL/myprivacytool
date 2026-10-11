@@ -36,3 +36,8 @@ export function blogCtaDestination(href: string | null | undefined): string | nu
   if (path.startsWith("/blog/")) return path;
   return null;
 }
+
+/** Href for a blog call to action, tagged so GA4 attributes the scan to the post (utm_campaign = slug). */
+export function blogCtaHref(slug: string, path = "/scan"): string {
+  return `${path}?utm_source=blog&utm_medium=content&utm_campaign=${encodeURIComponent(slug)}`;
+}

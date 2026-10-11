@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { captureAttribution, getAttribution, parseAttribution, resetAttributionForTests } from "./attribution";
 
 describe("attribution", () => {
@@ -25,5 +25,26 @@ describe("attribution", () => {
   it("ignores URLs without utm_source", () => {
     captureAttribution("?utm_medium=orphan");
     expect(getAttribution()).toEqual({});
+  });
+});
+
+describe("lead events carry attribution (MPC-7376)", () => {
+  beforeEach(() => {
+    resetAttributionForTests();
+    window.gtag = vi.fn();
+  });
+  afterEach(() => {
+    delete window.gtag;
+  });
+
+  it("adds first-touch utm params to the form event and generate_lead", async () => {
+    captureAttribution("?utm_source=blog&utm_campaign=mpc-7033-w02");
+    const { trackNewsletterSignup } = await import("./analytics");
+    trackNewsletterSignup({ source: "newsletter_page" });
+    const calls = (window.gtag as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.map((c) => c[1])).toEqual(["newsletter_signup", "generate_lead"]);
+    for (const c of calls) {
+      expect(c[2]).toMatchObject({ utm_source: "blog", utm_campaign: "mpc-7033-w02", source: "newsletter_page" });
+    }
   });
 });

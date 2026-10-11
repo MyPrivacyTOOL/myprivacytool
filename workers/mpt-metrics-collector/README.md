@@ -22,9 +22,10 @@ Test: `node workers/mpt-metrics-collector/worker.test.mjs`.
 zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and Workers `mpt-leads`, `core-brain`, `social-listeners`
 (invocations + errors, `workersInvocationsAdaptive`). Both untouched responses are stored in `payload.zone` / `payload.workers`.
 
+- Zone query also returns bandwidth (`sum.bytes`), `cachedRequests`/`cachedBytes`, the `responseStatusMap` (4xx/5xx) and `threats`. A third query (`firewallEventsAdaptiveGroups`, action=block) is stored in `payload.firewall`; it is optional, so if the plan/token cannot read it the row stays `ok` with `payload.firewall = null` and a `firewall_note`.
 - Secrets (set by a human): `CLOUDFLARE_ANALYTICS_TOKEN` = a token with **Analytics Read only** (CK-7318 notes `mpt-openclaw-readonly` already exists; never use the deploy token), and `CLOUDFLARE_ZONE_ID` = zone ID of myprivacytool.io.
 - A failed call writes `status=error`; the failed half stays `null` (blank), the other half is kept.
-- `supabase/sql/mpt-cloudflare-daily-metrics.sql`: view `mpt_cloudflare_daily` (visitors, requests, per-Worker invocations/errors per day). `mpt_daily_metrics` joins it on `metric_date` to show `cloudflare_visitors` next to GA4 active users.
+- `supabase/sql/mpt-cloudflare-daily-metrics.sql`: view `mpt_cloudflare_daily` (visitors, requests, bandwidth, cached requests, cache-hit ratio, 4xx/5xx, threats blocked, per-Worker invocations/errors per day; re-run the file in the Supabase SQL editor to pick up the added columns). `mpt_daily_metrics` joins it on `metric_date` to show `cloudflare_visitors` next to GA4 active users.
 
 ## Notion publisher (MPC-7382, task 7/9)
 
@@ -55,6 +56,7 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 - **Read-only:** secret `HUBSPOT_READONLY_TOKEN` (a read-only private-app token; not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY` other Workers hold). `hubspotRead()` only allows GET and the contact/deal search endpoints. The token is redacted from error text, and error text carries the HTTP status only.
 - Scopes needed on the private app: `crm.objects.contacts.read`, `crm.objects.deals.read`, `crm.schemas.contacts.read`, `crm.schemas.deals.read` (pipelines, lifecycle options).
 - `supabase/sql/mpt-hubspot-daily.sql`: view `mpt_hubspot_daily` and `hubspot_total_contacts` / `hubspot_new_contacts` appended to `mpt_daily_metrics`. Total contacts is the count when the run happened; new contacts is for the Hong Kong day in `payload.day`.
+- **Form submissions and email engagement** (extension): `payload.forms` = `{submissions_on_day, forms_counted}` (forms from `GET /marketing/v3/forms/`, submissions from `GET /form-integrations/v1/submissions/forms/{id}`, newest first, counted for the Hong Kong day; submitted values are never stored) and `payload.email` = `{sent, delivered, opens, clicks, bounces, unsubscribes}` (`GET /marketing/v3/emails/statistics/list`, aggregate counters; all null if no marketing email was sent). Extra scopes on the private app: `forms` and `content`. If the token lacks one (HTTP 403) that section is `null`, a warning is logged and named in `payload.scope_warnings`, and the row stays `ok`; other failures make the row `status=error`.
 - Test: `node workers/mpt-metrics-collector/hubspot.test.mjs`.
 
 ## Monday Slack digest (MPC-7383, task 8/9)

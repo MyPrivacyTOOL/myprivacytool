@@ -6,7 +6,7 @@ const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 
 const NOW = new Date('2026-10-09T16:15:00Z'); // 00:15 HKT 2026-10-10 => collects HK day 2026-10-09
 const PERSON = { email: 'jane@example.com', firstname: 'Jane', phone: '+85255501234' }; // must never reach a stored row
 
-let inserts = [], calls = [], portalId = 246502821, portalHttp = null, failPath = null, status429Once = false;
+let formsHttp = null, emailHttp = null, emailBody = null, inserts = [], calls = [], portalId = 246502821, portalHttp = null, failPath = null, status429Once = false;
 const json = (b) => ({ ok: true, status: 200, json: async () => b });
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
@@ -18,6 +18,17 @@ globalThis.fetch = async (url, opts = {}) => {
   if (status429Once) { status429Once = false; return { ok: false, status: 429 }; }
   if (failPath && path.startsWith(failPath)) return { ok: false, status: 500, json: async () => ({ message: `leak hs-ro-tok ${PERSON.email}` }) };
   if (path === '/account-info/v3/details') return portalHttp ? { ok: false, status: portalHttp } : json({ portalId, timeZone: 'Asia/Hong_Kong' });
+  if (path.startsWith('/marketing/v3/forms/')) return formsHttp ? { ok: false, status: formsHttp } : json({ results: [{ id: 'f1', name: 'Contact' }, { id: 'f2', name: 'Newsletter' }] });
+  if (path.startsWith('/form-integrations/v1/submissions/forms/')) {
+    if (formsHttp) return { ok: false, status: formsHttp };
+    const T = (iso) => Date.parse(iso);
+    const v = [{ name: 'email', value: PERSON.email }];
+    if (path.includes('/f2')) return json({ results: [{ submittedAt: T('2026-10-09T15:00:00Z'), values: v }, { submittedAt: T('2026-10-08T15:59:00Z'), values: v }] });
+    return new URL(url).searchParams.get('after')
+      ? json({ results: [{ submittedAt: T('2026-10-08T17:00:00Z'), values: v }, { submittedAt: T('2026-10-08T10:00:00Z'), values: v }, { submittedAt: T('2026-10-01T00:00:00Z'), values: v }] })
+      : json({ results: [{ submittedAt: T('2026-10-09T16:30:00Z'), values: v }, { submittedAt: T('2026-10-09T12:00:00Z'), values: v }], paging: { next: { after: 'p2' } } });
+  }
+  if (path.startsWith('/marketing/v3/emails/statistics/list')) return emailHttp ? { ok: false, status: emailHttp } : json(emailBody ?? { aggregate: { counters: { sent: 100, delivered: 95, open: 40, click: 12, bounce: 5, unsubscribed: 2 } } });
   if (path === '/crm/v3/properties/contacts/lifecyclestage') return json({ options: [{ value: 'subscriber' }, { value: 'lead' }, { value: 'customer' }] });
   if (path === '/crm/v3/pipelines/deals') return json({ results: [{ id: 'default', label: 'Sales', stages: [{ id: 'qual', label: 'Qualified' }, { id: 'won', label: 'Closed won' }] }] });
   if (path.startsWith('/crm/v3/objects/contacts/search')) {
@@ -56,12 +67,25 @@ const d = row.payload.deals;
 check(d.total === 3 && d.amount_sum === 1500.5 && d.by_stage.length === 2, 'deals counted across pages, amounts summed');
 const q = d.by_stage.find((s) => s.stage_id === 'qual');
 check(q.count === 2 && q.with_amount === 1 && q.amount_sum === 1000 && q.stage === 'Qualified' && q.pipeline === 'Sales', 'deals by stage with count, amount and labels');
+check(row.payload.forms.submissions_on_day === 3 && row.payload.forms.forms_counted === 2, 'form submissions in the HKT day counted across forms and pages (newer/older excluded)');
+check(JSON.stringify(row.payload.email) === JSON.stringify({ sent: 100, delivered: 95, opens: 40, clicks: 12, bounces: 5, unsubscribes: 2 }), 'email engagement counters');
+const emailCall = calls.find((x) => x.path.startsWith('/marketing/v3/emails/statistics/list'));
+check(emailCall.path.includes('startTimestamp=2026-10-08T16%3A00%3A00.000Z') && emailCall.path.includes('endTimestamp=2026-10-09T16%3A00%3A00.000Z'), 'email window is the HKT day');
 const stored = JSON.stringify(row);
-check(!/jane|example\.com|5550|firstname|email|phone|dealname|Jane Co/i.test(stored), 'no personal data in the stored row');
+check(!/jane|example\.com|@|5550|firstname|phone|dealname|Jane Co/i.test(stored), 'no personal data in the stored row');
 check(!stored.includes('hs-ro-tok'), 'token not in stored row');
 check(calls.every((x) => x.auth === 'Bearer hs-ro-tok'), 'read-only token used for every call');
 check(calls.every((x) => x.method === 'GET' || (x.method === 'POST' && /^\/crm\/v3\/objects\/(contacts|deals)\/search$/.test(x.path))), 'only GET and search calls were made');
 check(calls.every((x) => x.body === null || x.body.limit === 1), 'search asks for one record, only hs_object_id');
+
+// Optional sections: missing scope (403) => null + warning, row stays ok
+formsHttp = 403; emailHttp = 403; row = await run(); formsHttp = null; emailHttp = null;
+check(row.status === 'ok' && row.error === null && row.payload.forms === null && row.payload.email === null && row.payload.contacts.total === 42, 'forms/email 403 => nulls, row still ok, core metrics kept');
+check(row.payload.scope_warnings.length === 2 && /scope forms/.test(row.payload.scope_warnings[0]) && /scope content/.test(row.payload.scope_warnings[1]), 'scope warnings name the missing scopes');
+formsHttp = 500; row = await run(); formsHttp = null;
+check(row.status === 'error' && /HTTP 500/.test(row.error) && row.payload.forms === null && row.payload.email.sent === 100, 'forms 500 => error row, other sections kept');
+emailBody = { aggregate: { counters: {} } }; row = await run(); emailBody = null;
+check(row.status === 'ok' && row.payload.email.sent === null && row.payload.email.opens === null, 'no marketing email sent => nulls');
 
 // Portal guard
 portalId = 245999072; row = await run(); portalId = 246502821;
