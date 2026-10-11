@@ -1,6 +1,6 @@
 # scan-report Worker (MPC-6677)
 
-Makes the "report within 48 hours" promise true. One Worker owns **both** the confirmation email and the report.
+Delivers the report: normally within a few minutes of the request (the report job runs every 5 minutes, up to 5 scans per run, oldest first). A report that is still unsent after 48 hours (`report_due_at`) is logged as an ALERT; 48 hours is that internal deadline, not what users are told. One Worker owns **both** the confirmation email and the report.
 
 ```
 /scan form --POST /api/scan--> mpt-scan-report
@@ -15,7 +15,7 @@ GA4 `generate_lead` already fires client-side from `trackStartSignup` in `src/pa
 ## Free mode (current default, no paid services)
 HIBP's Core plan only searches domains you have proven you own, so it cannot look up arbitrary visitor emails; no free equivalent exists. Default is therefore `ALLOW_PARTIAL_REPORT=true` with no `HIBP_API_KEY`: the report carries removal steps for the five brokers and a link to HIBP's free self-check, shows **no score** (nothing was checked) and says "not yet checked" everywhere else. The confirmation copy is a DRAFT for Chris to approve. Setting `HIBP_API_KEY` later switches on real breach checks and a partial score with no code change.
 
-## What the report really contains when every check runs (and the confirmation email must say only what is delivered)
+## What the report really contains when every check runs (and the confirmation email must say only what is delivered: since MPC-7469 it promises two things, the browser findings replayed and what the email address reveals, and no username, phone or address search)
 - Breaches for the email (Have I Been Pwned). Needs `HIBP_API_KEY`; without it reports are **held**, not sent half-built (`ALLOW_PARTIAL_REPORT=true` overrides, breaches then labelled "not yet checked").
 - Spokeo, Whitepages, BeenVerified, MyLife, Intelius: always **"not yet checked"**. The form collects an email only; these sites search by name and location and prohibit automated lookups. Removal links come only from `src/data/optOutGuides.json` (verified guides); MyLife and Intelius have none yet, so the email says so.
 - Score 0-100 per MPC-076 v1.0, over checked categories only, labelled partial. Multipliers for email (1.5) and search (1.2) are our interpolation; broker/AI/social come from the spec.

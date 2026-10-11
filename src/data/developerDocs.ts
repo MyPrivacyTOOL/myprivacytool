@@ -57,7 +57,7 @@ export const ENDPOINTS: Endpoint[] = [
     base: BASES.scan,
     status: "live",
     summary:
-      "Records an explicit-consent scan request for one email address. A confirmation email is sent once, then a privacy report is emailed within 48 hours.",
+      "Records an explicit-consent scan request for one email address. A confirmation email is sent once, then a privacy report is emailed, normally within a few minutes (a background job runs every 5 minutes; a report is flagged overdue after 48 hours).",
     auth: "None. Browser calls are CORS-restricted to myprivacytool.io; server-to-server calls are not.",
     source: "workers/scan-report/index.js",
     request: {
@@ -520,7 +520,7 @@ export const QUICK_START_STEPS = [
   },
   {
     title: "Request a scan",
-    body: "Call POST /api/scan from your server. A 200 with duplicate: false means a confirmation email follows, then the report within 48 hours.",
+    body: "Call POST /api/scan from your server. A 200 with duplicate: false means a confirmation email follows, then the report, normally within a few minutes.",
     code: `curl -X POST ${BASES.scan}/api/scan \\
   -H 'Content-Type: application/json' \\
   -d '{"email":"you@example.com","consent":true,"consent_source":"partner_app"}'
