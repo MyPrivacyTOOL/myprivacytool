@@ -3,20 +3,22 @@ import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 
-// MPC-7460: locked pricing approved Sep 23 2026 (Free / Basic / Pro / Executive). Names and monthly
-// prices only; the feature-to-tier mapping is still TBD, so no per-tier features are listed.
+// MPC-7460: locked pricing approved Sep 23 2026 (Free / Basic / Pro / Executive). Scan allowances are
+// placeholder defaults pending review.
 // There is no checkout yet, so the paid tiers send people to launch updates, not a purchase.
 interface Plan {
   name: string;
   monthly: string;
+  scans: string;
+  note?: string;
   cta: { label: string; to: string };
 }
 
 const PLANS: Plan[] = [
-  { name: "Free", monthly: "$0", cta: { label: "Check my exposure", to: "/scan" } },
-  { name: "Basic", monthly: "$7.99", cta: { label: "Get launch updates", to: "/newsletter" } },
-  { name: "Pro", monthly: "$14.99", cta: { label: "Get launch updates", to: "/newsletter" } },
-  { name: "Executive", monthly: "$49.99", cta: { label: "Get launch updates", to: "/newsletter" } },
+  { name: "Free", scans: "1 scan per month", note: "No credit card required", monthly: "$0", cta: { label: "Check my exposure", to: "/scan" } },
+  { name: "Basic", scans: "5 scans per month", monthly: "$7.99", cta: { label: "Get launch updates", to: "/newsletter" } },
+  { name: "Pro", scans: "25 scans per month", monthly: "$14.99", cta: { label: "Get launch updates", to: "/newsletter" } },
+  { name: "Executive", scans: "Unlimited scans", monthly: "$49.99", cta: { label: "Get launch updates", to: "/newsletter" } },
 ];
 
 const Pricing = () => (
@@ -43,10 +45,14 @@ const Pricing = () => (
               <h2 id={`plan-${plan.name}`} className="mb-4 text-xl font-semibold text-foreground">
                 {plan.name}
               </h2>
-              <p className="mb-6 flex-1 text-3xl font-bold text-foreground">
+              <p className="mb-4 text-3xl font-bold text-foreground">
                 {plan.monthly}
                 <span className="text-base font-normal text-muted-foreground"> /month</span>
               </p>
+              <ul className="mb-6 flex-1 space-y-1 text-sm text-muted-foreground">
+                <li>{plan.scans}</li>
+                {plan.note && <li>{plan.note}</li>}
+              </ul>
               <Button asChild variant="outline">
                 <Link to={plan.cta.to}>{plan.cta.label}</Link>
               </Button>
