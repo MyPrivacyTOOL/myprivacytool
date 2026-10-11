@@ -1,0 +1,112 @@
+// MPC-7467 email hexagons. Stubbed fetch, no network. Run: node workers/scan-report/email-hexagons.test.mjs
+// '+' test addresses only (testingnt69+...@gmail.com style); no real person's address appears here.
+import { checkNameInAddress, checkProviderAndDomain, checkPublicProfile, runEmailHexagons, emailHexagonSignalRows, EMAIL_HEXAGONS } from './lib/emailHexagons.js';
+import { runReportJob } from './index.js';
+
+let ok = true; let count = 0;
+const check = (c, m) => { count++; console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
+const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, json: async () => body, text: async () => JSON.stringify(body ?? '') });
+
+// ---- 2. name in address (pure logic)
+let r = checkNameInAddress('john.smith1985+t@gmail.com');
+check(r.status === 'found' && /first name/.test(r.value) && /birth year/.test(r.value) && /not a confirmed fact/.test(r.value), 'name: first name + birth year => found, worded as a pattern not a fact');
+r = checkNameInAddress('testingnt69+j.smith@gmail.com');
+check(r.status === 'clear', 'name: +tag content is ignored (name only in the tag), so clear');
+r = checkNameInAddress('t.smith@example.com');
+check(r.status === 'found' && /initial/.test(r.value) && !/first name/.test(r.value), 'name: initial + word => initial only, no invented first name');
+r = checkNameInAddress('xk92qz+test@example.com');
+check(r.status === 'clear' && !r.value, 'name: opaque address => clear');
+r = checkNameInAddress('info@example.com');
+check(r.status === 'clear', 'name: role mailbox is clear');
+r = checkNameInAddress('order2087761@example.com');
+check(r.status === 'clear', 'name: long digit run is not a birth year');
+r = checkNameInAddress('anna1850+t@example.com');
+check(r.status === 'found' && !/birth year/.test(r.value), 'name: implausible year (1850) not offered as birth year');
+r = checkNameInAddress('not-an-email');
+check(r.status === 'not_checked', 'name: invalid address => not_checked (failure)');
+
+// ---- 3. provider and domain
+const dns = (map, opts = {}) => async (url) => {
+  if (opts.fail) throw new Error('network down');
+  const u = new URL(url); const key = `${u.searchParams.get('name')}|${u.searchParams.get('type')}`;
+  const v = map[key];
+  if (v === 'nx') return res(200, { Status: 3 });
+  return res(200, { Status: 0, Answer: v || [] });
+};
+const gmail = dns({ 'gmail.com|MX': [{ type: 15, data: '5 gmail-smtp-in.l.google.com.' }], 'gmail.com|TXT': [{ type: 16, data: '"v=spf1 redirect=_spf.google.com"' }], '_dmarc.gmail.com|TXT': [{ type: 16, data: '"v=DMARC1; p=none"' }] });
+r = await checkProviderAndDomain('testingnt69+a@gmail.com', gmail);
+check(r.status === 'found' && /Google/.test(r.value) && /personal webmail/.test(r.value), 'provider: gmail => Google, personal domain');
+const work = dns({ 'acme-example.com|MX': [{ type: 15, data: '1 acme-example-com.mail.protection.outlook.com.' }], 'acme-example.com|TXT': [{ type: 16, data: '"v=spf1 include:spf.protection.outlook.com -all"' }], '_dmarc.acme-example.com|TXT': [{ type: 16, data: '"v=DMARC1; p=reject; rua=mailto:x@acme-example.com"' }] });
+r = await checkProviderAndDomain('testingnt69+a@acme-example.com', work);
+check(r.status === 'found' && /Microsoft/.test(r.value) && /work or own domain/.test(r.value) && /SPF published/.test(r.value) && /policy: reject/.test(r.value), 'provider: work domain => Microsoft 365, work domain note, SPF + DMARC policy');
+r = await checkProviderAndDomain('testingnt69+a@bare-example.com', dns({ 'bare-example.com|MX': [{ type: 15, data: '10 mail.bare-example.com.' }] }));
+check(/SPF not found/.test(r.value) && /DMARC not found/.test(r.value) && /do not recognise/.test(r.value), 'provider: no anti-spoofing records and unknown host reported plainly');
+r = await checkProviderAndDomain('testingnt69+a@nope-example.com', dns({ 'nope-example.com|MX': 'nx' }));
+check(r.status === 'found' && /does not exist/.test(r.value), 'provider: NXDOMAIN reported');
+r = await checkProviderAndDomain('testingnt69+a@gmail.com', dns({}, { fail: true }));
+check(r.status === 'not_checked' && /failed/.test(r.reason), 'provider: network failure => not_checked');
+r = await checkProviderAndDomain('testingnt69+a@gmail.com', async () => res(503, {}));
+check(r.status === 'not_checked', 'provider: DNS HTTP 503 => not_checked');
+r = await checkProviderAndDomain('testingnt69+a@gmail.com', (u, o) => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(new Error('aborted')))), { timeoutMs: 30 });
+check(r.status === 'not_checked' && /timed out/.test(r.reason), 'provider: slow lookup times out => not_checked');
+let seen = [];
+await checkProviderAndDomain('testingnt69+secret@gmail.com', async (u, o) => { seen.push(String(u)); return res(200, { Status: 0, Answer: [] }); });
+check(seen.length === 3 && seen.every((u) => u.startsWith('https://cloudflare-dns.com/') && !u.includes('testingnt69')), 'provider: only the domain is sent to DNS, never the part before the @');
+
+// ---- 4. public profile
+const grav = (a, p) => async (url) => (String(url).includes('/avatar/') ? res(a) : res(p));
+r = await checkPublicProfile('testingnt69+a@gmail.com', grav(200, 404));
+check(r.status === 'found' && /avatar/.test(r.value), 'profile: avatar present => found');
+r = await checkPublicProfile('testingnt69+a@gmail.com', grav(404, 200));
+check(r.status === 'found' && /profile/.test(r.value), 'profile: profile present => found');
+r = await checkPublicProfile('testingnt69+a@gmail.com', grav(404, 404));
+check(r.status === 'clear', 'profile: both 404 => clear');
+r = await checkPublicProfile('testingnt69+a@gmail.com', grav(404, 429));
+check(r.status === 'not_checked', 'profile: rate limited => not_checked, never clear');
+r = await checkPublicProfile('testingnt69+a@gmail.com', async () => { throw new Error('boom'); });
+check(r.status === 'not_checked', 'profile: network failure => not_checked');
+seen = [];
+await checkPublicProfile('Testingnt69+Hash@Gmail.com', async (u) => { seen.push(String(u)); return res(404); });
+check(seen.length === 2 && seen.every((u) => !u.includes('testingnt69') && /[0-9a-f]{64}/.test(u)), 'profile: only a SHA-256 hash leaves, not the address');
+const h1 = seen[0].match(/[0-9a-f]{64}/)[0]; seen = [];
+await checkPublicProfile('testingnt69+hash@gmail.com', async (u) => { seen.push(String(u)); return res(404); });
+check(seen[0].includes(h1), 'profile: hash is case-insensitive');
+
+// ---- run all: never throws, never slow
+const all = await runEmailHexagons('testingnt69+a@gmail.com', {}, async (u) => (String(u).includes('gravatar') ? res(404) : res(200, { Status: 0, Answer: [] })));
+check(all.length === 3 && all.map((h) => h.id).join() === Object.keys(EMAIL_HEXAGONS).join(), 'run: three hexagons returned in registry order');
+const t0 = Date.now();
+const slow = await runEmailHexagons('testingnt69+a@gmail.com', { EMAIL_HEXAGON_TIMEOUT_MS: '50' }, () => new Promise(() => {}));
+check(Date.now() - t0 < 1500 && slow.filter((h) => h.id !== 'email-name').every((h) => h.status === 'not_checked'), 'run: hung outside services => not_checked within the budget, pure check unaffected');
+const rows = emailHexagonSignalRows('scan1', all);
+check(rows.length === 3 && rows.every((x) => x.category === 'email' && ['found', 'clear', 'not_checked'].includes(x.check_status) && x.signal_type.startsWith('email-')), 'rows: stored as email-category signals with valid status values');
+
+// ---- report job: hexagons stored, report not blocked by failures
+function fakeJob(dnsFails) {
+  const db = { users: [{ id: 'u1', email: 'testingnt69+a@gmail.com' }], scans: [{ id: 's1', user_id: 'u1', email_scanned: 'testingnt69+a@gmail.com', report_status: 'pending', report_attempts: 0, confirmation_sent_at: '2026-10-01T00:00:00Z', report_due_at: '2099-01-01T00:00:00Z', created_at: '2026-10-01T00:00:00Z' }], signals: [], hexagon_scores: [] };
+  const f = async (url, o = {}) => {
+    url = String(url);
+    if (url.includes('api.resend.com')) return res(200, { id: 'msg1' });
+    if (url.includes('api.hubapi.com')) return res(200, {});
+    if (url.includes('cloudflare-dns.com')) { if (dnsFails) throw new Error('dns down'); return res(200, { Status: 0, Answer: [] }); }
+    if (url.includes('gravatar.com')) return res(url.includes('/avatar/') ? 200 : 404);
+    if (url.includes('/rpc/')) return res(200, null);
+    const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
+    if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)); db[t].push(...rows); return res(201, rows); }
+    if (o.method === 'PATCH') { const row = db[t].find((x) => `eq.${x.id}` === q.get('id')); if (row) Object.assign(row, JSON.parse(o.body)); return res(200, row ? [row] : []); }
+    return res(200, t === 'scans' ? db.scans.filter((x) => x.report_status === 'pending') : db[t] || []);
+  };
+  return { db, f };
+}
+for (const dnsFails of [false, true]) {
+  const F = fakeJob(dnsFails);
+  const out = await runReportJob({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', ALLOW_PARTIAL_REPORT: 'true' }, F.f);
+  const hex = F.db.signals.filter((s) => s.signal_type.startsWith('email-'));
+  check(out.sent === 1 && F.db.scans[0].report_status === 'sent', `job (dns ${dnsFails ? 'down' : 'up'}): report still sent`);
+  check(hex.length === 3, `job (dns ${dnsFails ? 'down' : 'up'}): 3 email hexagon rows stored with the scan`);
+  const byType = Object.fromEntries(hex.map((s) => [s.signal_type, s.check_status]));
+  check(byType['email-profile'] === 'found' && byType['email-provider'] === (dnsFails ? 'not_checked' : 'found'), `job (dns ${dnsFails ? 'down' : 'up'}): provider ${dnsFails ? 'not_checked' : 'found'}, profile found`);
+}
+
+console.log(`${count} checks`);
+if (!ok) { console.log('FAILED'); process.exit(1); }
