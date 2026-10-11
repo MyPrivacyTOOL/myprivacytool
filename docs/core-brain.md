@@ -19,7 +19,7 @@ Response (200): `{ ok, intent, intent_source, trust_level, state, state_source, 
 keep the state as it is, so a read failure can never reset a confirmed conversation.
 `/ingest/social` answers `200 { ok: true, ignored: true }` for verified events that carry no user text (follows, likes, edits,
 our own DM echoes) so the platform does not retry. Errors use the shared `{ error: { code, message } }` shape: 400 bad JSON or
-payload, 401 bad token, 503 not configured (retryable), 405/413.
+payload, 401 bad token, 429 rate limited (`Retry-After: 60`), 503 not configured (retryable), 405/413.
 
 ## Decisions
 
@@ -41,7 +41,17 @@ payload, 401 bad token, 503 not configured (retryable), 405/413.
    unchanged). The database applies `trust_level = greatest(existing, floor)`, so **trust only ever goes up**; no message can
    lower it. The write runs after the reply is sent (`waitUntil`) and is best effort: if Supabase is down or the migration is
    not applied yet, it is logged as a warning and the reply is unchanged.
-6. **Privacy.** Emails and phone numbers are redacted before text goes to Qwen. Logs carry event metadata only: no message text,
+6. **Rate limiting (MPC-7257).** Two Workers Rate Limiting bindings declared in `wrangler.toml` (`[[ratelimits]]`; no KV, so no
+   namespace to create): `RATE_LIMITER` allows **10 requests per 60 s per sender** (key `platform:sender_id`, so the 11th inside a
+   minute gets `429 { error: { code: "rate_limited" } }` with `Retry-After: 60`), and `RATE_LIMITER_GLOBAL` is a **300 per 60 s**
+   backstop on the Qwen cost; tune it from real traffic. The check runs after auth and body parsing and before Qwen or Supabase, so
+   unauthenticated or malformed requests never consume a sender's budget and a throttled request makes no outbound call. It
+   **fails open** when a binding is missing or errors (every caller already holds the shared secret). Counters are kept per
+   Cloudflare location, so the limit is approximate. social-listeners acknowledges a 429 (200 to Telegram and X) and drops the
+   event instead of answering 502, because platforms retry non-2xx and a retry would only hit the limiter again. Neither the
+   sender id nor the message text is logged. To prove it live, run Actions -> "Core Brain rate-limit probe" (manual; about 11 live Qwen calls; the secret stays in repo secrets). It expects 200 for requests 1 to 10, then 429 with `Retry-After: 60`, and a different sender still 200. `namespace_id` values are account-unique integers (8601, 8602; mpt-leads uses 7350,
+   scan-report 7351).
+7. **Privacy.** Emails and phone numbers are redacted before text goes to Qwen. Logs carry event metadata only: no message text,
    sender ids or keys (a test enforces it).
 
 ## Not built (deferred; no code owns these yet)
