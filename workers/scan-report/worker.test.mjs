@@ -45,7 +45,7 @@ check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includ
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [] }; const calls = []; let n = 0;
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [] }; const calls = []; let n = 0;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -57,6 +57,7 @@ function fake(opts = {}) {
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
+      if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
       if (rows.length > 1 && new Set(rows.map((x) => Object.keys(x).filter((k) => !['id', 'report_status', 'report_attempts'].includes(k)).sort().join(','))).size > 1) return res(400, { code: 'PGRST102', message: 'All object keys must match' });   // PostgREST bulk-insert rule
       db[t].push(...rows); return res(201, rows); }
     if (o.method === 'PATCH') { const id = q.get('id')?.replace('eq.', ''); const st = q.get('report_status')?.replace('eq.', '');
@@ -179,6 +180,9 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(peek.status === 200 && !F.db.users[0].email_opt_out_at && /<form method="POST"/.test(peekHtml) && /noindex/.test(peekHtml) && !peekHtml.includes(EMAIL), 'unsubscribe: GET (what a mail scanner does) only shows a confirm page, opts nobody out, does not print the address');
   const good = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
   check(good.status === 200 && F.db.users[0].email_opt_out_at && /You are unsubscribed/.test(await good.text()), 'unsubscribe: POST (button or one-click) opts the user out');
+  check(F.db.email_suppressions.length === 1 && /^[0-9a-f]{64}$/.test(F.db.email_suppressions[0].email_hash) && !JSON.stringify(F.db.email_suppressions).includes(EMAIL), 'unsubscribe: also writes an email-hash suppression (no readable address)');
+  await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
+  check(F.db.email_suppressions.length === 1, 'unsubscribe twice: suppression stays a single row');
   const badPost = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`, { method: 'POST' }), OB, {});
   check(badPost.status === 400, 'unsubscribe: POST with a bad token => 400');
   check((await runFollowUpJob(OB, F.f)).skipped === 1 && resendCount(F) === 2, 'opted-out user gets no follow-up');

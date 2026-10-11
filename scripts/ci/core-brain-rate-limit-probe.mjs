@@ -18,6 +18,13 @@ const check = (name, ok, detail = "") => ({ name, ok: Boolean(ok), detail });
 export async function probe(base, secret, { count = 15, f = fetch, now = () => Date.now() } = {}) {
   if (!secret || !secret.trim()) return [check("rate limit probe", false, "WEBHOOK_SECRET is not set in the environment")];
   const stamp = now();
+  const results = [];
+  // Is the limiter actually bound on the live Worker? (health reports booleans only.) A missing binding fails open, which
+  // looks exactly like "the limit does not work", so name it. Older Workers without the field report "unknown".
+  const health = await f(`${base}/health`).then((r) => r.json()).catch(() => ({}));
+  const rl = health?.rate_limit;
+  results.push(check("RATE_LIMITER binding is attached on the live Worker", rl ? rl.sender === true : true,
+    rl ? `sender ${rl.sender}, global ${rl.global}` : "health does not report rate_limit yet (unknown)"));
   const post = (sender) => f(`${base}/webhook`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-MPT-Webhook-Secret": secret },
@@ -33,13 +40,13 @@ export async function probe(base, secret, { count = 15, f = fetch, now = () => D
   }
   const first429 = statuses.indexOf(429) + 1; // 0 when none
   const body = firstLimited ? await firstLimited.json().catch(() => ({})) : {};
-  const results = [
+  results.push(
     check(`first ${LIMIT} requests for one sender -> 200`, statuses.slice(0, LIMIT).every((s) => s === 200), `statuses ${statuses.slice(0, LIMIT).join(",")}`),
     check(`request ${LIMIT + 1} -> 429`, first429 === LIMIT + 1, first429 ? `first 429 at request ${first429}` : "no 429 in any request"),
     check("requests after the first 429 stay 429", first429 > 0 && statuses.slice(first429 - 1).every((s) => s === 429), `statuses ${statuses.join(",")}`),
     check("429 carries error.code rate_limited", body?.error?.code === "rate_limited", `code "${body?.error?.code ?? "none"}"`),
     check("429 carries Retry-After: 60", firstLimited?.headers?.get?.("retry-after") === "60", `Retry-After "${firstLimited?.headers?.get?.("retry-after") ?? "none"}"`),
-  ];
+  );
   const other = await post(`rl-probe-${stamp}-other`);
   results.push(check("a different sender is not limited -> 200", other.status === 200, `status ${other.status}`));
   return results;

@@ -1,0 +1,39 @@
+name: Register Telegram webhook
+
+# MPC-7251: manual. Actions -> "Register Telegram webhook" -> Run workflow.
+# Points the Telegram bot at social-listeners /webhook/telegram using the repo secrets TELEGRAM_BOT_TOKEN and
+# TELEGRAM_WEBHOOK_SECRET (the same secret deploy.yml uploads to the Worker), then probes the live Worker.
+# Secrets are read by the runner and never printed or handed to a person or an agent. Run it after
+# 'Deploy core-brain & social-listeners' has finished. Anyone with Actions access (a person or the OpenClaw agent
+# through the GitHub API workflow_dispatch endpoint) can run it; no token ever has to be pasted into a chat or a URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      drop_pending_updates:
+        description: Drop updates queued while the webhook was failing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: register-telegram-webhook
+  cancel-in-progress: false
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Register webhook and verify (setWebhook, getWebhookInfo, live Worker probe)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          DROP_PENDING_UPDATES: ${{ inputs.drop_pending_updates }}
+        run: node scripts/ci/telegram-webhook-register.mjs
