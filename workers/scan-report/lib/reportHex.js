@@ -15,12 +15,12 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const clean = (v, max) => Array.from(String(v ?? '').replace(/[\u0000-\u001f\u007f​-‏‪-‮⁦-⁩]+/g, ' ').trim()).slice(0, max).join('');
 
 // ---- definitions -----------------------------------------------------------------------------------------------------------------
-// Web hexagons come from the registry (generated from docs/hexagon-registry-draft.json until MPC-7466 promotes the final one).
-export const WEB_HEXAGONS = HEX.map(([id, label, category, kind, emoji, art, cannot]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art, cannot: Boolean(cannot) }));
+// Web hexagons come from the shared registry (shared/hexagon-registry/registry.js, via scripts/sync-hexagons.mjs).
+// `unrated` = the registry says the site can never check it (truth level cannot_be_checked): always NOT CHECKED. `canClear` = the registry allows CHECKED AND CLEAR.
+export const WEB_HEXAGONS = HEX.map(([id, label, category, kind, emoji, art, cannot, level, clear]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art, cannot: Boolean(cannot), unrated: level === 'x', estimateLevel: level === 'e', canClear: Boolean(clear) }));
 // Email hexagons: the registry's email_hexagons (MPC-7467 owns the checks).
-export const EMAIL_HEXAGONS = EMAIL.map(([id, label, category, kind, emoji, art]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art }));
-// Hexagons whose value is a guess, not a measurement. Registry truth levels (MPC-7466) replace this; a saved item may also say estimate:true.
-const ESTIMATES = new Set(['demographic']);
+export const EMAIL_HEXAGONS = EMAIL.map(([id, label, category, kind, emoji, art, , level]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art, estimateLevel: level === 'e' }));
+// Hexagons whose value is a guess, not a measurement: the registry's truth level 'estimated' (MPC-7487), or a saved item that says estimate:true.
 
 export const GROUPS = {
   device: 'Your device', network: 'Your network', privacy: 'Your privacy settings', language: 'Your language', profile: 'Your estimated profile',
@@ -51,20 +51,26 @@ export function normaliseHexagons(defs, items) {
     const it = byId.get(d.id);
     let status; let reported = null;
     if (it && it.status === undefined) {
-      // A saved browser scan (MPC-7465) carries no status, only what the browser reported. Until the detectors return one (MPC-7466),
-      // only a hexagon the code CAN tell apart is FOUND: the 29 where it cannot tell clear from not checked (registry flag `cannot`,
-      // including the five social ones) are NOT CHECKED, and so is any empty or placeholder value. Their reported value stays in the JSON.
+      // A scan saved before MPC-7487 carries no status, only what the browser reported: today's strict behaviour. Only a hexagon the code
+      // CAN tell apart is FOUND: the 29 where it cannot tell clear from not checked (registry flag `cannot`, including the five social
+      // ones) are NOT CHECKED, and so is any empty or placeholder value. Their reported value stays in the JSON.
       const v = clean(it.value, 1000);
       reported = v || null;
       status = !v || PLACEHOLDER.test(v) || d.cannot ? STATUS.NOT_CHECKED : STATUS.FOUND;
     } else {
       status = it && Object.values(STATUS).includes(it.status) ? it.status : STATUS.NOT_CHECKED;
-      if (status === STATUS.CLEAR && d.kind === 'info') status = STATUS.NOT_CHECKED;   // informational: nothing to be clear of
+      // The status came from the visitor's browser, so the registry has the last word: the hexagons the site can never check are NOT CHECKED
+      // whatever was sent, FOUND needs a real value, and CLEAR is only allowed where the registry allows it (never for an informational one).
+      if (d.unrated) status = STATUS.NOT_CHECKED;
+      if (status === STATUS.FOUND && (!clean(it.value, 1000) || PLACEHOLDER.test(clean(it.value, 1000)))) status = STATUS.NOT_CHECKED;
+      if (status === STATUS.CLEAR && (d.kind === 'info' || d.canClear === false)) status = STATUS.NOT_CHECKED;   // nothing to be clear of / not allowed
+      if (status === STATUS.NOT_CHECKED) reported = clean(it?.value, 1000) || null;
     }
     const value = status === STATUS.FOUND ? clean(it.value, 1000) : '';
-    let detail = it && it.status === undefined ? { confidence: it.confidence ?? null, risk: it.risk ?? null, confirmed_by_visitor: it.confirmed ?? null, icon: it.icon ?? null } : it?.detail ?? null;
+    const fromBrowser = it && ['confidence', 'risk', 'confirmed', 'icon'].some((k) => it[k] !== undefined);   // a saved browser scan item
+    let detail = fromBrowser ? { confidence: it.confidence ?? null, risk: it.risk ?? null, confirmed_by_visitor: it.confirmed ?? null, icon: it.icon ?? null } : it?.detail ?? null;
     if (detail !== null) { try { const s = JSON.stringify(detail); if (s.length > MAX_DETAIL) detail = { truncated: true, preview: s.slice(0, MAX_DETAIL) }; } catch { detail = null; } }
-    return { ...d, status, value, reported, estimate: Boolean(it?.estimate) || ESTIMATES.has(d.id), detail };
+    return { ...d, status, value, reported, estimate: Boolean(it?.estimate) || Boolean(d.estimateLevel), detail };
   });
 }
 const PLACEHOLDER = /^(location detected|unknown|n\/a|not available|none|undefined|null)$/i;
