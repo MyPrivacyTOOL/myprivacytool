@@ -2,6 +2,7 @@
 import worker, { handleScan, runReportJob, runFollowUpJob, recipientAllowed } from './index.js';
 import { computeScore, breachRisk } from './lib/score.js';
 import { checkBreaches } from './lib/hibp.js';
+import { pushScanActivity } from './lib/hubspot.js';
 import { checkBrokers } from './lib/brokers.js';
 import { buildConfirmationEmail, buildReportEmail, tagLinks } from './lib/email.js';
 import { buildMirrorReport } from './lib/mirror.js';
@@ -25,9 +26,9 @@ check(breachRisk({ DataClasses: ['Passwords'] }) === 7 && breachRisk({ DataClass
 
 // ---- HIBP
 check((await checkBreaches('a@b.co', {})).status === 'not_checked', 'HIBP without key => not_checked');
-check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k' }, async () => ({ status: 404 }))).breaches.length === 0, 'HIBP 404 => checked, no breaches');
-check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k' }, async () => ({ status: 200, json: async () => [{ Name: 'X' }] }))).breaches[0].Name === 'X', 'HIBP 200 => breaches');
-check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k' }, async () => ({ status: 500 }))).status === 'not_checked', 'HIBP 500 => not_checked');
+check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: '0' }, async () => ({ status: 404 }))).breaches.length === 0, 'HIBP 404 => checked, no breaches');
+check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: '0' }, async () => ({ status: 200, json: async () => [{ Name: 'X' }] }))).breaches[0].Name === 'X', 'HIBP 200 => breaches');
+check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: '0' }, async () => ({ status: 500 }))).status === 'not_checked', 'HIBP 500 => not_checked');
 
 // ---- brokers never guess
 const br = await checkBrokers(EMAIL, {});
@@ -36,7 +37,8 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Alice, our AI guide, will search/.test(conf.text) && !/AI Bot/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && /Usernames/.test(conf.text) && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 8 && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
+check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /I’m Alice, MyPrivacyTOOL’s AI guide/.test(conf.text) && /A real person on our team can step in/.test(conf.text) && /growing suite of AI tools/.test(conf.text) && !/ANY Social Network/i.test(conf.text) && !/will search publicly|Everything Alice finds/.test(conf.text) && /don’t search databases for you yet/.test(conf.text) && !/AI Bot/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 8 && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
+check(/Talk soon,\nAlice\nYour Dedicated MyPrivacyTOOL AI/.test(conf.text) && /<strong>Alice<\/strong><br>Your Dedicated MyPrivacyTOOL AI/.test(conf.html) && !/The MyPrivacyTOOL team/.test(conf.text + conf.html), 'confirmation email signs off as Alice, not the team');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
 check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
@@ -75,7 +77,7 @@ function fake(opts = {}) {
   };
   return { f, db, calls };
 }
-const env = { SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HUBSPOT_TOKEN: 'h', HIBP_API_KEY: 'p', RECIPIENT_ALLOWLIST: EMAIL };
+const env = { SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HUBSPOT_TOKEN: 'h', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', RECIPIENT_ALLOWLIST: EMAIL };
 const input = { email: EMAIL, consentSource: 'scan_page', ip: '1.2.3.4', utm: { source: 'x', medium: '', campaign: '', content: '', referrer: '' } };
 
 check(recipientAllowed(env, 'Testing.NT69+abc@gmail.com') && !recipientAllowed(env, 'real@person.com') && recipientAllowed({}, 'any@x.com'), 'allowlist: gmail +tag/dots ignored; others blocked; empty = open');
@@ -101,6 +103,26 @@ res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT
 check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.calls.filter((c) => c.url.includes('resend')).length === 1, 'no HIBP key + ALLOW_PARTIAL_REPORT=false => report held (pending)');
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'true' }, F.f);
 check(res.sent === 1 && /have not checked your email/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not checked; privacy_score stays null');
+
+// HIBP rate limited => scan stays pending, attempt not counted, nothing sent, never reported as "not checked"
+const limited = () => ({ ok: false, status: 429, headers: { get: () => '0.001' }, text: async () => '', json: async () => ({}) });
+F = fake({ hibp: limited }); await handleScan(env, null, input, F.f);
+const sendsBefore = F.calls.filter((c) => c.url.includes('resend')).length;
+res = await runReportJob({ ...env, HIBP_MIN_INTERVAL_MS: '0' }, F.f);
+check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.db.scans[0].report_attempts === 0 && F.calls.filter((c) => c.url.includes('resend')).length === sendsBefore && /rate limited/.test(F.db.scans[0].report_last_error), 'HIBP 429 => scan held for the next run, attempt not counted, no report sent');
+check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: '0' }, async () => limited())).status === 'rate_limited', 'HIBP persistent 429 => rate_limited');
+
+// HubSpot activity note on the contact
+{
+  const seen = [];
+  const stub = (contacts) => async (url, o) => { seen.push({ url: String(url), body: o?.body ? JSON.parse(o.body) : null }); const body = String(url).endsWith('/search') ? { results: contacts } : {}; return { ok: true, status: 200, json: async () => body, text: async () => '' }; };
+  const args = { email: EMAIL, scanId: 's1', score: 80, riskLevel: 'low', signalsFound: 2, breachStatus: 'checked', breachCount: 2 };
+  const r1 = await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, stub([{ id: '77' }]));
+  const note = seen.find((c) => c.url.endsWith('/notes'));
+  check(r1.pushed && note.body.associations[0].to.id === '77' && /80\/100/.test(note.body.properties.hs_note_body) && !note.body.properties.hs_note_body.includes(EMAIL), 'HubSpot: scan result pushed as a note on the contact (no email address in the body)');
+  check((await pushScanActivity({}, args, stub([]))).skipped && (await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, stub([]))).skipped, 'HubSpot: no token or no contact => skipped, no throw');
+  check((await pushScanActivity({ HUBSPOT_TOKEN: 'h' }, args, async () => { throw new Error('boom'); })).failed, 'HubSpot: network error => reported, not thrown');
+}
 
 // allowlist blocks real users
 F = fake(); await handleScan({ ...env, RECIPIENT_ALLOWLIST: 'someone@else.com' }, null, input, F.f);
@@ -138,6 +160,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const f2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: 'https://x/u' });
   check(/Change the password/.test(f1.text) && /first 100/.test(f1.text) && /not yet checked/.test(f1.text) && f1.html.includes('https://x/u') && f1.text.includes('https://x/u'), 'follow-up 1: next steps from the mirror, cohort line, unsubscribe in text + html');
   check(/Reply to this email/.test(f2.text) && !/first 100/.test(f2.text) && !/removed|we will remove|automatic/i.test(f1.text + f2.text.replace('remove you', '')), 'follow-up 2: feedback ask; no cohort line outside cohort; no fulfilment claims');
+  check(/\nAlice\nYour Dedicated MyPrivacyTOOL AI\n/.test(f1.text) && /\nAlice\nYour Dedicated MyPrivacyTOOL AI\n/.test(f2.text) && f1.html.includes('<strong>Alice</strong>') && !/The MyPrivacyTOOL team/.test(f1.text + f2.text + f1.html + f2.html), 'follow-up emails sign off as Alice, not the team');
   const UNSUB = 'https://myprivacytool.io/unsubscribe?e=a%40b.co&t=abc';
   const g1 = buildFollowUpEmail({ stage: 1, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });
   const g2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });

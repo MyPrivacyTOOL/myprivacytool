@@ -20,6 +20,11 @@ HIBP's Core plan only searches domains you have proven you own, so it cannot loo
 - Spokeo, Whitepages, BeenVerified, MyLife, Intelius: always **"not yet checked"**. The form collects an email only; these sites search by name and location and prohibit automated lookups. Removal links come only from `src/data/optOutGuides.json` (verified guides); MyLife and Intelius have none yet, so the email says so.
 - Score 0-100 per MPC-076 v1.0, over checked categories only, labelled partial. Multipliers for email (1.5) and search (1.2) are our interpolation; broker/AI/social come from the spec.
 
+## HIBP pacing, HubSpot activity (MPC-6677)
+- Calls to HIBP are spaced `HIBP_MIN_INTERVAL_MS` apart (default 6500 ms, under the 10/min paid limit). A 429 is retried with `Retry-After`; if it persists the scan stays `pending` for the next 5-minute run, no attempt is counted and no report is sent (it is never reported as "not checked"). No `HIBP_API_KEY`: a clear error is logged each run and processing continues per `ALLOW_PARTIAL_REPORT`; the Worker never crashes.
+- When a report is sent, `lib/hubspot.js` adds a note (counts only, no email address) to the contact's timeline. Best effort: a HubSpot failure never affects the report.
+- Status vocabulary: `scans.report_status` is `pending | processing | sent | failed` (`sent` = complete); results are delivered by the report email, not a results page.
+
 ## Safety gates
 - `RECIPIENT_ALLOWLIST` (wrangler.toml) limits sends to test inboxes until the privacy policy (MPC-6545) is live and Chris approves a real-user send. Empty = open to everyone. Scans for other addresses stay `pending` and untouched (no email, no attempt counted) and never count against the per-run limit of 5, so they cannot block allowlisted scans; once the allowlist is emptied they are reported oldest first, 5 per run (MPC-7406).
 - Consent must be `true` in the request; it is never defaulted. One scan per address per 24h.

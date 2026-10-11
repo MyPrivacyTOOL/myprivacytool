@@ -1,5 +1,6 @@
 import { db } from './lib/supabase.js';
 import { checkBreaches } from './lib/hibp.js';
+import { pushScanActivity } from './lib/hubspot.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
@@ -172,6 +173,7 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
   const { queue, held, cancelled } = await nextReportJobs(env, sb, limit);
   const out = { sent: 0, held, failed: 0, cancelled: cancelled.length };
   console.log(`scan queue: ${queue.length} to process, ${held} held by allowlist, ${cancelled.length} cancelled`);
+  if (!env.HIBP_API_KEY) console.error(`HIBP_API_KEY is not set: breach checks skipped (${env.ALLOW_PARTIAL_REPORT === 'true' ? 'reports go out with breaches "not yet checked"' : 'reports are held'})`);
   for (const id of cancelled) {   // take them out of the queue for good: nothing is sent and the reason is on the row
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
   }
@@ -199,6 +201,7 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
 async function processScan(env, sb, job, fetchImpl) {
   const email = job.email_scanned;
   const hibp = await checkBreaches(email, env, fetchImpl);
+  if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
 
@@ -230,6 +233,8 @@ async function processScan(env, sb, job, fetchImpl) {
     mirror_report: mirror, data_freshness: new Date().toISOString(), report_status: 'sent', report_sent_at: new Date().toISOString(), resend_message_id: sent.id, report_last_error: null,
   });
   await claimCohort(env, sb, job.user_id);
+  const hs = await pushScanActivity(env, { email, scanId: job.id, score: result.score, riskLevel: result.risk_level, signalsFound: result.signals_found, breachStatus: hibp.status, breachCount: breaches.length }, fetchImpl);
+  if (hs.failed) console.error('HubSpot activity push failed:', hs.failed);
   return { sent: true, signals: inserted.length };
 }
 

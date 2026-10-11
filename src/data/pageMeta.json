@@ -55,6 +55,10 @@
     "title": "Cookie Policy | MyPrivacyTOOL",
     "description": "Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
   },
+  "/acceptable-use": {
+    "title": "Acceptable Use Policy | MyPrivacyTOOL",
+    "description": "Rules for using MyPrivacyTOOL: what you may and may not do when scanning for data breach and dark web exposure."
+  },
   "/dpa": {
     "title": "Data Processing Agreement Summary | MyPrivacyTOOL",
     "description": "Plain-language summary of how MyPrivacyTOOL processes personal data on behalf of business customers: roles, sub-processors, security, transfers and deletion."
