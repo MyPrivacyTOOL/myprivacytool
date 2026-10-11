@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { jsonResponse } from "@/test/render";
 import EmailCaptureModal from "./EmailCaptureModal";
+import { HEXAGON_COUNT } from "../../shared/hexagon-registry/registry.js";
 
 afterEach(() => vi.unstubAllGlobals());
 const setup = (riskScore = 55) => {
@@ -18,7 +19,8 @@ describe("EmailCaptureModal", () => {
   it.each([[75, "High Risk"], [50, "Medium Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
     setup(score);
     expect(screen.getByText(label)).toBeInTheDocument();
-    expect(screen.getByText(/50% exposure/)).toBeInTheDocument();
+    // MPC-7466: the exposure percentage divides by the registry hexagon count (was a hard-coded 46).
+    expect(screen.getByText(new RegExp(`${Math.round((23 / HEXAGON_COUNT) * 100)}% exposure`))).toBeInTheDocument();
   });
 
   it("validates the email and requires consent before calling the Worker", async () => {

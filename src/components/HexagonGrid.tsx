@@ -28,6 +28,7 @@ import {
 import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
+import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 // MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
 const StoragePanel = lazy(() => import('./StoragePanel'));
@@ -44,7 +45,10 @@ interface HexagonGridProps {
   deviceData?: DeviceData;
 }
 
-// Define progressive reveal thresholds - Total 46 hexagons
+// Define progressive reveal thresholds. The hexagon total shown to the user comes from the registry (HEXAGON_COUNT).
+// FINAL_SUMMARY_MIN_VISIBLE is the wave boundary after which the behavior wave has been revealed, not a count of hexagons.
+const FINAL_SUMMARY_MIN_VISIBLE = 46;
+
 const REVEAL_THRESHOLDS = {
   initial: 5,           // Location, Device, Browser, ISP, Time Pattern
   secondWave: 5,        // After 5 confirmations: Screen, Privacy, Connection, Battery
@@ -247,7 +251,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Check for final summary (all 46+ hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= 46 && !showFinalSummary) {
+    if (confirmedCount >= visibleCount && visibleCount >= FINAL_SUMMARY_MIN_VISIBLE && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
@@ -748,14 +752,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
               <h2 className="text-2xl font-bold text-foreground">Complete Digital Shadow Revealed!</h2>
               <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
             </div>
-            <p className="text-muted-foreground text-sm">All 46 hexagons analyzed across 8 categories</p>
+            <p className="text-muted-foreground text-sm">All {HEXAGON_COUNT} hexagons analyzed across {HEXAGON_GROUP_COUNT} categories</p>
             <div className="flex items-center justify-center gap-4 mt-4">
               <div className="text-center">
-                <p className="text-3xl font-bold text-brand">46</p>
+                <p className="text-3xl font-bold text-brand">{HEXAGON_COUNT}</p>
                 <p className="text-xs text-muted-foreground">Data Points</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-brand">8</p>
+                <p className="text-3xl font-bold text-brand">{HEXAGON_GROUP_COUNT}</p>
                 <p className="text-xs text-muted-foreground">Categories</p>
               </div>
               <div className="text-center">
@@ -767,7 +771,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         </div>
       )}
 
-      {/* Final Summary Panel - shown after all 46 hexagons confirmed */}
+      {/* Final Summary Panel - shown after all hexagons confirmed */}
       {showFinalSummary && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>

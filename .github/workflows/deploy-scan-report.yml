@@ -11,6 +11,7 @@ on:
     branches: [main]
     paths:
       - 'workers/scan-report/**'
+      - 'shared/hexagon-registry/**'
       - 'src/data/optOutGuides.json'
       - '.github/workflows/deploy-scan-report.yml'
   workflow_dispatch:

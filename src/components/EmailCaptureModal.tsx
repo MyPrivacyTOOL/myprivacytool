@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Shield, Lock, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface EmailCaptureModalProps {
   riskScore: number;
@@ -85,7 +86,7 @@ export default function EmailCaptureModal({
     }
   };
 
-  const exposurePct = Math.round((confirmedCount / 46) * 100);
+  const exposurePct = Math.round((confirmedCount / HEXAGON_COUNT) * 100);
 
   return (
     /* Backdrop */

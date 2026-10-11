@@ -31,6 +31,7 @@ import AliceHDBadge from './AliceHDBadge';
 import AliceHDModal from './AliceHDModal';
 import FreeVoiceBadge from './FreeVoiceBadge';
 import { trackUpgradeModalOpened } from '@/lib/analytics';
+import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
@@ -1055,7 +1056,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       newMessage = `Almost there! I now have a complete picture of your digital shadow.`;
     } else if (confirmedCount === totalCount && totalCount >= 46) {
       // Final comprehensive summary for full 46 hexagons
-      newMessage = `COMPLETE! I've analyzed all 46 aspects of your digital shadow across 7 categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
+      newMessage = `COMPLETE! I've analyzed all ${HEXAGON_COUNT} aspects of your digital shadow across ${HEXAGON_GROUP_COUNT} categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
       trackVoiceAIMessage('full_scan_complete');
     } else if (confirmedCount === totalCount && totalCount > 0) {
       newMessage = `Complete! Your digital shadow is fully mapped. Data brokers collect and sell this kind of data. Ready to take back control?`;

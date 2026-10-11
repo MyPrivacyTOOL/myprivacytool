@@ -1,3 +1,4 @@
+import { hexagonLabel } from '../../shared/hexagon-registry/registry.js';
 import {
   detectCanvasFingerprint,
   detectWebGLFingerprint,
@@ -367,6 +368,13 @@ export async function captureDeviceData(): Promise<DeviceData> {
 }
 
 // Convert device data to hexagons with proper ordering for progressive reveal
+// MPC-7466: labels come from the shared hexagon registry so the site, the report and the docs name each hexagon the same way.
+// Applied in place: generateHexagonsAsync mutates the dns-leak object after returning, so objects must keep their identity.
+function applyRegistryLabels(list: HexagonData[]): HexagonData[] {
+  list.forEach(h => { h.label = hexagonLabel(h.id, h.label); });
+  return list;
+}
+
 export function generateHexagons(data: DeviceData): HexagonData[] {
   // Initial 5 hexagons: Location, Device, Browser, ISP, Time Pattern
   const initialHexagons: HexagonData[] = [
@@ -585,12 +593,12 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
   ];
 
   // Combine all hexagons in order
-  return [
+  return applyRegistryLabels([
     ...initialHexagons,
     ...secondWaveHexagons,
     ...languageHexagons,
     ...orientationHexagons,
-  ];
+  ]);
 }
 
 // Determine user profile from language analysis
@@ -1490,7 +1498,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // Add behavior hexagons
   baseHexagons.push(...behaviorHexagons);
   
-  return baseHexagons;
+  return applyRegistryLabels(baseHexagons);
 }
 
 // Detect current device orientation
