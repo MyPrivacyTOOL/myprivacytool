@@ -1,0 +1,37 @@
+{
+  "_readme": "The ONLY place to change the Hong Kong DNC hotline key presses and pause lengths (MPC-7450). Edit values here; no code change needed. status: UNVERIFIED = placeholder/guess, REPORTED = one person heard it on one call, VERIFIED = confirmed on a real call by someone who understood the menu in that language. Set IVR_VERIFIED=true in hkDnc.ts only when every key is VERIFIED (a unit test enforces this). Sequence pressed: language, menu (register a number), register choice, confirm. Procedure: docs/hk-dnc-ivr-procedure.md.",
+  "pauses": {
+    "_note": "Each unit is one comma, about 2 seconds on Android. Chris heard about 10-12 s of greeting before the language menu. UNVERIFIED.",
+    "beforeFirstKey": 6,
+    "betweenKeys": 3
+  },
+  "language": {
+    "_note": "Language menu as reported by Chris 2026-10-11: 1 Cantonese, 2 Putonghua (Mandarin, unused by us), 3 English.",
+    "en": { "key": "3", "status": "REPORTED" },
+    "yue": { "key": "1", "status": "REPORTED" }
+  },
+  "menu": {
+    "_note": "Main menu: 1 = register a number (reported by Chris).",
+    "key": "1",
+    "status": "REPORTED"
+  },
+  "registers": {
+    "_note": "Each register: [register-choice key, confirm key]. Chris heard 3 options after 'register': 1 'do not call', 2 'do not call, long message', 3 'do not call, short message'. Which is pre-recorded / SMS / fax / all is a GUESS (needs a trilingual speaker). Confirm key is a GUESS. Fax has no key heard yet.",
+    "sms": [
+      { "key": "3", "status": "UNVERIFIED" },
+      { "key": "1", "status": "UNVERIFIED" }
+    ],
+    "prerecorded": [
+      { "key": "2", "status": "UNVERIFIED" },
+      { "key": "1", "status": "UNVERIFIED" }
+    ],
+    "fax": [
+      { "key": "4", "status": "UNVERIFIED" },
+      { "key": "1", "status": "UNVERIFIED" }
+    ],
+    "all": [
+      { "key": "1", "status": "UNVERIFIED" },
+      { "key": "1", "status": "UNVERIFIED" }
+    ]
+  }
+}

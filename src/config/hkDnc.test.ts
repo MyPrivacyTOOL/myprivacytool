@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   HK_REGISTERS,
+  IVR_DATA,
   IVR_VERIFIED,
   PAUSES,
   buildDialString,
@@ -8,13 +9,28 @@ import {
 } from "./hkDnc";
 
 describe("hkDnc config", () => {
-  it("ships unverified until MPC-7445", () => {
+  it("IVR_VERIFIED is false until every key is VERIFIED (and only then may it be true)", () => {
+    const all = HK_REGISTERS.flatMap((r) => (["en", "yue"] as const).flatMap((l) => getIvrKeys(r, l)));
+    const everyVerified = all.every((k) => k.status === "VERIFIED");
     expect(IVR_VERIFIED).toBe(false);
-    for (const r of HK_REGISTERS) {
-      for (const lang of ["en", "yue"] as const) {
-        expect(getIvrKeys(r, lang).every((k) => k.status === "UNVERIFIED")).toBe(true);
-      }
+    if (IVR_VERIFIED) expect(everyVerified).toBe(true);
+    expect(everyVerified).toBe(false);
+  });
+
+  it("reported language menu: 1 Cantonese, 3 English; 'register a number' is 1", () => {
+    expect(IVR_DATA.language.yue.key).toBe("1");
+    expect(IVR_DATA.language.en.key).toBe("3");
+    expect(IVR_DATA.menu.key).toBe("1");
+  });
+
+  it("the JSON only holds valid DTMF keys and known statuses", () => {
+    const keys = [IVR_DATA.language.en, IVR_DATA.language.yue, IVR_DATA.menu, ...HK_REGISTERS.flatMap((r) => IVR_DATA.registers[r])];
+    for (const k of keys) {
+      expect(k.key).toMatch(/^[0-9*#]$/);
+      expect(["UNVERIFIED", "REPORTED", "VERIFIED"].includes(k.status)).toBe(true);
     }
+    expect(Number.isInteger(PAUSES.beforeFirstKey) && PAUSES.beforeFirstKey >= 0).toBe(true);
+    expect(Number.isInteger(PAUSES.betweenKeys) && PAUSES.betweenKeys >= 0).toBe(true);
   });
 
   it("android: pauses plus auto keys, prefix and hotline first", () => {
@@ -53,9 +69,9 @@ describe("hkDnc config", () => {
     }
   });
 
-  it("every register has a language key, a register key and a confirm key", () => {
+  it("every register has language, menu, register and confirm keys in that order", () => {
     for (const r of HK_REGISTERS) {
-      expect(getIvrKeys(r).map((k) => k.purpose)).toEqual(["language", "register", "confirm"]);
+      expect(getIvrKeys(r).map((k) => k.purpose)).toEqual(["language", "menu", "register", "confirm"]);
     }
   });
 });
