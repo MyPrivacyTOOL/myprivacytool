@@ -110,6 +110,8 @@ res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT
 check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.calls.filter((c) => c.url.includes('resend')).length === 1, 'no HIBP key + ALLOW_PARTIAL_REPORT=false => report held (pending)');
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'true' }, F.f);
 check(res.sent === 1 && /have not checked your email/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not checked; privacy_score stays null');
+{ const body = JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body); const att = body.attachments?.[0];
+  check(body.attachments?.length === 1 && /\.json$/.test(att.filename) && JSON.parse(Buffer.from(att.content, 'base64').toString()).web_scan.saved === false && /no saved web scan/i.test(body.text), 'report send carries the JSON attachment; a scan with no saved web scan still sends, Part 1 explained'); }
 
 // HIBP rate limited => scan stays pending, attempt not counted, nothing sent, never reported as "not checked"
 const limited = () => ({ ok: false, status: 429, headers: { get: () => '0.001' }, text: async () => '', json: async () => ({}) });
@@ -157,8 +159,8 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   check(free.next_steps[0].id === 'check-breaches' && free.next_steps.some((s) => s.id === 'opt-out-spokeo') && !free.next_steps.some((s) => s.id === 'opt-out-mylife'), 'mirror: HIBP self-check first; opt-out steps only where a verified guide exists');
   const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
   check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
-  const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, mirror: free });
-  check(/YOUR HEXAGONS \(0 of 8 filled in/.test(repM.text) && /Empty hexagons \(we have not searched these yet\): .*Data broker profiles/.test(repM.text) && !/\/100/.test(repM.text) && repM.html.includes('/email/hex/broker-empty.png') && !repM.html.includes('-found.png'), 'report email renders hexagon images: all empty when nothing is checked, empty ones on one line in text, still no invented score');
+  const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, webScan: null });
+  check(/PART 1: YOUR WEB SCAN, REPLAYED/.test(repM.text) && /no saved web scan/i.test(repM.text) && /PART 2: YOUR EMAIL ADDRESS/.test(repM.text) && /\[NOT CHECKED\]/.test(repM.text) && !/\/100/.test(repM.text) && !repM.html.includes('-found.png') && !/Data broker profiles/.test(repM.text), 'two-part report with no saved web scan: Part 1 explained, email hexagons NOT CHECKED, still no invented score (full coverage in report-email.test.mjs)');
 
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 2 * 864e5).toISOString(), followup_stage: 0 }) === 0, 'follow-up: not due before day 3');
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 4 * 864e5).toISOString(), followup_stage: 0 }) === 1, 'follow-up: stage 1 due after day 3');
