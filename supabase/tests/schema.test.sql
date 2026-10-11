@@ -288,5 +288,28 @@ select pg_temp.assert((select count(*) from public.hk_spam_due_reminders) = 1 an
   'hk_spam_due_reminders: only today + email + consent');
 reset role;
 
+-- ===== MPC-7448: reminder_sent_at (at-most-once) and email_suppressions =====
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, reminder_sent_at) values ('ios', 'en', '2026-10-23', now())$$) = '42501',
+  'hk_spam_registrations: anon cannot set reminder_sent_at');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, utm_source, source_page) values ('ios', 'yue', '2026-10-23', 'a@example.com', true, 'x', '/HongKongSpam')$$) = '',
+  'hk_spam_registrations: anon can still insert all the form columns');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.email_suppressions$$) = '42501', 'email_suppressions: anon must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.email_suppressions (email_hash) values (repeat('a', 64))$$) = '42501', 'email_suppressions: anon must not insert');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.email_suppressions$$) = '42501', 'email_suppressions: authenticated must not read');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.email_suppressions (email_hash, source) values (repeat('a', 64), 'unsubscribe')$$) = '', 'email_suppressions: service_role inserts');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.email_suppressions (email_hash) values (repeat('a', 64))$$) = '23505', 'email_suppressions: one row per hash');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.email_suppressions (email_hash) values ('not-a-hash')$$) = '23514', 'email_suppressions: hash shape is checked');
+
+set local role service_role;
+insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent) values
+  ('ios', 'en', (now() at time zone 'Asia/Hong_Kong')::date, 'claim@example.com', true);
+select pg_temp.assert((select count(*) from public.hk_spam_due_reminders where email = 'claim@example.com') = 1, 'due view: unsent row is listed');
+select pg_temp.assert((select count(*) from public.hk_spam_registrations where email = 'claim@example.com' and reminder_sent_at is null) = 1, 'reminder_sent_at starts null');
+update public.hk_spam_registrations set reminder_sent_at = now() where email = 'claim@example.com' and reminder_sent_at is null;
+select pg_temp.assert((select count(*) from public.hk_spam_due_reminders where email = 'claim@example.com') = 0, 'due view: a claimed row is no longer listed');
+with u as (update public.hk_spam_registrations set reminder_sent_at = now() where email = 'claim@example.com' and reminder_sent_at is null returning 1)
+  select pg_temp.assert(count(*) = 0, 'claim is atomic: a second claim matches nothing') from u;
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

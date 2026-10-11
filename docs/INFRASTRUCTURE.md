@@ -22,7 +22,7 @@ Merge to `main`; GitHub Actions does the rest.
 | Workflow | Triggers on changes to | Does |
 |---|---|---|
 | `deploy-mpt-leads.yml` | `workers/mpt-leads/**` | tests, secret-name guard, `wrangler deploy` |
-| `deploy-scan-report.yml` | `workers/scan-report/**`, `src/data/optOutGuides.json` | regenerates `lib/guides.generated.js`, tests, `wrangler deploy` |
+| `deploy-scan-report.yml` | `workers/scan-report/**`, `src/data/optOutGuides.json` | regenerates `lib/guides.generated.js`, tests, `wrangler deploy`. The Worker also owns the HK Spam day-10 email cron (OFF by flag): `docs/hk-spam-day10-email-mpc-7448.md` |
 | `deploy-oauth-poc.yml` | `workers/oauth-poc/**` | tests, secret-name guard, `wrangler deploy` |
 
 Needs repo Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
@@ -54,4 +54,5 @@ To rotate: Cloudflare dashboard -> Workers & Pages -> the Worker -> Settings -> 
 | Worker returns success but no row | The Supabase write is fail-soft and only logs: read the Worker log (Dashboard -> Worker -> Observability). |
 | Worker deploy: `No such module ...json` or `Expected ";" but found "with"` | JSON imported with import attributes. Wrangler 3.x cannot bundle them; use a generated JS module (see `workers/scan-report/scripts/sync-guides.mjs`). |
 | Scan-report feature does nothing | Needs the Worker deployed and the migration applied. The site posts to the Worker by default (MPC-7385); check `VITE_SCAN_API_URL` is not set to an empty string in the Pages project, and that the address is in `RECIPIENT_ALLOWLIST` while the allowlist is in place. |
+| HK Spam day-10 email not arriving | By design while `HK_SPAM_EMAIL_ENABLED` is not `"true"` in `workers/scan-report/wrangler.toml` (dry run, counts only). Go-live steps and checks: `docs/hk-spam-day10-email-mpc-7448.md`. |
 | Push 403 / repo not found in a Claude session | Session is attached to the other GitHub owner. |

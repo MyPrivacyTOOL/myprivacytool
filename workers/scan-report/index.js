@@ -3,6 +3,8 @@ import { checkBreaches } from './lib/hibp.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
+import { runHkSpamReminderJob, HK_SPAM_CRON } from './lib/hkSpam.js';
+import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
@@ -61,8 +63,15 @@ export default {
     }
   },
 
-  async scheduled(_event, env, ctx) { ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env))); },
+  async scheduled(event, env, ctx) {
+    // MPC-7448: the HK Spam day-10 email has its own cron; every other trigger runs the report + follow-up jobs as before.
+    if (event?.cron === HK_SPAM_CRON) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
+    else ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env)));
+  },
 };
+
+// MPC-7448: HK Spam day-10 email. Dry run (counts only) unless HK_SPAM_EMAIL_ENABLED === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
+export const runHkSpamJob = (env, fetchImpl = fetch, limit) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit });
 
 // ------------------------------------------------------------------ submit path
 export async function handleScan(env, ctx, { email, consentSource, ip, utm }, fetchImpl = fetch) {
@@ -274,7 +283,9 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
       `<form method="POST" action="${action}"><button type="submit" style="background:#15803d;color:#fff;border:0;border-radius:8px;padding:11px 20px;font-size:15px;font-weight:600;cursor:pointer">Yes, unsubscribe me</button></form>`);
   }
   try {
-    await db(env).patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
+    const sb = db(env);
+    await sb.patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
+    await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants)
     return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails. You can run a new scan on our site whenever you like.');
   } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
 }

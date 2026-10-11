@@ -7,7 +7,7 @@ workers_dev = true
 
 # Cron fallback + report runner: every 5 minutes. Each scan is due within 48h (report_due_at).
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "5 1-4 * * *"]
 
 [vars]
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
@@ -18,6 +18,10 @@ RECIPIENT_ALLOWLIST = ""
 # Free mode: send the report even without a HIBP key (breaches shown as "not yet checked" + self-check link).
 # With HIBP_API_KEY set, breaches are checked for real. Set "false" to HOLD reports until HIBP works.
 ALLOW_PARTIAL_REPORT = "true"
+
+# MPC-7448: HK Spam day-10 "you are now protected" email. OFF: anything but "true" is a dry run that only counts what is due.
+# Switch on only after Chris's go-live word (see docs/hk-spam-day10-email-mpc-7448.md). The cron "5 1-4 * * *" (09:05-12:05 HKT) must match HK_SPAM_CRON in lib/hkSpam.js.
+HK_SPAM_EMAIL_ENABLED = "false"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]

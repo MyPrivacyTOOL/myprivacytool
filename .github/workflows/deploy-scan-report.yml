@@ -38,7 +38,7 @@ jobs:
         run: node workers/scan-report/scripts/sync-guides.mjs
 
       - name: Test Worker (stubbed fetch)
-        run: node workers/scan-report/worker.test.mjs
+        run: node workers/scan-report/worker.test.mjs && node workers/scan-report/hk-spam.test.mjs
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         # The action runs `npm i wrangler@3.90.0` from the repo's npm workspace; a peer-dependency conflict from the
