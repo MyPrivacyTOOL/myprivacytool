@@ -115,12 +115,12 @@ Follow-up to MPC-6545 (not a blocker). Two human checks remain; neither can run 
 | Check | Status | Result / where it lands |
 |---|---|---|
 | GA4 consent gating | Mostly verified 2026-10-11 (merged in #197) | Fresh incognito load, banner untouched: 9 requests only (consentmanager, favicons, local script, font, video); no `googletagmanager.com`, `google-analytics.com` or `hsforms` requests; console clean. After "Accept all": `googletagmanager` (gtag), `collect?v=2&tid=G-1BWMDBJSPL` and the HubSpot form frame (`hsforms`) load. Not yet tested: after "Reject all", and accept-then-reject (expect no further `collect`). |
-| privacy@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
-| support@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
-| dpo@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
-| legal@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
-| accessibility@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
-| scan@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| privacy@myprivacytool.io | NOT yet confirmed (most referenced address, 20 places) | The direct test from testingnt7@gmail.com was not sent; the cransford@gmail.com test mails cannot show forwarding. Send one from an outside account and note where it lands. |
+| support@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| dpo@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| legal@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| accessibility@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| scan@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
 | chris@myprivacytool.io | Confirmed 2026-10-11 | Forwards to cransford@gmail.com (mail from testingnt7@gmail.com arrived in that Inbox). |
 
 Notes:
