@@ -19,10 +19,9 @@ No history rewrite was done because there was nothing to scrub. If `WEBSITE_CONT
 Notion page, Google Drive, a local file, a gist), the values in it should still be treated as exposed and **rotated in
 the Cloudflare and Supabase dashboards**. After rotating, update the destinations listed in section 4.
 
-Guardrails: `.gitignore` excludes `.env`, `.env.*` and `.dev.vars*`. `scripts/ci/scan-secrets.mjs` exists, but
-**no workflow runs it**. Today it reports one false positive: `workers/mpt-metrics-collector/ga4.test.mjs` builds a
-PEM header around an RSA key that is generated at runtime. Wiring the scanner into `ci.yml` (with an allowlist for
-that test) would catch the next accidental commit.
+Guardrails: `.gitignore` excludes `.env`, `.env.*` and `.dev.vars*`. `scripts/ci/scan-secrets.mjs` runs as a
+blocking step in the `ci.yml` lint job, so a committed key fails the PR. Its allowlist skips a PEM header followed by
+a `${…}` template, which only matches the runtime-generated test key in `workers/mpt-metrics-collector/ga4.test.mjs`.
 
 ## 2. GitHub Actions repository secrets
 
@@ -72,16 +71,16 @@ human has to set it.
 | core-brain | `SUPABASE_URL`, `SUPABASE_KEY`, `WEBHOOK_SECRET`, `QWEN_API_KEY` | `workers/core-brain/` | ✅ deploy.yml | ✅ |
 | social-listeners | `SUPABASE_URL`, `SUPABASE_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `CORE_BRAIN_TOKEN`, `TELEGRAM_BOT_TOKEN` | `workers/social-listeners/` | ✅ deploy.yml | ✅ |
 | scan-report | `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN` | `workers/scan-report/` | ✅ deploy-scan-report.yml | ✅ |
-| scan-report | `UNSUBSCRIBE_SECRET` | `workers/scan-report/index.js` (unsubscribe links, day 3/7 follow-ups) | ❌ | ❌ **gap** |
+| scan-report | `UNSUBSCRIBE_SECRET` | `workers/scan-report/index.js` (unsubscribe links, day 3/7 follow-ups) | ❌ | optional, omitted on purpose |
 | mpt-leads | `HUBSPOT_API_KEY`, `HUBSPOT_TOKEN`, `NOTION_TOKEN`, `RESEND_API_KEY`, `SLACK_BOT_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_URL` (+ `LEADS_DB_ID`, `SLACK_CHANNEL_ID` ids) | `workers/mpt-leads/` | ❌ | ✅ |
-| mpt-leads | `HUNTER_API_KEY` | `workers/mpt-leads/lead-scoring.js` (optional enrichment) | ❌ | ❌ **gap** |
+| mpt-leads | `HUNTER_API_KEY` | `workers/mpt-leads/lead-scoring.js` (optional enrichment) | ❌ | optional, omitted on purpose |
 | mpt-metrics-collector | `CLOUDFLARE_ANALYTICS_TOKEN`, `COLLECTOR_TRIGGER_TOKEN`, `GA4_SERVICE_ACCOUNT_JSON`, `HUBSPOT_READONLY_TOKEN`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`, `YOUTUBE_API_KEY` (+ `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` ids) | `workers/mpt-metrics-collector/` | ❌ | ✅ |
 | github-channel | `GITHUB_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | `workers/github-channel/` | ❌ | ✅ |
-| github-channel | `REDDIT_CLIENT_SECRET` | `workers/github-channel/lib/reddit-routes.js` (optional Reddit OAuth) | ❌ | ❌ **gap** |
+| github-channel | `REDDIT_CLIENT_SECRET` | `workers/github-channel/lib/reddit-routes.js` (optional Reddit OAuth) | ❌ | optional, omitted on purpose |
 | oauth-poc | `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY` | `workers/oauth-poc/` | ❌ | ✅ |
-| oauth-poc | `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_URL`) | `workers/oauth-poc/supabase.js` (optional account linking) | ❌ | ❌ **gap** |
+| oauth-poc | `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_URL`) | `workers/oauth-poc/supabase.js` (optional account linking) | ❌ | optional, omitted on purpose |
 | telegram-webhook | `TELEGRAM_BOT_TOKEN`, `HUBSPOT_API_KEY`, `WEBHOOK_SECRET` | `workers/telegram-webhook/` | ❌ | ✅ |
-| webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` | `workers/webhook-receiver/` | ❌ (no deploy workflow) | ❌ **no file** |
+| webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` | `workers/webhook-receiver/` | ❌ (no deploy workflow) | ✅ (not enforced: no deploy workflow) |
 | mirror-risk | none | — | — | ✅ (empty) |
 
 ## 4. Upstream source of each credential (where it is minted or rotated)
@@ -106,9 +105,13 @@ operator's local environment or from CI.
 
 1. **Rotating the Supabase service-role key affects six Workers**, and only scan-report is synced by CI. The other
    five need a manual `wrangler secret put`, or they will keep failing with 401 against Supabase.
-2. **Missing from `EXPECTED_SECRETS.txt`:** `UNSUBSCRIBE_SECRET` (scan-report), `HUNTER_API_KEY` (mpt-leads),
-   `REDDIT_CLIENT_SECRET` (github-channel), `SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_URL` (oauth-poc).
-   `workers/webhook-receiver/` has no `EXPECTED_SECRETS.txt` and no deploy workflow.
+2. **`EXPECTED_SECRETS.txt` means *required*.** deploy-mpt-leads, deploy-mpt-metrics-collector and
+   deploy-mpt-digest **fail** (deploy-oauth-poc warns) when a listed name is not set on the Worker. Optional secrets
+   are therefore left out on purpose: `UNSUBSCRIBE_SECRET` (scan-report follow-ups and unsubscribe links),
+   `HUNTER_API_KEY` (mpt-leads enrichment), `REDDIT_CLIENT_SECRET` (github-channel Reddit OAuth) and
+   `SUPABASE_SERVICE_ROLE_KEY` on oauth-poc. Each feature switches itself off when its secret is unset. Do not add
+   them unless the feature becomes mandatory. `workers/webhook-receiver/EXPECTED_SECRETS.txt` now lists that Worker's
+   names. It has no deploy workflow, so nothing enforces the list yet.
 3. **GitHub secrets that may not be set:** all 7 social-listeners secrets and `QWEN_API_KEY` are optional, and
    deploy.yml silently substitutes `placeholder` when they are missing. The 4 `SCAN_REPORT_*` secrets are skipped
    silently when empty. This repo has no way to read which GitHub secrets exist, so check *Settings → Secrets* against
