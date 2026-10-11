@@ -34,6 +34,22 @@ describe("X webhook", () => {
   });
 });
 
+describe("core-brain rate limit (MPC-7257)", () => {
+  const limited = () => ({ fetch: vi.fn(async () => Response.json({ error: { code: "rate_limited" } }, { status: 429 })) });
+  it("acknowledges X when core-brain throttles the sender, so X does not retry", async () => {
+    const body = "{}";
+    const r = await call("/webhook/x", { method: "POST", body, headers: { "X-Twitter-Webhooks-Signature": sig("xs", body) } }, env(limited()));
+    expect(r.status).toBe(200);
+  });
+  it("acknowledges Telegram when core-brain throttles the sender, and sends no reply", async () => {
+    const b = limited(); const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await call("/webhook/telegram", { method: "POST", body: '{"update_id":1}', headers: { "X-Telegram-Bot-Api-Secret-Token": "tg" } }, { ...env(b), TELEGRAM_BOT_TOKEN: "123:abc" });
+    expect(r.status).toBe(200);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+});
+
 describe("Telegram webhook", () => {
   const h = (s: string) => ({ "X-Telegram-Bot-Api-Secret-Token": s });
   it("requires the secret token and fails closed when unset", async () => {
