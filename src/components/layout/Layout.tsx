@@ -6,11 +6,13 @@ import Footer from "./Footer";
 import MatrixRain from "@/components/MatrixRain";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { usePageViewTracking } from "@/hooks/usePageViewTracking";
 
 const { title: DEFAULT_TITLE, description: DEFAULT_DESCRIPTION } = pageMeta["/"];
 
 const Layout = () => {
   const location = useLocation();
+  usePageViewTracking();
 
   useEffect(() => {
     if (!location.hash) return;

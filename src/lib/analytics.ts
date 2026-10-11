@@ -34,6 +34,11 @@ export const trackEvent = (
   }
 };
 
+// Route-change page view for the single-page app (MPC-7376). gtag reads page_location and page_title itself.
+export const trackPageView = () => {
+  trackEvent('page_view');
+};
+
 // Events that must carry first-touch utm_* as custom parameters so GA4 can report scans by source (MPC-7182).
 // Register utm_source / utm_campaign as event-scoped custom dimensions in GA4.
 const attributedEvent = (eventName: string, params: Record<string, string | number | boolean>) => {
