@@ -34,14 +34,20 @@ const honeycomb = (tiles) => {
   return `<div style="margin:6px 0 14px 0">${row(tiles.slice(0, 3).map((t) => cell(t, '33%')), '100%', false)}${row(tiles.slice(3, 5).map((t) => cell(t, '50%')), '67%', true)}${row(tiles.slice(5, 8).map((t) => cell(t, '33%')), '100%', true)}</div>`;
 };
 // Alice, MyPrivacyTOOL's AI guide (artwork from the YouTube stills). Hosted from the site's public/email folder.
-const ALICE_IMG = `${SITE}/email/alice-curtain.jpg`;
+// Three looping animations cut from the Alice clips (public/email/alice/*.gif, ~500 KB each, 220px). Mail apps cannot play video, and
+// those that do not animate GIFs (some Outlook versions) show the first frame, so each loop starts on its best pose.
+const ALICE_POSES = {
+  wave: { file: 'alice-wave.gif', alt: 'Alice, MyPrivacyTOOL\u2019s AI guide, drawing back the curtain on green code and waving hello' },
+  peek: { file: 'alice-peek.gif', alt: 'Alice, MyPrivacyTOOL\u2019s AI guide, peeking behind the curtain at the green code' },
+  twirl: { file: 'alice-twirl.gif', alt: 'Alice, MyPrivacyTOOL\u2019s AI guide, twirling and turning to face you' },
+};
 const ALICE_TAGLINE = 'Alice looks behind the digital curtain, then shows you what to change.';
-const aliceHero = (titleHtml) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px 0"><tr>
+const aliceHero = (titleHtml, pose = 'wave') => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px 0"><tr>
 <td valign="middle" style="padding-right:14px"><h1 style="margin:0 0 8px 0;font-size:26px;line-height:31px;color:#111827">${titleHtml}</h1>
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px 0"><tr><td width="64" height="4" style="background:${BRAND};font-size:0;line-height:0">&nbsp;</td></tr></table>
 <div style="font-size:15px;line-height:22px;color:#374151">${esc(ALICE_TAGLINE)}</div>
 <div style="margin-top:8px;font-size:12px;line-height:16px;font-weight:700;color:#111827">With Alice, MyPrivacyTOOL&rsquo;s AI guide</div></td>
-<td width="140" valign="middle" align="right"><img src="${ALICE_IMG}" width="140" height="155" alt="Alice, MyPrivacyTOOL&rsquo;s AI guide, pulling back a curtain to reveal green code" style="display:block;width:140px;height:auto;border:0"></td></tr></table>
+<td width="140" valign="middle" align="right"><img src="${SITE}/email/alice/${ALICE_POSES[pose].file}" width="140" height="140" alt="${esc(ALICE_POSES[pose].alt)}" style="display:block;width:140px;height:auto;border:0"></td></tr></table>
 `;
 const h2 = (t) => `<h2 style="margin:28px 0 10px 0;font-size:18px;line-height:24px;color:#111827">${t}</h2>`;
 const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
@@ -87,7 +93,7 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     ...(unsubscribeLink ? [`Unsubscribe from further emails: ${unsubscribeLink}`] : []),
   ].join('\n');
   const html = shell(subject, 'We are starting your privacy scan now.',
-    `${aliceHero('Your privacy scan is starting')}
+    `${aliceHero('Your privacy scan is starting', 'wave')}
 ${para('Hi,')}
 ${para('You asked us to look at your privacy exposure &mdash; so we&rsquo;re starting right now.')}
 ${para('Most people don&rsquo;t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.')}
@@ -170,7 +176,7 @@ ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;lin
     : `<div style="margin-top:6px;font-size:14px;color:#6b7280">We have not yet written a verified removal guide for ${esc(b.name)}.</div>`}
 </td></tr></table>`).join('');
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
-    `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`)}
+    `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`, 'peek')}
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${esc(partialNote)}</td></tr></table>
 ${mirror ? `${h2(`Your hexagons <span style="font-size:13px;font-weight:500;color:#6b7280">${checkedHex.length} of ${mirror.hexagons.length} filled in</span>`)}${para('Each hexagon fills in when we find out a bit of data about you. Empty ones are areas we have not searched yet.')}${honeycomb(hexTiles)}` : ''}
 ${h2('Email breaches')}${breachStatus !== 'checked' ? `${para('We have not checked your email against known data breaches. You can do it yourself, free, in about 10 seconds. If your address appears, change the password on that service and anywhere you reused it, and turn on two-factor sign-in.')}${button('https://haveibeenpwned.com', 'Check on haveibeenpwned.com')}`
