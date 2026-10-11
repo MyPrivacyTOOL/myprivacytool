@@ -16,7 +16,7 @@ const clean = (v, max) => Array.from(String(v ?? '').replace(/[\u0000-\u001f\u00
 
 // ---- definitions -----------------------------------------------------------------------------------------------------------------
 // Web hexagons come from the registry (generated from docs/hexagon-registry-draft.json until MPC-7466 promotes the final one).
-export const WEB_HEXAGONS = HEX.map(([id, label, category, kind, emoji, art]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art }));
+export const WEB_HEXAGONS = HEX.map(([id, label, category, kind, emoji, art, cannot]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art, cannot: Boolean(cannot) }));
 // Email hexagons: the registry's email_hexagons (MPC-7467 owns the checks).
 export const EMAIL_HEXAGONS = EMAIL.map(([id, label, category, kind, emoji, art]) => ({ id, label, category, kind: kind === 'r' ? 'risk' : 'info', emoji, art }));
 // Hexagons whose value is a guess, not a measurement. Registry truth levels (MPC-7466) replace this; a saved item may also say estimate:true.
@@ -49,14 +49,25 @@ export function normaliseHexagons(defs, items) {
   const byId = new Map((Array.isArray(items) ? items : []).filter((i) => i && typeof i.id === 'string').map((i) => [i.id, i]));
   return defs.map((d) => {
     const it = byId.get(d.id);
-    let status = it && Object.values(STATUS).includes(it.status) ? it.status : STATUS.NOT_CHECKED;
-    if (status === STATUS.CLEAR && d.kind === 'info') status = STATUS.NOT_CHECKED;
+    let status; let reported = null;
+    if (it && it.status === undefined) {
+      // A saved browser scan (MPC-7465) carries no status, only what the browser reported. Until the detectors return one (MPC-7466),
+      // only a hexagon the code CAN tell apart is FOUND: the 29 where it cannot tell clear from not checked (registry flag `cannot`,
+      // including the five social ones) are NOT CHECKED, and so is any empty or placeholder value. Their reported value stays in the JSON.
+      const v = clean(it.value, 1000);
+      reported = v || null;
+      status = !v || PLACEHOLDER.test(v) || d.cannot ? STATUS.NOT_CHECKED : STATUS.FOUND;
+    } else {
+      status = it && Object.values(STATUS).includes(it.status) ? it.status : STATUS.NOT_CHECKED;
+      if (status === STATUS.CLEAR && d.kind === 'info') status = STATUS.NOT_CHECKED;   // informational: nothing to be clear of
+    }
     const value = status === STATUS.FOUND ? clean(it.value, 1000) : '';
-    let detail = null;
-    if (it && it.detail !== undefined && it.detail !== null) { try { const s = JSON.stringify(it.detail); detail = s.length <= MAX_DETAIL ? it.detail : { truncated: true, preview: s.slice(0, MAX_DETAIL) }; } catch { detail = null; } }
-    return { ...d, status, value, estimate: Boolean(it?.estimate) || ESTIMATES.has(d.id), detail };
+    let detail = it && it.status === undefined ? { confidence: it.confidence ?? null, risk: it.risk ?? null, confirmed_by_visitor: it.confirmed ?? null, icon: it.icon ?? null } : it?.detail ?? null;
+    if (detail !== null) { try { const s = JSON.stringify(detail); if (s.length > MAX_DETAIL) detail = { truncated: true, preview: s.slice(0, MAX_DETAIL) }; } catch { detail = null; } }
+    return { ...d, status, value, reported, estimate: Boolean(it?.estimate) || ESTIMATES.has(d.id), detail };
   });
 }
+const PLACEHOLDER = /^(location detected|unknown|n\/a|not available|none|undefined|null)$/i;
 
 // Email hexagons from what the Worker already knows. Breaches come from the HIBP check; the other three arrive from MPC-7467 in `extra`
 // (same item shape).
@@ -119,7 +130,7 @@ export function hexText(hexes) {
 }
 
 // ---- JSON attachment (shape documented in docs/report-json-shape.md) -----------------------------------------------------------------
-const outHex = (h) => ({ id: h.id, label: h.label, category: h.category, status: h.status, value: h.status === 'found' ? clean(h.value, 1000) : null, estimate: h.estimate, detail: h.detail });
+const outHex = (h) => ({ id: h.id, label: h.label, category: h.category, status: h.status, value: h.status === 'found' ? clean(h.value, 1000) : null, reported_value: h.status !== 'found' ? (h.reported ?? null) : null, estimate: h.estimate, detail: h.detail });
 export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString() }) {
   return {
     schema_version: REPORT_JSON_VERSION,

@@ -4,7 +4,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { buildReportEmail, BRIDGE } from './lib/email.js';
 import { computeScore } from './lib/score.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, MAX_VALUE } from './lib/reportHex.js';
-import { loadWebScan } from './lib/webscan.js';
+import { loadWebScan } from './lib/webScanLoader.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
@@ -81,10 +81,25 @@ check(/^my-privacy-scan-[a-z0-9-]+\.json$/.test(att.filename) && parsed.schema_v
 check(!JSON.stringify(parsed).includes('@'), 'JSON attachment holds no email address');
 check(Object.keys(parsed).sort().join() === 'email,generated_at,report_id,schema_version,score,web_scan', 'JSON top-level keys match docs/report-json-shape.md');
 
-// loader
-const sb = (rows) => ({ select: async () => { if (rows instanceof Error) throw rows; return rows; } });
-check(await loadWebScan(sb([]), 's') === null && await loadWebScan(sb(new Error('relation does not exist')), 's') === null, 'loader: no row or missing table => null');
-check((await loadWebScan(sb([{ id: 1, created_at: 't', results: [{ id: 'location' }] }]), 's')).hexagons.length === 1, 'loader: returns the saved hexagons');
+// loader (real MPC-7465 tables: web_scan_contacts links scans.id to web_scans.id)
+const sb = (byTable) => ({ select: async (path) => { const t = path.split('?')[0]; if (byTable instanceof Error) throw byTable; return byTable[t] ?? []; } });
+check(await loadWebScan(sb({}), 's') === null && await loadWebScan(sb(new Error('boom')), 's') === null, 'loader: no link or database error => null, never throws');
+const ld = await loadWebScan(sb({ web_scan_contacts: [{ web_scan_id: 'ws1' }], web_scans: [{ id: 'ws1', created_at: 't', results: [{ id: 'location', label: 'Location', value: 'Springfield' }] }] }), 's');
+check(ld.id === 'ws1' && ld.hexagons.length === 1, 'loader: follows web_scan_contacts to the saved web_scans row');
+
+// the saved scan is what the browser reported (id, label, value, confirmed, ...): no status field
+const browser = buildReportEmail({ scan, breaches: [], breachStatus: 'checked', webScan: { id: 'w', hexagons: [
+  { id: 'screen', label: 'Screen Resolution', value: '1920x1080', confirmed: true, confidence: 90, risk: 'low' },   // informational, code can tell: FOUND
+  { id: 'location', label: 'Location', value: 'Springfield, Exampleshire', confirmed: true },                      // flagged 'cannot tell' in the registry: NOT CHECKED
+  { id: 'browser', label: 'Browser', value: 'Unknown', confirmed: true },                                                    // placeholder: NOT CHECKED
+  { id: 'google-services', label: 'Google Account', value: 'Not signed in', confirmed: true },                                // code cannot tell clear from not checked: NOT CHECKED
+  { id: 'device', label: 'Device Type', value: '', confirmed: false },
+] } });
+const bh = Object.fromEntries(browser.report.web_scan.hexagons.map((h) => [h.id, h]));
+check(bh.screen.status === 'found' && bh.screen.value === '1920x1080' && bh.screen.detail.confidence === 90, 'browser-shaped scan: a real value on a hexagon the code can tell apart is FOUND, with its technical detail kept');
+check(bh.location.status === 'not_checked' && bh.browser.status === 'not_checked' && bh.device.status === 'not_checked' && bh['google-services'].status === 'not_checked', 'browser-shaped scan: placeholders, empty values and the "cannot tell" hexagons are NOT CHECKED, never clear');
+check(bh['google-services'].reported_value === 'Not signed in' && bh['google-services'].value === null, 'a NOT CHECKED hexagon keeps what the browser reported in the JSON only');
+check(browser.report.web_scan.hexagons.every((h) => h.status !== 'clear'), 'a browser-shaped scan never produces CLEAR (the code cannot tell)');
 
 if (process.env.REPORT_RENDER_DIR) {
   mkdirSync(process.env.REPORT_RENDER_DIR, { recursive: true });

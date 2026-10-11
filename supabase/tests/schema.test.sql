@@ -311,5 +311,25 @@ with u as (update public.hk_spam_registrations set reminder_sent_at = now() wher
   select pg_temp.assert(count(*) = 0, 'claim is atomic: a second claim matches nothing') from u;
 reset role;
 
+-- ===== MPC-7465: web_scans + web_scan_contacts (service_role only) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scans$$) = '42501', 'web_scans: anon must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.web_scans (hexagon_count, results, results_bytes) values (1, '[{}]', 4)$$) = '42501', 'web_scans: anon must not insert');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.web_scan_contacts$$) = '42501', 'web_scan_contacts: authenticated must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scan_funnel$$) = '42501', 'web_scan_funnel: anon must not read');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scans (hexagon_count, results, results_bytes) values (2, '[{}]', 4)$$) = '23514', 'web_scans: hexagon_count must match results');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scans (hexagon_count, results, results_bytes) values (1, '{}', 2)$$) = '23514', 'web_scans: results must be an array');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values (gen_random_uuid(), 'email', gen_random_uuid())$$) = '23503', 'web_scan_contacts: scan number must exist');
+select pg_temp.assert((select relforcerowsecurity from pg_class where oid = 'public.web_scans'::regclass) and (select relforcerowsecurity from pg_class where oid = 'public.web_scan_contacts'::regclass), 'web scan tables: RLS forced');
+
+set local role service_role;
+insert into public.web_scans (id, hexagon_count, results, results_bytes) values
+  ('00000000-0000-4000-8000-000000007465', 1, '[{"id":"browser","label":"Browser","value":"Testfox 1"}]', 50),
+  ('00000000-0000-4000-8000-000000007466', 1, '[{"id":"browser","label":"Browser","value":"Testfox 2"}]', 50);
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values ('00000000-0000-4000-8000-000000007465', 'email', gen_random_uuid());
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values ('00000000-0000-4000-8000-000000007465', 'telegram', gen_random_uuid());   -- a new channel needs no schema change
+select pg_temp.assert((select sum(scans_completed) from public.web_scan_funnel) >= 2 and (select sum(scans_with_contact) from public.web_scan_funnel) >= 1
+  and (select sum(scans_without_contact) from public.web_scan_funnel) >= 1, 'web_scan_funnel: counts scans with and without a contact');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

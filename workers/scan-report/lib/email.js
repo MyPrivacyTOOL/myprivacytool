@@ -1,4 +1,3 @@
-import { CATEGORIES } from './score.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, emailItems, tally, tallyLine, hexGroups, hexText, buildReportJson } from './reportHex.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -71,9 +70,14 @@ export const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-heig
 export const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
 
 // DRAFT COPY: Chris must approve before any real-user send.
-// CK 2026-10-11: copy rewritten to the "Your privacy scan is starting" version. It describes an automated search of public,
-// open-source data for usernames, phone numbers and addresses linked to the email. The report job (buildReportEmail) does NOT do
-// that lookup yet, so keep RECIPIENT_ALLOWLIST set until the pipeline matches this email (see the PR description).
+// MPC-7469 (B5): the first email promises exactly what the rebuilt report (MPC-7468) delivers, and nothing else: (1) the user's
+// web scan findings replayed, (2) what their email address reveals. No username, phone number or address search is promised until
+// one exists. Two hexagons, one per report part, replace the old 8 score categories (brokers, social, LinkedIn and so on), which
+// the report never checks. Timing: the report job runs every 5 minutes, so "usually within a few minutes" (README).
+const CONFIRMATION_PARTS = [
+  { key: 'device', label: 'Your browser findings' },
+  { key: 'email', label: 'What your email address reveals' },
+];
 export function buildConfirmationEmail({ unsubscribeLink } = {}) {
   const subject = 'Your privacy scan is starting';
   const text = [
@@ -83,34 +87,25 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     '',
     'I’m Alice, MyPrivacyTOOL’s AI guide. From now on I’m your personal point of contact for your privacy concerns.',
     '',
-    'MyPrivacyTOOL is a growing suite of AI tools and services for the places you communicate: social networks and other channels. We’re starting with your email address and people-search sites, and adding more channels over time.',
+    'You asked us to look at your privacy exposure, so we’re starting right now.',
     '',
-    'My job is to show you what you look like from the outside on those channels. I’ll explain what’s exposed, show you what to fix first, answer your questions and concerns, and help you understand how information like this gets out there, what risk it poses to you, and how to fix it going forward.',
+    'MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We’re starting with two things: your browser and your email address. More channels will follow over time.',
     '',
-    'As more data builds up across platforms, I’ll show you what it means for your privacy and risk.',
-    '',
-    'A real person on our team can step in whenever you ask.',
-    '',
-    'You asked us to look at your privacy exposure — so we’re starting right now.',
-    '',
-    'Most people don’t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.',
+    'My job is to show you what you look like from the outside: what’s exposed, what it means for you, and what to change first.',
     '',
     'Here’s what happens next.',
     '',
-    'Within 48 hours I’ll send you your report. In this first version I don’t search databases for you yet, so I’ll be clear about what I have and haven’t checked. You’ll get:',
+    'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
     '',
-    '  - A map of the 8 areas where your information can be exposed, each marked as checked or not yet checked',
-    '  - A link to check your email for known data breaches yourself',
-    '  - Step-by-step opt-out guides for the people-search sites where we have a verified guide',
+    '  1. Your browser findings, replayed. The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.',
+    '  2. What your email address reveals. New hexagons about the one new thing you gave us: your email address.',
     '',
-    'At this stage we are not using any paid tools or private databases — only publicly available, open-source data.',
+    'Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won’t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.',
     '',
-    'Our goal is simple: First we “mirror” what you look like from the outside and explain the risk in plain language. Then we help you start removing what’s out there.',
+    'This email is now our open channel. You can reply anytime with a question, or simply reply with the name of either hexagon below, and we’ll continue the conversation right here. A real person on our team can step in whenever you ask.',
     '',
-    'This email is now our open channel. You can reply anytime with a question, or simply reply with the name of any hexagon below, and we’ll continue the conversation right here.',
-    '',
-    'Your hexagons — each one fills in when we find out a bit of data about you:',
-    ...Object.values(CATEGORIES).map((c) => `  ${HEX_OFF} ${c.label}`),
+    'Your report, in two hexagons:',
+    ...CONFIRMATION_PARTS.map((p) => `  ${HEX_OFF} ${p.label}`),
     '',
     'Talk soon,',
     ...SIGN_OFF,
@@ -118,27 +113,23 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     `${CONTACT}  We never sell your data.`,
     ...(unsubscribeLink ? [`Unsubscribe from further emails: ${unsubscribeLink}`] : []),
   ].join('\n');
-  const html = shell(subject, 'We are starting your privacy scan now.',
+  const tiles = CONFIRMATION_PARTS.map((p) => hexTile({ key: p.key, label: p.label, caption: esc(p.label), href: `mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${p.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${p.label}`)}` }).replace('<td width="33%"', '<td width="50%"'));
+  const html = shell(subject, 'Your report is on its way: your browser findings, plus what your email address reveals.',
     `${aliceHero('Your privacy scan is starting', 'wave')}
 ${para('Hi,')}
 ${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m your personal point of contact for your privacy concerns.')}
-${para('MyPrivacyTOOL is a growing suite of AI tools and services for the places you communicate: social networks and other channels. We&rsquo;re starting with your email address and people-search sites, and adding more channels over time.')}
-${para('My job is to show you what you look like from the outside on those channels. I&rsquo;ll explain what&rsquo;s exposed, show you what to fix first, answer your questions and concerns, and help you understand how information like this gets out there, what risk it poses to you, and how to fix it going forward.')}
-${para('As more data builds up across platforms, I&rsquo;ll show you what it means for your privacy and risk.')}
-${para('A real person on our team can step in whenever you ask.')}
-${para('You asked us to look at your privacy exposure &mdash; so we&rsquo;re starting right now.')}
-${para('Most people don&rsquo;t realize how much of their personal information is already public. With just an email address, a surprising amount can often be found: linked usernames, phone numbers, physical addresses, and other details scattered across the open web. Once that information is out there, it can be used for spam, scams, or more serious risks.')}
+${para('You asked us to look at your privacy exposure, so we&rsquo;re starting right now.')}
+${para('MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We&rsquo;re starting with two things: your browser and your email address. More channels will follow over time.')}
+${para('My job is to show you what you look like from the outside: what&rsquo;s exposed, what it means for you, and what to change first.')}
 ${h2('Here&rsquo;s what happens next.')}
-${para('Within 48 hours I&rsquo;ll send you your report. In this first version I don&rsquo;t search databases for you yet, so I&rsquo;ll be clear about what I have and haven&rsquo;t checked. You&rsquo;ll get:')}
-<ul style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
-<li style="margin-bottom:6px">A map of the 8 areas where your information can be exposed, each marked as checked or not yet checked</li>
-<li style="margin-bottom:6px">A link to check your email for known data breaches yourself</li>
-<li>Step-by-step opt-out guides for the people-search sites where we have a verified guide</li></ul>
-${para('At this stage we are not using any paid tools or private databases &mdash; only publicly available, open-source data.')}
-${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like from the outside and explain the risk in plain language. Then we help you start removing what&rsquo;s out there.')}
-${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the hexagons below, and we&rsquo;ll continue the conversation right here.')}
-${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
-${honeycomb(Object.entries(CATEGORIES).map(([key, c]) => hexTile({ key, label: c.label, href: `mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}` })))}
+${para('Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
+<ol style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
+<li style="margin-bottom:6px"><strong>Your browser findings, replayed.</strong> The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.</li>
+<li><strong>What your email address reveals.</strong> New hexagons about the one new thing you gave us: your email address.</li></ol>
+${para('Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won&rsquo;t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.')}
+${para('This email is now our open channel. You can reply anytime with a question, or simply click either hexagon below, and we&rsquo;ll continue the conversation right here. A real person on our team can step in whenever you ask.')}
+${para('<strong>Your report, in two hexagons.</strong>')}
+<table role="presentation" width="67%" align="center" cellpadding="0" cellspacing="0" style="width:67%;margin:6px auto 14px auto"><tr>${tiles.join('')}</tr></table>
 ${para(`Talk soon,<br><strong>${SIGN_OFF[0]}</strong><br>${SIGN_OFF[1]}`)}`, unsubscribeLink);
   return tagged('scan-confirmation', { subject, text, html });
 }

@@ -37,7 +37,10 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /I’m Alice, MyPrivacyTOOL’s AI guide/.test(conf.text) && /A real person on our team can step in/.test(conf.text) && /growing suite of AI tools/.test(conf.text) && !/ANY Social Network/i.test(conf.text) && !/will search publicly|Everything Alice finds/.test(conf.text) && /don’t search databases for you yet/.test(conf.text) && !/AI Bot/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 8 && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
+// MPC-7469: the first email promises exactly what the report delivers (browser findings replayed + what the email address reveals) and nothing else.
+const confAll = conf.text + '\n' + conf.html.replace(/<[^>]+>/g, ' ').replace(/&rsquo;/g, '’');
+check(conf.subject === 'Your privacy scan is starting' && /I’m Alice, MyPrivacyTOOL’s AI guide/.test(conf.text) && /Your browser findings, replayed/.test(conf.text) && /What your email address reveals/.test(conf.text) && /within a few minutes/.test(conf.text) && /A real person on our team can step in/.test(conf.text) && /We never sell your data/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 2 && /honest status/.test(conf.text), 'confirmation: promises exactly two things (browser findings replayed, what the email address reveals), Alice, two hexagons, reply invitation, footer');
+check(!/username|phone number|physical address|addresses|people-search|open-source|publicly available|open web|paid tools|private databases|search databases|scattered|8 areas|image tiles|AI Bot|ANY Social Network|20\+|46 data|AI-platform|privacy score from 0/i.test(confAll) && !/48/.test(confAll), 'confirmation: blocks the old over-promises (username, phone, address, people-search and public-data searches, 8 areas, 48 hours)');
 check(/Talk soon,\nAlice\nYour Dedicated MyPrivacyTOOL AI/.test(conf.text) && /<strong>Alice<\/strong><br>Your Dedicated MyPrivacyTOOL AI/.test(conf.html) && !/The MyPrivacyTOOL team/.test(conf.text + conf.html), 'confirmation email signs off as Alice, not the team');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
 check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
@@ -47,7 +50,7 @@ check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includ
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [] }; const calls = []; let n = 0;
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [] }; const calls = []; let n = 0;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -59,6 +62,8 @@ function fake(opts = {}) {
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
+      if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
+      if (t === 'web_scan_contacts') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
@@ -361,5 +366,70 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   await handleScan(open, null, { ...input, email: 'real@example.com' }, F.f);
   o = await runReportJob(open, F.f);
   check(o.cancelled === 6 && o.sent === 1 && F.db.scans.find((x) => x.email_scanned === 'real@example.com').report_status === 'sent' && resends(F).every((c) => JSON.parse(c.body).to[0] === 'real@example.com'), 'six cancelled scans ahead do not block the next real scan, and nothing is mailed to them');
+}
+
+// ---- MPC-7465: save every completed web scan, link the contact
+{
+  const ON = { ...env, WEB_SCAN_SAVE_ENABLED: 'true' };
+  const hex = (n = 3) => Array.from({ length: n }, (_, i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `Test value ${i} <b>&</b>`, icon: 'x', confidence: 80, risk: 'low', confirmed: i % 2 === 0, category: 'device' }));
+  const post = async (e, body, { path = '/api/web-scan', origin = 'https://myprivacytool.io', raw, headers = {}, F } = {}) => {
+    F = F || fake(); globalThis.fetch = F.f; const w = [];
+    const rs = await worker.fetch(new Request(`https://x${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { Origin: origin } : {}), ...headers }, body: raw ?? JSON.stringify(body) }), e, { waitUntil: (pr) => w.push(pr) });
+    await Promise.all(w); return { rs, F, j: await rs.clone().json().catch(() => null) };
+  };
+  // save
+  let o = await post(ON, { consent: true, hexagons: hex() });
+  const saved = o.F.db.web_scans[0];
+  check(o.rs.status === 200 && o.j.saved === true && /^[0-9a-f-]{36}$/.test(o.j.scan_number) && saved.id === o.j.scan_number && saved.hexagon_count === 3 && saved.results.length === 3 && saved.results[0].value === 'Test value 0 <b>&</b>' && saved.results_bytes > 0, 'web scan: saved in full, scan number returned');
+  check(!('ip' in saved) && !('email' in saved) && !('user_id' in saved) && !JSON.stringify(saved).includes('1.2.3.4'), 'web scan: row carries no IP, email or user id');
+  // link: scan submit with the scan number
+  const F = fake(); const sn = (await post(ON, { consent: true, hexagons: hex() }, { F })).j.scan_number;
+  o = await post(ON, { email: 'mpc7465+link@example.com', consent: true, scan_number: sn }, { path: '/api/scan', F });
+  const link = F.db.web_scan_contacts[0];
+  check(o.rs.status === 200 && F.db.web_scan_contacts.length === 1 && link.web_scan_id === sn && link.channel === 'email' && link.contact_id === F.db.scans[0].id, 'link: email request with a scan number links the scan row to the saved scan');
+  o = await post(ON, { email: 'mpc7465+link@example.com', consent: true, scan_number: sn }, { path: '/api/scan', F });
+  check(o.rs.status === 200 && o.j.duplicate === true && F.db.web_scan_contacts.length === 1, 'link: repeat request is not double-linked and still answers normally');
+  // missing / bad / unknown scan number: no error, no link
+  const G = fake();
+  o = await post(ON, { email: 'mpc7465+none@example.com', consent: true }, { path: '/api/scan', F: G });
+  check(o.rs.status === 200 && o.j.success === true && G.db.web_scan_contacts.length === 0 && G.db.scans.length === 1, 'missing scan number: email accepted, no link, no error');
+  for (const bad of ['not-a-uuid', 12345, null, '00000000-0000-4000-8000-000000000000']) {
+    const H = fake();
+    o = await post(ON, { email: 'mpc7465+bad@example.com', consent: true, scan_number: bad }, { path: '/api/scan', F: H });
+    check(o.rs.status === 200 && o.j.success === true && H.db.web_scan_contacts.length === 0, `bad or unknown scan number (${JSON.stringify(bad)}): email accepted, no link, no error`);
+  }
+  // oversized
+  o = await post(ON, { consent: true, hexagons: hex() }, { headers: { 'content-length': '99999999' } });
+  check(o.rs.status === 413 && o.F.db.web_scans.length === 0, 'oversized (content-length) => 413, nothing saved');
+  o = await post(ON, null, { raw: JSON.stringify({ consent: true, hexagons: [{ id: 'a', label: 'a', value: 'x'.repeat(70 * 1024) }] }) });
+  check(o.rs.status === 413 && o.F.db.web_scans.length === 0, 'oversized (real body, no content-length check) => 413, nothing saved');
+  // malformed
+  const malformed = {
+    'bad JSON': { raw: '{nope' }, 'array body': { body: [] }, 'no consent': { body: { hexagons: hex() } }, 'consent false': { body: { consent: false, hexagons: hex() } },
+    'no hexagons': { body: { consent: true } }, 'empty list': { body: { consent: true, hexagons: [] } }, 'too many': { body: { consent: true, hexagons: hex(101) } },
+    'hexagon not object': { body: { consent: true, hexagons: ['x'] } }, 'missing label': { body: { consent: true, hexagons: [{ id: 'a', value: 'v' }] } },
+    'unknown key': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'v', evil: 1 }] } }, 'bad id': { body: { consent: true, hexagons: [{ id: '../a', label: 'a', value: 'v' }] } },
+    'value not text': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: { x: 1 } }] } }, 'value too long': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'x'.repeat(1001) }] } },
+    'control character': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'v\u0000w' }] } }, 'duplicate id': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '' }, { id: 'a', label: 'b', value: '' }] } },
+    'confidence out of range': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', confidence: 500 }] } }, 'extra top-level key': { body: { consent: true, hexagons: hex(), admin: true } },
+  };
+  for (const [name, c] of Object.entries(malformed)) {
+    o = await post(ON, c.body, { raw: c.raw });
+    check(o.rs.status === 400 && o.F.db.web_scans.length === 0, `malformed (${name}) => 400, nothing saved`);
+  }
+  // origin, rate limit
+  o = await post(ON, { consent: true, hexagons: hex() }, { origin: 'https://evil.example' });
+  check(o.rs.status === 403 && o.F.db.web_scans.length === 0, 'web scan: foreign origin => 403');
+  o = await post({ ...ON, RATE_LIMITER: { limit: async () => ({ success: false }) } }, { consent: true, hexagons: hex() });
+  check(o.rs.status === 429 && o.F.db.web_scans.length === 0, 'web scan: rate limit => 429');
+  // switch off (var absent, "false", or anything but "true")
+  for (const v of [undefined, 'false', 'TRUE', '1']) {
+    o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: v }, { consent: true, hexagons: hex() });
+    check(o.rs.status === 200 && o.j.saved === false && !o.j.scan_number && o.F.db.web_scans.length === 0, `switch off (${v}): nothing saved, no scan number, no error`);
+  }
+  const OFF = fake(); const sn2 = (await post(ON, { consent: true, hexagons: hex() }, { F: OFF })).j.scan_number;
+  o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: 'false' }, { email: 'mpc7465+off@example.com', consent: true, scan_number: sn2 }, { path: '/api/scan', F: OFF });
+  check(o.rs.status === 200 && OFF.db.web_scan_contacts.length === 0, 'switch off: email request is accepted and nothing is linked');
+  check(/WEB_SCAN_SAVE_ENABLED\s*=\s*"false"/.test((await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8')), 'wrangler.toml ships with the switch OFF');
 }
 process.exit(ok ? 0 : 1);
