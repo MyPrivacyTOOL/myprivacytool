@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { blogCtaDestination, newlyReachedThresholds, scrollDepthPercent } from "./blogTracking";
+import { blogCtaDestination, blogCtaHref, newlyReachedThresholds, scrollDepthPercent } from "./blogTracking";
 import {
   trackBlogCtaClick,
   trackBlogListView,
@@ -79,5 +79,18 @@ describe("blog GA4 events", () => {
   it("does nothing, and does not throw, when gtag is absent (blocked or no consent)", () => {
     delete window.gtag;
     expect(() => trackBlogPostView("x", "y", 1)).not.toThrow();
+  });
+});
+
+describe("blogCtaHref", () => {
+  it("tags the scan link with the post slug as utm_campaign", () => {
+    expect(blogCtaHref("stop-spam-calls-texts-and-emails")).toBe(
+      "/scan?utm_source=blog&utm_medium=content&utm_campaign=stop-spam-calls-texts-and-emails",
+    );
+  });
+  it("supports other destinations and stays a recognised CTA", () => {
+    const href = blogCtaHref("how-github-becomes-a-private-profile", "/connect/github");
+    expect(href).toBe("/connect/github?utm_source=blog&utm_medium=content&utm_campaign=how-github-becomes-a-private-profile");
+    expect(blogCtaDestination(blogCtaHref("x"))).toBe("/scan");
   });
 });
