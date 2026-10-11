@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "scan:secrets": "node scripts/ci/scan-secrets.mjs",
     "dev": "vite",
     "build": "vite build",
     "postbuild": "node scripts/prerender-meta.mjs && node scripts/generate-sitemap.mjs && node scripts/generate-feed.mjs && node scripts/write-version.mjs",

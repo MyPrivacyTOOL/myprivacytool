@@ -64,7 +64,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Secret scan (blocking; prints file:line and pattern name only, never the value)
-        run: node scripts/ci/scan-secrets.mjs
+        run: npm run scan:secrets
       - name: Typecheck
         run: npx tsc -p tsconfig.app.json --noEmit
       - name: Lint test code (blocking)
