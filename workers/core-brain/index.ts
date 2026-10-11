@@ -423,7 +423,12 @@ export default {
       if (pathname === "/webhook") return await handleWebhook(request, env, log, ctx);
       if (pathname === "/ingest/social") return await handleIngestSocial(request, env, log, ctx);
       if (pathname === "/health" && request.method === "GET") {
-        return json({ ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0 });
+        // rate_limit: whether each Workers Rate Limiting binding is attached at runtime (booleans only). Lets an operator tell
+        // "binding missing, so the limiter fails open" apart from "binding present but not counting" (MPC-7257).
+        return json({
+          ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0,
+          rate_limit: { sender: Boolean(env.RATE_LIMITER), global: Boolean(env.RATE_LIMITER_GLOBAL) },
+        });
       }
       throw new MptError("not_found", "No such route");
     } catch (err) {

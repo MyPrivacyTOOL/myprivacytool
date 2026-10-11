@@ -8,6 +8,10 @@ name: Core Brain rate-limit probe
 
 on:
   workflow_dispatch:
+    inputs:
+      count:
+        description: "Requests to send for the one sender (11 to 30). More requests tell an approximate limiter from a missing one."
+        default: "15"
 
 permissions:
   contents: read
@@ -28,4 +32,5 @@ jobs:
       - name: Core Brain rate-limit probe (429 on request 11)
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-        run: node scripts/ci/core-brain-rate-limit-probe.mjs
+          COUNT: ${{ inputs.count }}
+        run: node scripts/ci/core-brain-rate-limit-probe.mjs --count "${COUNT:-15}"
