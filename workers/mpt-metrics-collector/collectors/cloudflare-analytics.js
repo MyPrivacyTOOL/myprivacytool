@@ -3,7 +3,8 @@ import { previousHkDay } from '../lib/hk.js';
 // Cloudflare GraphQL Analytics pull: a cross-check on GA4 (which undercounts behind consent banners and ad blockers).
 // Zone: requests + unique visitors for myprivacytool.io. Workers: invocations + errors for the MPT Workers.
 // Auth: CLOUDFLARE_ANALYTICS_TOKEN, a read-only token (Analytics Read only). Never reuse the deploy token here.
-// The untouched GraphQL responses are stored under payload.zone / payload.workers.
+// The untouched GraphQL responses are stored under payload.zone / payload.workers / payload.firewall.
+// Zone numbers: requests, uniques, bandwidth (bytes), cached requests/bytes, status-code map (4xx/5xx) and threats.
 export const ACCOUNT_ID = '35cb17172c65a20f5cf1baf131485382';
 export const ZONE_NAME = 'myprivacytool.io';
 export const WORKERS = ['mpt-leads', 'core-brain', 'social-listeners'];
@@ -11,7 +12,19 @@ const ENDPOINT = 'https://api.cloudflare.com/client/v4/graphql';
 
 const ZONE_QUERY = `query($zoneTag: string!, $day: Date!) {
   viewer { zones(filter: { zoneTag: $zoneTag }) {
-    httpRequests1dGroups(limit: 1, filter: { date: $day }) { dimensions { date } sum { requests } uniq { uniques } }
+    httpRequests1dGroups(limit: 1, filter: { date: $day }) {
+      dimensions { date }
+      sum { requests bytes cachedRequests cachedBytes threats responseStatusMap { edgeResponseStatus requests } }
+      uniq { uniques }
+    }
+  } }
+}`;
+
+// Blocked threats (WAF/firewall). Optional: plan or token scope may not include firewall analytics, so a failure here
+// leaves payload.firewall null with a note and never turns the row into status=error.
+const FIREWALL_QUERY = `query($zoneTag: string!, $start: Time!, $end: Time!) {
+  viewer { zones(filter: { zoneTag: $zoneTag }) {
+    firewallEventsAdaptiveGroups(limit: 1, filter: { datetime_geq: $start, datetime_lt: $end, action: "block" }) { count }
   } }
 }`;
 
@@ -57,6 +70,9 @@ export default {
     catch (e) { failures.push(`zone: ${e.message}`); }
     try { payload.workers = await graphql(env, WORKERS_QUERY, { accountTag: ACCOUNT_ID, start: period.period_start, end: period.period_end, scripts: WORKERS }); }
     catch (e) { failures.push(`workers: ${e.message}`); }
+    payload.firewall = null;
+    try { payload.firewall = await graphql(env, FIREWALL_QUERY, { zoneTag: env.CLOUDFLARE_ZONE_ID, start: period.period_start, end: period.period_end }); }
+    catch (e) { payload.firewall_note = `firewall unavailable: ${e.message}`; }
     return { ...period, payload, error: failures.length ? failures.join('; ') : null };
   },
 };

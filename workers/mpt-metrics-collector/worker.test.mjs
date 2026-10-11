@@ -24,11 +24,13 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   if (url === 'https://api.cloudflare.com/client/v4/graphql') {
     const b = JSON.parse(opts.body); cfCalls.push({ auth: opts.headers.Authorization, b });
-    const kind = b.query.includes('httpRequests1dGroups') ? 'zone' : 'workers';
+    const kind = b.query.includes('httpRequests1dGroups') ? 'zone' : b.query.includes('firewallEventsAdaptiveGroups') ? 'firewall' : 'workers';
+    if (kind === 'firewall') return cfFail === 'firewall-gql' ? { ok: true, status: 200, json: async () => ({ data: null, errors: [{ message: 'no firewall analytics' }] }) }
+      : { ok: true, status: 200, json: async () => ({ data: { viewer: { zones: [{ firewallEventsAdaptiveGroups: [{ count: 7 }] }] } }, errors: null }) };
     if (cfFail === kind + '-http') return { ok: false, status: 403, json: async () => ({}) };
     if (cfFail === kind + '-gql') return { ok: true, status: 200, json: async () => ({ data: null, errors: [{ message: 'authz' }] }) };
     return { ok: true, status: 200, json: async () => kind === 'zone'
-      ? { data: { viewer: { zones: [{ httpRequests1dGroups: [{ dimensions: { date: b.variables.day }, sum: { requests: 1234 }, uniq: { uniques: 56 } }] }] } }, errors: null }
+      ? { data: { viewer: { zones: [{ httpRequests1dGroups: [{ dimensions: { date: b.variables.day }, sum: { requests: 1234, bytes: 5e6, cachedRequests: 900, cachedBytes: 4e6, threats: 3, responseStatusMap: [{ edgeResponseStatus: 200, requests: 1000 }, { edgeResponseStatus: 404, requests: 200 }, { edgeResponseStatus: 502, requests: 34 }] }, uniq: { uniques: 56 } }] }] } }, errors: null }
       : { data: { viewer: { accounts: [{ workersInvocationsAdaptive: WORKERS.map((w, i) => ({ dimensions: { scriptName: w }, sum: { requests: 100 * (i + 1), errors: i } })) }] } }, errors: null } };
   }
   if (opts.method === 'HEAD') {
@@ -90,7 +92,7 @@ check(row.source === 'cloudflare' && row.status === 'ok' && row.error === null, 
 check(row.period_start === '2026-10-08T16:00:00.000Z' && row.period_end === '2026-10-09T16:00:00.000Z', 'period is the previous full Hong Kong day (00:00-24:00 HKT)');
 check(row.payload.day === '2026-10-09' && cfCalls[0].b.variables.day === '2026-10-09' && cfCalls[0].b.variables.zoneTag === 'zone1', 'zone queried for that day');
 check(row.payload.zone.data.viewer.zones[0].httpRequests1dGroups[0].sum.requests === 1234 && row.payload.zone.data.viewer.zones[0].httpRequests1dGroups[0].uniq.uniques === 56, 'zone response stored untouched');
-check(row.payload.workers.data.viewer.accounts[0].workersInvocationsAdaptive.length === 3 && cfCalls[1].b.variables.scripts.join() === 'mpt-leads,core-brain,social-listeners', 'three Workers requested and stored untouched');
+check(row.payload.workers.data.viewer.accounts[0].workersInvocationsAdaptive.length === 3 && cfCalls.find((c) => c.b.variables.scripts).b.variables.scripts.join() === 'mpt-leads,core-brain,social-listeners', 'three Workers requested and stored untouched');
 check(cfCalls.every((c) => c.auth === 'Bearer cfro'), 'read-only analytics token used (not the deploy token)');
 check(!JSON.stringify(row).includes('cfro'), 'analytics token not in row');
 check(previousDay(new Date('2026-03-01T05:00:00Z')).day === '2026-02-28', 'previous-day rollover');
@@ -101,6 +103,10 @@ cfFail = 'zone-http'; row = await rowFor(); cfFail = null;
 check(row.status === 'error' && /zone: HTTP 403/.test(row.error) && row.payload.zone === null && row.payload.workers !== null, 'zone HTTP failure => status=error, zone blank, workers kept');
 cfFail = 'workers-gql'; row = await rowFor(); cfFail = null;
 check(row.status === 'error' && /workers: GraphQL: authz/.test(row.error) && row.payload.workers === null && row.payload.zone !== null, 'GraphQL errors => status=error, workers blank');
+check(/bytes cachedRequests/.test(cfCalls[0].b.query) && /responseStatusMap/.test(cfCalls[0].b.query) && row.payload.zone.data.viewer.zones[0].httpRequests1dGroups[0].sum.bytes === 5e6, 'zone query asks for bandwidth, cache and status-code breakdown');
+check(row.payload.firewall.data.viewer.zones[0].firewallEventsAdaptiveGroups[0].count === 7, 'firewall (blocked threats) response stored');
+cfFail = 'firewall-gql'; row = await rowFor(); cfFail = null;
+check(row.status === 'ok' && row.error === null && row.payload.firewall === null && /firewall unavailable/.test(row.payload.firewall_note) && row.payload.zone !== null, 'firewall failure is soft: row stays ok, note recorded');
 row = await rowFor({ ...env, CLOUDFLARE_ANALYTICS_TOKEN: undefined });
 check(row.status === 'error' && row.payload.zone === null && row.payload.workers === null && cfCalls.length === 0, 'missing token => error row, blank cells, no API call');
 

@@ -18,8 +18,20 @@ select
   (l.payload #>> '{zone,data,viewer,zones,0,httpRequests1dGroups,0,sum,requests}')::bigint   as cloudflare_requests,
   w.script_name,
   w.requests as worker_invocations,
-  w.errors   as worker_errors
+  w.errors   as worker_errors,
+  -- appended columns (create or replace view only allows new columns at the end)
+  (z #>> '{sum,bytes}')::bigint                                  as cloudflare_bandwidth_bytes,
+  (z #>> '{sum,cachedRequests}')::bigint                         as cloudflare_cached_requests,
+  case when (z #>> '{sum,requests}')::numeric > 0
+       then round((z #>> '{sum,cachedRequests}')::numeric / (z #>> '{sum,requests}')::numeric, 4) end as cloudflare_cache_hit_ratio,
+  (select sum((e->>'requests')::bigint) from jsonb_array_elements(coalesce(z #> '{sum,responseStatusMap}', '[]'::jsonb)) e
+     where (e->>'edgeResponseStatus')::int between 400 and 499) as cloudflare_error_4xx,
+  (select sum((e->>'requests')::bigint) from jsonb_array_elements(coalesce(z #> '{sum,responseStatusMap}', '[]'::jsonb)) e
+     where (e->>'edgeResponseStatus')::int between 500 and 599) as cloudflare_error_5xx,
+  -- threats_blocked: firewall block events (NULL when firewall analytics were unavailable)
+  (l.payload #>> '{firewall,data,viewer,zones,0,firewallEventsAdaptiveGroups,0,count}')::bigint as cloudflare_threats_blocked
 from latest l
+cross join lateral (select l.payload #> '{zone,data,viewer,zones,0,httpRequests1dGroups,0}' as z) zz
 left join lateral (
   select e->'dimensions'->>'scriptName' as script_name,
          (e->'sum'->>'requests')::bigint as requests,
