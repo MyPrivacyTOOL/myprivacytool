@@ -3,6 +3,8 @@
 -- future DSAR Worker after verifying the requester controls the email address). Covers Supabase only: the same
 -- request must also be run against HubSpot, the Notion Leads DB, Slack #leads history and Resend (see
 -- docs/security-audit-mpc-7350.md, section "Right to be forgotten").
+-- MPC-7488: a saved web scan can also be exported, deleted and purged by SCAN NUMBER (mpt_export_web_scan, mpt_delete_web_scan,
+-- mpt_purge_expired_web_scans) from migration 20261011220000; operator script scripts/web-scan-admin.mjs.
 -- Validated 2026-10-06 on a throwaway local Postgres 16 loaded with supabase/migrations/20261005120000_scan_report_pipeline.sql:
 -- export, erase, cascade, case/whitespace-insensitive matching, and anon denied / service_role allowed.
 

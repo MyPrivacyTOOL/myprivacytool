@@ -1,24 +1,35 @@
 import type { HexagonData } from "@/lib/deviceDetection";
-import { hasConsent } from "@/lib/cookieConsent";
+import { hasScanSaveConsent } from "@/lib/cookieConsent";
 
-// MPC-7465: every completed web scan is saved under an anonymous scan number, and the number is carried to the contact step.
+// MPC-7465: every completed web scan is saved under a random scan number, and the number is carried to the contact step.
 // OFF unless VITE_SAVE_WEB_SCANS is exactly "true" (production keeps it off until the privacy wording, MPC-7470, is signed off).
-// A visitor who has not accepted the consent banner (or rejected it) is never saved: hasConsent() is false by default.
+// MPC-7488: saved only when the visitor accepted the specific consent purpose for saving their scan (hasScanSaveConsent()),
+// not any one purpose. A saved scan is personal data: the visitor is shown the number and can quote it to have the scan deleted.
+// The number is kept in this browser (localStorage) so it is still there on this device later; sessionStorage only marks
+// "already saved on this visit" so a new visit saves a new scan.
 const KEY = "mpt_web_scan_number";
+export const SCAN_NUMBER_EVENT = "mpt-scan-number";
 const SCAN_NUMBER_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const API_URL =
   (import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev";
 
 export const saveWebScansEnabled = (): boolean => import.meta.env.VITE_SAVE_WEB_SCANS === "true";
 
-/** The scan number kept for this visit (tab session), or null. */
-export function getScanNumber(): string | null {
+const read = (store: () => Storage): string | null => {
   try {
-    const v = sessionStorage.getItem(KEY);
+    const v = store().getItem(KEY);
     return v && SCAN_NUMBER_RE.test(v) ? v : null;
   } catch {
     return null;
   }
+};
+
+/** The scan number saved on this visit (tab session), or null. This is the one linked to a contact given on this visit. */
+export const visitScanNumber = (): string | null => read(() => sessionStorage);
+
+/** The scan number kept on this device (the latest scan saved from this browser), or null. */
+export function getScanNumber(): string | null {
+  return read(() => localStorage) ?? visitScanNumber();
 }
 
 // Trim to what the Worker accepts: only known fields, short text, no control characters, one entry per id.
@@ -52,8 +63,8 @@ export function toPayload(hexagons: HexagonData[]) {
  * consent is missing, there is nothing to save, or the request fails (a failure never affects the visitor).
  */
 export async function saveCompletedScan(hexagons: HexagonData[]): Promise<string | null> {
-  if (!saveWebScansEnabled() || !API_URL || !hasConsent() || hexagons.length === 0) return null;
-  const existing = getScanNumber();
+  if (!saveWebScansEnabled() || !API_URL || !hasScanSaveConsent() || hexagons.length === 0) return null;
+  const existing = visitScanNumber();
   if (existing) return existing;
   try {
     const payload = toPayload(hexagons);
@@ -70,6 +81,16 @@ export async function saveCompletedScan(hexagons: HexagonData[]): Promise<string
       sessionStorage.setItem(KEY, data.scan_number);
     } catch {
       /* storage blocked: the scan is saved, it just cannot be linked */
+    }
+    try {
+      localStorage.setItem(KEY, data.scan_number);
+    } catch {
+      /* storage blocked: the number is still shown on this screen */
+    }
+    try {
+      window.dispatchEvent(new CustomEvent(SCAN_NUMBER_EVENT, { detail: data.scan_number }));
+    } catch {
+      /* no window: nothing to tell */
     }
     return data.scan_number;
   } catch {

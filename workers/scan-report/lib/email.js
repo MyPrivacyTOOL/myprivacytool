@@ -176,12 +176,14 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   const part1Intro = webScan
     ? `This is your own web scan, replayed. Every hexagon is something your browser told us when you ran it: ${tallyLine(wt, 'hexagons')}. Estimates are marked as estimates. A NOT CHECKED hexagon means we could not tell, not that you are safe.`
     : 'We have no saved web scan for this request, so there is nothing to replay here. That happens if you asked for a report without running the web scan first, or your browser was set not to let us keep the result. Run the scan at https://myprivacytool.io/ and request your report again to see every hexagon your browser gives away. Nothing below is guessed in its place.';
+  // MPC-7488: the visitor's scan number, so they can quote it to have the saved scan deleted. Only when a saved scan is in this report.
+  const scanNumberLine = webScan?.id ? `Your scan number: ${webScan.id}. Quote this number if you want this scan deleted.` : '';
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
   const brokerLines = brokers.map((b) => (!b.removal_url && !b.steps ? `${b.name}\n  We have not yet written a verified removal guide for ${b.name}.`
     : `${b.name}  (${b.time_needed || 'a few minutes'}; ${b.processing_time || 'timing varies'})\n  Official opt-out page: ${b.removal_url}\n${b.steps ? b.steps.map((st, i) => `   ${i + 1}. ${st}`).join('\n') : ''}`));
   const text = [
     s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, ALICE_TAGLINE, '', noteScore, '',
-    'PART 1: YOUR WEB SCAN, REPLAYED', part1Intro, ...(webScan ? hexText(web) : []), '',
+    'PART 1: YOUR WEB SCAN, REPLAYED', part1Intro, ...(scanNumberLine ? [scanNumberLine] : []), ...(webScan ? hexText(web) : []), '',
     BRIDGE, '',
     'PART 2: YOUR EMAIL ADDRESS', `${tallyLine(et, 'hexagons')}.`, ...hexText(emailHexes),
     ...breachRows.map((b) => `  - ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`), ...(breachMore ? [`  ...and ${breachMore} more (all of them are in the attached JSON file)`] : []), '',
@@ -203,7 +205,7 @@ ${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;lin
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
     `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`, 'peek')}
 ${box(esc(noteScore))}
-${h2('Part 1: your web scan, replayed')}${para(esc(part1Intro))}${webScan ? hexGroups(web) : ''}
+${h2('Part 1: your web scan, replayed')}${para(esc(part1Intro))}${scanNumberLine ? para(esc(scanNumberLine)) : ''}${webScan ? hexGroups(web) : ''}
 <div style="margin:26px 0 0 0;padding:14px 16px;border-left:4px solid ${BRAND};background:#f9fafb;font-size:16px;line-height:24px;font-weight:600;color:#111827">${esc(BRIDGE)}</div>
 ${h2('Part 2: your email address')}${para(esc(`${tallyLine(et, 'hexagons')}.`))}${hexGroups(emailHexes)}
 ${breachRows.length ? `<ul style="margin:10px 0 12px 0;padding-left:20px;font-size:13px;line-height:19px;color:#374151">${breachRows.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}${breachMore ? `<li>&hellip;and ${breachMore} more (all of them are in the attached file)</li>` : ''}</ul>` : ''}

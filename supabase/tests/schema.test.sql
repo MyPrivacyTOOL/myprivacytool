@@ -335,5 +335,61 @@ reset role;
 select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_purge_expired_web_scans()$$) = '42501', 'mpt_purge_expired_web_scans: anon must not execute');
 select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_purge_expired_web_scans()$$) = '42501', 'mpt_purge_expired_web_scans: authenticated must not execute');
 
+-- ===== MPC-7488: deletion by scan number, retention setting, dry run, deletion log (service_role only) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_delete_web_scan(gen_random_uuid())$$) = '42501', 'mpt_delete_web_scan: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_export_web_scan(gen_random_uuid())$$) = '42501', 'mpt_export_web_scan: authenticated must not execute');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_purge_expired_web_scans(true)$$) = '42501', 'mpt_purge_expired_web_scans(dry run): anon must not execute');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scan_deletion_log$$) = '42501', 'web_scan_deletion_log: anon must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scan_retention$$) = '42501', 'web_scan_retention: anon must not read');
+select pg_temp.assert((select months from public.web_scan_retention) = 12 and (select unlinked_days from public.web_scan_retention) = 90, 'web_scan_retention: defaults are 12 months, 90 days unlinked');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_retention (id, months) values (false, 6)$$) = '23514', 'web_scan_retention: only one row is possible');
+
+set local role service_role;
+-- fixtures (made-up ids): A old+linked, B old+unlinked (past 90 days, under 12 months), C recent, D recent+linked, E older than 12 months, unlinked
+insert into public.web_scans (id, created_at, hexagon_count, results, results_bytes) values
+  ('00000000-0000-4000-8000-0000000074a1', now() - interval '13 months', 1, '[{"id":"browser","label":"Browser","value":"Testfox A"}]', 50),
+  ('00000000-0000-4000-8000-0000000074a2', now() - interval '120 days',  1, '[{"id":"browser","label":"Browser","value":"Testfox B"}]', 50),
+  ('00000000-0000-4000-8000-0000000074a3', now() - interval '10 days',   1, '[{"id":"browser","label":"Browser","value":"Testfox C"}]', 50),
+  ('00000000-0000-4000-8000-0000000074a4', now() - interval '10 days',   1, '[{"id":"browser","label":"Browser","value":"Testfox D"}]', 50),
+  ('00000000-0000-4000-8000-0000000074a5', now() - interval '14 months', 1, '[{"id":"browser","label":"Browser","value":"Testfox E"}]', 50);
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values
+  ('00000000-0000-4000-8000-0000000074a1', 'email', gen_random_uuid()),
+  ('00000000-0000-4000-8000-0000000074a4', 'email', gen_random_uuid());
+delete from public.web_scan_deletion_log;
+
+-- dry run: reports the count, deletes nothing, logs a dry-run row
+select pg_temp.assert((public.mpt_purge_expired_web_scans(true)->>'scans')::int = 3 and (public.mpt_purge_expired_web_scans(true)->>'dry_run')::boolean, 'purge dry run: counts A, B and E');
+select pg_temp.assert((select count(*) from public.web_scans where id::text like '00000000-0000-4000-8000-0000000074a%') = 5, 'purge dry run: nothing deleted');
+select pg_temp.assert((select count(*) from public.web_scan_deletion_log where kind = 'purge_dry_run') = 2 and (select count(*) from public.web_scan_deletion_log where kind = 'purge') = 0, 'purge dry run: logged as a dry run');
+
+-- the period is one setting: shorten unlinked_days off and months to 12 -> only the over-12-months scans go (A linked, E unlinked)
+update public.web_scan_retention set unlinked_days = null;
+select pg_temp.assert((public.mpt_purge_expired_web_scans(true)->>'scans')::int = 2, 'retention setting: with unlinked_days off only the 12-month rule applies');
+update public.web_scan_retention set unlinked_days = 90;
+
+-- real run: A (old, linked), B (unlinked past 90 days), E (older than 12 months) go; C and D stay
+create temp table purge_runs as select 1 as n, public.mpt_purge_expired_web_scans() as j;
+insert into purge_runs select 2, public.mpt_purge_expired_web_scans(false);
+select pg_temp.assert((select (j->>'scans')::int from purge_runs where n = 1) = 3 and (select (j->>'scans')::int from purge_runs where n = 2) = 0, 'purge: deletes A, B, E and nothing on a second run');
+select pg_temp.assert((select array_agg(right(id::text, 2) order by id) from public.web_scans where id::text like '00000000-0000-4000-8000-0000000074a%') = array['a3','a4'], 'purge: keeps the recent scans');
+select pg_temp.assert((select count(*) from public.web_scan_contacts where web_scan_id = '00000000-0000-4000-8000-0000000074a1') = 0, 'purge: the contact link goes with its scan');
+select pg_temp.assert((select scans_deleted from public.web_scan_deletion_log where kind = 'purge' order by id limit 1) = 3 and (select links_deleted from public.web_scan_deletion_log where kind = 'purge' order by id limit 1) = 1, 'purge: count logged');
+
+-- export and delete by scan number
+select pg_temp.assert((public.mpt_export_web_scan('00000000-0000-4000-8000-0000000074a4')->'web_scan'->>'id') = '00000000-0000-4000-8000-0000000074a4'
+  and jsonb_array_length(public.mpt_export_web_scan('00000000-0000-4000-8000-0000000074a4')->'contact_links') = 1, 'export by scan number: returns the scan and its links');
+select pg_temp.assert((public.mpt_export_web_scan(gen_random_uuid())->'web_scan') = 'null'::jsonb, 'export by scan number: unknown number returns nothing');
+create temp table delete_run as select public.mpt_delete_web_scan('00000000-0000-4000-8000-0000000074a4') as j;
+select pg_temp.assert((select (j->>'scans_deleted')::int = 1 and (j->>'contact_links_deleted')::int = 1 from delete_run), 'delete by scan number: reports one scan and one link deleted');
+select pg_temp.assert((select count(*) from public.web_scan_contacts where web_scan_id = '00000000-0000-4000-8000-0000000074a4') = 0
+  and (select count(*) from public.web_scans where id = '00000000-0000-4000-8000-0000000074a4') = 0, 'delete by scan number: removes the scan and its contact link');
+select pg_temp.assert((select count(*) from public.web_scans where id = '00000000-0000-4000-8000-0000000074a3') = 1, 'delete by scan number: leaves other scans');
+create temp table delete_run2 as select public.mpt_delete_web_scan(gen_random_uuid()) as j;
+select pg_temp.assert((select (j->>'found')::boolean = false and (j->>'scans_deleted')::int = 0 from delete_run2), 'delete by scan number: unknown number deletes nothing');
+select pg_temp.assert((select count(*) from public.web_scan_deletion_log where kind = 'by_scan_number') = 2, 'delete by scan number: each call is logged');
+-- the log holds counts only: no uuid, no email, no browser value anywhere in it
+select pg_temp.assert(not exists (select 1 from public.web_scan_deletion_log l where l::text ~* '[0-9a-f]{8}-[0-9a-f]{4}-|@|Testfox'), 'deletion log: no scan number, email or value');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

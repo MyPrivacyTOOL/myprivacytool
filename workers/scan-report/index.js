@@ -80,7 +80,7 @@ export default {
   },
 };
 
-// MPC-7465: POST /api/web-scan {consent:true, hexagons:[...]} -> {scan_number}. Saves a completed home-page scan, anonymously.
+// MPC-7465: POST /api/web-scan {consent:true, hexagons:[...]} -> {scan_number}. Saves a completed home-page scan (personal data, not anonymous: the values include browser-reported IP addresses).
 // Off (WEB_SCAN_SAVE_ENABLED != "true") it saves nothing and answers {saved:false}, so the site carries on without an error.
 async function handleWebScan(env, request, origin, json) {
   if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);

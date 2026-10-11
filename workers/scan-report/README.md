@@ -53,11 +53,19 @@ On by default since MPC-7385: `src/pages/Scan.tsx` posts to `https://mpt-scan-re
 ## Test
 `node workers/scan-report/worker.test.mjs` (stubbed fetch, no network).
 
-## Web scan saving (MPC-7465)
+## Web scan saving (MPC-7465, MPC-7488)
+
+A saved scan is **personal data, not anonymous**: `results` holds what the browser reported per hexagon, which includes IP addresses and fingerprint-style values. There is no connection-IP column, no email and no user id on `web_scans`; a contact is linked only through `web_scan_contacts` when the visitor gives one. (An earlier comment and doc said no IP is stored; that was wrong.)
 
 `POST /api/web-scan` `{consent:true, hexagons:[{id,label,value,...}]}` saves a completed home-page scan to `web_scans` and returns `{saved:true, scan_number}`.
 `POST /api/scan` may carry `scan_number`; the Worker then links that scan to the new email request in `web_scan_contacts` (`channel='email'`, `contact_id=scans.id`). Other channels later = new `channel` values, no schema change.
 Switch: Worker var `WEB_SCAN_SAVE_ENABLED` (default `"false"`; only `"true"` saves) and site build flag `VITE_SAVE_WEB_SCANS`. Off, the endpoint answers `{saved:false}`. Drop-off: `select * from web_scan_funnel`.
+**Consent (MPC-7488).** The site saves a scan only when the visitor accepted the specific consent-tool purpose for saving their scan, read from `__cmp('getCMPData').purposeConsents[<id>]`. The id is the build variable `VITE_SCAN_SAVE_CONSENT_PURPOSE` (for a custom purpose in consentmanager.net: `c` + the number shown there). Until Chris creates the purpose and sets the variable, nothing is saved for anyone, whatever the other purposes say. Accepting analytics or any other purpose alone does not save.
+**Scan number.** Shown on the results screen ("Quote this number if you want this scan deleted."), kept in the visitor's browser (localStorage, `mpt_web_scan_number`), and in the report email (text, HTML and the JSON attachment `web_scan.id`).
+**Deletion, export, clean-up** (service_role only; counts are logged to `web_scan_deletion_log`, never a scan number, contact or value):
+- `node scripts/web-scan-admin.mjs delete <scan-number>` deletes the scan and its contact link(s); `export <scan-number>` prints it; `purge [--dry-run]` runs the clean-up now. Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the environment. Tests: `node scripts/web-scan-admin.test.mjs`.
+- Database functions: `mpt_delete_web_scan(uuid)`, `mpt_export_web_scan(uuid)`, `mpt_purge_expired_web_scans(p_dry_run boolean default false)`. An email-based request still goes through `mpt_dsar_export` / `mpt_dsar_erase` (`supabase/sql/mpt-dsar-erase-export.sql`), which cover linked web scans.
+- Retention is one setting: the single row of `public.web_scan_retention` (`months` = 12; `unlinked_days` = 90 is the shorter rule for scans never linked to a contact that Chris approved in #249, set it to null to apply only `months`). Change it with `update public.web_scan_retention set months = N`. A daily pg_cron job `mpt-purge-expired-web-scans` (19:10 UTC) runs the purge.
 
 ## Email hexagons (MPC-7467)
 Name in address, mail provider and domain, public profile (Gravatar) run per scan; results are `signals` rows (`email-name`, `email-provider`, `email-profile`), never block the report, and do not affect the score. Services that receive the address or a hash of it, and the held breach check: `docs/email-hexagons-mpc-7467.md`. Test: `node workers/scan-report/email-hexagons.test.mjs`.

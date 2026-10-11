@@ -1,18 +1,22 @@
 // MPC-7465: the site side of "save every completed web scan".
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { saveCompletedScan, getScanNumber, toPayload } from "./webScan";
+import { saveCompletedScan, getScanNumber, visitScanNumber, toPayload, SCAN_NUMBER_EVENT } from "./webScan";
+import { hasScanSaveConsent } from "./cookieConsent";
 import type { HexagonData } from "./deviceDetection";
 
 const NUMBER = "11111111-2222-4333-8444-555555555555";
 const hex = (n = 3): HexagonData[] =>
   Array.from({ length: n }, (_, i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `v${i}`, icon: "x", confidence: 80, risk: "low", confirmed: true, category: "device" }));
-const setConsent = (on: boolean) => {
+// The consent purpose that covers saving a scan (MPC-7488). Any other purpose id is "a different purpose".
+const PURPOSE = "c42";
+const setPurposes = (purposeConsents: Record<string, boolean>, userChoiceExists = true) => {
   (window as unknown as { __cmp: unknown }).__cmp = (cmd: string) =>
-    cmd === "getCMPData" ? { userChoiceExists: true, purposeConsents: { c1: on } } : undefined;
+    cmd === "getCMPData" ? { userChoiceExists, purposeConsents } : undefined;
 };
+const setConsent = (on: boolean) => setPurposes({ [PURPOSE]: on });
 const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as unknown as Response;
 
-beforeEach(() => { sessionStorage.clear(); });
+beforeEach(() => { sessionStorage.clear(); localStorage.clear(); vi.stubEnv("VITE_SCAN_SAVE_CONSENT_PURPOSE", PURPOSE); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); delete (window as unknown as { __cmp?: unknown }).__cmp; });
 
 describe("saveCompletedScan", () => {
@@ -62,6 +66,64 @@ describe("saveCompletedScan", () => {
     vi.stubGlobal("fetch", vi.fn(async () => ok({ saved: true, scan_number: "not-a-number" })));
     expect(await saveCompletedScan(hex())).toBeNull();
     expect(getScanNumber()).toBeNull();
+  });
+});
+
+describe("specific consent (MPC-7488)", () => {
+  it("accepting a different purpose alone does not save", async () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    const f = vi.fn(async (..._args: unknown[]) => ok({ saved: true, scan_number: NUMBER })); vi.stubGlobal("fetch", f);
+    setPurposes({ c1: true, "1": true, "3": true, [PURPOSE]: false });
+    expect(hasScanSaveConsent()).toBe(false);
+    expect(await saveCompletedScan(hex())).toBeNull();
+    setPurposes({ c1: true, "1": true }); // purpose absent altogether
+    expect(await saveCompletedScan(hex())).toBeNull();
+    expect(f).not.toHaveBeenCalled();
+    expect(getScanNumber()).toBeNull();
+  });
+
+  it("saves once the scan-saving purpose is accepted", async () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    vi.stubGlobal("fetch", vi.fn(async () => ok({ saved: true, scan_number: NUMBER })));
+    setPurposes({ c1: false, [PURPOSE]: true });
+    expect(await saveCompletedScan(hex())).toBe(NUMBER);
+  });
+
+  it("saves nothing for anyone while the purpose id is not configured", async () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    vi.stubEnv("VITE_SCAN_SAVE_CONSENT_PURPOSE", "");
+    const f = vi.fn(); vi.stubGlobal("fetch", f);
+    setPurposes({ c1: true, [PURPOSE]: true, "": true });
+    expect(hasScanSaveConsent()).toBe(false);
+    expect(await saveCompletedScan(hex())).toBeNull();
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("needs a recorded choice, not just a purpose flag", () => {
+    setPurposes({ [PURPOSE]: true }, false);
+    expect(hasScanSaveConsent()).toBe(false);
+  });
+});
+
+describe("scan number kept in this browser (MPC-7488)", () => {
+  it("is kept on the device after the visit ends, announced to the screen, and a new visit saves a new scan", async () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true"); setConsent(true);
+    const seen: string[] = [];
+    const on = (e: Event) => seen.push((e as CustomEvent<string>).detail);
+    window.addEventListener(SCAN_NUMBER_EVENT, on);
+    vi.stubGlobal("fetch", vi.fn(async () => ok({ saved: true, scan_number: NUMBER })));
+    expect(await saveCompletedScan(hex())).toBe(NUMBER);
+    window.removeEventListener(SCAN_NUMBER_EVENT, on);
+    expect(seen).toEqual([NUMBER]);
+    expect(localStorage.getItem("mpt_web_scan_number")).toBe(NUMBER);
+    sessionStorage.clear(); // tab closed, same device
+    expect(visitScanNumber()).toBeNull();
+    expect(getScanNumber()).toBe(NUMBER);
+    const NEXT = "11111111-2222-4333-8444-666666666666";
+    const f = vi.fn(async (..._args: unknown[]) => ok({ saved: true, scan_number: NEXT })); vi.stubGlobal("fetch", f);
+    expect(await saveCompletedScan(hex())).toBe(NEXT);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(getScanNumber()).toBe(NEXT);
   });
 });
 

@@ -65,6 +65,13 @@ check(!/hexagons filled in|8 hexagons|Data broker profiles|AI threat/i.test(real
 // two parts, bridge, brokers, no-scan
 check(real.html.includes('Part 1') && real.html.includes('Part 2') && real.html.indexOf(BRIDGE.replace(/'/g, '&#39;')) > real.html.indexOf('Part 1') && real.html.indexOf(BRIDGE) < real.html.indexOf('Part 2') && real.text.includes(BRIDGE), 'bridge line sits between Part 1 and Part 2 (HTML and text)');
 check(/no saved web scan/i.test(none.text) && /no saved web scan/i.test(none.html) && none.report.web_scan.saved === false && none.report.web_scan.hexagons.length === 0 && /Part 2/.test(none.html), 'no saved web scan: still builds, Part 1 explained honestly, Part 2 present');
+
+// MPC-7488: the scan number is in the email text, the email HTML and the JSON attachment; no number when no scan is in the report
+const SN = '11111111-2222-4333-8444-555555555555';
+const withNo = buildReportEmail({ scan, breaches: [], breachStatus: 'checked', brokers: [], webScan: { id: SN, created_at: '2026-10-11T00:00:00Z', hexagons: mix } });
+check(withNo.text.includes(`Your scan number: ${SN}. Quote this number if you want this scan deleted.`) && withNo.html.includes(`Your scan number: ${SN}. Quote this number if you want this scan deleted.`), 'scan number and what it is for are in the email text and HTML');
+check(withNo.report.web_scan.id === SN && Buffer.from(reportAttachment(withNo.report).content, 'base64').toString('utf8').includes(SN), 'scan number is in the JSON attachment');
+check(!/Your scan number/.test(none.text) && !/Your scan number/.test(none.html), 'no saved scan: no scan number line');
 check(!/PEOPLE-SEARCH SITES/.test(none.text) && none.text.includes('/opt-out') && !none.html.includes('Open the official opt-out page'), 'people-search guides move to a link when no finding makes them relevant');
 check(/PEOPLE-SEARCH SITES/.test(worst.text) && worst.html.includes('Open the official opt-out page'), 'people-search guides appear when a finding makes them relevant');
 check(/Alice/.test(real.html) && real.html.includes('/email/alice/alice-peek.gif'), 'Alice is kept');
