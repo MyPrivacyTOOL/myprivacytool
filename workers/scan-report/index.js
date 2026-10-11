@@ -1,3 +1,4 @@
+import { runEmailHexagons, emailHexagonSignalRows } from './lib/emailHexagons.js';
 import { db } from './lib/supabase.js';
 import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity } from './lib/hubspot.js';
@@ -192,6 +193,7 @@ async function processScan(env, sb, job, fetchImpl) {
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
+  const emailHex = await runEmailHexagons(email, env, fetchImpl).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
 
   const breaches = hibp.status === 'checked' ? hibp.breaches : [];
   const checked = new Set(hibp.status === 'checked' ? ['email'] : []);
@@ -202,6 +204,7 @@ async function processScan(env, sb, job, fetchImpl) {
     ...breaches.map((b) => ({ scan_id: job.id, category: 'email', signal_type: `breach:${clip(b.Name, 80)}`, severity: breachRisk(b) >= 8 ? 'high' : 'medium', data_source: 'Have I Been Pwned', check_status: 'found', details: clip(`${b.BreachDate || ''} exposed: ${(b.DataClasses || []).join(', ')}`, 500), removal_status: 'manual_only' })),
     ...(hibp.status === 'checked' && breaches.length === 0 ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:none', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'clear' }] : []),
     ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
+    ...emailHexagonSignalRows(job.id, emailHex),
     ...brokers.map((b) => ({ scan_id: job.id, category: 'broker', signal_type: `${b.key}_profile`, severity: 'high', data_source: b.name, check_status: 'not_checked', details: clip(b.reason, 300), removal_status: 'manual_only', removal_url: b.removal_url, removal_instructions: b.steps ? b.steps.join('\n') : null })),
   ];
   // PostgREST bulk insert rejects rows with different key sets (PGRST102), so give every signal row the same columns.
