@@ -51,6 +51,15 @@ const funnelSteps: Record<string, number> = {
   'deep_scan_triggered': 6,
   'all_hexagons_confirmed': 7,
   'scroll_to_footer': 8,
+  // Wave steps previously reported step_number 0. New numbers only; 1-8 keep their historical meaning (MPC-7376).
+  'language_scan_triggered': 9,
+  'orientation_scan_triggered': 10,
+  'fingerprint_scan_triggered': 11,
+  'advanced_fingerprint_scan_triggered': 12,
+  'storage_scan_triggered': 13,
+  'social_scan_triggered': 14,
+  'security_scan_triggered': 15,
+  'behavior_scan_triggered': 16,
 };
 
 export const trackFunnelStep = (step: string, metadata?: Record<string, string | number | boolean>) => {
@@ -59,6 +68,16 @@ export const trackFunnelStep = (step: string, metadata?: Record<string, string |
     step_number: funnelSteps[step] || 0,
     ...metadata,
   });
+};
+
+// A scan "starts" at the first hexagon interaction, so it can be told apart from a bare page load (MPC-7376).
+// Fires once per page session.
+let scanStartedTracked = false;
+
+export const trackScanStarted = () => {
+  if (scanStartedTracked) return;
+  scanStartedTracked = true;
+  attributedEvent('scan_started', {});
 };
 
 // Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
@@ -424,18 +443,18 @@ export const trackAIAccessCheckCta = (
 };
 
 export const trackAIAccessCheckSignup = (params?: Record<string, string>) => {
-  trackEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
+  attributedEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
   // GA4 recommended event so the signup can be marked as a key event
-  trackEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
+  attributedEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
 };
 
 // ---------------------------------------------------------------------------
 // Newsletter signup (MPC-6977 tracking audit)
 // ---------------------------------------------------------------------------
 export const trackNewsletterSignup = (params?: Record<string, string>) => {
-  trackEvent('newsletter_signup', { form: 'newsletter', ...params });
+  attributedEvent('newsletter_signup', { form: 'newsletter', ...params });
   // GA4 recommended event so the signup can be marked as a key event
-  trackEvent('generate_lead', { method: 'newsletter', ...params });
+  attributedEvent('generate_lead', { method: 'newsletter', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -443,13 +462,13 @@ export const trackNewsletterSignup = (params?: Record<string, string>) => {
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackBusinessLead = (params?: Record<string, string>) => {
-  trackEvent('business_audit_request', { form: 'business_inquiry', ...params });
-  trackEvent('generate_lead', { method: 'business_inquiry', ...params });
+  attributedEvent('business_audit_request', { form: 'business_inquiry', ...params });
+  attributedEvent('generate_lead', { method: 'business_inquiry', ...params });
 };
 
 export const trackEnterpriseLead = (params?: Record<string, string>) => {
-  trackEvent('enterprise_demo_request', { form: 'enterprise_demo', ...params });
-  trackEvent('generate_lead', { method: 'enterprise_demo', ...params });
+  attributedEvent('enterprise_demo_request', { form: 'enterprise_demo', ...params });
+  attributedEvent('generate_lead', { method: 'enterprise_demo', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -457,8 +476,8 @@ export const trackEnterpriseLead = (params?: Record<string, string>) => {
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackStartSignup = (params?: Record<string, string>) => {
-  trackEvent('start_scan_signup', { form: 'start_scan', ...params });
-  trackEvent('generate_lead', { method: 'start_scan', ...params });
+  attributedEvent('start_scan_signup', { form: 'start_scan', ...params });
+  attributedEvent('generate_lead', { method: 'start_scan', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -466,8 +485,8 @@ export const trackStartSignup = (params?: Record<string, string>) => {
 // confirmed successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackAliceHDWaitlistSignup = (params?: Record<string, string>) => {
-  trackEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
-  trackEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
+  attributedEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
+  attributedEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -534,4 +553,16 @@ export const trackBlogScrollDepth = (postSlug: string, percentScrolled: number) 
 export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destination: string) => {
   trackActivity();
   attributedEvent('blog_cta_click', { post_slug: postSlug, cta_location: ctaLocation, destination });
+};
+
+// ---------------------------------------------------------------------------
+// Pricing page (MPC-7376). No checkout exists yet, so plan buttons are the conversion signal.
+// ---------------------------------------------------------------------------
+export const trackPricingView = () => {
+  trackEvent('pricing_view');
+};
+
+export const trackPricingPlanClick = (plan: string, destination: string) => {
+  trackActivity();
+  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination });
 };

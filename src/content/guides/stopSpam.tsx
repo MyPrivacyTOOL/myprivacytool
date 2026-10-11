@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { blogCtaHref } from "@/lib/blogTracking";
 
 export const sections = [
   { id: "why-you-get-spam", title: "Why you keep getting spam calls, texts and emails" },
@@ -98,7 +99,7 @@ const Content = () => (
       broker, the leaked database and the dialer keep supplying new senders. To make a lasting difference, you need to
       reduce the number of places your details sit, as well as filter what still gets through. If you want to see how
       exposed you are right now, you can{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=stop-spam-calls-texts-and-emails">run a free scan with MyPrivacyTOOL</Link>{" "}
+      <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>run a free scan with MyPrivacyTOOL</Link>{" "}
       to check where your phone number and email may appear in broker listings and public sources.
     </p>
 
@@ -294,7 +295,7 @@ const Content = () => (
         guide on{" "}
         <Link to="/blog/remove-personal-information-from-internet">removing personal information from the internet</Link>{" "}
         explains the process. You can also{" "}
-        <Link to="/scan?utm_source=blog&utm_medium=stop-spam-calls-texts-and-emails">start with a free scan</Link> to
+        <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>start with a free scan</Link> to
         see where your details appear, and use removal to cut the source rather than chasing each sender.
       </li>
       <li>
@@ -625,7 +626,7 @@ const Content = () => (
       <li>Use an alias or a separate address for new sign-ups, and skip optional phone number fields.</li>
       <li>
         Re-check where your details appear. Broker listings can reappear, so an occasional{" "}
-        <Link to="/scan?utm_source=blog&utm_medium=stop-spam-calls-texts-and-emails">free scan</Link> is a sensible
+        <Link to={blogCtaHref("stop-spam-calls-texts-and-emails")}>free scan</Link> is a sensible
         habit.
       </li>
       <li>Report anything new and suspicious rather than only deleting it.</li>
