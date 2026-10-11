@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
+import ScanSavingNotice from '@/components/ScanSavingNotice';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
@@ -285,6 +286,7 @@ const Index = () => {
           ) : (
             <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
           )}
+          <ScanSavingNotice variant="scan" className="mt-3 text-center" />
         </section>
 
         {/* MPC-7446: Hong Kong visitors only; hidden until the /HongKongSpam launch flag is on */}

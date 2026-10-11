@@ -13,7 +13,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 30 September 2026
+              Last updated: 11 October 2026
             </p>
 
             <section className="mb-8">
@@ -51,11 +51,13 @@ const Privacy = () => {
               </h3>
               <p className="text-muted-foreground">
                 The free scan on our homepage detects device, browser and network
-                characteristics directly in your browser. Those results are shown to
-                you and are not sent to or stored on our servers. We only receive
-                and store information when you take an action that submits it, as
-                described below (for example, entering your email address, messaging
-                our bot, or requesting a scan of a social handle).
+                characteristics directly in your browser and shows them to you.
+                If you accept cookies in our consent banner, the complete result
+                is also saved on our servers when the scan finishes (see 2.3).
+                If you decline, the result stays in your browser and is not
+                saved. Other information reaches us only when you submit it, as
+                described below (for example, entering your email address,
+                messaging our bot, or requesting a scan of a social handle).
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
@@ -147,6 +149,78 @@ const Privacy = () => {
                   derived from IP address (not precise location)
                 </li>
               </ul>
+
+              <h3 id="saved-scans" className="mt-6 text-xl font-semibold text-foreground">
+                2.3 Saved Scans (With or Without a Contact)
+              </h3>
+              <p className="text-muted-foreground">
+                If you accept cookies, every completed web scan is saved in full
+                under a random scan number, even if you never give us your email
+                or any other contact. We do this so we can see where visitors
+                drop out and fix the process.
+              </p>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground">
+                <li>
+                  <strong>What is saved:</strong> for each result the scan
+                  shows (up to 54), its name, the value your browser reported,
+                  our confidence and risk rating, and whether it was confirmed.
+                  These values can include your IP address (when your browser
+                  reveals it), device and browser details, language and time
+                  zone, screen and hardware details, and browser fingerprint
+                  values. Some values are estimates and are labelled as such.
+                </li>
+                <li>
+                  <strong>What is not saved with it:</strong> your name, your
+                  email address or any other contact. We do not attach the IP
+                  address your connection used to reach our server to the saved
+                  scan, but IP addresses your browser reports as part of the
+                  results are saved.
+                </li>
+                <li>
+                  <strong>If you later give us a contact:</strong> we link your
+                  contact to the saved scan, so the scan then becomes personal
+                  data about you. A different device or browser starts a new
+                  scan.
+                </li>
+                <li>
+                  <strong>Declining:</strong> if you decline or withdraw
+                  consent in the banner, scans are not saved.
+                </li>
+                <li>
+                  <strong>Access:</strong> the saved scans are readable by us
+                  and by service providers that host our database. They are not
+                  published or sold.
+                </li>
+              </ul>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                2.4 Checks on Your Email Address
+              </h3>
+              <p className="text-muted-foreground">
+                When you ask for a report, we run checks on the email address you
+                give us. Two outside services receive part of it:
+              </p>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground">
+                <li>
+                  <strong>Cloudflare (public DNS lookup):</strong> receives the
+                  domain only, the part after the @, to find out which company
+                  hosts your mail.
+                </li>
+                <li>
+                  <strong>Gravatar (Automattic):</strong> receives a SHA-256 hash
+                  of your lower-cased email address, to see whether a public
+                  avatar or profile is attached to it. A hash is not anonymous:
+                  anyone who already knows your address can compute the same
+                  hash.
+                </li>
+              </ul>
+              <p className="mt-2 text-muted-foreground">
+                The address itself is stored with our database provider
+                (Supabase) and sent to you by our email provider (Resend). We do
+                not currently send your address to any data-breach service. If we
+                add one, we will update this policy before we do. A failed check
+                is shown as "not checked" and never delays your report.
+              </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 2.3 Information from Third Parties
@@ -263,7 +337,9 @@ const Privacy = () => {
                   <strong>Service Providers:</strong> Payment processors (Stripe),
                   hosting and edge infrastructure (Cloudflare), databases (Supabase,
                   Google Cloud), CRM and email (HubSpot), messaging platforms
-                  (Telegram), transactional email (Resend), internal task and
+                  (Telegram), transactional email (Resend), public DNS lookup
+                  (Cloudflare) and avatar lookup (Gravatar) for the email
+                  checks described in 2.4, internal task and
                   notification tools (Notion, Slack), consent management
                   (Consentmanager), and analytics (Google Analytics 4)
                 </li>
@@ -302,6 +378,13 @@ const Privacy = () => {
                   historical comparison and reporting
                 </li>
                 <li>
+                  <strong>Saved Scans:</strong> Kept for 12 months from the day
+                  the scan was saved, then deleted. A scan with no contact
+                  cannot be traced back to you, so it is deleted only when this
+                  period ends. If you gave us a contact, we also delete the
+                  linked scan when you ask us to delete your data
+                </li>
+                <li>
                   <strong>Messaging Conversation State:</strong> Retained for 7
                   days of inactivity in our messaging system; the CRM record
                   remains until you ask us to delete it or unsubscribe
@@ -327,7 +410,15 @@ const Privacy = () => {
               </ul>
               <p className="mt-4 text-muted-foreground">
                 You may request deletion of your data at any time, subject to
-                legal retention requirements.
+                legal retention requirements. To ask, email{" "}
+                <a
+                  href="mailto:privacy@myprivacytool.io"
+                  className="text-brand underline hover:text-foreground"
+                >
+                  privacy@myprivacytool.io
+                </a>{" "}
+                from the address you gave us. We reply within 30 days. We can
+                only find saved scans that are linked to a contact.
               </p>
             </section>
 

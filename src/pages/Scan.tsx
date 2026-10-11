@@ -6,6 +6,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import ScanSavingNotice from "@/components/ScanSavingNotice";
 import { trackStartSignup } from "@/lib/analytics";
 import { getScanNumber } from "@/lib/webScan";
 
@@ -97,6 +98,7 @@ const Scan = () => {
         {submitting ? "Sending…" : "Check My Exposure →"}
       </Button>
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      <ScanSavingNotice variant="contact" />
     </form>
   );
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Shield, Lock, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
+import ScanSavingNotice from '@/components/ScanSavingNotice';
 
 interface EmailCaptureModalProps {
   riskScore: number;
@@ -197,6 +198,7 @@ export default function EmailCaptureModal({
                 />
                 <span>Email me my fix guide and Privacy Check, the monthly newsletter. I can unsubscribe at any time.</span>
               </label>
+              <ScanSavingNotice variant="contact" />
 
               <Button
                 type="submit"
