@@ -424,18 +424,18 @@ export const trackAIAccessCheckCta = (
 };
 
 export const trackAIAccessCheckSignup = (params?: Record<string, string>) => {
-  trackEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
+  attributedEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
   // GA4 recommended event so the signup can be marked as a key event
-  trackEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
+  attributedEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
 };
 
 // ---------------------------------------------------------------------------
 // Newsletter signup (MPC-6977 tracking audit)
 // ---------------------------------------------------------------------------
 export const trackNewsletterSignup = (params?: Record<string, string>) => {
-  trackEvent('newsletter_signup', { form: 'newsletter', ...params });
+  attributedEvent('newsletter_signup', { form: 'newsletter', ...params });
   // GA4 recommended event so the signup can be marked as a key event
-  trackEvent('generate_lead', { method: 'newsletter', ...params });
+  attributedEvent('generate_lead', { method: 'newsletter', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -443,13 +443,13 @@ export const trackNewsletterSignup = (params?: Record<string, string>) => {
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackBusinessLead = (params?: Record<string, string>) => {
-  trackEvent('business_audit_request', { form: 'business_inquiry', ...params });
-  trackEvent('generate_lead', { method: 'business_inquiry', ...params });
+  attributedEvent('business_audit_request', { form: 'business_inquiry', ...params });
+  attributedEvent('generate_lead', { method: 'business_inquiry', ...params });
 };
 
 export const trackEnterpriseLead = (params?: Record<string, string>) => {
-  trackEvent('enterprise_demo_request', { form: 'enterprise_demo', ...params });
-  trackEvent('generate_lead', { method: 'enterprise_demo', ...params });
+  attributedEvent('enterprise_demo_request', { form: 'enterprise_demo', ...params });
+  attributedEvent('generate_lead', { method: 'enterprise_demo', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -457,8 +457,8 @@ export const trackEnterpriseLead = (params?: Record<string, string>) => {
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackStartSignup = (params?: Record<string, string>) => {
-  trackEvent('start_scan_signup', { form: 'start_scan', ...params });
-  trackEvent('generate_lead', { method: 'start_scan', ...params });
+  attributedEvent('start_scan_signup', { form: 'start_scan', ...params });
+  attributedEvent('generate_lead', { method: 'start_scan', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -466,8 +466,8 @@ export const trackStartSignup = (params?: Record<string, string>) => {
 // confirmed successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackAliceHDWaitlistSignup = (params?: Record<string, string>) => {
-  trackEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
-  trackEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
+  attributedEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
+  attributedEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
 };
 
 // ---------------------------------------------------------------------------
