@@ -15,9 +15,13 @@ plaintext in `WEBSITE_CONTROL.md`. Findings:
 | `sb_secret_…`, `sbp_…`, `cfut_…`, service-role JWTs (`eyJhbGciOi…`) added anywhere in `myprivacytool` history | None (only truncated placeholders in `workers/core-brain/.env.example`) |
 | `*_API_TOKEN` / `*_SERVICE_ROLE_KEY` / `*_SECRET_KEY` assigned a 30+ char literal in `myprivacytool` history | None |
 
-No history rewrite was done because there was nothing to scrub. If `WEBSITE_CONTROL.md` lives somewhere else (a
-Notion page, Google Drive, a local file, a gist), the values in it should still be treated as exposed and **rotated in
-the Cloudflare and Supabase dashboards**. After rotating, update the destinations listed in section 4.
+No history rewrite was done because there was nothing to scrub. The leaked file is
+`agents/myprivacytool/WEBSITE_CONTROL.md` in the agent workspace, outside this repo (Notion: MyPrivacyTOOL →
+STANDING_OBJECTIVES, O2). Status as recorded there:
+
+- **Cloudflare token:** closed. It was redacted in that repo (PR #598), and Cloudflare reported it invalid on 2026-08-30.
+- **Supabase secret key:** **not yet rotated** (last recorded 2026-10-09). Rotate it in the Supabase dashboard, then
+  update every destination in section 4. Tracked in Notion as MPC-7385-F5.
 
 Guardrails: `.gitignore` excludes `.env`, `.env.*` and `.dev.vars*`. `scripts/ci/scan-secrets.mjs` runs as a
 blocking step in the `ci.yml` lint job, so a committed key fails the PR. Its allowlist skips a PEM header followed by
