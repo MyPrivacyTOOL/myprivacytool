@@ -1,5 +1,6 @@
 // HubSpot daily collector (MPC-7379). Counts and aggregates only: no contact emails, names, phone numbers or any
-// other personal data is ever read into the payload, the logs or the error text.
+// other personal data is ever stored in the payload, the logs or the error text. (The form-submissions endpoint returns
+// submitted values; they pass through memory for counting only and are dropped.)
 //
 // Safety rails:
 //  * Portal guard. Before any CRM read the collector asks HubSpot which portal the token belongs to and compares it
@@ -16,6 +17,7 @@ const API = 'https://api.hubapi.com';
 const MAX_DEAL_PAGES = 50; // 100 deals per page; beyond this the pull is reported as an error, not silently truncated
 const SEARCH_PATH = /^\/crm\/v3\/objects\/(contacts|deals)\/search$/;
 const NO_STAGE = '(none)';
+const MAX_FORM_PAGES = 20; // 50 submissions per page per form; beyond this the form count is reported as an error, not truncated
 
 const sleep = (ms) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
 
@@ -30,7 +32,7 @@ export async function hubspotRead(env, method, path, label, body) {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 429 && attempt === 0) { await sleep(Number(env.HUBSPOT_PAUSE_MS ?? 1000)); continue; }
-    if (!res.ok) throw new Error(`hubspot ${label}: HTTP ${res.status}`);
+    if (!res.ok) throw Object.assign(new Error(`hubspot ${label}: HTTP ${res.status}`), { status: res.status });
     return res.json();
   }
 }
@@ -89,6 +91,57 @@ async function collectDeals(env) {
   return { total: count, amount_sum: amountSum, by_stage: [...groups.values()] };
 }
 
+// Form submissions that landed in the window, counted across all forms. The submissions endpoint returns the submitted
+// values (personal data): each page is read, only submittedAt is looked at, and nothing else is kept or logged.
+// Needs scope `forms`; a 403 is reported by the caller as a scope warning, not an error.
+async function collectForms(env, { start, end }) {
+  await sleep(Number(env.HUBSPOT_PAUSE_MS ?? 250));
+  const list = await hubspotRead(env, 'GET', '/marketing/v3/forms/?limit=100', 'forms list');
+  let submissions = 0; let formsCounted = 0;
+  for (const form of list.results ?? []) {
+    if (!/^[\w-]+$/.test(String(form.id))) continue;
+    formsCounted += 1;
+    let after;
+    for (let page = 0; ; page++) {
+      if (page >= MAX_FORM_PAGES) throw new Error(`hubspot form submissions: more than ${MAX_FORM_PAGES * 50} submissions on one form, not collected`);
+      await sleep(Number(env.HUBSPOT_PAUSE_MS ?? 250));
+      const qs = new URLSearchParams({ limit: '50' });
+      if (after) qs.set('after', after);
+      const out = await hubspotRead(env, 'GET', `/form-integrations/v1/submissions/forms/${form.id}?${qs}`, 'form submissions');
+      let reachedOlder = false;
+      for (const r of out.results ?? []) { // newest first
+        const t = Number(r.submittedAt);
+        if (t >= end.getTime()) continue;
+        if (t < start.getTime()) { reachedOlder = true; break; }
+        submissions += 1;
+      }
+      after = out.paging?.next?.after;
+      if (reachedOlder || !after) break;
+    }
+  }
+  return { submissions_on_day: submissions, forms_counted: formsCounted };
+}
+
+// Marketing email engagement for the window (aggregate counters only). All null when no marketing email went out.
+// Needs scope `content` (marketing email statistics); a 403 is reported by the caller as a scope warning.
+async function collectEmail(env, { start, end }) {
+  await sleep(Number(env.HUBSPOT_PAUSE_MS ?? 250));
+  const qs = new URLSearchParams({ startTimestamp: start.toISOString(), endTimestamp: end.toISOString() });
+  const out = await hubspotRead(env, 'GET', `/marketing/v3/emails/statistics/list?${qs}`, 'email statistics');
+  const c = out?.aggregate?.counters;
+  const num = (k) => (c && Number.isFinite(Number(c[k])) ? Number(c[k]) : null);
+  if (!c || !num('sent')) return { sent: null, delivered: null, opens: null, clicks: null, bounces: null, unsubscribes: null };
+  return { sent: num('sent'), delivered: num('delivered'), opens: num('open'), clicks: num('click'), bounces: num('bounce'), unsubscribes: num('unsubscribed') };
+}
+
+// Missing scope (403) => null + warning, so a token without the extra scopes still yields a healthy row.
+async function optional(name, scope, payload, failures, fn) {
+  try { payload[name] = await fn(); } catch (e) {
+    payload[name] = null;
+    if (e.status === 403) { (payload.scope_warnings ??= []).push(`${name}: token lacks scope ${scope}`); console.warn(`hubspot ${name}: token lacks scope ${scope}, skipped`); } else failures.push(e.message);
+  }
+}
+
 export default {
   source: 'hubspot',
   report: 'portal_daily',
@@ -96,7 +149,7 @@ export default {
     // "That day" = the Hong Kong day before this run; period_start/end are that day's instants.
     const win = previousHkDay(now);
     const period = { period_start: win.start.toISOString(), period_end: win.end.toISOString() };
-    const blank = { day: win.day, portal_id: HUBSPOT_PORTAL_ID, contacts: null, deals: null };
+    const blank = { day: win.day, portal_id: HUBSPOT_PORTAL_ID, contacts: null, deals: null, forms: null, email: null };
 
     if (!env.HUBSPOT_READONLY_TOKEN) return { ...period, payload: { ...blank, guard: { ok: false } }, error: 'HUBSPOT_READONLY_TOKEN not set' };
 
@@ -119,6 +172,8 @@ export default {
     const failures = [];
     try { payload.contacts = await collectContacts(env, win); } catch (e) { failures.push(e.message); }
     try { payload.deals = await collectDeals(env); } catch (e) { failures.push(e.message); }
+    await optional('forms', 'forms', payload, failures, () => collectForms(env, win));
+    await optional('email', 'content', payload, failures, () => collectEmail(env, win));
     return { ...period, payload, error: failures.length ? failures.join('; ') : null };
   },
 };
