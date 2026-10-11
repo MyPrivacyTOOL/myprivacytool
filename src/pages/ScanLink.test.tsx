@@ -10,7 +10,7 @@ beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollT
 afterEach(() => vi.unstubAllGlobals());
 
 async function submit() {
-  const f = vi.fn(async () => jsonResponse({}));
+  const f = vi.fn(async (..._args: unknown[]) => jsonResponse({}));
   vi.stubGlobal("fetch", f);
   const user = userEvent.setup();
   renderPage(<Scan />);
@@ -18,7 +18,7 @@ async function submit() {
   await user.click(screen.getAllByRole("checkbox")[0]);
   await user.click(screen.getAllByRole("button", { name: /check my exposure/i })[0]);
   await screen.findByRole("status");
-  const call = f.mock.calls.find((c) => String(c[0]).endsWith("/api/scan")) as unknown as [string, RequestInit];
+  const call = f.mock.calls.find((c: unknown[]) => String(c[0]).endsWith("/api/scan")) as unknown as [string, RequestInit];
   return { call, body: JSON.parse(call[1].body as string) };
 }
 

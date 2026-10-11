@@ -18,7 +18,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); delete (window as u
 describe("saveCompletedScan", () => {
   it("saves a completed scan and keeps the scan number for the visit", async () => {
     vi.stubEnv("VITE_SAVE_WEB_SCANS", "true"); setConsent(true);
-    const f = vi.fn(async () => ok({ saved: true, scan_number: NUMBER }));
+    const f = vi.fn(async (..._args: unknown[]) => ok({ saved: true, scan_number: NUMBER }));
     vi.stubGlobal("fetch", f);
     expect(await saveCompletedScan(hex())).toBe(NUMBER);
     expect(getScanNumber()).toBe(NUMBER);
