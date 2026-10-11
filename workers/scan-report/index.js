@@ -1,3 +1,4 @@
+import { runEmailHexagons, emailHexagonSignalRows } from './lib/emailHexagons.js';
 import { db } from './lib/supabase.js';
 import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity } from './lib/hubspot.js';
@@ -11,7 +12,7 @@ import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUr
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
 const MAX_ATTEMPTS = 5;
-const STALE_CLAIM_MS = 15 * 60 * 1000;
+const STALE_CLAIM_MS = 30 * 60 * 1000;   // MPC-7406: a scan 'processing' longer than this was abandoned (Worker timeout/crash) and goes back to pending
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const clip = (v, n) => String(v ?? '').slice(0, n);
 // Per-IP limit (wrangler.toml [[unsafe.bindings]] type "ratelimit"); fails open if the binding is absent or errors.
@@ -69,7 +70,7 @@ export default {
     // slots (01:05 to 04:05 UTC) that tick runs only the HK job, to keep within the 50-subrequest limit; the report and follow-up jobs
     // run on every other tick, so a report waits at most 5 minutes longer.
     if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
-    else ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env)));
+    else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
   },
 };
 
@@ -157,11 +158,24 @@ async function nextReportJobs(env, sb, limit) {
   }
 }
 
+// MPC-7406: a Worker killed mid-scan never reaches its catch block, leaving the row 'processing' forever. Put such rows
+// back to 'pending' (retry) or, once attempts are used up, to 'failed' with the reason, so none is stuck silently.
+// Uses the same atomic claim filter (status + claimed_at) as the claim, so a live run's row is never touched.
+async function resetStaleClaims(sb) {
+  const stale = encodeURIComponent(new Date(Date.now() - STALE_CLAIM_MS).toISOString());
+  const base = `scans?report_status=eq.processing&report_claimed_at=lt.${stale}`;
+  const exhausted = await sb.patch(`${base}&report_attempts=gte.${MAX_ATTEMPTS}`, { report_status: 'failed', report_last_error: 'stale: stuck in processing past the retry limit' });
+  const retried = await sb.patch(`${base}&report_attempts=lt.${MAX_ATTEMPTS}`, { report_status: 'pending', report_last_error: 'stale: processing timed out, reset for retry' });
+  if (exhausted.length || retried.length) console.warn(`scan queue: reset ${retried.length} stale scan(s) to pending, failed ${exhausted.length} past the retry limit`);
+}
+
 export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return { skipped: 'no supabase key' };
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.error('scan queue: SUPABASE_SERVICE_ROLE_KEY is not set, nothing can be processed'); return { skipped: 'no supabase key' }; }
   const sb = db(env, fetchImpl);
+  await resetStaleClaims(sb).catch((e) => console.error('scan queue: stale reset failed:', String(e)));
   const { queue, held, cancelled } = await nextReportJobs(env, sb, limit);
   const out = { sent: 0, held, failed: 0, cancelled: cancelled.length };
+  console.log(`scan queue: ${queue.length} to process, ${held} held by allowlist, ${cancelled.length} cancelled`);
   if (!env.HIBP_API_KEY) console.error(`HIBP_API_KEY is not set: breach checks skipped (${env.ALLOW_PARTIAL_REPORT === 'true' ? 'reports go out with breaches "not yet checked"' : 'reports are held'})`);
   for (const id of cancelled) {   // take them out of the queue for good: nothing is sent and the reason is on the row
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
@@ -170,15 +184,16 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
     try {
       if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl);     // catch up a missed confirmation
       const claimed = await sb.patch(`scans?id=eq.${job.id}&report_status=eq.${job.report_status}`, { report_status: 'processing', report_claimed_at: new Date().toISOString(), report_attempts: job.report_attempts + 1 });
-      if (!claimed.length) continue;                                                                    // another run took it
+      if (!claimed.length) { console.log(`scan ${job.id}: already claimed by another run, skipping`); continue; }   // another run took it
+      console.log(`scan ${job.id}: processing (attempt ${job.report_attempts + 1}/${MAX_ATTEMPTS})`);
       const r = await processScan(env, sb, job, fetchImpl);
-      if (r.held) { await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
-      else out.sent++;
+      if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
+      else { out.sent++; console.log(`scan ${job.id}: sent`); }
     } catch (e) {
       out.failed++;
       const attempts = job.report_attempts + 1;
       console.error(`report failed for scan ${job.id} (attempt ${attempts}):`, String(e));
-      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch(() => {});
+      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch((e2) => console.error(`scan ${job.id}: could not record failure (row may stay processing until the stale reset):`, String(e2)));
     }
   }
   const overdue = queue.filter((j) => new Date(j.report_due_at) < new Date()).length;
@@ -192,6 +207,7 @@ async function processScan(env, sb, job, fetchImpl) {
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
+  const emailHex = await runEmailHexagons(email, env, fetchImpl).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
 
   const breaches = hibp.status === 'checked' ? hibp.breaches : [];
   const checked = new Set(hibp.status === 'checked' ? ['email'] : []);
@@ -202,6 +218,7 @@ async function processScan(env, sb, job, fetchImpl) {
     ...breaches.map((b) => ({ scan_id: job.id, category: 'email', signal_type: `breach:${clip(b.Name, 80)}`, severity: breachRisk(b) >= 8 ? 'high' : 'medium', data_source: 'Have I Been Pwned', check_status: 'found', details: clip(`${b.BreachDate || ''} exposed: ${(b.DataClasses || []).join(', ')}`, 500), removal_status: 'manual_only' })),
     ...(hibp.status === 'checked' && breaches.length === 0 ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:none', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'clear' }] : []),
     ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
+    ...emailHexagonSignalRows(job.id, emailHex),
     ...brokers.map((b) => ({ scan_id: job.id, category: 'broker', signal_type: `${b.key}_profile`, severity: 'high', data_source: b.name, check_status: 'not_checked', details: clip(b.reason, 300), removal_status: 'manual_only', removal_url: b.removal_url, removal_instructions: b.steps ? b.steps.join('\n') : null })),
   ];
   // PostgREST bulk insert rejects rows with different key sets (PGRST102), so give every signal row the same columns.
