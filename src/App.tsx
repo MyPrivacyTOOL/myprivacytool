@@ -32,6 +32,7 @@ const OptOutGuide = lazy(() => import("./pages/OptOutGuide"));
 const Journey = lazy(() => import("./pages/Journey"));
 const AmIExposed = lazy(() => import("./pages/AmIExposed"));
 const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
+const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // MPC-7200: every route except the home page is code-split so the first paint only downloads what it renders.
@@ -82,6 +83,11 @@ const App = () => (
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
             <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />
             <Route path="/guides/stop-spam" element={<Navigate to="/blog/stop-spam-calls-texts-and-emails" replace />} />
+            {/* MPC-7446: bilingual HK Do-not-call page. Route matching ignores case, so /hongkongspam renders the
+                page, which redirects to the canonical /HongKongSpam. Noindex and unlinked until the hkSpam.json flag. */}
+            <Route path="/HongKongSpam" element={<HongKongSpam />} />
+            <Route path="/stop-spam-hk" element={<Navigate to="/HongKongSpam" replace />} />
+            <Route path="/hong-kong-spam" element={<Navigate to="/HongKongSpam" replace />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Route>

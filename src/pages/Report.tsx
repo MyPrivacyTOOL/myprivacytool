@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Search, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
+import HkStopSpamCard from "@/components/HkStopSpamCard";
 import pageMeta from "@/data/pageMeta.json";
 
 const Report = () => {
@@ -78,6 +79,9 @@ const Report = () => {
           And because brokers re-add you within weeks, we scan continuously.
         </p>
       </section>
+
+      {/* MPC-7446: Hong Kong visitors only; hidden until the /HongKongSpam launch flag is on */}
+      <HkStopSpamCard placement="report" />
 
       {/* What's Different */}
       <section className="max-w-3xl mx-auto px-6 mb-16">

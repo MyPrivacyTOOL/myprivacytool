@@ -8,6 +8,7 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { hkSpamPrerenderRoute, readHkSpamConfig } from "./hkSpamFlag.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist");
@@ -49,6 +50,8 @@ function buildRoutes() {
       description: g.summary,
     });
   }
+  // MPC-7446: /HongKongSpam, noindex until the single flag in src/data/hkSpam.json is flipped.
+  routes.push(hkSpamPrerenderRoute(readHkSpamConfig(ROOT), SITE_URL));
   return routes;
 }
 
@@ -63,6 +66,7 @@ function headBlock(r) {
     `<meta name="description" content="${d}" />`,
     `<meta name="robots" content="${r.noindex ? "noindex" : "index, follow"}" />`,
     `<link rel="canonical" href="${url}" />`,
+    ...(r.alternates ?? []).map((a) => `<link rel="alternate" hreflang="${esc(a.hreflang)}" href="${esc(a.href)}" />`),
     `<meta property="og:type" content="${r.type ?? "website"}" />`,
     `<meta property="og:url" content="${url}" />`,
     `<meta property="og:title" content="${t}" />`,
