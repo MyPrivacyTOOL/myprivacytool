@@ -115,16 +115,16 @@ Follow-up to MPC-6545 (not a blocker). Two human checks remain; neither can run 
 | Check | Status | Result / where it lands |
 |---|---|---|
 | GA4 consent gating | Mostly verified 2026-10-11 (merged in #197) | Fresh incognito load, banner untouched: 9 requests only (consentmanager, favicons, local script, font, video); no `googletagmanager.com`, `google-analytics.com` or `hsforms` requests; console clean. After "Accept all": `googletagmanager` (gtag), `collect?v=2&tid=G-1BWMDBJSPL` and the HubSpot form frame (`hsforms`) load. Not yet tested: after "Reject all", and accept-then-reject (expect no further `collect`). |
-| privacy@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | Landing place: TBD |
-| support@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | TBD |
-| dpo@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | TBD |
-| legal@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | TBD |
-| accessibility@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | TBD |
-| scan@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | TBD |
-| chris@myprivacytool.io | Test mail sent 2026-10-10, delivery unconfirmed | TBD |
+| privacy@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| support@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| dpo@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| legal@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| accessibility@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| scan@myprivacytool.io | Confirmed 2026-10-11 (reported by tester; not independently verified) | Receives mail. Landing place: not recorded. |
+| chris@myprivacytool.io | Confirmed 2026-10-11 | Forwards to cransford@gmail.com (mail from testingnt7@gmail.com arrived in that Inbox). |
 
 Notes:
-- Test mails (subject "MPC mailbox test: <name>@ (2026-10-10)") were sent with testingnt7@gmail.com on CC. Check Cloudflare Email Routing for the myprivacytool.io zone for the rule and destination of each address.
+- Mailbox check run 2026-10-10/11. Test mails (subject "MPC mailbox test: <name>@ (2026-10-10)") were sent with testingnt7@gmail.com on CC. Check Cloudflare Email Routing for the myprivacytool.io zone for the rule and destination of each address.
 - `index.html` loads gtag.js directly with no Consent Mode default, so the Consentmanager autoblocking script is the only gate. If the browser test shows early requests, add `gtag('consent','default',{ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500})` before `gtag('js', ...)` and grant via a Consentmanager consent callback (or its built-in Google Consent Mode setting). Not applied: an unverified change could silence analytics after consent.
 - ipify/ipapi pre-consent calls remain disclosure-only (Chris, 2026-10-07).
 - 2026-10-10 evidence so far (incognito, narrow responsive viewport, Keep log on, no clean first-load capture): GA4 `a?id=G-1BWMDBJSPL` and `collect?v=2` requests exist in the log (timing vs consent unknown), and the HubSpot forms embed (`src/pages/Index.tsx`) loads and pings (`ipl`, `tracking`, `rhumb`) with no consent check. Note: the DevTools Network filter treats `|` literally; use `/google|gtm|collect/` for a regex. Superseded by the 2026-10-11 result in the table above.
