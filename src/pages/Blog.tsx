@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import blogPosts from '@/data/blogPosts.json';
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
-import { trackBlogListView, trackBlogPostClick } from "@/lib/analytics";
+import { trackBlogCtaClick, trackBlogListView, trackBlogPostClick } from "@/lib/analytics";
+import { blogCtaHref } from "@/lib/blogTracking";
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-secondary text-foreground",
@@ -124,8 +125,17 @@ export default function Blog() {
           </div>
         )}
 
+        {/* Scan CTA */}
+        <div className="mt-16 bg-secondary rounded-lg p-8 border border-border text-center">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Ready to reclaim your privacy?</h2>
+          <p className="mb-4 text-muted-foreground">See where your data is exposed, then take it back.</p>
+          <Button asChild size="lg">
+            <Link to={blogCtaHref("blog-index")} onClick={() => trackBlogCtaClick("blog-index", "blog_index", "/scan")}>Check My Exposure →</Link>
+          </Button>
+        </div>
+
         {/* Newsletter CTA */}
-        <div className="mt-16 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
+        <div className="mt-8 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
           <h2 className="text-2xl font-bold mb-2">Privacy Check</h2>
           <p className="mb-4 text-muted-foreground">Subscribe to Privacy Check, our newsletter, for privacy insights and practical steps you can act on</p>
           <Button asChild size="lg">
