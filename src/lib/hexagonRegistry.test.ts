@@ -1,12 +1,13 @@
 // MPC-7466: keeps the shared hexagon registry in step with the detection code and the website.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { generateHexagons, generateHexagonsAsync, type DeviceData } from './deviceDetection';
 import {
   HEXAGONS, HEXAGON_COUNT, HEXAGON_ALWAYS_COUNT, HEXAGON_CONDITIONAL_COUNT, STATUSES, TRUTH_LEVELS, getHexagon, isKnownHexagonId,
 } from '../../shared/hexagon-registry/registry.js';
 
-const source = readFileSync(new URL('./deviceDetection.ts', import.meta.url), 'utf8');
+const source = readFileSync(resolve(process.cwd(), 'src/lib/deviceDetection.ts'), 'utf8');
 const codeIds = [...source.matchAll(/^\s+id: '([a-z-]+)',$/gm)].map(m => m[1]);
 
 describe('hexagon registry', () => {
