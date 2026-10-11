@@ -49,7 +49,7 @@ payload, 401 bad token, 429 rate limited (`Retry-After: 60`), 503 not configured
    **fails open** when a binding is missing or errors (every caller already holds the shared secret). Counters are kept per
    Cloudflare location, so the limit is approximate. social-listeners acknowledges a 429 (200 to Telegram and X) and drops the
    event instead of answering 502, because platforms retry non-2xx and a retry would only hit the limiter again. Neither the
-   sender id nor the message text is logged. `namespace_id` values are account-unique integers (8601, 8602; mpt-leads uses 7350,
+   sender id nor the message text is logged. To prove it live, run Actions -> "Core Brain rate-limit probe" (manual; about 11 live Qwen calls; the secret stays in repo secrets). It expects 200 for requests 1 to 10, then 429 with `Retry-After: 60`, and a different sender still 200. `namespace_id` values are account-unique integers (8601, 8602; mpt-leads uses 7350,
    scan-report 7351).
 7. **Privacy.** Emails and phone numbers are redacted before text goes to Qwen. Logs carry event metadata only: no message text,
    sender ids or keys (a test enforces it).
