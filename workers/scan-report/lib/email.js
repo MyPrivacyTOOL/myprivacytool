@@ -2,6 +2,8 @@ import { CATEGORIES } from './score.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SITE = 'https://myprivacytool.io';
+// Sign-off for the scan, report and follow-up emails: Alice, the AI guide, not an anonymous team.
+export const SIGN_OFF = ['Alice', 'Your Dedicated MyPrivacyTOOL AI'];
 
 // MPC-7406 follow-up: shared HTML shell for the transactional emails. Table layout with inline styles only (mail apps strip <style>
 // and scripts), 600px max width, system fonts, light/dark safe colours. The plain-text parts are unchanged.
@@ -101,7 +103,7 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     ...Object.values(CATEGORIES).map((c) => `  ${HEX_OFF} ${c.label}`),
     '',
     'Talk soon,',
-    'The MyPrivacyTOOL team',
+    ...SIGN_OFF,
     '',
     `${CONTACT}  We never sell your data.`,
     ...(unsubscribeLink ? [`Unsubscribe from further emails: ${unsubscribeLink}`] : []),
@@ -123,7 +125,7 @@ ${para('Our goal is simple: First we &ldquo;mirror&rdquo; what you look like fro
 ${para('This email is now our open channel. You can reply anytime with a question, or simply click any of the hexagons below, and we&rsquo;ll continue the conversation right here.')}
 ${para('<strong>Your hexagons</strong> &mdash; each one fills in when we find out a bit of data about you.')}
 ${honeycomb(Object.entries(CATEGORIES).map(([key, c]) => hexTile({ key, label: c.label, href: `mailto:${CONTACT}?subject=${encodeURIComponent(`Hexagon: ${c.label}`)}&body=${encodeURIComponent(`Hi, tell me more about: ${c.label}`)}` })))}
-${para('Talk soon,<br>The MyPrivacyTOOL team')}`, unsubscribeLink);
+${para(`Talk soon,<br><strong>${SIGN_OFF[0]}</strong><br>${SIGN_OFF[1]}`)}`, unsubscribeLink);
   return tagged('scan-confirmation', { subject, text, html });
 }
 
