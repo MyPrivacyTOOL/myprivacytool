@@ -72,7 +72,9 @@ describe("auth and validation", () => {
 
   it("GET /health reports configuration as a boolean; unknown paths 404", async () => {
     const ok = await worker.fetch(new Request("https://brain.test/health"), env);
-    expect(await ok.json()).toEqual({ ok: true, worker: "core-brain", configured: true });
+    expect(await ok.json()).toEqual({ ok: true, worker: "core-brain", configured: true, rate_limit: { sender: false, global: false } });
+    const limited = { ...env, RATE_LIMITER: { limit: async () => ({ success: true }) } };
+    expect(((await (await worker.fetch(new Request("https://brain.test/health"), limited)).json()) as any).rate_limit).toEqual({ sender: true, global: false });
     const bare = await worker.fetch(new Request("https://brain.test/health"), {} as any);
     expect((await bare.json() as any).configured).toBe(false);
     expect((await worker.fetch(new Request("https://brain.test/x"), env)).status).toBe(404);

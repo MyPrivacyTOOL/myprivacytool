@@ -11,9 +11,10 @@ const SECRET = "s3cr3t-value-for-test";
 const resp = (status, json, headers = {}) => ({ status, ok: status < 400, json: async () => json ?? {}, headers: { get: (k) => headers[k.toLowerCase()] ?? null } });
 
 // Fake core-brain: allows `max` requests per sender, then answers 429 like the real Worker.
-const brain = ({ max = LIMIT, retryAfter = "60", code = "rate_limited" } = {}) => {
+const brain = ({ max = LIMIT, retryAfter = "60", code = "rate_limited", health = { sender: true, global: true } } = {}) => {
   const seen = new Map(); const senders = [];
-  const f = async (_u, o) => {
+  const f = async (u, o) => {
+    if (String(u).endsWith("/health")) return resp(200, health === null ? { ok: true } : { ok: true, rate_limit: health });
     const sender = JSON.parse(o.body).sender_id; senders.push(sender);
     const n = (seen.get(sender) ?? 0) + 1; seen.set(sender, n);
     return n <= max ? resp(200, { intent: "scan" }) : resp(429, { error: { code } }, { "retry-after": retryAfter });
@@ -30,6 +31,13 @@ describe("core-brain-rate-limit-probe", () => {
     expect(rs.every((r) => r.ok)).toBe(true);
     expect(b.senders.filter((s) => s === "rl-probe-111")).toHaveLength(15);
     expect(b.senders.at(-1)).toBe("rl-probe-111-other");
+  });
+  it("names a missing binding: health says the sender limiter is not attached", async () => {
+    const b = brain({ max: 999, health: { sender: false, global: false } });
+    expect(names(await probe("https://b", SECRET, { f: b.f }))).toContain("RATE_LIMITER binding is attached on the live Worker");
+  });
+  it("does not fail the binding check on an older Worker whose health has no rate_limit field", async () => {
+    expect(names(await probe("https://b", SECRET, { f: brain({ health: null }).f }))).toEqual([]);
   });
   it("fails when the limit is looser (first 429 later than request 11)", async () => {
     expect(names(await probe("https://b", SECRET, { f: brain({ max: 12 }).f }))).toContain("request 11 -> 429");
