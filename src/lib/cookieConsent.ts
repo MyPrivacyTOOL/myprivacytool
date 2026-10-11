@@ -34,6 +34,29 @@ export function hasConsent(): boolean {
 }
 
 /**
+ * MPC-7488: the consentmanager.net purpose that covers saving the visitor's scan. Its id (for a custom purpose, "c" plus the
+ * number the consent tool shows, e.g. "c12") is set at build time in VITE_SCAN_SAVE_CONSENT_PURPOSE. Until Chris creates the
+ * purpose and sets the id, this is empty and no scan is saved for anyone.
+ */
+export const scanSavePurposeId = (): string => String(import.meta.env.VITE_SCAN_SAVE_CONSENT_PURPOSE ?? "").trim();
+
+/**
+ * True only when the visitor has made a choice AND accepted the specific purpose that covers saving their scan. Accepting any
+ * other purpose (analytics, marketing...) is not enough. False when the purpose id is not configured, the CMP is missing,
+ * still loading or errors.
+ */
+export function hasScanSaveConsent(): boolean {
+  try {
+    const id = scanSavePurposeId();
+    if (!id || typeof window === "undefined" || typeof window.__cmp !== "function") return false;
+    const data = (window.__cmp as unknown as (c: string) => CmpData | undefined)("getCMPData");
+    return !!data?.userChoiceExists && data.purposeConsents?.[id] === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Calls `cb` whenever the visitor saves a consent choice. Returns an
  * unsubscribe function. A no-op if the CMP has not loaded.
  */

@@ -7,7 +7,7 @@ import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackStartSignup } from "@/lib/analytics";
-import { getScanNumber } from "@/lib/webScan";
+import { visitScanNumber } from "@/lib/webScan";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -24,9 +24,9 @@ const SCAN_API_URL =
 async function requestScanReport(email: string): Promise<void> {
   if (!SCAN_API_URL) return;
   const q = new URLSearchParams(window.location.search);
-  // MPC-7465: the anonymous scan number from this visit's home-page scan. A visitor who arrives here without one (a direct
+  // MPC-7465: the scan number from this visit's home-page scan. A visitor who arrives here without one (a direct
   // link, a blog post, a new tab) is simply sent without it: the email is accepted and no scan is linked.
-  const scanNumber = getScanNumber();
+  const scanNumber = visitScanNumber();
   const res = await fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

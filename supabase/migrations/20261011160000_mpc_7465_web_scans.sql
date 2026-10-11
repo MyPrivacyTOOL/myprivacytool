@@ -1,9 +1,11 @@
--- MPC-7465 (report email B2, strategy decisions D7, D8, D9): every completed web scan is saved in full under an anonymous
+-- MPC-7465 (report email B2, strategy decisions D7, D8, D9): every completed web scan is saved in full under a random
 -- scan number, with or without a contact, so drop-off at the contact step can be seen and fixed.
 --
 -- public.web_scans          one row per completed home-page scan. id IS the scan number (random uuid, no personal key).
---                           No IP address, email or user id is stored here. results holds what the browser reported,
---                           per hexagon, exactly as sent (untrusted text, validated and size-capped by the Worker).
+--                           No email or user id is stored here, and no connection IP column. BUT results holds what the browser
+--                           reported, per hexagon, exactly as sent (untrusted text, validated and size-capped by the Worker), and
+--                           that includes IP addresses (e.g. WebRTC and DNS-leak values) and fingerprint-style values. A saved scan
+--                           is personal data, not anonymous (MPC-7488 corrected this comment; it said no IP was stored).
 -- public.web_scan_contacts  links a web scan to a contact row once the visitor gives one. channel + contact_id is
 --                           generic on purpose (D8): 'email' points at public.scans.id today; 'mobile', 'telegram' and
 --                           others can be added later as new channel values with no schema change.
@@ -23,8 +25,8 @@ create table if not exists public.web_scans (
   results_bytes  integer not null check (results_bytes between 2 and 65536)
 );
 
-comment on table public.web_scans is 'MPC-7465. One row per completed web scan. id = anonymous scan number. results = per-hexagon {id,label,value,icon,confidence,risk,confirmed,category} as sent by the browser (untrusted text). No IP, email or user id. service_role only.';
-comment on column public.web_scans.id is 'The anonymous scan number returned to the browser and carried to the contact step.';
+comment on table public.web_scans is 'MPC-7465. One row per completed web scan. id = random scan number. results = per-hexagon {id,label,value,icon,confidence,risk,confirmed,category} as sent by the browser (untrusted text); these values include browser-reported IP addresses, so a saved scan is personal data. No email or user id column. service_role only.';
+comment on column public.web_scans.id is 'The random scan number returned to the browser and carried to the contact step.';
 comment on column public.web_scans.results is 'Untrusted browser-reported values. Never render without escaping.';
 
 create index if not exists web_scans_created_at_idx on public.web_scans (created_at);

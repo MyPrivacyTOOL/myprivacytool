@@ -1,4 +1,4 @@
-// MPC-7465 (report email B2): save every completed web scan under an anonymous scan number, then link the contact to it.
+// MPC-7465 (report email B2): save every completed web scan under a random scan number (personal data: the results hold browser-reported values such as IP addresses), then link the contact to it.
 // Everything in a scan comes from the visitor's browser, so it is untrusted text: strict shape, short strings, no control
 // characters, never logged. Values are stored as given (escaped later, when anything renders them).
 // Switch: WEB_SCAN_SAVE_ENABLED must be exactly "true" (wrangler.toml keeps it "false" until MPC-7470 signs off the wording).

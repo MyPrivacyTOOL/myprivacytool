@@ -19,8 +19,9 @@ import {
   trackNewsletterSignup
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
-import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
+import { hasConsent, hasScanSaveConsent, onConsentChange } from '@/lib/cookieConsent';
 import { saveCompletedScan } from '@/lib/webScan';
+import ScanNumberNotice from '@/components/ScanNumberNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -34,15 +35,15 @@ const Index = () => {
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
 
-  // MPC-7465: save the scan once, when it first completes (not on every live orientation refresh). Needs cookie consent; if the
-  // visitor accepts after the scan finished, the consent listener tries again. Off unless VITE_SAVE_WEB_SCANS is "true".
+  // MPC-7465: save the scan once, when it first completes (not on every live orientation refresh). Needs the specific scan-saving consent purpose (MPC-7488); if the
+  // visitor accepts the scan-saving purpose after the scan finished, the consent listener tries again. Off unless VITE_SAVE_WEB_SCANS is "true".
   const scanSaveStarted = useRef(false);
   const latestHexagons = useRef<HexagonData[]>([]);
   latestHexagons.current = hexagons;
   useEffect(() => {
     if (loading || hexagons.length === 0) return;
     const trySave = () => {
-      if (scanSaveStarted.current || !hasConsent() || latestHexagons.current.length === 0) return;
+      if (scanSaveStarted.current || !hasScanSaveConsent() || latestHexagons.current.length === 0) return;
       scanSaveStarted.current = true;
       saveCompletedScan(latestHexagons.current).then((n) => {
         if (!n) scanSaveStarted.current = false;
@@ -283,7 +284,10 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">This only takes a few seconds</p>
             </div>
           ) : (
-            <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+            <>
+              <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+              <ScanNumberNotice />
+            </>
           )}
         </section>
 
