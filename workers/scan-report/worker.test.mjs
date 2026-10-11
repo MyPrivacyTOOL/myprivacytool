@@ -53,6 +53,8 @@ function fake(opts = {}) {
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
     if (url.includes('api.resend.com')) return opts.resendFail ? res(500, 'x') : res(200, { id: `msg_${++n}` });
     if (url.includes('api.hubapi.com')) return res(200, {});
+    if (url.includes('cloudflare-dns.com')) return res(200, { Status: 0, Answer: [] });   // MPC-7467 email hexagons
+    if (url.includes('gravatar.com')) return res(404);
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
@@ -64,7 +66,8 @@ function fake(opts = {}) {
       db[t].push(...rows); return res(201, rows); }
     if (o.method === 'PATCH') { const id = q.get('id')?.replace('eq.', ''); const st = q.get('report_status')?.replace('eq.', '');
       const fs = q.get('followup_stage')?.replace('eq.', ''); const em = q.get('email')?.replace('eq.', '');
-      const hit = db[t].filter((x) => (!id || x.id === id) && (!st || x.report_status === st) && (fs === undefined || String(x.followup_stage ?? 0) === fs) && (!em || x.email === decodeURIComponent(em))); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
+      const cl = q.get('report_claimed_at')?.replace('lt.', ''); const ag = q.get('report_attempts');
+      const hit = db[t].filter((x) => (!id || x.id === id) && (!st || x.report_status === st) && (!cl || (x.report_claimed_at && new Date(x.report_claimed_at) < new Date(cl))) && (!ag || (ag.startsWith('gte.') ? x.report_attempts >= Number(ag.slice(4)) : x.report_attempts < Number(ag.slice(3)))) && (fs === undefined || String(x.followup_stage ?? 0) === fs) && (!em || x.email === decodeURIComponent(em))); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
     let rows = db[t]; const uid = q.get('id')?.replace('eq.', ''); if (uid) rows = rows.filter((x) => x.id === uid);
     if (t === 'scans' && q.get('report_status') === 'eq.sent') rows = rows.filter((x) => x.report_status === 'sent' && (x.followup_stage ?? 0) < 2 && x.report_sent_at && new Date(x.report_sent_at) < new Date(decodeURIComponent(q.get('report_sent_at').replace('lt.', ''))));
     const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
@@ -231,6 +234,22 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   o = await runFollowUpJob(OB, F2r.f);
   check(o.failed === 1 && F.db.scans[0].followup_stage === 0, 'follow-up send failure releases the stage for retry');
 }
+// ---- MPC-7406: stale 'processing' scans are reset (30 min), never stuck
+{
+  const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
+  const open = { SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HIBP_API_KEY: 'p' };
+  const F = fake();
+  F.db.scans.push(
+    { id: 'live', user_id: 'u1', email_scanned: 'a@x.co', report_status: 'processing', report_attempts: 1, report_claimed_at: ago(10), confirmation_sent_at: ago(1) },
+    { id: 'dead', user_id: 'u2', email_scanned: 'b@x.co', report_status: 'processing', report_attempts: 1, report_claimed_at: ago(45), confirmation_sent_at: ago(1) },
+    { id: 'spent', user_id: 'u3', email_scanned: 'c@x.co', report_status: 'processing', report_attempts: 5, report_claimed_at: ago(45), confirmation_sent_at: ago(1) });
+  F.db.users.push({ id: 'u2', email: 'b@x.co' });
+  await runReportJob(open, F.f);
+  const g = (id) => F.db.scans.find((x) => x.id === id);
+  check(g('live').report_status === 'processing' && g('live').report_attempts === 1, 'stale reset: a claim under 30 minutes old is left alone');
+  check(g('dead').report_status !== 'processing' && g('dead').report_attempts === 2, 'stale reset: processing > 30 min goes back to pending and is retried (attempt counted once)');
+  check(g('spent').report_status === 'failed' && /stale/.test(g('spent').report_last_error), 'stale reset: exhausted attempts => failed with a reason, not stuck');
+}
 // ---- MPC-7406: held scans must not block the report queue
 {
   const held = (n) => Array.from({ length: n }, (_, i) => ({ id: `held${i}`, user_id: `hu${i}`, email_scanned: `visitor${i}@example.com`, confirmation_sent_at: null, report_status: 'pending', report_attempts: 0, report_due_at: new Date(Date.now() + 864e5).toISOString() }));
@@ -242,7 +261,7 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const mine = F.db.scans.find((x) => x.email_scanned === EMAIL);
   check(o.sent === 1 && o.held === 12 && mine.report_status === 'sent', 'queue: 12 older held scans do not block the allowlisted scan');
   check(JSON.stringify(F.db.scans.slice(0, 12)) === before && sendTo(F).every((to) => to === EMAIL), 'queue: held scans untouched (still pending, 0 attempts) and nothing mailed outside the allowlist');
-  check(F.calls.filter((c) => c.method === 'PATCH' && !c.url.includes(mine.id)).length === 0, 'queue: no write of any kind to a held scan');
+  check(F.calls.filter((c) => c.method === 'PATCH' && !c.url.includes(mine.id) && !c.url.includes('report_claimed_at=lt.')).length === 0, 'queue: no write of any kind to a held scan');
   // Spans several pages (page size 1000): 1,200 held scans first.
   F = fake(); F.db.scans.push(...held(1200)); await handleScan(env, null, input, F.f);
   o = await runReportJob(env, F.f);
