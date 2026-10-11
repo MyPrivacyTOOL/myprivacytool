@@ -16,7 +16,8 @@
       "CLEAR": "CHECKED AND CLEAR: detector ran successfully and positively found nothing. Only meaningful for status_kind \"risk-check\".",
       "NOT_CHECKED": "detector did not run, was blocked, timed out, is unsupported, produced a placeholder, the user never interacted, or the hexagon was never produced. Always shown, with what is needed."
     },
-    "example_values_note": "All example values are made up (IPs use the 203.0.113.0/24 documentation range)."
+    "example_values_note": "All example values are made up (IPs use the 203.0.113.0/24 documentation range).",
+    "email_hexagons_note": "MPC-7467: email hexagons are listed separately from the 54 web scan hexagons so the web count is untouched. Provisional until the final registry (MPC-7466) lands; expect to be moved into it."
   },
   "hexagons": [
     {
@@ -1435,6 +1436,128 @@
       "code_cannot_tell_clear_from_not_checked": false,
       "note": null,
       "source": "src/lib/deviceDetection.ts:1480"
+    }
+  ],
+  "email_hexagons": [
+    {
+      "id": "email-breaches",
+      "label": "Known breaches",
+      "category": "email",
+      "order": 1,
+      "surface": "report-email",
+      "artwork": {
+        "file": null,
+        "type": "emoji (no artwork file yet)",
+        "emoji": "🔓"
+      },
+      "detection": "Breach lookup for the address (MPC-7252 code, source XposedOrNot).",
+      "detection_in_browser": "no: runs in the report Worker when a report is prepared",
+      "value_type": "text: breach names",
+      "example_value": "Example Breach (2019)",
+      "presence": "always",
+      "sensitivity": "high",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "Address appears in one or more breaches.",
+        "clear": "Source answered and lists none.",
+        "not_checked": "Source unreachable, slow, or its terms not confirmed."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "truth_level": "measured",
+      "stored_as": "signals row, category 'email', signal_type = id",
+      "note": "NOT BUILT in MPC-7467: the breach source's commercial-use terms could not be read from the build environment (host blocked). See docs/email-hexagons-mpc-7467.md.",
+      "source": "workers/mirror-risk (not deployed)",
+      "build_status": "not built: terms unconfirmed"
+    },
+    {
+      "id": "email-name",
+      "label": "Name in your address",
+      "category": "email",
+      "order": 2,
+      "surface": "report-email",
+      "artwork": {
+        "file": null,
+        "type": "emoji (no artwork file yet)",
+        "emoji": "🪪"
+      },
+      "detection": "Pattern match on the part before the @ (+tag removed): common first name list, initial beside a word, 4-digit year 13-100 years ago. Pure logic.",
+      "detection_in_browser": "no: runs in the report Worker when a report is prepared",
+      "value_type": "text: hints",
+      "example_value": "Your address may contain what looks like a first name, a number that could be a birth year. This is a pattern match, not a confirmed fact.",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "One or more patterns match; wording always says 'may' / 'looks like'.",
+        "clear": "Role mailbox or no pattern matched.",
+        "not_checked": "Address not valid."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "truth_level": "estimated",
+      "stored_as": "signals row, category 'email', signal_type = id",
+      "note": "An estimate: a name list and a year pattern cannot prove a name or an age. Never shown as fact.",
+      "source": "workers/scan-report/lib/emailHexagons.js",
+      "build_status": "built"
+    },
+    {
+      "id": "email-provider",
+      "label": "Mail provider and domain",
+      "category": "email",
+      "order": 3,
+      "surface": "report-email",
+      "artwork": {
+        "file": null,
+        "type": "emoji (no artwork file yet)",
+        "emoji": "📬"
+      },
+      "detection": "Public DNS over HTTPS (Cloudflare 1.1.1.1): MX (provider), TXT (SPF), _dmarc TXT (DMARC). Only the domain is sent.",
+      "detection_in_browser": "no: runs in the report Worker when a report is prepared",
+      "value_type": "text",
+      "example_value": "Your mail is handled by Google (Gmail or Google Workspace). Personal webmail domain.",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "Lookup answered (including 'domain does not exist').",
+        "clear": "n/a: informational",
+        "not_checked": "DNS failed, returned an error, or exceeded 3 s."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "truth_level": "measured",
+      "stored_as": "signals row, category 'email', signal_type = id",
+      "note": "Work vs personal is decided from a fixed list of consumer webmail domains; anything else is called 'looks like a work or own domain'.",
+      "source": "workers/scan-report/lib/emailHexagons.js",
+      "build_status": "built"
+    },
+    {
+      "id": "email-profile",
+      "label": "Public profile or avatar",
+      "category": "email",
+      "order": 4,
+      "surface": "report-email",
+      "artwork": {
+        "file": null,
+        "type": "emoji (no artwork file yet)",
+        "emoji": "🖼️"
+      },
+      "detection": "Gravatar avatar (d=404) and v3 profile lookup using a SHA-256 hash of the address.",
+      "detection_in_browser": "no: runs in the report Worker when a report is prepared",
+      "value_type": "text",
+      "example_value": "A public avatar is linked to this address.",
+      "presence": "always",
+      "sensitivity": "medium",
+      "status_kind": "risk-check",
+      "status_rule": {
+        "found": "Avatar or profile returned 200.",
+        "clear": "Both returned 404.",
+        "not_checked": "Either call rate limited, errored, timed out."
+      },
+      "code_cannot_tell_clear_from_not_checked": false,
+      "truth_level": "measured",
+      "stored_as": "signals row, category 'email', signal_type = id",
+      "note": "Covers Gravatar only; absence of a Gravatar says nothing about other sites.",
+      "source": "workers/scan-report/lib/emailHexagons.js",
+      "build_status": "built"
     }
   ]
 }

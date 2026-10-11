@@ -1,3 +1,4 @@
+import { runEmailHexagons, emailHexagonSignalRows } from './lib/emailHexagons.js';
 import { db } from './lib/supabase.js';
 import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity } from './lib/hubspot.js';
@@ -7,17 +8,18 @@ import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail,
 import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
+import { MAX_WEB_SCAN_BYTES, linkWebScan, readCappedJson, saveWebScan, validateWebScan, webScanEnabled } from './lib/webScan.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
 const MAX_ATTEMPTS = 5;
-const STALE_CLAIM_MS = 15 * 60 * 1000;
+const STALE_CLAIM_MS = 30 * 60 * 1000;   // MPC-7406: a scan 'processing' longer than this was abandoned (Worker timeout/crash) and goes back to pending
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
 const clip = (v, n) => String(v ?? '').slice(0, n);
 // Per-IP limit (wrangler.toml [[unsafe.bindings]] type "ratelimit"); fails open if the binding is absent or errors.
-async function rateLimited(env, request) {
+async function rateLimited(env, request, prefix = '') {
   if (!env.RATE_LIMITER) return false;
-  try { return !(await env.RATE_LIMITER.limit({ key: request.headers.get('CF-Connecting-IP') || 'unknown' })).success; } catch { return false; }
+  try { return !(await env.RATE_LIMITER.limit({ key: prefix + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
 }
 
 // gmail "+tag" and dots are ignored when matching the allowlist.
@@ -39,6 +41,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST', request, cors);
     if (request.method === 'POST' && url.pathname === '/api/unsubscribe-request') return handleUnsubscribeRequest(env, request, cors, json);
+    if (request.method === 'POST' && url.pathname === '/api/web-scan') return handleWebScan(env, request, origin, json);
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -57,6 +60,8 @@ export default {
         ip: request.headers.get('CF-Connecting-IP') || null,
         utm: { source: clip(b.utm_source, 100), medium: clip(b.utm_medium, 100), campaign: clip(b.utm_campaign, 100), content: clip(b.utm_content, 100), referrer: clip(b.referrer, 500) },
       });
+      // MPC-7465: link the saved web scan to this contact row. Best effort and silent: it never changes the response.
+      if (result.scanId && b.scan_number !== undefined) await linkWebScan(env, db(env), b.scan_number, 'email', result.scanId);
       return json({ success: true, duplicate: result.duplicate });
     } catch (e) {
       console.error('scan submit failed:', String(e));
@@ -69,9 +74,28 @@ export default {
     // slots (01:05 to 04:05 UTC) that tick runs only the HK job, to keep within the 50-subrequest limit; the report and follow-up jobs
     // run on every other tick, so a report waits at most 5 minutes longer.
     if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
-    else ctx.waitUntil(runReportJob(env).then(() => runFollowUpJob(env)));
+    else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
   },
 };
+
+// MPC-7465: POST /api/web-scan {consent:true, hexagons:[...]} -> {scan_number}. Saves a completed home-page scan, anonymously.
+// Off (WEB_SCAN_SAVE_ENABLED != "true") it saves nothing and answers {saved:false}, so the site carries on without an error.
+async function handleWebScan(env, request, origin, json) {
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
+  if (!webScanEnabled(env)) return json({ saved: false });
+  if (await rateLimited(env, request, 'web-scan:')) return json({ error: 'Too many requests' }, 429);
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Unavailable' }, 503);
+  const read = await readCappedJson(request, MAX_WEB_SCAN_BYTES);
+  if (read.status) return json({ error: read.status === 413 ? 'Payload too large' : 'Invalid request' }, read.status);
+  const v = validateWebScan(read.body);
+  if (v.error) return json({ error: v.error }, 400);
+  try {
+    return json({ saved: true, scan_number: await saveWebScan(db(env), v.hexagons) });
+  } catch (e) {
+    console.error('web scan save failed:', e.status || 'error');   // status only: the message could carry visitor values
+    return json({ error: 'Could not save the scan' }, 500);
+  }
+}
 
 // MPC-7448: HK Spam day-10 email. Dry run (counts only) unless HK_SPAM_EMAIL_ENABLED === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
 export const runHkSpamJob = (env, fetchImpl = fetch, limit) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit });
@@ -97,7 +121,7 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm }, fe
   // One report per address per 24h: stops the form being used to mail-bomb someone.
   const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
   const recent = await sb.select(`scans?user_id=eq.${user.id}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`);
-  if (recent.length) return { duplicate: true };
+  if (recent.length) return { duplicate: true, scanId: recent[0].id };
 
   const scan = await sb.insert('scans', { user_id: user.id, email_scanned: email, source: 'web_scan' });
   const side = [syncHubSpot(env, email, consentSource, now, fetchImpl), confirm(env, sb, scan.id, email, fetchImpl)];
@@ -157,11 +181,24 @@ async function nextReportJobs(env, sb, limit) {
   }
 }
 
+// MPC-7406: a Worker killed mid-scan never reaches its catch block, leaving the row 'processing' forever. Put such rows
+// back to 'pending' (retry) or, once attempts are used up, to 'failed' with the reason, so none is stuck silently.
+// Uses the same atomic claim filter (status + claimed_at) as the claim, so a live run's row is never touched.
+async function resetStaleClaims(sb) {
+  const stale = encodeURIComponent(new Date(Date.now() - STALE_CLAIM_MS).toISOString());
+  const base = `scans?report_status=eq.processing&report_claimed_at=lt.${stale}`;
+  const exhausted = await sb.patch(`${base}&report_attempts=gte.${MAX_ATTEMPTS}`, { report_status: 'failed', report_last_error: 'stale: stuck in processing past the retry limit' });
+  const retried = await sb.patch(`${base}&report_attempts=lt.${MAX_ATTEMPTS}`, { report_status: 'pending', report_last_error: 'stale: processing timed out, reset for retry' });
+  if (exhausted.length || retried.length) console.warn(`scan queue: reset ${retried.length} stale scan(s) to pending, failed ${exhausted.length} past the retry limit`);
+}
+
 export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return { skipped: 'no supabase key' };
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.error('scan queue: SUPABASE_SERVICE_ROLE_KEY is not set, nothing can be processed'); return { skipped: 'no supabase key' }; }
   const sb = db(env, fetchImpl);
+  await resetStaleClaims(sb).catch((e) => console.error('scan queue: stale reset failed:', String(e)));
   const { queue, held, cancelled } = await nextReportJobs(env, sb, limit);
   const out = { sent: 0, held, failed: 0, cancelled: cancelled.length };
+  console.log(`scan queue: ${queue.length} to process, ${held} held by allowlist, ${cancelled.length} cancelled`);
   if (!env.HIBP_API_KEY) console.error(`HIBP_API_KEY is not set: breach checks skipped (${env.ALLOW_PARTIAL_REPORT === 'true' ? 'reports go out with breaches "not yet checked"' : 'reports are held'})`);
   for (const id of cancelled) {   // take them out of the queue for good: nothing is sent and the reason is on the row
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
@@ -170,15 +207,16 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
     try {
       if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl);     // catch up a missed confirmation
       const claimed = await sb.patch(`scans?id=eq.${job.id}&report_status=eq.${job.report_status}`, { report_status: 'processing', report_claimed_at: new Date().toISOString(), report_attempts: job.report_attempts + 1 });
-      if (!claimed.length) continue;                                                                    // another run took it
+      if (!claimed.length) { console.log(`scan ${job.id}: already claimed by another run, skipping`); continue; }   // another run took it
+      console.log(`scan ${job.id}: processing (attempt ${job.report_attempts + 1}/${MAX_ATTEMPTS})`);
       const r = await processScan(env, sb, job, fetchImpl);
-      if (r.held) { await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
-      else out.sent++;
+      if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
+      else { out.sent++; console.log(`scan ${job.id}: sent`); }
     } catch (e) {
       out.failed++;
       const attempts = job.report_attempts + 1;
       console.error(`report failed for scan ${job.id} (attempt ${attempts}):`, String(e));
-      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch(() => {});
+      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch((e2) => console.error(`scan ${job.id}: could not record failure (row may stay processing until the stale reset):`, String(e2)));
     }
   }
   const overdue = queue.filter((j) => new Date(j.report_due_at) < new Date()).length;
@@ -192,6 +230,7 @@ async function processScan(env, sb, job, fetchImpl) {
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
+  const emailHex = await runEmailHexagons(email, env, fetchImpl).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
 
   const breaches = hibp.status === 'checked' ? hibp.breaches : [];
   const checked = new Set(hibp.status === 'checked' ? ['email'] : []);
@@ -202,6 +241,7 @@ async function processScan(env, sb, job, fetchImpl) {
     ...breaches.map((b) => ({ scan_id: job.id, category: 'email', signal_type: `breach:${clip(b.Name, 80)}`, severity: breachRisk(b) >= 8 ? 'high' : 'medium', data_source: 'Have I Been Pwned', check_status: 'found', details: clip(`${b.BreachDate || ''} exposed: ${(b.DataClasses || []).join(', ')}`, 500), removal_status: 'manual_only' })),
     ...(hibp.status === 'checked' && breaches.length === 0 ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:none', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'clear' }] : []),
     ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
+    ...emailHexagonSignalRows(job.id, emailHex),
     ...brokers.map((b) => ({ scan_id: job.id, category: 'broker', signal_type: `${b.key}_profile`, severity: 'high', data_source: b.name, check_status: 'not_checked', details: clip(b.reason, 300), removal_status: 'manual_only', removal_url: b.removal_url, removal_instructions: b.steps ? b.steps.join('\n') : null })),
   ];
   // PostgREST bulk insert rejects rows with different key sets (PGRST102), so give every signal row the same columns.

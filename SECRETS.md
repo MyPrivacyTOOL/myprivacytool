@@ -66,8 +66,9 @@ Workers with `cloudflare/wrangler-action@v3` and syncs these secrets to each Wor
 ## 4. Full per-Worker inventory (all Workers)
 
 The table at the top only covers `core-brain` and `social-listeners`. This is every secret the Worker code reads
-(`env.NAME`). Names marked † are read in code but missing from that Worker's `EXPECTED_SECRETS.txt`
-(`webhook-receiver` has no `EXPECTED_SECRETS.txt` at all). Reconcile these when rotating.
+(`env.NAME`). Names marked † are **optional**: read in code but left out of that Worker's `EXPECTED_SECRETS.txt` on
+purpose, because several deploy workflows fail when a listed name is missing. The feature behind each one switches
+itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 
 | Worker | Secrets |
 |---|---|
@@ -91,7 +92,9 @@ Revoke and reissue at the provider, then update **both** the Worker (`wrangler s
 
 - [ ] **Shared values: change everywhere in the same window**
   - `WEBHOOK_SECRET` (core-brain, telegram-webhook) and `CORE_BRAIN_TOKEN` (social-listeners) must stay equal.
-  - `SUPABASE_SERVICE_ROLE_KEY` is used by github-channel, mpt-leads, oauth-poc, scan-report and webhook-receiver.
+  - `SUPABASE_SERVICE_ROLE_KEY` is used by github-channel, mpt-leads, mpt-metrics-collector, oauth-poc, scan-report
+    and webhook-receiver. Only scan-report is synced by CI (`SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`); set the rest
+    by hand with `wrangler secret put`.
   - `HUBSPOT_API_KEY` / `HUBSPOT_TOKEN`, `RESEND_API_KEY`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_KEY`,
     `TELEGRAM_WEBHOOK_SECRET`, `META_APP_SECRET`, `TWILIO_AUTH_TOKEN` appear in several Workers. Confirm each
     pair of near-identical names (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_KEY`, `HUBSPOT_API_KEY`/`HUBSPOT_TOKEN`)
@@ -102,11 +105,11 @@ Revoke and reissue at the provider, then update **both** the Worker (`wrangler s
 - [ ] **`UNSUBSCRIBE_SECRET` (scan-report):** replacing invalidates unsubscribe links already sent in emails.
 - [ ] **Supabase:** rotate the service-role key, then the DB password and access token; redeploy via `deploy-supabase.yml`.
 - [ ] **Cloudflare:** reissue `CLOUDFLARE_API_TOKEN` last, since CI needs it to push the other secrets.
-- [ ] Update `EXPECTED_SECRETS.txt` for every † name above and add one for `webhook-receiver`.
+- [ ] Keep `EXPECTED_SECRETS.txt` to *required* names only. Add a † name only if its feature becomes mandatory.
 - [ ] Redeploy every Worker, run `npx wrangler secret list` in each, and hit the smoke checks in `DEPLOYMENT_RUNBOOK.md`.
 - [ ] Run `node scripts/ci/scan-secrets.mjs` (last run: clean, 417 files).
 
 ## Rules
 
 - Never paste real keys into code, issues, PRs or chat. Rotate immediately if one leaks.
-- Run `node scripts/ci/scan-secrets.mjs` before committing.
+- Run `node scripts/ci/scan-secrets.mjs` before committing (CI also runs it and blocks the merge on a hit).

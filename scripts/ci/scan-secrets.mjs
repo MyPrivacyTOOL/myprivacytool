@@ -19,7 +19,8 @@ const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard"], { e
   .split("\n").filter((f) => f && !/(^|\/)(package-lock\.json|bun\.lockb)$|\.(png|jpe?g|gif|webp|ico|woff2?|pdf|svg)$/i.test(f) && f !== "scripts/ci/scan-secrets.mjs");
 
 // GitHub's public docs example token, used as a fake fixture in a test (not a real credential).
-const ALLOW = [/gho_16C7e42F292c6912E7710c838347Ae178B4a/];
+// A PEM header followed by a `${...}` template is a key generated at runtime in a test, never a committed key.
+const ALLOW = [/gho_16C7e42F292c6912E7710c838347Ae178B4a/, /PRIVATE KEY-----\\n\$\{/];
 
 let hits = 0;
 for (const f of files) {

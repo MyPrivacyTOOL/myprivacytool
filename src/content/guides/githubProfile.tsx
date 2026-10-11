@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { blogCtaHref } from "@/lib/blogTracking";
 
 export const sections = [
   { id: "what-it-is", title: "What the GitHub profile is" },
@@ -60,7 +61,7 @@ const Content = () => (
       read:user, which is GitHub&apos;s basic read access to your profile. We do not request private repository access,
       we cannot change anything in your account, and we do not ask for your email address. You choose to connect, and
       you can{" "}
-      <Link to="/connect/github?utm_source=blog&utm_medium=how-github-becomes-a-private-profile">
+      <Link to={blogCtaHref("how-github-becomes-a-private-profile", "/connect/github")}>
         connect your GitHub account here
       </Link>
       .
@@ -150,7 +151,7 @@ const Content = () => (
     <p>
       This guide describes how the feature works at the time of writing. If you want to see how exposed your details
       are across the wider internet, you can also{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=how-github-becomes-a-private-profile">
+      <Link to={blogCtaHref("how-github-becomes-a-private-profile")}>
         run a free scan with MyPrivacyTOOL
       </Link>
       .

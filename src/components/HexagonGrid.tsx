@@ -22,7 +22,8 @@ import {
   trackScanCompleted,
   trackHexagonAccuracy,
   trackTimeToFirstConfirmation,
-  trackActivity
+  trackActivity,
+  trackScanStarted
 } from '@/lib/analytics';
 import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -391,6 +392,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackActivity();
       
       if (isFirstConfirmation.current) {
+        trackScanStarted();
         trackTimeToFirstConfirmation();
         trackFunnelStep('first_hexagon_confirmed');
         isFirstConfirmation.current = false;
