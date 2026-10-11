@@ -41,8 +41,9 @@ payload, 401 bad token, 429 rate limited (`Retry-After: 60`), 503 not configured
    unchanged). The database applies `trust_level = greatest(existing, floor)`, so **trust only ever goes up**; no message can
    lower it. The write runs after the reply is sent (`waitUntil`) and is best effort: if Supabase is down or the migration is
    not applied yet, it is logged as a warning and the reply is unchanged.
-6. **Rate limiting (MPC-7257).** Two Workers Rate Limiting bindings declared in `wrangler.toml` (`[[ratelimits]]`; no KV, so no
-   namespace to create): `RATE_LIMITER` allows **10 requests per 60 s per sender** (key `platform:sender_id`, so the 11th inside a
+6. **Rate limiting (MPC-7257).** Two Workers Rate Limiting bindings declared in `wrangler.toml` as `[[unsafe.bindings]]` with `type = "ratelimit"`
+   (not `[[ratelimits]]`: the deploy action's wrangler 3.90.0 ignores that table, so the Worker would go live with no limiter; a test
+   guards this. No KV, so no namespace to create): `RATE_LIMITER` allows **10 requests per 60 s per sender** (key `platform:sender_id`, so the 11th inside a
    minute gets `429 { error: { code: "rate_limited" } }` with `Retry-After: 60`), and `RATE_LIMITER_GLOBAL` is a **300 per 60 s**
    backstop on the Qwen cost; tune it from real traffic. The check runs after auth and body parsing and before Qwen or Supabase, so
    unauthenticated or malformed requests never consume a sender's budget and a throttled request makes no outbound call. It
