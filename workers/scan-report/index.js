@@ -7,6 +7,8 @@ import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail,
 import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
+import { loadWebScan } from './lib/webscan.js';
+import { reportAttachment } from './lib/reportHex.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -212,8 +214,9 @@ async function processScan(env, sb, job, fetchImpl) {
 
   const mirror = buildMirrorReport({ scan: result, breaches, breachStatus: hibp.status, brokers });
   const links = await unsubLinks(env, email);
-  const mail = buildReportEmail({ scan: result, breaches, breachStatus: hibp.status, brokers, mirror, unsubscribeLink: links?.page });
-  const sent = await sendEmail(env, { to: email, ...mail, idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
+  const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
+  const mail = buildReportEmail({ scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, unsubscribeLink: links?.page });
+  const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
     privacy_score: result.score, risk_level: result.risk_level, signals_found: result.signals_found,
