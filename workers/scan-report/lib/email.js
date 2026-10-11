@@ -7,7 +7,7 @@ const SITE = 'https://myprivacytool.io';
 // and scripts), 600px max width, system fonts, light/dark safe colours. The plain-text parts are unchanged.
 const BRAND = '#15803d';
 const CONTACT = 'hello@myprivacytool.io';
-const shell = (title, preheader, inner, unsubscribeLink) => `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(title)}</title></head>
+export const shell = (title, preheader, inner, unsubscribeLink) => `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${esc(title)}</title></head>
 <body style="margin:0;padding:0;background:#f3f4f6;-webkit-text-size-adjust:100%">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${esc(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px">
@@ -44,8 +44,8 @@ const aliceHero = (titleHtml) => `<table role="presentation" width="100%" cellpa
 <td width="140" valign="middle" align="right"><img src="${ALICE_IMG}" width="140" height="155" alt="Alice, MyPrivacyTOOL&rsquo;s AI guide, pulling back a curtain to reveal green code" style="display:block;width:140px;height:auto;border:0"></td></tr></table>
 `;
 const h2 = (t) => `<h2 style="margin:28px 0 10px 0;font-size:18px;line-height:24px;color:#111827">${t}</h2>`;
-const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
-const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
+export const para = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
+export const button = (href, label) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 4px 0"><tr><td style="background:${BRAND};border-radius:8px"><a href="${esc(href)}" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
 
 // DRAFT COPY: Chris must approve before any real-user send.
 // CK 2026-10-11: copy rewritten to the "Your privacy scan is starting" version. It describes an automated search of public,
