@@ -2557,6 +2557,150 @@ export const HEXAGONS = [
 ];
 
 
+// MPC-7487: the email hexagons (Part 2 of the report email; checks built in MPC-7467). They are about the email address, not the
+// browser, so they are not in HEXAGONS (the 54 web hexagons). Same status vocabulary.
+export const EMAIL_HEXAGONS = [
+  {
+    "id": "email-breaches",
+    "label": "Known breaches",
+    "group": "Email address",
+    "category": "email",
+    "order": 1,
+    "artwork": {
+      "file": null,
+      "emoji": "🔓",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "Breach lookup for the address (MPC-7252 code, source XposedOrNot).",
+    "value_type": "text: breach names",
+    "presence": "always",
+    "example_value": "Example Breach (2019)",
+    "truth": {
+      "level": "measured",
+      "sensitivity": "high",
+      "note": "NOT BUILT in MPC-7467: the breach source's commercial-use terms could not be read from the build environment (host blocked). See docs/email-hexagons-mpc-7467.md."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "CHECKED_AND_CLEAR",
+        "NOT_CHECKED"
+      ],
+      "found": "Address appears in one or more breaches.",
+      "clear": "Source answered and lists none.",
+      "not_checked": "Source unreachable, slow, or its terms not confirmed."
+    },
+    "trust_score": null,
+    "source": "workers/mirror-risk (not deployed)",
+    "build_status": "not built: terms unconfirmed"
+  },
+  {
+    "id": "email-name",
+    "label": "Name in your address",
+    "group": "Email address",
+    "category": "email",
+    "order": 2,
+    "artwork": {
+      "file": null,
+      "emoji": "🪪",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "Pattern match on the part before the @ (+tag removed): common first name list, initial beside a word, 4-digit year 13-100 years ago. Pure logic.",
+    "value_type": "text: hints",
+    "presence": "always",
+    "example_value": "Your address may contain what looks like a first name, a number that could be a birth year. This is a pattern match, not a confirmed fact.",
+    "truth": {
+      "level": "estimated",
+      "sensitivity": "medium",
+      "note": "An estimate: a name list and a year pattern cannot prove a name or an age. Never shown as fact."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "CHECKED_AND_CLEAR",
+        "NOT_CHECKED"
+      ],
+      "found": "One or more patterns match; wording always says 'may' / 'looks like'.",
+      "clear": "Role mailbox or no pattern matched.",
+      "not_checked": "Address not valid."
+    },
+    "trust_score": null,
+    "source": "workers/scan-report/lib/emailHexagons.js",
+    "build_status": "built"
+  },
+  {
+    "id": "email-provider",
+    "label": "Mail provider and domain",
+    "group": "Email address",
+    "category": "email",
+    "order": 3,
+    "artwork": {
+      "file": null,
+      "emoji": "📬",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "Public DNS over HTTPS (Cloudflare 1.1.1.1): MX (provider), TXT (SPF), _dmarc TXT (DMARC). Only the domain is sent.",
+    "value_type": "text",
+    "presence": "always",
+    "example_value": "Your mail is handled by Google (Gmail or Google Workspace). Personal webmail domain.",
+    "truth": {
+      "level": "measured",
+      "sensitivity": "medium",
+      "note": "Work vs personal is decided from a fixed list of consumer webmail domains; anything else is called 'looks like a work or own domain'."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "NOT_CHECKED"
+      ],
+      "found": "Lookup answered (including 'domain does not exist').",
+      "clear": "n/a: informational",
+      "not_checked": "DNS failed, returned an error, or exceeded 3 s."
+    },
+    "trust_score": null,
+    "source": "workers/scan-report/lib/emailHexagons.js",
+    "build_status": "built"
+  },
+  {
+    "id": "email-profile",
+    "label": "Public profile or avatar",
+    "group": "Email address",
+    "category": "email",
+    "order": 4,
+    "artwork": {
+      "file": null,
+      "emoji": "🖼️",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "Gravatar avatar (d=404) and v3 profile lookup using a SHA-256 hash of the address.",
+    "value_type": "text",
+    "presence": "always",
+    "example_value": "A public avatar is linked to this address.",
+    "truth": {
+      "level": "measured",
+      "sensitivity": "medium",
+      "note": "Covers Gravatar only; absence of a Gravatar says nothing about other sites."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "CHECKED_AND_CLEAR",
+        "NOT_CHECKED"
+      ],
+      "found": "Avatar or profile returned 200.",
+      "clear": "Both returned 404.",
+      "not_checked": "Either call rate limited, errored, timed out."
+    },
+    "trust_score": null,
+    "source": "workers/scan-report/lib/emailHexagons.js",
+    "build_status": "built"
+  }
+];
+
 export const STATUSES = ['FOUND', 'CHECKED_AND_CLEAR', 'NOT_CHECKED'];
 export const TRUTH_LEVELS = ['measured', 'estimated', 'cannot_be_checked'];
 

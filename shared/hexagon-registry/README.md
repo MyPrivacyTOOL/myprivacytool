@@ -10,3 +10,5 @@ NOT CHECKED rule. `trust_score` is deliberately null: Chris has not defined it. 
 - Tests: `src/lib/hexagonRegistry.test.ts` (vitest, ids and labels match the detection code) and `registry.test.mjs` (node, runs where the Worker runs).
 - Hexagon artwork: none exists. Each hexagon is an inline SVG with one emoji (`artwork.emoji`).
 - 46 was a hard-coded display number, 52 is the grid capacity, 28 was never found in the code.
+- `status.js` (MPC-7487): `captureStatus(id, value, ctx)` decides FOUND / CHECKED AND CLEAR / NOT CHECKED when the site captures a value; `src/lib/webScan.ts` saves it with the scan. It follows the `status` rules here; change a rule in the registry, this file and the Notion page together.
+- `EMAIL_HEXAGONS`: the four email hexagons (MPC-7467), outside the 54 web hexagons. `workers/scan-report/scripts/sync-hexagons.mjs` builds the Worker's compact copy from this file.

@@ -403,6 +403,9 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(o.rs.status === 413 && o.F.db.web_scans.length === 0, 'oversized (content-length) => 413, nothing saved');
   o = await post(ON, null, { raw: JSON.stringify({ consent: true, hexagons: [{ id: 'a', label: 'a', value: 'x'.repeat(70 * 1024) }] }) });
   check(o.rs.status === 413 && o.F.db.web_scans.length === 0, 'oversized (real body, no content-length check) => 413, nothing saved');
+  // MPC-7487: the status the site decided at capture is saved with the scan
+  o = await post(ON, { consent: true, hexagons: [{ id: 'screen', label: 'Screen Resolution', value: '1920x1080', status: 'found' }, { id: 'demographic', label: 'Estimated Profile', value: 'x', status: 'found', estimate: true }, { id: 'dns-leak', label: 'DNS Leak', value: 'Checking...', status: 'not_checked' }] });
+  check(o.rs.status === 200 && o.F.db.web_scans[0].results.map((h) => h.status).join() === 'found,found,not_checked' && o.F.db.web_scans[0].results[1].estimate === true, 'web scan: per-hexagon status and estimate flag are saved with the scan (MPC-7487)');
   // malformed
   const malformed = {
     'bad JSON': { raw: '{nope' }, 'array body': { body: [] }, 'no consent': { body: { hexagons: hex() } }, 'consent false': { body: { consent: false, hexagons: hex() } },
@@ -411,6 +414,7 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
     'unknown key': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'v', evil: 1 }] } }, 'bad id': { body: { consent: true, hexagons: [{ id: '../a', label: 'a', value: 'v' }] } },
     'value not text': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: { x: 1 } }] } }, 'value too long': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'x'.repeat(1001) }] } },
     'control character': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'v\u0000w' }] } }, 'duplicate id': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '' }, { id: 'a', label: 'b', value: '' }] } },
+    'bad status': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', status: 'FOUND' }] } }, 'estimate not boolean': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', estimate: 'yes' }] } },
     'confidence out of range': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', confidence: 500 }] } }, 'extra top-level key': { body: { consent: true, hexagons: hex(), admin: true } },
   };
   for (const [name, c] of Object.entries(malformed)) {

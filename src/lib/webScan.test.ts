@@ -73,4 +73,30 @@ describe("toPayload", () => {
     expect((p.hexagons[2].value as string).length).toBe(1000);
     expect(p.hexagons[2].value).not.toContain("\u0000");
   });
+
+  // MPC-7487: the status of each hexagon is decided at capture
+  it("records FOUND / CHECKED AND CLEAR / NOT CHECKED per hexagon, and flags estimates", () => {
+    const mk = (id: string, value: string) => ({ ...hex(1)[0], id, value });
+    const p = toPayload([
+      mk("device", "Desktop (macOS)"), mk("location", "Location detected"), mk("isp", "Unknown ISP"), mk("dns-leak", "Checking..."),
+      mk("google-services", "4 services"), mk("sessionstorage-status", "Empty"), mk("canvas-fingerprint", "a1b2c3d4..."), mk("demographic", "Tech professional"),
+    ]);
+    const by = Object.fromEntries(p.hexagons.map((x) => [x.id as string, x]));
+    expect(by.device.status).toBe("found");
+    expect(by.location.status).toBe("not_checked");
+    expect(by.isp.status).toBe("not_checked");
+    expect(by["dns-leak"].status).toBe("not_checked");
+    expect(by["google-services"].status).toBe("not_checked"); // one of the 7 the site cannot check
+    expect(by["sessionstorage-status"].status).toBe("clear");
+    expect(by["canvas-fingerprint"].status).toBe("found");
+    expect(by.demographic).toMatchObject({ status: "found", estimate: true });
+    expect(by.device.estimate).toBeUndefined();
+  });
+
+  it("treats the connection type as NOT CHECKED when the browser did not report one (the WiFi on screen is an assumption)", () => {
+    const conn = { ...hex(1)[0], id: "connection", value: "WiFi" };
+    expect(toPayload([conn]).hexagons[0].status).toBe("not_checked");
+    vi.stubGlobal("navigator", { ...navigator, connection: { type: "wifi" } });
+    expect(toPayload([conn]).hexagons[0].status).toBe("found");
+  });
 });

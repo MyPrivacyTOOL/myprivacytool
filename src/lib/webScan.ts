@@ -1,5 +1,6 @@
 import type { HexagonData } from "@/lib/deviceDetection";
 import { hasConsent } from "@/lib/cookieConsent";
+import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.js";
 
 // MPC-7465: every completed web scan is saved under an anonymous scan number, and the number is carried to the contact step.
 // OFF unless VITE_SAVE_WEB_SCANS is exactly "true" (production keeps it off until the privacy wording, MPC-7470, is signed off).
@@ -26,7 +27,19 @@ export function getScanNumber(): string | null {
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 const text = (v: unknown, n: number) => String(v ?? "").replace(CONTROL, "").slice(0, n);
 
+// MPC-7487: the status is decided here, at capture, so the report can show FOUND with the real value instead of guessing later.
+// The Network Information API is the only source for the connection type; without it the "WiFi" on screen is an assumed default.
+function captureContext(hexagons: HexagonData[]) {
+  const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { connection?: { effectiveType?: string; type?: string } }) : undefined;
+  const browser = hexagons.find((h) => h.id === "browser")?.value ?? "";
+  return {
+    connectionIsMeasured: Boolean(nav?.connection?.type === "wifi" || nav?.connection?.effectiveType),
+    browserKnown: !/^unknown\b/i.test(browser),
+  };
+}
+
 export function toPayload(hexagons: HexagonData[]) {
+  const ctx = captureContext(hexagons);
   const seen = new Set<string>();
   const out: Record<string, unknown>[] = [];
   for (const h of hexagons.slice(0, 100)) {
@@ -41,6 +54,8 @@ export function toPayload(hexagons: HexagonData[]) {
       confidence: Number.isFinite(h.confidence) ? Math.min(100, Math.max(0, h.confidence)) : 0,
       risk: text(h.risk, 32),
       confirmed: Boolean(h.confirmed),
+      status: captureStatus(id, h.value, ctx),
+      ...(isEstimate(id) ? { estimate: true } : {}),
       ...(h.category ? { category: text(h.category, 32) } : {}),
     });
   }
