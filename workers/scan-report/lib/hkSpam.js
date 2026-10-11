@@ -8,7 +8,9 @@ import { unsubscribePageUrl, unsubscribeUrl } from './onboarding.js';
 
 // Hours 01-04 UTC = 09:00-12:59 HKT. The due view is "today in Hong Kong", rows are claimed before sending, so extra runs are
 // harmless and just drain what the per-run cap left over (a Worker may make only 50 subrequests on the free plan).
-export const HK_SPAM_CRON = '5 1-4 * * *';
+// The Workers Free plan allows 5 cron triggers per account, so this job has no cron of its own: it runs on the existing 5-minute
+// trigger when that tick falls at minute 05 of hours 01-04 UTC (the same four moments the old '5 1-4 * * *' cron used).
+export const isHkSpamSlot = (when) => { const d = new Date(when); return d.getUTCHours() >= 1 && d.getUTCHours() <= 4 && d.getUTCMinutes() === 5; };
 const SITE = 'https://myprivacytool.io';
 export const HK_SPAM_SCAN_URL = `${SITE}/scan?utm_source=hk_spam_email&utm_medium=email&utm_campaign=day10`;
 const CONTACT = 'hello@myprivacytool.io';
