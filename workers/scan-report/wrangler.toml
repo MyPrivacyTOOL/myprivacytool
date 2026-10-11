@@ -1,4 +1,4 @@
-# MPC-6677: scan -> confirmation -> 48-hour privacy report. One Worker owns both the confirmation
+# MPC-6677: scan -> confirmation -> privacy report (normally minutes; 48h is the overdue deadline). One Worker owns both the confirmation
 # email and the report (no duplicate senders). Deploy to the MyPrivacyTOOL Cloudflare account.
 name = "mpt-scan-report"
 main = "index.js"
