@@ -331,5 +331,9 @@ select pg_temp.assert((select sum(scans_completed) from public.web_scan_funnel) 
   and (select sum(scans_without_contact) from public.web_scan_funnel) >= 1, 'web_scan_funnel: counts scans with and without a contact');
 reset role;
 
+-- ===== MPC-7470: web scan retention purge (service_role only; 90 days unlinked, 12 months linked) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_purge_expired_web_scans()$$) = '42501', 'mpt_purge_expired_web_scans: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_purge_expired_web_scans()$$) = '42501', 'mpt_purge_expired_web_scans: authenticated must not execute');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
