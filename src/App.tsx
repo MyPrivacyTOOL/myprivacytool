@@ -24,6 +24,7 @@ const Faq = lazy(() => import("./pages/Faq"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Cookies = lazy(() => import("./pages/Cookies"));
+const AcceptableUse = lazy(() => import("./pages/AcceptableUse"));
 const DPA = lazy(() => import("./pages/DPA"));
 const Trust = lazy(() => import("./pages/Trust"));
 const Developers = lazy(() => import("./pages/Developers"));
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
+            <Route path="/acceptable-use" element={<AcceptableUse />} />
             <Route path="/dpa" element={<DPA />} />
             <Route path="/trust" element={<Trust />} />
             {/* Guides */}
