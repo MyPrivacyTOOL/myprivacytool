@@ -172,7 +172,7 @@ jobs:
       - run: npx vitest run scripts
       - name: Worker configs are deployable (no placeholders, valid secret-name lists)
         run: |
-          node scripts/ci/check-env.mjs --worker workers/mpt-leads --worker workers/oauth-poc --worker workers/scan-report --worker workers/telegram-webhook
+          node scripts/ci/check-env.mjs --worker workers/mpt-leads --worker workers/oauth-poc --worker workers/scan-report --worker workers/telegram-webhook --worker workers/mirror-risk
 
   ci-gate:
     name: CI gate

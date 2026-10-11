@@ -1,0 +1,23 @@
+# mpt-mirror-risk — Mirror & Risk API (MPC-7252). MyPrivacyTOOL Cloudflare account.
+# NOT deployed by any workflow yet: the owner adds a deploy workflow (see README.md) once the HIBP key is set.
+name = "mpt-mirror-risk"
+main = "worker.ts"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+[vars]
+# Free breach source (no key). Switch to "hibp" + `wrangler secret put HIBP_API_KEY` after revenue (Phase 5).
+# TODO(owner): confirm XposedOrNot's terms allow commercial use, and that the privacy policy says the email is sent to it.
+BREACH_PROVIDER = "xposedornot"
+
+[observability]
+enabled = true
+
+# Per-IP rate limit (same pattern as mpt-scan-report). Code fails open if the binding is missing.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "7252001"
+simple = { limit = 10, period = 60 }
+
+# Secrets are not declared here. Expected names: EXPECTED_SECRETS.txt
