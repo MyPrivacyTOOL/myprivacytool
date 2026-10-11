@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { hkSpamSitemapEntry, patchRobots, readHkSpamConfig } from "./hkSpamFlag.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -102,11 +103,22 @@ function generateSitemap() {
     );
   }
 
+  // MPC-7446: /HongKongSpam is listed (and robots.txt un-blocked) only when the single flag in
+  // src/data/hkSpam.json is true; until then it stays out of the sitemap and is disallowed.
+  const hkCfg = readHkSpamConfig(ROOT);
+  const hkEntry = hkSpamSitemapEntry(hkCfg, SITE_URL);
+  if (hkEntry) entries.push(buildUrlEntry({ ...hkEntry, lastmod: gitLastmod("src/pages/HongKongSpam.tsx") }));
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>\n`;
 
   const distDir = path.join(ROOT, "dist");
   if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true });
   writeFileSync(path.join(distDir, "sitemap.xml"), xml, "utf8");
+
+  const robotsPath = path.join(distDir, "robots.txt");
+  if (existsSync(robotsPath)) {
+    writeFileSync(robotsPath, patchRobots(readFileSync(robotsPath, "utf8"), hkCfg), "utf8");
+  }
 
   console.log(`sitemap.xml written with ${entries.length} URLs`);
 }
