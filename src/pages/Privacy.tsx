@@ -51,11 +51,20 @@ const Privacy = () => {
               </h3>
               <p className="text-muted-foreground">
                 The free scan on our homepage detects device, browser and network
-                characteristics directly in your browser. Those results are shown to
-                you and are not sent to or stored on our servers. We only receive
-                and store information when you take an action that submits it, as
-                described below (for example, entering your email address, messaging
-                our bot, or requesting a scan of a social handle).
+                characteristics directly in your browser, and shows them to you
+                there. If you have accepted the consent banner, we also save the
+                full result of each completed scan on our servers under a random
+                scan number: the technical details your browser reported, such as
+                your IP address, device, browser, language, screen and
+                fingerprint-style values. We save it even if you never give us an
+                email address or any other contact, so we can see where people
+                drop out of the process and fix it. If you then ask for your
+                report, we link that scan number to your email address. If you
+                use another device, that starts a new scan. If you have not
+                accepted the consent banner, nothing from the scan is saved. The
+                other information described below is stored only when you take an
+                action that submits it (for example, entering your email address,
+                messaging our bot, or requesting a scan of a social handle).
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
@@ -268,6 +277,14 @@ const Privacy = () => {
                   (Consentmanager), and analytics (Google Analytics 4)
                 </li>
                 <li>
+                  <strong>Email Checks for Your Report:</strong> To prepare your
+                  report we send the domain part of your email address to
+                  Cloudflare (a public DNS lookup), and a SHA-256 hash of your
+                  email address to Gravatar to see whether a public profile
+                  exists. Where we check whether your address appears in a data
+                  breach, we name that provider here when the check is switched on
+                </li>
+                <li>
                   <strong>Legal Authorities:</strong> When required by law or to
                   protect rights and safety
                 </li>
@@ -300,6 +317,13 @@ const Privacy = () => {
                   submitted handles are deleted automatically after 24 hours.
                   Results saved to an account are retained for 2 years for
                   historical comparison and reporting
+                </li>
+                <li>
+                  <strong>Saved Web Scans:</strong> The full result of a completed
+                  web scan (see section 2.0) is deleted 12 months after the scan if
+                  it was linked to your email address, and 90 days after the scan
+                  if it was never linked to a contact. To ask for earlier deletion,
+                  contact us with your scan number or the email address you used
                 </li>
                 <li>
                   <strong>Messaging Conversation State:</strong> Retained for 7

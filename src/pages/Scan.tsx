@@ -97,6 +97,9 @@ const Scan = () => {
         {submitting ? "Sending…" : "Check My Exposure →"}
       </Button>
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      <p className="w-full text-left text-xs text-muted-foreground">
+        If you accepted the consent banner, we save your scan result under a random number and link it to your email so we can send your report.
+      </p>
     </form>
   );
 
