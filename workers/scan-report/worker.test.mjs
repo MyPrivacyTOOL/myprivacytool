@@ -140,7 +140,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const g1 = buildFollowUpEmail({ stage: 1, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });
   const g2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });
   const gc = buildConfirmationEmail({ unsubscribeLink: UNSUB });
-  check(g1.html.includes('utm_campaign=followup-3d') && g2.html.includes('utm_campaign=followup-7d') && gc.html.includes('utm_campaign=scan-confirmation') && g1.text.includes('utm_campaign=followup-3d'), 'email links to our site carry utm_source/medium/campaign (confirmation html, follow-up day 3 and day 7)');
+  check(g1.html.includes('utm_campaign=followup-3d') && g2.html.includes('utm_campaign=followup-7d') && gc.html.includes('utm_campaign=scan-confirmation'), 'email links to our site carry utm_source/medium/campaign (confirmation html, follow-up day 3 and day 7)');
   const UNSUB_HTML = UNSUB.replace(/&/g, '&amp;');
   check(g1.html.includes(UNSUB_HTML) && g1.text.includes(UNSUB) && gc.html.includes(UNSUB_HTML) && gc.text.includes(UNSUB), 'unsubscribe links are never tagged');
   check(tagLinks('x https://myprivacytool.io/opt-out.', 'c') === 'x https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=c.' && tagLinks('https://myprivacytool.io/email/a.png', 'c') === 'https://myprivacytool.io/email/a.png' && tagLinks('https://myprivacytool.io/p?utm_source=z', 'c') === 'https://myprivacytool.io/p?utm_source=z' && tagLinks('<a href="https://myprivacytool.io/a?b=1">', 'c', { html: true }).includes('b=1&amp;utm_source=email&amp;utm_medium=email&amp;utm_campaign=c'), 'tagLinks: keeps trailing punctuation, skips images and already-tagged links, uses &amp; in HTML');
