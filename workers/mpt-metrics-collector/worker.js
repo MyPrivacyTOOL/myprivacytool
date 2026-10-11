@@ -64,7 +64,7 @@ export default {
   async scheduled(event, env, ctx) {
     // Monday 09:00 HKT digest (MPC-7383): reads the tracker only, no collection. Failure never affects the daily run.
     if (event?.cron === DIGEST_CRON) {
-      if (!digestConfigured(env)) { console.error('mpt-metrics-collector: digest skipped, NOTION_TOKEN / SLACK_BOT_TOKEN / SLACK_CHANNEL_ID not set'); return; }
+      if (!digestConfigured(env)) { console.error('mpt-metrics-collector: digest skipped, NOTION_TOKEN / SLACK_BOT_TOKEN / MPTSLACK_CHANNEL_ID not set'); return; }
       ctx.waitUntil(postDigest(env).then((r) => console.log(JSON.stringify({ digest: 'posted', permalink: r.permalink, ts: r.ts }))).catch((e) => console.error(`mpt-metrics-collector: digest failed: ${SAFE(e?.message, env)}`)));
       return;
     }

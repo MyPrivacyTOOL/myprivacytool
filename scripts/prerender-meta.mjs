@@ -14,6 +14,9 @@ const DIST = path.join(ROOT, "dist");
 const SITE_URL = "https://www.myprivacytool.io";
 const SUFFIX = " | MyPrivacyTOOL";
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.jpg`;
+// Keep in sync with ARTICLE_AUTHOR / ARTICLE_PUBLISHER in src/components/Seo.tsx.
+const ARTICLE_AUTHOR = "Alice";
+const ARTICLE_PUBLISHER = "Wonderland";
 const readJson = (rel) => JSON.parse(readFileSync(path.join(ROOT, rel), "utf8"));
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -68,6 +71,13 @@ function headBlock(r) {
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
     `<meta property="og:site_name" content="MyPrivacyTOOL.IO" />`,
+    ...(r.type === "article"
+      ? [
+          `<meta name="author" content="${ARTICLE_AUTHOR}" />`,
+          `<meta property="article:author" content="${ARTICLE_AUTHOR}" />`,
+          `<meta property="article:publisher" content="${ARTICLE_PUBLISHER}" />`,
+        ]
+      : []),
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,

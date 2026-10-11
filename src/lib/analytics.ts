@@ -6,6 +6,8 @@ declare global {
   }
 }
 
+import { captureAttribution, getAttribution } from './attribution';
+
 // Session tracking
 let sessionStartTime: number = 0;
 let lastActivityTime: number = 0;
@@ -30,6 +32,13 @@ export const trackEvent = (
   if (typeof window !== 'undefined' && window.gtag) {
     window.gtag('event', eventName, params);
   }
+};
+
+// Events that must carry first-touch utm_* as custom parameters so GA4 can report scans by source (MPC-7182).
+// Register utm_source / utm_campaign as event-scoped custom dimensions in GA4.
+const attributedEvent = (eventName: string, params: Record<string, string | number | boolean>) => {
+  if (typeof window !== 'undefined') captureAttribution(window.location.search);
+  trackEvent(eventName, { ...params, ...getAttribution() });
 };
 
 // Funnel step tracking
@@ -59,7 +68,7 @@ let scanCompletedTracked = false;
 export const trackScanCompleted = (hexagonCount: number) => {
   if (scanCompletedTracked) return;
   scanCompletedTracked = true;
-  trackEvent('privacy_scan_completed', {
+  attributedEvent('privacy_scan_completed', {
     hexagon_count: hexagonCount,
     funnel_step: 'all_hexagons_confirmed',
   });
@@ -524,5 +533,5 @@ export const trackBlogScrollDepth = (postSlug: string, percentScrolled: number) 
 
 export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destination: string) => {
   trackActivity();
-  trackEvent('blog_cta_click', { post_slug: postSlug, cta_location: ctaLocation, destination });
+  attributedEvent('blog_cta_click', { post_slug: postSlug, cta_location: ctaLocation, destination });
 };

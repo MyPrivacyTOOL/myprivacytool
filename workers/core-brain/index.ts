@@ -17,6 +17,9 @@
 //
 // Secrets come from `env` only (see EXPECTED_SECRETS.txt): SUPABASE_KEY, WEBHOOK_SECRET (+ optional QWEN_API_KEY).
 // Non-secret vars (wrangler.toml [vars]): SUPABASE_URL, QWEN_BASE_URL, QWEN_MODEL.
+// Rate limit (MPC-7257): per sender 10 requests / 60s (RATE_LIMITER), plus an optional global backstop (RATE_LIMITER_GLOBAL).
+//                Runs after auth and body parsing and before Qwen or Supabase. Over the limit: 429 { error: { code: "rate_limited" } }
+//                with Retry-After. Fails open when a binding is missing or errors (callers already hold the secret).
 // Never log message text, sender ids or keys: log() fields are event metadata only.
 
 import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } from "@mpt/utils";
@@ -29,7 +32,12 @@ type Env = {
   QWEN_BASE_URL?: string;
   QWEN_MODEL?: string;
   LOG_LEVEL?: string;
+  /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional: absent means no limit (fail open). */
+  RATE_LIMITER?: RateLimiter;
+  RATE_LIMITER_GLOBAL?: RateLimiter;
 };
+
+type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
 type Intent = "scan" | "help" | "verify" | "unknown";
 type Inbound = { platform: string; senderId: string; text: string; locale: string };
@@ -278,8 +286,37 @@ async function readAuthorizedJson(request: Request, env: Env, log: Logger, autho
   }
 }
 
+const RATE_LIMIT_RETRY_AFTER_SECONDS = "60";
+
+/**
+ * MPC-7257: true when this sender (or the whole Worker) is over its limit. Keys are `platform:sender_id` for the
+ * per-sender binding and a fixed key for the global one; neither is logged. A missing binding or a limiter error
+ * fails open: every caller has already passed the shared-secret check, and a limiter outage must not take the brain down.
+ */
+async function isRateLimited(msg: Inbound, env: Env, log: Logger): Promise<boolean> {
+  const checks: [string, RateLimiter | undefined, string][] = [
+    ["sender", env.RATE_LIMITER, `${msg.platform}:${msg.senderId}`],
+    ["global", env.RATE_LIMITER_GLOBAL, "core-brain"],
+  ];
+  for (const [scope, limiter, key] of checks) {
+    if (!limiter) continue;
+    try {
+      if (!(await limiter.limit({ key })).success) {
+        log.warn("rate_limited", { scope, platform: msg.platform });
+        return true;
+      }
+    } catch (err) {
+      log.warn("rate_limiter_error", { scope, error: (err as Error).name });
+    }
+  }
+  return false;
+}
+
 /** Intent + state -> localized response keys. Shared by /webhook and /ingest/social. */
 async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
+  if (await isRateLimited(msg, env, log)) {
+    return json({ error: { code: "rate_limited", message: "Too many requests" } }, 429, { "retry-after": RATE_LIMIT_RETRY_AFTER_SECONDS });
+  }
   const st = await lookupState(msg, env, log);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).

@@ -36,11 +36,12 @@ check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spo
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
-check(/48 hours/.test(conf.text) && /does not do yet/i.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation promises 48h, removal steps, states gaps; no score/breach-lookup promise');
+check(conf.subject === 'Your privacy scan is starting' && /publicly available, open-source data/.test(conf.text) && /not using any paid tools or private databases/.test(conf.text) && /Alice, our AI guide, will search/.test(conf.text) && !/AI Bot/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && /Usernames/.test(conf.text) && /hexagon/i.test(conf.text) && !/image tiles/.test(conf.text) && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 8 && /Phone numbers/.test(conf.text) && /Physical addresses/.test(conf.text) && /We never sell your data/.test(conf.text) && !/20\+|46 data|AI-platform|privacy score from 0/i.test(conf.text), 'confirmation: "scan is starting" copy, public/open-source data only, no paid tools, no score or old over-promises');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
-check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /not yet checked/i.test(rep.text), 'free report: no score, self-check HIBP link, not yet checked');
+check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
 check(/Partial score/.test(rep2.text) && rep2.subject.includes('(partial)'), 'with HIBP: partial score labelled');
+check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includes('/email/alice/alice-peek.gif') && /AI guide/.test(rep.html), 'report email: Alice hero, tagline and image');
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
@@ -53,7 +54,7 @@ function fake(opts = {}) {
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
-    if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, ...x }));
+    if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (rows.length > 1 && new Set(rows.map((x) => Object.keys(x).filter((k) => !['id', 'report_status', 'report_attempts'].includes(k)).sort().join(','))).size > 1) return res(400, { code: 'PGRST102', message: 'All object keys must match' });   // PostgREST bulk-insert rule
@@ -66,6 +67,7 @@ function fake(opts = {}) {
     const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
+    if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
     if (t === 'scans' && q.get('or')) rows = rows.slice(Number(q.get('offset') || 0), Number(q.get('offset') || 0) + Number(q.get('limit') || rows.length));   // oldest first = insertion order
     return res(200, rows);
   };
@@ -96,7 +98,7 @@ F = fake(); await handleScan({ ...env, HIBP_API_KEY: undefined }, null, input, F
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'false' }, F.f);
 check(res.held === 1 && F.db.scans[0].report_status === 'pending' && F.calls.filter((c) => c.url.includes('resend')).length === 1, 'no HIBP key + ALLOW_PARTIAL_REPORT=false => report held (pending)');
 res = await runReportJob({ ...env, HIBP_API_KEY: undefined, ALLOW_PARTIAL_REPORT: 'true' }, F.f);
-check(res.sent === 1 && /not yet checked/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not yet checked; privacy_score stays null');
+check(res.sent === 1 && /have not checked your email/i.test(JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body).text) && F.db.scans[0].privacy_score === null, 'free mode sends report; breaches not checked; privacy_score stays null');
 
 // allowlist blocks real users
 F = fake(); await handleScan({ ...env, RECIPIENT_ALLOWLIST: 'someone@else.com' }, null, input, F.f);
@@ -125,7 +127,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
   check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
   const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, mirror: free });
-  check(/YOUR MIRROR/.test(repM.text) && /Data broker profiles: not yet checked/.test(repM.text) && !/\/100/.test(repM.text), 'report email renders the mirror, still no invented score');
+  check(/YOUR HEXAGONS \(0 of 8 filled in/.test(repM.text) && /Empty hexagons \(we have not searched these yet\): .*Data broker profiles/.test(repM.text) && !/\/100/.test(repM.text) && repM.html.includes('/email/hex/broker-empty.png') && !repM.html.includes('-found.png'), 'report email renders hexagon images: all empty when nothing is checked, empty ones on one line in text, still no invented score');
 
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 2 * 864e5).toISOString(), followup_stage: 0 }) === 0, 'follow-up: not due before day 3');
   check(nextFollowUp({ report_sent_at: new Date(Date.now() - 4 * 864e5).toISOString(), followup_stage: 0 }) === 1, 'follow-up: stage 1 due after day 3');
@@ -163,8 +165,14 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const t = await unsubscribeToken('s3cret', EMAIL);
   const bad = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`), OB, {});
   check(bad.status === 400 && !F.db.users[0].email_opt_out_at, 'unsubscribe: bad token => 400, nothing changed');
-  const good = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=${t}`), OB, {});
-  check(good.status === 200 && F.db.users[0].email_opt_out_at, 'unsubscribe: valid link opts the user out');
+  const qs = `e=${encodeURIComponent(EMAIL)}&t=${t}`;
+  const peek = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`), OB, {});
+  const peekHtml = await peek.text();
+  check(peek.status === 200 && !F.db.users[0].email_opt_out_at && /<form method="POST"/.test(peekHtml) && /noindex/.test(peekHtml) && !peekHtml.includes(EMAIL), 'unsubscribe: GET (what a mail scanner does) only shows a confirm page, opts nobody out, does not print the address');
+  const good = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
+  check(good.status === 200 && F.db.users[0].email_opt_out_at && /You are unsubscribed/.test(await good.text()), 'unsubscribe: POST (button or one-click) opts the user out');
+  const badPost = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`, { method: 'POST' }), OB, {});
+  check(badPost.status === 400, 'unsubscribe: POST with a bad token => 400');
   check((await runFollowUpJob(OB, F.f)).skipped === 1 && resendCount(F) === 2, 'opted-out user gets no follow-up');
 
   // Real launch (empty allowlist): cohort slots are claimed in order; non-members get no follow-ups; full cohort => null.
@@ -213,5 +221,89 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(sentIds().length === 10 && sentIds().at(-1) === 'held9', 'drain: second run reports the next 5 oldest');
   await runReportJob(open, F.f);
   check(sentIds().length === 12 && F.db.scans.every((x) => x.report_status === 'sent' && x.report_attempts === 1), 'drain: queue empties, each scan attempted exactly once');
+}
+// ---- unsubscribe link in the confirmation and report emails
+{
+  const sent = (F) => F.calls.filter((c) => c.url.includes('resend')).map((c) => ({ ...JSON.parse(c.body), hdr: JSON.parse(c.body).headers }));
+  let F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f);
+  const [conf, rep] = sent(F);
+  const linkRe = /https:\/\/myprivacytool\.io\/unsubscribe\?e=[^&\s"<]+(?:&amp;|&)t=[0-9a-f]{64}/;   // email bodies link to the branded site page (html escapes & as &amp;)
+  check(linkRe.test(conf.text) && linkRe.test(conf.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(conf.hdr['List-Unsubscribe']), 'confirmation email: signed site-page unsubscribe link in text and html, Worker link in the List-Unsubscribe header');
+  check(linkRe.test(rep.text) && linkRe.test(rep.html) && /^<https:\/\/.+\/api\/unsubscribe\?/.test(rep.hdr['List-Unsubscribe']) && rep.hdr['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'report email: signed site-page unsubscribe link in text and html, Worker link + one-click in the header');
+  check(/Fixed what is in this report/.test(rep.text) && /Fixed what is in this report/.test(rep.html) && /no more follow-up or marketing/.test(rep.text), 'report email invites unsubscribing once the findings are fixed');
+  check(rep.html.includes('mailto:hello@myprivacytool.io') && rep.html.includes('href="https://myprivacytool.io/"'), 'report email footer: contact address and site link');
+  globalThis.fetch = F.f;
+  const m = rep.text.match(/unsubscribe\?e=([^&\s]+)&t=([0-9a-f]{64})/);
+  const ok = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${m[1]}&t=${m[2]}`, { method: 'POST' }), OB, {});
+  check(ok.status === 200 && F.db.users[0].email_opt_out_at, 'the link in the report email really opts the user out');
+  F = fake(); await handleScan(env, null, input, F.f); await runReportJob(env, F.f);
+  const [c2, r2] = sent(F);
+  check(!/unsubscribe/i.test(c2.html + r2.html) && !c2.hdr && !r2.hdr, 'no UNSUBSCRIBE_SECRET: emails carry no broken unsubscribe link or header');
+}
+// ---- website unsubscribe page: JSON opt-out and the emailed confirmation link
+{
+  const origin = 'https://myprivacytool.io';
+  const mk = (path, init = {}) => new Request(`https://x${path}`, init);
+  let F = fake(); await handleScan(OB, null, input, F.f); await runReportJob(OB, F.f);
+  globalThis.fetch = F.f;
+  const t = await unsubscribeToken('s3cret', EMAIL);
+  const qs = `e=${encodeURIComponent(EMAIL)}&t=${t}`;
+  const bad = await worker.fetch(mk(`/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`, { method: 'POST', headers: { Accept: 'application/json', Origin: origin } }), OB, {});
+  check(bad.status === 400 && (await bad.json()).ok === false && !F.db.users[0].email_opt_out_at, 'website opt-out: bad token => 400 JSON, nothing changed');
+  const done = await worker.fetch(mk(`/api/unsubscribe?${qs}`, { method: 'POST', headers: { Accept: 'application/json', Origin: origin } }), OB, {});
+  check(done.status === 200 && (await done.json()).ok === true && done.headers.get('Access-Control-Allow-Origin') === origin && F.db.users[0].email_opt_out_at, 'website opt-out: POST with Accept JSON opts out, answers JSON with CORS for the site origin');
+
+  // request form: emails a confirmation link to that address only, never reveals whether the address is known
+  const reqUnsub = (F2, email, o = origin, extra = {}) => worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: o }, body: JSON.stringify({ email }), ...extra }), OB, {});
+  const sentTo = (F2) => F2.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));
+  F = fake(); await handleScan(OB, null, input, F.f); globalThis.fetch = F.f;
+  const before = sentTo(F).length;
+  let r = await reqUnsub(F, EMAIL);
+  const mails = sentTo(F).slice(before);
+  check(r.status === 200 && (await r.json()).ok === true && mails.length === 1 && mails[0].to[0] === EMAIL && /https:\/\/myprivacytool\.io\/unsubscribe\?e=[^\s]+&t=[0-9a-f]{64}/.test(mails[0].text) && /Confirm that you want to unsubscribe/.test(mails[0].subject), 'unsubscribe request: known address gets one confirmation email with a signed site link');
+  r = await reqUnsub(F, 'stranger@example.com');
+  const strangerBody = await r.json();
+  check(r.status === 200 && strangerBody.ok === true && sentTo(F).length === before + 1, 'unsubscribe request: unknown address gets the same answer and no email (no lookup oracle)');
+  F.db.users[0].email_opt_out_at = new Date().toISOString();
+  await reqUnsub(F, EMAIL);
+  check(sentTo(F).length === before + 1, 'unsubscribe request: already-unsubscribed address gets no email');
+  check((await reqUnsub(F, 'not-an-email')).status === 400, 'unsubscribe request: invalid email => 400');
+  check((await reqUnsub(F, EMAIL, 'https://evil.example')).status === 403, 'unsubscribe request: foreign browser origin => 403');
+  const limited = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, RATE_LIMITER: { limit: async () => ({ success: false }) } }, {});
+  check(limited.status === 429, 'unsubscribe request: rate limiter denial => 429');
+  const noSecret = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, UNSUBSCRIBE_SECRET: undefined }, {});
+  check(noSecret.status === 503, 'unsubscribe request: not configured => 503, no email');
+}
+// ---- unsubscribe before the report: no report is sent (found live 2026-10-10: report went out 2 min after an unsubscribe)
+{
+  const resends = (F) => F.calls.filter((c) => c.url.includes('resend'));
+  const later = (ms) => new Date(Date.now() + ms).toISOString();
+  // unsubscribed after requesting the scan, before the report job ran
+  let F = fake(); await handleScan(OB, null, input, F.f);
+  const sentBefore = resends(F).length;
+  F.db.users[0].email_opt_out_at = later(1000);
+  let o = await runReportJob(OB, F.f);
+  check(o.sent === 0 && o.cancelled === 1 && resends(F).length === sentBefore, 'unsubscribed before the report: no report email is sent');
+  check(F.db.scans[0].report_status === 'failed' && /unsubscribed/.test(F.db.scans[0].report_last_error) && F.db.scans[0].report_attempts === 0, 'unsubscribed before the report: scan is taken out of the queue with the reason on the row, no attempt counted');
+  o = await runReportJob(OB, F.f);
+  check(o.cancelled === 0 && resends(F).length === sentBefore, 'cancelled scan is not looked at again');
+
+  // a new scan requested AFTER unsubscribing is a fresh request: it still gets its report; follow-ups stay off
+  F = fake(); await handleScan(OB, null, input, F.f);
+  F.db.users[0].email_opt_out_at = new Date(Date.now() - 60000).toISOString();
+  o = await runReportJob(OB, F.f);
+  check(o.sent === 1 && F.db.scans[0].report_status === 'sent', 'scan requested after an earlier unsubscribe still gets its report');
+  F.db.scans[0].report_sent_at = new Date(Date.now() - 4 * 864e5).toISOString();
+  const beforeFollow = resends(F).length;
+  check((await runFollowUpJob(OB, F.f)).sent === 0 && resends(F).length === beforeFollow, 'and the opted-out user still gets no follow-up');
+
+  // six cancelled scans ahead must not block the next real scan (same shape as the held-scan bug), no allowlist
+  const open = { ...OB, RECIPIENT_ALLOWLIST: '' };
+  F = fake();
+  F.db.users.push(...Array.from({ length: 6 }, (_, i) => ({ id: `ou${i}`, email: `optout${i}@example.com`, email_opt_out_at: later(60000) })));
+  F.db.scans.push(...Array.from({ length: 6 }, (_, i) => ({ id: `old${i}`, user_id: `ou${i}`, email_scanned: `optout${i}@example.com`, confirmation_sent_at: new Date().toISOString(), report_status: 'pending', report_attempts: 0, report_due_at: later(864e5), created_at: new Date(Date.now() - 3600e3).toISOString() })));
+  await handleScan(open, null, { ...input, email: 'real@example.com' }, F.f);
+  o = await runReportJob(open, F.f);
+  check(o.cancelled === 6 && o.sent === 1 && F.db.scans.find((x) => x.email_scanned === 'real@example.com').report_status === 'sent' && resends(F).every((c) => JSON.parse(c.body).to[0] === 'real@example.com'), 'six cancelled scans ahead do not block the next real scan, and nothing is mailed to them');
 }
 process.exit(ok ? 0 : 1);

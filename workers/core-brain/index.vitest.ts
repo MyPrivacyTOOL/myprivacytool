@@ -427,3 +427,69 @@ describe("POST /ingest/social (MPC-8301 hand-off)", () => {
     expect((await ingest({ source: "myspace", payload: {} })).status).toBe(400);
   });
 });
+
+describe("rate limiting (MPC-7257)", () => {
+  // Fake Workers Rate Limiting binding: allows `max` calls per key, then refuses. Records every key it is asked about.
+  const limiter = (max: number) => {
+    const seen = new Map<string, number>();
+    const keys: string[] = [];
+    return { keys, limit: async ({ key }: { key: string }) => { keys.push(key); const n = (seen.get(key) ?? 0) + 1; seen.set(key, n); return { success: n <= max }; } };
+  };
+
+  it("lets 10 requests through and returns 429 on the 11th, with Retry-After and the shared error shape", async () => {
+    stub({ qwen: { intent: "help", confidence: 0.9 } });
+    const e = { ...env, RATE_LIMITER: limiter(10) };
+    for (let i = 0; i < 10; i++) expect((await post(msg("help"), undefined, e)).status).toBe(200);
+    const before = calls.length;
+    const res = await worker.fetch(new Request("https://brain.test/webhook", { method: "POST", headers: { "x-mpt-webhook-secret": env.WEBHOOK_SECRET }, body: JSON.stringify(msg("help")) }), e);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("60");
+    expect(await res.json()).toEqual({ error: { code: "rate_limited", message: "Too many requests" } });
+    expect(calls.length).toBe(before); // no Qwen or Supabase call for a throttled request
+  });
+
+  it("limits each sender separately, keyed by platform:sender_id", async () => {
+    stub({ qwen: { intent: "help", confidence: 0.9 } });
+    const l = limiter(1);
+    const e = { ...env, RATE_LIMITER: l };
+    expect((await post(msg("help", { sender_id: "1" }), undefined, e)).status).toBe(200);
+    expect((await post(msg("help", { sender_id: "1" }), undefined, e)).status).toBe(429);
+    expect((await post(msg("help", { sender_id: "2" }), undefined, e)).status).toBe(200);
+    expect(l.keys).toEqual(["telegram:1", "telegram:1", "telegram:2"]);
+  });
+
+  it("applies the global backstop after the per-sender check", async () => {
+    stub({ qwen: { intent: "help", confidence: 0.9 } });
+    const e = { ...env, RATE_LIMITER: limiter(10), RATE_LIMITER_GLOBAL: limiter(2) };
+    expect((await post(msg("help", { sender_id: "1" }), undefined, e)).status).toBe(200);
+    expect((await post(msg("help", { sender_id: "2" }), undefined, e)).status).toBe(200);
+    expect((await post(msg("help", { sender_id: "3" }), undefined, e)).status).toBe(429);
+  });
+
+  it("does not consume the limit for requests that fail auth or validation", async () => {
+    stub({});
+    const l = limiter(10);
+    const e = { ...env, RATE_LIMITER: l };
+    expect((await post(msg("help"), {}, e)).status).toBe(401);
+    expect((await post("not json", undefined, e)).status).toBe(400);
+    expect(l.keys).toEqual([]);
+  });
+
+  it("fails open when the binding is missing or throws", async () => {
+    stub({ qwen: { intent: "help", confidence: 0.9 } });
+    expect((await post(msg("help"))).status).toBe(200);
+    const broken = { limit: async () => { throw new Error("boom"); } };
+    expect((await post(msg("help"), undefined, { ...env, RATE_LIMITER: broken })).status).toBe(200);
+  });
+
+  it("never logs the sender id or message text when throttling", async () => {
+    stub({});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await post(msg("my secret text", { sender_id: "sender-777" }), undefined, { ...env, RATE_LIMITER: limiter(0) });
+    const out = JSON.stringify([...log.mock.calls, ...warn.mock.calls]);
+    expect(out).toContain("rate_limited");
+    expect(out).not.toContain("sender-777");
+    expect(out).not.toContain("my secret text");
+  });
+});

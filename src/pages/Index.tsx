@@ -18,6 +18,7 @@ import {
   trackNewsletterSignup
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
+import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -130,16 +131,21 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Load HubSpot embed script dynamically
+  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
-    if (document.getElementById(scriptId)) return;
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
-    script.defer = true;
-    document.body.appendChild(script);
+    const load = () => {
+      if (!hasConsent() || document.getElementById(scriptId)) return;
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
+      script.defer = true;
+      document.body.appendChild(script);
+    };
+    load();
+    const unsubscribe = onConsentChange(load);
     return () => {
+      unsubscribe();
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };
@@ -275,6 +281,20 @@ const Index = () => {
             </Button>
           </div>
         </section>
+
+        {/* Trust strip (MPC-6545): links only, no claims beyond what /trust and /privacy already state */}
+        <nav
+          className="pb-4 px-4 text-center text-xs text-muted-foreground"
+          aria-label="Trust and legal"
+        >
+          <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <li><Link to="/trust" className="underline hover:text-foreground">Trust Centre</Link></li>
+            <li><Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link></li>
+            <li><Link to="/cookies" className="underline hover:text-foreground">Cookie Policy</Link></li>
+            <li><Link to="/terms" className="underline hover:text-foreground">Terms</Link></li>
+            <li><Link to="/dpa" className="underline hover:text-foreground">DPA</Link></li>
+          </ul>
+        </nav>
 
         {/* Newsletter Sign-Up */}
         <section ref={footerRef} className="py-4 mt-12" aria-label="Newsletter sign-up">

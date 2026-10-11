@@ -28,6 +28,8 @@ HIBP's Core plan only searches domains you have proven you own, so it cannot loo
 ## First-100 onboarding (MPC-7261)
 Mirror Report, cohort numbers and day 3 / day 7 follow-ups: see `docs/first-100-onboarding-mpc-7261.md`. Follow-ups stay off until the optional `UNSUBSCRIBE_SECRET` secret is set.
 
+Unsubscribe (needs `UNSUBSCRIBE_SECRET`): the website page `/unsubscribe` is the user-facing flow. Email bodies link to `https://myprivacytool.io/unsubscribe?e=<address>&t=<signed token>` (override the base with `SITE_URL`), which shows a confirm button; pressing it calls `POST /api/unsubscribe?e=&t=` with `Accept: application/json`. A visitor without a link types their address on the page, which calls `POST /api/unsubscribe-request {email}`; we email a confirmation link to that address only and answer the same way whether or not it is on our list. `GET /api/unsubscribe` never opts anyone out (mail scanners open links); it shows a confirm page, and the `List-Unsubscribe` header uses the POST one-click form. The opt-out sets `users.email_opt_out_at`, which the follow-up job checks. The report job also checks it: a scan whose user unsubscribed after requesting it is cancelled (`report_status='failed'`, `report_last_error='cancelled: unsubscribed before the report was sent'`) and never emailed; a scan requested after an unsubscribe still gets its report. It does not yet update the newsletter `subscribers` table or HubSpot (follow-up).
+
 ## Secrets (names only; set with `wrangler secret put`)
 `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`.
 
