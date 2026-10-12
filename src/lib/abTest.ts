@@ -37,6 +37,7 @@ export const EXPERIMENTS = {
       { id: "control", weight: 50 }, // "Check My Exposure"
       { id: "early_access", weight: 50 }, // "Get early access, free"
     ],
+  },
   // /pricing experiments (MPC-7638). Four independent tests, each switched off until its flag is "true".
   // Concurrent tests are bucketed independently; read each one on its own (experiment_id breakdown).
   pricing_headline: {
