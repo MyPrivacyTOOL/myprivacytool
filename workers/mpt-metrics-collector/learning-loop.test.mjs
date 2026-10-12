@@ -28,7 +28,7 @@ const json = (b, status = 200) => ({ ok: status < 400, status, headers: new Head
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const body = opts.body ? JSON.parse(opts.body) : null;
   if (url.endsWith('/rest/v1/rpc/mpt_learning_loop')) { rpcCalls.push(body); return json(rawRows.length ? PAYLOAD : null); }
-  if (url.endsWith('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') { inserts.push(body); return { ok: true, status: 201 }; }
+  if (url.endsWith('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') { inserts.push(...[].concat(body)); return { ok: true, status: 201 }; }
   if (url.includes('/rest/v1/mpt_raw_metrics') && url.includes('source=eq.ga4')) return json(ga4Rows);
   if (url.includes('/rest/v1/mpt_raw_metrics')) return json(rawRows);
   if (url.includes('/rest/v1/')) return json([]);

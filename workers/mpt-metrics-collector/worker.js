@@ -23,7 +23,9 @@ const SAFE = (msg, env) => {
   return s.slice(0, 500);
 };
 
-async function insertRow(env, row) {
+// Inserts one row or an array of rows in a single request. Workers allow a limited number of outbound calls per
+// invocation (50 on the free plan), so runAll() sends all rows together instead of one call per collector.
+async function insertRows(env, rows) {
   const res = await fetch(`${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics`, {
     method: 'POST',
     headers: {
@@ -32,13 +34,13 @@ async function insertRow(env, row) {
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
-    body: JSON.stringify(row),
+    body: JSON.stringify(rows),
   });
-  if (!res.ok) throw new Error(`insert ${row.source} failed: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`insert ${[rows].flat().map((r) => r.source).join(',')} failed: HTTP ${res.status}`);
 }
 
 export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
-  const results = [];
+  const rows = [];
   const dayStart = hkDayStart(now); // default period: today so far, Hong Kong day
   for (const c of collectors) {
     if (c.skip?.(now)) continue; // e.g. GA4 weekly report runs on Mondays only
@@ -56,10 +58,19 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
     } catch (e) {
       row.status = 'error'; row.error = SAFE(e?.message, env);
     }
-    try { await insertRow(env, row); results.push({ source: c.source, status: row.status, stored: true }); }
-    catch (e) { results.push({ source: c.source, status: 'error', stored: false, error: SAFE(e?.message, env) }); }
+    rows.push(row);
   }
-  return results;
+  if (!rows.length) return [];
+  const result = (row, stored, e) => (stored ? { source: row.source, status: row.status, stored: true } : { source: row.source, status: 'error', stored: false, error: SAFE(e?.message, env) });
+  try { await insertRows(env, rows); return rows.map((r) => result(r, true)); }
+  catch (batchError) {
+    // The batch is all-or-nothing: fall back to one row at a time so a single bad row never loses the others.
+    const results = [];
+    for (const r of rows) {
+      try { await insertRows(env, [r]); results.push(result(r, true)); } catch (e) { results.push(result(r, false, e)); }
+    }
+    return results.length ? results : [result(rows[0], false, batchError)];
+  }
 }
 
 const previousHkDate = (now) => hkDate(new Date(now.getTime() - 86400000));
