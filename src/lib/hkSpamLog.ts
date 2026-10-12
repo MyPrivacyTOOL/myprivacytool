@@ -3,7 +3,9 @@
 export const SPAM_LOG_KEY = "mpt_hk_spam_log";
 export const SPAM_LOG_MAX = 200;
 
-export type SpamKind = "call" | "sms";
+/** "call" is the pre-split kind from the first release; it is still read and shown, never written. */
+export type SpamKind = "sms" | "recorded" | "live" | "call";
+export const SPAM_KINDS: readonly SpamKind[] = ["sms", "recorded", "live"];
 
 export interface SpamLogEntry {
   id: string;
@@ -19,7 +21,7 @@ function isEntry(v: unknown): v is SpamLogEntry {
   const e = v as Record<string, unknown>;
   return (
     typeof e.id === "string" &&
-    (e.kind === "call" || e.kind === "sms") &&
+    (e.kind === "call" || e.kind === "sms" || e.kind === "recorded" || e.kind === "live") &&
     typeof e.sender === "string" &&
     typeof e.note === "string" &&
     typeof e.at === "string"
@@ -82,9 +84,49 @@ export function spamLogToText(entries: SpamLogEntry[], lang: "en" | "zh"): strin
     timeStyle: "short",
     timeZone: "Asia/Hong_Kong",
   });
-  const kind = (k: SpamKind) => (lang === "zh" ? (k === "call" ? "來電" : "短訊") : k === "call" ? "Call" : "SMS");
   return [...entries]
     .reverse()
-    .map((e) => `${fmt.format(new Date(e.at))} | ${kind(e.kind)} | ${e.sender}${e.note ? ` | ${e.note}` : ""}`)
+    .map((e) => `${fmt.format(new Date(e.at))} | ${spamKindLabel(e.kind, lang)} | ${e.sender}${e.note ? ` | ${e.note}` : ""}`)
     .join("\n");
+}
+
+const KIND_LABEL: Record<"en" | "zh", Record<SpamKind, string>> = {
+  en: { sms: "SMS", recorded: "Recorded call", live: "Live call", call: "Call" },
+  zh: { sms: "短訊", recorded: "錄音來電", live: "真人來電", call: "來電" },
+};
+export function spamKindLabel(k: SpamKind, lang: "en" | "zh"): string {
+  return KIND_LABEL[lang][k];
+}
+
+function csvCell(v: string): string {
+  // Quote every cell; also defuse spreadsheet formulas (a leading = + - @ would run when opened in Excel).
+  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+/** CSV for the export button: number/sender, Hong Kong date and time, type, note. Oldest first. */
+export function spamLogToCsv(entries: SpamLogEntry[], lang: "en" | "zh"): string {
+  const head = lang === "zh" ? ["號碼或發送者", "日期及時間（香港）", "類別", "備註"] : ["Number or sender", "Date and time (Hong Kong)", "Type", "Note"];
+  const fmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Hong_Kong", hour12: false });
+  const rows = [...entries].reverse().map((e) => [e.sender, fmt.format(new Date(e.at)), spamKindLabel(e.kind, lang), e.note]);
+  // BOM so Excel reads the Chinese headings as UTF-8.
+  return `\uFEFF${[head, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n")}\r\n`;
+}
+
+/** Saves the CSV through a temporary download link. Resolves false when the browser blocks it; never throws. */
+export function downloadSpamLog(entries: SpamLogEntry[], lang: "en" | "zh"): boolean {
+  try {
+    const blob = new Blob([spamLogToCsv(entries, lang)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "hk-spam-log.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  }
 }

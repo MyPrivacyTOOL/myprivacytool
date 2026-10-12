@@ -1,15 +1,25 @@
 // MPC-7446: /HongKongSpam landing page. IVR_VERIFIED is false, so the public view must never list keys or claim
 // auto-send; only an internal preview shows the placeholders, under an "unverified" banner.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderPage } from "@/test/render";
 
-const flags = vi.hoisted(() => ({ preview: false }));
+const flags = vi.hoisted(() => ({ preview: false, enabled: true, hk: true }));
 
 vi.mock("@/config/hkSpamPage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/config/hkSpamPage")>()),
   isHkSpamPreview: () => flags.preview,
+  get HK_SPAM_ENABLED() {
+    return flags.enabled;
+  },
+}));
+
+// The geo lookup is its own module (MPC-7450); the page tests decide the answer so fetch counts stay exact.
+vi.mock("@/lib/hkVisitor", () => ({
+  isHongKongVisitor: async () => flags.hk,
+  hasHongKongOverride: () => false,
+  setHongKongOverride: vi.fn(),
 }));
 
 import HongKongSpam from "./HongKongSpam";
@@ -36,6 +46,8 @@ const noNavigate = (el: HTMLElement) => el.addEventListener("click", (e) => e.pr
 
 beforeEach(() => {
   flags.preview = false;
+  flags.enabled = true;
+  flags.hk = true;
   localStorage.clear();
   sessionStorage.clear();
   gtag = vi.fn();
@@ -237,17 +249,25 @@ describe("scan CTA, opt-out generator, spam log, FAQ, disclaimer", () => {
     expect(events()).toContain("hk_spam_scan_click");
   });
 
-  it("generates an opt-out message and tracks hk_spam_optout_generated without the company name", async () => {
+  it("ticks generic sender types, writes one copy-paste message each and tracks hk_spam_optout_generated without any names", async () => {
     const user = userEvent.setup();
     renderEn();
-    await user.type(screen.getByLabelText("Company or bank"), "Acme Bank");
+    for (const label of ["Banks", "Phone and mobile companies", "Shops and retailers", "Loyalty and rewards schemes"]) {
+      expect(screen.getByRole("checkbox", { name: label })).not.toBeChecked();
+    }
+    await user.click(screen.getByRole("button", { name: "Write my opt-out messages" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/tick at least one/i);
+    expect(events()).not.toContain("hk_spam_optout_generated");
+    await user.click(screen.getByRole("checkbox", { name: "Banks" }));
+    await user.click(screen.getByRole("checkbox", { name: "Loyalty and rewards schemes" }));
     await user.selectOptions(screen.getByLabelText("Send it by"), "email");
-    await user.click(screen.getByRole("button", { name: "Write my opt-out message" }));
-    const box = screen.getByRole("textbox", { name: /stop companies you said yes to/i }) as HTMLTextAreaElement;
-    expect(box.value).toContain("Acme Bank");
-    expect(box.value.startsWith("Subject:")).toBe(true);
-    expect(paramsOf("hk_spam_optout_generated")).toMatchObject({ channel: "email", language: "en" });
-    expect(JSON.stringify(gtag.mock.calls)).not.toContain("Acme");
+    await user.click(screen.getByRole("button", { name: "Write my opt-out messages" }));
+    const bank = screen.getByLabelText(/message for banks/i) as HTMLTextAreaElement;
+    expect(bank.value.startsWith("Subject:")).toBe(true);
+    expect(bank.value).toContain("my bank");
+    expect(screen.getByLabelText(/message for loyalty/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/message for shops/i)).not.toBeInTheDocument();
+    expect(paramsOf("hk_spam_optout_generated")).toMatchObject({ channel: "email", language: "en", sender_types: 2 });
   });
 
   it("logs spam on this device only, tracks hk_spam_log_added, and can remove and clear", async () => {
@@ -256,17 +276,20 @@ describe("scan CTA, opt-out generator, spam log, FAQ, disclaimer", () => {
     renderEn();
     expect(screen.getByText("Nothing logged yet.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add to log" })).toBeDisabled();
-    await user.type(screen.getByLabelText("Number or sender"), "+852 5555 0000");
+    await user.selectOptions(screen.getByLabelText("Type"), "recorded");
+    await user.type(screen.getByLabelText("Number"), "+852 5555 0000");
     await user.click(screen.getByRole("button", { name: "Add to log" }));
     const list = screen.getByTestId("hk-log-list");
     expect(within(list).getByText(/\+852 5555 0000/)).toBeInTheDocument();
+    expect(within(list).getByText("Recorded call")).toBeInTheDocument();
+    expect(screen.getByTestId("hk-log-export")).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem("mpt_hk_spam_log") as string)).toHaveLength(1);
     expect(events()).toContain("hk_spam_log_added");
     expect(JSON.stringify(gtag.mock.calls)).not.toContain("5555");
     expect(f).not.toHaveBeenCalled(); // the log never leaves the device
     await user.click(screen.getByRole("button", { name: "Remove" }));
     expect(screen.getByText("Nothing logged yet.")).toBeInTheDocument();
-    await user.type(screen.getByLabelText("Number or sender"), "x");
+    await user.type(screen.getByLabelText("Number"), "x");
     await user.click(screen.getByRole("button", { name: "Add to log" }));
     await user.click(screen.getByRole("button", { name: "Clear log" }));
     expect(JSON.parse(localStorage.getItem("mpt_hk_spam_log") as string)).toEqual([]);
@@ -303,5 +326,67 @@ describe("SEO head and routing", () => {
     window.history.pushState({}, "", `${ROUTE}?lang=zh`);
     renderEn("/hongkongspam");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("一鍵拒收香港垃圾來電及短訊");
+  });
+});
+
+describe("Done screen extras: consent placeholder and 'Didn't work?'", () => {
+  it("marks the consent wording as a placeholder until MPC-7538 finalises it", async () => {
+    const user = userEvent.setup();
+    renderEn();
+    await user.type(screen.getByLabelText(/email me when i am protected/i), "me@example.com");
+    expect(screen.getByTestId("hk-consent-placeholder")).toHaveTextContent(/placeholder.*MPC-7538/i);
+  });
+
+  it("shows 'You're protected from [date]' and a Didn't work? link to /contact with platform and language", async () => {
+    stubFetch();
+    setUa(ANDROID);
+    const user = userEvent.setup();
+    renderEn();
+    await user.click(screen.getByRole("button", { name: /done: i have registered/i }));
+    const result = await screen.findByTestId("hk-result");
+    expect(result).toHaveTextContent(/you're protected from .*23 October 2026/i);
+    const href = screen.getByTestId("hk-didnt-work").getAttribute("href") as string;
+    expect(href.startsWith("/contact?")).toBe(true);
+    const q = new URLSearchParams(href.split("?")[1]);
+    expect(Object.fromEntries(q)).toEqual({ source: "hk-spam", platform: "android", lang: "en" });
+  });
+
+  it("attaches the Chinese language code when the page is in Traditional Chinese", async () => {
+    stubFetch();
+    window.history.pushState({}, "", `${ROUTE}?lang=zh`);
+    const user = userEvent.setup();
+    renderEn();
+    await user.click(screen.getByRole("button", { name: /完成，我已登記/ }));
+    await screen.findByTestId("hk-result");
+    expect(screen.getByTestId("hk-didnt-work").getAttribute("href")).toContain("lang=zh");
+    expect(screen.getByTestId("hk-didnt-work")).toHaveTextContent("不成功？");
+  });
+});
+
+describe("Hong Kong only and the kill switch", () => {
+  it("non-HK visitors see a short 'for Hong Kong numbers' note; HK visitors do not", async () => {
+    flags.hk = false;
+    renderEn();
+    expect(await screen.findByTestId("hk-nonhk-note")).toHaveTextContent(/for hong kong numbers/i);
+    cleanup();
+    flags.hk = true;
+    renderEn();
+    await waitFor(() => expect(screen.getByTestId("hk-dial")).toBeInTheDocument());
+    expect(screen.queryByTestId("hk-nonhk-note")).not.toBeInTheDocument();
+  });
+
+  it("override button hides the note", async () => {
+    flags.hk = false;
+    const user = userEvent.setup();
+    renderEn();
+    await user.click(await screen.findByRole("button", { name: "I have a Hong Kong number" }));
+    expect(screen.queryByTestId("hk-nonhk-note")).not.toBeInTheDocument();
+  });
+
+  it("HK_SPAM_ENABLED=false hides the page entirely (404) and sends no event", () => {
+    flags.enabled = false;
+    renderEn();
+    expect(screen.queryByTestId("hk-dial")).not.toBeInTheDocument();
+    expect(events()).toEqual([]);
   });
 });
