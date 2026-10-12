@@ -8,5 +8,6 @@ run as an artifact. Nothing is uploaded to YouTube: a person watches it and appr
 - Format and the full tool: `tools/video-pipeline/README.md`.
 - The narration must be the **approved script word for word**. Only claims on the approved
   claims list (MPC-7402) may appear.
-- Alice's drawing goes in `video-scripts/assets/alice.png` (text-free reference). Until it
-  is there, the render has no Alice and is a layout check only.
+- Alice's drawing is `video-scripts/assets/alice.png` (the text-free reference, 820 px wide, so
+  it looks soft when enlarged). Replace it with a full-size text-free file when one exists.
+  Without a file there, the render has no Alice and is a layout check only.

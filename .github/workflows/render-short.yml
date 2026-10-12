@@ -13,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'video-scripts/*.json'
+      - 'video-scripts/assets/**'
       - 'tools/video-pipeline/**'
       - '.github/workflows/render-short.yml'
   workflow_dispatch:
