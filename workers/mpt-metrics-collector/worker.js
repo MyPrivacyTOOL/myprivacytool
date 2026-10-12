@@ -9,15 +9,17 @@ import hubspot from './collectors/hubspot.js';
 import learningLoop from './collectors/learning-loop.js';
 import scanGap from './collectors/scan-gap.js';
 import edgeMachines from './collectors/edge-machines.js';
+import channelOsint from './collectors/channel-osint.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 import { publishMachineMirror } from './publishers/machine-mirror.js';
 import { hkDate } from './lib/hk.js';
+import { channelOsintConfigured, postChannelOsint, buildChannelOsintText, publishChannelOsintDay } from './publishers/channel-osint.js';
 import { KPI_CRON, publishKpiDashboard } from './publishers/kpi-dashboard.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, ...ga4Reports];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, channelOsint, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
@@ -98,6 +100,9 @@ export default {
   async scheduled(event, env, ctx) {
     // Monday 09:00 HKT digest (MPC-7383): reads the tracker only, no collection. Failure never affects the daily run.
     if (event?.cron === DIGEST_CRON) {
+      // Channel OSINT weekly note (MPC-7641) is independent of the digest: it needs no Notion token and a failure in either never stops the other.
+      if (channelOsintConfigured(env)) ctx.waitUntil(postChannelOsint(env).then((r) => console.log(JSON.stringify({ channel_osint: 'posted', ts: r.ts }))).catch((e) => console.error(`mpt-metrics-collector: channel osint summary failed: ${SAFE(e?.message, env)}`)));
+      else console.error('mpt-metrics-collector: channel osint summary skipped, SLACK_BOT_TOKEN / MPTSLACK_CHANNEL_ID not set');
       if (!digestConfigured(env)) { console.error('mpt-metrics-collector: digest skipped, NOTION_TOKEN / SLACK_BOT_TOKEN / MPTSLACK_CHANNEL_ID not set'); return; }
       ctx.waitUntil(postDigest(env).then((r) => console.log(JSON.stringify({ digest: 'posted', permalink: r.permalink, ts: r.ts }))).catch((e) => console.error(`mpt-metrics-collector: digest failed: ${SAFE(e?.message, env)}`)));
       return;
@@ -116,6 +121,8 @@ export default {
         console.log(JSON.stringify(await publishAll(env)));
         // Machine mirror page (MPC-7492): separate so a failure here never affects the other publishes.
         try { console.log(JSON.stringify(await publishMachineMirror(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: machine mirror publish failed: ${SAFE(e?.message, env)}`); }
+        // Channel OSINT dashboard rows (MPC-7641): same isolation, a failure here never affects the other publishes.
+        try { console.log(JSON.stringify(await publishChannelOsintDay(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: channel osint publish failed: ${SAFE(e?.message, env)}`); }
       }
       else console.error('mpt-metrics-collector: NOTION_TOKEN not set, Notion publish skipped');
     })());
@@ -147,6 +154,22 @@ export default {
       const day = url.searchParams.get('day') || previousHkDate(new Date());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'bad date' }, 400);
       try { return json({ result: await publishMachineMirror(env, day) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
+    }
+    // Manual Channel OSINT Notion rows (MPC-7641): POST /publish-channel-osint?day=YYYY-MM-DD, same bearer token.
+    if (url.pathname === '/publish-channel-osint' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
+      const day = url.searchParams.get('day') || previousHkDate(new Date());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'bad date' }, 400);
+      try { return json({ result: await publishChannelOsintDay(env, day) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
+    }
+    // Manual Channel OSINT weekly summary (MPC-7641): POST /channel-osint?dry=1 returns the text for the previous Hong Kong week; POST /channel-osint posts it to Slack.
+    if (url.pathname === '/channel-osint' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (!configured(env)) return json({ error: 'not configured' }, 500);
+      if (url.searchParams.get('dry') === '1') return json({ text: await buildChannelOsintText(env) });
+      if (!channelOsintConfigured(env)) return json({ error: 'not configured' }, 500);
+      try { return json(await postChannelOsint(env)); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
     }
     // Manual KPI scorecard refresh (MPC-7618): POST /publish-kpi, same bearer token.
     if (url.pathname === '/publish-kpi' && request.method === 'POST') {
