@@ -188,25 +188,67 @@ describe("Done: protection date and the one Supabase insert", () => {
     const user = userEvent.setup();
     renderEn();
     await user.type(screen.getByLabelText(/email me when i am protected/i), "me@example.com");
-    await user.click(screen.getByRole("checkbox", { name: /email me once/i }));
+    // MPC-7538: the reminder box is ticked for them once they type an email; the privacy-tips box is not
+    expect(screen.getByRole("checkbox", { name: "Send me the reminder" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: /done: i have registered/i }));
     await screen.findByTestId("hk-result");
     expect(f).toHaveBeenCalledTimes(1);
     const body = JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
-    expect(body).toMatchObject({ email: "me@example.com", reminder_consent: true });
+    expect(body).toMatchObject({ email: "me@example.com", reminder_consent: true, marketing_consent: false });
     expect(events()).toContain("hk_spam_email_submit");
     expect(JSON.stringify(gtag.mock.calls)).not.toContain("me@example.com");
     expect(screen.getByText(/reminder saved/i)).toBeInTheDocument();
   });
 
-  it("blocks an email without consent, and an invalid email, without calling the network", async () => {
+  it("shows the consent line, links it to the policy section, and has two separate boxes (MPC-7538)", async () => {
+    const user = userEvent.setup();
+    renderEn();
+    const line = screen.getByTestId("hk-consent-line");
+    expect(line).toHaveTextContent("We collect your email, your registration date, your phone type (Android, iPhone or other) and your language. We never collect your phone number.");
+    expect(line).toHaveTextContent("one reminder on the day your protection starts");
+    expect(line).toHaveTextContent("unsubscribe");
+    expect(within(line).getByRole("link", { name: "How we handle your data" })).toHaveAttribute("href", "/privacy#hk-stop-spam");
+    expect(screen.queryByRole("checkbox", { name: "Send me the reminder" })).not.toBeInTheDocument(); // the consent boxes appear once an email is typed
+    await user.type(screen.getByLabelText(/email me when i am protected/i), "a");
+    expect(screen.getByRole("checkbox", { name: "Send me the reminder" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Send me MyPrivacyTOOL privacy tips/ })).not.toBeChecked();
+  });
+
+  it("stores marketing_consent only when the privacy-tips box is ticked on its own", async () => {
+    const f = stubFetch();
+    const user = userEvent.setup();
+    renderEn();
+    await user.type(screen.getByLabelText(/email me when i am protected/i), "me@example.com");
+    await user.click(screen.getByRole("checkbox", { name: /Send me MyPrivacyTOOL privacy tips/ }));
+    await user.click(screen.getByRole("checkbox", { name: "Send me the reminder" })); // untick the reminder
+    await user.click(screen.getByRole("button", { name: /done: i have registered/i }));
+    await screen.findByTestId("hk-result");
+    const body = JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body).toMatchObject({ email: "me@example.com", reminder_consent: false, marketing_consent: true });
+    expect(screen.queryByText(/reminder saved/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the Chinese consent line, link and boxes with ?lang=zh", async () => {
+    window.history.pushState({}, "", `${ROUTE}?lang=zh`);
+    const user = userEvent.setup();
+    renderEn();
+    const line = screen.getByTestId("hk-consent-line");
+    expect(line).toHaveTextContent("但絕不收集你的電話號碼");
+    expect(within(line).getByRole("link", { name: "我們如何處理你的資料" })).toHaveAttribute("href", "/privacy#hk-stop-spam-zh");
+    await user.type(screen.getByLabelText(/保障生效時以電郵通知我/), "a");
+    expect(screen.getByRole("checkbox", { name: "請發送提醒給我" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /請向我發送 MyPrivacyTOOL 私隱貼士/ })).not.toBeChecked();
+  });
+
+  it("blocks an email with both boxes unticked, and an invalid email, without calling the network", async () => {
     const f = stubFetch();
     const user = userEvent.setup();
     renderEn();
     const input = screen.getByLabelText(/email me when i am protected/i);
     await user.type(input, "me@example.com");
+    await user.click(screen.getByRole("checkbox", { name: "Send me the reminder" })); // untick
     await user.click(screen.getByRole("button", { name: /done: i have registered/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/tick the box/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/tick a box/i);
     await user.clear(input);
     await user.type(input, "not-an-email");
     await user.click(screen.getByRole("button", { name: /done: i have registered/i }));
@@ -334,11 +376,13 @@ describe("SEO head and routing", () => {
 });
 
 describe("Done screen extras: consent placeholder and 'Didn't work?'", () => {
-  it("marks the consent wording as a placeholder until MPC-7538 finalises it", async () => {
+  it("shows the real consent wording, with no placeholder tag (MPC-7538)", async () => {
     const user = userEvent.setup();
     renderEn();
     await user.type(screen.getByLabelText(/email me when i am protected/i), "me@example.com");
-    expect(screen.getByTestId("hk-consent-placeholder")).toHaveTextContent(/placeholder.*MPC-7538/i);
+    expect(screen.queryByTestId("hk-consent-placeholder")).not.toBeInTheDocument();
+    expect(screen.queryByText(/placeholder/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("hk-consent-line")).toHaveTextContent("We never collect your phone number.");
   });
 
   it("shows 'You're protected from [date]' and a Didn't work? link to /contact with platform and language", async () => {

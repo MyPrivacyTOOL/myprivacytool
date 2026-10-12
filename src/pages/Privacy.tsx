@@ -1,8 +1,48 @@
+import { useEffect } from "react";
 import Seo from "@/components/Seo";
+import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from "@/data/hkSpamCopy";
 import pageMeta from "@/data/pageMeta.json";
 import { recognitionFlagOn } from "@/lib/webScan";
 
+// MPC-7538: one language of the HK Stop Spam section. Wording lives in src/data/hkSpamCopy.ts (MPC-7542 reviews the Chinese).
+const HkPolicyBlocks = ({ copy, id }: { copy: HkPolicyCopy; id: string }) => (
+  <div id={id} lang={copy.lang} className="scroll-mt-24">
+    <h2 className="mt-8 text-2xl font-bold text-foreground">{copy.title}</h2>
+    <p className="text-muted-foreground">{copy.intro}</p>
+    {copy.blocks.map((b) => (
+      <div key={b.heading}>
+        <h3 className="mt-4 text-xl font-semibold text-foreground">{b.heading}</h3>
+        {b.paragraphs?.map((t) => (
+          <p key={t} className="text-muted-foreground">
+            {t}
+          </p>
+        ))}
+        {b.bullets && (
+          <ul className="list-inside list-disc space-y-2 text-muted-foreground">
+            {b.bullets.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    ))}
+    <p className="text-muted-foreground">
+      <a href="https://www.dnc.gov.hk" target="_blank" rel="noopener noreferrer" className="text-brand underline hover:text-foreground">
+        {copy.ofcaLinkText}
+      </a>{" "}
+      <a href="https://www.pcpd.org.hk" target="_blank" rel="noopener noreferrer" className="text-brand underline hover:text-foreground">
+        {copy.pcpdLinkText}
+      </a>
+    </p>
+  </div>
+);
+
 const Privacy = () => {
+  // The consent line on /HongKongSpam links to #hk-stop-spam (or #hk-stop-spam-zh); the section renders after load, so scroll to it here.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id) document.getElementById(id)?.scrollIntoView?.();
+  }, []);
 
   return (
     <>
@@ -693,6 +733,11 @@ const Privacy = () => {
                   the above email
                 </p>
               </div>
+            </section>
+
+            <section className="mb-8">
+              <HkPolicyBlocks copy={HK_POLICY_EN} id={HK_POLICY_ANCHOR.en} />
+              <HkPolicyBlocks copy={HK_POLICY_ZH} id={HK_POLICY_ANCHOR.zh} />
             </section>
 
             <section className="mb-12 rounded-lg bg-muted p-6">

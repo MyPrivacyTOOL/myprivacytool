@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import Seo, { SITE_URL } from "@/components/Seo";
 import { HK_SPAM_ENABLED } from "@/config/hkDnc";
 import { HK_SPAM_INDEXABLE, HK_SPAM_META, HK_SPAM_PATH, isHkSpamPreview } from "@/config/hkSpamPage";
-import { CONSENT_WORDING_FINAL, HK_COPY, type HkCopy } from "@/data/hkSpamCopy";
+import { HK_COPY, HK_POLICY_ANCHOR, HK_POLICY_PATH, type HkCopy } from "@/data/hkSpamCopy";
 import { hasHongKongOverride, isHongKongVisitor, setHongKongOverride } from "@/lib/hkVisitor";
 import { track, getUtm } from "@/lib/hkSpamTrack";
 import { formatHkDate, readInitialLang, resolveHkDial, detectHkPlatform, storeLang, type PageLang } from "@/lib/hkSpamPage";
@@ -79,7 +79,10 @@ const HongKongSpamPage = () => {
 
   // Registration
   const [email, setEmail] = useState("");
-  const [consent, setConsent] = useState(false);
+  // MPC-7538: two separate boxes. The reminder box is ticked for the visitor when they start typing an email (they can untick it);
+  // the privacy-tips box is NEVER ticked for them.
+  const [reminder, setReminder] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [formError, setFormError] = useState("");
   const recalled = useMemo(recallRegistration, []);
   const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">(recalled ? "done" : "idle");
@@ -139,14 +142,14 @@ const HongKongSpamPage = () => {
       setFormError(copy.emailInvalid);
       return;
     }
-    if (trimmed && !consent) {
+    if (trimmed && !reminder && !marketing) {
       setFormError(copy.consentNeeded);
       return;
     }
     setFormError("");
     let row;
     try {
-      row = buildRegistrationRow({ platform, lang, email: trimmed, reminderConsent: consent });
+      row = buildRegistrationRow({ platform, lang, email: trimmed, reminderConsent: reminder, marketingConsent: marketing });
     } catch {
       setStatus("error"); // the holiday table only covers 2026-2027; never show a guessed date
       return;
@@ -158,10 +161,19 @@ const HongKongSpamPage = () => {
     rememberRegistration(row.protection_date);
     setSaved(ok);
     if (ok && row.email) {
-      setReminderSaved(true);
+      setReminderSaved(row.reminder_consent);
       track("hk_spam_email_submit", { platform, language: lang });
     }
     setStatus("done");
+  };
+
+  const onEmailChange = (value: string) => {
+    if (!email.trim() && value.trim()) setReminder(true); // first character: tick "Send me the reminder"
+    if (!value.trim()) {
+      setReminder(false);
+      setMarketing(false);
+    }
+    setEmail(value);
   };
 
   const toggleSender = (s: SenderType) =>
@@ -343,28 +355,47 @@ const HongKongSpamPage = () => {
                 inputMode="email"
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => onEmailChange(e.target.value)}
+                aria-describedby="hk-consent-line"
                 className="h-12 text-base"
               />
-              <p className="mb-3 mt-1 text-xs text-muted-foreground">{copy.emailHint}</p>
+              <p id="hk-consent-line" className="mb-3 mt-1 text-xs text-muted-foreground" data-testid="hk-consent-line">
+                {copy.consentBefore}
+                <a
+                  href={`${HK_POLICY_PATH}#${HK_POLICY_ANCHOR[lang]}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="underline hover:text-foreground"
+                >
+                  {copy.consentPolicyLink}
+                </a>
+              </p>
               {email.trim() && (
-                <label htmlFor="hk-consent" className="mb-3 flex items-start gap-2 text-sm">
-                  <input
-                    id="hk-consent"
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                    className="mt-1 h-4 w-4 shrink-0"
-                  />
-                  <span>
-                    {copy.consentLabel}
-                    {!CONSENT_WORDING_FINAL && (
-                      <strong className="mt-1 block text-xs text-destructive" data-testid="hk-consent-placeholder">
-                        [{copy.consentPlaceholderTag}]
-                      </strong>
-                    )}
-                  </span>
-                </label>
+                <div className="mb-3 space-y-2">
+                  <label htmlFor="hk-reminder" className="flex items-start gap-2 text-sm">
+                    <input
+                      id="hk-reminder"
+                      type="checkbox"
+                      checked={reminder}
+                      onChange={(e) => setReminder(e.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0"
+                    />
+                    <span>{copy.reminderLabel}</span>
+                  </label>
+                  <label htmlFor="hk-marketing" className="flex items-start gap-2 text-sm">
+                    <input
+                      id="hk-marketing"
+                      type="checkbox"
+                      checked={marketing}
+                      onChange={(e) => setMarketing(e.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0"
+                    />
+                    <span>
+                      {copy.marketingLabel}
+                      <span className="block text-xs text-muted-foreground">{copy.marketingHint}</span>
+                    </span>
+                  </label>
+                </div>
               )}
               {formError && (
                 <p role="alert" className="mb-3 border-l-4 border-destructive pl-3 text-sm">

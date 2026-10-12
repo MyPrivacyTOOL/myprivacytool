@@ -39,11 +39,14 @@ export interface HkCopy {
   keysFallback: string;
   doneTitle: string;
   emailLabel: string;
-  emailHint: string;
   emailInvalid: string;
   consentNeeded: string;
-  consentLabel: string;
-  consentPlaceholderTag: string;
+  /** MPC-7538: the consent line at the email field. policyLink is the linked part; it points at the HK Stop Spam section of the Privacy Policy. */
+  consentBefore: string;
+  consentPolicyLink: string;
+  reminderLabel: string;
+  marketingLabel: string;
+  marketingHint: string;
   doneButton: string;
   saving: string;
   resultTitle: string;
@@ -97,13 +100,6 @@ export interface HkCopy {
   };
 }
 
-/**
- * The reminder-email consent wording is a PLACEHOLDER until MPC-7538 (privacy consent + policy) finalises it. While this is
- * false the page shows a visible "placeholder" tag next to the tick-box; flip it to true in the same change that
- * pastes the final wording. Launch (HK_SPAM_INDEXABLE) is gated on MPC-7538.
- */
-export const CONSENT_WORDING_FINAL = false;
-
 export const EN: HkCopy = {
   htmlLang: "en-HK",
   toggleLabel: "繁體中文",
@@ -131,11 +127,15 @@ export const EN: HkCopy = {
   keysFallback: "Keys on screen",
   doneTitle: "Finished the call?",
   emailLabel: "Email me when I am protected (optional)",
-  emailHint: "One email on your protection date. We never store your phone number.",
   emailInvalid: "That email address does not look right.",
-  consentNeeded: "Tick the box to get the reminder, or clear the email.",
-  consentLabel: "Yes, email me once when my protection starts. I can unsubscribe at any time.",
-  consentPlaceholderTag: "PLACEHOLDER consent wording. MPC-7538 finalises it.",
+  consentNeeded: "Tick a box so we can use your email, or clear the email.",
+  consentBefore:
+    "We collect your email, your registration date, your phone type (Android, iPhone or other) and your language. We never collect your phone number. " +
+    "We use them to send you one reminder on the day your protection starts. To unsubscribe, use the link in the email or write to privacy@myprivacytool.io. ",
+  consentPolicyLink: "How we handle your data",
+  reminderLabel: "Send me the reminder",
+  marketingLabel: "Send me MyPrivacyTOOL privacy tips",
+  marketingHint: "Optional. Not needed for the reminder. You can unsubscribe at any time.",
   doneButton: "Done: I have registered",
   saving: "Saving...",
   resultTitle: "You're protected from {date}",
@@ -246,11 +246,15 @@ export const ZH: HkCopy = {
   keysFallback: "畫面顯示的按鍵",
   doneTitle: "通話完成了嗎？",
   emailLabel: "保障生效時以電郵通知我（選填）",
-  emailHint: "只會在生效當日發送一封電郵。我們不會儲存你的電話號碼。",
   emailInvalid: "電郵地址格式不正確。",
-  consentNeeded: "請剔選方格以接收提醒，或清除電郵地址。",
-  consentLabel: "是，請在保障生效時發電郵通知我一次。我可隨時取消訂閱。",
-  consentPlaceholderTag: "暫代的同意聲明文字，最終內容由 MPC-7538 確定。",
+  consentNeeded: "請剔選一個方格讓我們使用你的電郵地址，或清除電郵地址。",
+  consentBefore:
+    "我們會收集你的電郵地址、登記日期、手機類型（Android、iPhone 或其他）及語言，但絕不收集你的電話號碼。" +
+    "這些資料只用來在你的保障生效當日向你發送一封提醒電郵。如要取消訂閱，請按電郵內的連結，或電郵至 privacy@myprivacytool.io。",
+  consentPolicyLink: "我們如何處理你的資料",
+  reminderLabel: "請發送提醒給我",
+  marketingLabel: "請向我發送 MyPrivacyTOOL 私隱貼士",
+  marketingHint: "選填。接收提醒不需要剔選此項。你可隨時取消訂閱。",
   doneButton: "完成，我已登記",
   saving: "儲存中……",
   resultTitle: "你由 {date}起受保障",
@@ -335,6 +339,128 @@ export const ZH: HkCopy = {
 };
 
 export const HK_COPY: Record<PageLang, HkCopy> = { en: EN, zh: ZH };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// MPC-7538: the "HK Stop Spam" section of the Privacy Policy (src/pages/Privacy.tsx), English and Traditional Chinese (Hong Kong
+// usage). Kept here with the page strings so MPC-7542 (native Chinese review) reads them in one file. DRAFT wording: Chris
+// signs off at MPC-7545, and a lawyer should check it (not legal advice). Retention (90 days) must match the Supabase job
+// mpt_purge_expired_hk_spam and the hk_spam_retention table.
+// ---------------------------------------------------------------------------------------------------------------------
+export const HK_POLICY_ANCHOR = { en: "hk-stop-spam", zh: "hk-stop-spam-zh" } as const;
+export const HK_POLICY_PATH = "/privacy";
+export const HK_RETENTION_DAYS = 90;
+
+export interface HkPolicyBlock {
+  heading: string;
+  /** Plain paragraphs. */
+  paragraphs?: string[];
+  bullets?: string[];
+}
+export interface HkPolicyCopy {
+  lang: string;
+  title: string;
+  intro: string;
+  blocks: HkPolicyBlock[];
+  /** Text before/after the two external links in the "not OFCA" block. */
+  ofcaLinkText: string;
+  pcpdLinkText: string;
+}
+
+export const HK_POLICY_EN: HkPolicyCopy = {
+  lang: "en",
+  title: "15. HK Stop Spam (Hong Kong Do-not-call page)",
+  intro:
+    "This section covers the Stop Spam page at myprivacytool.io/HongKongSpam. It sits alongside the rest of this policy. If it differs from another section for this page, this section applies.",
+  blocks: [
+    {
+      heading: "15.1 What we hold",
+      paragraphs: [
+        "When you tap Done on the page, we save one record with your protection date (the 10th Hong Kong working day after you registered), the day you registered, your phone type (Android, iPhone or other), the page language, and the ad or link you came from if there was one.",
+        "If you also enter your email address and tick a box, we save your email address and which boxes you ticked: \"Send me the reminder\" and \"Send me MyPrivacyTOOL privacy tips\".",
+        "We never ask for, receive or store your phone number. You dial the hotline from your own phone, and we do not see the number. The spam log and opt-out messages you make on the page stay on your device.",
+      ],
+    },
+    {
+      heading: "15.2 Why we use it",
+      bullets: [
+        "To send you one reminder email on the day your protection starts, if you ticked \"Send me the reminder\".",
+        "To send you MyPrivacyTOOL privacy tips, only if you ticked that box separately. We send no marketing email to anyone who has not ticked it.",
+        "To count, without your email address, how many people use the page, if you accepted analytics cookies.",
+      ],
+    },
+    {
+      heading: "15.3 How long we keep it",
+      paragraphs: [
+        "We delete your email address and the whole record 90 days after your protection date. An automatic job runs every day to do this.",
+        "The exception is if you ticked \"Send me MyPrivacyTOOL privacy tips\". Then we keep your record until you unsubscribe or ask us to delete it. Once you unsubscribe, the 90 days apply again and the record is deleted.",
+      ],
+    },
+    {
+      heading: "15.4 Your rights and how to use them",
+      paragraphs: [
+        "Under the Personal Data (Privacy) Ordinance (PDPO) of Hong Kong you can ask to see the personal data we hold about you, ask us to correct it, and ask us to stop using it for direct marketing. You can also ask us to delete it.",
+        "To do any of these, email privacy@myprivacytool.io from the address you gave us, and say you mean HK Stop Spam. We may ask you to confirm it is your address. We aim to reply within 30 days. For a request to see your data, the PDPO allows up to 40 days.",
+        "To stop emails, use the unsubscribe link in any email from us.",
+      ],
+    },
+    {
+      heading: "15.5 We are not OFCA",
+      paragraphs: [
+        "MyPrivacyTOOL is a private company. We are not OFCA, the Communications Authority or any part of the Hong Kong Government. The Do-not-call registers are run by OFCA. We cannot register your number for you and we never see the register.",
+      ],
+    },
+  ],
+  ofcaLinkText: "The official site is dnc.gov.hk.",
+  pcpdLinkText: "You can also complain to the Office of the Privacy Commissioner for Personal Data (pcpd.org.hk).",
+};
+
+export const HK_POLICY_ZH: HkPolicyCopy = {
+  lang: "zh-HK",
+  title: "15. 香港拒收垃圾訊息頁面（HK Stop Spam）",
+  intro:
+    "本節適用於 myprivacytool.io/HongKongSpam 的拒收垃圾訊息頁面，並與本私隱政策其他部分一併適用。就此頁面而言，如本節與其他部分有不同，以本節為準。",
+  blocks: [
+    {
+      heading: "15.1 我們持有的資料",
+      paragraphs: [
+        "當你在頁面按「完成」，我們會儲存一筆紀錄，內容包括：你的保障生效日期（登記後第 10 個香港工作天）、登記日期、手機類型（Android、iPhone 或其他）、頁面語言，以及你是經哪個廣告或連結進入（如有）。",
+        "如你同時輸入電郵地址並剔選方格，我們會儲存你的電郵地址，以及你剔選了哪些方格：「請發送提醒給我」及「請向我發送 MyPrivacyTOOL 私隱貼士」。",
+        "我們從不索取、接收或儲存你的電話號碼。你是用自己的手機撥打熱線，我們看不到該號碼。你在頁面建立的垃圾訊息紀錄及取消訂閱訊息只會留在你的裝置上。",
+      ],
+    },
+    {
+      heading: "15.2 我們如何使用這些資料",
+      bullets: [
+        "如你剔選「請發送提醒給我」，我們會在你的保障生效當日向你發送一封提醒電郵。",
+        "只有在你另外剔選「私隱貼士」方格時，我們才會向你發送 MyPrivacyTOOL 私隱貼士。沒有剔選的人，我們不會發送任何推廣電郵。",
+        "如你已接受分析 Cookie，我們會在不涉及你電郵地址的情況下，統計有多少人使用此頁面。",
+      ],
+    },
+    {
+      heading: "15.3 保存期限",
+      paragraphs: [
+        "在你的保障生效日期後 90 日，我們會刪除你的電郵地址及整筆紀錄。系統每日自動執行刪除。",
+        "例外情況：如你剔選了「請向我發送 MyPrivacyTOOL 私隱貼士」，我們會保留你的紀錄，直至你取消訂閱或要求我們刪除為止。你取消訂閱後，90 日的期限會重新適用，紀錄會被刪除。",
+      ],
+    },
+    {
+      heading: "15.4 你的權利及行使方法",
+      paragraphs: [
+        "根據香港《個人資料（私隱）條例》，你可以要求查閱我們持有的你的個人資料、要求更正，並要求我們停止將你的資料用於直接促銷。你亦可以要求我們刪除有關資料。",
+        "如要提出以上任何要求，請用你提供給我們的電郵地址，電郵至 privacy@myprivacytool.io，並註明是「HK Stop Spam」。我們可能會要求你確認該電郵地址屬於你。我們會盡量在 30 日內回覆；就查閱資料的要求，條例容許最長 40 日。",
+        "如要停止接收電郵，請按我們任何一封電郵內的取消訂閱連結。",
+      ],
+    },
+    {
+      heading: "15.5 我們不是通訊辦",
+      paragraphs: [
+        "MyPrivacyTOOL 是私人公司，並非通訊辦（OFCA）、通訊事務管理局或香港政府任何部門。「拒收訊息登記冊」由通訊辦營運。我們不能代你登記電話號碼，也看不到登記冊內的資料。",
+      ],
+    },
+  ],
+  ofcaLinkText: "官方網站為 dnc.gov.hk。",
+  pcpdLinkText: "你亦可向個人資料私隱專員公署（pcpd.org.hk）作出投訴。",
+};
 
 /**
  * MPC-7448: the day-10 "you are now protected" email strings (English and Traditional Chinese). They live in hkSpamEmailCopy.json

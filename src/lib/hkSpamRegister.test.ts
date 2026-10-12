@@ -34,6 +34,7 @@ describe("buildRegistrationRow", () => {
       utm_campaign: "hk1",
       email: null,
       reminder_consent: false,
+      marketing_consent: false,
       source_page: "/HongKongSpam",
     });
     expect(row.protection_date).toMatch(/^2026-10-\d{2}$/);
@@ -47,6 +48,14 @@ describe("buildRegistrationRow", () => {
     const noConsent = buildRegistrationRow({ platform: "android", lang: "en", email: "me@example.com", reminderConsent: false, now: NOW });
     expect(noConsent.email).toBeNull();
     expect(noConsent.reminder_consent).toBe(false);
+    // MPC-7538: marketing_consent is true only when its own box is ticked; the reminder alone never sets it
+    expect(withConsent.marketing_consent).toBe(false);
+    const both = buildRegistrationRow({ platform: "android", lang: "en", email: "me@example.com", reminderConsent: true, marketingConsent: true, now: NOW });
+    expect(both).toMatchObject({ email: "me@example.com", reminder_consent: true, marketing_consent: true });
+    const tipsOnly = buildRegistrationRow({ platform: "android", lang: "en", email: "me@example.com", reminderConsent: false, marketingConsent: true, now: NOW });
+    expect(tipsOnly).toMatchObject({ email: "me@example.com", reminder_consent: false, marketing_consent: true });
+    const tipsNoEmail = buildRegistrationRow({ platform: "android", lang: "en", marketingConsent: true, now: NOW });
+    expect(tipsNoEmail).toMatchObject({ email: null, reminder_consent: false, marketing_consent: false });
     const bad = buildRegistrationRow({ platform: "android", lang: "en", email: "nope", reminderConsent: true, now: NOW });
     expect(bad.email).toBeNull();
     expect(bad.reminder_consent).toBe(false);

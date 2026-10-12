@@ -60,3 +60,33 @@ describe("Privacy: recognising your device (MPC-7494)", () => {
     );
   });
 });
+
+// MPC-7538: the HK Stop Spam section, English and Traditional Chinese. Wording is a draft for Chris (MPC-7545) and a lawyer.
+describe("Privacy: HK Stop Spam section", () => {
+  it("has an English and a Chinese section the consent line can link to", () => {
+    renderPage(<Privacy />);
+    expect(document.getElementById("hk-stop-spam")).toHaveAttribute("lang", "en");
+    expect(document.getElementById("hk-stop-spam-zh")).toHaveAttribute("lang", "zh-HK");
+    expect(screen.getByRole("heading", { name: "15. HK Stop Spam (Hong Kong Do-not-call page)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "15. 香港拒收垃圾訊息頁面（HK Stop Spam）" })).toBeInTheDocument();
+  });
+
+  it("covers data held, no phone numbers, purpose, 90-day retention with the marketing exception, PDPO rights and not-OFCA", () => {
+    renderPage(<Privacy />);
+    const en = flat(document.getElementById("hk-stop-spam")?.textContent ?? "");
+    expect(en).toContain("We never ask for, receive or store your phone number.");
+    expect(en).toContain("one reminder email on the day your protection starts");
+    expect(en).toContain("We send no marketing email to anyone who has not ticked it.");
+    expect(en).toContain("We delete your email address and the whole record 90 days after your protection date.");
+    expect(en).toContain("The exception is if you ticked");
+    expect(en).toContain("Personal Data (Privacy) Ordinance (PDPO)");
+    expect(en).toContain("privacy@myprivacytool.io");
+    expect(en).toContain("We are not OFCA");
+    const zh = flat(document.getElementById("hk-stop-spam-zh")?.textContent ?? "");
+    expect(zh).toContain("我們從不索取、接收或儲存你的電話號碼");
+    expect(zh).toContain("90 日");
+    expect(zh).toContain("《個人資料（私隱）條例》");
+    expect(zh).toContain("我們不是通訊辦");
+    expect(document.querySelector('#hk-stop-spam a[href="https://www.dnc.gov.hk"]')).not.toBeNull();
+  });
+});
