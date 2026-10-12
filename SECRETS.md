@@ -15,6 +15,8 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `X_CONSUMER_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_WEBHOOK_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_BOT_TOKEN` (MPC-7251, sends Telegram replies) | | ✅ |
+| `X_BEARER_TOKEN` (MPC-7628, public profile lookup for the Mirror bot) | | ✅ |
+| `X_USER_ACCESS_TOKEN` (MPC-7628, OAuth 2.0 user token with `dm.write`, sends Mirror DMs) | | ✅ |
 
 Each Worker only receives the secrets it needs (least privilege). Secrets are read in code as `env.NAME`.
 `wrangler.toml` cannot hold secret values, so it lists the names in comments and `EXPECTED_SECRETS.txt`.
