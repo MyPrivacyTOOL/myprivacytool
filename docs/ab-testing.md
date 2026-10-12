@@ -20,11 +20,16 @@ Four independent tests on `/pricing`, all **off** until their flag is `true` on 
 | `pricing_tiers` (`VITE_AB_PRICING_TIERS_ENABLED`) | `control` equal cards / `highlight_pro` Pro card emphasised |
 | `pricing_social_proof` (`VITE_AB_PRICING_SOCIAL_PROOF_ENABLED`) | `control` none / `above_plans` / `below_plans` trust line |
 
-- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the on-page waitlist form, MPC-7626) divided by `experiment_exposure`, filtered by `experiment_id`, split by `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
+- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the on-page waitlist form, MPC-7626), split by the `ab_pricing_*` dimension for the test (those events carry `ab_<experiment_id>`, not `variant_id`), divided by `experiment_exposure` for the same `experiment_id` and `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
 - Time on page and bounce rate: GA4 engagement time and engaged-session rate, broken down by the same `variant_id`.
 - Preview: `/pricing?ab_pricing_cta=outline` (forced views are never counted).
 - Social proof: no real testimonial or customer count exists, so the trust line only repeats what the Free plan states. Do not add numbers or quotes without a verified source.
 - Run at least 14 days. The 20%+ lift goal needs far more traffic than the sample-size rule suggests; use the guidance below and call a winner only at 95% confidence. Rolling out a winner: see "Rotating a winner" (for pricing, edit `HEADLINE`, `PAID_CTA_LABEL`, etc. in `src/pages/Pricing.tsx`).
+
+## Launch log
+| Date | Experiment | Event |
+|---|---|---|
+| 2026-10-13 | `pricing_headline`, `pricing_cta`, `pricing_tiers`, `pricing_social_proof` | Copy approved; `VITE_AB_PRICING_*_ENABLED=true` set in Cloudflare Pages Production and the site rebuilt. Earliest readout 14 days after the start date (MPC-7638). |
 
 ## How it behaves
 - Variant picked once per browser tab session (`sessionStorage`), weighted random. Closing the tab forgets it, so nothing identifies a person across visits.
