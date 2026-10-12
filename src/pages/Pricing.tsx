@@ -116,7 +116,8 @@ const Pricing = () => {
           fields: {
             email: email.trim(),
             plan_interest: plan.toLowerCase(),
-            source_tag: SOURCE_TAG,
+            // The plan is also in source_tag because HubSpot has not been saving plan_interest from this form.
+            source_tag: `${SOURCE_TAG}-${plan.toLowerCase()}`,
             ...consentFields("pricing_waitlist"),
           },
           pageName: "Pricing",

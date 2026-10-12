@@ -36,7 +36,7 @@ describe("Pricing analytics (MPC-7376)", () => {
 describe("Pricing waitlist (MPC-7626)", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("submits to HubSpot with the pricing-waitlist source tag and fires pricing_waitlist_signup", async () => {
+  it("submits to HubSpot with the plan in the pricing-waitlist source tag and fires pricing_waitlist_signup", async () => {
     const f = vi.fn(async () => jsonResponse({}));
     vi.stubGlobal("fetch", f);
     const user = userEvent.setup();
@@ -50,7 +50,7 @@ describe("Pricing waitlist (MPC-7626)", () => {
     expect(url).toContain("/submit/246502821/");
     const fields = Object.fromEntries(JSON.parse(init.body as string).fields.map((x: { name: string; value: string }) => [x.name, x.value]));
     expect(fields).toMatchObject({
-      email: "ada@example.com", plan_interest: "executive", source_tag: "pricing-waitlist", consent_source: "pricing_waitlist",
+      email: "ada@example.com", plan_interest: "executive", source_tag: "pricing-waitlist-executive", consent_source: "pricing_waitlist",
     });
     expect(gtag).toHaveBeenCalledWith("event", "pricing_waitlist_signup", expect.objectContaining({ plan: "executive" }));
   });
