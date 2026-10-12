@@ -11,6 +11,7 @@ import { buildMirrorReport } from './lib/mirror.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
+import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -44,6 +45,9 @@ export default {
     if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST', request, cors);
     if (request.method === 'POST' && url.pathname === '/api/unsubscribe-request') return handleUnsubscribeRequest(env, request, cors, json);
     if (request.method === 'POST' && url.pathname === '/api/web-scan/step') return handleWebScanStep(env, request, origin, json);
+    // MPC-7494: the open mirror. Off unless RECOGNITION_ENABLED is "true". Read-only apart from the visitor's own delete button.
+    if (request.method === 'POST' && url.pathname === '/api/recognise') return handleRecognise(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    if (request.method === 'POST' && url.pathname === '/api/recognise/delete') return handleRecogniseDelete(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
