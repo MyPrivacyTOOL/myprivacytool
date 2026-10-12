@@ -35,7 +35,9 @@ begin
     'web_scans',  coalesce((select jsonb_agg(to_jsonb(w)) from public.web_scans w where w.id in (
                      select c.web_scan_id from public.web_scan_contacts c join public.scans s on s.id = c.contact_id
                      where c.channel = 'email' and s.user_id = uid)), '[]'),
-    'score_baseline', coalesce((select jsonb_agg(to_jsonb(b) - 'email_hash') from public.mpt_score_baselines b where b.email_hash = h), '[]')
+    'score_baseline', coalesce((select jsonb_agg(to_jsonb(b) - 'email_hash') from public.mpt_score_baselines b where b.email_hash = h), '[]'),
+    -- MPC-7645: referrals where this person invited someone, was invited (matched by the hash of their address) or was referred. Hashes of OTHER people are left out.
+    'referrals',  coalesce((select jsonb_agg(to_jsonb(r) - 'invitee_hash') from public.referrals r where r.referrer_user_id = uid or r.referee_user_id = uid or r.invitee_hash = h), '[]')
   );
   return out;
 end $$;
@@ -51,7 +53,7 @@ as $$
 declare
   e text := lower(btrim(p_email));
   h text := encode(extensions.digest(lower(btrim(p_email)), 'sha256'), 'hex');
-  n_users int; n_leads int; n_subs int; n_base int; n_scans int; n_web int;
+  n_users int; n_leads int; n_subs int; n_base int; n_scans int; n_web int; n_ref int;
 begin
   select count(*) into n_scans from public.scans s join public.users u on u.id = s.user_id where lower(u.email) = e;
   -- MPC-7470: saved web scans first (web_scan_contacts.contact_id has no foreign key to scans, so deleting users does not reach them).
@@ -59,12 +61,14 @@ begin
   delete from public.web_scans where id in (
     select c.web_scan_id from public.web_scan_contacts c join public.scans s on s.id = c.contact_id join public.users u on u.id = s.user_id
     where c.channel = 'email' and lower(u.email) = e);              get diagnostics n_web   = row_count;
+  -- MPC-7645: an invitation addressed to this person but never taken up has no users row, so it is found by the hash. Rows tied to a user go with the user (ON DELETE CASCADE).
+  delete from public.referrals where invitee_hash = h;             get diagnostics n_ref   = row_count;
   delete from public.users where lower(email) = e;                 get diagnostics n_users = row_count;
   delete from public.leads where lower(email) = e;                 get diagnostics n_leads = row_count;
   delete from public.subscribers where lower(email) = e;           get diagnostics n_subs  = row_count;
   delete from public.mpt_score_baselines where email_hash = h;     get diagnostics n_base  = row_count;
   return jsonb_build_object('erased_at', now(), 'users', n_users, 'scans_cascaded', n_scans,
-                            'leads', n_leads, 'subscribers', n_subs, 'score_baselines', n_base, 'web_scans', n_web);
+                            'leads', n_leads, 'subscribers', n_subs, 'score_baselines', n_base, 'web_scans', n_web, 'referral_invitations', n_ref);
 end $$;
 
 revoke all on function public.mpt_dsar_export(text), public.mpt_dsar_erase(text) from public, anon, authenticated;

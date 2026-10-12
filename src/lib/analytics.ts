@@ -587,3 +587,10 @@ export const trackPricingPlanClick = (plan: string, destination: string) => {
   trackActivity();
   trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination });
 };
+
+// MPC-7626: waitlist sign-up on /pricing. Fire only after a confirmed successful HubSpot submit.
+export const trackPricingWaitlistSignup = (plan: string) => {
+  attributedEvent('pricing_waitlist_signup', { form: 'pricing_waitlist', plan });
+  // GA4 recommended event so the signup can be marked as a key event
+  attributedEvent('generate_lead', { method: 'pricing_waitlist', plan });
+};

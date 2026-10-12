@@ -14,6 +14,7 @@ const Start = lazy(() => import("./pages/Start"));
 const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
 const ThankYou = lazy(() => import("./pages/ThankYou"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const Invite = lazy(() => import("./pages/Invite"));
 const Newsletter = lazy(() => import("./pages/Newsletter"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
@@ -33,6 +34,7 @@ const OptOutGuide = lazy(() => import("./pages/OptOutGuide"));
 const Journey = lazy(() => import("./pages/Journey"));
 const AmIExposed = lazy(() => import("./pages/AmIExposed"));
 const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
+const Monitoring = lazy(() => import("./pages/Monitoring"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -60,6 +62,7 @@ const App = () => (
             <Route path="/ai-access-check" element={<AIAccessCheck />} />
             <Route path="/thank-you" element={<ThankYou />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/invite" element={<Invite />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
@@ -85,6 +88,8 @@ const App = () => (
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
             <Route path="/guides/remove-from-google" element={<Navigate to="/blog/remove-your-name-and-info-from-google" replace />} />
             <Route path="/guides/stop-spam" element={<Navigate to="/blog/stop-spam-calls-texts-and-emails" replace />} />
+            {/* MPC-7649: Pro monitoring dashboard preview. Noindex, hidden in production until live data exists. */}
+            <Route path="/monitoring" element={<Monitoring />} />
             {/* MPC-7446: bilingual HK Do-not-call page. Route matching ignores case, so /hongkongspam renders the
                 page, which redirects to the canonical /HongKongSpam. Noindex and unlinked until the hkSpam.json flag. */}
             <Route path="/HongKongSpam" element={<HongKongSpam />} />
