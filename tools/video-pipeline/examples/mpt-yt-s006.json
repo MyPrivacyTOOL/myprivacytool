@@ -1,0 +1,14 @@
+{
+  "id": "MPT-YT-S006",
+  "slug": "hong-kong-do-not-call",
+  "title": "Hong Kong Do-Not-Call Registers: Quick Version",
+  "language": "en",
+  "beats": [
+    {"narration": "I'm Alice, and this is how to say no to some marketing messages in Hong Kong.", "on_screen": "Hong Kong Do-Not-Call registers"},
+    {"narration": "There are three free Do-Not-Call registers, for recorded phone messages, text messages and faxes.", "on_screen": "Recorded calls. Text messages. Faxes."},
+    {"narration": "Call the registration hotline, one eight three five zero zero zero, from the number you want to protect, and follow the voice prompts.", "on_screen": "Call 1835000 from your number"},
+    {"narration": "Protection starts on the tenth working day.", "on_screen": "Protection starts on the 10th working day"},
+    {"narration": "It won't stop calls from a real person, or from senders you've already agreed to hear from. For those, use the unsubscribe link.", "on_screen": "Use the unsubscribe link for those"},
+    {"narration": "Want to see where else your details are listed? Check your exposure.", "on_screen": "Check your exposure: myprivacytool.io/scan"}
+  ]
+}
