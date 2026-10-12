@@ -8,13 +8,23 @@ import { hkSpamDisallowPaths, hkSpamPrerenderRoute, hkSpamSitemapEntry, patchRob
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = "https://www.myprivacytool.io";
-const base = { enabled: true, indexable: false, path: "/HongKongSpam", en: { title: "T", description: "D" }, zh: { title: "ZT", description: "ZD" } };
+const base = { indexable: false, path: "/HongKongSpam", en: { title: "T", description: "D" }, zh: { title: "ZT", description: "ZD" } };
+/** Runs fn with VITE_HK_SPAM_ENABLED=false, the build-time kill switch (same parsing as hkDnc.ts). */
+const withKillSwitch = (fn) => {
+  const before = process.env.VITE_HK_SPAM_ENABLED;
+  process.env.VITE_HK_SPAM_ENABLED = "false";
+  try {
+    fn();
+  } finally {
+    if (before === undefined) delete process.env.VITE_HK_SPAM_ENABLED;
+    else process.env.VITE_HK_SPAM_ENABLED = before;
+  }
+};
 const robots = readFileSync(path.join(ROOT, "public/robots.txt"), "utf8");
 
 describe("hkSpam launch flag", () => {
-  it("ships enabled but not indexable: the committed config is noindex", () => {
+  it("ships not indexable: the committed config is noindex", () => {
     const cfg = readHkSpamConfig(ROOT);
-    expect(cfg.enabled).toBe(true);
     expect(cfg.indexable).toBe(false);
     expect(cfg.path).toBe("/HongKongSpam");
   });
@@ -27,12 +37,12 @@ describe("hkSpam launch flag", () => {
     expect(off.alternates[1].href).toBe(`${SITE}/HongKongSpam?lang=zh`);
     expect(hkSpamPrerenderRoute({ ...base, indexable: true }, SITE).noindex).toBe(false);
     // the kill switch wins over the SEO flag
-    expect(hkSpamPrerenderRoute({ ...base, enabled: false, indexable: true }, SITE).noindex).toBe(true);
+    withKillSwitch(() => expect(hkSpamPrerenderRoute({ ...base, indexable: true }, SITE).noindex).toBe(true));
   });
 
   it("sitemap entry exists only when enabled AND indexable", () => {
     expect(hkSpamSitemapEntry(base, SITE)).toBeNull();
-    expect(hkSpamSitemapEntry({ ...base, enabled: false, indexable: true }, SITE)).toBeNull();
+    withKillSwitch(() => expect(hkSpamSitemapEntry({ ...base, indexable: true }, SITE)).toBeNull());
     expect(hkSpamSitemapEntry({ ...base, indexable: true }, SITE)).toEqual({
       loc: `${SITE}/HongKongSpam`,
       changefreq: "monthly",
@@ -49,6 +59,6 @@ describe("hkSpam launch flag", () => {
     expect(patched.match(/^Disallow: \/HongKongSpam$/gm)).toHaveLength(groups);
     expect(patchRobots(patched, base)).toBe(patched); // idempotent
     expect(patchRobots(robots, { ...base, indexable: true })).toBe(robots);
-    expect(patchRobots(robots, { ...base, enabled: false, indexable: true })).not.toBe(robots);
+    withKillSwitch(() => expect(patchRobots(robots, { ...base, indexable: true })).not.toBe(robots));
   });
 });

@@ -2,6 +2,7 @@
 // Facts come from the OFCA Do-not-call Registers public FAQ (https://www.dnc.gov.hk). Nothing here may claim the
 // IVR menu keys work: they are unverified until MPC-7445 (see IVR_VERIFIED in src/config/hkDnc.ts).
 import type { PageLang } from "@/lib/hkSpamPage";
+import emailCopy from "./hkSpamEmailCopy.json";
 
 export interface HkFaq {
   q: string;
@@ -334,3 +335,9 @@ export const ZH: HkCopy = {
 };
 
 export const HK_COPY: Record<PageLang, HkCopy> = { en: EN, zh: ZH };
+
+/**
+ * MPC-7448: the day-10 "you are now protected" email strings (English and Traditional Chinese). They live in hkSpamEmailCopy.json
+ * so the Worker can use the same text (workers/scan-report/scripts/sync-hk-email-copy.mjs); they are part of the MPC-7542 Chinese review.
+ */
+export const HK_EMAIL_COPY = emailCopy;

@@ -1,15 +1,16 @@
 // /HongKongSpam launch switch and preview detection (MPC-7446).
 //
-// Two switches, both in src/data/hkSpam.json (the build scripts read the same file, scripts/hkSpamFlag.mjs, so the
-// page, the prerendered head, the sitemap and robots.txt cannot disagree):
-//  - `enabled`   HK_SPAM_ENABLED, the kill switch. False hides /HongKongSpam (404) and every HK card, and keeps the
-//                page out of the sitemap. VITE_HK_SPAM_ENABLED=false does the same at build time.
-//  - `indexable` HK_SPAM_INDEXABLE, the ONE SEO flag. False (the default) means noindex, not in the sitemap, disallowed
-//                in robots.txt and not linked from the site (the homepage and report cards stay hidden). Flip it to
-//                true only AFTER MPC-7445 has confirmed the IVR keys and IVR_VERIFIED in hkDnc.ts is true.
+// Two switches:
+//  - HK_SPAM_ENABLED (src/config/hkDnc.ts, VITE_HK_SPAM_ENABLED=false at build time) is the kill switch, owned by MPC-7450.
+//    False hides /HongKongSpam and every HK card, and also takes the page out of the sitemap.
+//  - HK_SPAM_INDEXABLE (`indexable` in src/data/hkSpam.json) is the ONE SEO flag. False (the default) means noindex, not
+//    in the sitemap, disallowed in robots.txt and not linked from the site (the homepage and report cards stay hidden).
+//    Flip it to true only AFTER MPC-7445 has confirmed the IVR keys and IVR_VERIFIED in hkDnc.ts is true.
+// The build scripts read the same JSON file (scripts/hkSpamFlag.mjs), so the page, the prerendered head, the sitemap and
+// robots.txt cannot disagree.
 import hkSpam from "@/data/hkSpam.json";
+import { HK_SPAM_ENABLED } from "@/config/hkDnc";
 
-export const HK_SPAM_ENABLED: boolean = hkSpam.enabled === true && import.meta.env.VITE_HK_SPAM_ENABLED !== "false";
 export const HK_SPAM_INDEXABLE: boolean = HK_SPAM_ENABLED && hkSpam.indexable === true;
 export const HK_SPAM_PATH: string = hkSpam.path;
 export const HK_SPAM_META = { en: hkSpam.en, zh: hkSpam.zh } as const;
@@ -59,5 +60,6 @@ export function isHkSpamPreview(): boolean {
 
 /** True when the Stop Spam cards may render: switched on, and either launched or an internal preview. */
 export function isHkSpamSurfaceEnabled(): boolean {
-  return HK_SPAM_ENABLED && (HK_SPAM_INDEXABLE || isHkSpamPreview());
+  if (!HK_SPAM_ENABLED) return false; // kill switch (hkDnc.ts) beats launch flag and preview
+  return HK_SPAM_INDEXABLE || isHkSpamPreview();
 }

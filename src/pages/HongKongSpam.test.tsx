@@ -10,6 +10,10 @@ const flags = vi.hoisted(() => ({ preview: false, enabled: true, hk: true }));
 vi.mock("@/config/hkSpamPage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/config/hkSpamPage")>()),
   isHkSpamPreview: () => flags.preview,
+}));
+
+vi.mock("@/config/hkDnc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/config/hkDnc")>()),
   get HK_SPAM_ENABLED() {
     return flags.enabled;
   },
@@ -383,7 +387,7 @@ describe("Hong Kong only and the kill switch", () => {
     expect(screen.queryByTestId("hk-nonhk-note")).not.toBeInTheDocument();
   });
 
-  it("HK_SPAM_ENABLED=false hides the page entirely (404) and sends no event", () => {
+  it("HK_SPAM_ENABLED=false hides the page entirely (sent to the homepage) and sends no event", () => {
     flags.enabled = false;
     renderEn();
     expect(screen.queryByTestId("hk-dial")).not.toBeInTheDocument();

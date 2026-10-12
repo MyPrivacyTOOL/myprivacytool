@@ -8,9 +8,9 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo, { SITE_URL } from "@/components/Seo";
-import { HK_SPAM_ENABLED, HK_SPAM_INDEXABLE, HK_SPAM_META, HK_SPAM_PATH, isHkSpamPreview } from "@/config/hkSpamPage";
+import { HK_SPAM_ENABLED } from "@/config/hkDnc";
+import { HK_SPAM_INDEXABLE, HK_SPAM_META, HK_SPAM_PATH, isHkSpamPreview } from "@/config/hkSpamPage";
 import { CONSENT_WORDING_FINAL, HK_COPY, type HkCopy } from "@/data/hkSpamCopy";
-import NotFound from "@/pages/NotFound";
 import { hasHongKongOverride, isHongKongVisitor, setHongKongOverride } from "@/lib/hkVisitor";
 import { track, getUtm } from "@/lib/hkSpamTrack";
 import { formatHkDate, readInitialLang, resolveHkDial, detectHkPlatform, storeLang, type PageLang } from "@/lib/hkSpamPage";
@@ -611,8 +611,7 @@ const HongKongSpamPage = () => {
 /** Route wrapper: lowercase, trailing-slash and other case variants all land on the canonical /HongKongSpam. */
 const HongKongSpam = () => {
   const { pathname, search, hash } = useLocation();
-  // Kill switch (HK_SPAM_ENABLED): with the feature off the page does not exist.
-  if (!HK_SPAM_ENABLED) return <NotFound />;
+  if (!HK_SPAM_ENABLED) return <Navigate to="/" replace />; // kill switch (hkDnc.ts)
   if (pathname !== HK_SPAM_PATH) return <Navigate to={`${HK_SPAM_PATH}${search}${hash}`} replace />;
   return <HongKongSpamPage />;
 };

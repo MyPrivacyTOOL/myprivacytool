@@ -2,7 +2,7 @@
 // The ONE SEO flag is `indexable` (HK_SPAM_INDEXABLE) in src/data/hkSpam.json; the React page reads the same file via
 // src/config/hkSpamPage.ts. While it is false the page is noindex, absent from the sitemap and disallowed in
 // robots.txt. Flipping it to true (only after MPC-7445 confirms the IVR keys) makes all three indexable at once.
-// `enabled` (HK_SPAM_ENABLED) is the kill switch: when false the page is also out of the sitemap and disallowed.
+// The kill switch (VITE_HK_SPAM_ENABLED=false, same parsing as src/config/hkDnc.ts) also makes it non-indexable.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -10,9 +10,15 @@ export function readHkSpamConfig(root) {
   return JSON.parse(readFileSync(path.join(root, "src/data/hkSpam.json"), "utf8"));
 }
 
+/** Same rule as parseHkSpamEnabled in src/config/hkDnc.ts: only an explicit false/0/off/no turns the feature off. */
+export function hkSpamEnabled(env = process.env) {
+  const raw = env.VITE_HK_SPAM_ENABLED;
+  return typeof raw !== "string" || !["false", "0", "off", "no"].includes(raw.trim().toLowerCase());
+}
+
 /** Indexable only when the feature is on AND the SEO flag is on. */
-export function hkSpamIsIndexable(cfg) {
-  return cfg.enabled === true && cfg.indexable === true;
+export function hkSpamIsIndexable(cfg, env = process.env) {
+  return hkSpamEnabled(env) && cfg.indexable === true;
 }
 
 /** Variants that must not be crawled while the page is unlaunched (robots.txt paths are case-sensitive). */

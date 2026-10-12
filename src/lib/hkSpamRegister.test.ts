@@ -24,7 +24,7 @@ describe("buildRegistrationRow", () => {
     sessionStorage.setItem(UTM_STORAGE_KEY, JSON.stringify({ utm_source: "fb", utm_campaign: "hk1" }));
     const row = buildRegistrationRow({ platform: "ios", lang: "zh", now: NOW });
     expect(Object.keys(row).sort()).toEqual(
-      ["email", "language", "platform", "protection_date", "reminder_consent", "source_page", "utm_campaign", "utm_medium", "utm_source"].sort(),
+      ["email", "language", "marketing_consent", "platform", "protection_date", "reminder_consent", "source_page", "utm_campaign", "utm_medium", "utm_source"].sort(),
     );
     expect(row).toMatchObject({
       platform: "ios",
@@ -51,6 +51,14 @@ describe("buildRegistrationRow", () => {
     expect(bad.email).toBeNull();
     expect(bad.reminder_consent).toBe(false);
     expect(buildRegistrationRow({ platform: "other", lang: "en", now: NOW }).language).toBe("en");
+  });
+
+  it("marketing consent is separate, defaults false, and needs a valid address", () => {
+    const base = { platform: "ios", lang: "en", now: NOW } as const;
+    expect(buildRegistrationRow({ ...base, email: "me@example.com", reminderConsent: true }).marketing_consent).toBe(false);
+    const m = buildRegistrationRow({ ...base, email: "me@example.com", marketingConsent: true });
+    expect(m).toMatchObject({ email: "me@example.com", marketing_consent: true, reminder_consent: false });
+    expect(buildRegistrationRow({ ...base, email: "nope", marketingConsent: true })).toMatchObject({ email: null, marketing_consent: false });
   });
 
   it("throws outside the holiday table rather than guessing a date", () => {
