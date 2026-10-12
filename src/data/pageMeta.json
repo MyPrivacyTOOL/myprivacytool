@@ -96,5 +96,10 @@
     "title": "Unsubscribe",
     "description": "Stop MyPrivacyTOOL scan report and follow-up emails. Confirm from the link in your email, or ask for a confirmation link.",
     "noindex": true
+  },
+  "/invite": {
+    "title": "Invite Friends",
+    "description": "Invite friends to check what their browser and email give away. Earn a free month of Pro for each friend who gets their report.",
+    "noindex": true
   }
 }

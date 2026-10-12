@@ -26,6 +26,10 @@ const COPY: Record<string, SourceCopy> = {
     title: "You're on the waitlist.",
     body: "Thanks. We'll email you when the full AI Access report opens up. We only use your email for that, and you can unsubscribe at any time.",
   },
+  "pricing-waitlist": {
+    title: "You're on the waitlist.",
+    body: "Thanks. We'll email you when paid plans open. No payment is taken now. We only use your email for that, and you can unsubscribe at any time.",
+  },
   contact: {
     title: "Message sent.",
     body: "Thanks for getting in touch. We'll reply to the email address you gave us.",

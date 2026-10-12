@@ -12,6 +12,7 @@ import ScanSavingNotice from "@/components/ScanSavingNotice";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
+import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
 import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
@@ -42,6 +43,8 @@ const Scan = () => {
   // already saved a scan; the drop-off before it is read from the GA4 events.
   useEffect(() => {
     reportStep("contact_step_opened");
+    // MPC-7645: a visitor who came from a friend's link may go and run the scan on the home page first; keep the code for this visit.
+    if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

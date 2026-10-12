@@ -394,6 +394,12 @@ describe("POST /ingest/social (MPC-8301 hand-off)", () => {
     payload: { for_user_id: forUser, direct_message_events: [{ type: "message_create", message_create: { sender_id: sender, message_data: { text } } }] },
   });
 
+  const li = (sender: string, text: string, org = "urn:li:organization:1") => ({
+    source: "linkedin",
+    receivedAt: "2026-10-07T00:00:00Z",
+    payload: { organization: org, events: [{ from: sender, message: { text } }] },
+  });
+
   it("requires the bearer token (service-binding callers included) and never calls out without it", async () => {
     stub({});
     expect((await ingest(tg("hi"), {})).status).toBe(401);
@@ -416,6 +422,21 @@ describe("POST /ingest/social (MPC-8301 hand-off)", () => {
     const r = await ingest(xdm("123", "how does this work?"));
     expect(r.body).toMatchObject({ ok: true, intent: "help", state_source: "anonymous", response_key: "bot.unknown.title" });
     expect(calls.some((c) => c.url.includes("conversation_states"))).toBe(false);
+  });
+
+  it("routes a LinkedIn message as an anonymous user (no LinkedIn state channel yet)", async () => {
+    stub({ qwen: { intent: "help", confidence: 0.9 } });
+    const r = await ingest(li("urn:li:person:abc", "how does this work?"));
+    expect(r.body).toMatchObject({ ok: true, intent: "help", state_source: "anonymous", response_key: "bot.unknown.title" });
+    expect(calls.some((c) => c.url.includes("conversation_states"))).toBe(false);
+  });
+
+  it("ignores LinkedIn events with no text and our own messages", async () => {
+    stub({});
+    for (const body of [li("urn:li:person:abc", ""), li("urn:li:organization:1", "echo", "urn:li:organization:1"), { source: "linkedin", payload: { events: [] } }]) {
+      expect((await ingest(body)).body).toEqual({ ok: true, ignored: true });
+    }
+    expect(calls).toHaveLength(0);
   });
 
   it("acknowledges verified events with no user text, and our own messages, with 200 ignored (no retry storm)", async () => {
