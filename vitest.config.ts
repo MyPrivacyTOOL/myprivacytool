@@ -18,7 +18,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}", "workers/**/*.vitest.{js,mjs,ts}", "scripts/**/*.vitest.{js,mjs,ts}"],
+    include: ["src/**/*.test.{ts,tsx}", "workers/**/*.vitest.{js,mjs,ts}", "scripts/**/*.vitest.{js,mjs,ts}", "shared/**/*.vitest.ts", "functions/**/*.vitest.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary", "lcov", "json-summary"],
