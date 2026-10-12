@@ -107,7 +107,7 @@ export default {
       ctx.waitUntil(postDigest(env).then((r) => console.log(JSON.stringify({ digest: 'posted', permalink: r.permalink, ts: r.ts }))).catch((e) => console.error(`mpt-metrics-collector: digest failed: ${SAFE(e?.message, env)}`)));
       return;
     }
-    // Live KPI scorecard (MPC-7618): every 30 minutes, reads Supabase and rewrites one Notion block. No collection, no raw rows.
+    // Live KPI scorecard (MPC-7618): when a */30 cron is configured (needs Workers Paid), reads Supabase and rewrites one Notion block. No collection, no raw rows.
     if (event?.cron === KPI_CRON) {
       if (!notionConfigured(env)) { console.error('mpt-metrics-collector: KPI refresh skipped, NOTION_TOKEN / SUPABASE_* not set'); return; }
       ctx.waitUntil(publishKpiDashboard(env).then((r) => console.log(JSON.stringify(r))).catch((e) => console.error(`mpt-metrics-collector: KPI refresh failed: ${SAFE(e?.message, env)}`)));
@@ -123,6 +123,8 @@ export default {
         try { console.log(JSON.stringify(await publishMachineMirror(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: machine mirror publish failed: ${SAFE(e?.message, env)}`); }
         // Channel OSINT dashboard rows (MPC-7641): same isolation, a failure here never affects the other publishes.
         try { console.log(JSON.stringify(await publishChannelOsintDay(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: channel osint publish failed: ${SAFE(e?.message, env)}`); }
+        // KPI scorecard on the MPT Dashboard (MPC-7618): separate so a failure here never affects the other publishes.
+        try { console.log(JSON.stringify(await publishKpiDashboard(env))); } catch (e) { console.error(`mpt-metrics-collector: KPI scorecard publish failed: ${SAFE(e?.message, env)}`); }
       }
       else console.error('mpt-metrics-collector: NOTION_TOKEN not set, Notion publish skipped');
     })());
