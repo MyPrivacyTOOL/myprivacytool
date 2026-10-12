@@ -4,9 +4,9 @@ import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity, pushEmailOptOut } from './lib/hubspot.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
-import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
+import { buildConfirmationEmail, buildReportEmail, buildUnsubscribedEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
 import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
-import { addSuppression } from './lib/suppression.js';
+import { addSuppression, emailHash } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
@@ -339,9 +339,16 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
   try {
     const sb = db(env);
     await sb.patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
-    await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
+    const firstTime = await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
     const hs = await pushEmailOptOut(env, { email });   // best effort: HubSpot must not mail them either; a failure never blocks the unsubscribe
     if (hs.failed) console.error('HubSpot opt-out failed:', hs.failed);
+    // MPC-7491: one plain confirmation email, only the first time (a repeat click sends nothing). Never blocks or fails the unsubscribe.
+    if (firstTime && recipientAllowed(env, email)) {
+      try {
+        const r = await sendEmail(env, { to: email, ...buildUnsubscribedEmail(), idempotencyKey: `unsubscribed-${await emailHash(email)}` });
+        if (!r.sent) console.error('unsubscribe confirmation email not sent:', r.reason);
+      } catch (e) { console.error('unsubscribe confirmation email failed', String(e).replace(/\S+@\S+/g, '[email]')); }
+    }
     return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails.');
   } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
 }

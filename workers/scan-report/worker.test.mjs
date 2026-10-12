@@ -215,14 +215,20 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const peek = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`), OB, {});
   const peekHtml = await peek.text();
   check(peek.status === 200 && !F.db.users[0].email_opt_out_at && /<form method="POST"/.test(peekHtml) && /noindex/.test(peekHtml) && !peekHtml.includes(EMAIL), 'unsubscribe: GET (what a mail scanner does) only shows a confirm page, opts nobody out, does not print the address');
+  const sentBefore = resendCount(F);
   const good = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
   check(good.status === 200 && F.db.users[0].email_opt_out_at && /You are unsubscribed/.test(await good.text()), 'unsubscribe: POST (button or one-click) opts the user out');
+  // MPC-7491: one plain confirmation email, no marketing, only the first time.
+  const uc = F.calls.filter((c) => c.url.includes('resend')).slice(sentBefore);
+  const ucBody = uc[0] ? JSON.parse(uc[0].body) : {};
+  check(uc.length === 1 && ucBody.subject === 'You are unsubscribed' && /no more scan report or follow-up emails/.test(ucBody.text) && /privacy@myprivacytool\.io/.test(ucBody.text), 'unsubscribe: sends one plain confirmation email');
+  check(!/<img|<a |<button|utm_|http/i.test(ucBody.html + ucBody.text) && !ucBody.headers, 'unsubscribe confirmation email: no images, buttons, links, UTM tags or unsubscribe header');
   check(F.db.email_suppressions.length === 1 && /^[0-9a-f]{64}$/.test(F.db.email_suppressions[0].email_hash) && !JSON.stringify(F.db.email_suppressions).includes(EMAIL), 'unsubscribe: also writes an email-hash suppression (no readable address)');
   await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
-  check(F.db.email_suppressions.length === 1, 'unsubscribe twice: suppression stays a single row');
+  check(F.db.email_suppressions.length === 1 && resendCount(F) === sentBefore + 1, 'unsubscribe twice: suppression stays a single row and no second confirmation email');
   const badPost = await worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=deadbeef`, { method: 'POST' }), OB, {});
   check(badPost.status === 400, 'unsubscribe: POST with a bad token => 400');
-  check((await runFollowUpJob(OB, F.f)).skipped === 1 && resendCount(F) === 2, 'opted-out user gets no follow-up');
+  check((await runFollowUpJob(OB, F.f)).skipped === 1 && resendCount(F) === 3, 'opted-out user gets no follow-up (only the unsubscribe confirmation was sent)');
 
   // Real launch (empty allowlist): cohort slots are claimed in order; non-members get no follow-ups; full cohort => null.
   const open = { ...OB, RECIPIENT_ALLOWLIST: '' };

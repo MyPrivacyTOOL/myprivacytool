@@ -116,7 +116,7 @@ for (const flag of [undefined, '', 'false', 'TRUE', '1', 'yes']) {
   const r = await worker.fetch(new Request(`https://x/api/unsubscribe?e=hkonly%40example.com&t=${t}`, { method: 'POST' }), { ...LIVE }, {});
   check(r.status === 200 && supp.length === 1 && supp[0].email_hash === await emailHash('hkonly@example.com'), 'unsubscribe by an HK registrant (no users row) records an email-hash suppression');
   const [o] = await quiet(() => runHkSpamJob(LIVE, f));
-  check(o.sent === 0 && o.suppressed === 1 && F.sends().length === 0, 'and the day-10 email is then not sent');
+  check(o.sent === 0 && o.suppressed === 1 && F.sends().filter((c) => JSON.parse(c.body).subject !== 'You are unsubscribed').length === 0, 'and the day-10 email is then not sent (only the plain unsubscribe confirmation went out)');
 }
 
 // ---- go-live safety gates

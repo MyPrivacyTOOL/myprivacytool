@@ -9,8 +9,8 @@ export async function emailHash(email) {
 
 // Called by the unsubscribe handler. Idempotent (a duplicate row is fine).
 export async function addSuppression(sb, email, source = 'unsubscribe') {
-  try { await sb.insert('email_suppressions', { email_hash: await emailHash(email), source }); }
-  catch (e) { if (e.status !== 409) throw e; }
+  try { await sb.insert('email_suppressions', { email_hash: await emailHash(email), source }); return true; }
+  catch (e) { if (e.status !== 409) throw e; return false; }   // true = newly recorded, false = was already there
 }
 
 // PostgREST in.(...) list with double-quoted values.

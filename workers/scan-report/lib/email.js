@@ -154,6 +154,26 @@ ${para('<br>If you did not ask for this, ignore this email and nothing changes.'
   return tagged('unsubscribe-confirm', { subject, text, html });
 }
 
+// MPC-7491: the plain "you are unsubscribed" notice. Transactional only: no images, buttons, links, UTM tags, unsubscribe footer or other
+// channels (a call to action right after an unsubscribe can count as marketing). Sent once, after the opt-out is recorded.
+export function buildUnsubscribedEmail() {
+  const subject = 'You are unsubscribed';
+  const text = [
+    'You are unsubscribed.',
+    '',
+    'We will send no more scan report or follow-up emails.',
+    '',
+    'To have your data deleted, write to privacy@myprivacytool.io.',
+    '',
+    'The MyPrivacyTOOL team',
+  ].join('\n');
+  const html = shell(subject, 'You will get no more scan report or follow-up emails.',
+    `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">You are unsubscribed</h1>
+${para('We will send no more scan report or follow-up emails.')}
+${para('To have your data deleted, write to privacy@myprivacytool.io.')}`, null, { footer: 'MyPrivacyTOOL' });
+  return { subject, text, html };
+}
+
 export const BRIDGE = 'You saw what your browser gives away. Now look at what one email address gives away.';
 const MAX_BREACH_ROWS = 10;
 // US people-search removal guides stay out of the main body unless a finding makes them relevant: a name in the address, or a breach that
