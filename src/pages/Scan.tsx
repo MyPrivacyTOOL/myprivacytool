@@ -63,7 +63,8 @@ const Scan = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !consent || (offerSave && !saveConsent) || submitting) return;
+    // The save box is optional: unticked = the report is still requested, the scan is just not saved.
+    if (!email.trim() || !consent || submitting) return;
     setSubmitting(true);
     setErrorMsg("");
     try {

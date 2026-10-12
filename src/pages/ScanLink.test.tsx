@@ -1,4 +1,4 @@
-// MPC-7470 (D12): /scan saves the scan only with an email AND the separate save box; nothing is saved without a scan in the browser.
+// MPC-7470 (D12): /scan saves the scan only with an email AND the separate, optional save box (unticked = report still requested, nothing saved); nothing is saved without a scan in the browser.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -45,28 +45,25 @@ describe("Scan page: save my scan result (D12)", () => {
     expect(getScanNumber()).toBe(NUMBER);
   });
 
-  it("shows a separate, required, unticked box with the exact label, next to the unchanged marketing box", () => {
+  it("shows a separate, optional, unticked box with the exact label, next to the unchanged marketing box", () => {
     vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
     rememberCompletedScan(hex());
     renderPage(<Scan />);
     const box = saveBox() as HTMLInputElement;
     expect(box).toBeTruthy();
     expect(box.checked).toBe(false);
-    expect(box.required).toBe(true);
+    expect(box.required).toBe(false);
     expect(screen.getAllByLabelText(MARKETING)[0]).not.toBe(box);
     expect(screen.getAllByTestId("contact-saving-notice").length).toBeGreaterThan(0);
   });
 
-  it("does not submit until the save box is ticked: nothing is sent", async () => {
+  it("with the box left unticked the report is still requested, but the scan is not sent or saved", async () => {
     vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
     rememberCompletedScan(hex());
-    const f = vi.fn(async () => jsonResponse({})); vi.stubGlobal("fetch", f);
-    const user = userEvent.setup();
-    renderPage(<Scan />);
-    await fill(user);
-    await user.click(screen.getAllByRole("button", { name: /check my exposure/i })[0]);
-    expect(f).not.toHaveBeenCalled();
-    expect(screen.queryByRole("status")).toBeNull();
+    const { body } = await submit({ tickSave: false, reply: { success: true } });
+    expect(body.email).toBe("mpc7470+site@example.com");
+    for (const k of ["scan", "save_consent", "save_consent_version", "scan_number"]) expect(k in body).toBe(false);
+    expect(getScanNumber()).toBeNull();
   });
 
   it("with no scan in the browser (arrived directly) there is no save box, the email goes through and nothing is saved", async () => {
