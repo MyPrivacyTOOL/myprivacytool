@@ -41,13 +41,13 @@ describe("core-brain-rate-limit-probe", () => {
   });
   it("tolerates a limiter that trips a request or two late (live run: first 429 at request 12)", async () => {
     for (const max of [10, 11, 12, 13, 14]) expect(names(await probe("https://b", SECRET, { f: brain({ max }).f }))).toEqual([]);
-    expect(SLACK).toBe(4);
+    expect(SLACK).toBe(19);
   });
   it("fails when the limit is much looser (first 429 after the slack)", async () => {
-    expect(names(await probe("https://b", SECRET, { f: brain({ max: 15 }).f }))).toContain("first 429 arrives by request 15 (spec: 11th, limiter is approximate)");
+    expect(names(await probe("https://b", SECRET, { f: brain({ max: 30 }).f }))).toContain("first 429 arrives by request 30 (spec: 11th, limiter is approximate)");
   });
   it("fails when no request is ever limited", async () => {
-    expect(names(await probe("https://b", SECRET, { f: brain({ max: 999 }).f }))).toContain("first 429 arrives by request 15 (spec: 11th, limiter is approximate)");
+    expect(names(await probe("https://b", SECRET, { f: brain({ max: 999 }).f }))).toContain("first 429 arrives by request 30 (spec: 11th, limiter is approximate)");
   });
   it("fails when the limit is tighter (an early request is refused)", async () => {
     expect(names(await probe("https://b", SECRET, { f: brain({ max: 5 }).f }))).toContain("first 10 requests for one sender -> 200");

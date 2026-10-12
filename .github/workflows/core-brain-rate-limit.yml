@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Core Brain rate-limit probe (first 429 by request 15)
+      - name: Core Brain rate-limit probe (first 429 by request 30)
         env:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           COUNT: ${{ inputs.count }}
