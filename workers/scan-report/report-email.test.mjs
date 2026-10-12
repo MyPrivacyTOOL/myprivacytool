@@ -143,6 +143,15 @@ check(fh['google-services'] === 'not_checked' && fh.screen === 'not_checked' && 
 const worstRated = buildReportEmail({ scan, breaches: manyBreaches, breachStatus: 'checked', brokers: BROKERS, webScan: { id: 'w3', hexagons: WEB_HEXAGONS.map((h) => ({ id: h.id, label: h.label, value: EVIL, status: 'found', estimate: true, confirmed: true, confidence: 100, risk: 'x'.repeat(200), icon: 'x' })) }, emailChecks: worstEmail, unsubscribeLink: UNSUB });
 check(bytes(worstRated.html) < HARD_LIMIT, `MPC-7487: worst case with saved statuses (${bytes(worstRated.html)} B) is under the ${HARD_LIMIT} byte limit`);
 
+// IP addresses stay in the attached JSON and never appear in the email body (HTML or text)
+{
+  const ipScan = { id: 'w', hexagons: [{ id: 'webrtc-leak', label: 'WebRTC Leak', value: 'Leaking: 203.0.113.7 and 2001:db8::1', status: 'found', confidence: 90 }] };
+  const ipMail = buildReportEmail({ scan, breaches: [], breachStatus: 'checked', webScan: ipScan });
+  const leak = ipMail.report.web_scan.hexagons.find((h) => h.id === 'webrtc-leak');
+  check(!/203\.0\.113\.7|2001:db8/.test(ipMail.html + ipMail.text) && ipMail.html.includes('IP address hidden here') && ipMail.text.includes('IP address hidden here'), 'IP addresses never appear in the email body (HTML or text)');
+  check(/203\.0\.113\.7/.test(leak.value) && /2001:db8::1/.test(leak.value), 'the full IP values stay in the attached JSON');
+}
+
 if (process.env.REPORT_RENDER_DIR) {
   mkdirSync(process.env.REPORT_RENDER_DIR, { recursive: true });
   for (const [k, m] of [['worst', worst], ['realistic', real], ['no-web-scan', none]]) {
