@@ -342,7 +342,7 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
     await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
     const hs = await pushEmailOptOut(env, { email });   // best effort: HubSpot must not mail them either; a failure never blocks the unsubscribe
     if (hs.failed) console.error('HubSpot opt-out failed:', hs.failed);
-    return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails. You can run a new scan on our site whenever you like.');
+    return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails.');
   } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
 }
 

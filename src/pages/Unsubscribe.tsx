@@ -77,7 +77,7 @@ const Unsubscribe = () => {
             </div>
             <h1 className="text-brand font-semibold text-xl mb-2">You are unsubscribed.</h1>
             <p className="text-muted-foreground text-sm">
-              We will send you no more scan report or follow-up emails. You can run a new scan on our site whenever you like.
+              We will send you no more scan report or follow-up emails.
             </p>
           </div>
         ) : status === "sent" ? (
