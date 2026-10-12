@@ -59,7 +59,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          # MPC-7385-F5: after a key rotation the new key lives in NEW_SUPABASE_SECRET_KEY and wins over the old secret.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
           HUBSPOT_TOKEN: ${{ secrets.SCAN_REPORT_HUBSPOT_TOKEN }}
           HIBP_API_KEY: ${{ secrets.SCAN_REPORT_HIBP_API_KEY }}
         run: |
