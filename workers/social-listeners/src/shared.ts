@@ -2,6 +2,9 @@ import type { Logger } from "./logger";
 
 export interface Env {
   X_CONSUMER_SECRET?: string;
+  /** MPC-7628 Mirror bot: app bearer token (public profile lookup) and user-context token with dm.write (DM replies). */
+  X_BEARER_TOKEN?: string;
+  X_USER_ACCESS_TOKEN?: string;
   /** LinkedIn app Client Secret (MPC-7640): signs webhook challenges and deliveries. Unset = LinkedIn webhook fails closed. */
   LINKEDIN_CLIENT_SECRET?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
