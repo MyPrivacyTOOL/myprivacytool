@@ -224,3 +224,25 @@ export function trackResults(): () => void {
     flush();
   };
 }
+
+// MPC-7494 (the open mirror): the scan number this browser kept from an EARLIER visit, or null. A number saved on this visit is not "earlier".
+export function earlierScanNumber(): string | null {
+  const held = read(() => localStorage);
+  return held && held !== visitScanNumber() ? held : null;
+}
+
+/** Forget the scan number kept on this device (and this visit) when it is the given one, after the visitor deleted that record. */
+export function forgetScanNumber(scanNumber: string): void {
+  for (const store of [() => localStorage, () => sessionStorage]) {
+    try {
+      if (store().getItem(KEY)?.toLowerCase() === scanNumber.toLowerCase()) store().removeItem(KEY);
+    } catch {
+      /* storage blocked: nothing to clear */
+    }
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(SCAN_NUMBER_EVENT, { detail: null }));
+  } catch {
+    /* no window */
+  }
+}

@@ -1,6 +1,10 @@
 # MPC-7494 (F5): the open mirror, "Welcome back, we recognised your device"
 
-Status: **backend only, switch OFF.** The welcome-back screen (site) is not in this PR. Chris approves the screen from screenshots before the switch goes on, and only if the MPC-7491 device-recognition wording (docs/policy-wording-mpc-7491.md) is live.
+Status: **backend and welcome-back screen built, both switches OFF.** Chris approves the screen from screenshots before the switch goes on, and only if the MPC-7491 device-recognition wording (docs/policy-wording-mpc-7491.md) is live.
+
+Approval: Chris approved the welcome-back screen and the threshold (>=12 of 20 comparable points, one agreeing hash, no differing hash, >=0.85 agreement) on 2026-10-12 from the four screenshots in docs/screenshots/mpc-7494/ (mocked API). That approval does not turn any switch on.
+
+**Open gap before any switch (for Chris):** the approved MPC-7491 wording says recognition is offered after a scan is saved as a separate "Recognise this device?" choice, used only with consent. This build recognises for any browser that holds a consented scan number, and the save tick-box text does not mention recognition. Either add a "Recognise this device?" opt-in at the contact step (new consent wording version), or change the MPC-7491 wording to match the existing save consent. Until then `RECOGNITION_ENABLED` and `VITE_RECOGNITION_ENABLED` stay off.
 
 Principle (Chris): MyPrivacyTOOL is not a tracker, it is a mirror. Recognition happens in the open, with consent, and is shown to the visitor with how it was done.
 
@@ -12,6 +16,9 @@ Principle (Chris): MyPrivacyTOOL is not a tracker, it is a mirror. Recognition h
 | Routes `POST /api/recognise`, `POST /api/recognise/delete` | `workers/scan-report/index.js` |
 | Switch `RECOGNITION_ENABLED = "false"` | `workers/scan-report/wrangler.toml` |
 | Candidate lookup (consent + retention enforced in the database) | `supabase/migrations/20261012230000_mpc_7494_recognition_candidates.sql` |
+| Welcome-back screen | `src/components/WelcomeBack.tsx`, `src/lib/recognise.ts`, shown from `src/pages/Index.tsx` |
+| Site flag `VITE_RECOGNITION_ENABLED` (unset = off), in `.env.example` | needs `VITE_SAVE_WEB_SCANS=true` too |
+| Screen tests (13) | `src/components/WelcomeBack.test.tsx` |
 | Tests (43 Worker checks, 8 database assertions) | `workers/scan-report/recognise.test.mjs`, `supabase/tests/schema.test.sql` |
 
 ## The rules, and where each is enforced
@@ -49,8 +56,8 @@ Why 0.85: browsers update every few weeks and screens get plugged in, so 1.0 wou
 ## Before it can go on
 
 1. Apply `20261012230000_mpc_7494_recognition_candidates.sql` in production (Supabase SQL Editor; the connector times out on function DDL).
-2. Build the screen (separate session with npm), Alice's voice, existing design: "Welcome back. We recognised your device without a cookie", the signals, when they were last here, that every site can do the same, and keep / delete.
-3. Chris approves screenshots; MPC-7491 device-recognition wording goes live; MPC-7471 turns the site save flag on.
+2. ~~Build the screen~~ Built (this PR). It calls `/api/recognise` only when `VITE_SAVE_WEB_SCANS` and `VITE_RECOGNITION_ENABLED` are both `"true"` and this browser holds a scan number from an earlier visit. No match shows nothing. Keep makes no call; Delete calls `/api/recognise/delete` with the matched scan number, confirms, and clears the stored number if it was the same one. Analytics events are count-only (`welcome_back_shown`, `welcome_back_choice` with keep/delete), never the scan number, signals or values. Screenshots (mocked API): `docs/screenshots/mpc-7494/`.
+3. Chris approves screenshots and the threshold; MPC-7491 device-recognition wording goes live; MPC-7471 turns the site save flag on.
 
 ## Open decision for Chris
 
