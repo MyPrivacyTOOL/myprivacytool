@@ -56,7 +56,7 @@ export function agentStatsText(s) {
   if (isNum(s.errorsCaught)) extra.push(`${fmt(s.errorsCaught)} errors caught`);
   if (isNum(s.acceptedPct)) extra.push(`${Math.round(s.acceptedPct)}% accepted as is`);
   if (isNum(s.revenueGbp)) extra.push(`£${fmt(s.revenueGbp)} revenue impacted`);
-  return `Agent tasks: ${s.done} done of ${s.total}, ${rate}, ${s.amended} amended, ${s.rejected} rejected, ${s.blocked} blocked${extra.length ? `, ${extra.join(', ')}` : ''}.`;
+  return `Agent tasks: ${s.done} done of ${s.total}, ${rate}, ${s.rejected} rejected, ${s.blocked} blocked${extra.length ? `, ${extra.join(', ')}` : ''}.`;
 }
 
 /**
