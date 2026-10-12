@@ -1,5 +1,5 @@
 // MPC-7470 (D12): the saved-scan wording of record. Changing it needs Chris's written approval.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderPage } from "@/test/render";
 import Privacy from "./Privacy";
@@ -35,5 +35,28 @@ describe("Privacy: saved scan", () => {
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("the domain part of your email address to Cloudflare");
     expect(text).toContain("a SHA-256 hash of your email address to Gravatar");
+  });
+});
+
+// MPC-7494: the "Recognising your device" paragraph (docs/policy-wording-mpc-7491.md) goes live in the same flip as the feature (VITE_RECOGNITION_ENABLED).
+describe("Privacy: recognising your device (MPC-7494)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("is not shown while recognition is off, and third-party information stays 2.5", () => {
+    renderPage(<Privacy />);
+    expect(screen.queryByRole("heading", { name: "2.5 Recognising Your Device" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "2.5 Information from Third Parties" })).toBeInTheDocument();
+    expect(flat(document.body.textContent ?? "")).not.toContain("Recognising your device");
+  });
+  it("is shown as 2.5 when recognition is on, with the approved wording, and third-party information becomes 2.6", () => {
+    vi.stubEnv("VITE_RECOGNITION_ENABLED", "true");
+    renderPage(<Privacy />);
+    expect(screen.getByRole("heading", { name: "2.5 Recognising Your Device" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "2.6 Information from Third Parties" })).toBeInTheDocument();
+    expect(flat(document.body.textContent ?? "")).toContain(
+      "If you choose to, we can tell you when we recognise the device you are using from the technical details its browser shows us, without using a cookie. " +
+        "We do this in the open: when it happens we show you that we recognised you, which details we used and how, and what you can do about it, including asking us to delete it. " +
+        "We do not recognise your device in the background. If you do nothing, we do not link a visit to you. Recognising a device is only used with your consent, " +
+        "and you can withdraw it at any time by contacting us or deleting your scan number record.",
+    );
   });
 });

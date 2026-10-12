@@ -1,5 +1,6 @@
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { recognitionFlagOn } from "@/lib/webScan";
 
 const Privacy = () => {
 
@@ -217,8 +218,28 @@ const Privacy = () => {
                 with your scan number or the email address you used.
               </p>
 
+              {recognitionFlagOn() && (
+                <>
+                  <h3 className="mt-6 text-xl font-semibold text-foreground">
+                    2.5 Recognising Your Device
+                  </h3>
+                  <p className="text-muted-foreground">
+                    If you choose to, we can tell you when we recognise the device
+                    you are using from the technical details its browser shows us,
+                    without using a cookie. We do this in the open: when it happens
+                    we show you that we recognised you, which details we used and
+                    how, and what you can do about it, including asking us to
+                    delete it. We do not recognise your device in the background.
+                    If you do nothing, we do not link a visit to you. Recognising a
+                    device is only used with your consent, and you can withdraw it
+                    at any time by contacting us or deleting your scan number
+                    record.
+                  </p>
+                </>
+              )}
+
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.5 Information from Third Parties
+                {recognitionFlagOn() ? "2.6" : "2.5"} Information from Third Parties
               </h3>
               <p className="text-muted-foreground">
                 We may receive information about you from third-party sources,

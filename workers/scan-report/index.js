@@ -74,7 +74,7 @@ export default {
       // MPC-7470: save the scan and link it to this contact, with the consent record. Not for a repeat request within 24h (no new report,
       // so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer to the email request.
       const saved = save.hexagons && !result.duplicate && result.scanId
-        ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
+        ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
         : { saved: false };
       return json({ success: true, duplicate: result.duplicate, scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}) });
     } catch (e) {
