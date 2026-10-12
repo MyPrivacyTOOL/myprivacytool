@@ -10,8 +10,9 @@ name: Rotate Supabase secret key (manual)
 #   4. Check the log: canary 200, then "set ..." for each Worker, no "FAILED".
 #   5. Only then revoke the OLD key in the Supabase dashboard.
 # The workflow never prints a key. It only touches Workers that already have the secret (oauth-poc omits it on purpose and
-# is skipped; a Worker that is not deployed is skipped). core-brain and social-listeners use SUPABASE_KEY via deploy.yml and are
-# NOT changed here.
+# is skipped; a Worker that is not deployed is skipped). core-brain and social-listeners hold the same key as SUPABASE_KEY (also synced
+# by deploy.yml, which now prefers NEW_SUPABASE_SECRET_KEY). The Cloudflare PAGES secret (site edge capture) is NOT reachable
+# from here: replace it by hand in the Cloudflare dashboard.
 
 on:
   workflow_dispatch:
@@ -45,13 +46,14 @@ jobs:
           NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         run: |
           failed=0
-          for dir in scan-report mpt-leads mpt-metrics-collector github-channel oauth-poc webhook-receiver; do
+          for entry in scan-report:SUPABASE_SERVICE_ROLE_KEY mpt-leads:SUPABASE_SERVICE_ROLE_KEY mpt-metrics-collector:SUPABASE_SERVICE_ROLE_KEY github-channel:SUPABASE_SERVICE_ROLE_KEY oauth-poc:SUPABASE_SERVICE_ROLE_KEY webhook-receiver:SUPABASE_SERVICE_ROLE_KEY core-brain:SUPABASE_KEY social-listeners:SUPABASE_KEY; do
+            dir="${entry%%:*}"; secret="${entry##*:}"
             cd "workers/$dir"
             names=$(npx --yes wrangler@3 secret list --format json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).map(x=>x.name).join(" "))}catch{console.log("")}})')
-            if echo " $names " | grep -q " SUPABASE_SERVICE_ROLE_KEY "; then
-              if printf '%s' "$NEW_KEY" | npx --yes wrangler@3 secret put SUPABASE_SERVICE_ROLE_KEY >/dev/null 2>&1; then echo "set $dir"; else echo "FAILED $dir"; failed=1; fi
+            if echo " $names " | grep -q " $secret "; then
+              if printf '%s' "$NEW_KEY" | npx --yes wrangler@3 secret put "$secret" >/dev/null 2>&1; then echo "set $dir ($secret)"; else echo "FAILED $dir"; failed=1; fi
             else
-              echo "skipped $dir (no SUPABASE_SERVICE_ROLE_KEY secret there, or Worker not deployed)"
+              echo "skipped $dir (no $secret secret there, or Worker not deployed)"
             fi
             cd ../..
           done

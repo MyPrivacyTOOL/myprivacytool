@@ -7,7 +7,7 @@ const ROWS = () => ALL.filter((c) => !c.skip?.(new Date())).length; // GA4 weekl
 import youtube, { DEFAULT_CHANNEL_ID } from './collectors/youtube.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', CLOUDFLARE_ANALYTICS_TOKEN: 'cfro', CLOUDFLARE_ZONE_ID: 'zone1', YOUTUBE_API_KEY: 'ytkey' };
-let inserts = [], failTable = null, failInsertFor = null, cfCalls = [], cfFail = null, ytCalls = [], ytStatus = {}, ytUploads = true;
+let insertRequests = 0, inserts = [], failTable = null, failInsertFor = null, cfCalls = [], cfFail = null, ytCalls = [], ytStatus = {}, ytUploads = true;
 const YT_VIDEOS = { items: [
   { id: 'v1', snippet: { title: 'Intro', publishedAt: '2026-10-09T08:00:00Z' }, statistics: { viewCount: '12', likeCount: '3', commentCount: '1' } },
   { id: 'v2', snippet: { title: 'Old', publishedAt: '2026-10-01T08:00:00Z' }, statistics: { viewCount: '5' } } ] };
@@ -39,9 +39,11 @@ globalThis.fetch = async (url, opts = {}) => {
     return { ok: true, status: 200, headers: new Headers({ 'content-range': `0-0/${TABLES.indexOf(t) + 10}` }) };
   }
   if (url.endsWith('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') {
-    const row = JSON.parse(opts.body);
-    if (row.source === failInsertFor) return { ok: false, status: 500 };
-    inserts.push({ row, headers: opts.headers }); return { ok: true, status: 201 };
+    const rows = [].concat(JSON.parse(opts.body));
+    insertRequests += 1;
+    if (rows.some((r) => r.source === failInsertFor)) return { ok: false, status: 500 };
+    for (const row of rows) inserts.push({ row, headers: opts.headers });
+    return { ok: true, status: 201 };
   }
   return { ok: false, status: 404 };
 };
@@ -130,5 +132,18 @@ ytStatus = { channels: 403 }; row = await ytRow(); ytStatus = {};
 check(row.status === 'error' && /HTTP 403/.test(row.error) && !row.error.includes('ytkey'), 'API failure => status=error row without the key');
 row = await ytRow({ ...env, YOUTUBE_API_KEY: undefined });
 check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'missing key => status=error row');
+// Batched insert: all collectors' rows go out in ONE request (Workers cap outbound calls per invocation)
+{
+  const mk = (source) => ({ source, report: 'r', collect: async () => ({ payload: { n: 1 } }) });
+  inserts = []; insertRequests = 0;
+  r = await runAll(env, [mk('a'), mk('b'), mk('c'), mk('d')]);
+  check(insertRequests === 1 && inserts.length === 4 && r.length === 4 && r.every((x) => x.stored), 'four collectors => one insert request, four rows stored');
+  check(r.map((x) => x.source).join() === 'a,b,c,d', 'results keep collector order');
+  inserts = []; insertRequests = 0; failInsertFor = 'b';
+  r = await runAll(env, [mk('a'), mk('b'), mk('c')]); failInsertFor = null;
+  check(r.find((x) => x.source === 'b').stored === false && r.filter((x) => x.stored).map((x) => x.source).join() === 'a,c' && inserts.map((i) => i.row.source).join() === 'a,c', 'one bad row fails the batch, then falls back row by row so the others are still stored');
+  insertRequests = 0; r = await runAll(env, []);
+  check(r.length === 0 && insertRequests === 0, 'no collectors => no insert request');
+}
 
 process.exit(ok ? 0 : 1);
