@@ -3,7 +3,9 @@ import {
   HK_REGISTERS,
   IVR_DATA,
   IVR_VERIFIED,
+  HK_SPAM_ENABLED,
   PAUSES,
+  parseHkSpamEnabled,
   buildDialString,
   getIvrKeys,
 } from "./hkDnc";
@@ -73,5 +75,13 @@ describe("hkDnc config", () => {
     for (const r of HK_REGISTERS) {
       expect(getIvrKeys(r).map((k) => k.purpose)).toEqual(["language", "menu", "register", "confirm"]);
     }
+  });
+});
+
+describe("HK_SPAM_ENABLED kill switch", () => {
+  it("defaults to true and only an explicit off value disables it", () => {
+    expect(HK_SPAM_ENABLED).toBe(true);
+    for (const v of [undefined, "", "true", "1", "on", "anything"]) expect(parseHkSpamEnabled(v)).toBe(true);
+    for (const v of ["false", "FALSE", " 0 ", "off", "No"]) expect(parseHkSpamEnabled(v)).toBe(false);
   });
 });
