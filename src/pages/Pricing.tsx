@@ -92,6 +92,7 @@ const Pricing = () => {
   const live = PRICING_TESTS.filter((id) => assignments[id].active);
   const liveVariants = Object.fromEntries(live.map((id) => [id, assignments[id].variantId]));
   const copy = HEADLINE[headline.variantId as keyof typeof HEADLINE] ?? HEADLINE.control;
+  // The paid buttons wrap (whitespace-normal): "Notify me when plans open" is wider than the card button at lg.
   const paidLabel = cta.variantId === "notify_text" ? "Notify me when plans open" : WAITLIST_CTA.label;
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState(PAID_PLANS[0]);
@@ -189,7 +190,12 @@ const Pricing = () => {
                 {plan.note && <li>{plan.note}</li>}
               </ul>
               {plan.cta.to.startsWith("#") ? (
-                <Button type="button" variant={cta.variantId === "outline" ? "outline" : "default"} onClick={() => choosePlan(plan)}>
+                <Button
+                  type="button"
+                  variant={cta.variantId === "outline" ? "outline" : "default"}
+                  className="h-auto min-h-10 whitespace-normal py-2 text-center"
+                  onClick={() => choosePlan(plan)}
+                >
                   {paidLabel}
                 </Button>
               ) : (
