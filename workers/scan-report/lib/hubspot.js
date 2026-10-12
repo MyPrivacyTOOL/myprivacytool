@@ -28,3 +28,25 @@ export async function pushScanActivity(env, { email, scanId, score, riskLevel, s
     return { failed: String(e).replace(/\S+@\S+/g, '[email]').slice(0, 200) };
   }
 }
+
+// Marks the contact as unsubscribed from all email in HubSpot (hs_email_optout), so no HubSpot-sent marketing email reaches them either.
+// Best effort: never throws, and never prints the address. A contact HubSpot does not know is fine (nothing to opt out).
+export async function pushEmailOptOut(env, { email }, fetchImpl = fetch) {
+  if (!env.HUBSPOT_TOKEN) return { skipped: 'no HUBSPOT_TOKEN' };
+  const headers = { Authorization: `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
+  try {
+    const found = await fetchImpl(`${API}/crm/v3/objects/contacts/search`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }], limit: 1 }),
+    });
+    if (!found.ok) return { failed: `contact search ${found.status}` };
+    const contactId = (await found.json()).results?.[0]?.id;
+    if (!contactId) return { skipped: 'contact not found' };
+    const patched = await fetchImpl(`${API}/crm/v3/objects/contacts/${contactId}`, {
+      method: 'PATCH', headers, body: JSON.stringify({ properties: { hs_email_optout: 'true' } }),
+    });
+    return patched.ok ? { optedOut: true } : { failed: `contact update ${patched.status}` };
+  } catch (e) {
+    return { failed: String(e).replace(/\S+@\S+/g, '[email]').slice(0, 200) };
+  }
+}

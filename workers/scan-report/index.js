@@ -1,7 +1,7 @@
 import { runEmailHexagons, emailHexagonSignalRows } from './lib/emailHexagons.js';
 import { db } from './lib/supabase.js';
 import { checkBreaches } from './lib/hibp.js';
-import { pushScanActivity } from './lib/hubspot.js';
+import { pushScanActivity, pushEmailOptOut } from './lib/hubspot.js';
 import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
@@ -339,7 +339,9 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
   try {
     const sb = db(env);
     await sb.patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
-    await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants)
+    await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
+    const hs = await pushEmailOptOut(env, { email });   // best effort: HubSpot must not mail them either; a failure never blocks the unsubscribe
+    if (hs.failed) console.error('HubSpot opt-out failed:', hs.failed);
     return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails. You can run a new scan on our site whenever you like.');
   } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
 }
