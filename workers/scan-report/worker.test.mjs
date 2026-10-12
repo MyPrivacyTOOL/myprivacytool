@@ -61,12 +61,13 @@ function fake(opts = {}) {
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
-    if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); db[t] = db[t].filter((x) => x.id !== id); return res(204); }
+    if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
       if (t === 'web_scan_contacts') { if (opts.linkFail) return res(500, 'x'); const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
+      if (t === 'hexagon_scores' && rows.some((x) => db.hexagon_scores.some((h) => h.scan_id === x.scan_id && h.category === x.category))) return res(409, { code: '23505' });   // unique (scan_id, category)
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
@@ -107,6 +108,16 @@ let res = await runReportJob(env, F.f);
 check(res.sent === 1 && F.db.scans[0].report_status === 'sent' && F.db.scans[0].privacy_score === 100, 'report job sends report and stores score');
 check(F.db.signals.filter((s) => s.category === 'broker').every((s) => s.check_status === 'not_checked') && F.db.hexagon_scores.length === 8, 'broker signals stored as not_checked; 8 hexagon rows');
 check(F.calls.filter((c) => c.url.includes('resend')).length === 2, 'no duplicate confirmation when job runs (1 confirm + 1 report)');
+
+// MPC-7616: a report email that fails (Resend down) is retried by the next run; the retry must not trip over the first attempt's rows
+{
+  const o = { resendFail: false }; const G = fake(o); await handleScan(env, null, input, G.f);
+  o.resendFail = true; let r = await runReportJob(env, G.f);
+  check(r.failed === 1 && G.db.scans[0].report_status === 'pending' && G.db.scans[0].report_attempts === 1, 'MPC-7616: report email fails => scan back to pending for a retry');
+  o.resendFail = false; r = await runReportJob(env, G.f);
+  check(r.sent === 1 && r.failed === 0 && G.db.scans[0].report_status === 'sent' && !G.db.scans[0].report_last_error, 'MPC-7616: the retry sends the report (no unique-key clash on hexagon_scores)');
+  check(G.db.hexagon_scores.length === 8 && new Set(G.db.signals.map((s) => s.signal_type)).size === G.db.signals.length, 'MPC-7616: one set of hexagon_scores and signals after the retry, no duplicates');
+}
 
 // HIBP missing => report held, nothing sent
 F = fake(); await handleScan({ ...env, HIBP_API_KEY: undefined }, null, input, F.f);
