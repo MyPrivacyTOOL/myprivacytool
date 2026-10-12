@@ -105,6 +105,10 @@ jobs:
             ${{ secrets.TELEGRAM_WEBHOOK_SECRET != '' && 'TELEGRAM_WEBHOOK_SECRET' || '' }}
             ${{ secrets.CORE_BRAIN_TOKEN != '' && 'CORE_BRAIN_TOKEN' || '' }}
             ${{ secrets.TELEGRAM_BOT_TOKEN != '' && 'TELEGRAM_BOT_TOKEN' || '' }}
+            ${{ secrets.X_BEARER_TOKEN != '' && 'X_BEARER_TOKEN' || '' }}
+            ${{ secrets.X_API_KEY != '' && 'X_API_KEY' || '' }}
+            ${{ secrets.X_ACCESS_TOKEN != '' && 'X_ACCESS_TOKEN' || '' }}
+            ${{ secrets.X_ACCESS_TOKEN_SECRET != '' && 'X_ACCESS_TOKEN_SECRET' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}   # MPC-7385-F5: the rotated key wins over the old secret
@@ -115,3 +119,8 @@ jobs:
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET || 'placeholder' }}
           CORE_BRAIN_TOKEN: ${{ secrets.CORE_BRAIN_TOKEN || 'placeholder' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || 'placeholder' }}
+          # MPC-7628: no placeholder here. The Mirror bot turns itself on only when all of its secrets are set.
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}

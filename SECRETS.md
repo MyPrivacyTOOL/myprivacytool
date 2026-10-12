@@ -15,6 +15,7 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `X_CONSUMER_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_WEBHOOK_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_BOT_TOKEN` (MPC-7251, sends Telegram replies) | | ✅ |
+| `X_BEARER_TOKEN`, `X_API_KEY`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` (MPC-7628, X Mirror bot; all four plus `X_CONSUMER_SECRET` or the bot stays off) | | ✅ |
 
 Each Worker only receives the secrets it needs (least privilege). Secrets are read in code as `env.NAME`.
 `wrangler.toml` cannot hold secret values, so it lists the names in comments and `EXPECTED_SECRETS.txt`.
@@ -73,7 +74,7 @@ itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 | Worker | Secrets |
 |---|---|
 | core-brain | `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `WEBHOOK_SECRET`, `SUPABASE_SERVICE_KEY` †, `TELEGRAM_BOT_TOKEN` †, `X_API_KEY` † |
-| social-listeners | `SUPABASE_URL`, `SUPABASE_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `CORE_BRAIN_TOKEN`, `TELEGRAM_BOT_TOKEN` |
+| social-listeners | `SUPABASE_URL`, `SUPABASE_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `CORE_BRAIN_TOKEN`, `TELEGRAM_BOT_TOKEN`, `X_BEARER_TOKEN`, `X_API_KEY`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` |
 | github-channel | `GITHUB_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `REDDIT_CLIENT_SECRET` † |
 | mpt-leads | `HUBSPOT_API_KEY`, `HUBSPOT_TOKEN`, `NOTION_TOKEN`, `RESEND_API_KEY`, `SLACK_BOT_TOKEN`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HUNTER_API_KEY` † (non-secret config: `LEADS_DB_ID`, `SLACK_CHANNEL_ID`, `SUPABASE_URL`) |
 | mpt-metrics-collector | `SUPABASE_SERVICE_ROLE_KEY`, `COLLECTOR_TRIGGER_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`, `YOUTUBE_API_KEY`, `GA4_SERVICE_ACCOUNT_JSON`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN` (MPC-7383 Monday digest, `chat:write` only), `HUBSPOT_READONLY_TOKEN` (read-only HubSpot private-app token for portal 246502821; deliberately not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY`) (non-secret config: `SUPABASE_URL`, `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` (set as a secret so `wrangler deploy` does not replace it)) |

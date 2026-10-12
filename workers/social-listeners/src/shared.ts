@@ -2,6 +2,13 @@ import type { Logger } from "./logger";
 
 export interface Env {
   X_CONSUMER_SECRET?: string;
+  /** MPC-7628 Mirror bot: app-only bearer (reads the public profile) + OAuth 1.0a user keys (sends the DM). All optional: unset = bot off. */
+  X_BEARER_TOKEN?: string;
+  X_API_KEY?: string;
+  X_ACCESS_TOKEN?: string;
+  X_ACCESS_TOKEN_SECRET?: string;
+  /** Optional KV for the short-lived consent marker; without it the Cache API is used. */
+  MIRROR_KV?: { get(k: string): Promise<string | null>; put(k: string, v: string, o: { expirationTtl: number }): Promise<void>; delete(k: string): Promise<void> };
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;

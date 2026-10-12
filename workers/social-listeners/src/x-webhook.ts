@@ -1,5 +1,6 @@
 // X (Twitter) Account Activity API listener: DM + mention events. Validate and route only.
 import { createLogger } from "./logger";
+import { handleMirrorDm } from "./mirror-bot";
 import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
 const log = createLogger("social-listeners:x");
@@ -19,7 +20,7 @@ export async function verifyXSignature(request: Request, rawBody: string, env: E
   return timingSafeEqual(request.headers.get("X-Twitter-Webhooks-Signature"), expected);
 }
 
-export async function handleXWebhook(request: Request, env: Env): Promise<Response> {
+export async function handleXWebhook(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
   if (request.method === "GET") return handleCrc(request, env);
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
@@ -31,6 +32,11 @@ export async function handleXWebhook(request: Request, env: Env): Promise<Respon
   }
   const payload = parseJson(raw);
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
+
+  // MPC-7628: MIRROR DMs (and the YES/NO that answers them) are handled here and are not forwarded: nothing is retained.
+  // The X API calls run after the response (waitUntil) so a slow call cannot make X retry the delivery.
+  const defer = async (work: Promise<unknown>) => { if (ctx?.waitUntil) ctx.waitUntil(work); else await work; };
+  if (await handleMirrorDm(payload, env, log, undefined, defer)) return new Response("OK");
 
   const ok = await forwardToCoreBrain(env, { source: "x", receivedAt: new Date().toISOString(), payload }, log);
   // 5xx on forward failure so X retries delivery.

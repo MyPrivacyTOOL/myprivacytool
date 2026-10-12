@@ -26,3 +26,11 @@ service = "core-brain"
 # HTTP fallback instead of the service binding: remove [[services]] above and set CORE_BRAIN_URL here.
 # [vars]
 # CORE_BRAIN_URL = "https://core-brain.<account>.workers.dev"
+
+# MPC-7628: X Mirror bot (DM "MIRROR" -> consent -> public-profile scan -> educational DM). Docs: /docs/channel-osint-bot-mpc-7628.md
+# Extra secrets: X_BEARER_TOKEN, X_API_KEY, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET (bot stays off until all are set, with X_CONSUMER_SECRET).
+# The consent marker lives in the Cache API by default. For a single global store, create a KV namespace
+# (`wrangler kv namespace create MIRROR_KV`) and uncomment:
+# [[kv_namespaces]]
+# binding = "MIRROR_KV"
+# id = "<namespace id>"
