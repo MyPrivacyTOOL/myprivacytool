@@ -1,6 +1,6 @@
 // MPC-7645: referral programme. Stubbed fetch, no network. Run: node workers/scan-report/referral.test.mjs
 import worker, { handleScan } from './index.js';
-import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, mailbox, manageToken, manageUrl, newCode, referralsEnabled, shareUrl, verifyManageToken, CODE_RE, MAX_INVITES } from './lib/referral.js';
+import { referralTester, attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, mailbox, manageToken, manageUrl, newCode, referralsEnabled, shareUrl, verifyManageToken, CODE_RE, MAX_INVITES } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
 import { buildReportEmail, tagLinks } from './lib/email.js';
 import { computeScore } from './lib/score.js';
@@ -228,6 +228,36 @@ const mk = async (F, extra = {}) => { const u = user(F, 'me@example.com', { refe
   const inv = await worker.fetch(req('/api/referral/invite', { code: 'ABCDEFGH', token: tok, emails: ['pal@example.com'] }), ON, {});
   const st = await worker.fetch(req('/api/referral/status', { code: 'ABCDEFGH', token: tok }), ON, {});
   check(inv.status === 200 && st.status === 200 && (await worker.fetch(req('/api/referral/status', { code: 'ABCDEFGH', token: tok }), { ...ON, REFERRALS_ENABLED: 'false' }, {})).status === 404, 'worker routes /api/referral/invite and /api/referral/status (404 when off)');
+}
+
+// ---- tester mode: REFERRALS_TEST_RECIPIENTS limits every referral feature to the listed addresses
+{
+  const T = { ...ON, REFERRALS_TEST_RECIPIENTS: ' Tester.One+x@gmail.com , b@example.org ' };
+  check(referralTester(T, 'testerone@gmail.com') && referralTester(T, 'B@Example.org') && !referralTester(T, 'real@person.com') && !referralTester({ ...T, REFERRALS_ENABLED: 'false' }, 'b@example.org'), 'tester mode: listed addresses only (gmail dots/+tags ignored, case ignored); off means off for everyone');
+  check(referralTester(ON, 'anyone@example.com') && referralTester({ ...ON, REFERRALS_TEST_RECIPIENTS: '  ,' }, 'anyone@example.com'), 'tester list unset or blank: everyone (clearing the secret opens the programme)');
+
+  // a non-tester referrer cannot use the endpoints, even with a valid token (same answer as a wrong link)
+  const F = fake(); user(F, 'real@person.com', { referral_code: 'ABCDEFGH' }); const tok = await manageToken('s3cret', 'ABCDEFGH');
+  check((await handleReferralInvite(T, req('/x', { code: 'ABCDEFGH', token: tok, emails: ['b@example.org'] }), ORIGIN, json, deps(F))).status === 403 && F.sends().length === 0
+    && (await handleReferralStatus(T, req('/x', { code: 'ABCDEFGH', token: tok }), ORIGIN, json, deps(F))).status === 403, 'tester mode: a referrer who is not listed gets 403 on invite and status, nothing sent');
+
+  // a tester may only invite other testers
+  const G = fake(); user(G, 'b@example.org', { referral_code: 'ABCDEFGH' });
+  const r = await read(await handleReferralInvite(T, req('/x', { code: 'ABCDEFGH', token: tok, emails: ['stranger@example.com', 'tester.one@gmail.com'] }), ORIGIN, json, deps(G)));
+  check(r.status === 200 && r.sent === 1 && G.sends().length === 1 && G.sends()[0].to[0] === 'tester.one@gmail.com' && G.db.referrals.length === 1, 'tester mode: invitations to anyone not listed are skipped (no email, no row)');
+
+  // reward email only to a listed referrer
+  const H = fake(); const out = user(H, 'real@person.com', { referral_code: 'ABCDEFGH' }); const fr = user(H, 'b@example.org');
+  H.db.referrals.push({ id: 'r', referrer_user_id: out.id, referee_user_id: fr.id, status: 'signed_up' });
+  const o = await completeReferral(T, dbOf(H), fr.id, H.f);
+  check(o.completed && out.pro_months_earned === 1 && H.sends().length === 0, 'tester mode: an unlisted referrer is credited but never emailed');
+
+  // attach and report block through the HTTP layer
+  const W = fake(); user(W, 'b@example.org', { referral_code: 'ABCDEFGH' }); globalThis.fetch = W.f; const w = [];
+  await worker.fetch(req('/api/scan', { email: 'stranger@example.com', consent: true, ref: 'ABCDEFGH' }), T, { waitUntil: (p) => w.push(p) }); await Promise.all(w);
+  check(W.db.referrals.length === 0, 'tester mode: an unlisted visitor arriving with a code is not linked');
+  await worker.fetch(req('/api/scan', { email: 'tester.one@gmail.com', consent: true, ref: 'ABCDEFGH' }), T, { waitUntil: (p) => w.push(p) }); await Promise.all(w);
+  check(W.db.referrals.length === 1 && W.db.referrals[0].status === 'signed_up', 'tester mode: a listed visitor arriving with a code is linked');
 }
 
 console.log(ok ? '\nreferral tests: all passed' : '\nreferral tests: FAILURES');

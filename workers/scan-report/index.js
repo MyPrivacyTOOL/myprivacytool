@@ -12,7 +12,7 @@ import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
-import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, shareUrl } from './lib/referral.js';
+import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
@@ -136,7 +136,7 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref 
   } catch (e) { if (e.status !== 409) console.error('lead insert failed', String(e)); }   // 409 = already a lead (dedupe)
 
   // MPC-7645: a brand-new user who arrived through a friend's link is linked to that friend. Only new users count, so nobody can be referred after the fact.
-  if (ref && isNewUser && referralsEnabled(env)) await attachReferral(sb, { ref, userId: user.id, email, isNewUser }).catch((e) => console.error('referral attach failed:', String(e).replace(/\S+@\S+/g, '[email]')));
+  if (ref && isNewUser && referralTester(env, email)) await attachReferral(sb, { ref, userId: user.id, email, isNewUser }).catch((e) => console.error('referral attach failed:', String(e).replace(/\S+@\S+/g, '[email]')));
 
   // One report per address per 24h: stops the form being used to mail-bomb someone.
   const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
@@ -278,7 +278,7 @@ async function processScan(env, sb, job, fetchImpl) {
   const mirror = buildMirrorReport({ scan: result, breaches, breachStatus: hibp.status, brokers });
   const links = await unsubLinks(env, email);
   const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
-  const referral = await referralFor(env, sb, job.user_id);
+  const referral = await referralFor(env, sb, job.user_id, email);
   const mail = buildReportEmail({ scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
@@ -295,8 +295,8 @@ async function processScan(env, sb, job, fetchImpl) {
 }
 
 // MPC-7645: the "Invite 3 friends" block in the report. Needs UNSUBSCRIBE_SECRET (it signs the private invite link). Never lets the programme break the report.
-async function referralFor(env, sb, userId) {
-  if (!referralsEnabled(env) || !env.UNSUBSCRIBE_SECRET) return null;
+async function referralFor(env, sb, userId, email) {
+  if (!referralTester(env, email) || !env.UNSUBSCRIBE_SECRET) return null;
   try {
     const code = await ensureReferralCode(sb, userId);
     return code ? referralBlock({ shareLink: shareUrl(env, code), manageLink: await manageUrl(env, code) }) : null;

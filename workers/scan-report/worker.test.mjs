@@ -614,6 +614,12 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const reward = sent.find((m) => m.to[0] === 'ref@example.com');
   check(F.db.referrals[0].status === 'completed' && F.db.users[0].pro_months_earned === 1 && reward && /free month of Pro/i.test(reward.text), 'referral: the friend\'s delivered report credits the referrer one month and emails them');
   check(report && /INVITE 3 FRIENDS/.test(report.text) && /\/invite#c=[A-HJ-NP-Z2-9]{8}&t=[0-9a-f]{64}/.test(report.text) && /^[A-HJ-NP-Z2-9]{8}$/.test(friend.referral_code || F.db.users.find((u) => u.id === friend.id).referral_code || ''), 'referral: the friend\'s own report carries their invite block with a fresh code and private link');
+  // tester mode through the real report job: only the listed address gets the block
+  const TM = { ...RB, REFERRALS_TEST_RECIPIENTS: 'friend@example.com' };
+  const K = fake();
+  await handleScan(TM, null, { ...input, email: 'friend@example.com' }, K.f); await handleScan(TM, null, { ...input, email: 'other@example.com' }, K.f); await runReportJob(TM, K.f);
+  const km = K.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body)).filter((m) => /privacy report/i.test(m.subject));
+  check(km.find((m) => m.to[0] === 'friend@example.com')?.text.includes('INVITE 3 FRIENDS') && km.find((m) => m.to[0] === 'other@example.com') && !km.find((m) => m.to[0] === 'other@example.com').text.includes('INVITE 3 FRIENDS'), 'referral tester mode: only the listed address gets the invite block; every other report is unchanged');
   const G = fake(); G.db.users.push({ id: 'ref1', email: 'ref@example.com', referral_code: 'ABCDEFGH', pro_months_earned: 0 });
   await handleScan({ ...RB, REFERRALS_ENABLED: 'false' }, null, { ...input, email: 'friend@example.com', ref: 'ABCDEFGH' }, G.f); await runReportJob({ ...RB, REFERRALS_ENABLED: 'false' }, G.f);
   const off = G.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));
