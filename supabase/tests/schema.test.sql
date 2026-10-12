@@ -391,5 +391,33 @@ select pg_temp.assert((select count(*) from public.web_scan_deletion_log where k
 select pg_temp.assert(not exists (select 1 from public.web_scan_deletion_log l where l::text ~* '[0-9a-f]{8}-[0-9a-f]{4}-|@|Testfox'), 'deletion log: no scan number, email or value');
 reset role;
 
+-- ===== MPC-7490: edge_visits (service_role only), IP cut for person/unknown after the retention setting =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.edge_visits$$) = '42501', 'edge_visits: anon must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.edge_visits (path, method, class, rule, ruleset_version) values ('/', 'GET', 'person', 'R8', 'v')$$) = '42501', 'edge_visits: anon must not insert');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.edge_visit_retention$$) = '42501', 'edge_visit_retention: authenticated must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_cut_edge_visit_ips()$$) = '42501', 'mpt_cut_edge_visit_ips: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_cut_edge_visit_ips(true)$$) = '42501', 'mpt_cut_edge_visit_ips: authenticated must not execute');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.edge_visits (path, method, class, rule, ruleset_version) values ('/', 'GET', 'robot', 'R8', 'v')$$) = '23514', 'edge_visits: class must be one of the four');
+select pg_temp.assert((select relforcerowsecurity from pg_class where oid = 'public.edge_visits'::regclass) and (select relforcerowsecurity from pg_class where oid = 'public.edge_visit_retention'::regclass), 'edge visit tables: RLS forced');
+select pg_temp.assert((select ip_days from public.edge_visit_retention) = 30, 'edge_visit_retention: default 30 days');
+-- made-up rows: 40 days old (older than the 30-day default) and 5 days old, one per class; documentation-range IPs only
+insert into public.edge_visits (seen_at, path, method, status, user_agent, ip, class, rule, ruleset_version) values
+  (now() - interval '40 days', '/', 'GET', 200, 'ExampleBrowser/1.0', '192.0.2.10', 'person',  'R8', 'test'),
+  (now() - interval '40 days', '/', 'GET', 200, 'ExampleBrowser/1.0', '192.0.2.11', 'unknown', 'R5', 'test'),
+  (now() - interval '40 days', '/', 'GET', 200, 'ExampleAIBot/1.0',   '192.0.2.12', 'ai',      'R1', 'test'),
+  (now() - interval '40 days', '/', 'GET', 200, 'ExampleCrawler/1.0', '192.0.2.13', 'bot',     'R4', 'test'),
+  (now() - interval '5 days',  '/', 'GET', 200, 'ExampleBrowser/1.0', '192.0.2.14', 'person',  'R8', 'test');
+create temp table cut_dry as select public.mpt_cut_edge_visit_ips(true) as j;
+select pg_temp.assert((select (j->>'ips_cut')::int = 2 and (j->>'dry_run')::boolean from cut_dry) and (select count(*) from public.edge_visits where ip is not null) = 5, 'edge ip cut: dry run counts person+unknown only and changes nothing');
+create temp table cut_run as select public.mpt_cut_edge_visit_ips(false) as j;
+select pg_temp.assert((select (j->>'ips_cut')::int = 2 from cut_run), 'edge ip cut: cuts the old person and unknown rows');
+select pg_temp.assert((select count(*) from public.edge_visits where class in ('person','unknown') and seen_at < now() - interval '30 days' and ip is not null) = 0, 'edge ip cut: no old person/unknown IP left');
+select pg_temp.assert((select count(*) from public.edge_visits where class in ('bot','ai') and ip is not null) = 2, 'edge ip cut: bot and ai rows kept in full');
+select pg_temp.assert((select ip from public.edge_visits where ip is not null and class = 'person') = '192.0.2.14', 'edge ip cut: recent person row keeps its IP');
+select pg_temp.assert((select count(*) from public.edge_visits where ip is null and ip_cut_at is not null and user_agent is not null and path = '/' and rule is not null) = 2, 'edge ip cut: the rest of a cut row stays');
+update public.edge_visit_retention set ip_days = 3;
+select pg_temp.assert((select (public.mpt_cut_edge_visit_ips(false)->>'ips_cut')::int) = 1, 'edge ip cut: reads the retention setting (3 days cuts the 5-day-old person row)');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
