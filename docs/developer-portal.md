@@ -32,7 +32,7 @@ Also documented: the PaPIT v1 profile and how to verify its `cryptographic_recei
 
 | # | Gap | Evidence | Suggested follow-up |
 |---|---|---|---|
-| 1 | **No API keys or per-client auth anywhere.** Any server can POST leads or scans. | `mpt-leads/worker.js` and `scan-report/index.js` check only CORS, which browsers enforce and servers ignore. | Decide whether a partner API is wanted. If yes: key header checked in a shared helper, keys stored hashed in Supabase, per-key limits. |
+| 1 | **No API keys or per-client auth anywhere.** *(MPC-7651: partner API with hashed keys, per-key limits and an OpenAPI spec now exists in `workers/partner-api`, not yet deployed or listed on `/developers`.)* Any server can POST leads or scans. | `mpt-leads/worker.js` and `scan-report/index.js` check only CORS, which browsers enforce and servers ignore. | Decide whether a partner API is wanted. If yes: key header checked in a shared helper, keys stored hashed in Supabase, per-key limits. |
 | 2 | **No request-level rate limiting** except one scan per address per 24h. `mpt_api_rate_limits` exists but nothing reads it (it is intended for outbound platform quotas). | grep of `workers/` and `src/` | Cloudflare rate-limiting rule or Workers rate-limit binding on `mpt-leads` and `/api/scan`. |
 | 3 | `mpt-leads` accepts a POST on **any path** and can be used to spam Notion, Slack and HubSpot. | `worker.js` routes only on method. | Restrict to `/webhook/leads` and add the limit from #2. (Already noted as a risk in MPC-7120.) |
 | 4 | `mpt-leads` returns the upstream Notion error text in `detail` on 500 and `e.message` on other errors. | `worker.js` lines returning `Save failed`. | Return a generic message; keep detail in logs. |
