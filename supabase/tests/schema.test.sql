@@ -580,5 +580,36 @@ reset role;
 select pg_temp.assert((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'web_scan_contacts' and column_name in ('recognise_consent_at', 'recognise_consent_version')) = 2, 'web_scan_contacts: has the recognise consent columns (MPC-7494)');
 select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and not has_function_privilege('authenticated', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and has_function_privilege('service_role', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute'), 'mpt_recognition_candidates: grants unchanged, service_role only');
 
+-- ===== MPC-7650: Family Plan households (5-profile cap, owner sees children only, adults private, RLS) =====
+insert into auth.users (id, email) values
+  ('00000000-0000-4000-8000-000000007650', 'owner@example.test'), ('00000000-0000-4000-8000-000000007651', 'adult@example.test'),
+  ('00000000-0000-4000-8000-000000007652', 'child@example.test'), ('00000000-0000-4000-8000-000000007653', 'other@example.test');
+insert into public.households (id, owner_user_id) values ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007650');
+insert into public.household_members (household_id, user_id, display_name, role, status) values
+  ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007650', 'Owner', 'owner', 'active'),
+  ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007651', 'Adult', 'adult', 'active'),
+  ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007652', 'Child', 'child', 'active');
+select pg_temp.assert(public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007650', '00000000-0000-4000-8000-000000007652'), 'household: the owner can view a child');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007650', '00000000-0000-4000-8000-000000007651'), 'household: the owner cannot view another adult');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007651', '00000000-0000-4000-8000-000000007650'), 'household: an adult cannot view the owner');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007652', '00000000-0000-4000-8000-000000007650'), 'household: a child cannot view the owner');
+select pg_temp.assert(public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007651', '00000000-0000-4000-8000-000000007651'), 'household: anyone can view their own reports');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007653', '00000000-0000-4000-8000-000000007652'), 'household: a stranger cannot view a child');
+insert into public.household_members (household_id, email, display_name, role) values
+  ('00000000-0000-4000-8000-0000000076a0', 'a@example.test', 'A', 'adult'), ('00000000-0000-4000-8000-0000000076a0', 'b@example.test', 'B', 'child');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.household_members (household_id, email, display_name, role) values ('00000000-0000-4000-8000-0000000076a0', 'c@example.test', 'C', 'child')$$) = '23514', 'household: a sixth profile is refused');
+update public.household_members set status = 'removed' where email = 'b@example.test';
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.household_members (household_id, email, display_name, role) values ('00000000-0000-4000-8000-0000000076a0', 'c@example.test', 'C', 'child')$$) = '', 'household: removing a profile frees its slot');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.household_members$$) = '42501', 'household_members: anon denied');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.households$$) = '42501', 'households: anon denied');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000007651","role":"authenticated"}', true);
+select pg_temp.assert((select count(*) from public.household_members) = 1, 'household_members: an adult sees only their own row');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000007650","role":"authenticated"}', true);
+select pg_temp.assert((select count(*) from public.household_members) = 6, 'household_members: the owner sees every profile in their household');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000007653","role":"authenticated"}', true);
+select pg_temp.assert((select count(*) from public.household_members) = 0 and (select count(*) from public.households) = 0, 'household: a stranger sees nothing');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

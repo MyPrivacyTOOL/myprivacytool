@@ -69,7 +69,15 @@ const Pricing = () => {
           ))}
         </div>
 
-        <section className="mt-12 rounded-lg bg-muted p-6">
+        <section aria-labelledby="family-plan" className="mt-12 rounded-lg border border-border p-6">
+          <h2 id="family-plan" className="mb-2 text-xl font-semibold text-foreground">Family members on Pro and Executive</h2>
+          <p className="text-muted-foreground">
+            Add up to 4 family members for $5/month each, on one subscription. Everyone gets their own scan history,
+            reports and monitoring. You can see the reports of children on your plan; adults keep their reports private from each other.
+          </p>
+        </section>
+
+        <section className="mt-6 rounded-lg bg-muted p-6">
           <h2 className="mb-2 text-xl font-semibold text-foreground">For teams and businesses</h2>
           <p className="mb-4 text-muted-foreground">
             Protecting staff or executives? Tell us about your team and we will put a quote together.
