@@ -28,8 +28,9 @@ select
      where (e->>'edgeResponseStatus')::int between 400 and 499) as cloudflare_error_4xx,
   (select sum((e->>'requests')::bigint) from jsonb_array_elements(coalesce(z #> '{sum,responseStatusMap}', '[]'::jsonb)) e
      where (e->>'edgeResponseStatus')::int between 500 and 599) as cloudflare_error_5xx,
-  -- threats_blocked: firewall block events (NULL when firewall analytics were unavailable)
-  (l.payload #>> '{firewall,data,viewer,zones,0,firewallEventsAdaptiveGroups,0,count}')::bigint as cloudflare_threats_blocked
+  -- threats_blocked: firewall block events; falls back to the zone's own threat count (httpRequests1dGroups sum.threats) when
+  -- firewall analytics are not available to the token/plan (MPC-7381: Cloudflare denied firewallEventsAdaptiveGroups for this zone)
+  coalesce((l.payload #>> '{firewall,data,viewer,zones,0,firewallEventsAdaptiveGroups,0,count}')::bigint, (z #>> '{sum,threats}')::bigint) as cloudflare_threats_blocked
 from latest l
 cross join lateral (select l.payload #> '{zone,data,viewer,zones,0,httpRequests1dGroups,0}' as z) zz
 left join lateral (
