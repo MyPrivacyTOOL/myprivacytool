@@ -28,6 +28,11 @@ STANDING_OBJECTIVES, O2). Status as recorded there:
   disabling the legacy keys also disables the legacy anon key, so first confirm in the Supabase API logs that no caller
   still sends a legacy JWT (`request.sb.jwt.apikey.payload.role`). Tracked in Notion as MPC-7385-F5.
 
+  **Deferred (MPC-7614, 2026-10-12):** the rest of this rotation is deferred to the fleet-wide security audit. Still open
+  when it resumes: create the new key and set GitHub secret `NEW_SUPABASE_SECRET_KEY`, run `rotate-supabase-key.yml`,
+  replace the Cloudflare Pages secret by hand and redeploy the site, check the API logs for legacy JWT callers, then
+  revoke the old key.
+
 Guardrails: `.gitignore` excludes `.env`, `.env.*` and `.dev.vars*`. `scripts/ci/scan-secrets.mjs` runs as a
 blocking step in the `ci.yml` lint job, so a committed key fails the PR. Its allowlist skips a PEM header followed by
 a `${…}` template, which only matches the runtime-generated test key in `workers/mpt-metrics-collector/ga4.test.mjs`.
