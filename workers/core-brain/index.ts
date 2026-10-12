@@ -6,7 +6,7 @@
 //                The caller resolves the key to text and sends it; this Worker never talks to the platforms.
 //                After deciding, it records the sender's next state and one `interaction_log` row through the
 //                `mpt_brain_record` RPC (best effort: a failed write never blocks or changes the reply).
-// POST /ingest/social  MPC-8301 hand-off from social-listeners: { source: "x"|"telegram", receivedAt, payload }.
+// POST /ingest/social  MPC-8301 hand-off from social-listeners: { source: "x"|"telegram"|"linkedin", receivedAt, payload }.
 //                Auth: `Authorization: Bearer <WEBHOOK_SECRET>` (social-listeners holds it as CORE_BRAIN_TOKEN), required on
 //                the service-binding path too. Verified events with no user text answer 200 { ignored: true }, no retry.
 // GET  /health   liveness + whether the required bindings are present (booleans only).
@@ -62,7 +62,7 @@ const INTENTS: Intent[] = ["scan", "help", "verify", "unknown"];
 const LOCALES = ["en", "ja", "zh", "ko", "vi", "es", "de", "fr", "pt", "ar"];
 const DEFAULT_LOCALE = "en";
 
-// conversation_states.channel is constrained to these values; other platforms (e.g. X) have no state row yet.
+// conversation_states.channel is constrained to these values; other platforms (e.g. X, LinkedIn) have no state row yet.
 const STATE_CHANNELS = ["web", "email", "sms", "whatsapp", "telegram"];
 
 // ASSUMPTION (product decision to confirm): trust_level is 0..5 with no documented meaning. We treat >= 1 as
@@ -391,7 +391,7 @@ async function handleWebhook(request: Request, env: Env, log: Logger, ctx?: Exec
 }
 
 // MPC-8301 hand-off. social-listeners verifies the platform signature, then forwards
-// { source: "x" | "telegram", receivedAt, payload } here with `Authorization: Bearer <token>`.
+// { source: "x" | "telegram" | "linkedin", receivedAt, payload } here with `Authorization: Bearer <token>`.
 // DECISION: the bearer token is this Worker's WEBHOOK_SECRET (social-listeners holds it as CORE_BRAIN_TOKEN) and is
 // required on the service-binding path too, because the Worker is also reachable on its public workers.dev address.
 function bearerMatches(request: Request, secret: string): boolean {
@@ -413,12 +413,30 @@ function parseXEnvelope(payload: any): Inbound | null {
   return null;
 }
 
+// LinkedIn (MPC-7640). Messaging is partner-gated, so the delivered shape is an ASSUMPTION to confirm against the approved
+// product: { organization|for_user: "<urn>", events: [{ from|sender: "<urn>", message|text|message_text: "..." }] }.
+// A bare single event (no `events` array) is accepted too. Our own echoes (sender == organization) are ignored.
+function parseLinkedInEnvelope(payload: any): Inbound | null {
+  const events: any[] = Array.isArray(payload?.events) ? payload.events : payload && typeof payload === "object" ? [payload] : [];
+  const self = String(payload?.organization ?? payload?.for_user ?? "");
+  const pick = (v: any) => (typeof v === "string" ? v : typeof v?.text === "string" ? v.text : undefined);
+  for (const ev of events) {
+    const sender = ev?.from ?? ev?.sender;
+    const text = pick(ev?.message) ?? pick(ev?.text) ?? pick(ev?.message_text);
+    if (typeof sender !== "string" || !text?.trim()) continue;
+    if (self && sender === self) continue;
+    return parseInbound({ platform: "linkedin", sender_id: sender, message_text: text, locale: ev?.locale });
+  }
+  return null;
+}
+
 async function handleIngestSocial(request: Request, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
   const body: any = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
   if (body instanceof Response) return body;
   const source = body?.source;
-  if (source !== "x" && source !== "telegram") throw new MptError("bad_request", "Unknown source");
-  const msg = source === "telegram" ? parseInbound(body.payload) : parseXEnvelope(body.payload);
+  if (source !== "x" && source !== "telegram" && source !== "linkedin") throw new MptError("bad_request", "Unknown source");
+  const msg = source === "telegram" ? parseInbound(body.payload)
+    : source === "linkedin" ? parseLinkedInEnvelope(body.payload) : parseXEnvelope(body.payload);
   if (!msg) {
     // Verified but carries no user text (follows, likes, edits, our own messages). 200 so the platform does not retry.
     log.info("ignored", { source });
