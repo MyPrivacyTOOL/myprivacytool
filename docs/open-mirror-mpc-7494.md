@@ -2,6 +2,10 @@
 
 Status: **backend and welcome-back screen built, both switches OFF.** Chris approves the screen from screenshots before the switch goes on, and only if the MPC-7491 device-recognition wording (docs/policy-wording-mpc-7491.md) is live.
 
+Approval: Chris approved the welcome-back screen and the threshold (>=12 of 20 comparable points, one agreeing hash, no differing hash, >=0.85 agreement) on 2026-10-12 from the four screenshots in docs/screenshots/mpc-7494/ (mocked API). That approval does not turn any switch on.
+
+**Open gap before any switch (for Chris):** the approved MPC-7491 wording says recognition is offered after a scan is saved as a separate "Recognise this device?" choice, used only with consent. This build recognises for any browser that holds a consented scan number, and the save tick-box text does not mention recognition. Either add a "Recognise this device?" opt-in at the contact step (new consent wording version), or change the MPC-7491 wording to match the existing save consent. Until then `RECOGNITION_ENABLED` and `VITE_RECOGNITION_ENABLED` stay off.
+
 Principle (Chris): MyPrivacyTOOL is not a tracker, it is a mirror. Recognition happens in the open, with consent, and is shown to the visitor with how it was done.
 
 ## What is built
