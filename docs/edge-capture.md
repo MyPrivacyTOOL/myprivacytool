@@ -47,8 +47,8 @@ RLS enabled and forced; `service_role` only (anon and authenticated are denied; 
 
 ## Classifier
 
-First match wins, in `RULES` order; version `2026-10-12.1`. R1 AI tokens, R2 search crawlers, R3 SEO/scraper/script clients,
-R4 generic bot word, R5 browser UA from a hosting network (**unknown**), R6 missing UA/Accept/Accept-Language or HTTP/1.0 (bot),
+First match wins, in `RULES` order; version `2026-10-12.2`. R1 AI tokens, R2 search crawlers, R3 SEO/scraper/script clients,
+R4 generic bot word, R5 browser UA from a hosting network (**unknown**), R6 missing UA, HTTP/1.0, or a non-browser UA without Accept/Accept-Language (bot), R9 browser UA without Accept/Accept-Language (**unknown**, MPC-7491: a person hiding details keeps the IP cut),
 nothing matched = R8 **person**. Unknown is treated as a person (`treatAsPerson`). Weaknesses are those in inventory section 6: the UA
 is self-declared, AI agents driving a browser look human, privacy-minded people can look like R5/R6. R7 (no browser event follows the
 fetch) is not decidable at the edge and is not in this version. Because the raw facts are kept, rows can be re-classified when the rules improve.

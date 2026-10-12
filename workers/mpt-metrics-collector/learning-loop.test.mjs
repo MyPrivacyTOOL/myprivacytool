@@ -2,7 +2,7 @@
 import learningLoop, { GRACE_HOURS } from './collectors/learning-loop.js';
 import { runAll } from './worker.js';
 import { publishAll } from './publishers/notion.js';
-import { publishLearningLoop, learningLoopLines, shown, rate, MIN_GROUP, TITLE } from './publishers/learning-loop.js';
+import { publishLearningLoop, learningLoopLines, sumGa4Events, shown, rate, MIN_GROUP, TITLE } from './publishers/learning-loop.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const PARENT = '3f628547eaa7814082b4fc9cd266ae1f';
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', NOTION_TOKEN: 'ntn_secret', NOTION_LEARNING_LOOP_PARENT_PAGE_ID: PARENT };
@@ -21,13 +21,15 @@ const PAYLOAD = {
   returns: { returned_total: 4, within_7_days: 3, within_30_days: 4 },
 };
 
-let rpcCalls, inserts, pages, blocks, rawRows;
-const reset = () => { rpcCalls = []; inserts = []; pages = []; blocks = {}; rawRows = [{ payload: PAYLOAD }]; };
+let rpcCalls, inserts, pages, blocks, rawRows, ga4Rows;
+const reset = () => { rpcCalls = []; inserts = []; pages = []; blocks = {}; rawRows = [{ payload: PAYLOAD }]; ga4Rows = []; };
+const ga4Day = (day, started, completed, requested, captured = '2026-10-12T00:00:00Z') => ({ period_start: day, captured_at: captured, payload: { rows: [{ dimensionValues: [{ value: 'scan_started' }], metricValues: [{ value: String(started) }] }, { dimensionValues: [{ value: 'privacy_scan_completed' }], metricValues: [{ value: String(completed) }] }, { dimensionValues: [{ value: 'report_requested' }], metricValues: [{ value: String(requested) }] }, { dimensionValues: [{ value: 'page_view' }], metricValues: [{ value: '999' }] }] } });
 const json = (b, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => b });
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const body = opts.body ? JSON.parse(opts.body) : null;
   if (url.endsWith('/rest/v1/rpc/mpt_learning_loop')) { rpcCalls.push(body); return json(rawRows.length ? PAYLOAD : null); }
   if (url.endsWith('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') { inserts.push(body); return { ok: true, status: 201 }; }
+  if (url.includes('/rest/v1/mpt_raw_metrics') && url.includes('source=eq.ga4')) return json(ga4Rows);
   if (url.includes('/rest/v1/mpt_raw_metrics')) return json(rawRows);
   if (url.includes('/rest/v1/')) return json([]);
   const kids = /\/v1\/blocks\/([^/?]+)\/children/.exec(url);
@@ -96,5 +98,23 @@ reset(); all = await publishAll({ ...env, NOTION_LEARNING_LOOP_PARENT_PAGE_ID: u
 check(!all.some((x) => x.kind === 'learning-loop'), 'publishAll: nothing for the learning loop when no parent page is configured');
 reset(); all = await publishAll(env, new Date('2026-10-13T00:20:00Z'));
 check(!all.some((x) => x.kind === 'learning-loop'), 'publishAll: not on other days');
+
+// ---- GA4 drop-off (decision D12: saved scans always have a contact, so scans completed vs report requested come from GA4 events)
+{
+  const sum = sumGa4Events([ga4Day('2026-10-04T16:00:00Z', 10, 8, 3), ga4Day('2026-10-05T16:00:00Z', 20, 15, 4), ga4Day('2026-10-05T16:00:00Z', 99, 99, 99, '2026-10-01T00:00:00Z')]);
+  check(sum.days === 2 && sum.started === 30 && sum.completed === 23 && sum.requested === 7, 'GA4: sums the three scan events per day, latest pull per day wins, other events ignored');
+  const l = learningLoopLines('2026-10-05', { ...PAYLOAD, leavers: 0, pending: 0 }, 'T', sum).lines.join('\n');
+  check(/Saved scans always have a contact \(decision D12\)/.test(l) && !/Left without giving a contact/.test(l), 'GA4: with no leavers among saved scans the page says drop-off comes from GA4');
+  check(/scans started 30, scans completed 23, report requested 7; share of completed scans that asked for the report: 30\.4%/.test(l) && /2 of 7 days collected/.test(l), 'GA4: scans completed against report requested, with days collected');
+  const small = learningLoopLines('2026-10-05', PAYLOAD, 'T', { days: 7, started: 3, completed: 4, requested: 2 }).lines.join('\n');
+  check(/scans started <5, scans completed <5, report requested <5; share of completed scans that asked for the report: not enough scans yet/.test(small), 'GA4: small counts are suppressed and no rate under 5');
+  check(/Left without giving a contact: 25/.test(learningLoopLines('2026-10-05', PAYLOAD, 'T', sum).lines.join('\n')), 'leavers lines still shown when saved scans have leavers');
+  check(/no GA4 daily events collected/.test(learningLoopLines('2026-10-05', PAYLOAD, 'T', { days: 0, started: 0, completed: 0, requested: 0 }).lines.join('\n')), 'GA4: says so when no daily events were collected');
+  reset(); rawRows = []; ga4Rows = [ga4Day('2026-10-04T16:00:00Z', 10, 8, 3)];
+  const g = await publishLearningLoop(env, '2026-10-05', monday);
+  check(g.action === 'created' && /scans completed 8/.test(JSON.stringify(pages[0].written)), 'publish: a week with GA4 events but no saved scans still gets its page');
+  reset(); rawRows = []; ga4Rows = [];
+  check((await publishLearningLoop(env, '2026-10-05', monday)).action === 'skipped_no_data' && pages.length === 0, 'publish: nothing from either source => nothing written');
+}
 check(MIN_GROUP === 5, 'minimum group size is 5');
 process.exit(ok ? 0 : 1);

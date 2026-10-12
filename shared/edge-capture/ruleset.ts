@@ -5,7 +5,7 @@
 // Built from the proposal in docs/inbound-funnel-inventory.md section 6. R7 (no browser event follows the page fetch) cannot be
 // decided at the edge alone, so it is not in this version.
 
-export const RULESET_VERSION = "2026-10-12.1";
+export const RULESET_VERSION = "2026-10-12.2";
 
 export type VisitClass = "person" | "bot" | "ai" | "unknown";
 
@@ -62,11 +62,19 @@ export const RULES: Rule[] = [
   {
     id: "R6",
     cls: "bot",
-    description: "no user agent, or none of the headers every real browser sends (Accept, Accept-Language), or HTTP/1.0",
+    description: "no user agent, or HTTP/1.0, or a non-browser user agent without the headers every real browser sends (Accept, Accept-Language)",
     test: (f) =>
       f.userAgent.trim() === "" ||
-      (!f.headers["accept-language"] && !f.headers["accept"]) ||
-      (f.httpProtocol ?? "").toUpperCase() === "HTTP/1.0",
+      (f.httpProtocol ?? "").toUpperCase() === "HTTP/1.0" ||
+      (!f.headers["accept-language"] && !f.headers["accept"] && !BROWSER_UA.test(f.userAgent)),
+  },
+  {
+    // MPC-7491: a browser-looking user agent with the headers stripped is more often a privacy-minded person than a bot, so it is
+    // "unknown" (handled as a person, IP cut after the retention period), not "bot" (kept in full).
+    id: "R9",
+    cls: "unknown",
+    description: "browser-looking user agent but none of the headers every real browser sends: could be a person hiding details",
+    test: (f) => BROWSER_UA.test(f.userAgent) && !f.headers["accept-language"] && !f.headers["accept"],
   },
 ];
 
