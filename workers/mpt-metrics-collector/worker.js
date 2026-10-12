@@ -13,6 +13,7 @@ import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 import { publishMachineMirror } from './publishers/machine-mirror.js';
 import { hkDate } from './lib/hk.js';
+import { KPI_CRON, publishKpiDashboard } from './publishers/kpi-dashboard.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
@@ -101,6 +102,12 @@ export default {
       ctx.waitUntil(postDigest(env).then((r) => console.log(JSON.stringify({ digest: 'posted', permalink: r.permalink, ts: r.ts }))).catch((e) => console.error(`mpt-metrics-collector: digest failed: ${SAFE(e?.message, env)}`)));
       return;
     }
+    // Live KPI scorecard (MPC-7618): every 30 minutes, reads Supabase and rewrites one Notion block. No collection, no raw rows.
+    if (event?.cron === KPI_CRON) {
+      if (!notionConfigured(env)) { console.error('mpt-metrics-collector: KPI refresh skipped, NOTION_TOKEN / SUPABASE_* not set'); return; }
+      ctx.waitUntil(publishKpiDashboard(env).then((r) => console.log(JSON.stringify(r))).catch((e) => console.error(`mpt-metrics-collector: KPI refresh failed: ${SAFE(e?.message, env)}`)));
+      return;
+    }
     if (!configured(env)) { console.error('mpt-metrics-collector: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set'); return; }
     // Collect first, then publish the summaries to Notion (MPC-7382). A Notion failure never affects collection.
     ctx.waitUntil((async () => {
@@ -140,6 +147,12 @@ export default {
       const day = url.searchParams.get('day') || previousHkDate(new Date());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'bad date' }, 400);
       try { return json({ result: await publishMachineMirror(env, day) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
+    }
+    // Manual KPI scorecard refresh (MPC-7618): POST /publish-kpi, same bearer token.
+    if (url.pathname === '/publish-kpi' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
+      try { return json({ result: await publishKpiDashboard(env) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
     }
     // Manual digest for verification: POST /digest (posts to Slack, returns the permalink) or POST /digest?dry=1 (returns the text only).
     if (url.pathname === '/digest' && request.method === 'POST') {
