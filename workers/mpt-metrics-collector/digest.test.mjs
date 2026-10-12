@@ -1,5 +1,5 @@
 import worker from './worker.js';
-import { buildDigest, movers } from './lib/digest.js';
+import { buildDigest, movers, summariseAgentTasks, agentStatsText } from './lib/digest.js';
 import { rowFromPage, failedSources, buildDigestText, postDigest, digestConfigured, DIGEST_CRON } from './publishers/slack-digest.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok', NOTION_TOKEN: 'ntn_secret', SLACK_BOT_TOKEN: 'xoxb-secret', MPTSLACK_CHANNEL_ID: 'C1' };
@@ -28,15 +28,28 @@ const r = rowFromPage(page(120, '🔴 Behind'));
 check(r.cumulativeScans === 120 && r.targetScans === 200 && r.paceGapPct === -20 && r.conversionRate === 12.5 && r.ga4ActiveUsers === null, 'rowFromPage: numbers, formulas, percent fraction, blanks');
 check(r.agentPlan === 'more X' && r.decisions === 'ladder', 'rowFromPage: Plan / Decision lines from Agent Insights');
 
+// ---- MPC-7654 agent stats
+const st = summariseAgentTasks([
+  { status: 'Done', amended: true, blocked: false, approval: 'Approved' }, { status: 'Done', amended: false, blocked: true, approval: null },
+  { status: 'Cancelled', amended: false, blocked: false, approval: 'Rejected' }, { status: 'In progress', amended: true, blocked: true, approval: null }]);
+check(st.total === 4 && st.done === 2 && st.successRatePct === (2 / 3) * 100 && st.amended === 2 && st.blocked === 2 && st.approved === 1 && st.rejected === 1, 'summariseAgentTasks counts');
+check(summariseAgentTasks([{ status: 'In progress' }]).successRatePct === null, 'no finished task => finish rate null, not 0');
+check(agentStatsText(st) === 'Agent tasks: 2 done of 4, 67% finish rate, 2 amended, 1 rejected, 2 blocked.' && agentStatsText(null) === 'Agent stats unavailable.', 'agentStatsText');
+const ds = buildDigest({ weekOf: 'w', current: cur, previous: prev, agentStats: st });
+check(ds.lines.length <= 5 && ds.text.includes('Agent plan: none recorded. Agent tasks: 2 done of 4'), 'agent stats ride the agent line, still <=5 lines');
+check(!buildDigest({ weekOf: 'w', current: cur, previous: prev }).text.includes('Agent tasks'), 'no agentStats arg => digest unchanged');
+
 // ---- stubs
-let calls, rawRows, notionRows, slackOk;
-const reset = () => { calls = []; slackOk = true; notionRows = [page(120, '🔴 Behind'), page(100, '🟢 On Track')];
+let calls, rawRows, notionRows, slackOk, tasksRows;
+const task = (status, amend = '', block = '') => ({ properties: { Status: { status: { name: status } }, Amendments: { rich_text: amend ? [{ plain_text: amend }] : [] }, Blocker_Reason: { rich_text: block ? [{ plain_text: block }] : [] }, Archived: { checkbox: false } } });
+const reset = () => { calls = []; slackOk = true; tasksRows = [task('Done'), task('Done', 'x'), task('Cancelled', '', 'y'), task('Not started')]; notionRows = [page(120, '🔴 Behind'), page(100, '🟢 On Track')];
   rawRows = [{ source: 'ga4', report: 'daily_overview', status: 'error' }, { source: 'ga4', report: 'daily_overview', status: 'ok' }, { source: 'hubspot', report: 'contacts', status: 'error' }, { source: 'supabase', report: 'table_counts', status: 'ok' }]; };
 reset();
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const json = (b, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => b });
   calls.push({ url, method: opts.method, body: opts.body ? JSON.parse(opts.body) : null });
   if (url.includes('/rest/v1/mpt_raw_metrics')) return json(rawRows);
+  if (url.includes('/data_sources/2dd28547-eaa7-8154-8a16-000ba5543325/query')) return tasksRows === 'fail' ? json({}, 500) : json({ results: tasksRows, has_more: false });
   if (url.includes('/data_sources/') && url.endsWith('/query')) return notionRows === 'fail' ? json({}, 500) : json({ results: notionRows });
   if (url.endsWith('/chat.postMessage')) return slackOk ? json({ ok: true, ts: '1700.1', channel: 'C1' }) : json({ ok: false, error: 'channel_not_found' });
   if (url.endsWith('/chat.getPermalink')) return json({ ok: true, permalink: 'https://slack.example/p1700' });
@@ -51,6 +64,12 @@ reset();
 const text = await buildDigestText(env);
 check(text.includes('120 scans against a target of 200') && text.includes('DATA GAP: ga4, hubspot failed'), 'digest text built from Notion rows and failed sources');
 check(calls.find((c) => c.url.endsWith('/query')).body.page_size === 2, 'reads the latest two tracker rows');
+check(text.includes('Agent tasks: 2 done of 4, 67% finish rate, 1 amended, 0 rejected, 1 blocked.'), 'digest text includes agent task counts from the Tasks DB');
+const tq = calls.find((c) => c.url.includes('2dd28547-eaa7-8154-8a16-000ba5543325/query')).body;
+check(tq.filter.multi_select.contains === 'MyPrivacyToolClaw' && tq.filter.property === 'Assigned Actor', 'tasks query is limited to the MPT agent');
+tasksRows = 'fail';
+check((await buildDigestText(env)).includes('Agent stats unavailable.'), 'unreadable Tasks DB: digest still posts, says stats unavailable');
+reset();
 notionRows = 'fail';
 const bad = await buildDigestText(env);
 check(bad.includes('could not be built') && !/\d+ scans/.test(bad) && !bad.includes('ntn_secret'), 'unreadable tracker: error line, no figures, no secret');

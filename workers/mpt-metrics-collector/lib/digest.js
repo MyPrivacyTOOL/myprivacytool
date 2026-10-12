@@ -27,12 +27,35 @@ export function movers(current, previous) {
 }
 
 /**
+ * MPC-7654: agent performance counts from Tasks DB rows ({status, amended, blocked, signoff, approval}).
+ * Success rate = done / (done + cancelled); null when nothing has finished. Time saved, errors caught and revenue
+ * are not recorded anywhere yet, so they are never reported (no estimates).
+ */
+export function summariseAgentTasks(rows) {
+  const n = (f) => rows.filter(f).length;
+  const done = n((r) => r.status === 'Done');
+  const cancelled = n((r) => r.status === 'Cancelled');
+  return {
+    total: rows.length, done, cancelled,
+    successRatePct: done + cancelled ? (done / (done + cancelled)) * 100 : null,
+    amended: n((r) => r.amended), blocked: n((r) => r.blocked),
+    approved: n((r) => r.approval === 'Approved'), rejected: n((r) => r.approval === 'Rejected'),
+  };
+}
+
+export function agentStatsText(s) {
+  if (!s) return 'Agent stats unavailable.';
+  const rate = isNum(s.successRatePct) ? `${Math.round(s.successRatePct)}% finish rate` : 'finish rate n/a';
+  return `Agent tasks: ${s.done} done of ${s.total}, ${rate}, ${s.amended} amended, ${s.rejected} rejected, ${s.blocked} blocked.`;
+}
+
+/**
  * current/previous: { cumulativeScans, targetScans, paceGapPct, paceStatus, ga4ActiveUsers, currentMrr,
  *   conversionRate, blogPosts, xThreads, agentPlan, decisions }  (null = blank/unavailable)
  * failedSources: names of sources whose status=error this week (e.g. ['ga4']).
  * Returns { text, lines }.
  */
-export function buildDigest({ weekOf, current, previous, failedSources = [] }) {
+export function buildDigest({ weekOf, current, previous, failedSources = [], agentStats }) {
   const lines = [];
   const c = current || {};
 
@@ -61,7 +84,8 @@ export function buildDigest({ weekOf, current, previous, failedSources = [] }) {
     lines.push('Biggest movers: not available (no comparable previous week).');
   }
 
-  lines.push(c.agentPlan ? `Agent plan: ${c.agentPlan}` : 'Agent plan: none recorded.');
+  const plan = c.agentPlan ? `Agent plan: ${c.agentPlan}` : 'Agent plan: none recorded.';
+  lines.push(agentStats === undefined ? plan : `${plan} ${agentStatsText(agentStats)}`);
 
   const tail = [];
   if (failedSources.length) tail.push(`DATA GAP: ${failedSources.join(', ')} failed, cells left blank`);
