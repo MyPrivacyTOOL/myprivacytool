@@ -334,7 +334,8 @@ const Privacy = () => {
                   Google Cloud), CRM and email (HubSpot), messaging platforms
                   (Telegram), transactional email (Resend), internal task and
                   notification tools (Notion, Slack), consent management
-                  (Consentmanager), and analytics (Google Analytics 4)
+                  (Consentmanager), and analytics (Google Analytics 4, and Cloudflare
+                  Web Analytics, which counts page loads without cookies)
                 </li>
                 <li>
                   <strong>Email Checks for Your Report:</strong> To prepare your
