@@ -485,6 +485,24 @@ select pg_temp.assert((select count(*) from public.web_scan_events where web_sca
 create temp table loop_purge as select public.mpt_purge_expired_web_scans(false) as j;   -- S0 is 45 days old and never linked (>90 days? no): keep; nothing here is past retention
 select pg_temp.assert((select count(*) from public.web_scans where id = '00000000-0000-4000-8000-000000007490') = 1, 'clean-up leaves recent scans (and their returns) alone');
 reset role;
+-- MPC-7492: machine mirror aggregate. Fresh made-up rows in a window far in the past so earlier test rows do not interfere.
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_machine_visits_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_machine_visits_daily: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_machine_visits_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_machine_visits_daily: authenticated must not execute');
+delete from public.edge_visits;
+insert into public.edge_visits (seen_at, path, method, status, user_agent, ip, class, rule, ruleset_version) values
+  ('2031-03-02 01:00+00', '/robots.txt', 'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 01:01+00', '/',           'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 01:02+00', '/blog/a',     'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 01:03+00', '/missing',    'GET', 404, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 02:00+00', '/',           'GET', 200, 'ExampleCrawler/1.0', '192.0.2.21', 'bot',   'R4', 'test'),
+  ('2031-03-02 03:00+00', '/',           'GET', 200, 'ExampleBrowser/1.0', '192.0.2.22', 'person','R8', 'test'),
+  ('2031-03-02 03:01+00', '/',           'GET', 200, 'ExampleBrowser/1.0', '192.0.2.23', 'unknown','R5', 'test'),
+  ('2031-03-01 01:00+00', '/',           'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test');
+create temp table mv as select public.mpt_machine_visits_daily('2031-03-02 00:00+00', '2031-03-03 00:00+00') as j;
+select pg_temp.assert((select (j->>'total_requests')::int = 7 and (j->>'machine_requests')::int = 5 from mv), 'machine visits: totals count every class, machine requests only bot+ai');
+select pg_temp.assert((select jsonb_array_length(j->'rows') = 2 from mv) and not (select j::text like '%ExampleBrowser%' or j::text like '%192.0.2.%' from mv), 'machine visits: no person or unknown row and no IP in the output');
+select pg_temp.assert((select (r->>'requests')::int = 4 and (r->>'robots_fetches')::int = 1 and r->'pages' = '["/", "/blog/a"]'::jsonb from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: requests, robots.txt fetches and pages served (no robots.txt, no 404)');
+select pg_temp.assert((select r->>'first_ever' = '2031-03-01T01:00:00+00:00' from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: first_ever looks past the window');
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
