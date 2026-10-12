@@ -133,6 +133,7 @@ describe("oauth1Header", () => {
 });
 
 describe("X webhook integration", () => {
+  const kv = () => { const m = new Map<string, string>(); return { get: async (k: string) => m.get(k) ?? null, put: async (k: string, v: string) => { m.set(k, v); }, delete: async (k: string) => { m.delete(k); } }; };
   const post = (body: object, e: object, ctx?: ExecutionContext) => {
     const raw = JSON.stringify(body);
     return worker.fetch(new Request("https://w/webhook/x", { method: "POST", body: raw, headers: { "X-Twitter-Webhooks-Signature": sig("cs", raw) } }), e as never, ctx);
@@ -140,7 +141,7 @@ describe("X webhook integration", () => {
   it("does not forward a MIRROR DM to core-brain and answers X before the DM is sent", async () => {
     const { calls } = stubX(); const brain = { fetch: vi.fn(async () => new Response("ok")) };
     const pending: Promise<unknown>[] = [];
-    const r = await post(dmEvent("MIRROR", "321"), { ...env, CORE_BRAIN: brain }, { waitUntil: (p: Promise<unknown>) => pending.push(p) } as never);
+    const r = await post(dmEvent("MIRROR", "321"), { ...env, MIRROR_KV: kv(), CORE_BRAIN: brain }, { waitUntil: (p: Promise<unknown>) => pending.push(p) } as never);
     expect(r.status).toBe(200);
     expect(brain.fetch).not.toHaveBeenCalled();
     await Promise.all(pending);
@@ -148,7 +149,7 @@ describe("X webhook integration", () => {
   });
   it("still forwards other DMs to core-brain", async () => {
     stubX(); const brain = { fetch: vi.fn(async () => new Response("ok")) };
-    const r = await post(dmEvent("scan me", "321"), { ...env, CORE_BRAIN: brain });
+    const r = await post(dmEvent("scan me", "321"), { ...env, MIRROR_KV: kv(), CORE_BRAIN: brain });
     expect(r.status).toBe(200);
     expect(brain.fetch).toHaveBeenCalledTimes(1);
   });
