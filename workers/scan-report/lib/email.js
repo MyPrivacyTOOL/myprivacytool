@@ -11,7 +11,7 @@ export const SIGN_OFF = ['Alice', 'Your Dedicated MyPrivacyTOOL AI'];
 // Campaign tags on links back to our own site, so GA4 can attribute visits to the email that drove them (only for visitors who accept
 // cookies; no tracking pixel, no third-party redirect). Skips unsubscribe links, images and anything already tagged. Plain text and HTML.
 const OWN_URL = /https:\/\/(?:www\.)?myprivacytool\.io[^\s"'<>)]*/g;
-const SKIP_TAG = /\/(?:api\/)?unsubscribe|\/email\/|\.(?:png|jpe?g|gif|svg)(?:[?#]|$)|[?&]utm_/;
+const SKIP_TAG = /\/(?:api\/)?unsubscribe|\/invite#|\/email\/|\.(?:png|jpe?g|gif|svg)(?:[?#]|$)|[?&]utm_/;
 export const tagLinks = (str, campaign, { html = false } = {}) => String(str).replace(OWN_URL, (m) => {
   const trail = (m.match(/[.,;:!]+$/) || [''])[0];
   const url = trail ? m.slice(0, -trail.length) : m;
@@ -181,7 +181,7 @@ const MAX_BREACH_ROWS = 10;
 const brokersRelevant = (emailHexes, breaches) => emailHexes.some((h) => h.id === 'email-name' && h.status === 'found')
   || breaches.some((b) => (b.DataClasses || []).some((c) => /^(names|phone numbers|physical addresses)$/i.test(String(c))));
 
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink }) {
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -212,6 +212,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
       : [`US people-search removal guides (we have not searched these sites for you): ${SITE}/opt-out`, '']),
     `More removal guides: ${SITE}/opt-out`, '',
     'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
+    ...(referral ? ['', referral.text] : []),
     ...(unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
   ].join('\n');
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
@@ -234,6 +235,7 @@ ${showBrokers ? `${h2('People-search sites')}${para('A finding above makes these
     : para(`US people-search removal guides: <a href="${SITE}/opt-out" style="color:${BRAND}">see them on the site</a>. We have not searched these sites for you.`)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
+${referral ? referral.html : ''}
 ${unsubscribeLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Then you do not need to hear from us again. <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">Unsubscribe</a> and we will send you no more follow-up or marketing emails.</td></tr></table>` : ''}`, unsubscribeLink);
   return { ...tagged('scan-report', { subject, text, html }), report };
 }

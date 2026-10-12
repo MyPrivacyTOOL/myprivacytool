@@ -37,6 +37,11 @@ WEB_SCAN_SAVE_ENABLED = "true"
 # approved it, and only if the MPC-7491 device-recognition wording is live. Needs WEB_SCAN_SAVE_ENABLED too. Anything but "true" does nothing.
 RECOGNITION_ENABLED = "false"
 
+# MPC-7645: referral programme ("Invite 3 friends", one free month of Pro per friend who gets a report). OFF. Turn on only after Chris has approved the
+# email copy (lib/referralEmail.js) and the Privacy text, and migration 20261013100000_mpc_7645_referrals.sql is applied. Needs UNSUBSCRIBE_SECRET.
+# The site has a matching flag, VITE_REFERRALS_ENABLED. Anything but "true" does nothing: no link, no block in the report, no reward, endpoints answer 404.
+REFERRALS_ENABLED = "false"
+
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
 enabled = true
