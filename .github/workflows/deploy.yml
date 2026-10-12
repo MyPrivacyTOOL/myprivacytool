@@ -64,7 +64,7 @@ jobs:
         if: matrix.worker == 'core-brain'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}   # MPC-7385-F5: the rotated key wins over the old secret
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: node scripts/ci/check-env.mjs --require SUPABASE_URL,SUPABASE_KEY,WEBHOOK_SECRET
 
@@ -83,7 +83,7 @@ jobs:
             ${{ secrets.QWEN_API_KEY != '' && 'QWEN_API_KEY' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}   # MPC-7385-F5: the rotated key wins over the old secret
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
 
@@ -107,7 +107,7 @@ jobs:
             ${{ secrets.TELEGRAM_BOT_TOKEN != '' && 'TELEGRAM_BOT_TOKEN' || '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}   # MPC-7385-F5: the rotated key wins over the old secret
           TWILIO_SID: ${{ secrets.TWILIO_SID || 'placeholder' }}
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN || 'placeholder' }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET || 'placeholder' }}
