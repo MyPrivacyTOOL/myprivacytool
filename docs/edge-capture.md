@@ -73,3 +73,7 @@ Database rollback is in the migration header.
 
 Live Pages behaviour of the middleware and `_routes.json`, the zone's fail-open setting and plan, and the Cloudflare AI Crawl Control history
 (inventory section 5) were not reachable from this session. Run-time checks happen when MPC-7491 turns it on.
+
+## Turn-on log
+
+- 2026-10-12 15:33 HKT: Pages secrets set (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY as Secret), fail open confirmed, routing merged (PR 258), `EDGE_CAPTURE_ENABLED=true` set in Production. This docs commit triggers the deploy that picks the variable up.
