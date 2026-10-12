@@ -8,7 +8,7 @@ export const FOLLOWUP_DELAYS_MS = [3 * DAY, 7 * DAY];      // stage 1 at +3 days
 export const COHORT_SIZE = 100;
 
 const hex = (bytes) => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-async function hmac(secret, msg) {
+export async function hmac(secret, msg) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
 }

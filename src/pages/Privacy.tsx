@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import Seo from "@/components/Seo";
 import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from "@/data/hkSpamCopy";
 import pageMeta from "@/data/pageMeta.json";
+import { referralsEnabled } from "@/lib/referral";
 import { recognitionFlagOn } from "@/lib/webScan";
 
 // MPC-7538: one language of the HK Stop Spam section. Wording lives in src/data/hkSpamCopy.ts (MPC-7542 reviews the Chinese).
@@ -739,6 +740,25 @@ const Privacy = () => {
               <HkPolicyBlocks copy={HK_POLICY_EN} id={HK_POLICY_ANCHOR.en} />
               <HkPolicyBlocks copy={HK_POLICY_ZH} id={HK_POLICY_ANCHOR.zh} />
             </section>
+
+            {/* MPC-7645: shown only while the referral programme is on, so the policy goes live in the same flip as the feature. Draft wording for Chris and a lawyer. */}
+            {referralsEnabled() && (
+              <section className="mb-8" id="referrals">
+                <h2 className="mt-8 text-2xl font-bold text-foreground">16. Inviting Friends (Referral Programme)</h2>
+                <p className="text-muted-foreground">
+                  If you invite friends, we give you a personal referral code and a private link, both in your report email. We keep your code, how many friends signed up through it and how many got their first report, and the number of free Pro months you have earned. We do not keep your friends&apos; names, and we never tell you or them anything about each other&apos;s results.
+                </p>
+                <h3 className="mt-4 text-xl font-semibold text-foreground">If you ask us to email a friend</h3>
+                <p className="text-muted-foreground">
+                  You give us the address. We send that person one email saying someone who uses MyPrivacyTOOL asked us to, without saying who. We keep only a SHA-256 hash of the address, never the address itself, so we can tell if you invite the same person twice and match them if they later sign up through your link. We check it against our opt-out and suppression lists first, send no reminders, and the email has an unsubscribe link that stops us ever emailing that address. You may invite up to 10 people in total. Only invite people who would expect to hear from you.
+                </p>
+                <h3 className="mt-4 text-xl font-semibold text-foreground">If someone invites you</h3>
+                <p className="text-muted-foreground">
+                  Using a friend&apos;s link is your choice. If you run a scan through it, your friend learns only that you completed one, and earns a free month of Pro. You can ask us to delete your data at any time, which also removes the link between you and your friend.
+                </p>
+                <p className="text-muted-foreground">We keep referral records for as long as the accounts they belong to, and delete them with the account. Write to privacy@myprivacytool.io to see or delete yours.</p>
+              </section>
+            )}
 
             <section className="mb-12 rounded-lg bg-muted p-6">
               <h3 className="mb-4 text-lg font-semibold text-foreground">

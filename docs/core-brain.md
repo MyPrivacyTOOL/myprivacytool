@@ -9,7 +9,7 @@ talks to the platforms: the caller resolves the key to text (`public.localizatio
 | Route | Caller | Auth | Body |
 |---|---|---|---|
 | `POST /webhook` | any HTTP client | `X-MPT-Webhook-Secret: <WEBHOOK_SECRET>` | `{ platform, sender_id, message_text, locale? }` or a raw Telegram update |
-| `POST /ingest/social` | social-listeners (MPC-8301) | `Authorization: Bearer <WEBHOOK_SECRET>` | `{ source: "x" \| "telegram", receivedAt, payload }` |
+| `POST /ingest/social` | social-listeners (MPC-8301) | `Authorization: Bearer <WEBHOOK_SECRET>` | `{ source: "x" \| "telegram" \| "linkedin", receivedAt, payload }` |
 | `GET /health` | anyone | none | `{ ok, worker, configured }` |
 
 Response (200): `{ ok, intent, intent_source, trust_level, state, state_source, next_state, locale, response_key, message_keys }`.

@@ -80,3 +80,32 @@ describe("core-brain auth (MPC-8601)", () => {
     expect((b2.fetch.mock.calls[0][0] as Request).headers.get("authorization")).toBeNull();
   });
 });
+
+describe("LinkedIn webhook (MPC-7640)", () => {
+  const li = (secret: string, body: string) => "hmacsha256=" + createHmac("sha256", secret).update(body).digest("hex");
+  const lenv = (b = brain()) => ({ LINKEDIN_CLIENT_SECRET: "ls", CORE_BRAIN: b });
+  const post = (body: string, headers: Record<string, string>, e: object) => call("/webhook/linkedin", { method: "POST", body, headers }, e);
+
+  it("answers the challenge with a hex HMAC and fails closed without a secret", async () => {
+    const r = await call("/webhook/linkedin?challengeCode=abc", {}, lenv());
+    expect(await r.json()).toEqual({ challengeCode: "abc", challengeResponse: createHmac("sha256", "ls").update("abc").digest("hex") });
+    expect((await call("/webhook/linkedin?challengeCode=abc", {}, {})).status).toBe(400);
+  });
+  it("rejects missing/bad signature and unset secret, without forwarding", async () => {
+    const b = brain(); const body = '{"events":[]}';
+    expect((await post(body, {}, lenv(b))).status).toBe(401);
+    expect((await post(body, { "X-LI-Signature": li("bad", body) }, lenv(b))).status).toBe(401);
+    expect((await post(body, { "X-LI-Signature": li("ls", body) }, { CORE_BRAIN: b })).status).toBe(401);
+    expect(b.fetch).not.toHaveBeenCalled();
+  });
+  it("forwards a verified payload untouched as source linkedin", async () => {
+    const b = brain(); const body = '{"events":[{"from":"u","message":{"text":"hi"}}]}';
+    expect((await post(body, { "X-LI-Signature": li("ls", body) }, lenv(b))).status).toBe(200);
+    expect(await (b.fetch.mock.calls[0][0] as Request).json()).toMatchObject({ source: "linkedin", payload: { events: [{ from: "u" }] } });
+  });
+  it("returns 502 when core-brain fails so LinkedIn retries, 400 on malformed JSON", async () => {
+    const b = { fetch: vi.fn(async () => new Response("no", { status: 500 })) };
+    expect((await post("{}", { "X-LI-Signature": li("ls", "{}") }, lenv(b))).status).toBe(502);
+    expect((await post("nope", { "X-LI-Signature": li("ls", "nope") }, lenv())).status).toBe(400);
+  });
+});

@@ -19,6 +19,9 @@
 
 import { resolveLocale, firstHexagon, confirmedY, confirmedN, unknown, confirmPrompt } from "./messages.js";
 
+// MPC-7641: Telegram's legacy Markdown reads "_" as italics, which would break the UTM-tagged links. Escape them inside URLs only.
+export const escapeUrlUnderscores = (text) => String(text).replace(/https?:\/\/\S+/g, (u) => u.replace(/_/g, "\\_"));
+
 async function sendTelegramMessage(chatId, text, token) {
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   await fetch(url, {
@@ -26,7 +29,7 @@ async function sendTelegramMessage(chatId, text, token) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       chat_id: chatId,
-      text,
+      text: escapeUrlUnderscores(text),
       parse_mode: "Markdown",
     }),
   });

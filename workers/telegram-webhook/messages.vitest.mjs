@@ -3,7 +3,7 @@
 // MPC-7251 follow-up (2026-10-12): wording rewritten to match what the free scan really does (needs Chris's approval before merge).
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { resolveLocale, t, firstHexagon, confirmedY, confirmedN, unknown, confirmPrompt } from "./messages.js";
-import worker from "./index.js";
+import worker, { escapeUrlUnderscores } from "./index.js";
 import master from "../../locales/master_keys.json";
 
 const FIRST_HEXAGON = `🔍 *Here's what the free MyPrivacyTOOL scan looks at:*
@@ -27,14 +27,14 @@ const CONFIRMED_Y = `✅ *Great.*
 You run the scan in your browser.
 
 👉 Start here:
-https://myprivacytool.io/scan
+https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=bot_reply
 
 When it's done, give your email and we'll send you your report.`;
 
 const CONFIRMED_N = `👍 *No problem.*
 
 Whenever you want to run the free scan, it's here:
-https://myprivacytool.io/scan
+https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=bot_reply
 
 Say *"scan me"* any time to see this again.`;
 
@@ -96,9 +96,15 @@ describe("worker replies in the sender's locale", () => {
     expect(sent[0].text).toBe(FIRST_HEXAGON); // ja is a placeholder, so English until translated
   });
   it("Y and N and invalid replies", async () => {
-    expect((await run({}, "y", "awaiting_confirmation")).sent[0].text).toBe(CONFIRMED_Y);
-    expect((await run({}, "no", "awaiting_confirmation")).sent[0].text).toBe(CONFIRMED_N);
+    expect((await run({}, "y", "awaiting_confirmation")).sent[0].text).toBe(escapeUrlUnderscores(CONFIRMED_Y));
+    expect((await run({}, "no", "awaiting_confirmation")).sent[0].text).toBe(escapeUrlUnderscores(CONFIRMED_N));
     expect((await run({}, "?", "awaiting_confirmation")).sent[0].text).toBe("Reply *Y* to get the link to the free scan, or *N* if you'd rather not.");
     expect((await run({}, "x", "confirmed")).sent[0].text).toBe(UNKNOWN);
+  });
+  it("MPC-7641: the scan link carries the channel UTMs and its underscores are escaped for Telegram Markdown", async () => {
+    const text = (await run({}, "y", "awaiting_confirmation")).sent[0].text;
+    expect(text).toContain("utm\\_source=telegram&utm\\_medium=channel\\_osint&utm\\_campaign=bot\\_reply");
+    expect(CONFIRMED_Y).toContain("utm_source=telegram&utm_medium=channel_osint");
+    expect(escapeUrlUnderscores("keep_this https://a.b/c?x_y=1 and_this")).toBe("keep_this https://a.b/c?x\\_y=1 and_this");
   });
 });
