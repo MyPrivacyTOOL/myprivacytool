@@ -12,6 +12,14 @@ import { sendEmail } from './email.js';
 import { readCappedJson } from './webScan.js';
 
 export const referralsEnabled = (env) => env.REFERRALS_ENABLED === 'true';
+// Tester mode: while REFERRALS_TEST_RECIPIENTS (a Worker secret, comma separated) lists addresses, referral features apply to those addresses ONLY
+// (report block, invite page and invitations, invited friends, reward emails). Everyone else's reports and scans are unchanged. Unset or empty = everyone.
+// Clearing the secret is what opens the programme to all users. Same gmail dot/+tag matching as the other allowlists.
+export const referralTester = (env, email) => {
+  if (!referralsEnabled(env)) return false;
+  const list = String(env.REFERRALS_TEST_RECIPIENTS || '').split(',').map((e) => e.trim()).filter(Boolean);
+  return list.length === 0 || list.map(mailbox).includes(mailbox(email));
+};
 export const CODE_RE = /^[A-HJ-NP-Z2-9]{8}$/;
 export const MAX_PER_REQUEST = 3;      // "Invite 3 friends"
 export const MAX_INVITES = 10;         // lifetime invite emails per referrer (stops the form being used to mail strangers)
@@ -74,7 +82,7 @@ export async function completeReferral(env, sb, refereeUserId, fetchImpl = fetch
     if (!row) return { completed: false };
     if (row.rewarded && env.UNSUBSCRIBE_SECRET) {
       const u = (await sb.select(`users?id=eq.${row.referrer_user_id}&select=email,email_opt_out_at,referral_code&limit=1`))[0];
-      if (u && !u.email_opt_out_at && allowed(env, u.email)) {
+      if (u && !u.email_opt_out_at && allowed(env, u.email) && referralTester(env, u.email)) {
         const mail = buildRewardEmail({ months: row.pro_months_earned, manageLink: u.referral_code ? await manageUrl(env, u.referral_code) : null, unsubscribeLink: await unsubscribePageUrl(env, u.email) });
         const r = await sendEmail(env, { to: u.email, ...mail, idempotencyKey: `referral-reward-${refereeUserId}` }, fetchImpl);
         if (!r.sent) console.error('referral reward email not sent:', r.reason);
@@ -87,7 +95,8 @@ export async function completeReferral(env, sb, refereeUserId, fetchImpl = fetch
 async function authorise(env, b, sb) {
   const code = String(b?.code || '');
   if (!CODE_RE.test(code) || !(await verifyManageToken(env.UNSUBSCRIBE_SECRET, code, b?.token))) return null;
-  return (await sb.select(`users?referral_code=eq.${code}&select=id,email,email_opt_out_at&limit=1`))[0] || null;
+  const me = (await sb.select(`users?referral_code=eq.${code}&select=id,email,email_opt_out_at&limit=1`))[0] || null;
+  return me && referralTester(env, me.email) ? me : null;   // tester mode: anyone else gets the same answer as a wrong link
 }
 const gate = async (env, request, origin, json, { allowedOrigins, rateLimited, prefix }) => {
   if (!referralsEnabled(env)) return json({ error: 'Not available' }, 404);
@@ -138,7 +147,7 @@ export async function handleReferralInvite(env, request, origin, json, deps) {
   const link = shareUrl(env, String(read.body.code));
   let sent = 0;
   for (const email of room) {
-    if (mailbox(email) === mailbox(me.email) || blocked.has(email) || known.has(email) || !allowed(env, email)) continue;
+    if (mailbox(email) === mailbox(me.email) || blocked.has(email) || known.has(email) || !allowed(env, email) || !referralTester(env, email)) continue;
     const hash = await emailHash(email);
     try { await sb.insert('referrals', { referrer_user_id: me.id, invitee_hash: hash, source: 'invite_email' }); }
     catch (e) { if (e.status === 409) continue; throw e; }   // already invited by this person

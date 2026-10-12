@@ -40,12 +40,16 @@ Pro is not on sale (`src/pages/Pricing.tsx`: "Get launch updates"), so the rewar
 ## Success criteria from the task
 "Feature live, tracking works, 10%+ of users send referrals." Tracking works (tables above). To measure the 10%: `select count(distinct referrer_user_id) filter (where source = 'invite_email') * 1.0 / (select count(*) from users where referral_code is not null) from referrals;` (people who invited at least one friend by email, of everyone who was shown a code). Link shares are not countable (a copied link leaves no trace until it is used).
 
+## Tester mode (REFERRALS_TEST_RECIPIENTS)
+`RECIPIENT_ALLOWLIST` is empty in production (open to everyone), so it cannot be used to test. Instead set the Worker **secret** `REFERRALS_TEST_RECIPIENTS` (comma separated; Cloudflare dashboard -> Workers -> mpt-scan-report -> Settings -> Variables and Secrets, add as a Secret; deploys never touch secrets). While it is set and `REFERRALS_ENABLED = "true"`, referral features apply to those addresses only: the invite block in their reports, the private page and invitations (and only to other listed addresses), a visitor's code being honoured, reward emails. Every other user's scan and report are unchanged. **Delete the secret to open the programme to everyone.** Unset = everyone, so set the secret before enabling the flag.
+
 ## Go live
 1. Chris approves the copy in `lib/referralEmail.js`, `src/pages/Invite.tsx` and Privacy section 16 (and a lawyer reads the third-party invitation email: it is mail to someone who has not consented, sent at the user's request).
 2. Apply `20261013100000_mpc_7645_referrals.sql` to production (Supabase), then re-run `supabase/sql/mpt-dsar-erase-export.sql`.
 3. `UNSUBSCRIBE_SECRET` is already required by the follow-up emails; confirm it is set on `mpt-scan-report`.
-4. Set `REFERRALS_ENABLED = "true"` in `workers/scan-report/wrangler.toml` and deploy; set `VITE_REFERRALS_ENABLED=true` on the Cloudflare Pages project and redeploy. Both are needed (the site hides the page and the policy text without its flag).
-5. Test with `RECIPIENT_ALLOWLIST` set first: run a scan, open the private link from the report, invite a test inbox, run a scan from that inbox through the invite, and check the reward email.
+4. Set the secret `REFERRALS_TEST_RECIPIENTS` to your test inboxes first (tester mode above), then set `REFERRALS_ENABLED = "true"` in `workers/scan-report/wrangler.toml` and deploy; set `VITE_REFERRALS_ENABLED=true` on the Cloudflare Pages project and redeploy. Both are needed (the site hides the page and the policy text without its flag).
+5. Test in tester mode (not with `RECIPIENT_ALLOWLIST`, which is empty in production and would hold real users' reports if set): run a scan, open the private link from the report, invite a test inbox, run a scan from that inbox through the invite, and check the reward email.
+5b. Open to everyone: delete the `REFERRALS_TEST_RECIPIENTS` secret.
 6. Rollback: set `REFERRALS_ENABLED = "false"` and redeploy. Existing rows and earned months stay; nothing is sent.
 
 ## Test
