@@ -23,6 +23,7 @@ insert into public.localization (key, locale, value, description, status) values
   ('bot.unknown.title', 'en', '👋 *Welcome to MyPrivacyTOOL.*', 'Welcome / unknown-input header', 'draft'),
   ('bot.unknown.body', 'en', 'Say *"scan me"* and I''ll tell you what our free scan looks at and send you the link to run it.', 'Welcome body', 'draft'),
   ('bot.unknown.free', 'en', 'It''s free. You''ll be asked for your email so we can send your report.', 'Welcome footer', 'draft'),
-  ('bot.confirm_prompt', 'en', 'Reply *Y* to get the link to the free scan, or *N* if you''d rather not.', 'Re-prompt on invalid reply', 'draft')
+  ('bot.confirm_prompt', 'en', 'Reply *Y* to get the link to the free scan, or *N* if you''d rather not.', 'Re-prompt on invalid reply', 'draft'),
+  ('bot.contact_unsupported', 'en', '📧 I can''t take an email address or phone number in this chat yet, and I haven''t saved what you sent. Say *"scan me"* and I''ll send you the link to the free scan instead.', 'Email or phone typed into the bot (not supported yet)', 'draft')
 on conflict (key, locale) do update
   set value = excluded.value, description = excluded.description, updated_at = now();

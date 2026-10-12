@@ -19,5 +19,6 @@
   "bot.unknown.title": "",
   "bot.unknown.body": "",
   "bot.unknown.free": "",
-  "bot.confirm_prompt": ""
+  "bot.confirm_prompt": "",
+  "bot.contact_unsupported": ""
 }
