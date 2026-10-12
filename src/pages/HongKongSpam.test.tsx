@@ -184,7 +184,7 @@ describe("Done: protection date and the one Supabase insert", () => {
     const user = userEvent.setup();
     renderEn();
     await user.type(screen.getByLabelText(/email me when i am protected/i), "me@example.com");
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("checkbox", { name: /email me once/i }));
     await user.click(screen.getByRole("button", { name: /done: i have registered/i }));
     await screen.findByTestId("hk-result");
     expect(f).toHaveBeenCalledTimes(1);
