@@ -25,7 +25,7 @@ globalThis.fetch = async (url, opts = {}) => {
     gaCalls.push({ url, auth: opts.headers.Authorization, body: JSON.parse(opts.body) });
     return { ok: true, status: 200, json: async () => API('r') };
   }
-  if (url.endsWith('/rest/v1/mpt_raw_metrics')) { inserts.push(JSON.parse(opts.body)); return { ok: true, status: 201 }; }
+  if (url.endsWith('/rest/v1/mpt_raw_metrics')) { inserts.push(...[].concat(JSON.parse(opts.body))); return { ok: true, status: 201 }; }
   return { ok: false, status: 404 };
 };
 

@@ -10,7 +10,7 @@ let formsHttp = null, emailHttp = null, emailBody = null, inserts = [], calls = 
 const json = (b) => ({ ok: true, status: 200, json: async () => b });
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
-  if (url.endsWith('/rest/v1/mpt_raw_metrics')) { inserts.push(JSON.parse(opts.body)); return { ok: true, status: 201 }; }
+  if (url.endsWith('/rest/v1/mpt_raw_metrics')) { inserts.push(...[].concat(JSON.parse(opts.body))); return { ok: true, status: 201 }; }
   if (!url.startsWith('https://api.hubapi.com')) return { ok: false, status: 404 };
   const path = url.slice('https://api.hubapi.com'.length);
   const method = opts.method || 'GET';
