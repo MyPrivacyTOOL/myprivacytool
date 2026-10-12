@@ -580,5 +580,31 @@ reset role;
 select pg_temp.assert((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'web_scan_contacts' and column_name in ('recognise_consent_at', 'recognise_consent_version')) = 2, 'web_scan_contacts: has the recognise consent columns (MPC-7494)');
 select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and not has_function_privilege('authenticated', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and has_function_privilege('service_role', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute'), 'mpt_recognition_candidates: grants unchanged, service_role only');
 
+-- ===== MPC-7641: channel OSINT daily funnel (counts per platform, service_role only) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_channel_osint_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_channel_osint_daily: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_channel_osint_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_channel_osint_daily: authenticated must not execute');
+delete from public.interaction_log;
+insert into public.interaction_log (channel, intent, intent_source, response_key, state_before, state_after, trust_before, trust_after, created_at) values
+  ('telegram', 'scan',    'rules', 'k', 'new',                   'awaiting_confirmation', 0, 0, '2031-04-02 01:00+00'),
+  ('telegram', 'unknown', 'rules', 'k', 'awaiting_confirmation', 'confirmed',             0, 1, '2031-04-02 01:05+00'),
+  ('telegram', 'help',    'rules', 'k', 'confirmed',             'confirmed',             1, 1, '2031-04-02 02:00+00'),
+  ('x',        'scan',    'qwen',  'k', 'new',                   'new',                   0, 0, '2031-04-02 03:00+00'),
+  ('x',        'scan',    'qwen',  'k', 'new',                   'new',                   0, 0, '2031-04-01 03:00+00');   -- outside the window
+insert into public.web_scans (created_at, source, hexagon_count, results, results_bytes) values
+  ('2031-04-02 04:00+00', 'x',   1, '[{"id":"a"}]', 10),
+  ('2031-04-02 04:01+00', 'web', 1, '[{"id":"a"}]', 10);                                                                      -- plain web scans are not channel scans
+insert into public.leads (email, utm_source, utm_medium, created_at) values
+  ('mpc7641a@example.com', 'LinkedIn', 'channel_osint', '2031-04-02 05:00+00'),
+  ('mpc7641b@example.com', 'x',        'email',         '2031-04-02 05:01+00'),                                              -- same platform, other medium: not a channel conversion
+  ('mpc7641c@example.com', 'x',        'channel_osint', '2031-04-01 05:00+00');                                              -- outside the window
+set local role service_role;
+create temp table co as select public.mpt_channel_osint_daily('2031-04-02 00:00+00', '2031-04-03 00:00+00') as j;
+select pg_temp.assert((select jsonb_array_length(j->'platforms') = 3 from co), 'channel osint: one row per platform seen (telegram, x, linkedin)');
+select pg_temp.assert((select (r->>'dms_received')::int = 3 and (r->>'scan_requests')::int = 1 and (r->>'consents_given')::int = 1 and (r->>'scans_completed')::int = 0 and (r->>'conversions')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'telegram'), 'channel osint: telegram DMs, scan requests, consent (awaiting_confirmation -> confirmed)');
+select pg_temp.assert((select (r->>'dms_received')::int = 1 and (r->>'scans_completed')::int = 1 and (r->>'consents_given')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'x'), 'channel osint: x counts only the in-window DM and the channel-sourced scan (plain web scans and other days excluded)');
+select pg_temp.assert((select (r->>'conversions')::int = 1 and (r->>'dms_received')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'linkedin'), 'channel osint: linkedin conversion counted case-insensitively; other medium and other days excluded');
+select pg_temp.assert((select not (j::text ~* '(@|example\.com)') from co), 'channel osint: no email or personal value in the output');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

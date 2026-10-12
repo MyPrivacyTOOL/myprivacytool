@@ -92,3 +92,14 @@ A daily record of which bots and AIs read MyPrivacyTOOL. Bot and AI rows only: p
 posts an alert to the usual Slack channel (`SLACK_BOT_TOKEN` + `MPTSLACK_CHANNEL_ID`, the same as the Monday digest). A check that cannot run
 (HubSpot scope missing, Supabase unreadable, more than 40 submissions in a day) posts an alert too. Stored payload and alert text hold counts only.
 Needs the HubSpot read-only token to have the `forms` scope. Manual run: `POST /run` with the trigger token.
+
+## Channel OSINT analytics (MPC-7641)
+
+Channel OSINT (the X / LinkedIn / Telegram bots) tracked apart from website scans, one row per platform per Hong Kong day.
+
+- `supabase/migrations/20261013100000_mpc_7641_channel_osint_daily.sql`: `mpt_channel_osint_daily(p_from, p_to)` (service_role only, counts only, no sender id or text): `dms_received` (interaction_log rows), `scan_requests` (intent `scan`), `consents_given` (awaiting_confirmation -> confirmed), `scans_completed` (web_scans whose `source` is the platform name), `conversions` (leads with `utm_medium=channel_osint`, grouped by `utm_source`). SQL assertions in `supabase/tests/schema.test.sql`.
+- `collectors/channel-osint.js` (`source=channel_osint, report=funnel_daily`, runs with the other collectors at 00:15 HKT): adds `clicks` = GA4 sessions with `utm_medium=channel_osint` (edge_visits drops the query string, so it cannot attribute clicks). GA4 unreadable => funnel counts kept, `clicks` null, row `status=error` naming it. Nothing is estimated.
+- **Tagging convention (needed for clicks and conversions):** every link a channel bot sends to the main site carries `utm_source=<platform>` (`x`, `linkedin`, `telegram`) and `utm_medium=channel_osint`. The site already records UTMs on GA4 events and leads. Until bot links carry the tags, clicks and conversions read 0. To have scans counted per channel, the scan page must send `source=<platform>` when it saves a web scan (today it always sends `web`).
+- `publishers/channel-osint.js` + `lib/channel-osint.js`: Monday 09:00 HKT Slack note to Chris (same cron as the digest, same `SLACK_BOT_TOKEN` / `MPTSLACK_CHANNEL_ID`, no Notion token needed): per platform DMs, consents, scan requests, scans, clicks, leads, **leads per 100 DMs**, a "best return" line (only when two platforms each have 10+ DMs), and named data gaps. There is no spend data, so "ROI" is leads per 100 DMs, not money.
+- Manual: `POST /channel-osint?dry=1` returns the text for the previous week, `POST /channel-osint` posts it (bearer `COLLECTOR_TRIGGER_TOKEN`). Test: `node workers/mpt-metrics-collector/channel-osint.test.mjs`.
+- **Not done here:** the Channel OSINT section on the Notion MPC-7618 dashboard (the daily rows are in `mpt_raw_metrics`, ready for a view or the Notion publisher), and the X bot has no state row, so its consents stay 0 until X becomes a stateful channel (docs/core-brain.md).
