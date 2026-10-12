@@ -21,8 +21,8 @@ Strategy: Notion "MPT > Inbound Funnels (the Mirror)". Built on `docs/inbound-fu
 
 1. **`EDGE_CAPTURE_ENABLED`**, a Cloudflare Pages variable (Production). Unset or anything but `1/true/on/yes` = off: the middleware only
    passes the response through, makes no call and no `waitUntil`.
-2. **`public/_routes.json`** decides which paths run the middleware at all. At merge it is `include: ["/api/*"]`, which is exactly what runs
-   Functions today (`/api/hk-geo`), so page requests are untouched. Page capture needs the routes in "Turning it on" below.
+2. **`public/_routes.json`** decides which paths run the middleware at all. It now covers all pages and `/api/*` and excludes static assets
+   (switched on 2026-10-12 HKT in the MPC-7490 turn-on). With the variable unset the middleware only passes responses through.
 
 ## Decision: static assets are not recorded
 
@@ -62,9 +62,7 @@ runs it at 19:20 UTC (03:20 HKT) where pg_cron exists. Change the period: `updat
 ## Turning it on (MPC-7491, after Chris approves the wording)
 
 1. Pages secrets (Production): `SUPABASE_URL` = `https://xmdmkumwxpgahmlweuug.supabase.co`, `SUPABASE_SERVICE_ROLE_KEY`. Set the project to fail open.
-2. Replace `public/_routes.json` with
-   `{"version":1,"include":["/*"],"exclude":["/assets/*","/blog/*","/email/*","/favicon.ico","/og-image.jpg","/placeholder.svg","/site.webmanifest"]}`
-   (and update the test that pins the off routing).
+2. Routing: done (`public/_routes.json` now covers pages, excludes static assets).
 3. Set `EDGE_CAPTURE_ENABLED=true`. Watch `select class, count(*) from edge_visits where seen_at > now() - interval '1 hour' group by 1`
    and the Workers request count against the 100k/day quota.
 
