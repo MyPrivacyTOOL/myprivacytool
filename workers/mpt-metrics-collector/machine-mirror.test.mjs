@@ -68,7 +68,7 @@ const json = (b, status = 200) => ({ ok: status < 400, status, headers: new Head
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const body = opts.body ? JSON.parse(opts.body) : null;
   if (url.endsWith('/rpc/mpt_machine_visits_daily')) { rpcCalls.push({ body, auth: opts.headers.Authorization }); return rpcStatus !== 200 ? json({}, rpcStatus) : json(rpcBy(body)); }
-  if (url.includes('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') { inserts.push(JSON.parse(opts.body)); return json({}, 201); }
+  if (url.includes('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') { inserts.push(...[].concat(JSON.parse(opts.body))); return json({}, 201); }
   if (url.includes('/rest/v1/mpt_raw_metrics')) return json(storedPayload ? [{ payload: storedPayload }] : []);
   if (url.startsWith('https://api.notion.com/v1')) {
     notionCalls.push({ url, method: opts.method, body });
