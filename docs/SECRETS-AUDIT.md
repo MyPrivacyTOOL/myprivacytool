@@ -20,8 +20,13 @@ No history rewrite was done because there was nothing to scrub. The leaked file 
 STANDING_OBJECTIVES, O2). Status as recorded there:
 
 - **Cloudflare token:** closed. It was redacted in that repo (PR #598), and Cloudflare reported it invalid on 2026-08-30.
-- **Supabase secret key:** **not yet rotated** (last recorded 2026-10-09). Rotate it in the Supabase dashboard, then
-  update every destination in section 4. Tracked in Notion as MPC-7385-F5.
+- **Supabase secret key:** **rotation in progress (2026-10-12).** The leaked key is a legacy JWT service_role key. A new
+  secret key (`sb_secret_...`) was created and copied to scan-report, mpt-leads, mpt-metrics-collector, github-channel,
+  core-brain and social-listeners by the manual workflow `rotate-supabase-key.yml` (GitHub secret
+  `NEW_SUPABASE_SECRET_KEY`; deploy workflows now prefer it). The Cloudflare Pages secret `SUPABASE_SERVICE_ROLE_KEY`
+  (site edge capture) is set by hand in the Pages dashboard and needs a site redeploy. **The old key is NOT revoked yet:**
+  disabling the legacy keys also disables the legacy anon key, so first confirm in the Supabase API logs that no caller
+  still sends a legacy JWT (`request.sb.jwt.apikey.payload.role`). Tracked in Notion as MPC-7385-F5.
 
 Guardrails: `.gitignore` excludes `.env`, `.env.*` and `.dev.vars*`. `scripts/ci/scan-secrets.mjs` runs as a
 blocking step in the `ci.yml` lint job, so a committed key fails the PR. Its allowlist skips a PEM header followed by
