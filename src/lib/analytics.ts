@@ -594,3 +594,12 @@ export const trackPricingPlanClick = (
   const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
   trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination, ...ab });
 };
+
+// MPC-7626: waitlist sign-up on /pricing. Fire only after a confirmed successful HubSpot submit.
+// `variants` as in trackPricingPlanClick (MPC-7638): the waitlist signup is the real conversion to split by variant.
+export const trackPricingWaitlistSignup = (plan: string, variants: Record<string, string> = {}) => {
+  const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
+  attributedEvent('pricing_waitlist_signup', { form: 'pricing_waitlist', plan, ...ab });
+  // GA4 recommended event so the signup can be marked as a key event
+  attributedEvent('generate_lead', { method: 'pricing_waitlist', plan, ...ab });
+};

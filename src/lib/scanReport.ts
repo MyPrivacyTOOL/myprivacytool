@@ -1,3 +1,4 @@
+import { getReferralCode } from "@/lib/referral";
 import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan";
 
 // MPC-6677: scan-report Worker (confirmation email + 48h report).
@@ -22,6 +23,7 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
   const base = resolveScanApiUrl();
   if (!base) return; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
   const q = new URLSearchParams(window.location.search);
+  const ref = getReferralCode(); // MPC-7645: a friend's code, only while the referral switch is on
   let res: Response;
   try {
     res = await fetch(`${base}/api/scan`, {
@@ -32,6 +34,7 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
         consent: true, // only called after the consent checkbox is ticked
         consent_source: "scan_page",
         ...(saveScan ? scanSaveFields({ recognise }) : {}),
+        ...(ref ? { ref } : {}),
         utm_source: q.get("utm_source") ?? "",
         utm_medium: q.get("utm_medium") ?? "",
         utm_campaign: q.get("utm_campaign") ?? "",

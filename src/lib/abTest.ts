@@ -54,9 +54,9 @@ export const EXPERIMENTS = {
     description: "Paid-plan button style and text on /pricing",
     enabled: import.meta.env.VITE_AB_PRICING_CTA_ENABLED === "true",
     variants: [
-      { id: "control", weight: 34 }, // outline button, "Get launch updates"
-      { id: "solid", weight: 33 }, // solid primary button, same text
-      { id: "notify_text", weight: 33 }, // outline button, "Notify me when plans open"
+      { id: "control", weight: 34 }, // solid button, "Join the waitlist"
+      { id: "outline", weight: 33 }, // outline button, same text
+      { id: "notify_text", weight: 33 }, // solid button, "Notify me when plans open"
     ],
   },
   pricing_tiers: {

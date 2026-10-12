@@ -16,13 +16,13 @@ Four independent tests on `/pricing`, all **off** until their flag is `true` on 
 | Experiment (flag) | Variants |
 |---|---|
 | `pricing_headline` (`VITE_AB_PRICING_HEADLINE_ENABLED`) | `control` "Pricing" / `free_first` "Know your exposure for free. Pay to remove it." |
-| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` outline "Get launch updates" / `solid` solid button / `notify_text` "Notify me when plans open" (paid tiers only) |
+| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` solid "Join the waitlist" / `outline` outline button / `notify_text` "Notify me when plans open" (paid tiers only) |
 | `pricing_tiers` (`VITE_AB_PRICING_TIERS_ENABLED`) | `control` equal cards / `highlight_pro` Pro card emphasised |
 | `pricing_social_proof` (`VITE_AB_PRICING_SOCIAL_PROOF_ENABLED`) | `control` none / `above_plans` / `below_plans` trust line |
 
-- Conversion = `experiment_cta_click` (plan button click, since there is no checkout or in-page signup yet) / `experiment_exposure`, filtered by `experiment_id`, split by `variant_id`. `pricing_plan_click` also carries `ab_<experiment_id>` params for cross-test cuts. Waitlist signups from `/newsletter` stay in HubSpot.
+- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the on-page waitlist form, MPC-7626) divided by `experiment_exposure`, filtered by `experiment_id`, split by `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
 - Time on page and bounce rate: GA4 engagement time and engaged-session rate, broken down by the same `variant_id`.
-- Preview: `/pricing?ab_pricing_cta=solid` (forced views are never counted).
+- Preview: `/pricing?ab_pricing_cta=outline` (forced views are never counted).
 - Social proof: no real testimonial or customer count exists, so the trust line only repeats what the Free plan states. Do not add numbers or quotes without a verified source.
 - Run at least 14 days. The 20%+ lift goal needs far more traffic than the sample-size rule suggests; use the guidance below and call a winner only at 95% confidence. Rolling out a winner: see "Rotating a winner" (for pricing, edit `HEADLINE`, `PAID_CTA_LABEL`, etc. in `src/pages/Pricing.tsx`).
 
