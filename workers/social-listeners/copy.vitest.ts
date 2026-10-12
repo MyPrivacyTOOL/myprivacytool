@@ -29,6 +29,10 @@ describe("bot English wording does not over-promise", () => {
     expect(en["bot.unknown.free"]).toMatch(/email/i);
     expect(en["bot.confirmed_y.duration"]).toMatch(/email/i);
   });
+  it("says plainly that contact details are not taken in chat yet", () => {
+    expect(en["bot.contact_unsupported"]).toMatch(/can't take an email address or phone number/);
+    expect(en["bot.contact_unsupported"]).toMatch(/haven't saved/);
+  });
   it("keeps the Y and N prompts and the scan link", () => {
     expect(en["bot.first_hexagon.reply_y"]).toMatch(/\*Y\*/);
     expect(en["bot.first_hexagon.reply_n"]).toMatch(/\*N\*/);

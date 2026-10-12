@@ -130,6 +130,15 @@ describe("intent -> response key", () => {
     expect((await post(msg("verify me"))).body.response_key).toBe("bot.first_hexagon.title");
   });
 
+  it("a bare email or phone number gets the not-supported reply, with no Qwen call and no state change", async () => {
+    stub({ state: [{ trust_level: 1, state: "confirmed" }] });
+    for (const text of ["me@example.com", "+852 9123 4567"]) {
+      const r = await post(msg(text));
+      expect(r.body).toMatchObject({ intent: "unknown", intent_source: "rules", response_key: "bot.contact_unsupported", next_state: "confirmed" });
+    }
+    expect(calls.some((c) => c.url.includes("/chat/completions"))).toBe(false);
+  });
+
   it("normalizes locale (pt-BR -> pt) and falls back to en for unsupported ones", async () => {
     stub({ qwen: { intent: "help", confidence: 0.9 } });
     expect((await post(msg("help", { locale: "pt-BR" }))).body.locale).toBe("pt");

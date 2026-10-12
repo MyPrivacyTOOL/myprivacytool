@@ -79,6 +79,7 @@ const KEYS = {
   confirmedYes: ["bot.confirmed_y.title", "bot.confirmed_y.generating", "bot.confirmed_y.cta", "bot.confirmed_y.duration"],
   confirmedNo: ["bot.confirmed_n.title", "bot.confirmed_n.cta", "bot.confirmed_n.duration"],
   confirmPrompt: ["bot.confirm_prompt"],
+  contactUnsupported: ["bot.contact_unsupported"],
   welcome: ["bot.unknown.title", "bot.unknown.body", "bot.unknown.free"],
 };
 
@@ -131,6 +132,12 @@ function redact(text: string): string {
   return text
     .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[email]")
     .replace(/\+?\d[\d\s().-]{5,}\d/g, "[phone]");
+}
+
+// MPC-7518: the bot cannot take contact details in chat yet. Matches a message that is only an email or phone number.
+function isContactDetail(text: string): boolean {
+  const t = text.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t) || /^\+?\d[\d\s().-]{5,}\d$/.test(t);
 }
 
 function ruleIntent(text: string): Intent {
@@ -220,6 +227,7 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
 //   anything else leaves the state as it was.
 function decide(intent: Intent, text: string, st: BrainState): Decision {
   const stay: NextState = { state: st.state, trustFloor: 0 };
+  if (intent === "unknown" && isContactDetail(text)) return { keys: KEYS.contactUnsupported, next: stay };
   if (intent === "verify" && st.state === "awaiting_confirmation") {
     const t = text.trim();
     if (YES.test(t)) return { keys: KEYS.confirmedYes, next: { state: "confirmed", trustFloor: CONFIRMED_TRUST_LEVEL } };
@@ -322,7 +330,11 @@ async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionConte
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).
   let intent: Intent;
   let intentSource: "qwen" | "rules";
-  if (st.state === "awaiting_confirmation" && (YES.test(msg.text) || NO.test(msg.text))) {
+  if (isContactDetail(msg.text)) {
+    // No Qwen call for contact details (privacy), and decide() answers with the "not supported yet" message.
+    intent = "unknown";
+    intentSource = "rules";
+  } else if (st.state === "awaiting_confirmation" && (YES.test(msg.text) || NO.test(msg.text))) {
     intent = "verify";
     intentSource = "rules";
   } else {

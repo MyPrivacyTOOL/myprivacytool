@@ -113,6 +113,10 @@
     {
       "key": "bot.confirm_prompt",
       "description": "Re-prompt on invalid reply"
+    },
+    {
+      "key": "bot.contact_unsupported",
+      "description": "Email or phone typed into the bot (not supported yet)"
     }
   ]
 }
