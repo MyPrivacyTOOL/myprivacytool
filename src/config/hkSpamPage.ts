@@ -6,6 +6,7 @@
 // has confirmed the IVR keys and IVR_VERIFIED in hkDnc.ts is true. The build scripts read the same JSON file
 // (scripts/hkSpamFlag.mjs), so the page, the prerendered head, the sitemap and robots.txt cannot disagree.
 import hkSpam from "@/data/hkSpam.json";
+import { HK_SPAM_ENABLED } from "@/config/hkDnc";
 
 export const HK_SPAM_PUBLIC: boolean = hkSpam.public === true;
 export const HK_SPAM_PATH: string = hkSpam.path;
@@ -56,5 +57,6 @@ export function isHkSpamPreview(): boolean {
 
 /** True when the Stop Spam cards may render: launched, or an internal preview. */
 export function isHkSpamSurfaceEnabled(): boolean {
+  if (!HK_SPAM_ENABLED) return false; // kill switch (hkDnc.ts) beats launch flag and preview
   return HK_SPAM_PUBLIC || isHkSpamPreview();
 }
