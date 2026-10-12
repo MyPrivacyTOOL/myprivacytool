@@ -50,7 +50,7 @@ check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includ
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [] }; const calls = []; let n = 0;
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [] }; const calls = []; let n = 0;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -59,26 +59,33 @@ function fake(opts = {}) {
     if (url.includes('cloudflare-dns.com')) return res(200, { Status: 0, Answer: [] });   // MPC-7467 email hexagons
     if (url.includes('gravatar.com')) return res(404);
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
+    if (url.includes('/rpc/mpt_complete_referral')) {   // MPC-7645: same rules as the SQL function
+      const id = JSON.parse(o.body).p_referee_user_id; const r = db.referrals.find((x) => x.referee_user_id === id && x.status === 'signed_up'); if (!r) return res(200, []);
+      r.status = 'completed'; const u = db.users.find((x) => x.id === r.referrer_user_id); u.pro_months_earned = (u.pro_months_earned || 0) + 1; return res(200, [{ referrer_user_id: u.id, rewarded: true, pro_months_earned: u.pro_months_earned }]);
+    }
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
-    if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); db[t] = db[t].filter((x) => x.id !== id); return res(204); }
+    if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
       if (t === 'web_scan_contacts') { if (opts.linkFail) return res(500, 'x'); const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
+      if (t === 'hexagon_scores' && rows.some((x) => db.hexagon_scores.some((h) => h.scan_id === x.scan_id && h.category === x.category))) return res(409, { code: '23505' });   // unique (scan_id, category)
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
       if (rows.length > 1 && new Set(rows.map((x) => Object.keys(x).filter((k) => !['id', 'report_status', 'report_attempts'].includes(k)).sort().join(','))).size > 1) return res(400, { code: 'PGRST102', message: 'All object keys must match' });   // PostgREST bulk-insert rule
       db[t].push(...rows); return res(201, rows); }
     if (o.method === 'PATCH' && t === 'web_scan_events') { const lt = Number(q.get('seconds').replace('lt.', '')); const hit = db.web_scan_events.filter((x) => x.web_scan_id === q.get('web_scan_id').replace('eq.', '') && x.step === q.get('step').replace('eq.', '') && x.seconds < lt); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
+    if (o.method === 'PATCH' && t === 'referrals') return res(200, []);   // MPC-7645: no pre-invited rows in these tests
     if (o.method === 'PATCH') { const id = q.get('id')?.replace('eq.', ''); const st = q.get('report_status')?.replace('eq.', '');
       const fs = q.get('followup_stage')?.replace('eq.', ''); const em = q.get('email')?.replace('eq.', '');
       const cl = q.get('report_claimed_at')?.replace('lt.', ''); const ag = q.get('report_attempts');
       const hit = db[t].filter((x) => (!id || x.id === id) && (!st || x.report_status === st) && (!cl || (x.report_claimed_at && new Date(x.report_claimed_at) < new Date(cl))) && (!ag || (ag.startsWith('gte.') ? x.report_attempts >= Number(ag.slice(4)) : x.report_attempts < Number(ag.slice(3)))) && (fs === undefined || String(x.followup_stage ?? 0) === fs) && (!em || x.email === decodeURIComponent(em))); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
     let rows = db[t]; const uid = q.get('id')?.replace('eq.', ''); if (uid) rows = rows.filter((x) => x.id === uid);
     if (t === 'scans' && q.get('report_status') === 'eq.sent') rows = rows.filter((x) => x.report_status === 'sent' && (x.followup_stage ?? 0) < 2 && x.report_sent_at && new Date(x.report_sent_at) < new Date(decodeURIComponent(q.get('report_sent_at').replace('lt.', ''))));
+    const rc = q.get('referral_code'); if (rc?.startsWith('eq.')) rows = rows.filter((x) => x.referral_code === rc.slice(3));
     const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
@@ -107,6 +114,16 @@ let res = await runReportJob(env, F.f);
 check(res.sent === 1 && F.db.scans[0].report_status === 'sent' && F.db.scans[0].privacy_score === 100, 'report job sends report and stores score');
 check(F.db.signals.filter((s) => s.category === 'broker').every((s) => s.check_status === 'not_checked') && F.db.hexagon_scores.length === 8, 'broker signals stored as not_checked; 8 hexagon rows');
 check(F.calls.filter((c) => c.url.includes('resend')).length === 2, 'no duplicate confirmation when job runs (1 confirm + 1 report)');
+
+// MPC-7616: a report email that fails (Resend down) is retried by the next run; the retry must not trip over the first attempt's rows
+{
+  const o = { resendFail: false }; const G = fake(o); await handleScan(env, null, input, G.f);
+  o.resendFail = true; let r = await runReportJob(env, G.f);
+  check(r.failed === 1 && G.db.scans[0].report_status === 'pending' && G.db.scans[0].report_attempts === 1, 'MPC-7616: report email fails => scan back to pending for a retry');
+  o.resendFail = false; r = await runReportJob(env, G.f);
+  check(r.sent === 1 && r.failed === 0 && G.db.scans[0].report_status === 'sent' && !G.db.scans[0].report_last_error, 'MPC-7616: the retry sends the report (no unique-key clash on hexagon_scores)');
+  check(G.db.hexagon_scores.length === 8 && new Set(G.db.signals.map((s) => s.signal_type)).size === G.db.signals.length, 'MPC-7616: one set of hexagon_scores and signals after the retry, no duplicates');
+}
 
 // HIBP missing => report held, nothing sent
 F = fake(); await handleScan({ ...env, HIBP_API_KEY: undefined }, null, input, F.f);
@@ -582,5 +599,24 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(R.db.web_scan_returns.length === 1, 'return visit: no earlier scan number => no return recorded');
   const rk = new Set(R.db.web_scan_returns.flatMap((x) => Object.keys(x)));
   check([...rk].every((k) => ['web_scan_id', 'previous_scan_id', 'id', 'created_at', 'report_status', 'report_attempts'].includes(k)), 'return visit: only the two scan numbers are stored (no fingerprint, IP or other value)');
+}
+
+// ---- MPC-7645: referral programme through the real report job (Worker wiring; the rules are in referral.test.mjs)
+{
+  const RB = { ...env, RECIPIENT_ALLOWLIST: '', UNSUBSCRIBE_SECRET: 's3cret', REFERRALS_ENABLED: 'true' };
+  const F = fake(); F.db.users.push({ id: 'ref1', email: 'ref@example.com', referral_code: 'ABCDEFGH', pro_months_earned: 0 });
+  await handleScan(RB, null, { ...input, email: 'friend@example.com', ref: 'ABCDEFGH' }, F.f);
+  const friend = F.db.users.find((u) => u.email === 'friend@example.com');
+  check(F.db.referrals.length === 1 && F.db.referrals[0].status === 'signed_up' && F.db.referrals[0].referee_user_id === friend.id, 'referral: a new user arriving with a code is linked when the scan is requested');
+  await runReportJob(RB, F.f);
+  const sent = F.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));
+  const report = sent.find((m) => m.to[0] === 'friend@example.com' && /privacy report/i.test(m.subject));
+  const reward = sent.find((m) => m.to[0] === 'ref@example.com');
+  check(F.db.referrals[0].status === 'completed' && F.db.users[0].pro_months_earned === 1 && reward && /free month of Pro/i.test(reward.text), 'referral: the friend\'s delivered report credits the referrer one month and emails them');
+  check(report && /INVITE 3 FRIENDS/.test(report.text) && /\/invite#c=[A-HJ-NP-Z2-9]{8}&t=[0-9a-f]{64}/.test(report.text) && /^[A-HJ-NP-Z2-9]{8}$/.test(friend.referral_code || F.db.users.find((u) => u.id === friend.id).referral_code || ''), 'referral: the friend\'s own report carries their invite block with a fresh code and private link');
+  const G = fake(); G.db.users.push({ id: 'ref1', email: 'ref@example.com', referral_code: 'ABCDEFGH', pro_months_earned: 0 });
+  await handleScan({ ...RB, REFERRALS_ENABLED: 'false' }, null, { ...input, email: 'friend@example.com', ref: 'ABCDEFGH' }, G.f); await runReportJob({ ...RB, REFERRALS_ENABLED: 'false' }, G.f);
+  const off = G.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));
+  check(G.db.referrals.length === 0 && G.db.users[0].pro_months_earned === 0 && off.every((m) => !/invite 3 friends/i.test(m.text)) && !off.some((m) => m.to[0] === 'ref@example.com') && !G.calls.some((c) => c.url.includes('mpt_complete_referral')), 'referral: switch off => no link, no block in the report, no reward, no call');
 }
 process.exit(ok ? 0 : 1);

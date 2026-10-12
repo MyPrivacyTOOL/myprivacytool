@@ -92,3 +92,30 @@ A daily record of which bots and AIs read MyPrivacyTOOL. Bot and AI rows only: p
 posts an alert to the usual Slack channel (`SLACK_BOT_TOKEN` + `MPTSLACK_CHANNEL_ID`, the same as the Monday digest). A check that cannot run
 (HubSpot scope missing, Supabase unreadable, more than 40 submissions in a day) posts an alert too. Stored payload and alert text hold counts only.
 Needs the HubSpot read-only token to have the `forms` scope. Manual run: `POST /run` with the trigger token.
+
+## Channel OSINT analytics (MPC-7641)
+
+Channel OSINT (the X / LinkedIn / Telegram bots) tracked apart from website scans, one row per platform per Hong Kong day.
+
+- `supabase/migrations/20261013100000_mpc_7641_channel_osint_daily.sql`: `mpt_channel_osint_daily(p_from, p_to)` (service_role only, counts only, no sender id or text): `dms_received` (interaction_log rows), `scan_requests` (intent `scan`), `consents_given` (awaiting_confirmation -> confirmed), `conversions` (leads with `utm_medium=channel_osint`, grouped by `utm_source`). SQL assertions in `supabase/tests/schema.test.sql`.
+- `collectors/channel-osint.js` (`source=channel_osint, report=funnel_daily`, runs with the other collectors at 00:15 HKT): adds from GA4, for sessions with `utm_medium=channel_osint`: `clicks` (sessions) and `scans_completed` (`privacy_scan_completed` events). edge_visits drops the query string and web_scans has no campaign, so neither can attribute them. GA4 unreadable => funnel counts kept, `clicks` and `scans_completed` null, row `status=error` naming it. Nothing is estimated.
+- **Tagging convention:** every link a channel bot sends to the main site carries `utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply`. The Telegram bots (`workers/telegram-webhook`, `workers/social-listeners`) now do this; underscores inside URLs are escaped (`\_`) before sending because Telegram's legacy Markdown reads `_` as italics. The site already records UTMs on GA4 events and leads. Any new channel's links must follow the same rule (X and LinkedIn bots send no links today).
+- `publishers/channel-osint.js` + `lib/channel-osint.js`: Monday 09:00 HKT Slack note to Chris (same cron as the digest, same `SLACK_BOT_TOKEN` / `MPTSLACK_CHANNEL_ID`, no Notion token needed): per platform DMs, consents, scan requests, scans, clicks, leads, **leads per 100 DMs**, a "best return" line (only when two platforms each have 10+ DMs), and named data gaps. There is no spend data, so "ROI" is leads per 100 DMs, not money.
+- Manual: `POST /channel-osint?dry=1` returns the text for the previous week, `POST /channel-osint` posts it (bearer `COLLECTOR_TRIGGER_TOKEN`). Test: `node workers/mpt-metrics-collector/channel-osint.test.mjs`.
+- **Notion dashboard (section 5 of the MPT Dashboard):** database "Channel OSINT Daily (MPC-7641)" (data source `7929984d-9ee4-4b76-955c-6a5ce6c33e6a`, override `NOTION_CHANNEL_OSINT_DATA_SOURCE_ID`) under the MPT Dashboard page. `publishers/channel-osint.js` `publishChannelOsintDay` writes one row per platform per Hong Kong day from the stored `channel_osint/funnel_daily` row, after the other publishes (same `NOTION_TOKEN`; **the integration must have access to the new database, it sits under the MPT Dashboard page**). Idempotent by Name (`YYYY-MM-DD · platform`); rows without the `[mpt-metrics-collector]` marker in Notes are never touched. Manual: `POST /publish-channel-osint?day=YYYY-MM-DD`.
+- **Limits:** the X bot has no state row, so its consents stay 0 until X is a stateful channel (docs/core-brain.md). X and LinkedIn bots send no links today; when they do, tag them as above.
+
+## KPI scorecard on the MPT Dashboard (MPC-7618)
+
+`publishers/kpi-dashboard.js` + `lib/kpi.js`. The daily run (00:15 HKT, after the other publishes) rewrites **one callout block** at the top of Chris's MPT Dashboard page (id `DASHBOARD_PAGE_ID`; first line starts with `[mpt-metrics-collector KPI scorecard]`). It collects nothing and writes no raw rows; other blocks on the page (the four linked views) are never touched, and two marked blocks is an error, not a guess.
+
+- **Progress to the North Star:** scans vs 10,000, paid conversions vs 1,000, ARR vs $120,000 (MRR x 12), each with % complete and the weekly run rate needed to hit it by 2027-08-31 (`GOALS` in `lib/kpi.js`).
+- **Weekly growth:** new scans in the last full week against the week before (blank unless both exist and the earlier one is above zero), plus this week so far.
+- **Top 5 traffic sources:** GA4 `daily_source_medium` summed over the last 7 complete Hong Kong days (newest pull per day only).
+- **Funnel, 7 complete days:** GA4 sessions -> scans -> saved scans (visitors who gave a contact and ticked the save box, `web_scan_contacts.save_consent_at`) -> paid. Each step shows its rate against the previous step and the drop-off. A step with no data reads "not collected" and the steps after it show no rate.
+- **Last 7 days:** sessions, new scans, new users per day.
+- **Freshness:** refreshed once a day at 00:15 HKT, and on demand with `POST /publish-kpi`. Scans, paid users and saved scans are live counts at refresh time. A 30-minute refresh needs a third cron (`*/30 * * * *`): the Cloudflare Free plan allows only 5 cron triggers per account (deploy error 10072, MPC-7618), so it needs Workers Paid or a freed slot; the Worker already handles that cron. Sessions and sources come from the daily GA4 pull, so today's sessions stay blank until tomorrow. Nothing is estimated.
+- **Known gap:** paid conversions in the funnel are "not collected" because paid history is not stored (only the current total is known). It fills in once a paid-date history exists.
+- **Secrets:** none new. It needs `NOTION_TOKEN` (the integration must be able to edit the MPT Dashboard page), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+- **Manual refresh:** `POST /publish-kpi` with the collector bearer token.
+- Test: `node workers/mpt-metrics-collector/kpi.test.mjs`.

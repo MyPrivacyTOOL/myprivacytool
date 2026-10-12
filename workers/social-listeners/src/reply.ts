@@ -13,9 +13,13 @@ import ar from "../../../locales/ar/main.json";
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
 
-const SCAN_URL = "https://myprivacytool.io/scan";
+// MPC-7641: tagged so GA4 and leads can attribute clicks, scans and sign-ups to this channel (utm_medium=channel_osint, utm_source = platform).
+const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=bot_reply";
 const CATALOGS: Record<string, Record<string, string>> = { en, ja, zh, ko, vi, es, de, fr, pt, ar };
 const TELEGRAM_TIMEOUT_MS = 5000;
+
+// MPC-7641: Telegram's legacy Markdown reads "_" as italics, which would break the UTM-tagged links. Escape them inside URLs only.
+export const escapeUrlUnderscores = (text: string): string => text.replace(/https?:\/\/\S+/g, (u) => u.replace(/_/g, "\\_"));
 
 /** Text that follows a key before the next key (default: a line break). Mirrors workers/telegram-webhook/messages.js. */
 const AFTER: Record<string, string> = {
@@ -72,7 +76,7 @@ export async function sendTelegramReply(env: Env, update: unknown, brain: Respon
       const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: reply, parse_mode: "Markdown" }),
+        body: JSON.stringify({ chat_id: chatId, text: escapeUrlUnderscores(reply), parse_mode: "Markdown" }),
         signal: ctl.signal,
       });
       if (!res.ok) log.error("telegram_send_rejected", { status: res.status });
