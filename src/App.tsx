@@ -14,6 +14,7 @@ const Start = lazy(() => import("./pages/Start"));
 const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
 const ThankYou = lazy(() => import("./pages/ThankYou"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const Invite = lazy(() => import("./pages/Invite"));
 const Newsletter = lazy(() => import("./pages/Newsletter"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPost = lazy(() => import("./pages/BlogPost"));
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/ai-access-check" element={<AIAccessCheck />} />
             <Route path="/thank-you" element={<ThankYou />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/invite" element={<Invite />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />

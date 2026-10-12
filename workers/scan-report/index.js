@@ -12,6 +12,8 @@ import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
+import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, shareUrl } from './lib/referral.js';
+import { referralBlock } from './lib/referralEmail.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -48,6 +50,9 @@ export default {
     // MPC-7494: the open mirror. Off unless RECOGNITION_ENABLED is "true". Read-only apart from the visitor's own delete button.
     if (request.method === 'POST' && url.pathname === '/api/recognise') return handleRecognise(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/recognise/delete') return handleRecogniseDelete(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    // MPC-7645: referral programme. Both answer 404 unless REFERRALS_ENABLED is "true". Authorised by the signed manage link in the referrer's report email.
+    if (request.method === 'POST' && url.pathname === '/api/referral/status') return handleReferralStatus(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    if (request.method === 'POST' && url.pathname === '/api/referral/invite') return handleReferralInvite(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -69,6 +74,7 @@ export default {
         email,
         consentSource: clip(b.consent_source || 'scan_page', 64).replace(/[^a-z0-9_-]/gi, '') || 'scan_page',
         ip: request.headers.get('CF-Connecting-IP') || null,
+        ref: clip(b.ref, 16).toUpperCase(),   // MPC-7645: referral code from the share link, ignored unless REFERRALS_ENABLED
         utm: { source: clip(b.utm_source, 100), medium: clip(b.utm_medium, 100), campaign: clip(b.utm_campaign, 100), content: clip(b.utm_content, 100), referrer: clip(b.referrer, 500) },
       });
       // MPC-7470: save the scan and link it to this contact, with the consent record. Not for a repeat request within 24h (no new report,
@@ -111,15 +117,16 @@ async function handleWebScanStep(env, request, origin, json) {
 export const runHkSpamJob = (env, fetchImpl = fetch, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
 
 // ------------------------------------------------------------------ submit path
-export async function handleScan(env, ctx, { email, consentSource, ip, utm }, fetchImpl = fetch) {
+export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref }, fetchImpl = fetch) {
   const sb = db(env, fetchImpl);
   const now = new Date();
   const retainUntil = new Date(now.getTime() + 3 * 365 * 24 * 3600 * 1000).toISOString();
   const consent = { consent_given_at: now.toISOString(), consent_source: consentSource, ip_address: ip, retain_until: retainUntil };
 
   let user = (await sb.select(`users?email=eq.${encodeURIComponent(email)}&select=id&limit=1`))[0];
+  let isNewUser = false;
   if (!user) {
-    try { user = await sb.insert('users', { email, ...consent }); }
+    try { user = await sb.insert('users', { email, ...consent }); isNewUser = true; }
     catch (e) { if (e.status !== 409) throw e; user = (await sb.select(`users?email=eq.${encodeURIComponent(email)}&select=id&limit=1`))[0]; }
   } else {
     await sb.patch(`users?id=eq.${user.id}`, { ...consent, updated_at: now.toISOString() });
@@ -127,6 +134,9 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm }, fe
   try {
     await sb.insert('leads', { email, user_id: user.id, utm_source: utm.source || null, utm_medium: utm.medium || null, utm_campaign: utm.campaign || null, utm_content: utm.content || null, utm_referrer: utm.referrer || null, ...consent });
   } catch (e) { if (e.status !== 409) console.error('lead insert failed', String(e)); }   // 409 = already a lead (dedupe)
+
+  // MPC-7645: a brand-new user who arrived through a friend's link is linked to that friend. Only new users count, so nobody can be referred after the fact.
+  if (ref && isNewUser && referralsEnabled(env)) await attachReferral(sb, { ref, userId: user.id, email, isNewUser }).catch((e) => console.error('referral attach failed:', String(e).replace(/\S+@\S+/g, '[email]')));
 
   // One report per address per 24h: stops the form being used to mail-bomb someone.
   const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
@@ -268,7 +278,8 @@ async function processScan(env, sb, job, fetchImpl) {
   const mirror = buildMirrorReport({ scan: result, breaches, breachStatus: hibp.status, brokers });
   const links = await unsubLinks(env, email);
   const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
-  const mail = buildReportEmail({ scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const referral = await referralFor(env, sb, job.user_id);
+  const mail = buildReportEmail({ scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
@@ -277,9 +288,19 @@ async function processScan(env, sb, job, fetchImpl) {
     mirror_report: mirror, data_freshness: new Date().toISOString(), report_status: 'sent', report_sent_at: new Date().toISOString(), resend_message_id: sent.id, report_last_error: null,
   });
   await claimCohort(env, sb, job.user_id);
+  if (referralsEnabled(env)) await completeReferral(env, sb, job.user_id, fetchImpl, recipientAllowed);   // MPC-7645: this report finishing is what earns the friend who invited them a month of Pro
   const hs = await pushScanActivity(env, { email, scanId: job.id, score: result.score, riskLevel: result.risk_level, signalsFound: result.signals_found, breachStatus: hibp.status, breachCount: breaches.length }, fetchImpl);
   if (hs.failed) console.error('HubSpot activity push failed:', hs.failed);
   return { sent: true, signals: inserted.length };
+}
+
+// MPC-7645: the "Invite 3 friends" block in the report. Needs UNSUBSCRIBE_SECRET (it signs the private invite link). Never lets the programme break the report.
+async function referralFor(env, sb, userId) {
+  if (!referralsEnabled(env) || !env.UNSUBSCRIBE_SECRET) return null;
+  try {
+    const code = await ensureReferralCode(sb, userId);
+    return code ? referralBlock({ shareLink: shareUrl(env, code), manageLink: await manageUrl(env, code) }) : null;
+  } catch (e) { console.error('referral block failed', String(e)); return null; }
 }
 
 // MPC-7261: the first 100 real users get a cohort number when their report is delivered. While RECIPIENT_ALLOWLIST is
