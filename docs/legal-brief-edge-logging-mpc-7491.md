@@ -14,3 +14,4 @@ A browser-looking request with the usual browser headers missing is sorted as un
 4. Is keeping bot and AI rows in full, with no consent step, acceptable given that classification is imperfect and a person can be sorted as a bot?
 5. Is the deletion route (contact us with the approximate time and your IP address) adequate, and is it a problem that the IP is the identifier we ask for?
 6. Anything else the wording needs before open device recognition is added (not live; see `docs/policy-wording-mpc-7491.md`)?
+7. Unsubscribe confirmation (added 2026-10-12): when someone unsubscribes we show a plain confirmation page and send no email. Is that enough? If we ever send a confirmation email, is it safe if it holds no marketing, links to other channels or calls to action? (We removed the line "You can run a new scan on our site" from the confirmation page as a precaution.)
