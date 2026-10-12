@@ -34,8 +34,12 @@ describe("classifier: each class", () => {
     expect(classify(facts({ userAgent: "Mozilla/5.0 (compatible; ExampleAIBot/1.0)" }))).toMatchObject({ cls: "bot", rule: "R4" });
     expect(classify(facts({ userAgent: "ExampleCrawler/0.9" }))).toMatchObject({ cls: "bot", rule: "R4" });
     expect(classify(facts({ userAgent: "" }))).toMatchObject({ cls: "bot", rule: "R6" });
-    expect(classify(facts({ headers: {} }))).toMatchObject({ cls: "bot", rule: "R6" });
+    expect(classify(facts({ userAgent: "ExampleClient/1.0", headers: {} }))).toMatchObject({ cls: "bot", rule: "R6" });
     expect(classify(facts({ httpProtocol: "HTTP/1.0" }))).toMatchObject({ cls: "bot", rule: "R6" });
+  });
+  it("unknown, not bot: a browser UA with the browser headers stripped is R9 (a person hiding details keeps the IP cut)", () => {
+    expect(classify(facts({ headers: {} }))).toMatchObject({ cls: "unknown", rule: "R9" });
+    expect(treatAsPerson(classify(facts({ headers: {} })).cls)).toBe(true);
   });
   it("person: a plain browser from a home network falls through to R8", () => {
     expect(classify(facts())).toEqual({ cls: "person", rule: "R8", rulesetVersion: RULESET_VERSION });
