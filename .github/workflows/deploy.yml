@@ -9,7 +9,7 @@ name: Deploy core-brain & social-listeners
 #     SUPABASE_URL, SUPABASE_KEY, WEBHOOK_SECRET
 #   core-brain (optional): QWEN_API_KEY. Without it intent classification uses the rules engine.
 #   social-listeners: SUPABASE_URL, SUPABASE_KEY, plus TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
-#     X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain WEBHOOK_SECRET),
+#     X_CONSUMER_SECRET, LINKEDIN_CLIENT_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain WEBHOOK_SECRET),
 #     TELEGRAM_BOT_TOKEN (BotFather token; replies are not sent without it)
 #
 # MPC-7260: core-brain is served from https://brain.myprivacytool.io (custom domain route in wrangler.toml).
@@ -102,6 +102,7 @@ jobs:
             ${{ secrets.TWILIO_AUTH_TOKEN != '' && 'TWILIO_AUTH_TOKEN' || '' }}
             ${{ secrets.META_APP_SECRET != '' && 'META_APP_SECRET' || '' }}
             ${{ secrets.X_CONSUMER_SECRET != '' && 'X_CONSUMER_SECRET' || '' }}
+            ${{ secrets.LINKEDIN_CLIENT_SECRET != '' && 'LINKEDIN_CLIENT_SECRET' || '' }}
             ${{ secrets.TELEGRAM_WEBHOOK_SECRET != '' && 'TELEGRAM_WEBHOOK_SECRET' || '' }}
             ${{ secrets.CORE_BRAIN_TOKEN != '' && 'CORE_BRAIN_TOKEN' || '' }}
             ${{ secrets.TELEGRAM_BOT_TOKEN != '' && 'TELEGRAM_BOT_TOKEN' || '' }}
@@ -114,6 +115,7 @@ jobs:
           TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN || 'placeholder' }}
           META_APP_SECRET: ${{ secrets.META_APP_SECRET || 'placeholder' }}
           X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET || 'placeholder' }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET || 'placeholder' }}
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET || 'placeholder' }}
           CORE_BRAIN_TOKEN: ${{ secrets.CORE_BRAIN_TOKEN || 'placeholder' }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || 'placeholder' }}

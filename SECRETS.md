@@ -13,6 +13,7 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `META_APP_SECRET` | | ✅ |
 | `CORE_BRAIN_TOKEN` (same value as core-brain `WEBHOOK_SECRET`) | | ✅ |
 | `X_CONSUMER_SECRET` (MPC-8301) | | ✅ |
+| `LINKEDIN_CLIENT_SECRET` (MPC-7640) | | ✅ |
 | `TELEGRAM_WEBHOOK_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_BOT_TOKEN` (MPC-7251, sends Telegram replies) | | ✅ |
 | `X_BEARER_TOKEN` (MPC-7628, public profile lookup for the Mirror bot) | | ✅ |
@@ -48,6 +49,7 @@ npx wrangler secret put TWILIO_SID
 npx wrangler secret put TWILIO_AUTH_TOKEN
 npx wrangler secret put META_APP_SECRET
 npx wrangler secret put X_CONSUMER_SECRET
+npx wrangler secret put LINKEDIN_CLIENT_SECRET
 npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 npx wrangler secret put TELEGRAM_BOT_TOKEN
 ```
@@ -59,7 +61,7 @@ Check names (not values) with `npx wrangler secret list`.
 Add under **Settings → Secrets and variables → Actions → New repository secret**:
 
 - `CLOUDFLARE_API_TOKEN` (Account → Workers Scripts → Edit), `CLOUDFLARE_ACCOUNT_ID`
-- `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `WEBHOOK_SECRET`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `CORE_BRAIN_TOKEN`, `X_CONSUMER_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`
+- `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `WEBHOOK_SECRET`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `CORE_BRAIN_TOKEN`, `X_CONSUMER_SECRET`, `LINKEDIN_CLIENT_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`
 
 On every push to `main`, `.github/workflows/deploy.yml` runs `npm install` + `npm test`, then deploys both
 Workers with `cloudflare/wrangler-action@v3` and syncs these secrets to each Worker.
@@ -75,7 +77,7 @@ itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 | Worker | Secrets |
 |---|---|
 | core-brain | `SUPABASE_URL`, `SUPABASE_KEY`, `QWEN_API_KEY`, `WEBHOOK_SECRET`, `SUPABASE_SERVICE_KEY` †, `TELEGRAM_BOT_TOKEN` †, `X_API_KEY` † |
-| social-listeners | `SUPABASE_URL`, `SUPABASE_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `CORE_BRAIN_TOKEN`, `TELEGRAM_BOT_TOKEN` |
+| social-listeners | `SUPABASE_URL`, `SUPABASE_KEY`, `TWILIO_SID`, `TWILIO_AUTH_TOKEN`, `META_APP_SECRET`, `X_CONSUMER_SECRET`, `LINKEDIN_CLIENT_SECRET`, `TELEGRAM_WEBHOOK_SECRET`, `CORE_BRAIN_TOKEN`, `TELEGRAM_BOT_TOKEN` |
 | github-channel | `GITHUB_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `ENCRYPTION_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `REDDIT_CLIENT_SECRET` † |
 | mpt-leads | `HUBSPOT_API_KEY`, `HUBSPOT_TOKEN`, `NOTION_TOKEN`, `RESEND_API_KEY`, `SLACK_BOT_TOKEN`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `HUNTER_API_KEY` † (non-secret config: `LEADS_DB_ID`, `SLACK_CHANNEL_ID`, `SUPABASE_URL`) |
 | mpt-metrics-collector | `SUPABASE_SERVICE_ROLE_KEY`, `COLLECTOR_TRIGGER_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`, `YOUTUBE_API_KEY`, `GA4_SERVICE_ACCOUNT_JSON`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN` (MPC-7383 Monday digest, `chat:write` only), `HUBSPOT_READONLY_TOKEN` (read-only HubSpot private-app token for portal 246502821; deliberately not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY`) (non-secret config: `SUPABASE_URL`, `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` (set as a secret so `wrangler deploy` does not replace it)) |
