@@ -38,7 +38,7 @@ Set in *Settings → Secrets and variables → Actions*.
 
 | GitHub secret | Workflows | Passed to |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | deploy, deploy-scan-report, deploy-mpt-leads, deploy-mpt-digest, deploy-mpt-metrics-collector, deploy-github-channel, deploy-oauth-poc, deploy-telegram-webhook, rollback | wrangler-action `apiToken` (deploy only; scope it to *Workers Scripts: Edit* on the account, not "all permissions") |
+| `CLOUDFLARE_API_TOKEN` | deploy, deploy-scan-report, deploy-mpt-leads, deploy-mpt-metrics-collector, deploy-github-channel, deploy-oauth-poc, deploy-telegram-webhook, rollback | wrangler-action `apiToken` (deploy only; scope it to *Workers Scripts: Edit* on the account, not "all permissions") |
 | `CLOUDFLARE_ACCOUNT_ID` | same as above | wrangler-action `accountId` (identifier, not a secret, but kept alongside) |
 | `SUPABASE_URL` | deploy | core-brain, social-listeners Worker secret |
 | `SUPABASE_KEY` | deploy | core-brain, social-listeners Worker secret |
@@ -114,8 +114,8 @@ operator's local environment or from CI.
 
 1. **Rotating the Supabase service-role key affects six Workers**, and only scan-report is synced by CI. The other
    five need a manual `wrangler secret put`, or they will keep failing with 401 against Supabase.
-2. **`EXPECTED_SECRETS.txt` means *required*.** deploy-mpt-leads, deploy-mpt-metrics-collector and
-   deploy-mpt-digest **fail** (deploy-oauth-poc warns) when a listed name is not set on the Worker. Optional secrets
+2. **`EXPECTED_SECRETS.txt` means *required*.** deploy-mpt-leads and
+   deploy-mpt-metrics-collector **fail** (deploy-oauth-poc warns) when a listed name is not set on the Worker. Optional secrets
    are therefore left out on purpose: `UNSUBSCRIBE_SECRET` (scan-report follow-ups and unsubscribe links),
    `HUNTER_API_KEY` (mpt-leads enrichment), `REDDIT_CLIENT_SECRET` (github-channel Reddit OAuth) and
    `SUPABASE_SERVICE_ROLE_KEY` on oauth-poc. Each feature switches itself off when its secret is unset. Do not add
