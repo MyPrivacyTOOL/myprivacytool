@@ -20,7 +20,7 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, hasScanSaveConsent, onConsentChange } from '@/lib/cookieConsent';
-import { saveCompletedScan } from '@/lib/webScan';
+import { markScanStarted, saveCompletedScan, trackResults } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
