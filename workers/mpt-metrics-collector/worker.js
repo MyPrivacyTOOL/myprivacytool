@@ -14,7 +14,7 @@ import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 import { publishMachineMirror } from './publishers/machine-mirror.js';
 import { hkDate } from './lib/hk.js';
-import { channelOsintConfigured, postChannelOsint, buildChannelOsintText } from './publishers/channel-osint.js';
+import { channelOsintConfigured, postChannelOsint, buildChannelOsintText, publishChannelOsintDay } from './publishers/channel-osint.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
@@ -114,6 +114,8 @@ export default {
         console.log(JSON.stringify(await publishAll(env)));
         // Machine mirror page (MPC-7492): separate so a failure here never affects the other publishes.
         try { console.log(JSON.stringify(await publishMachineMirror(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: machine mirror publish failed: ${SAFE(e?.message, env)}`); }
+        // Channel OSINT dashboard rows (MPC-7641): same isolation, a failure here never affects the other publishes.
+        try { console.log(JSON.stringify(await publishChannelOsintDay(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: channel osint publish failed: ${SAFE(e?.message, env)}`); }
       }
       else console.error('mpt-metrics-collector: NOTION_TOKEN not set, Notion publish skipped');
     })());
@@ -145,6 +147,14 @@ export default {
       const day = url.searchParams.get('day') || previousHkDate(new Date());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'bad date' }, 400);
       try { return json({ result: await publishMachineMirror(env, day) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
+    }
+    // Manual Channel OSINT Notion rows (MPC-7641): POST /publish-channel-osint?day=YYYY-MM-DD, same bearer token.
+    if (url.pathname === '/publish-channel-osint' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
+      const day = url.searchParams.get('day') || previousHkDate(new Date());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'bad date' }, 400);
+      try { return json({ result: await publishChannelOsintDay(env, day) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
     }
     // Manual Channel OSINT weekly summary (MPC-7641): POST /channel-osint?dry=1 returns the text for the previous Hong Kong week; POST /channel-osint posts it to Slack.
     if (url.pathname === '/channel-osint' && request.method === 'POST') {
