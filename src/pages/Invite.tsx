@@ -3,10 +3,13 @@ import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react
 import { Gift, Users } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { useExperiment } from "@/hooks/useExperiment";
+import { trackExperimentCta, trackExperimentExposure, trackReferralInvitesSent } from "@/lib/analytics";
 import { validateEmail } from "@/lib/formFeedback";
 import {
   MAX_INVITES_AT_ONCE,
   fetchReferralStatus,
+  parseInviteVariant,
   parseManageHash,
   parseReferralCode,
   referralsEnabled,
@@ -40,6 +43,14 @@ const Invite = () => {
     if (referralsEnabled() && friendCode) rememberReferralCode(friendCode);
   }, [friendCode]);
 
+  // A/B tests (MPC-7645), all off unless switched on. Layout is picked here; the report-email wording (v in the private link) and the invitation subject
+  // (iv in the share link) are picked by the Worker, so the page only reports that the person arrived.
+  const layout = useExperiment("referral_invite_layout");
+  const inviteVariant = parseInviteVariant(params.get("iv"));
+  useEffect(() => {
+    if (referralsEnabled() && friendCode && inviteVariant) trackExperimentExposure("referral_invite_subject", inviteVariant);
+  }, [friendCode, inviteVariant]);
+
   const [status, setStatus] = useState<ReferralStatus | "invalid" | "error" | "loading">("loading");
   const [emails, setEmails] = useState<string[]>(() => Array(MAX_INVITES_AT_ONCE).fill(""));
   const [problem, setProblem] = useState("");
@@ -55,6 +66,14 @@ const Invite = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const statusReady = typeof status === "object";
+  useEffect(() => {
+    if (!referralsEnabled() || !link || !statusReady) return;
+    if (link.block) trackExperimentExposure("referral_report_block", link.block);
+    if (layout.active) trackExperimentExposure(layout.experimentId, layout.variantId, layout.forced);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusReady]);
+
   if (!referralsEnabled()) return <Navigate to="/scan" replace />;
 
   const send = async (ev: React.FormEvent) => {
@@ -65,11 +84,13 @@ const Invite = () => {
     const bad = filled.map((e) => validateEmail(e)).find(Boolean);
     if (bad) return setProblem(bad);
     setProblem("");
+    if (layout.active) trackExperimentCta(layout.experimentId, layout.variantId, layout.forced);
     setBusy(true);
     const r = await sendReferralInvites(link, filled);
     setBusy(false);
     if (r.kind === "sent") {
       setResult({ sent: r.sent, skipped: r.skipped });
+      if (r.sent > 0) trackReferralInvitesSent(r.sent, { layout: layout.active ? layout.variantId : undefined, block: link?.block });
       setEmails(Array(MAX_INVITES_AT_ONCE).fill(""));
       void load();
     } else {
@@ -134,7 +155,8 @@ const Invite = () => {
                   ))}
                 </dl>
 
-                <section className="mb-8">
+                <div className="flex flex-col">
+                <section className={`mb-8 ${layout.variantId === "email_first" ? "order-2" : "order-1"}`}>
                   <h2 className="font-semibold mb-2">Share your link</h2>
                   <div className="flex gap-2">
                     <input readOnly aria-label="Your invite link" value={status.share_url} className="flex-1 bg-background border border-surface-border rounded-lg px-3 py-2 text-sm" onFocus={(e) => e.currentTarget.select()} />
@@ -144,7 +166,7 @@ const Invite = () => {
                   </div>
                 </section>
 
-                <section>
+                <section className={layout.variantId === "email_first" ? "order-1 mb-8" : "order-2"}>
                   <h2 className="font-semibold mb-2">Or we email them for you</h2>
                   <p className="text-muted-foreground text-xs mb-3">
                     We send each friend one plain email saying you asked us to. It does not say who you are. We keep only a scrambled (hashed) copy of their address so we never send it twice, we never email them again unless they run a scan, and they can unsubscribe. Only enter people who would not mind hearing from you. You have {left} invitation{left === 1 ? "" : "s"} left.
@@ -178,6 +200,7 @@ const Invite = () => {
                     <p className="text-sm text-muted-foreground">You have used all your invitations. Your link above still works.</p>
                   )}
                 </section>
+                </div>
               </>
             )}
           </>

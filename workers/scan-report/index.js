@@ -14,6 +14,7 @@ import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, save
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
+import { abOn, abVariant } from './lib/referralAb.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -299,7 +300,12 @@ async function referralFor(env, sb, userId, email) {
   if (!referralTester(env, email) || !env.UNSUBSCRIBE_SECRET) return null;
   try {
     const code = await ensureReferralCode(sb, userId);
-    return code ? referralBlock({ shareLink: shareUrl(env, code), manageLink: await manageUrl(env, code) }) : null;
+    if (!code) return null;
+    // A/B test report_block: the variant is stored the first time so the same person always sees the same wording; `v` in the private link lets the page count the visit.
+    const tracked = abOn(env, 'report_block');
+    const variant = await abVariant(env, 'report_block', code);
+    if (tracked) await sb.patch(`users?id=eq.${userId}&referral_block_variant=is.null`, { referral_block_variant: variant }).catch((e) => console.error('referral variant not saved', String(e)));
+    return referralBlock({ shareLink: shareUrl(env, code), manageLink: await manageUrl(env, code, tracked ? variant : undefined), variant });
   } catch (e) { console.error('referral block failed', String(e)); return null; }
 }
 

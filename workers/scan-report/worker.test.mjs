@@ -620,6 +620,13 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   await handleScan(TM, null, { ...input, email: 'friend@example.com' }, K.f); await handleScan(TM, null, { ...input, email: 'other@example.com' }, K.f); await runReportJob(TM, K.f);
   const km = K.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body)).filter((m) => /privacy report/i.test(m.subject));
   check(km.find((m) => m.to[0] === 'friend@example.com')?.text.includes('INVITE 3 FRIENDS') && km.find((m) => m.to[0] === 'other@example.com') && !km.find((m) => m.to[0] === 'other@example.com').text.includes('INVITE 3 FRIENDS'), 'referral tester mode: only the listed address gets the invite block; every other report is unchanged');
+  // A/B test report_block through the real report job: variant stored once, tagged on the private link; off = nothing stored
+  const AB = { ...RB, REFERRAL_AB_REPORT_BLOCK: 'true' };
+  const Q = fake(); await handleScan(AB, null, { ...input, email: 'abtest@example.com' }, Q.f); await runReportJob(AB, Q.f);
+  const qu = Q.db.users.find((u) => u.email === 'abtest@example.com'); const qm = JSON.parse(Q.calls.filter((c) => c.url.includes('resend')).map((c) => c.body).pop());
+  check(['control', 'friend_first'].includes(qu.referral_block_variant) && qm.text.includes(`&v=${qu.referral_block_variant}`) && (qu.referral_block_variant === 'friend_first') === qm.text.includes('KNOW SOMEONE WHO WOULD WANT TO SEE THIS?'), 'A/B report_block on: the user\'s variant is stored, tagged on the private link, and matches the wording sent');
+  const P = fake(); await handleScan(RB, null, { ...input, email: 'abtest@example.com' }, P.f); await runReportJob(RB, P.f);
+  check(!('referral_block_variant' in P.db.users.find((u) => u.email === 'abtest@example.com')) && !JSON.parse(P.calls.filter((c) => c.url.includes('resend')).map((c) => c.body).pop()).text.includes('&v='), 'A/B report_block off: nothing stored and no v on the link');
   const G = fake(); G.db.users.push({ id: 'ref1', email: 'ref@example.com', referral_code: 'ABCDEFGH', pro_months_earned: 0 });
   await handleScan({ ...RB, REFERRALS_ENABLED: 'false' }, null, { ...input, email: 'friend@example.com', ref: 'ABCDEFGH' }, G.f); await runReportJob({ ...RB, REFERRALS_ENABLED: 'false' }, G.f);
   const off = G.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));

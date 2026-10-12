@@ -37,12 +37,20 @@ export function getReferralCode(search: string = typeof window !== "undefined" ?
   }
 }
 
-export type ManageLink = { code: string; token: string };
+// Variants the Worker may tag a link with (A/B tests, MPC-7645). Anything else is ignored, so a hand-edited link cannot invent a variant.
+export const BLOCK_VARIANTS = ["control", "friend_first"] as const;
+export const INVITE_VARIANTS = ["control", "specific_subject"] as const;
+const oneOf = <T extends string>(list: readonly T[], v: unknown): T | null => (list.find((x) => x === v) ?? null);
+export const parseBlockVariant = (v: unknown) => oneOf(BLOCK_VARIANTS, v);
+export const parseInviteVariant = (v: unknown) => oneOf(INVITE_VARIANTS, v);
+
+export type ManageLink = { code: string; token: string; block?: string };
 export function parseManageHash(hash: string): ManageLink | null {
   const p = new URLSearchParams(hash.replace(/^#/, ""));
   const code = parseReferralCode(p.get("c"));
   const token = (p.get("t") ?? "").trim();
-  return code && /^[0-9a-f]{64}$/.test(token) ? { code, token } : null;
+  const block = parseBlockVariant(p.get("v"));
+  return code && /^[0-9a-f]{64}$/.test(token) ? { code, token, ...(block ? { block } : {}) } : null;
 }
 
 export type ReferralStatus = {
@@ -58,10 +66,11 @@ export type ReferralStatus = {
 const api = () => resolveScanApiUrl() || DEFAULT_SCAN_API_URL;
 const post = (path: string, body: unknown) =>
   fetch(`${api()}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const credentials = ({ code, token }: ManageLink) => ({ code, token }); // the A/B label in the link is never sent back
 
 export async function fetchReferralStatus(link: ManageLink): Promise<ReferralStatus | "invalid" | "error"> {
   try {
-    const res = await post("/api/referral/status", link);
+    const res = await post("/api/referral/status", credentials(link));
     if (res.status === 403 || res.status === 404) return "invalid";
     return res.ok ? ((await res.json()) as ReferralStatus) : "error";
   } catch {
@@ -72,7 +81,7 @@ export async function fetchReferralStatus(link: ManageLink): Promise<ReferralSta
 export type InviteResult = { kind: "sent"; sent: number; skipped: number } | { kind: "limit" | "invalid" | "rate_limited" | "error" };
 export async function sendReferralInvites(link: ManageLink, emails: string[]): Promise<InviteResult> {
   try {
-    const res = await post("/api/referral/invite", { ...link, emails });
+    const res = await post("/api/referral/invite", { ...credentials(link), emails });
     if (res.ok) {
       const j = (await res.json()) as { sent: number; skipped: number };
       return { kind: "sent", sent: j.sent, skipped: j.skipped };

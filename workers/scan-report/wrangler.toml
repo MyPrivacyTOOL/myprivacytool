@@ -47,6 +47,13 @@ REFERRALS_ENABLED = "false"
 # those addresses while it is tested: the invite block, invite page, invitations (to listed addresses only) and reward emails. Everyone else is unchanged.
 # Delete the secret to open the programme to every user. Order matters: set the secret BEFORE setting REFERRALS_ENABLED = "true".
 
+# MPC-7645 A/B tests across the referral funnel, both OFF (anything but "true" = everyone gets the control and nothing is recorded). Copy needs Chris's approval before either goes on.
+#  REFERRAL_AB_REPORT_BLOCK   wording of the invite block in the report email (control / friend_first), stored in users.referral_block_variant
+#  REFERRAL_AB_INVITE_SUBJECT subject line of the invitation to the friend (control / specific_subject), stored in referrals.invite_variant
+# The site has a third, in-browser test (VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED). Reading results: docs/ab-testing.md.
+REFERRAL_AB_REPORT_BLOCK = "false"
+REFERRAL_AB_INVITE_SUBJECT = "false"
+
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
 enabled = true
