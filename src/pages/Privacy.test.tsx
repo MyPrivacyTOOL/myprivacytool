@@ -90,3 +90,25 @@ describe("Privacy: HK Stop Spam section", () => {
     expect(document.querySelector('#hk-stop-spam a[href="https://www.dnc.gov.hk"]')).not.toBeNull();
   });
 });
+
+// MPC-7645: the referral section follows the site switch (wording is a draft for Chris and a lawyer).
+describe("Privacy: referral programme section", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is not shown while the programme is off", () => {
+    renderPage(<Privacy />);
+    expect(screen.queryByRole("heading", { name: "16. Inviting Friends (Referral Programme)" })).not.toBeInTheDocument();
+  });
+
+  it("when on, says what is kept, that invited addresses are hashed, no reminders, unsubscribe, and the 10-person cap", () => {
+    vi.stubEnv("VITE_REFERRALS_ENABLED", "true");
+    renderPage(<Privacy />);
+    expect(screen.getByRole("heading", { name: "16. Inviting Friends (Referral Programme)" })).toBeInTheDocument();
+    const t = flat(document.getElementById("referrals")?.textContent ?? "");
+    expect(t).toContain("We keep only a SHA-256 hash of the address, never the address itself");
+    expect(t).toContain("send no reminders");
+    expect(t).toContain("unsubscribe link");
+    expect(t).toContain("up to 10 people in total");
+    expect(t).toContain("privacy@myprivacytool.io");
+  });
+});

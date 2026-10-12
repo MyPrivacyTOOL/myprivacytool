@@ -602,6 +602,39 @@ select pg_temp.assert((select (r->>'dms_received')::int = 1 and (r->>'consents_g
 select pg_temp.assert((select (r->>'conversions')::int = 1 and (r->>'dms_received')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'linkedin'), 'channel osint: linkedin conversion counted case-insensitively; other medium and other days excluded');
 select pg_temp.assert((select not (j::text ~* '(@|example\.com)') from co), 'channel osint: no email or personal value in the output');
 reset role;
+-- ===== MPC-7645: referrals (service_role only, one referral per friend, atomic reward capped at 12, no readable address) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.referrals$$) = '42501' and pg_temp.try_as('authenticated', $$select 1 from public.referrals$$) = '42501', 'referrals: anon and authenticated must be denied');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.referrals$$) = '' and (select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.referrals'::regclass), 'referrals: service_role reads; RLS enabled and forced');
+select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_complete_referral(uuid)', 'execute') and not has_function_privilege('authenticated', 'public.mpt_complete_referral(uuid)', 'execute') and has_function_privilege('service_role', 'public.mpt_complete_referral(uuid)', 'execute'), 'mpt_complete_referral: service_role only');
+select pg_temp.assert(not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'referrals' and column_name ilike any (array['email', '%\_email', '%address%'])), 'referrals: no readable email column (hash only)');
+insert into public.users (id, email, referral_code) values
+  ('00000000-0000-4000-8000-000000007645', 'referrer-7645@example.com', 'ABCDEFGH'),
+  ('00000000-0000-4000-8000-000000007646', 'friend-7645@example.com', null),
+  ('00000000-0000-4000-8000-000000007647', 'friend2-7645@example.com', null);
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.users (email, referral_code) values ('x-7645@example.com', 'ABCDEFGH')$$) = '23505', 'users.referral_code: unique');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.users (email, referral_code) values ('y-7645@example.com', 'abcdefgh')$$) = '23514' and pg_temp.try_as('service_role', $$insert into public.users (email, referral_code) values ('z-7645@example.com', 'ABCDEF01')$$) = '23514', 'users.referral_code: 8 characters from the unambiguous upper-case alphabet only');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, referee_user_id, status) values ('00000000-0000-4000-8000-000000007645', '00000000-0000-4000-8000-000000007645', 'signed_up')$$) = '23514', 'referrals: nobody can refer themselves');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, status) values ('00000000-0000-4000-8000-000000007645', 'signed_up')$$) = '23514', 'referrals: signed_up needs a referee');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, invitee_hash) values ('00000000-0000-4000-8000-000000007645', 'not-a-hash')$$) = '23514', 'referrals: invitee_hash must be a SHA-256 hex digest');
+insert into public.referrals (referrer_user_id, invitee_hash, source) values ('00000000-0000-4000-8000-000000007645', repeat('a', 64), 'invite_email');
+select pg_temp.assert(pg_temp.try_as('service_role', format($$insert into public.referrals (referrer_user_id, invitee_hash) values ('00000000-0000-4000-8000-000000007645', %L)$$, repeat('a', 64))) = '23505', 'referrals: the same friend cannot be invited twice by the same person');
+insert into public.referrals (referrer_user_id, referee_user_id, status, signed_up_at) values ('00000000-0000-4000-8000-000000007645', '00000000-0000-4000-8000-000000007646', 'signed_up', now());
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, referee_user_id, status) values ('00000000-0000-4000-8000-000000007647', '00000000-0000-4000-8000-000000007646', 'signed_up')$$) = '23505', 'referrals: a friend is referred only once');
+set local role service_role;
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007647')) = 0, 'mpt_complete_referral: a friend nobody referred changes nothing');
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007646') where rewarded and pro_months_earned = 1 and referrer_user_id = '00000000-0000-4000-8000-000000007645') = 1, 'mpt_complete_referral: the first completion rewards the referrer one month');
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007646')) = 0 and (select pro_months_earned from public.users where id = '00000000-0000-4000-8000-000000007645') = 1, 'mpt_complete_referral: completing the same friend again rewards nothing (at most once)');
+select pg_temp.assert((select status = 'completed' and completed_at is not null and rewarded_at is not null from public.referrals where referee_user_id = '00000000-0000-4000-8000-000000007646'), 'mpt_complete_referral: the row is marked completed and rewarded');
+update public.users set pro_months_earned = 12 where id = '00000000-0000-4000-8000-000000007645';
+insert into public.referrals (referrer_user_id, referee_user_id, status, signed_up_at) values ('00000000-0000-4000-8000-000000007645', '00000000-0000-4000-8000-000000007647', 'signed_up', now());
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007647') where not rewarded and pro_months_earned = 12) = 1, 'mpt_complete_referral: at the 12-month cap the friend counts as completed but earns nothing');
+select pg_temp.assert((select status = 'completed' and rewarded_at is null from public.referrals where referee_user_id = '00000000-0000-4000-8000-000000007647') and (select pro_months_earned from public.users where id = '00000000-0000-4000-8000-000000007645') = 12, 'mpt_complete_referral: capped completion leaves rewarded_at empty and the ledger at 12');
+reset role;
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.users set pro_months_earned = 13 where id = '00000000-0000-4000-8000-000000007645'$$) = '23514', 'users.pro_months_earned: never above 12');
+delete from public.users where id = '00000000-0000-4000-8000-000000007646';
+select pg_temp.assert((select count(*) from public.referrals where referee_user_id = '00000000-0000-4000-8000-000000007646') = 0, 'referrals: deleting a user (erasure) removes the referral row where they are the friend');
+delete from public.users where id = '00000000-0000-4000-8000-000000007645';
+select pg_temp.assert((select count(*) from public.referrals where referrer_user_id = '00000000-0000-4000-8000-000000007645') = 0, 'referrals: deleting a user removes the referral rows where they are the referrer');
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

@@ -38,6 +38,46 @@ export const EXPERIMENTS = {
       { id: "early_access", weight: 50 }, // "Get early access, free"
     ],
   },
+  // /pricing experiments (MPC-7638). Four independent tests, each switched off until its flag is "true".
+  // Concurrent tests are bucketed independently; read each one on its own (experiment_id breakdown).
+  pricing_headline: {
+    id: "pricing_headline",
+    description: "H1 and sub-line on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_HEADLINE_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // "Pricing"
+      { id: "free_first", weight: 50 }, // "Know your exposure for free. Pay to remove it."
+    ],
+  },
+  pricing_cta: {
+    id: "pricing_cta",
+    description: "Paid-plan button style and text on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_CTA_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 34 }, // solid button, "Join the waitlist"
+      { id: "outline", weight: 33 }, // outline button, same text
+      { id: "notify_text", weight: 33 }, // solid button, "Notify me when plans open"
+    ],
+  },
+  pricing_tiers: {
+    id: "pricing_tiers",
+    description: "Plan card presentation on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_TIERS_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // four equal cards
+      { id: "highlight_pro", weight: 50 }, // Pro card visually emphasised
+    ],
+  },
+  pricing_social_proof: {
+    id: "pricing_social_proof",
+    description: "Placement of the trust line on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_SOCIAL_PROOF_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 34 }, // no trust line
+      { id: "above_plans", weight: 33 },
+      { id: "below_plans", weight: 33 },
+    ],
+  },
 } as const satisfies Record<string, Experiment>;
 
 export type ExperimentId = keyof typeof EXPERIMENTS;

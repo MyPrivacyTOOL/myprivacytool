@@ -583,7 +583,23 @@ export const trackPricingView = () => {
   trackEvent('pricing_view');
 };
 
-export const trackPricingPlanClick = (plan: string, destination: string) => {
+// `variants` maps experiment id to variant id for the live (non-forced) pricing experiments (MPC-7638),
+// sent as ab_<experiment_id> so a click can be split by every test the visitor was in.
+export const trackPricingPlanClick = (
+  plan: string,
+  destination: string,
+  variants: Record<string, string> = {},
+) => {
   trackActivity();
-  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination });
+  const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
+  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination, ...ab });
+};
+
+// MPC-7626: waitlist sign-up on /pricing. Fire only after a confirmed successful HubSpot submit.
+// `variants` as in trackPricingPlanClick (MPC-7638): the waitlist signup is the real conversion to split by variant.
+export const trackPricingWaitlistSignup = (plan: string, variants: Record<string, string> = {}) => {
+  const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
+  attributedEvent('pricing_waitlist_signup', { form: 'pricing_waitlist', plan, ...ab });
+  // GA4 recommended event so the signup can be marked as a key event
+  attributedEvent('generate_lead', { method: 'pricing_waitlist', plan, ...ab });
 };

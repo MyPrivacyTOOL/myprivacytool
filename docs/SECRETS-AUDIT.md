@@ -28,6 +28,11 @@ STANDING_OBJECTIVES, O2). Status as recorded there:
   disabling the legacy keys also disables the legacy anon key, so first confirm in the Supabase API logs that no caller
   still sends a legacy JWT (`request.sb.jwt.apikey.payload.role`). Tracked in Notion as MPC-7385-F5.
 
+  **Deferred (MPC-7614, 2026-10-12):** the rest of this rotation is deferred to the fleet-wide security audit. Still open
+  when it resumes: create the new key and set GitHub secret `NEW_SUPABASE_SECRET_KEY`, run `rotate-supabase-key.yml`,
+  replace the Cloudflare Pages secret by hand and redeploy the site, check the API logs for legacy JWT callers, then
+  revoke the old key.
+
 Guardrails: `.gitignore` excludes `.env`, `.env.*` and `.dev.vars*`. `scripts/ci/scan-secrets.mjs` runs as a
 blocking step in the `ci.yml` lint job, so a committed key fails the PR. Its allowlist skips a PEM header followed by
 a `${…}` template, which only matches the runtime-generated test key in `workers/mpt-metrics-collector/ga4.test.mjs`.
@@ -38,7 +43,7 @@ Set in *Settings → Secrets and variables → Actions*.
 
 | GitHub secret | Workflows | Passed to |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | deploy, deploy-scan-report, deploy-mpt-leads, deploy-mpt-digest, deploy-mpt-metrics-collector, deploy-github-channel, deploy-oauth-poc, deploy-telegram-webhook, rollback | wrangler-action `apiToken` (deploy only; scope it to *Workers Scripts: Edit* on the account, not "all permissions") |
+| `CLOUDFLARE_API_TOKEN` | deploy, deploy-scan-report, deploy-mpt-leads, deploy-mpt-metrics-collector, deploy-github-channel, deploy-oauth-poc, deploy-telegram-webhook, rollback | wrangler-action `apiToken` (deploy only; scope it to *Workers Scripts: Edit* on the account, not "all permissions") |
 | `CLOUDFLARE_ACCOUNT_ID` | same as above | wrangler-action `accountId` (identifier, not a secret, but kept alongside) |
 | `SUPABASE_URL` | deploy | core-brain, social-listeners Worker secret |
 | `SUPABASE_KEY` | deploy | core-brain, social-listeners Worker secret |
@@ -114,8 +119,8 @@ operator's local environment or from CI.
 
 1. **Rotating the Supabase service-role key affects six Workers**, and only scan-report is synced by CI. The other
    five need a manual `wrangler secret put`, or they will keep failing with 401 against Supabase.
-2. **`EXPECTED_SECRETS.txt` means *required*.** deploy-mpt-leads, deploy-mpt-metrics-collector and
-   deploy-mpt-digest **fail** (deploy-oauth-poc warns) when a listed name is not set on the Worker. Optional secrets
+2. **`EXPECTED_SECRETS.txt` means *required*.** deploy-mpt-leads and
+   deploy-mpt-metrics-collector **fail** (deploy-oauth-poc warns) when a listed name is not set on the Worker. Optional secrets
    are therefore left out on purpose: `UNSUBSCRIBE_SECRET` (scan-report follow-ups and unsubscribe links),
    `HUNTER_API_KEY` (mpt-leads enrichment), `REDDIT_CLIENT_SECRET` (github-channel Reddit OAuth) and
    `SUPABASE_SERVICE_ROLE_KEY` on oauth-poc. Each feature switches itself off when its secret is unset. Do not add
