@@ -49,6 +49,13 @@ function captureContext(hexagons: HexagonData[]) {
   };
 }
 
+// MPC-7493: when this visit's scan began (set once by the home page), so the saved scan can be dated "started" as well as "finished".
+const MAX_SCAN_MS = 10 * 60 * 1000;
+let scanStartedAt: number | null = null;
+export function markScanStarted(): void {
+  if (scanStartedAt === null) scanStartedAt = Date.now();
+}
+
 export function toPayload(hexagons: HexagonData[]) {
   const ctx = captureContext(hexagons);
   const seen = new Set<string>();
@@ -70,7 +77,15 @@ export function toPayload(hexagons: HexagonData[]) {
       ...(h.category ? { category: text(h.category, 32) } : {}),
     });
   }
-  return { consent: true, hexagons: out };
+  // MPC-7493: how long the scan took, and the scan number this browser already held from an earlier visit (how a return visit is
+  // recognised: the number kept here, never a fingerprint match). Both are optional and only ever sent along with a scan that is being saved.
+  const previous = read(() => localStorage);
+  return {
+    consent: true,
+    hexagons: out,
+    ...(scanStartedAt !== null ? { started_ms: Math.min(MAX_SCAN_MS, Math.max(0, Math.round(Date.now() - scanStartedAt))) } : {}),
+    ...(previous ? { previous_scan_number: previous } : {}),
+  };
 }
 
 /**
@@ -111,4 +126,64 @@ export async function saveCompletedScan(hexagons: HexagonData[]): Promise<string
   } catch {
     return null;
   }
+}
+
+// MPC-7493: funnel steps for the scan saved on this visit. Sent only when saving is on, the visitor accepted the scan-saving consent
+// purpose and a scan was saved (so there is a scan number to attach to). A failure never affects the visitor.
+export type FunnelStep = "results_viewed" | "contact_step_opened" | "results_time";
+const MAX_RESULTS_SECONDS = 3600;
+const sent = new Set<string>();
+
+export function reportStep(step: FunnelStep, seconds?: number): void {
+  const scanNumber = visitScanNumber();
+  if (!saveWebScansEnabled() || !API_URL || !hasScanSaveConsent() || !scanNumber) return;
+  if (step !== "results_time") {
+    if (sent.has(`${scanNumber}:${step}`)) return;
+    sent.add(`${scanNumber}:${step}`);
+  }
+  try {
+    void fetch(`${API_URL.replace(/\/$/, "")}/api/web-scan/step`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        scan_number: scanNumber,
+        step,
+        ...(step === "results_time" ? { seconds: Math.min(MAX_RESULTS_SECONDS, Math.max(0, Math.round(seconds ?? 0))) } : {}),
+      }),
+    }).catch(() => undefined);
+  } catch {
+    /* never affects the visitor */
+  }
+}
+
+/**
+ * Call when the results are on screen. Reports "results viewed" as soon as the scan has a number, and the seconds the visitor spent
+ * on the results (tab visible) each time they hide or leave the page. Returns a cleanup function.
+ */
+export function trackResults(): () => void {
+  let visibleSince: number | null = typeof document !== "undefined" && document.visibilityState === "hidden" ? null : Date.now();
+  let total = 0;
+  const viewed = () => reportStep("results_viewed");
+  const flush = () => {
+    if (visibleSince !== null) {
+      total += (Date.now() - visibleSince) / 1000;
+      visibleSince = null;
+    }
+    if (total > 0) reportStep("results_time", total);
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") flush();
+    else visibleSince = Date.now();
+  };
+  viewed();
+  window.addEventListener(SCAN_NUMBER_EVENT, viewed);
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("pagehide", flush);
+  return () => {
+    window.removeEventListener(SCAN_NUMBER_EVENT, viewed);
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("pagehide", flush);
+    flush();
+  };
 }

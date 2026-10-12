@@ -53,6 +53,14 @@ const Index = () => {
     return onConsentChange(trySave);
   }, [loading, hexagons.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // MPC-7493: funnel steps for consented visitors. The scan starts when the page opens; once the results are on screen we report
+  // "results viewed" and the time spent there. Nothing is sent unless a scan was saved with the scan-saving consent.
+  useEffect(() => {
+    markScanStarted();
+  }, []);
+  const resultsShown = !loading && hexagons.length > 0;
+  useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
+
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
   const { motion } = useDeviceMotion();

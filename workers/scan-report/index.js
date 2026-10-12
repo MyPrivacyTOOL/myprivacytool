@@ -10,7 +10,7 @@ import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
-import { MAX_WEB_SCAN_BYTES, linkWebScan, readCappedJson, saveWebScan, validateWebScan, webScanEnabled } from './lib/webScan.js';
+import { MAX_WEB_SCAN_BYTES, linkWebScan, readCappedJson, recordEvent, saveWebScan, validateStep, validateWebScan, webScanEnabled } from './lib/webScan.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -44,6 +44,7 @@ export default {
     if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST', request, cors);
     if (request.method === 'POST' && url.pathname === '/api/unsubscribe-request') return handleUnsubscribeRequest(env, request, cors, json);
     if (request.method === 'POST' && url.pathname === '/api/web-scan') return handleWebScan(env, request, origin, json);
+    if (request.method === 'POST' && url.pathname === '/api/web-scan/step') return handleWebScanStep(env, request, origin, json);
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -92,11 +93,25 @@ async function handleWebScan(env, request, origin, json) {
   const v = validateWebScan(read.body);
   if (v.error) return json({ error: v.error }, 400);
   try {
-    return json({ saved: true, scan_number: await saveWebScan(db(env), v.hexagons) });
+    return json({ saved: true, scan_number: await saveWebScan(db(env), v.hexagons, v) });
   } catch (e) {
     console.error('web scan save failed:', e.status || 'error');   // status only: the message could carry visitor values
     return json({ error: 'Could not save the scan' }, 500);
   }
+}
+
+// MPC-7493: POST /api/web-scan/step {scan_number, step, seconds?} -> {recorded}. A funnel step for a scan that was saved with consent (results viewed,
+// contact step opened, seconds on the results screen). An unknown scan number records nothing. Off with the same switch as saving the scan.
+async function handleWebScanStep(env, request, origin, json) {
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
+  if (!webScanEnabled(env)) return json({ recorded: false });
+  if (await rateLimited(env, request, 'web-scan-step:')) return json({ error: 'Too many requests' }, 429);
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Unavailable' }, 503);
+  const read = await readCappedJson(request, 512);
+  if (read.status) return json({ error: read.status === 413 ? 'Payload too large' : 'Invalid request' }, read.status);
+  const v = validateStep(read.body);
+  if (v.error) return json({ error: v.error }, 400);
+  return json({ recorded: await recordEvent(db(env), v.scanNumber, v.step, { seconds: v.seconds }) });
 }
 
 // MPC-7448: HK Spam day-10 email. Dry run (counts only) unless HK_SPAM_EMAIL_ENABLED === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
