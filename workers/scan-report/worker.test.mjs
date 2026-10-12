@@ -55,7 +55,7 @@ function fake(opts = {}) {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
     if (url.includes('api.resend.com')) return opts.resendFail ? res(500, 'x') : res(200, { id: `msg_${++n}` });
-    if (url.includes('api.hubapi.com')) return res(200, {});
+    if (url.includes('api.hubapi.com')) return res(200, url.includes('/contacts/search') && opts.hsContact !== false ? { results: [{ id: '42' }] } : {});
     if (url.includes('cloudflare-dns.com')) return res(200, { Status: 0, Answer: [] });   // MPC-7467 email hexagons
     if (url.includes('gravatar.com')) return res(404);
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
@@ -317,6 +317,20 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(bad.status === 400 && (await bad.json()).ok === false && !F.db.users[0].email_opt_out_at, 'website opt-out: bad token => 400 JSON, nothing changed');
   const done = await worker.fetch(mk(`/api/unsubscribe?${qs}`, { method: 'POST', headers: { Accept: 'application/json', Origin: origin } }), OB, {});
   check(done.status === 200 && (await done.json()).ok === true && done.headers.get('Access-Control-Allow-Origin') === origin && F.db.users[0].email_opt_out_at, 'website opt-out: POST with Accept JSON opts out, answers JSON with CORS for the site origin');
+  {
+    // HubSpot: a confirmed unsubscribe also sets hs_email_optout on the contact; the suppression list gets the address hash (covers the newsletter list)
+    const patch = F.calls.find((c) => c.url.includes('hubapi') && c.url.includes('/contacts/') && c.method === 'PATCH');
+    check(patch && JSON.parse(patch.body).properties.hs_email_optout === 'true', 'unsubscribe: HubSpot contact gets hs_email_optout=true');
+    check(F.db.email_suppressions.length === 1 && !JSON.stringify(F.db.email_suppressions).includes(EMAIL), 'unsubscribe: suppression row stored as a hash, no readable address');
+    const hsLog = []; const origErr = console.error; console.error = (...a) => hsLog.push(a.join(' '));
+    const F3 = fake(); await handleScan(OB, null, input, F3.f); await runReportJob(OB, F3.f);
+    const failing = (url, o) => (String(url).includes('hubapi') ? Promise.reject(new Error(`boom ${EMAIL}`)) : F3.f(url, o));
+    globalThis.fetch = failing;
+    const t3 = await unsubscribeToken('s3cret', EMAIL);
+    const r3 = await worker.fetch(mk(`/api/unsubscribe?e=${encodeURIComponent(EMAIL)}&t=${t3}`, { method: 'POST', headers: { Accept: 'application/json', Origin: origin } }), OB, {});
+    console.error = origErr; globalThis.fetch = F.f;
+    check(r3.status === 200 && F3.db.users[0].email_opt_out_at && !hsLog.join(' ').includes(EMAIL), 'unsubscribe: a HubSpot failure never blocks the opt-out and never logs the address');
+  }
 
   // request form: emails a confirmation link to that address only, never reveals whether the address is known
   const reqUnsub = (F2, email, o = origin, extra = {}) => worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: o }, body: JSON.stringify({ email }), ...extra }), OB, {});
