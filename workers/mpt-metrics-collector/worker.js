@@ -6,6 +6,7 @@ import cloudflareAnalytics from './collectors/cloudflare-analytics.js';
 import youtube from './collectors/youtube.js';
 import ga4Reports from './collectors/ga4.js';
 import hubspot from './collectors/hubspot.js';
+import learningLoop from './collectors/learning-loop.js';
 import edgeMachines from './collectors/edge-machines.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
@@ -14,7 +15,7 @@ import { hkDate } from './lib/hk.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, ...ga4Reports];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');

@@ -20,7 +20,7 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, hasScanSaveConsent, onConsentChange } from '@/lib/cookieConsent';
-import { saveCompletedScan } from '@/lib/webScan';
+import { markScanStarted, saveCompletedScan, trackResults } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
@@ -52,6 +52,14 @@ const Index = () => {
     trySave();
     return onConsentChange(trySave);
   }, [loading, hexagons.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // MPC-7493: funnel steps for consented visitors. The scan starts when the page opens; once the results are on screen we report
+  // "results viewed" and the time spent there. Nothing is sent unless a scan was saved with the scan-saving consent.
+  useEffect(() => {
+    markScanStarted();
+  }, []);
+  const resultsShown = !loading && hexagons.length > 0;
+  useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
