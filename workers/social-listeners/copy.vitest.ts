@@ -33,6 +33,6 @@ describe("bot English wording does not over-promise", () => {
     expect(en["bot.first_hexagon.reply_y"]).toMatch(/\*Y\*/);
     expect(en["bot.first_hexagon.reply_n"]).toMatch(/\*N\*/);
     expect(en["bot.confirm_prompt"]).toMatch(/\*Y\*.*\*N\*/);
-    expect(composeReply(["bot.confirmed_y.title", "bot.confirmed_y.generating", "bot.confirmed_y.cta"], "en")).toContain("https://myprivacytool.io/scan");
+    expect(composeReply(["bot.confirmed_y.title", "bot.confirmed_y.generating", "bot.confirmed_y.cta", "bot.confirmed_y.duration"], "en")).toContain("https://myprivacytool.io/scan");
   });
 });
