@@ -30,3 +30,27 @@ describe("Pricing analytics (MPC-7376)", () => {
     });
   });
 });
+
+describe("Pricing A/B tests (MPC-7638)", () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it("serves the control and sends no experiment events while the tests are off", () => {
+    renderPage(<Pricing />);
+    expect(screen.getByRole("heading", { level: 1, name: "Pricing" })).toBeTruthy();
+    expect(screen.queryByText("The scan is free and needs no credit card.")).toBeNull();
+    expect(eventNames()).toEqual(["pricing_view"]);
+  });
+
+  it("shows forced variants without counting them", () => {
+    renderPage(
+      <Pricing />,
+      "/pricing?ab_pricing_headline=free_first&ab_pricing_cta=notify_text&ab_pricing_social_proof=above_plans",
+    );
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Know your exposure for free. Pay to remove it.");
+    expect(screen.getAllByRole("link", { name: "Notify me when plans open" })).toHaveLength(3);
+    expect(screen.getByText("The scan is free and needs no credit card.")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("link", { name: "Notify me when plans open" })[0]);
+    expect(eventNames()).toEqual(["pricing_view", "pricing_plan_click"]);
+    expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", expect.not.objectContaining({ ab_pricing_cta: expect.anything() }));
+  });
+});

@@ -583,7 +583,14 @@ export const trackPricingView = () => {
   trackEvent('pricing_view');
 };
 
-export const trackPricingPlanClick = (plan: string, destination: string) => {
+// `variants` maps experiment id to variant id for the live (non-forced) pricing experiments (MPC-7638),
+// sent as ab_<experiment_id> so a click can be split by every test the visitor was in.
+export const trackPricingPlanClick = (
+  plan: string,
+  destination: string,
+  variants: Record<string, string> = {},
+) => {
   trackActivity();
-  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination });
+  const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
+  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination, ...ab });
 };
