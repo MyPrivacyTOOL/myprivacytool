@@ -15,15 +15,44 @@ export const shown = (v) => { const x = n(v); return x > 0 && x < MIN_GROUP ? `<
 export const rate = (part, whole) => (n(whole) >= MIN_GROUP ? `${Math.round((n(part) / n(whole)) * 1000) / 10}%` : 'not enough scans yet');
 const secs = (avg, count) => (n(count) >= MIN_GROUP && avg !== null && avg !== undefined ? `${Number(avg).toFixed(1)} s` : 'not enough scans yet');
 
+// GA4 event names (src/lib/analytics.ts). Decision D12 saves a scan only when the visitor gives a contact, so the drop-off between "scan completed"
+// and "asked for the report" is counted from these GA4 events (analytics-consented visitors only), not from the database.
+export const GA4_EVENTS = { started: 'scan_started', completed: 'privacy_scan_completed', requested: 'report_requested' };
+
+// Sums eventCount per event name over the week's daily_events rows (one per Hong Kong day; the latest pull per day wins).
+export function sumGa4Events(rows) {
+  const byDay = new Map();
+  for (const r of rows ?? []) {
+    const k = r.period_start;
+    if (!byDay.has(k) || String(r.captured_at) > String(byDay.get(k).captured_at)) byDay.set(k, r);
+  }
+  const out = { days: byDay.size, started: 0, completed: 0, requested: 0 };
+  for (const r of byDay.values()) {
+    for (const row of r.payload?.rows ?? []) {
+      const name = row.dimensionValues?.[0]?.value;
+      const count = Number(row.metricValues?.[0]?.value ?? 0);
+      for (const [key, ev] of Object.entries(GA4_EVENTS)) if (name === ev && Number.isFinite(count)) out[key] += count;
+    }
+  }
+  return out;
+}
+
 // The lines of the page, as plain strings (the first carries the marker). Exported so the tests can check exactly what would be published.
-export function learningLoopLines(weekOf, p, readAt) {
+export function learningLoopLines(weekOf, p, readAt, ga4) {
   const lines = [
     `${MARKER} Week of ${weekOf} (Mon-Sun Hong Kong time). Aggregates only, read ${readAt} from mpt_raw_metrics (learning_loop_weekly). Counts of 1 to 4 are shown as "<${MIN_GROUP}"; rates need at least ${MIN_GROUP} scans. Only visitors who accepted the scan-saving consent have a saved scan.`,
     'Did they come back? Why did they not stay? What made them leave?',
     `Scans finished: ${shown(p.finished)}`,
     `Contacts given: ${shown(p.contacts_given)} (${rate(p.contacts_given, p.finished)} of scans finished)`,
-    `Left without giving a contact: ${shown(p.leavers)} (scans at least ${p.grace_hours} hours old with no contact); still open: ${shown(p.pending)}`,
-    `Last step reached by those who left: scan finished ${shown(p.leavers_last_step?.scan_finished)}, results viewed ${shown(p.leavers_last_step?.results_viewed)}, contact step opened ${shown(p.leavers_last_step?.contact_step_opened)}`,
+    ...(n(p.leavers) > 0 ? [
+      `Left without giving a contact: ${shown(p.leavers)} (scans at least ${p.grace_hours} hours old with no contact); still open: ${shown(p.pending)}`,
+      `Last step reached by those who left: scan finished ${shown(p.leavers_last_step?.scan_finished)}, results viewed ${shown(p.leavers_last_step?.results_viewed)}, contact step opened ${shown(p.leavers_last_step?.contact_step_opened)}`,
+    ] : [
+      'Saved scans always have a contact (decision D12), so the drop-off is counted from GA4 events (next lines), not from saved scans.',
+    ]),
+    ...(ga4 && ga4.days > 0 ? [
+      `Drop-off from GA4 (visitors who accepted analytics, ${ga4.days} of 7 days collected): scans started ${shown(ga4.started)}, scans completed ${shown(ga4.completed)}, report requested ${shown(ga4.requested)}; share of completed scans that asked for the report: ${rate(ga4.requested, ga4.completed)}`,
+    ] : ['Drop-off from GA4: no GA4 daily events collected for this week.']),
     `Average time on the results screen: leavers ${secs(p.results_seconds?.leavers_avg, p.results_seconds?.leavers_n)}, stayers ${secs(p.results_seconds?.stayers_avg, p.results_seconds?.stayers_n)}`,
     `Came back (a new scan from a browser holding an earlier scan number): ${shown(p.returns?.returned_total)}; within 7 days ${shown(p.returns?.within_7_days)}; within 30 days ${shown(p.returns?.within_30_days)}`,
   ];
@@ -69,13 +98,17 @@ async function children(env, blockId) {
 export async function publishLearningLoop(env, weekOf, now = new Date()) {
   const readAt = now.toISOString();
   const [raw] = await supa(env, `mpt_raw_metrics?source=eq.supabase&report=eq.learning_loop_weekly&status=eq.ok&period_start=eq.${encodeURIComponent(hkDayStartOf(weekOf).toISOString())}&order=captured_at.desc&limit=1&select=payload`);
-  if (!raw?.payload || n(raw.payload.finished) === 0) return { kind: 'learning-loop', weekOf, action: 'skipped_no_data' };
+  const weekStart = hkDayStartOf(weekOf).toISOString(), weekEnd = hkDayStartOf(addDays(weekOf, 7)).toISOString();
+  const ga4Rows = await supa(env, `mpt_raw_metrics?source=eq.ga4&report=eq.daily_events&status=eq.ok&period_start=gte.${encodeURIComponent(weekStart)}&period_start=lt.${encodeURIComponent(weekEnd)}&select=period_start,captured_at,payload`);
+  const ga4 = sumGa4Events(ga4Rows);
+  const payload = raw?.payload ?? { grace_hours: 24, finished: 0, contacts_given: 0, leavers: 0, pending: 0 };
+  if (n(payload.finished) === 0 && ga4.completed === 0) return { kind: 'learning-loop', weekOf, action: 'skipped_no_data' };
   const parent = env.NOTION_LEARNING_LOOP_PARENT_PAGE_ID;
   const title = TITLE(weekOf);
   const kids = await children(env, parent);
   const existing = kids.filter((k) => k.type === 'child_page' && k.child_page?.title === title);
   if (existing.length > 1) throw new Error(`${existing.length} pages already titled "${title}"; refusing to pick one`);
-  const { lines } = learningLoopLines(weekOf, raw.payload, readAt);
+  const { lines } = learningLoopLines(weekOf, payload, readAt, ga4);
   const blocks = learningLoopBlocks(lines);
   if (existing.length === 0) {
     const page = await notion(env, 'POST', '/pages', { parent: { type: 'page_id', page_id: parent }, properties: { title: { title: richText(title) } }, children: blocks });
