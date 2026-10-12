@@ -54,7 +54,7 @@ const Privacy = () => {
                 characteristics directly in your browser, and shows them to you
                 there. The finished result stays in your browser. It is not sent
                 to us unless you ask for your report and choose to save it (see
-                section 2.3). If you leave without giving us an email address,
+                section 2.4). If you leave without giving us an email address,
                 nothing from the scan is saved. The other information described
                 below is stored only when you take an action that submits it (for
                 example, entering your email address, messaging our bot, or
@@ -152,7 +152,44 @@ const Privacy = () => {
               </ul>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.3 Your Saved Scan Result
+                2.3 Server Logs of Every Page Request
+              </h3>
+              <p className="text-muted-foreground">
+                When your browser or any other program asks our website for a
+                page, our servers keep a log entry of that request, as most
+                websites do. We keep it to protect the site, to tell people apart
+                from automated programs, and to understand which programs read
+                our site. We do not use this log to block or challenge anyone. The
+                entry holds: the time, the page address (without anything after a
+                question mark), the request type and our response code, the
+                browser or program name it reported (the user agent), your IP
+                address, the country and network your IP address belongs to, the
+                page you came from (site and page only), and a short list of
+                technical headers that browsers send (such as accepted languages
+                and browser hints). It never holds cookies or login details. Images,
+                fonts and other page files are not logged.
+              </p>
+              <p className="mt-4 text-muted-foreground">
+                We sort each request into one of four groups using a written list
+                of rules, which we version and improve over time: person, search
+                or other bot, AI crawler or AI agent, or unknown. The rules look at
+                the program name, the kind of network the request comes from, and
+                whether the request has the headers every ordinary browser sends.
+                Any request we cannot place is treated as a person. The sorting
+                is not perfect: a program can pretend to be a browser, and a
+                person who hides their browser details can look like a bot.
+              </p>
+              <p className="mt-4 text-muted-foreground">
+                For bots and AI crawlers we record and keep the full entry,
+                because a machine is not a person. For people, and for requests we
+                could not place, we keep the entry but remove the IP address after
+                30 days; the rest of the entry then stays without it. If you think
+                a visit of yours was wrongly sorted as a bot, contact us and we
+                will delete it.
+              </p>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                2.4 Your Saved Scan Result
               </h3>
               <p className="text-muted-foreground">
                 The free scan runs in your browser and shows you the results
@@ -181,7 +218,7 @@ const Privacy = () => {
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.4 Information from Third Parties
+                2.5 Information from Third Parties
               </h3>
               <p className="text-muted-foreground">
                 We may receive information about you from third-party sources,
@@ -343,10 +380,17 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Saved Web Scans:</strong> The full result of a scan you
-                  chose to save with your email address (see section 2.3) is
+                  chose to save with your email address (see section 2.4) is
                   kept for 12 months, then deleted automatically. To ask for
                   earlier deletion, contact us with your scan number or the email
                   address you used
+                </li>
+                <li>
+                  <strong>Server Request Logs:</strong> The log of page requests
+                  (see section 2.3) keeps full entries for bots and AI crawlers.
+                  For people and requests we could not place, the IP address is
+                  removed after 30 days. To ask for earlier deletion of a visit,
+                  contact us with the approximate time and your IP address
                 </li>
                 <li>
                   <strong>Messaging Conversation State:</strong> Retained for 7

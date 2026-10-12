@@ -310,7 +310,7 @@ Upstream HIBP problems are **not** errors: they return success with `status: "no
 ## Integration Checklist
 
 - [ ] Install dependencies: `npm install`
-- [ ] Free mode: set `BREACH_PROVIDER=xposedornot` (no key). Paid mode (after revenue): `BREACH_PROVIDER=hibp` and set `HIBP_API_KEY` as a Worker secret (`wrangler secret put HIBP_API_KEY`); it is passed in as `env.HIBP_API_KEY`, never read from `process.env` or a client bundle
+- [ ] Free mode (only with written permission from XposedOrNot): set `BREACH_PROVIDER=xposedornot` (no key). Paid mode (after revenue): `BREACH_PROVIDER=hibp` and set `HIBP_API_KEY` as a Worker secret (`wrangler secret put HIBP_API_KEY`); it is passed in as `env.HIBP_API_KEY`, never read from `process.env` or a client bundle
 - [ ] Run tests: `npm test -- mirrorRiskEngine.test`
 - [ ] Add health check to monitoring (GET /api/v1/health)
 - [ ] Configure rate limiting (per IP, per user)
@@ -380,7 +380,7 @@ Expected coverage:
 
 ---
 
-**Status:** Draft. Free provider (XposedOrNot) coded from public SDK docs, unverified against the live API; HIBP path parked until revenue. Not mounted in a Worker yet.
+**Status:** Merged, not deployed. No provider is enabled by default. XposedOrNot's free API is NOT cleared for commercial use (Terms s.4: licensing agreement required; s.5: attribution). HIBP path parked until revenue (Phase 5). Not mounted in a Worker yet.
 **Version:** 1.0.0
 **Last Updated:** 2026-10-10
 **Branch:** feat/mpc-7252-mirror-risk-engine

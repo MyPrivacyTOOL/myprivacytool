@@ -50,7 +50,7 @@ check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includ
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [] }; const calls = []; let n = 0;
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [] }; const calls = []; let n = 0;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -65,11 +65,14 @@ function fake(opts = {}) {
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
       if (t === 'web_scan_contacts') { if (opts.linkFail) return res(500, 'x'); const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
+      if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
+      if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
       if (rows.length > 1 && new Set(rows.map((x) => Object.keys(x).filter((k) => !['id', 'report_status', 'report_attempts'].includes(k)).sort().join(','))).size > 1) return res(400, { code: 'PGRST102', message: 'All object keys must match' });   // PostgREST bulk-insert rule
       db[t].push(...rows); return res(201, rows); }
+    if (o.method === 'PATCH' && t === 'web_scan_events') { const lt = Number(q.get('seconds').replace('lt.', '')); const hit = db.web_scan_events.filter((x) => x.web_scan_id === q.get('web_scan_id').replace('eq.', '') && x.step === q.get('step').replace('eq.', '') && x.seconds < lt); hit.forEach((x) => Object.assign(x, JSON.parse(o.body))); return res(200, hit); }
     if (o.method === 'PATCH') { const id = q.get('id')?.replace('eq.', ''); const st = q.get('report_status')?.replace('eq.', '');
       const fs = q.get('followup_stage')?.replace('eq.', ''); const em = q.get('email')?.replace('eq.', '');
       const cl = q.get('report_claimed_at')?.replace('lt.', ''); const ag = q.get('report_attempts');
@@ -458,5 +461,92 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
     check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && !('scan_number' in o.j) && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 1, `switch off (${v}): email accepted, nothing saved, no scan number`);
   }
   check(/WEB_SCAN_SAVE_ENABLED\s*=\s*"false"/.test((await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8')), 'wrangler.toml ships with the switch OFF');
+}
+
+// ---- MPC-7493: the learning loop, under D12 (MPC-7470). Funnel steps against the scan number; a scan exists only after the contact step,
+// so these numbers cover only visitors who gave a contact and ticked the box. Return visits by the scan number the browser already held.
+{
+  const ON = { ...env, WEB_SCAN_SAVE_ENABLED: 'true' };
+  const V = '2026-10-12-v1';
+  const hex = () => [{ id: 'screen', label: 'Screen', value: '1920x1080', status: 'found' }, { id: 'dns-leak', label: 'DNS', value: 'x', status: 'not_checked' }];
+  const post = async (e, body, { path = '/api/scan', origin = 'https://myprivacytool.io', raw, F } = {}) => {
+    F = F || fake(); globalThis.fetch = F.f; const w = [];
+    const rs = await worker.fetch(new Request(`https://x${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: raw ?? JSON.stringify(body) }), e, { waitUntil: (pr) => w.push(pr) });
+    await Promise.all(w); return { rs, F, j: await rs.clone().json().catch(() => null) };
+  };
+  let n = 0;
+  // a contact step with the save box ticked (a fresh address each time, so the 24h repeat rule does not apply)
+  const save = (extra = {}, { e = ON, F } = {}) => post(e, { email: `mpc7493+${++n}@example.com`, consent: true, scan: hex(), save_consent: true, save_consent_version: V, ...extra }, { F });
+  const steps = (F, sn) => F.db.web_scan_events.filter((x) => x.web_scan_id === sn).map((x) => x.step).sort().join();
+  const step = (F, sn, st, seconds) => post(ON, { scan_number: sn, step: st, ...(seconds !== undefined ? { seconds } : {}) }, { path: '/api/web-scan/step', F });
+
+  // scan started + scan finished + contact given are recorded when the scan is saved at the contact step; started is dated by the scan duration
+  let o = await save({ started_ms: 4000 });
+  let F = o.F; const sn = o.j.scan_number;
+  const ev = (st) => F.db.web_scan_events.find((x) => x.step === st);
+  check(o.rs.status === 200 && o.j.scan_saved === true && steps(F, sn) === 'contact_given,scan_finished,scan_started' && new Date(ev('scan_finished').occurred_at) - new Date(ev('scan_started').occurred_at) >= 3900, 'steps: scan_started, scan_finished and contact_given are recorded when the scan is saved with its contact; started is dated by the scan duration');
+  o = await save();
+  check(steps(o.F, o.j.scan_number) === 'contact_given,scan_finished', 'step scan_finished: recorded even when the site sends no start time');
+  // results_viewed, contact_step_opened
+  o = await step(F, sn, 'results_viewed');
+  check(o.rs.status === 200 && o.j.recorded === true && steps(F, sn).includes('results_viewed'), 'step results_viewed: recorded');
+  o = await step(F, sn, 'results_viewed');
+  check(o.rs.status === 200 && o.j.recorded === false && F.db.web_scan_events.filter((x) => x.step === 'results_viewed').length === 1, 'step results_viewed: a repeat is not counted twice');
+  o = await step(F, sn, 'contact_step_opened');
+  check(o.j.recorded === true && steps(F, sn).includes('contact_step_opened'), 'step contact_step_opened: recorded');
+  // results_time keeps the longest, is capped
+  o = await step(F, sn, 'results_time', 12.4);
+  check(o.j.recorded === true && F.db.web_scan_events.find((x) => x.step === 'results_time').seconds === 12, 'step results_time: seconds recorded');
+  await step(F, sn, 'results_time', 30); await step(F, sn, 'results_time', 5);
+  check(F.db.web_scan_events.filter((x) => x.step === 'results_time').length === 1 && F.db.web_scan_events.find((x) => x.step === 'results_time').seconds === 30, 'step results_time: keeps the longest time, one row');
+  await step(F, sn, 'results_time', 99999);
+  check(F.db.web_scan_events.find((x) => x.step === 'results_time').seconds === 3600, 'step results_time: capped at one hour');
+  // contact_given is set by the server, never reported by the browser
+  o = await step(F, sn, 'contact_given');
+  check(o.rs.status === 400, 'step contact_given: the browser cannot report it');
+  // a step before the contact step: the browser has no scan number, so nothing is sent; an unknown scan number records nothing
+  o = await step(F, '00000000-0000-4000-8000-000000000000', 'results_viewed');
+  check(o.rs.status === 200 && o.j.recorded === false && F.db.web_scan_events.every((x) => x.web_scan_id === sn), 'steps: unknown scan number records nothing');
+  const keys = new Set(F.db.web_scan_events.flatMap((x) => Object.keys(x)));
+  check([...keys].every((k) => ['web_scan_id', 'step', 'occurred_at', 'seconds', 'id', 'created_at', 'report_status', 'report_attempts'].includes(k)), 'steps (id, created_at, report_* come from the stub store): a step row holds only scan number, step, time and seconds');
+  // a request that sends no scan (no box, or arrived without a scan) records no scan and no steps
+  { const G = fake(); o = await post(ON, { email: 'mpc7493+nosave@example.com', consent: true }, { F: G });
+    check(o.rs.status === 200 && o.j.scan_saved === false && G.db.web_scans.length === 0 && G.db.web_scan_events.length === 0, 'no scan sent: no scan and no steps are recorded'); }
+  // invalid steps
+  for (const [name, b] of Object.entries({ 'unknown step': { scan_number: sn, step: 'purchase' }, 'bad scan number': { scan_number: 'nope', step: 'results_viewed' }, 'extra key': { scan_number: sn, step: 'results_viewed', ua: 'x' }, 'seconds on a non-time step': { scan_number: sn, step: 'results_viewed', seconds: 3 }, 'time without seconds': { scan_number: sn, step: 'results_time' }, 'negative seconds': { scan_number: sn, step: 'results_time', seconds: -1 }, 'text seconds': { scan_number: sn, step: 'results_time', seconds: '9' } })) {
+    const G = fake(); o = await post(ON, b, { path: '/api/web-scan/step', F: G });
+    check(o.rs.status === 400 && G.db.web_scan_events.length === 0, `step invalid (${name}) => 400, nothing recorded`);
+  }
+  o = await post(ON, null, { path: '/api/web-scan/step', raw: '{nope' }); check(o.rs.status === 400, 'step: bad JSON => 400');
+  o = await post(ON, null, { path: '/api/web-scan/step', raw: JSON.stringify({ scan_number: sn, step: 'results_viewed', pad: 'x'.repeat(600) }) }); check(o.rs.status === 413, 'step: oversized body => 413');
+  o = await post(ON, { scan_number: sn, step: 'results_viewed' }, { path: '/api/web-scan/step', origin: 'https://evil.example' }); check(o.rs.status === 403, 'step: foreign origin => 403');
+  o = await post({ ...ON, RATE_LIMITER: { limit: async () => ({ success: false }) } }, { scan_number: sn, step: 'results_viewed' }, { path: '/api/web-scan/step' }); check(o.rs.status === 429, 'step: rate limit => 429');
+  for (const v of [undefined, 'false', 'TRUE']) {
+    const G = fake(); const s2 = (await save({}, { F: G })).j.scan_number; G.db.web_scan_events.length = 0;
+    o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: v }, { scan_number: s2, step: 'results_viewed' }, { path: '/api/web-scan/step', F: G });
+    check(o.rs.status === 200 && o.j.recorded === false && G.db.web_scan_events.length === 0, `step: switch off (${v}) records nothing`);
+  }
+  // switch off at save: no scan, no steps, no return link
+  o = await save({ started_ms: 10 }, { e: { ...env, WEB_SCAN_SAVE_ENABLED: 'false' } }); check(o.j.scan_saved === false && o.F.db.web_scans.length === 0 && o.F.db.web_scan_events.length === 0 && o.F.db.web_scan_returns.length === 0, 'switch off: no scan, no steps, no return link');
+  // a failing step store never costs the visitor the scan
+  const H = fake(); const real = H.f; H.f = async (u, oo = {}) => (String(u).includes('web_scan_events') ? { ok: false, status: 500, headers: { get: () => null }, text: async () => 'boom' } : real(u, oo));
+  o = await save({ started_ms: 10 }, { F: H }); check(o.rs.status === 200 && o.j.scan_saved === true && /^[0-9a-f-]{36}$/.test(o.j.scan_number), 'a failing step store does not cost the visitor their scan number');
+  // validation of the optional fields: rejected with the scan, nothing stored
+  for (const [name, extra] of Object.entries({ 'started_ms negative': { started_ms: -1 }, 'started_ms text': { started_ms: '5' }, 'started_ms too long': { started_ms: 99999999 }, 'previous not a uuid': { previous_scan_number: 'abc' }, 'previous a number': { previous_scan_number: 5 } })) {
+    o = await save(extra); check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, `save with ${name} => 400, nothing stored`);
+  }
+  // started_ms / previous_scan_number without a scan and save_consent are rejected too (they may only travel with the saved scan)
+  o = await post(ON, { email: 'mpc7493+lone@example.com', consent: true, started_ms: 100 }); check(o.rs.status === 400 && o.F.db.scans.length === 0, 'started_ms without a scan + save_consent => 400');
+
+  // return visits: counted by the scan number the browser already held
+  const R = fake(); const first = (await save({}, { F: R })).j.scan_number;
+  o = await save({ previous_scan_number: first }, { F: R }); const second = o.j.scan_number;
+  check(o.rs.status === 200 && R.db.web_scan_returns.length === 1 && R.db.web_scan_returns[0].web_scan_id === second && R.db.web_scan_returns[0].previous_scan_id === first, 'return visit: a scan made by a browser holding an earlier scan number is linked to it');
+  o = await save({ previous_scan_number: '00000000-0000-4000-8000-000000000000' }, { F: R });
+  check(o.rs.status === 200 && o.j.scan_saved === true && R.db.web_scan_returns.length === 1, 'return visit: an unknown or deleted earlier scan number does not stop the new scan being saved');
+  o = await save({}, { F: R });
+  check(R.db.web_scan_returns.length === 1, 'return visit: no earlier scan number => no return recorded');
+  const rk = new Set(R.db.web_scan_returns.flatMap((x) => Object.keys(x)));
+  check([...rk].every((k) => ['web_scan_id', 'previous_scan_id', 'id', 'created_at', 'report_status', 'report_attempts'].includes(k)), 'return visit: only the two scan numbers are stored (no fingerprint, IP or other value)');
 }
 process.exit(ok ? 0 : 1);

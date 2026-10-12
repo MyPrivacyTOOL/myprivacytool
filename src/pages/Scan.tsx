@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Home, Phone, Users, MapPin, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested } from "@/lib/analytics";
-import { SCAN_API_URL, canOfferScanSave, noteSaveResult, scanSaveFields } from "@/lib/webScan";
+import { SCAN_API_URL, canOfferScanSave, noteSaveResult, reportStep, scanSaveFields } from "@/lib/webScan";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -54,6 +54,12 @@ const Scan = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
+  // already saved a scan; the drop-off before it is read from the GA4 events.
+  useEffect(() => {
+    reportStep("contact_step_opened");
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   rememberCompletedScan, pendingScan, canOfferScanSave, scanSaveFields, noteSaveResult,
-  getScanNumber, visitScanNumber, toPayload, SCAN_NUMBER_EVENT,
+  getScanNumber, visitScanNumber, toPayload, SCAN_NUMBER_EVENT, markScanStarted, reportStep, trackResults,
 } from "./webScan";
 import { SAVE_CONSENT_LABEL, SAVE_CONSENT_VERSION } from "./saveConsent";
 import type { HexagonData } from "./deviceDetection";
@@ -139,5 +139,105 @@ describe("toPayload", () => {
     expect(toPayload([conn])[0].status).toBe("not_checked");
     vi.stubGlobal("navigator", { ...navigator, connection: { type: "wifi" } });
     expect(toPayload([conn])[0].status).toBe("found");
+  });
+});
+
+// MPC-7493 under D12 (MPC-7470): the learning-loop pieces still work, but a scan exists only after the contact step.
+const KEY = "mpt_web_scan_number";
+const OLDER = "99999999-2222-4333-8444-555555555555";
+const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body }) as unknown as Response;
+const stepCalls = (f: { mock: { calls: unknown[][] } }) =>
+  f.mock.calls.filter((c) => String(c[0]).endsWith("/api/web-scan/step")).map((c) => JSON.parse((c[1] as RequestInit).body as string));
+
+describe("funnel steps (MPC-7493, under D12)", () => {
+  it("a first visit sends no earlier scan number and no scan time before markScanStarted; a malformed stored number is ignored", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    rememberCompletedScan(hex());
+    expect("previous_scan_number" in scanSaveFields()).toBe(false);
+    expect("started_ms" in scanSaveFields()).toBe(false);
+    localStorage.setItem(KEY, "<script>");
+    expect("previous_scan_number" in scanSaveFields()).toBe(false);
+  });
+
+  it("sends how long the scan took, only together with the scan at the contact step", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    markScanStarted();
+    rememberCompletedScan(hex());
+    const f = scanSaveFields();
+    expect(Number.isInteger(f.started_ms)).toBe(true);
+    expect(f.started_ms as number).toBeGreaterThanOrEqual(0);
+    expect(f.started_ms as number).toBeLessThanOrEqual(600000);
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "false");
+    expect(scanSaveFields()).toEqual({}); // nothing travels without a scan to save
+  });
+
+  it("a return visit: sends the scan number this browser already held from an earlier visit, and only that", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    localStorage.setItem(KEY, OLDER);
+    rememberCompletedScan(hex());
+    const f = scanSaveFields();
+    expect(f.previous_scan_number).toBe(OLDER);
+    expect(Object.keys(f).sort()).toEqual(["previous_scan_number", "save_consent", "save_consent_version", "scan", "started_ms"]);
+  });
+
+  it("does not call this visit's own scan an earlier visit", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    localStorage.setItem(KEY, OLDER); sessionStorage.setItem(KEY, OLDER);
+    rememberCompletedScan(hex());
+    expect("previous_scan_number" in scanSaveFields()).toBe(false);
+  });
+
+  it("reports results viewed, contact step opened and results time against this visit's saved scan number", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    sessionStorage.setItem(KEY, "aaaaaaaa-2222-4333-8444-555555555551");
+    const f = vi.fn(async (..._args: unknown[]) => ok({})); vi.stubGlobal("fetch", f);
+    reportStep("results_viewed"); reportStep("results_viewed"); reportStep("contact_step_opened"); reportStep("results_time", 12.6); reportStep("results_time", 99999);
+    const calls = stepCalls(f);
+    expect(calls.map((c) => c.step)).toEqual(["results_viewed", "contact_step_opened", "results_time", "results_time"]); // a repeat step is sent once
+    expect(calls.every((c) => c.scan_number === "aaaaaaaa-2222-4333-8444-555555555551")).toBe(true);
+    expect(calls[2].seconds).toBe(13);
+    expect(calls[3].seconds).toBe(3600);
+    expect(Object.keys(calls[0]).sort()).toEqual(["scan_number", "step"]); // no other data
+  });
+
+  it("before the contact step (no saved scan, so no scan number) nothing is sent and nothing breaks", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    const f = vi.fn(async (..._args: unknown[]) => ok({})); vi.stubGlobal("fetch", f);
+    reportStep("results_viewed"); reportStep("contact_step_opened"); reportStep("results_time", 5);
+    localStorage.setItem(KEY, OLDER); reportStep("results_viewed"); // only an earlier visit's number: not this visit
+    rememberCompletedScan(hex()); // a scan held in the browser is not a saved scan
+    reportStep("results_viewed");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("sends nothing with the switch off", () => {
+    sessionStorage.setItem(KEY, "aaaaaaaa-2222-4333-8444-555555555552");
+    const f = vi.fn(async (..._args: unknown[]) => ok({})); vi.stubGlobal("fetch", f);
+    reportStep("contact_step_opened");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("trackResults sends nothing before a scan is saved, then reports results viewed and the time when the page is left", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    const f = vi.fn(async (..._args: unknown[]) => ok({})); vi.stubGlobal("fetch", f);
+    vi.useFakeTimers();
+    const stop = trackResults(); // no saved scan yet: nothing sent
+    expect(f).not.toHaveBeenCalled();
+    sessionStorage.setItem(KEY, "aaaaaaaa-2222-4333-8444-555555555553");
+    window.dispatchEvent(new CustomEvent(SCAN_NUMBER_EVENT)); // the scan was saved at the contact step
+    vi.advanceTimersByTime(7000);
+    window.dispatchEvent(new Event("pagehide"));
+    stop();
+    vi.useRealTimers();
+    const calls = stepCalls(f);
+    expect(calls[0]).toMatchObject({ step: "results_viewed", scan_number: "aaaaaaaa-2222-4333-8444-555555555553" });
+    expect(calls.find((c) => c.step === "results_time")?.seconds).toBe(7);
+  });
+
+  it("a failing request never throws to the visitor", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    sessionStorage.setItem(KEY, "aaaaaaaa-2222-4333-8444-555555555554");
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    expect(() => reportStep("results_viewed")).not.toThrow();
   });
 });

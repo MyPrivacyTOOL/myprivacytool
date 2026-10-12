@@ -52,6 +52,13 @@ function captureContext(hexagons: HexagonData[]) {
   };
 }
 
+// MPC-7493: when this visit's scan began (set once by the home page), so the saved scan can be dated "started" as well as "finished".
+const MAX_SCAN_MS = 10 * 60 * 1000;
+let scanStartedAt: number | null = null;
+export function markScanStarted(): void {
+  if (scanStartedAt === null) scanStartedAt = Date.now();
+}
+
 /** The hexagons in the shape the Worker accepts. */
 export function toPayload(hexagons: HexagonData[]) {
   const ctx = captureContext(hexagons);
@@ -114,7 +121,17 @@ export const canOfferScanSave = (): boolean => saveWebScansEnabled() && pendingS
  */
 export function scanSaveFields(): Record<string, unknown> {
   const scan = saveWebScansEnabled() ? pendingScan() : null;
-  return scan ? { scan, save_consent: true, save_consent_version: SAVE_CONSENT_VERSION } : {};
+  if (!scan) return {};
+  // MPC-7493: how long the scan took, and the scan number this browser already held from an EARLIER visit (how a return visit is recognised: the
+  // number kept here, never a fingerprint match). Both are optional and travel only with the scan being saved at the contact step.
+  const earlier = read(() => localStorage);
+  return {
+    scan,
+    save_consent: true,
+    save_consent_version: SAVE_CONSENT_VERSION,
+    ...(scanStartedAt !== null ? { started_ms: Math.min(MAX_SCAN_MS, Math.max(0, Math.round(Date.now() - scanStartedAt))) } : {}),
+    ...(earlier && earlier !== visitScanNumber() ? { previous_scan_number: earlier } : {}),
+  };
 }
 
 /**
@@ -145,4 +162,65 @@ export function noteSaveResult(data: unknown): string | null {
     /* no window: nothing to tell */
   }
   return d.scan_number;
+}
+
+// MPC-7493: funnel steps for a scan that has been saved. Under D12 (MPC-7470) a scan exists only after the contact step, so before it this browser has
+// no scan number and these calls send nothing; drop-off before the contact step is read from the GA4 events instead. Sent only when saving is on.
+// A failure never affects the visitor.
+export type FunnelStep = "results_viewed" | "contact_step_opened" | "results_time";
+const MAX_RESULTS_SECONDS = 3600;
+const sent = new Set<string>();
+
+export function reportStep(step: FunnelStep, seconds?: number): void {
+  const scanNumber = visitScanNumber();
+  if (!saveWebScansEnabled() || !SCAN_API_URL || !scanNumber) return;
+  if (step !== "results_time") {
+    if (sent.has(`${scanNumber}:${step}`)) return;
+    sent.add(`${scanNumber}:${step}`);
+  }
+  try {
+    void fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/web-scan/step`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        scan_number: scanNumber,
+        step,
+        ...(step === "results_time" ? { seconds: Math.min(MAX_RESULTS_SECONDS, Math.max(0, Math.round(seconds ?? 0))) } : {}),
+      }),
+    }).catch(() => undefined);
+  } catch {
+    /* never affects the visitor */
+  }
+}
+
+/**
+ * Call when the results are on screen. Reports "results viewed" as soon as the scan has a number, and the seconds the visitor spent
+ * on the results (tab visible) each time they hide or leave the page. Returns a cleanup function.
+ */
+export function trackResults(): () => void {
+  let visibleSince: number | null = typeof document !== "undefined" && document.visibilityState === "hidden" ? null : Date.now();
+  let total = 0;
+  const viewed = () => reportStep("results_viewed");
+  const flush = () => {
+    if (visibleSince !== null) {
+      total += (Date.now() - visibleSince) / 1000;
+      visibleSince = null;
+    }
+    if (total > 0) reportStep("results_time", total);
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === "hidden") flush();
+    else visibleSince = Date.now();
+  };
+  viewed();
+  window.addEventListener(SCAN_NUMBER_EVENT, viewed);
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("pagehide", flush);
+  return () => {
+    window.removeEventListener(SCAN_NUMBER_EVENT, viewed);
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("pagehide", flush);
+    flush();
+  };
 }

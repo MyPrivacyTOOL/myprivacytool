@@ -111,8 +111,11 @@ describe("switch", () => {
     expect(waitUntil).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
-  it("ships with routing that does not cover pages: /api/* only", () => {
-    expect(routes.include).toEqual(["/api/*"]);
+  it("routing: pages, robots.txt and /api/* run the middleware; static assets do not", () => {
+    expect(routes.include).toEqual(["/*"]);
+    for (const p of ["/assets/*", "/blog/*", "/email/*", "/favicon.ico", "/og-image.jpg", "/placeholder.svg", "/site.webmanifest"]) expect(routes.exclude).toContain(p);
+    expect(routes.exclude).not.toContain("/robots.txt");
+    expect(routes.exclude).not.toContain("/api/*");
   });
 });
 

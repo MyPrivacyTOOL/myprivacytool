@@ -10,7 +10,7 @@ import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
-import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, saveWebScanForContact, webScanEnabled } from './lib/webScan.js';
+import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -43,6 +43,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST', request, cors);
     if (request.method === 'POST' && url.pathname === '/api/unsubscribe-request') return handleUnsubscribeRequest(env, request, cors, json);
+    if (request.method === 'POST' && url.pathname === '/api/web-scan/step') return handleWebScanStep(env, request, origin, json);
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -69,7 +70,7 @@ export default {
       // MPC-7470: save the scan and link it to this contact, with the consent record. Not for a repeat request within 24h (no new report,
       // so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer to the email request.
       const saved = save.hexagons && !result.duplicate && result.scanId
-        ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version })
+        ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
         : { saved: false };
       return json({ success: true, duplicate: result.duplicate, scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}) });
     } catch (e) {
@@ -86,6 +87,21 @@ export default {
     else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
   },
 };
+
+// MPC-7493: POST /api/web-scan/step {scan_number, step, seconds?} -> {recorded}. A funnel step for a scan that was saved (results viewed,
+// contact step opened, seconds on the results screen). An unknown scan number records nothing. Off with the same switch as saving the scan.
+// MPC-7470 (D12): a scan exists only after the contact step, so a browser only ever has a scan number to report against after saving.
+async function handleWebScanStep(env, request, origin, json) {
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
+  if (!webScanEnabled(env)) return json({ recorded: false });
+  if (await rateLimited(env, request, 'web-scan-step:')) return json({ error: 'Too many requests' }, 429);
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Unavailable' }, 503);
+  const read = await readCappedJson(request, 512);
+  if (read.status) return json({ error: read.status === 413 ? 'Payload too large' : 'Invalid request' }, read.status);
+  const v = validateStep(read.body);
+  if (v.error) return json({ error: v.error }, 400);
+  return json({ recorded: await recordEvent(db(env), v.scanNumber, v.step, { seconds: v.seconds }) });
+}
 
 // MPC-7448: HK Spam day-10 email. Dry run (counts only) unless HK_SPAM_EMAIL_ENABLED === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
 export const runHkSpamJob = (env, fetchImpl = fetch, limit) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit });

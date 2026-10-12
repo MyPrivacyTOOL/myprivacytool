@@ -421,5 +421,90 @@ update public.edge_visit_retention set ip_days = 3;
 select pg_temp.assert((select (public.mpt_cut_edge_visit_ips(false)->>'ips_cut')::int) = 1, 'edge ip cut: reads the retention setting (3 days cuts the 5-day-old person row)');
 reset role;
 
+-- ===== MPC-7493: learning loop: web_scan_events, web_scan_returns, mpt_learning_loop (service_role only; aggregates only) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scan_events$$) = '42501', 'web_scan_events: anon must not read');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.web_scan_returns$$) = '42501', 'web_scan_returns: authenticated must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.web_scan_events (web_scan_id, step) values (gen_random_uuid(), 'results_viewed')$$) = '42501', 'web_scan_events: anon must not insert');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_learning_loop(now() - interval '7 days', now())$$) = '42501', 'mpt_learning_loop: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_learning_loop(now() - interval '7 days', now())$$) = '42501', 'mpt_learning_loop: authenticated must not execute');
+select pg_temp.assert((select relforcerowsecurity from pg_class where oid = 'public.web_scan_events'::regclass) and (select relforcerowsecurity from pg_class where oid = 'public.web_scan_returns'::regclass), 'learning loop tables: RLS forced');
+
+set local role service_role;
+-- made-up scans. Window [now-9.5d, now-2d), grace 24h. S1 stayer; S2, S3, S4 leavers; S5 too young to call a leaver. S0 and S00 are older scans outside the window.
+insert into public.web_scans (id, created_at, hexagon_count, results, results_bytes) values
+  ('00000000-0000-4000-8000-000000007490', now() - interval '45 days',  1, '[{"id":"screen","label":"Screen","value":"x","status":"found"}]', 50),
+  ('00000000-0000-4000-8000-000000007491', now() - interval '20 days',  1, '[{"id":"screen","label":"Screen","value":"x","status":"found"}]', 50),
+  ('00000000-0000-4000-8000-000000007493', now() - interval '9 days',   2, '[{"id":"screen","label":"Screen","value":"x","status":"found"},{"id":"dns","label":"DNS","value":"x","status":"not_checked"}]', 100),
+  ('00000000-0000-4000-8000-000000007494', now() - interval '8 days',   2, '[{"id":"screen","label":"Screen","value":"x","status":"found"},{"id":"dns","label":"DNS","value":"x","status":"found"}]', 100),
+  ('00000000-0000-4000-8000-000000007495', now() - interval '7 days',   2, '[{"id":"screen","label":"Screen","value":"x","status":"found"},{"id":"dns","label":"DNS","value":"x","status":"not_checked"}]', 100),
+  ('00000000-0000-4000-8000-000000007496', now() - interval '6 days',   1, '[{"id":"screen","label":"Screen","value":"x","status":"not_checked"}]', 50),
+  ('00000000-0000-4000-8000-000000007497', now() - interval '60 hours', 1, '[{"id":"screen","label":"Screen","value":"x","status":"found"}]', 50),
+  ('00000000-0000-4000-8000-000000007498', now() - interval '1 day',    1, '[{"id":"screen","label":"Screen","value":"x","status":"found"}]', 50);
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values
+  ('00000000-0000-4000-8000-000000007493', 'email', gen_random_uuid()),
+  ('00000000-0000-4000-8000-000000007498', 'email', gen_random_uuid());   -- outside the window
+insert into public.web_scan_events (web_scan_id, step, seconds) values
+  ('00000000-0000-4000-8000-000000007493', 'scan_finished', null), ('00000000-0000-4000-8000-000000007493', 'results_viewed', null),
+  ('00000000-0000-4000-8000-000000007493', 'contact_step_opened', null), ('00000000-0000-4000-8000-000000007493', 'contact_given', null), ('00000000-0000-4000-8000-000000007493', 'results_time', 40),
+  ('00000000-0000-4000-8000-000000007494', 'scan_finished', null), ('00000000-0000-4000-8000-000000007494', 'results_viewed', null),
+  ('00000000-0000-4000-8000-000000007494', 'contact_step_opened', null), ('00000000-0000-4000-8000-000000007494', 'results_time', 10),
+  ('00000000-0000-4000-8000-000000007495', 'scan_finished', null), ('00000000-0000-4000-8000-000000007495', 'results_viewed', null), ('00000000-0000-4000-8000-000000007495', 'results_time', 20),
+  ('00000000-0000-4000-8000-000000007496', 'scan_finished', null),
+  ('00000000-0000-4000-8000-000000007497', 'scan_finished', null);
+-- returns: S3 came back 3 days after S2 (7 and 30 days); S4 came back after 39 days (neither); S5 after 14 days (30 days only)
+insert into public.web_scan_returns (web_scan_id, previous_scan_id, returned_at) values
+  ('00000000-0000-4000-8000-000000007495', '00000000-0000-4000-8000-000000007494', (select created_at + interval '3 days' from public.web_scans where id = '00000000-0000-4000-8000-000000007494')),
+  ('00000000-0000-4000-8000-000000007496', '00000000-0000-4000-8000-000000007490', now() - interval '6 days'),
+  ('00000000-0000-4000-8000-000000007497', '00000000-0000-4000-8000-000000007491', now() - interval '60 hours');
+
+-- step rules
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_events (web_scan_id, step) values ('00000000-0000-4000-8000-000000007496', 'results_time')$$) = '23514', 'web_scan_events: results_time needs seconds');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_events (web_scan_id, step, seconds) values ('00000000-0000-4000-8000-000000007496', 'results_viewed', 5)$$) = '23514', 'web_scan_events: only results_time carries seconds');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_events (web_scan_id, step, seconds) values ('00000000-0000-4000-8000-000000007496', 'results_time', 4000)$$) = '23514', 'web_scan_events: seconds capped at one hour');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_events (web_scan_id, step) values ('00000000-0000-4000-8000-000000007496', 'purchase')$$) = '23514', 'web_scan_events: only the six steps');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_events (web_scan_id, step) values ('00000000-0000-4000-8000-000000007496', 'scan_finished')$$) = '23505', 'web_scan_events: one row per step per scan');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_events (web_scan_id, step) values (gen_random_uuid(), 'scan_finished')$$) = '23503', 'web_scan_events: the scan number must exist');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_returns (web_scan_id, previous_scan_id) values ('00000000-0000-4000-8000-000000007496', '00000000-0000-4000-8000-000000007496')$$) = '23514', 'web_scan_returns: a scan cannot return to itself');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.web_scan_returns (web_scan_id, previous_scan_id) values ('00000000-0000-4000-8000-000000007494', gen_random_uuid())$$) = '23503', 'web_scan_returns: the earlier scan number must exist');
+
+-- rollup
+create temp table loop_run as select public.mpt_learning_loop(now() - interval '9 days 12 hours', now() - interval '2 days', 24) as j;
+select pg_temp.assert((select (j->>'finished')::int = 5 and (j->>'contacts_given')::int = 1 from loop_run), 'learning loop: scans finished against contacts given');
+select pg_temp.assert((select (j->>'leavers')::int = 3 and (j->>'pending')::int = 1 from loop_run), 'learning loop: three leavers; a scan under 24 hours old is pending, not a leaver');
+select pg_temp.assert((select (j->'leavers_last_step'->>'scan_finished')::int = 1 and (j->'leavers_last_step'->>'results_viewed')::int = 1 and (j->'leavers_last_step'->>'contact_step_opened')::int = 1 from loop_run), 'learning loop: last step reached by those who left');
+select pg_temp.assert((select (j->'results_seconds'->>'leavers_n')::int = 2 and (j->'results_seconds'->>'leavers_avg')::numeric = 15.0 and (j->'results_seconds'->>'stayers_n')::int = 1 and (j->'results_seconds'->>'stayers_avg')::numeric = 40.0 from loop_run), 'learning loop: time on results, leavers vs stayers');
+select pg_temp.assert((select (h->>'leavers_found')::int = 2 and (h->>'leavers_total')::int = 3 and (h->>'stayers_found')::int = 1 and (h->>'stayers_total')::int = 1 from loop_run, jsonb_array_elements(j->'hexagons') h where h->>'id' = 'screen'), 'learning loop: hexagon shown as a finding to leavers vs stayers (screen)');
+select pg_temp.assert((select (h->>'leavers_found')::int = 1 and (h->>'leavers_total')::int = 2 and (h->>'stayers_found')::int = 0 and (h->>'stayers_total')::int = 1 from loop_run, jsonb_array_elements(j->'hexagons') h where h->>'id' = 'dns'), 'learning loop: hexagon shown as a finding to leavers vs stayers (dns)');
+select pg_temp.assert((select (j->'returns'->>'returned_total')::int = 3 and (j->'returns'->>'within_7_days')::int = 1 and (j->'returns'->>'within_30_days')::int = 2 from loop_run), 'learning loop: returned within 7 and 30 days');
+select pg_temp.assert((select not (j::text ~* '(0000-4000|@|Testfox)') from loop_run), 'learning loop: the result holds no scan number or value, only counts');
+select pg_temp.assert((select (public.mpt_learning_loop(now() - interval '400 days', now() - interval '390 days')->>'finished')::int = 0), 'learning loop: an empty window returns zero, not an error');
+
+-- steps and returns go with the scan when it is deleted by its scan number (the visitor's right) and by the clean-up
+create temp table loop_delete as select public.mpt_delete_web_scan('00000000-0000-4000-8000-000000007494') as j;
+select pg_temp.assert((select count(*) from public.web_scan_events where web_scan_id = '00000000-0000-4000-8000-000000007494') = 0, 'delete by scan number: its funnel steps go too');
+select pg_temp.assert((select count(*) from public.web_scan_returns where previous_scan_id = '00000000-0000-4000-8000-000000007494' or web_scan_id = '00000000-0000-4000-8000-000000007494') = 0, 'delete by scan number: return links to or from it go too');
+select pg_temp.assert((select count(*) from public.web_scan_events where web_scan_id = '00000000-0000-4000-8000-000000007493') = 5, 'delete by scan number: other scans keep their steps');
+create temp table loop_purge as select public.mpt_purge_expired_web_scans(false) as j;   -- S0 is 45 days old and never linked (>90 days? no): keep; nothing here is past retention
+select pg_temp.assert((select count(*) from public.web_scans where id = '00000000-0000-4000-8000-000000007490') = 1, 'clean-up leaves recent scans (and their returns) alone');
+reset role;
+-- MPC-7492: machine mirror aggregate. Fresh made-up rows in a window far in the past so earlier test rows do not interfere.
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_machine_visits_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_machine_visits_daily: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_machine_visits_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_machine_visits_daily: authenticated must not execute');
+delete from public.edge_visits;
+insert into public.edge_visits (seen_at, path, method, status, user_agent, ip, class, rule, ruleset_version) values
+  ('2031-03-02 01:00+00', '/robots.txt', 'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 01:01+00', '/',           'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 01:02+00', '/blog/a',     'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 01:03+00', '/missing',    'GET', 404, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test'),
+  ('2031-03-02 02:00+00', '/',           'GET', 200, 'ExampleCrawler/1.0', '192.0.2.21', 'bot',   'R4', 'test'),
+  ('2031-03-02 03:00+00', '/',           'GET', 200, 'ExampleBrowser/1.0', '192.0.2.22', 'person','R8', 'test'),
+  ('2031-03-02 03:01+00', '/',           'GET', 200, 'ExampleBrowser/1.0', '192.0.2.23', 'unknown','R5', 'test'),
+  ('2031-03-01 01:00+00', '/',           'GET', 200, 'ExampleAIBot/1.0', '192.0.2.20', 'ai',      'R1', 'test');
+create temp table mv as select public.mpt_machine_visits_daily('2031-03-02 00:00+00', '2031-03-03 00:00+00') as j;
+select pg_temp.assert((select (j->>'total_requests')::int = 7 and (j->>'machine_requests')::int = 5 from mv), 'machine visits: totals count every class, machine requests only bot+ai');
+select pg_temp.assert((select jsonb_array_length(j->'rows') = 2 from mv) and not (select j::text like '%ExampleBrowser%' or j::text like '%192.0.2.%' from mv), 'machine visits: no person or unknown row and no IP in the output');
+select pg_temp.assert((select (r->>'requests')::int = 4 and (r->>'robots_fetches')::int = 1 and r->'pages' = '["/", "/blog/a"]'::jsonb from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: requests, robots.txt fetches and pages served (no robots.txt, no 404)');
+select pg_temp.assert((select r->>'first_ever' = '2031-03-01T01:00:00+00:00' from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: first_ever looks past the window');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

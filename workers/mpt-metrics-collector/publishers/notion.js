@@ -3,6 +3,7 @@
 // A number the views report as NULL (source missing or status=error) is left blank, never estimated.
 // Rows this publisher did not create (no MARKER in Notes / Agent Insights) are left untouched.
 import { hkDate, hkDayStartOf } from '../lib/hk.js';
+import { learningLoopConfigured, publishLearningLoop } from './learning-loop.js';
 
 export const NOTION_VERSION = '2025-09-03';
 export const DEFAULT_DAILY_DS = '5bf43eae-1da1-438e-859d-56b241b5b1ac'; // Management & Data Analytics MPT Hub
@@ -158,5 +159,7 @@ export async function publishAll(env, now = new Date(), { day, weekOf } = {}) {
   await run('daily', () => publishDaily(env, d, now));
   const w = weekOf || (new Date(`${today}T00:00:00Z`).getUTCDay() === 1 ? addDays(today, -7) : null);
   if (w) await run('weekly', () => publishWeekly(env, w, now));
+  // MPC-7493: the learning-loop page for the same week, when a parent page is configured. Aggregates only.
+  if (w && learningLoopConfigured(env)) await run('learning-loop', () => publishLearningLoop(env, w, now));
   return out;
 }

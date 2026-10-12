@@ -7,9 +7,9 @@ import Privacy from "./Privacy";
 const flat = (s: string) => s.replace(/\s+/g, " ").trim();
 
 describe("Privacy: saved scan", () => {
-  it("2.3 says a scan is saved only with the email and the box, for 12 months, and what is counted without personal data", () => {
+  it("2.4 says a scan is saved only with the email and the box, for 12 months, and what is counted without personal data", () => {
     renderPage(<Privacy />);
-    expect(screen.getByRole("heading", { name: "2.3 Your Saved Scan Result" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "2.4 Your Saved Scan Result" })).toBeInTheDocument();
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain(
       "The free scan runs in your browser and shows you the results there. We do not save it unless you ask for your report. " +
@@ -23,7 +23,7 @@ describe("Privacy: saved scan", () => {
   it("2.0 and the retention line match; the old save-everything wording and the 90-day rule are gone", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("The finished result stays in your browser. It is not sent to us unless you ask for your report and choose to save it (see section 2.3).");
+    expect(text).toContain("The finished result stays in your browser. It is not sent to us unless you ask for your report and choose to save it (see section 2.4).");
     expect(text).toContain("is kept for 12 months, then deleted automatically");
     expect(text).not.toMatch(/even if you never give us an email/i);
     expect(text).not.toMatch(/90 days after the scan/i);

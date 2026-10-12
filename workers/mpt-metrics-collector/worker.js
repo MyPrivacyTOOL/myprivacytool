@@ -6,12 +6,16 @@ import cloudflareAnalytics from './collectors/cloudflare-analytics.js';
 import youtube from './collectors/youtube.js';
 import ga4Reports from './collectors/ga4.js';
 import hubspot from './collectors/hubspot.js';
+import learningLoop from './collectors/learning-loop.js';
+import edgeMachines from './collectors/edge-machines.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
+import { publishMachineMirror } from './publishers/machine-mirror.js';
+import { hkDate } from './lib/hk.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, ...ga4Reports];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
@@ -58,6 +62,7 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
   return results;
 }
 
+const previousHkDate = (now) => hkDate(new Date(now.getTime() - 86400000));
 const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default {
@@ -72,7 +77,11 @@ export default {
     // Collect first, then publish the summaries to Notion (MPC-7382). A Notion failure never affects collection.
     ctx.waitUntil((async () => {
       console.log(JSON.stringify(await runAll(env)));
-      if (notionConfigured(env)) console.log(JSON.stringify(await publishAll(env)));
+      if (notionConfigured(env)) {
+        console.log(JSON.stringify(await publishAll(env)));
+        // Machine mirror page (MPC-7492): separate so a failure here never affects the other publishes.
+        try { console.log(JSON.stringify(await publishMachineMirror(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: machine mirror publish failed: ${SAFE(e?.message, env)}`); }
+      }
       else console.error('mpt-metrics-collector: NOTION_TOKEN not set, Notion publish skipped');
     })());
   },
@@ -95,6 +104,14 @@ export default {
       const weekOf = url.searchParams.get('week') || undefined;
       if ([day, weekOf].some((v) => v && !/^\d{4}-\d{2}-\d{2}$/.test(v))) return json({ error: 'bad date' }, 400);
       return json({ results: await publishAll(env, new Date(), { day, weekOf }) });
+    }
+    // Manual machine mirror page (MPC-7492): POST /publish-mirror?day=YYYY-MM-DD, same bearer token.
+    if (url.pathname === '/publish-mirror' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
+      const day = url.searchParams.get('day') || previousHkDate(new Date());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'bad date' }, 400);
+      try { return json({ result: await publishMachineMirror(env, day) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
     }
     // Manual digest for verification: POST /digest (posts to Slack, returns the permalink) or POST /digest?dry=1 (returns the text only).
     if (url.pathname === '/digest' && request.method === 'POST') {

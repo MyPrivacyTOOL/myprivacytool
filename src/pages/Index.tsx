@@ -20,7 +20,7 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
-import { rememberCompletedScan } from '@/lib/webScan';
+import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
@@ -44,6 +44,14 @@ const Index = () => {
     scanRemembered.current = true;
     rememberCompletedScan(hexagons);
   }, [loading, hexagons]);
+
+  // MPC-7493: funnel steps for a saved scan. The scan starts when the page opens; once the results are on screen we report "results viewed" and the
+  // time spent there. Under D12 (MPC-7470) a scan is saved only at the contact step, so before that there is no scan number and nothing is sent.
+  useEffect(() => {
+    markScanStarted();
+  }, []);
+  const resultsShown = !loading && hexagons.length > 0;
+  useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();

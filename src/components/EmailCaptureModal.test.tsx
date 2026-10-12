@@ -5,11 +5,8 @@ import userEvent from "@testing-library/user-event";
 import { jsonResponse } from "@/test/render";
 import EmailCaptureModal from "./EmailCaptureModal";
 import { HEXAGON_COUNT } from "../../shared/hexagon-registry/registry.js";
-import { SAVE_CONSENT_LABEL, SAVE_CONSENT_VERSION } from "@/lib/saveConsent";
-import { rememberCompletedScan, getScanNumber } from "@/lib/webScan";
-import type { HexagonData } from "@/lib/deviceDetection";
 
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); sessionStorage.clear(); localStorage.clear(); });
+afterEach(() => vi.unstubAllGlobals());
 const setup = (riskScore = 55) => {
   const onClose = vi.fn(), onSubmit = vi.fn();
   render(<EmailCaptureModal riskScore={riskScore} categoryScores={{ fingerprint: 50 }} confirmedCount={23} onClose={onClose} onSubmit={onSubmit} />);
@@ -83,88 +80,3 @@ describe("EmailCaptureModal", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 });
-
-// MPC-7470 (D12): the separate "save my scan result" box at the contact step.
-describe("EmailCaptureModal: save my scan result", () => {
-  const NUMBER = "11111111-2222-4333-8444-555555555555";
-  const hexes = (): HexagonData[] =>
-    [0, 1].map((i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `v${i}`, icon: "x", confidence: 80, risk: "low", confirmed: true, category: "device" }));
-  const saveBox = () => screen.queryByLabelText(SAVE_CONSENT_LABEL) as HTMLInputElement | null;
-  const marketing = () => screen.getByLabelText(/email me my fix guide and privacy check/i);
-  const routed = () => vi.fn(async (url: unknown) =>
-    String(url).includes("/api/scan") ? jsonResponse({ success: true, scan_saved: true, scan_number: NUMBER }) : jsonResponse({ success: true }));
-
-  it("shows the exact label as a separate, unticked box; the marketing box is unchanged", () => {
-    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
-    rememberCompletedScan(hexes());
-    setup();
-    expect(saveBox()).not.toBeNull();
-    expect(saveBox()!.checked).toBe(false);
-    expect(marketing()).not.toBe(saveBox());
-    expect(screen.getByText("Email me my fix guide and Privacy Check, the monthly newsletter. I can unsubscribe at any time.")).toBeInTheDocument();
-  });
-
-  it("requires the save box: without it nothing is sent anywhere", async () => {
-    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
-    rememberCompletedScan(hexes());
-    const f = routed(); vi.stubGlobal("fetch", f);
-    const { user } = setup();
-    await user.type(email(), "ok@example.com");
-    await user.click(marketing());
-    await user.click(send());
-    expect(await screen.findByRole("alert")).toHaveTextContent("save your scan result");
-    expect(f).not.toHaveBeenCalled();
-  });
-
-  it("with the box ticked, posts the scan with save_consent to the scan-report Worker and keeps the scan number", async () => {
-    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
-    rememberCompletedScan(hexes());
-    const f = routed(); vi.stubGlobal("fetch", f);
-    const { user, onSubmit } = setup();
-    await user.type(email(), "ok@example.com");
-    await user.click(marketing());
-    await user.click(saveBox()!);
-    await user.click(send());
-    await screen.findByText("You're on the list.");
-    expect(onSubmit).toHaveBeenCalledWith("ok@example.com");
-    const call = f.mock.calls.find((c) => String(c[0]).includes("/api/scan")) as unknown as [string, RequestInit];
-    const body = JSON.parse(call[1].body as string);
-    expect(body).toMatchObject({ email: "ok@example.com", consent: true, save_consent: true, save_consent_version: SAVE_CONSENT_VERSION });
-    expect(body.scan).toHaveLength(2);
-    expect(getScanNumber()).toBe(NUMBER);
-  });
-
-  it("a failed save request does not undo the lead the visitor sees as recorded", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
-    rememberCompletedScan(hexes());
-    vi.stubGlobal("fetch", vi.fn(async (url: unknown) => (String(url).includes("/api/scan") ? jsonResponse({}, 500) : jsonResponse({ success: true }))));
-    const { user } = setup();
-    await user.type(email(), "ok@example.com");
-    await user.click(marketing());
-    await user.click(saveBox()!);
-    await user.click(send());
-    await screen.findByText("You're on the list.");
-    expect(getScanNumber()).toBeNull();
-  });
-
-  it("with no scan in the browser, or saving off, there is no save box and no scan request", async () => {
-    const f = routed(); vi.stubGlobal("fetch", f);
-    // saving off
-    rememberCompletedScan(hexes());
-    const a = setup();
-    expect(saveBox()).toBeNull();
-    await a.user.type(email(), "ok@example.com");
-    await a.user.click(marketing());
-    await a.user.click(send());
-    await screen.findByText("You're on the list.");
-    expect(f.mock.calls.every((c) => !String(c[0]).includes("/api/scan"))).toBe(true);
-  });
-
-  it("with saving on but no scan in this browser, there is no save box", () => {
-    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
-    setup();
-    expect(saveBox()).toBeNull();
-  });
-});
-

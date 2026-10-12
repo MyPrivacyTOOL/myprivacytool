@@ -70,3 +70,16 @@ scans against target, pace status, biggest mover up and down (week on week), the
 - **Manual / verification:** `POST /digest?dry=1` returns the text without posting; `POST /digest` posts and returns `{ts, channel, permalink}` (same bearer token as `/run`). Record the permalink as evidence.
 - Test: `node workers/mpt-metrics-collector/digest.test.mjs`.
 - Chris's page: **MPT Dashboard** under the MyPrivacyTOOL hub (linked views only, no copied data): https://app.notion.com/p/3f528547eaa78102917edbc1acc368ee
+
+## Machine mirror (MPC-7492, inbound funnels F3)
+
+A daily record of which bots and AIs read MyPrivacyTOOL. Bot and AI rows only: person and unknown rows are never returned, stored or published (they are counted only in the total used as the denominator for "share of all traffic"). No IP address is read.
+
+- `supabase/migrations/20261012170000_mpc_7492_machine_visits_daily.sql`: `mpt_machine_visits_daily(p_from, p_to)` (service_role only) aggregates `edge_visits` per class and user agent.
+- `collectors/edge-machines.js` (`source=edge, report=machine_daily`, runs with the other collectors at 00:15 HKT) stores one row for the previous Hong Kong day: `payload.families[]` (family, class, requests, pages_taken, pages, first_seen, last_seen, share_pct of all traffic, robots_fetches, fetched_robots_txt, first_ever), `total_requests`, `machine_requests`, `machine_share_pct` and `flags[]`. This is the row the weekly KPI tracker can read. No edge visits that day => an `ok` row with zero totals and a note, nothing estimated.
+- `lib/machine-mirror.js`: family names (from the self-declared user agent; a test keeps them in step with the classifier tokens in `shared/edge-capture/ruleset.ts`), the rollup and the flags.
+- **Flags:** `new_family` (the family's first sighting ever is inside the day); `tenfold_up` / `tenfold_down` (requests changed by 10x or more against the previous Hong Kong day; a family that vanished counts as down; the busier day needs at least 20 requests so 1 -> 10 is not noise).
+- **robots.txt:** `fetched_robots_txt` = the family requested `/robots.txt` that day. `public/robots.txt` has no Disallow rules, so obeying a rule cannot be measured yet.
+- `publishers/machine-mirror.js`: one page per day, "Machine mirror — YYYY-MM-DD", under the Inbound Funnels strategy page (id in `STRATEGY_PAGE_ID`). It reads the stored row, not raw visits. Idempotent (a re-run replaces that page), skips pages without its marker, and writes nothing when the day has no edge data. **Chris must share the strategy page with the Notion integration (`NOTION_TOKEN`).** Manual: `POST /publish-mirror?day=YYYY-MM-DD` with the bearer token.
+- Test: `node workers/mpt-metrics-collector/machine-mirror.test.mjs`; SQL assertions in `supabase/tests/schema.test.sql`.
+- **Needs before data flows:** the migration applied to the live project, and edge capture on (MPC-7491, Chris's sign-off).
