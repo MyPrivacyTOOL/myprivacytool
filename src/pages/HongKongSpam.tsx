@@ -308,7 +308,6 @@ const HongKongSpamPage = () => {
                 >
                   {copy.consentPolicyLink}
                 </a>
-                {copy.consentAfter}
               </p>
               {email.trim() && (
                 <div className="mb-3 space-y-2">

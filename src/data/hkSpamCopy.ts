@@ -43,7 +43,6 @@ export interface HkCopy {
   /** MPC-7538: the consent line at the email field. policyLink is the linked part; it points at the HK Stop Spam section of the Privacy Policy. */
   consentBefore: string;
   consentPolicyLink: string;
-  consentAfter: string;
   reminderLabel: string;
   marketingLabel: string;
   marketingHint: string;
@@ -127,7 +126,6 @@ export const EN: HkCopy = {
     "We collect your email, your registration date, your phone type (Android, iPhone or other) and your language. We never collect your phone number. " +
     "We use them to send you one reminder on the day your protection starts. To unsubscribe, use the link in the email or write to privacy@myprivacytool.io. ",
   consentPolicyLink: "How we handle your data",
-  consentAfter: "",
   reminderLabel: "Send me the reminder",
   marketingLabel: "Send me MyPrivacyTOOL privacy tips",
   marketingHint: "Optional. Not needed for the reminder. You can unsubscribe at any time.",
@@ -241,7 +239,6 @@ export const ZH: HkCopy = {
     "我們會收集你的電郵地址、登記日期、手機類型（Android、iPhone 或其他）及語言，但絕不收集你的電話號碼。" +
     "這些資料只用來在你的保障生效當日向你發送一封提醒電郵。如要取消訂閱，請按電郵內的連結，或電郵至 privacy@myprivacytool.io。",
   consentPolicyLink: "我們如何處理你的資料",
-  consentAfter: "",
   reminderLabel: "請發送提醒給我",
   marketingLabel: "請向我發送 MyPrivacyTOOL 私隱貼士",
   marketingHint: "選填。接收提醒不需要剔選此項。你可隨時取消訂閱。",
