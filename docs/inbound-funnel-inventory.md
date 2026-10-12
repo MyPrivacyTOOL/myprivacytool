@@ -87,13 +87,20 @@ Live `mpt_raw_metrics` (60 rows total, first row 2026-10-10 06:51 UTC):
   (`collectors/cloudflare-analytics.js`). The last two runs (2026-10-10 14:37 and 16:15 UTC) also errored.
 - The single `ok` row (2026-10-10 08:52 UTC) holds day 2026-10-09 and has no `firewall`/bandwidth keys, so it came from an earlier version
   of the collector. It shows the token and zone ID worked at least once.
-- **Why the later runs lost them is not verified.** My tools cannot list secret names or values. Possible causes (hypotheses, not findings):
-  the secrets were set on a different Worker version or removed again, or the zone ID or token was never persisted.
-  The deploy workflow's secret-name check would fail loudly on a missing name; the Actions logs were not read.
-  Whether the 2026-10-11 16:15 UTC run has fired yet: not yet at the time of writing (it is 14:54 UTC).
-- Separate stall: all five daily GA4 reports also have `status=error` on the two latest runs:
-  `GA4 property timezone is America/Los_Angeles, expected Asia/Hong_Kong`. The `ok` GA4 pull still reports `timeZone America/Los_Angeles`,
-  so GA4 day boundaries are Pacific time, not Hong Kong, until Chris changes the GA4 reporting time zone.
+- **Update 2026-10-12 (supersedes the first version of this section).** The stall is resolved. Chris's screenshots of the Worker's
+  Settings page show `CLOUDFLARE_ANALYTICS_TOKEN` and `CLOUDFLARE_ZONE_ID` present as encrypted secrets (values not visible, not tested),
+  and the **2026-10-11 16:15 UTC run is `status=ok`** (day 2026-10-11: zone 3,808 requests, 335 unique visitors). So the cause was the two
+  secrets not yet being set at the earlier runs, as the error text says. Who set them and when is not recorded.
+- The optional firewall query still fails on the free plan (`zone does not have access to the path`), so the `firewall` payload is `null`:
+  blocked-request counts are not available. This confirms the free-plan limit in section 2.
+- Separate stall: all five daily GA4 reports plus the weekly one had `status=error` up to and including the 2026-10-11 16:15 UTC run:
+  `GA4 property timezone is America/Los_Angeles, expected Asia/Hong_Kong`. On 2026-10-12 about 14:50 HKT Chris changed the GA4 property
+  (ID 515216281) Reporting time zone to Hong Kong (GMT+08:00); his screenshot shows "Success." The change applies going forward only, so
+  earlier GA4 days keep Pacific-time boundaries. **Not yet proven:** the first collector run after the change (2026-10-12 16:15 UTC) should
+  turn the GA4 rows to `ok`; check `mpt_raw_metrics` where `source='ga4'`.
+- A secret named `mpt-metrics-collector` (the Worker's own name) also exists in Production. No code reads it; it looks like a stray.
+  Safe to delete once Chris confirms nobody set it on purpose. Secret names and purposes are documented in the Notion page "MPT
+  Infrastructure", section 11.
 
 ## 4. Current instructions to machines
 
@@ -162,7 +169,7 @@ the full row is kept (not personal data per strategy). For **person/unclassified
 1. **Zone settings are not verified** (plan name, Bot Fight Mode, AI Crawl Control, managed robots.txt, Logpush). They change what is visible and may already hold history.
 2. **Free-plan quota.** Edge capture on every page request spends the shared 100,000 Workers requests/day. A crawl burst could exhaust it; make sure Pages is fail open, and consider excluding assets and sampling bots.
 3. **Pages Functions are not in front of pages today**, so "capture every visit" is a new routing change on the production path (MPC-7490 scope and rollback plan).
-4. **Collector secrets.** Cloudflare collector is stalled by missing secrets; GA4 by a time-zone mismatch. Both need a human with dashboard access (token scope Analytics Read only; GA4 Admin > Property details).
+4. **Collector.** Cloudflare collector now works (secrets set; 2026-10-11 run ok). GA4 time zone was changed to Hong Kong on 2026-10-12; whether GA4 rows are `ok` again is not yet verified (see section 3).
 5. **Personal data.** The edge IP of a person is personal data in the EU/UK sense; the strategy proposes 30 days. Existing lead and scan flows already store IP, country and city in Notion, HubSpot, Slack and `users.ip_address`; their retention outside Supabase is not defined here. Legal review is MPC-6798; wording is MPC-7491.
 6. **Worker logs hold 3 days at most** and cannot be the record. A Supabase table written by the edge function is needed.
 7. **`web_scans` stores values the browser reports** (WebRTC/DNS-leak IP addresses, fingerprint values), per its own table comment, so "no IP" there is about the connection IP only.
