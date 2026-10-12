@@ -28,6 +28,10 @@ HK_SPAM_EMAIL_ENABLED = "false"
 # The site has a matching flag, VITE_SAVE_WEB_SCANS (a Cloudflare Pages build variable): the tick box only shows when BOTH are on.
 WEB_SCAN_SAVE_ENABLED = "true"
 
+# MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). OFF. Turn on only after Chris has seen the screen and
+# approved it, and only if the MPC-7491 device-recognition wording is live. Needs WEB_SCAN_SAVE_ENABLED too. Anything but "true" does nothing.
+RECOGNITION_ENABLED = "false"
+
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
 enabled = true
