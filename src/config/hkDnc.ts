@@ -19,6 +19,18 @@ export const HK_CALLER_ID_PREFIX = "1357";
 /** Flip to true ONLY after MPC-7445 has recorded the real IVR menu in docs/hk-dnc-ivr-procedure.md. */
 export const IVR_VERIFIED = false;
 
+/**
+ * Kill switch for /HongKongSpam and every HK card (homepage, report). Defaults to true; set the build variable
+ * VITE_HK_SPAM_ENABLED to "false" (or "0", "off", "no") and rebuild to hide all HK surfaces at once. This is
+ * independent of the `public` launch flag in src/data/hkSpam.json: both must allow the page to show it.
+ */
+export function parseHkSpamEnabled(raw: unknown): boolean {
+  if (typeof raw !== "string") return true;
+  return !["false", "0", "off", "no"].includes(raw.trim().toLowerCase());
+}
+
+export const HK_SPAM_ENABLED: boolean = parseHkSpamEnabled(import.meta.env.VITE_HK_SPAM_ENABLED);
+
 export type HkRegister = "sms" | "prerecorded" | "fax" | "all";
 export type HkLanguage = "en" | "yue";
 export type HkPlatform = "android" | "ios" | "other";
