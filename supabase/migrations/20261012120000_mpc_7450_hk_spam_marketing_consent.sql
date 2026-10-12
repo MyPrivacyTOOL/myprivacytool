@@ -9,3 +9,7 @@ alter table public.hk_spam_registrations
 alter table public.hk_spam_registrations
   add constraint hk_spam_registrations_marketing_needs_email
   check (email is not null or marketing_consent = false);
+
+-- anon insert is column-level (MPC-7448 moved it off the table-level grant): the form now sends this column,
+-- so without this grant every registration insert would fail with 42501.
+grant insert (marketing_consent) on public.hk_spam_registrations to anon;
