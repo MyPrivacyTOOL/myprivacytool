@@ -256,6 +256,11 @@ async function processScan(env, sb, job, fetchImpl) {
   ];
   // PostgREST bulk insert rejects rows with different key sets (PGRST102), so give every signal row the same columns.
   const SIGNAL_DEFAULTS = { details: null, removal_status: 'not_started', removal_url: null, removal_instructions: null };
+  // MPC-7616: a retry (report email failed, Worker killed after these writes) must not collide with the rows of the earlier attempt:
+  // hexagon_scores has unique (scan_id, category), so the second insert 409'd, every retry failed the same way and the report was never sent.
+  // Clear this scan's earlier output first so each attempt writes a complete, single set (signals has no unique key and would double up).
+  await sb.remove(`signals?scan_id=eq.${job.id}`);
+  await sb.remove(`hexagon_scores?scan_id=eq.${job.id}`);
   const inserted = await sb.insertMany('signals', rows.map((r) => ({ ...SIGNAL_DEFAULTS, ...r })));
   await sb.insertMany('hexagon_scores', result.hexagons.map((h) => ({ scan_id: job.id, category: h.category, score: h.score, signals_count: h.signals_count, risk_multiplier: h.risk_multiplier, color: h.color, checked: h.checked })));
   // Removal tasks only track brokers confirmed present; "not yet checked" brokers get none.
