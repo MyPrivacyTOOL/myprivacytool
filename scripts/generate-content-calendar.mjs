@@ -1,7 +1,9 @@
 // MPC-7033: generates the 13-week content calendar (39 blog, 91 X, 26 Reddit).
 // Usage: node scripts/generate-content-calendar.mjs > docs/content-calendar-mpc-7033.csv
-// MPC-7504: `--linkedin` instead prints the LinkedIn schedule (one Thursday post per week, week 1 = pillar post):
+// MPC-7504: `--linkedin` instead prints the LinkedIn schedule (one Thursday post per week from src/data/blogPosts.json, week 1 = pillar post):
 //   node scripts/generate-content-calendar.mjs --linkedin > docs/linkedin-schedule-mpc-7504.csv
+import { readFileSync } from 'node:fs';
+
 const SITE = 'https://www.myprivacytool.io';
 const START = new Date(Date.UTC(2026, 9, 7)); // Wed 2026-10-07
 const WEEKS = 13;
@@ -61,13 +63,34 @@ for (let w = 0; w < WEEKS; w++) {
 rows[1][3] = 'How Exposed Are You? The 46 Things Tracking You Online (pillar)';
 rows[1][5] = utm('/blog/how-exposed-are-you', 'blog', 'mpc-7033-w01');
 if (process.argv.includes('--linkedin')) {
+  // MPC-7504-A1: one Thursday post per week, taken from the posts that exist in src/data/blogPosts.json (never repeated,
+  // never invented). Week 1 is the pillar post; weeks 2 to 8 follow the Blog Deployment Runbook order (Blogs 2 to 8);
+  // later weeks stay 'unassigned' (empty title and url) until another post is published and added to LINKEDIN_ORDER.
+  const LINKEDIN_ORDER = [
+    'how-exposed-are-you',
+    '25-years-mass-surveillance',
+    'linkedin-data-brokers',
+    'ai-training-data-opt-out',
+    'remove-personal-information-from-internet',
+    'remove-your-name-and-info-from-google',
+    'stop-spam-calls-texts-and-emails',
+    'how-github-becomes-a-private-profile',
+  ];
+  const posts = JSON.parse(readFileSync(new URL('../src/data/blogPosts.json', import.meta.url), 'utf8'));
   const li = [['date', 'week', 'content_type', 'title', 'target', 'url_with_utm', 'status', 'owner', 'posted_url']];
-  // Thursday blog row of each week (offset 1 is the first blog row of the week)
+  // Thursday of each week: the first blog row of the week is on offset 1 (Thu) of the Wed-based week.
   rows.filter((r) => r[2] === 'blog' && new Date(r[0] + 'T00:00:00Z').getUTCDay() === 4).forEach((r) => {
     const wk = Number(r[1]);
-    const path = new URL(r[5]).pathname;
-    li.push([r[0], wk, wk === 1 ? 'linkedin-pillar' : 'linkedin-weekly', r[3], 'linkedin.com/company/myprivacytool',
-      utm(path, 'linkedin', `mpc-7504-w${pad(wk)}`), 'draft', '', '']);
+    const slug = LINKEDIN_ORDER[wk - 1];
+    const type = wk === 1 ? 'linkedin-pillar' : 'linkedin-weekly';
+    if (!slug) {
+      li.push([r[0], wk, type, '', 'linkedin.com/company/myprivacytool', '', 'unassigned', '', '']);
+      return;
+    }
+    const post = posts.find((p) => p.slug === slug);
+    if (!post) throw new Error(`LINKEDIN_ORDER slug not found in src/data/blogPosts.json: ${slug}`);
+    li.push([r[0], wk, type, post.title, 'linkedin.com/company/myprivacytool',
+      utm(`/blog/${slug}`, 'linkedin', `mpc-7504-w${pad(wk)}`), 'draft', '', '']);
   });
   console.log(li.map((r) => r.map(q).join(',')).join('\n'));
 } else
