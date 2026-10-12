@@ -6,10 +6,14 @@ import Seo from "@/components/Seo";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import SubmitButton from "@/components/SubmitButton";
 import pageMeta from "@/data/pageMeta.json";
+import { useExperiment } from "@/hooks/useExperiment";
 import { useLeadSubmit } from "@/hooks/useLeadSubmit";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import { suggestEmail, validateEmail } from "@/lib/formFeedback";
+import { cn } from "@/lib/utils";
 import {
+  trackExperimentCta,
+  trackExperimentExposure,
   trackFormSubmitError,
   trackFormValidationError,
   trackPricingPlanClick,
@@ -67,7 +71,28 @@ const PLANS: Plan[] = [
   { name: "Executive", scans: "Unlimited scans", monthly: "$49.99", cta: WAITLIST_CTA },
 ];
 
+// MPC-7638: A/B tests (docs/ab-testing.md). Every variant string below is truthful for a page with no
+// checkout yet; the trust line makes no claim beyond what the Free plan already states.
+const HEADLINE = {
+  control: { h1: "Pricing", sub: "The scan is free. Paid plans remove your data from brokers and keep it off." },
+  free_first: { h1: "Know your exposure for free. Pay to remove it.", sub: "Paid plans remove your data from brokers and keep it off." },
+} as const;
+const TRUST_LINE = "The scan is free and needs no credit card.";
+const PRICING_TESTS = ["pricing_headline", "pricing_cta", "pricing_tiers", "pricing_social_proof"] as const;
+
+const TrustLine = () => <p className="mb-6 text-sm font-medium text-foreground">{TRUST_LINE}</p>;
+
 const Pricing = () => {
+  const headline = useExperiment("pricing_headline");
+  const cta = useExperiment("pricing_cta");
+  const tiers = useExperiment("pricing_tiers");
+  const proof = useExperiment("pricing_social_proof");
+  const assignments = { pricing_headline: headline, pricing_cta: cta, pricing_tiers: tiers, pricing_social_proof: proof };
+  // Only live, non-forced assignments are reported (QA ?ab_ overrides never count).
+  const live = PRICING_TESTS.filter((id) => assignments[id].active);
+  const liveVariants = Object.fromEntries(live.map((id) => [id, assignments[id].variantId]));
+  const copy = HEADLINE[headline.variantId as keyof typeof HEADLINE] ?? HEADLINE.control;
+  const paidLabel = cta.variantId === "notify_text" ? "Notify me when plans open" : WAITLIST_CTA.label;
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState(PAID_PLANS[0]);
   const [consent, setConsent] = useState(false);
@@ -80,6 +105,8 @@ const Pricing = () => {
 
   useEffect(() => {
     trackPricingView();
+    live.forEach((id) => trackExperimentExposure(id, assignments[id].variantId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -87,7 +114,8 @@ const Pricing = () => {
   }, [status]);
 
   const choosePlan = (p: Plan) => {
-    trackPricingPlanClick(p.name.toLowerCase(), p.cta.to);
+    trackPricingPlanClick(p.name.toLowerCase(), p.cta.to, liveVariants);
+    live.forEach((id) => trackExperimentCta(id, assignments[id].variantId));
     if (p.cta.to.startsWith("#")) {
       if (PAID_PLANS.includes(p.name)) setPlan(p.name);
       document.getElementById(WAITLIST_ID)?.scrollIntoView?.({ behavior: "smooth" });
@@ -122,7 +150,7 @@ const Pricing = () => {
           },
           pageName: "Pricing",
         }),
-      () => trackPricingWaitlistSignup(plan.toLowerCase()),
+      () => trackPricingWaitlistSignup(plan.toLowerCase(), liveVariants),
     );
   };
 
@@ -131,21 +159,23 @@ const Pricing = () => {
     <Seo {...pageMeta["/pricing"]} path="/pricing" />
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
-        <h1 className="mb-2 text-4xl font-bold text-foreground">Pricing</h1>
-        <p className="mb-4 text-lg text-muted-foreground">
-          The scan is free. Paid plans remove your data from brokers and keep it off.
-        </p>
+        <h1 className="mb-2 text-4xl font-bold text-foreground">{copy.h1}</h1>
+        <p className="mb-4 text-lg text-muted-foreground">{copy.sub}</p>
         <p className="mb-10 text-sm text-muted-foreground">
           Paid plans are not open yet. Prices below are the planned prices; join the waitlist
           and we will tell you when they open.
         </p>
 
+        {proof.variantId === "above_plans" && <TrustLine />}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => (
             <section
               key={plan.name}
               aria-labelledby={`plan-${plan.name}`}
-              className="flex flex-col rounded-lg border border-border p-6"
+              className={cn(
+                "flex flex-col rounded-lg border border-border p-6",
+                tiers.variantId === "highlight_pro" && plan.name === "Pro" && "border-2 border-primary shadow-lg",
+              )}
             >
               <h2 id={`plan-${plan.name}`} className="mb-4 text-xl font-semibold text-foreground">
                 {plan.name}
@@ -159,8 +189,8 @@ const Pricing = () => {
                 {plan.note && <li>{plan.note}</li>}
               </ul>
               {plan.cta.to.startsWith("#") ? (
-                <Button type="button" onClick={() => choosePlan(plan)}>
-                  {plan.cta.label}
+                <Button type="button" variant={cta.variantId === "outline" ? "outline" : "default"} onClick={() => choosePlan(plan)}>
+                  {paidLabel}
                 </Button>
               ) : (
                 <Button asChild variant="outline">
@@ -172,6 +202,7 @@ const Pricing = () => {
             </section>
           ))}
         </div>
+        {proof.variantId === "below_plans" && <div className="mt-6"><TrustLine /></div>}
 
         <section id={WAITLIST_ID} aria-labelledby="waitlist-heading" className="mt-12 rounded-lg border border-border p-6">
           <h2 id="waitlist-heading" className="mb-2 text-xl font-semibold text-foreground">Join the waitlist</h2>
