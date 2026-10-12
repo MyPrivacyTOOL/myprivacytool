@@ -83,3 +83,12 @@ A daily record of which bots and AIs read MyPrivacyTOOL. Bot and AI rows only: p
 - `publishers/machine-mirror.js`: one page per day, "Machine mirror — YYYY-MM-DD", under the Inbound Funnels strategy page (id in `STRATEGY_PAGE_ID`). It reads the stored row, not raw visits. Idempotent (a re-run replaces that page), skips pages without its marker, and writes nothing when the day has no edge data. **Chris must share the strategy page with the Notion integration (`NOTION_TOKEN`).** Manual: `POST /publish-mirror?day=YYYY-MM-DD` with the bearer token.
 - Test: `node workers/mpt-metrics-collector/machine-mirror.test.mjs`; SQL assertions in `supabase/tests/schema.test.sql`.
 - **Needs before data flows:** the migration applied to the live project, and edge capture on (MPC-7491, Chris's sign-off).
+
+## Daily /scan gap check (MPC-7535)
+
+`collectors/scan-gap.js` runs with the daily collection (00:15 HKT) for the previous Hong Kong day. It counts the distinct addresses that submitted the
+/scan page (HubSpot "Start Scan" form, `source_tag = scan-page`, read-only token) and checks each against `scans` rows with `source = web_scan`
+(created within 24h before the day started, because the Worker makes one report per address per 24h). Any submission without an accepted request
+posts an alert to the usual Slack channel (`SLACK_BOT_TOKEN` + `MPTSLACK_CHANNEL_ID`, the same as the Monday digest). A check that cannot run
+(HubSpot scope missing, Supabase unreadable, more than 40 submissions in a day) posts an alert too. Stored payload and alert text hold counts only.
+Needs the HubSpot read-only token to have the `forms` scope. Manual run: `POST /run` with the trigger token.

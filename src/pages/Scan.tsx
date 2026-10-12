@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Home, Phone, Users, MapPin, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,42 +10,14 @@ import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
-import { trackStartSignup, trackReportRequested } from "@/lib/analytics";
-import { SCAN_API_URL, canOfferScanSave, noteSaveResult, recognitionEnabled, reportStep, scanSaveFields } from "@/lib/webScan";
+import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
+import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
+import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
   import.meta.env.VITE_HUBSPOT_START_FORM_ID || "22ee30ae-6cf9-419b-aa46-b656b0e7b1bf";
 const SOURCE_TAG = "scan-page";
-
-// MPC-6677: scan-report Worker (confirmation email + 48h report).
-// MPC-7385: defaults to the production Worker (SCAN_API_URL, src/lib/webScan.ts), like the other Worker endpoints in this app, so the site no longer
-// depends on a Pages build variable. Set VITE_SCAN_API_URL to an empty string to turn the feature off (HubSpot-only).
-// Who actually receives emails is still gated by RECIPIENT_ALLOWLIST on the Worker.
-// MPC-7470 (D12): when the visitor ticked the save box, the finished scan kept in this browser goes in the same request (save_consent: true).
-// A visitor who arrived here without a scan, or did not see the box, sends the email alone and nothing is saved.
-// MPC-7494: the separate recognise box adds recognise_consent only when ticked, and only together with the save box.
-async function requestScanReport(email: string, saveScan: boolean, recognise: boolean): Promise<void> {
-  if (!SCAN_API_URL) return;
-  const q = new URLSearchParams(window.location.search);
-  const res = await fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/scan`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email,
-      consent: true, // only called after the consent checkbox is ticked
-      consent_source: "scan_page",
-      ...(saveScan ? scanSaveFields({ recognise }) : {}),
-      utm_source: q.get("utm_source") ?? "",
-      utm_medium: q.get("utm_medium") ?? "",
-      utm_campaign: q.get("utm_campaign") ?? "",
-      utm_content: q.get("utm_content") ?? "",
-      referrer: document.referrer,
-    }),
-  });
-  if (!res.ok) throw new Error(`scan-report ${res.status}`);
-  if (saveScan) noteSaveResult(await res.json().catch(() => null));
-}
 
 const Scan = () => {
   const [email, setEmail] = useState("");
@@ -63,6 +35,8 @@ const Scan = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // MPC-7535: on a retry after a failed report request the HubSpot lead is not sent a second time.
+  const hubspotSent = useRef(false);
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -77,17 +51,25 @@ const Scan = () => {
     setSubmitting(true);
     setErrorMsg("");
     try {
-      await submitHubSpotForm({
-        formId: FORM_ID,
-        fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("scan_page") },
-        pageName: "Free exposure scan",
-      });
+      if (!hubspotSent.current) {
+        await submitHubSpotForm({
+          formId: FORM_ID,
+          fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("scan_page") },
+          pageName: "Free exposure scan",
+        });
+        hubspotSent.current = true; // the lead is kept whatever happens to the report request
+      }
       try {
         await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent);
-        trackReportRequested("scan_page", offerSave && saveConsent);
       } catch (reportErr) {
-        console.error("Scan report request failed", reportErr); // never block the HubSpot lead
+        const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
+        const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
+        console.error("Scan report request failed", kind, status);
+        trackReportFailed("scan_page", kind, status);
+        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        return;
       }
+      trackReportRequested("scan_page", offerSave && saveConsent);
       trackStartSignup({ source: "scan_page" });
       setSubmitted(true);
     } catch (err: unknown) {
