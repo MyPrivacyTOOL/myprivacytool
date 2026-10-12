@@ -1,55 +1,56 @@
 // @vitest-environment node
-// MPT-1003: the English output must stay byte-identical to the strings the worker hardcoded before it read /locales.
+// MPT-1003: the English output is pinned here so a copy change is always a deliberate edit of both the locale file and this test.
+// MPC-7251 follow-up (2026-10-12): wording rewritten to match what the free scan really does (needs Chris's approval before merge).
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { resolveLocale, t, firstHexagon, confirmedY, confirmedN, unknown, confirmPrompt } from "./messages.js";
 import worker from "./index.js";
 import master from "../../locales/master_keys.json";
 
-const FIRST_HEXAGON = `🔍 *Here's what's publicly known about you right now:*
+const FIRST_HEXAGON = `🔍 *Here's what the free MyPrivacyTOOL scan looks at:*
 
-✅ Name: visible from your Telegram profile
-✅ Location: city & country estimable from IP
-⚠️ Phone: possibly linked to this account
-⚠️ Email: may be findable via data brokers
-⚠️ Social profiles: cross-platform links detected
-🚨 Data broker exposure: estimated 40+ sites
+• What your browser and device reveal to every website you visit
+• What your IP address reveals, such as your approximate city and country
+• What your email address reveals, such as its provider and any public profile
+• Breach history: not checked automatically yet, so your report gives you a link to check it yourself
+• People-search sites: your report has opt-out guides to follow step by step
+• Data broker databases: not searched yet, and I'll say so plainly in your report
 
 ---
-Is this data about you?
+I can't see your Telegram profile, phone number or contacts, only what you type here. Want to run the scan now?
 
-Reply *Y* to see your full privacy report and start removing yourself from data broker sites.
+Reply *Y* and I'll send you the link.
 
-Reply *N* if this profile doesn't match you — we'll run a fresh scan.`;
+Reply *N* if you'd rather not for now.`;
 
-const CONFIRMED_Y = `✅ *Confirmed.*
+const CONFIRMED_Y = `✅ *Great.*
 
-Your full privacy report is being generated now.
+You run the scan in your browser.
 
-👉 Go here to see it and start the removal process:
+👉 Start here:
 https://myprivacytool.io/scan
 
-We'll walk you through every step. It takes about 5 minutes.`;
+When it's done, give your email and we'll send you your report.`;
 
-const CONFIRMED_N = `🔍 *No problem — let's find the right profile.*
+const CONFIRMED_N = `👍 *No problem.*
 
-Run a fresh scan with your details here:
+Whenever you want to run the free scan, it's here:
 https://myprivacytool.io/scan
 
-Takes 30 seconds.`;
+Say *"scan me"* any time to see this again.`;
 
 const UNKNOWN = `👋 *Welcome to MyPrivacyTOOL.*
 
-Send me your name or just say *"scan me"* and I'll show you what data brokers know about you right now.
+Say *"scan me"* and I'll tell you what our free scan looks at and send you the link to run it.
 
-It's free. No signup needed.`;
+It's free. You'll be asked for your email so we can send your report.`;
 
-describe("English output is unchanged", () => {
+describe("English output is as approved", () => {
   it.each([
     ["first hexagon", firstHexagon("en"), FIRST_HEXAGON],
     ["confirmed Y", confirmedY("en"), CONFIRMED_Y],
     ["confirmed N", confirmedN("en"), CONFIRMED_N],
     ["unknown", unknown("en"), UNKNOWN],
-    ["confirm prompt", confirmPrompt("en"), "Reply *Y* to confirm this is you, or *N* if not."],
+    ["confirm prompt", confirmPrompt("en"), "Reply *Y* to get the link to the free scan, or *N* if you'd rather not."],
   ])("%s", (_n, got, want) => expect(got).toBe(want));
 });
 
@@ -97,7 +98,7 @@ describe("worker replies in the sender's locale", () => {
   it("Y and N and invalid replies", async () => {
     expect((await run({}, "y", "awaiting_confirmation")).sent[0].text).toBe(CONFIRMED_Y);
     expect((await run({}, "no", "awaiting_confirmation")).sent[0].text).toBe(CONFIRMED_N);
-    expect((await run({}, "?", "awaiting_confirmation")).sent[0].text).toBe("Reply *Y* to confirm this is you, or *N* if not.");
+    expect((await run({}, "?", "awaiting_confirmation")).sent[0].text).toBe("Reply *Y* to get the link to the free scan, or *N* if you'd rather not.");
     expect((await run({}, "x", "confirmed")).sent[0].text).toBe(UNKNOWN);
   });
 });
