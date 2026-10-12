@@ -19,9 +19,10 @@ import {
   trackNewsletterSignup
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
-import { hasConsent, hasScanSaveConsent, onConsentChange } from '@/lib/cookieConsent';
-import { saveCompletedScan } from '@/lib/webScan';
+import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
+import { rememberCompletedScan } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
+import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -35,23 +36,14 @@ const Index = () => {
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
 
-  // MPC-7465: save the scan once, when it first completes (not on every live orientation refresh). Needs the specific scan-saving consent purpose (MPC-7488); if the
-  // visitor accepts the scan-saving purpose after the scan finished, the consent listener tries again. Off unless VITE_SAVE_WEB_SCANS is "true".
-  const scanSaveStarted = useRef(false);
-  const latestHexagons = useRef<HexagonData[]>([]);
-  latestHexagons.current = hexagons;
+  // MPC-7470 (D12): when the scan first completes it is kept in this browser only (sessionStorage), never sent. It is saved on the server only
+  // if the visitor reaches the contact step, gives an email and ticks the separate save box. Not on every live orientation refresh. Off unless VITE_SAVE_WEB_SCANS is "true".
+  const scanRemembered = useRef(false);
   useEffect(() => {
-    if (loading || hexagons.length === 0) return;
-    const trySave = () => {
-      if (scanSaveStarted.current || !hasScanSaveConsent() || latestHexagons.current.length === 0) return;
-      scanSaveStarted.current = true;
-      saveCompletedScan(latestHexagons.current).then((n) => {
-        if (!n) scanSaveStarted.current = false;
-      });
-    };
-    trySave();
-    return onConsentChange(trySave);
-  }, [loading, hexagons.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (loading || hexagons.length === 0 || scanRemembered.current) return;
+    scanRemembered.current = true;
+    rememberCompletedScan(hexagons);
+  }, [loading, hexagons]);
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
@@ -286,6 +278,7 @@ const Index = () => {
           ) : (
             <>
               <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+              <ScanSavingNotice variant="scan" />
               <ScanNumberNotice />
             </>
           )}

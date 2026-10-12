@@ -13,7 +13,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 30 September 2026
+              Last updated: 12 October 2026
             </p>
 
             <section className="mb-8">
@@ -52,19 +52,13 @@ const Privacy = () => {
               <p className="text-muted-foreground">
                 The free scan on our homepage detects device, browser and network
                 characteristics directly in your browser, and shows them to you
-                there. If you have accepted the consent banner, we also save the
-                full result of each completed scan on our servers under a random
-                scan number: the technical details your browser reported, such as
-                your IP address, device, browser, language, screen and
-                fingerprint-style values. We save it even if you never give us an
-                email address or any other contact, so we can see where people
-                drop out of the process and fix it. If you then ask for your
-                report, we link that scan number to your email address. If you
-                use another device, that starts a new scan. If you have not
-                accepted the consent banner, nothing from the scan is saved. The
-                other information described below is stored only when you take an
-                action that submits it (for example, entering your email address,
-                messaging our bot, or requesting a scan of a social handle).
+                there. The finished result stays in your browser. It is not sent
+                to us unless you ask for your report and choose to save it (see
+                section 2.3). If you leave without giving us an email address,
+                nothing from the scan is saved. The other information described
+                below is stored only when you take an action that submits it (for
+                example, entering your email address, messaging our bot, or
+                requesting a scan of a social handle).
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
@@ -158,7 +152,36 @@ const Privacy = () => {
               </ul>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.3 Information from Third Parties
+                2.3 Your Saved Scan Result
+              </h3>
+              <p className="text-muted-foreground">
+                The free scan runs in your browser and shows you the results
+                there. We do not save it unless you ask for your report. When you
+                enter your email address and tick the box to save your scan
+                result, we save the full result, meaning the technical details
+                your browser reported such as IP address, device, browser,
+                language, screen and fingerprint-style values, together with your
+                email address, for 12 months, so your report can show it. If you
+                leave without giving an email address, nothing from the scan is
+                saved. We only count, without personal data, how many visitors
+                finish a scan and how many ask for a report, through our analytics
+                if you accepted analytics cookies.
+              </p>
+              <p className="mt-4 text-muted-foreground">
+                A saved scan is personal data. After you save it we show you a
+                scan number, and it is in your report email. To have a saved scan
+                deleted, write to{" "}
+                <a
+                  href="mailto:privacy@myprivacytool.io"
+                  className="text-brand underline hover:text-foreground"
+                >
+                  privacy@myprivacytool.io
+                </a>{" "}
+                with your scan number or the email address you used.
+              </p>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                2.4 Information from Third Parties
               </h3>
               <p className="text-muted-foreground">
                 We may receive information about you from third-party sources,
@@ -319,11 +342,11 @@ const Privacy = () => {
                   historical comparison and reporting
                 </li>
                 <li>
-                  <strong>Saved Web Scans:</strong> The full result of a completed
-                  web scan (see section 2.0) is deleted 12 months after the scan if
-                  it was linked to your email address, and 90 days after the scan
-                  if it was never linked to a contact. To ask for earlier deletion,
-                  contact us with your scan number or the email address you used
+                  <strong>Saved Web Scans:</strong> The full result of a scan you
+                  chose to save with your email address (see section 2.3) is
+                  kept for 12 months, then deleted automatically. To ask for
+                  earlier deletion, contact us with your scan number or the email
+                  address you used
                 </li>
                 <li>
                   <strong>Messaging Conversation State:</strong> Retained for 7

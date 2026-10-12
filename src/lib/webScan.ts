@@ -1,17 +1,20 @@
 import type { HexagonData } from "@/lib/deviceDetection";
-import { hasScanSaveConsent } from "@/lib/cookieConsent";
+import { SAVE_CONSENT_VERSION } from "@/lib/saveConsent";
 import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.js";
 
-// MPC-7465: every completed web scan is saved under a random scan number, and the number is carried to the contact step.
-// OFF unless VITE_SAVE_WEB_SCANS is exactly "true" (production keeps it off until the privacy wording, MPC-7470, is signed off).
-// MPC-7488: saved only when the visitor accepted the specific consent purpose for saving their scan (hasScanSaveConsent()),
-// not any one purpose. A saved scan is personal data: the visitor is shown the number and can quote it to have the scan deleted.
-// The number is kept in this browser (localStorage) so it is still there on this device later; sessionStorage only marks
-// "already saved on this visit" so a new visit saves a new scan.
+// MPC-7470 (decision D12): the finished scan stays in THIS browser (sessionStorage) and is never sent anywhere until the visitor
+// reaches the contact step, gives an email address and ticks the separate "save my scan result" box. Only then is the full scan
+// posted, in the same request as the email (POST /api/scan with save_consent:true), saved, linked to the contact and stored with a
+// consent record. A visitor who gives no contact has nothing saved. (MPC-7465 saved at completion; MPC-7488 gated it on a consent-tool
+// purpose that the Free consentmanager package cannot create. Both are replaced by this.)
+// OFF unless VITE_SAVE_WEB_SCANS is exactly "true"; the Worker has its own switch (WEB_SCAN_SAVE_ENABLED). Both stay off until Chris approves the wording.
+// A saved scan is personal data: the visitor is shown the scan number afterwards and can quote it to have the scan deleted.
+// The number is kept in this browser (localStorage) so it is still there on this device later; sessionStorage marks "this visit".
 const KEY = "mpt_web_scan_number";
+const PENDING_KEY = "mpt_pending_scan";
 export const SCAN_NUMBER_EVENT = "mpt-scan-number";
 const SCAN_NUMBER_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const API_URL =
+export const SCAN_API_URL =
   (import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev";
 
 export const saveWebScansEnabled = (): boolean => import.meta.env.VITE_SAVE_WEB_SCANS === "true";
@@ -25,7 +28,7 @@ const read = (store: () => Storage): string | null => {
   }
 };
 
-/** The scan number saved on this visit (tab session), or null. This is the one linked to a contact given on this visit. */
+/** The scan number saved on this visit (tab session), or null. */
 export const visitScanNumber = (): string | null => read(() => sessionStorage);
 
 /** The scan number kept on this device (the latest scan saved from this browser), or null. */
@@ -49,6 +52,7 @@ function captureContext(hexagons: HexagonData[]) {
   };
 }
 
+/** The hexagons in the shape the Worker accepts. */
 export function toPayload(hexagons: HexagonData[]) {
   const ctx = captureContext(hexagons);
   const seen = new Set<string>();
@@ -70,45 +74,75 @@ export function toPayload(hexagons: HexagonData[]) {
       ...(h.category ? { category: text(h.category, 32) } : {}),
     });
   }
-  return { consent: true, hexagons: out };
+  return out;
 }
 
+
 /**
- * Posts a completed scan and keeps the scan number for the visit. Returns the number, or null when saving is off,
- * consent is missing, there is nothing to save, or the request fails (a failure never affects the visitor).
+ * Keeps the completed scan in this browser (sessionStorage) until the contact step. Nothing is sent. Does nothing while saving is off.
  */
-export async function saveCompletedScan(hexagons: HexagonData[]): Promise<string | null> {
-  if (!saveWebScansEnabled() || !API_URL || !hasScanSaveConsent() || hexagons.length === 0) return null;
-  const existing = visitScanNumber();
-  if (existing) return existing;
+export function rememberCompletedScan(hexagons: HexagonData[]): void {
+  if (!saveWebScansEnabled() || hexagons.length === 0) return;
   try {
-    const payload = toPayload(hexagons);
-    if (payload.hexagons.length === 0) return null;
-    const res = await fetch(`${API_URL.replace(/\/$/, "")}/api/web-scan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { saved?: boolean; scan_number?: string };
-    if (!data.saved || !data.scan_number || !SCAN_NUMBER_RE.test(data.scan_number)) return null;
-    try {
-      sessionStorage.setItem(KEY, data.scan_number);
-    } catch {
-      /* storage blocked: the scan is saved, it just cannot be linked */
-    }
-    try {
-      localStorage.setItem(KEY, data.scan_number);
-    } catch {
-      /* storage blocked: the number is still shown on this screen */
-    }
-    try {
-      window.dispatchEvent(new CustomEvent(SCAN_NUMBER_EVENT, { detail: data.scan_number }));
-    } catch {
-      /* no window: nothing to tell */
-    }
-    return data.scan_number;
+    const list = toPayload(hexagons);
+    if (list.length > 0) sessionStorage.setItem(PENDING_KEY, JSON.stringify(list));
+  } catch {
+    /* storage blocked or full: the visitor simply has no scan to save, the contact step works as before */
+  }
+}
+
+/** The scan kept in this browser for the contact step, or null (arrived without a scan, storage blocked, nothing valid stored). */
+export function pendingScan(): Record<string, unknown>[] | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const list = JSON.parse(raw) as unknown;
+    if (!Array.isArray(list) || list.length < 1 || list.length > 100) return null;
+    if (!list.every((h) => h && typeof h === "object" && !Array.isArray(h))) return null;
+    return list as Record<string, unknown>[];
   } catch {
     return null;
   }
+}
+
+/** True when saving is on and this browser holds a finished scan: only then does the contact step show the save tick box. */
+export const canOfferScanSave = (): boolean => saveWebScansEnabled() && pendingScan() !== null;
+
+/**
+ * The extra fields for POST /api/scan when the visitor ticked the save box, or {} when there is nothing to save.
+ * Call it only after the box is ticked.
+ */
+export function scanSaveFields(): Record<string, unknown> {
+  const scan = saveWebScansEnabled() ? pendingScan() : null;
+  return scan ? { scan, save_consent: true, save_consent_version: SAVE_CONSENT_VERSION } : {};
+}
+
+/**
+ * Reads the Worker's answer to a request that carried a scan. When it says the scan was saved, keeps the scan number on this
+ * device, shows it, and drops the copy held for the contact step. Returns the number or null.
+ */
+export function noteSaveResult(data: unknown): string | null {
+  const d = data as { scan_saved?: unknown; scan_number?: unknown } | null;
+  if (!d || d.scan_saved !== true || typeof d.scan_number !== "string" || !SCAN_NUMBER_RE.test(d.scan_number)) return null;
+  try {
+    sessionStorage.setItem(KEY, d.scan_number);
+  } catch {
+    /* storage blocked: the scan is saved, the number is still in the report email */
+  }
+  try {
+    localStorage.setItem(KEY, d.scan_number);
+  } catch {
+    /* storage blocked */
+  }
+  try {
+    sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* nothing to drop */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(SCAN_NUMBER_EVENT, { detail: d.scan_number }));
+  } catch {
+    /* no window: nothing to tell */
+  }
+  return d.scan_number;
 }

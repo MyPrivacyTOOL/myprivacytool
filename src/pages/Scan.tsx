@@ -6,8 +6,11 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
-import { trackStartSignup } from "@/lib/analytics";
-import { visitScanNumber } from "@/lib/webScan";
+import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
+import ScanSavingNotice from "@/components/ScanSavingNotice";
+import ScanNumberNotice from "@/components/ScanNumberNotice";
+import { trackStartSignup, trackReportRequested } from "@/lib/analytics";
+import { SCAN_API_URL, canOfferScanSave, noteSaveResult, scanSaveFields } from "@/lib/webScan";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -15,18 +18,14 @@ const FORM_ID =
 const SOURCE_TAG = "scan-page";
 
 // MPC-6677: scan-report Worker (confirmation email + 48h report).
-// MPC-7385: defaults to the production Worker, like the other Worker endpoints in this app, so the site no longer
+// MPC-7385: defaults to the production Worker (SCAN_API_URL, src/lib/webScan.ts), like the other Worker endpoints in this app, so the site no longer
 // depends on a Pages build variable. Set VITE_SCAN_API_URL to an empty string to turn the feature off (HubSpot-only).
 // Who actually receives emails is still gated by RECIPIENT_ALLOWLIST on the Worker.
-const SCAN_API_URL =
-  (import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev";
-
-async function requestScanReport(email: string): Promise<void> {
+// MPC-7470 (D12): when the visitor ticked the save box, the finished scan kept in this browser goes in the same request (save_consent: true).
+// A visitor who arrived here without a scan, or did not see the box, sends the email alone and nothing is saved.
+async function requestScanReport(email: string, saveScan: boolean): Promise<void> {
   if (!SCAN_API_URL) return;
   const q = new URLSearchParams(window.location.search);
-  // MPC-7465: the scan number from this visit's home-page scan. A visitor who arrives here without one (a direct
-  // link, a blog post, a new tab) is simply sent without it: the email is accepted and no scan is linked.
-  const scanNumber = visitScanNumber();
   const res = await fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/scan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,7 +33,7 @@ async function requestScanReport(email: string): Promise<void> {
       email,
       consent: true, // only called after the consent checkbox is ticked
       consent_source: "scan_page",
-      ...(scanNumber ? { scan_number: scanNumber } : {}),
+      ...(saveScan ? scanSaveFields() : {}),
       utm_source: q.get("utm_source") ?? "",
       utm_medium: q.get("utm_medium") ?? "",
       utm_campaign: q.get("utm_campaign") ?? "",
@@ -43,18 +42,22 @@ async function requestScanReport(email: string): Promise<void> {
     }),
   });
   if (!res.ok) throw new Error(`scan-report ${res.status}`);
+  if (saveScan) noteSaveResult(await res.json().catch(() => null));
 }
 
 const Scan = () => {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
+  // MPC-7470: the save box exists only while saving is on AND this browser holds a finished scan (the visitor ran the scan on the home page).
+  const [offerSave] = useState(() => canOfferScanSave());
+  const [saveConsent, setSaveConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !consent || submitting) return;
+    if (!email.trim() || !consent || (offerSave && !saveConsent) || submitting) return;
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -64,7 +67,8 @@ const Scan = () => {
         pageName: "Free exposure scan",
       });
       try {
-        await requestScanReport(email.trim());
+        await requestScanReport(email.trim(), offerSave && saveConsent);
+        trackReportRequested("scan_page", offerSave && saveConsent);
       } catch (reportErr) {
         console.error("Scan report request failed", reportErr); // never block the HubSpot lead
       }
@@ -97,9 +101,12 @@ const Scan = () => {
         {submitting ? "Sending…" : "Check My Exposure →"}
       </Button>
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
-      <p className="w-full text-left text-xs text-muted-foreground">
-        If you accepted the consent banner, we save your scan result under a random number and link it to your email so we can send your report.
-      </p>
+      {offerSave && (
+        <>
+          <SaveScanConsentCheckbox id={`scan-save-consent-${idSuffix}`} checked={saveConsent} onChange={setSaveConsent} disabled={submitting} />
+          <ScanSavingNotice variant="contact" />
+        </>
+      )}
     </form>
   );
 
@@ -110,6 +117,7 @@ const Scan = () => {
       <p className="text-muted-foreground text-sm">
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
+      <ScanNumberNotice />
     </div>
   );
 

@@ -327,6 +327,8 @@ insert into public.web_scans (id, hexagon_count, results, results_bytes) values
   ('00000000-0000-4000-8000-000000007466', 1, '[{"id":"browser","label":"Browser","value":"Testfox 2"}]', 50);
 insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values ('00000000-0000-4000-8000-000000007465', 'email', gen_random_uuid());
 insert into public.web_scan_contacts (web_scan_id, channel, contact_id) values ('00000000-0000-4000-8000-000000007465', 'telegram', gen_random_uuid());   -- a new channel needs no schema change
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id, save_consent_at, save_consent_version) values ('00000000-0000-4000-8000-000000007466', 'email', gen_random_uuid(), now(), '2026-10-12-v1');   -- MPC-7470: consent record on the link
+select pg_temp.assert((select count(*) from public.web_scan_contacts where web_scan_id = '00000000-0000-4000-8000-000000007466' and save_consent_at is not null and save_consent_version = '2026-10-12-v1') = 1, 'web_scan_contacts: stores the save-consent time and wording version (MPC-7470)');
 select pg_temp.assert((select sum(scans_completed) from public.web_scan_funnel) >= 2 and (select sum(scans_with_contact) from public.web_scan_funnel) >= 1
   and (select sum(scans_without_contact) from public.web_scan_funnel) >= 1, 'web_scan_funnel: counts scans with and without a contact');
 reset role;

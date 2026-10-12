@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { Shield, Lock, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SaveScanConsentCheckbox from '@/components/SaveScanConsentCheckbox';
+import ScanSavingNotice from '@/components/ScanSavingNotice';
+import { trackReportRequested } from '@/lib/analytics';
+import { SCAN_API_URL, canOfferScanSave, noteSaveResult, scanSaveFields } from '@/lib/webScan';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface EmailCaptureModalProps {
@@ -31,6 +35,9 @@ export default function EmailCaptureModal({
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [consent, setConsent] = useState(false);
+  // MPC-7470 (D12): the separate save box exists only while saving is on AND this browser holds the finished scan. Required when shown.
+  const [offerSave] = useState(() => canOfferScanSave());
+  const [saveConsent, setSaveConsent] = useState(false);
   const [baseline, setBaseline] = useState<Baseline | null>(null);
 
   const getRiskLabel = (risk: number) => {
@@ -51,6 +58,11 @@ export default function EmailCaptureModal({
 
     if (!consent) {
       setErrorMsg('Please tick the box to receive your fix guide by email.');
+      return;
+    }
+
+    if (offerSave && !saveConsent) {
+      setErrorMsg('Please tick the box to save your scan result with your email.');
       return;
     }
 
@@ -76,6 +88,23 @@ export default function EmailCaptureModal({
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json().catch(() => null);
       if (data?.baseline) setBaseline(data.baseline);
+
+      // MPC-7470 (D12): with the save box ticked, the scan kept in this browser goes to the scan-report Worker together with the email
+      // (the report is where the saved scan is shown). Best effort: the lead above is already recorded, so a failure here changes nothing for the visitor.
+      if (offerSave && saveConsent && SCAN_API_URL) {
+        try {
+          const r = await fetch(`${SCAN_API_URL.replace(/\/$/, '')}/api/scan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: trimmed, consent: true, consent_source: 'web_scan_summary', ...scanSaveFields() }),
+          });
+          if (r.ok) noteSaveResult(await r.json().catch(() => null));
+          else console.error('Scan save request failed:', r.status);
+        } catch (saveErr) {
+          console.error('Scan save request failed:', saveErr);
+        }
+      }
+      trackReportRequested('web_scan_summary', offerSave && saveConsent);
 
       setStatus('success');
       onSubmit(trimmed);
@@ -197,6 +226,19 @@ export default function EmailCaptureModal({
                 />
                 <span>Email me my fix guide and Privacy Check, the monthly newsletter. I can unsubscribe at any time.</span>
               </label>
+
+              {offerSave && (
+                <>
+                  <SaveScanConsentCheckbox
+                    id="email-modal-save-consent"
+                    checked={saveConsent}
+                    onChange={(v) => { setSaveConsent(v); setErrorMsg(''); }}
+                    disabled={status === 'loading'}
+                    required={false}
+                  />
+                  <ScanSavingNotice variant="contact" />
+                </>
+              )}
 
               <Button
                 type="submit"
