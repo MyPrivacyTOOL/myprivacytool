@@ -33,9 +33,11 @@ HK_SPAM_EMAILS_LIVE = "false"
 # The site has a matching flag, VITE_SAVE_WEB_SCANS (a Cloudflare Pages build variable): the tick box only shows when BOTH are on.
 WEB_SCAN_SAVE_ENABLED = "true"
 
-# MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). OFF. Turn on only after Chris has seen the screen and
-# approved it, and only if the MPC-7491 device-recognition wording is live. Needs WEB_SCAN_SAVE_ENABLED too. Anything but "true" does nothing.
-RECOGNITION_ENABLED = "false"
+# MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). ON since 2026-10-12 on Chris's instruction, after he approved the
+# screen, the threshold and the exact opt-in wording, and after the recognise-opt-in migration (20261012240000) was applied. Recognition runs only for a browser
+# holding a scan saved with BOTH the save consent and the separate "recognise this device" consent. Needs WEB_SCAN_SAVE_ENABLED too. "false" is the rollback;
+# anything but "true" does nothing.
+RECOGNITION_ENABLED = "true"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
