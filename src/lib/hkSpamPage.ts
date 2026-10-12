@@ -96,3 +96,12 @@ export function formatHkDate(iso: string, lang: PageLang): string {
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat(lang === "zh" ? "zh-HK" : "en-HK", { dateStyle: "full", timeZone: "UTC" }).format(d);
 }
+
+// "Didn't work?" on /HongKongSpam links here with ?source=hk-spam&platform=..&lang=.. (MPC-7446). Only known values
+// are accepted, so the query string cannot inject text into the message.
+export function hkSpamContactPrefill(params: URLSearchParams): string {
+  if (params.get("source") !== "hk-spam") return "";
+  const platform = ["android", "ios", "other"].find((p) => p === params.get("platform")) ?? "unknown";
+  const lang = ["en", "zh"].find((l) => l === params.get("lang")) ?? "unknown";
+  return `Hong Kong Stop Spam did not work for me.\nWhat happened: \n\n(Phone type: ${platform}. Page language: ${lang}.)`;
+}

@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo, { SITE_URL } from "@/components/Seo";
 import { HK_SPAM_ENABLED } from "@/config/hkDnc";
-import { HK_SPAM_META, HK_SPAM_PATH, HK_SPAM_PUBLIC, isHkSpamPreview } from "@/config/hkSpamPage";
-import { HK_COPY, type HkCopy } from "@/data/hkSpamCopy";
+import { HK_SPAM_INDEXABLE, HK_SPAM_META, HK_SPAM_PATH, isHkSpamPreview } from "@/config/hkSpamPage";
+import { CONSENT_WORDING_FINAL, HK_COPY, type HkCopy } from "@/data/hkSpamCopy";
+import { hasHongKongOverride, isHongKongVisitor, setHongKongOverride } from "@/lib/hkVisitor";
 import { track, getUtm } from "@/lib/hkSpamTrack";
 import { formatHkDate, readInitialLang, resolveHkDial, detectHkPlatform, storeLang, type PageLang } from "@/lib/hkSpamPage";
 import {
@@ -23,12 +24,15 @@ import {
 import {
   addSpamLogEntry,
   clearSpamLog,
+  downloadSpamLog,
   loadSpamLog,
   removeSpamLogEntry,
+  SPAM_KINDS,
+  spamKindLabel,
   spamLogToText,
   type SpamKind,
 } from "@/lib/hkSpamLog";
-import { buildOptOutText, type OptOutChannel } from "@/lib/hkSpamOptOut";
+import { buildOptOutText, SENDER_TYPES, type OptOutChannel, type SenderType } from "@/lib/hkSpamOptOut";
 
 const SELECT_CLASS = "h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground";
 
@@ -84,17 +88,29 @@ const HongKongSpamPage = () => {
   const [reminderSaved, setReminderSaved] = useState(false);
 
   // Opt-out generator
-  const [company, setCompany] = useState("");
+  const [picked, setPicked] = useState<SenderType[]>([]);
   const [channel, setChannel] = useState<OptOutChannel>("sms");
-  const [optOut, setOptOut] = useState("");
-  const [optOutCopied, setOptOutCopied] = useState(false);
+  const [optOuts, setOptOuts] = useState<{ sender: SenderType; text: string }[]>([]);
+  const [optOutError, setOptOutError] = useState(false);
+  const [copiedSender, setCopiedSender] = useState<SenderType | null>(null);
 
   // Spam log
   const [log, setLog] = useState(loadSpamLog);
-  const [logKind, setLogKind] = useState<SpamKind>("call");
+  const [logKind, setLogKind] = useState<SpamKind>("sms");
   const [logSender, setLogSender] = useState("");
   const [logNote, setLogNote] = useState("");
   const [logCopied, setLogCopied] = useState(false);
+  const [exportFailed, setExportFailed] = useState(false);
+
+  // Visitors outside Hong Kong get a short note with an override (the page itself still works).
+  const [hkState, setHkState] = useState<"loading" | "hk" | "other">("loading");
+  useEffect(() => {
+    let alive = true;
+    isHongKongVisitor().then((hk) => alive && setHkState(hk ? "hk" : "other"));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // GA4: hk_spam_view fires once per page load.
   useEffect(() => {
@@ -148,11 +164,25 @@ const HongKongSpamPage = () => {
     setStatus("done");
   };
 
+  const toggleSender = (s: SenderType) =>
+    setPicked((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
+
   const onGenerate = () => {
-    setOptOut(buildOptOutText({ company, channel, lang }));
-    setOptOutCopied(false);
-    track("hk_spam_optout_generated", { channel, language: lang });
+    if (picked.length === 0) {
+      setOptOutError(true);
+      return;
+    }
+    setOptOutError(false);
+    setOptOuts(SENDER_TYPES.filter((s) => picked.includes(s)).map((sender) => ({ sender, text: buildOptOutText({ sender, channel, lang }) })));
+    setCopiedSender(null);
+    track("hk_spam_optout_generated", { channel, language: lang, sender_types: picked.length });
   };
+
+  const onExport = () => {
+    setExportFailed(!downloadSpamLog(log, lang));
+  };
+
+  const didntWorkHref = `/contact?${new URLSearchParams({ source: "hk-spam", platform, lang }).toString()}`;
 
   const onAddLog = () => {
     const next = addSpamLogEntry(log, { kind: logKind, sender: logSender, note: logNote });
@@ -170,7 +200,7 @@ const HongKongSpamPage = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground" lang={copy.htmlLang}>
-      <Seo title={meta.title} description={meta.description} path={HK_SPAM_PATH} noindex={!HK_SPAM_PUBLIC} />
+      <Seo title={meta.title} description={meta.description} path={HK_SPAM_PATH} noindex={!HK_SPAM_INDEXABLE} />
       <Helmet>
         <html lang={copy.htmlLang} />
         <link rel="alternate" hrefLang="en-HK" href={url} />
@@ -194,6 +224,36 @@ const HongKongSpamPage = () => {
             {copy.toggleLabel}
           </button>
         </div>
+
+        {hkState === "other" && (
+          <p role="note" className="mb-4 rounded-lg bg-muted p-3 text-center text-sm" data-testid="hk-nonhk-note">
+            {copy.card.nonHkNote}{" "}
+            <button
+              type="button"
+              className="min-h-11 px-1 font-semibold underline"
+              onClick={() => {
+                setHongKongOverride(true);
+                setHkState("hk");
+              }}
+            >
+              {copy.card.nonHkButton}
+            </button>
+          </p>
+        )}
+        {hkState === "hk" && hasHongKongOverride() && (
+          <p className="mb-4 text-center text-xs text-muted-foreground">
+            <button
+              type="button"
+              className="min-h-11 px-1 underline"
+              onClick={() => {
+                setHongKongOverride(false);
+                setHkState("other");
+              }}
+            >
+              {copy.card.notHkButton}
+            </button>
+          </p>
+        )}
 
         {/* Hero */}
         <section className="text-center" aria-labelledby="hk-hero">
@@ -296,7 +356,14 @@ const HongKongSpamPage = () => {
                     onChange={(e) => setConsent(e.target.checked)}
                     className="mt-1 h-4 w-4 shrink-0"
                   />
-                  <span>{copy.consentLabel}</span>
+                  <span>
+                    {copy.consentLabel}
+                    {!CONSENT_WORDING_FINAL && (
+                      <strong className="mt-1 block text-xs text-destructive" data-testid="hk-consent-placeholder">
+                        [{copy.consentPlaceholderTag}]
+                      </strong>
+                    )}
+                  </span>
                 </label>
               )}
               {formError && (
@@ -317,13 +384,17 @@ const HongKongSpamPage = () => {
             )}
             {status === "done" && protectionDate && (
               <div className="rounded-xl bg-primary/10 p-4" data-testid="hk-result">
-                <h3 className="mb-1 text-lg font-bold">{copy.resultTitle}</h3>
-                <p className="mb-2 text-base font-semibold">
-                  {copy.resultBody.replace("{date}", formatHkDate(protectionDate, lang))}
-                </p>
+                <h3 className="mb-1 text-lg font-bold">{copy.resultTitle.replace("{date}", formatHkDate(protectionDate, lang))}</h3>
+                <p className="mb-2 text-base">{copy.resultBody}</p>
                 <p className="text-sm text-muted-foreground">{copy.resultWeather}</p>
                 {saved === false && <p className="mt-2 text-sm">{copy.resultSaveFailed}</p>}
                 {reminderSaved && <p className="mt-2 text-sm">{copy.resultReminderSaved}</p>}
+                <p className="mt-3 text-sm">
+                  <Link to={didntWorkHref} className="inline-block min-h-11 py-2 font-semibold underline" data-testid="hk-didnt-work">
+                    {copy.didntWork}
+                  </Link>{" "}
+                  <span className="text-muted-foreground">{copy.didntWorkBody}</span>
+                </p>
               </div>
             )}
           </div>
@@ -348,17 +419,23 @@ const HongKongSpamPage = () => {
             {copy.optOutTitle}
           </h2>
           <p className="mb-3 text-sm text-muted-foreground">{copy.optOutIntro}</p>
-          <label htmlFor="hk-company" className="mb-1 block text-sm font-medium">
-            {copy.optOutCompany}
-          </label>
-          <Input
-            id="hk-company"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            placeholder={copy.optOutCompanyPlaceholder}
-            maxLength={80}
-            className="mb-3 h-12 text-base"
-          />
+          <fieldset className="mb-3">
+            <legend className="mb-1 block text-sm font-medium">{copy.optOutPick}</legend>
+            <div className="space-y-1">
+              {SENDER_TYPES.map((t) => (
+                <label key={t} htmlFor={`hk-sender-${t}`} className="flex min-h-11 items-center gap-3 text-base">
+                  <input
+                    id={`hk-sender-${t}`}
+                    type="checkbox"
+                    checked={picked.includes(t)}
+                    onChange={() => toggleSender(t)}
+                    className="h-5 w-5 shrink-0"
+                  />
+                  {copy.senderTypes[t]}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label htmlFor="hk-channel" className="mb-1 block text-sm font-medium">
             {copy.optOutChannel}
           </label>
@@ -372,28 +449,36 @@ const HongKongSpamPage = () => {
             <option value="email">{copy.channels.email}</option>
             <option value="letter">{copy.channels.letter}</option>
           </select>
+          {optOutError && (
+            <p role="alert" className="mb-3 border-l-4 border-destructive pl-3 text-sm">
+              {copy.optOutNonePicked}
+            </p>
+          )}
           <Button type="button" onClick={onGenerate} className="h-12 w-full text-base font-bold">
             {copy.optOutGenerate}
           </Button>
-          {optOut && (
-            <div className="mt-3">
+          {optOuts.map(({ sender, text }) => (
+            <div key={sender} className="mt-3" data-testid={`hk-optout-${sender}`}>
+              <label htmlFor={`hk-optout-text-${sender}`} className="mb-1 block text-sm font-semibold">
+                {copy.optOutFor} {copy.senderTypes[sender]}
+              </label>
               <textarea
+                id={`hk-optout-text-${sender}`}
                 readOnly
-                value={optOut}
-                rows={8}
-                aria-label={copy.optOutTitle}
+                value={text}
+                rows={6}
                 className="w-full rounded-md border border-input bg-background p-3 text-sm"
               />
               <Button
                 type="button"
                 variant="outline"
                 className="mt-2 h-11"
-                onClick={async () => setOptOutCopied(await copyText(optOut))}
+                onClick={async () => setCopiedSender((await copyText(text)) ? sender : null)}
               >
-                {optOutCopied ? copy.optOutCopied : copy.optOutCopy}
+                {copiedSender === sender ? copy.optOutCopied : copy.optOutCopy}
               </Button>
             </div>
-          )}
+          ))}
         </section>
 
         {/* On-device spam log */}
@@ -412,8 +497,11 @@ const HongKongSpamPage = () => {
             onChange={(e) => setLogKind(e.target.value as SpamKind)}
             className={`${SELECT_CLASS} mb-3`}
           >
-            <option value="call">{copy.logKinds.call}</option>
-            <option value="sms">{copy.logKinds.sms}</option>
+            {SPAM_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {copy.logKinds[k]}
+              </option>
+            ))}
           </select>
           <label htmlFor="hk-log-sender" className="mb-1 block text-sm font-medium">
             {copy.logSender}
@@ -447,7 +535,7 @@ const HongKongSpamPage = () => {
                 {log.map((e) => (
                   <li key={e.id} className="flex items-start justify-between gap-2 rounded-lg border border-border p-3 text-sm">
                     <span className="min-w-0 break-words">
-                      <span className="font-semibold">{copy.logKinds[e.kind]}</span> · {e.sender}
+                      <span className="font-semibold">{spamKindLabel(e.kind, lang)}</span> · {e.sender}
                       {e.note ? ` · ${e.note}` : ""}
                       <span className="block text-xs text-muted-foreground">
                         {new Intl.DateTimeFormat(lang === "zh" ? "zh-HK" : "en-HK", {
@@ -476,10 +564,18 @@ const HongKongSpamPage = () => {
                 >
                   {logCopied ? copy.optOutCopied : copy.logCopyAll}
                 </Button>
+                <Button type="button" variant="outline" className="h-11" onClick={onExport} data-testid="hk-log-export">
+                  {copy.logExport}
+                </Button>
                 <Button type="button" variant="outline" className="h-11" onClick={() => setLog(clearSpamLog())}>
                   {copy.logClear}
                 </Button>
               </div>
+              {exportFailed && (
+                <p role="alert" className="mt-2 text-sm">
+                  {copy.logExportFailed}
+                </p>
+              )}
             </>
           )}
         </section>
@@ -515,7 +611,7 @@ const HongKongSpamPage = () => {
 /** Route wrapper: lowercase, trailing-slash and other case variants all land on the canonical /HongKongSpam. */
 const HongKongSpam = () => {
   const { pathname, search, hash } = useLocation();
-  if (!HK_SPAM_ENABLED) return <Navigate to="/" replace />; // kill switch
+  if (!HK_SPAM_ENABLED) return <Navigate to="/" replace />; // kill switch (hkDnc.ts)
   if (pathname !== HK_SPAM_PATH) return <Navigate to={`${HK_SPAM_PATH}${search}${hash}`} replace />;
   return <HongKongSpamPage />;
 };

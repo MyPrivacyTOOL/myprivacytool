@@ -43,6 +43,7 @@ export interface HkCopy {
   emailInvalid: string;
   consentNeeded: string;
   consentLabel: string;
+  consentPlaceholderTag: string;
   doneButton: string;
   saving: string;
   resultTitle: string;
@@ -51,13 +52,17 @@ export interface HkCopy {
   resultSaveFailed: string;
   resultReminderSaved: string;
   resultError: string;
+  didntWork: string;
+  didntWorkBody: string;
   scanTitle: string;
   scanBody: string;
   scanButton: string;
   optOutTitle: string;
   optOutIntro: string;
-  optOutCompany: string;
-  optOutCompanyPlaceholder: string;
+  optOutPick: string;
+  senderTypes: { banks: string; telcos: string; retailers: string; loyalty: string };
+  optOutNonePicked: string;
+  optOutFor: string;
   optOutChannel: string;
   channels: { sms: string; email: string; letter: string };
   optOutGenerate: string;
@@ -67,7 +72,9 @@ export interface HkCopy {
   logIntro: string;
   logPrivacy: string;
   logKind: string;
-  logKinds: { call: string; sms: string };
+  logKinds: { sms: string; recorded: string; live: string; call: string };
+  logExport: string;
+  logExportFailed: string;
   logSender: string;
   logSenderPlaceholder: string;
   logNote: string;
@@ -89,6 +96,13 @@ export interface HkCopy {
     notHkButton: string;
   };
 }
+
+/**
+ * The reminder-email consent wording is a PLACEHOLDER until MPC-7538 (privacy consent + policy) finalises it. While this is
+ * false the page shows a visible "placeholder" tag next to the tick-box; flip it to true in the same change that
+ * pastes the final wording. Launch (HK_SPAM_INDEXABLE) is gated on MPC-7538.
+ */
+export const CONSENT_WORDING_FINAL = false;
 
 export const EN: HkCopy = {
   htmlLang: "en-HK",
@@ -121,33 +135,40 @@ export const EN: HkCopy = {
   emailInvalid: "That email address does not look right.",
   consentNeeded: "Tick the box to get the reminder, or clear the email.",
   consentLabel: "Yes, email me once when my protection starts. I can unsubscribe at any time.",
+  consentPlaceholderTag: "PLACEHOLDER consent wording. MPC-7538 finalises it.",
   doneButton: "Done: I have registered",
   saving: "Saving...",
-  resultTitle: "You are registered",
-  resultBody: "Your protection starts on {date}, the 10th Hong Kong working day after you registered.",
+  resultTitle: "You're protected from {date}",
+  resultBody: "That is the 10th Hong Kong working day after you registered. Until then you can still get messages.",
   resultWeather: "A black rainstorm or gale warning day is not a working day, so the date can move later by one day for each such day.",
   resultSaveFailed: "We could not save your reminder, but your date above is still correct.",
   resultReminderSaved: "Reminder saved. We will email you on that day.",
   resultError: "We could not work out the date for today. Please check dnc.gov.hk.",
+  didntWork: "Didn't work?",
+  didntWorkBody: "Tell us what happened. We attach your phone type and language so we can help faster.",
   scanTitle: "Next: see what else is exposed",
   scanBody: "Spam often starts with your details being listed online. Run the free privacy scan to see where, then remove it.",
   scanButton: "Run the free privacy scan",
   optOutTitle: "Stop companies you said yes to",
   optOutIntro:
-    "The register does not block a company you have given consent to. Write to each one to withdraw it. Add your own number before you send.",
-  optOutCompany: "Company or bank",
-  optOutCompanyPlaceholder: "e.g. Your bank, telco or shop",
+    "The register does not block a company you have given consent to. Tick the kinds of sender you have said yes to, then copy a message for each. Add your own number and the sender's name before you send.",
+  optOutPick: "Who have you said yes to?",
+  senderTypes: { banks: "Banks", telcos: "Phone and mobile companies", retailers: "Shops and retailers", loyalty: "Loyalty and rewards schemes" },
+  optOutNonePicked: "Tick at least one kind of sender.",
+  optOutFor: "Message for",
   optOutChannel: "Send it by",
   channels: { sms: "SMS", email: "Email", letter: "Letter" },
-  optOutGenerate: "Write my opt-out message",
+  optOutGenerate: "Write my opt-out messages",
   optOutCopy: "Copy message",
   optOutCopied: "Copied",
   logTitle: "Spam log (kept on this phone)",
   logIntro: "Note each spam call or SMS. If you complain to OFCA you will have the details ready.",
   logPrivacy: "Stored only in this browser. We never receive it.",
   logKind: "Type",
-  logKinds: { call: "Call", sms: "SMS" },
-  logSender: "Number or sender",
+  logKinds: { sms: "SMS", recorded: "Recorded call", live: "Live call", call: "Call" },
+  logExport: "Export log (CSV)",
+  logExportFailed: "Your browser blocked the download. Use Copy whole log instead.",
+  logSender: "Number",
   logSenderPlaceholder: "e.g. +852 5555 0000 or a sender name",
   logNote: "Note (optional)",
   logAdd: "Add to log",
@@ -229,21 +250,26 @@ export const ZH: HkCopy = {
   emailInvalid: "電郵地址格式不正確。",
   consentNeeded: "請剔選方格以接收提醒，或清除電郵地址。",
   consentLabel: "是，請在保障生效時發電郵通知我一次。我可隨時取消訂閱。",
+  consentPlaceholderTag: "暫代的同意聲明文字，最終內容由 MPC-7538 確定。",
   doneButton: "完成，我已登記",
   saving: "儲存中……",
-  resultTitle: "你已完成登記",
-  resultBody: "你的保障將於 {date}生效，即登記後第 10 個香港工作日。",
+  resultTitle: "你由 {date}起受保障",
+  resultBody: "即登記後第 10 個香港工作日。在此之前，你仍可能收到訊息。",
   resultWeather: "黑色暴雨警告日及烈風警告日不算工作日，每遇一日，生效日期便會順延一日。",
   resultSaveFailed: "未能儲存提醒電郵，但上面的日期仍然正確。",
   resultReminderSaved: "已儲存提醒，我們會在當日發電郵給你。",
   resultError: "未能計算今天的生效日期，請到 dnc.gov.hk 查詢。",
+  didntWork: "不成功？",
+  didntWorkBody: "告訴我們發生了甚麼事。我們會附上你的手機類型及語言，以便更快協助你。",
   scanTitle: "下一步：看看還有甚麼資料外洩",
   scanBody: "垃圾訊息往往源自你的資料被公開列出。立即免費掃描，看看在哪裏，然後移除。",
   scanButton: "免費私隱掃描",
   optOutTitle: "停止你曾答應接收的公司訊息",
-  optOutIntro: "登記冊不會攔截你曾經同意接收的公司。請逐一去信撤回同意，並在發送前填上你自己的電話號碼。",
-  optOutCompany: "公司或銀行",
-  optOutCompanyPlaceholder: "例如：你的銀行、電訊商或商店",
+  optOutIntro: "登記冊不會攔截你曾經同意接收的公司。請剔選你曾答應接收訊息的發送者類別，再逐一複製通知。發送前請填上你自己的電話號碼及發送者名稱。",
+  optOutPick: "你曾答應哪些類別接收訊息？",
+  senderTypes: { banks: "銀行", telcos: "電訊及流動電話公司", retailers: "商店及零售商", loyalty: "會員及積分計劃" },
+  optOutNonePicked: "請至少剔選一個類別。",
+  optOutFor: "通知對象：",
   optOutChannel: "發送方式",
   channels: { sms: "短訊", email: "電郵", letter: "信件" },
   optOutGenerate: "撰寫退出通知",
@@ -253,8 +279,10 @@ export const ZH: HkCopy = {
   logIntro: "記下每次垃圾來電或短訊。日後向通訊辦投訴時，資料已準備好。",
   logPrivacy: "只儲存在此瀏覽器，我們不會收到。",
   logKind: "類別",
-  logKinds: { call: "來電", sms: "短訊" },
-  logSender: "號碼或發送者",
+  logKinds: { sms: "短訊", recorded: "錄音來電", live: "真人來電", call: "來電" },
+  logExport: "匯出記錄（CSV）",
+  logExportFailed: "瀏覽器封鎖了下載。請改用「複製全部記錄」。",
+  logSender: "號碼",
   logSenderPlaceholder: "例如 +852 5555 0000 或發送者名稱",
   logNote: "備註（選填）",
   logAdd: "加入記錄",

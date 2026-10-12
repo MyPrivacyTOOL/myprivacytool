@@ -4,7 +4,7 @@ import {
   HK_PREVIEW_KEY,
   HK_SPAM_META,
   HK_SPAM_PATH,
-  HK_SPAM_PUBLIC,
+  HK_SPAM_INDEXABLE,
   computePreview,
   isHkSpamPreview,
   isHkSpamSurfaceEnabled,
@@ -15,7 +15,7 @@ const base = { search: "", hostname: "www.myprivacytool.io", stored: null, dev: 
 
 describe("launch flag", () => {
   it("ships switched off, and stays off while the IVR keys are unverified", () => {
-    expect(HK_SPAM_PUBLIC).toBe(false);
+    expect(HK_SPAM_INDEXABLE).toBe(false);
     expect(IVR_VERIFIED).toBe(false);
     expect(HK_SPAM_PATH).toBe("/HongKongSpam");
   });
@@ -66,6 +66,6 @@ describe("isHkSpamPreview / isHkSpamSurfaceEnabled (jsdom, localhost)", () => {
     window.history.pushState({}, "", "/?hkpreview=1");
     expect(isHkSpamSurfaceEnabled()).toBe(true);
     window.history.pushState({}, "", "/?hkpreview=0");
-    expect(isHkSpamSurfaceEnabled()).toBe(HK_SPAM_PUBLIC);
+    expect(isHkSpamSurfaceEnabled()).toBe(HK_SPAM_INDEXABLE);
   });
 });
