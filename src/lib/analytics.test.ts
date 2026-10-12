@@ -37,3 +37,18 @@ describe("funnel_step numbering (MPC-7376)", () => {
     }
   });
 });
+
+describe("report_requested (MPC-7470)", () => {
+  it("fires once per request with only non-personal values, and reaches nothing without gtag (analytics consent)", async () => {
+    const { trackReportRequested } = await import("./analytics");
+    trackReportRequested("scan_page", true);
+    const calls = gtag.mock.calls.filter((c) => c[0] === "event" && c[1] === "report_requested");
+    expect(calls).toHaveLength(1);
+    const params = calls[0][2] as Record<string, unknown>;
+    expect(params).toMatchObject({ source: "scan_page", scan_save_ticked: true });
+    for (const v of Object.values(params)) expect(String(v)).not.toMatch(/@|[0-9a-f]{8}-[0-9a-f]{4}-/i); // no email, no scan number
+    delete window.gtag;
+    expect(() => trackReportRequested("web_scan_summary", false)).not.toThrow();
+  });
+});
+
