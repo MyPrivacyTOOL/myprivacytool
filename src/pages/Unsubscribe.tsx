@@ -4,6 +4,7 @@ import { Check, MailX } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { validateEmail } from "@/lib/formFeedback";
+import { DEFAULT_SCAN_API_URL, resolveScanApiUrl } from "@/lib/webScan";
 
 // "Unsubscribe me" page. Two ways in:
 //  1. From a link in one of our emails (?e=<address>&t=<signed token>): shows a confirm button, and the opt-out happens
@@ -11,7 +12,7 @@ import { validateEmail } from "@/lib/formFeedback";
 //  2. From the footer: the visitor types their address and we email a confirmation link to it, so only the owner of the
 //     address can opt out. The answer is the same whether or not the address is on our list.
 // Both talk to the scan-report Worker, the same service the /scan page uses.
-const API = ((import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev").replace(/\/$/, "");
+const API = resolveScanApiUrl() || DEFAULT_SCAN_API_URL; // MPC-7535: a blank Pages variable no longer sends this to a relative URL
 
 type Status = "idle" | "loading" | "done" | "sent" | "invalid" | "limited" | "error";
 

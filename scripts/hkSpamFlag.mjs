@@ -1,12 +1,24 @@
 // Build-time side of the /HongKongSpam launch switch (MPC-7446).
-// The ONE flag is `public` in src/data/hkSpam.json (the React page reads the same file via
-// src/config/hkSpamPage.ts). While it is false the page is noindex, absent from the sitemap and disallowed in
+// The ONE SEO flag is `indexable` (HK_SPAM_INDEXABLE) in src/data/hkSpam.json; the React page reads the same file via
+// src/config/hkSpamPage.ts. While it is false the page is noindex, absent from the sitemap and disallowed in
 // robots.txt. Flipping it to true (only after MPC-7445 confirms the IVR keys) makes all three indexable at once.
+// The kill switch (VITE_HK_SPAM_ENABLED=false, same parsing as src/config/hkDnc.ts) also makes it non-indexable.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
 export function readHkSpamConfig(root) {
   return JSON.parse(readFileSync(path.join(root, "src/data/hkSpam.json"), "utf8"));
+}
+
+/** Same rule as parseHkSpamEnabled in src/config/hkDnc.ts: only an explicit false/0/off/no turns the feature off. */
+export function hkSpamEnabled(env = process.env) {
+  const raw = env.VITE_HK_SPAM_ENABLED;
+  return typeof raw !== "string" || !["false", "0", "off", "no"].includes(raw.trim().toLowerCase());
+}
+
+/** Indexable only when the feature is on AND the SEO flag is on. */
+export function hkSpamIsIndexable(cfg, env = process.env) {
+  return hkSpamEnabled(env) && cfg.indexable === true;
 }
 
 /** Variants that must not be crawled while the page is unlaunched (robots.txt paths are case-sensitive). */
@@ -21,7 +33,7 @@ export function hkSpamPrerenderRoute(cfg, siteUrl) {
     route: cfg.path,
     title: cfg.en.title,
     description: cfg.en.description,
-    noindex: cfg.public !== true,
+    noindex: !hkSpamIsIndexable(cfg),
     alternates: [
       { hreflang: "en-HK", href: url },
       { hreflang: "zh-HK", href: `${url}?lang=zh` },
@@ -32,13 +44,13 @@ export function hkSpamPrerenderRoute(cfg, siteUrl) {
 
 /** Sitemap entry fields, or null while the page is not public. */
 export function hkSpamSitemapEntry(cfg, siteUrl) {
-  if (cfg.public !== true) return null;
+  if (!hkSpamIsIndexable(cfg)) return null;
   return { loc: `${siteUrl}${cfg.path}`, changefreq: "monthly", priority: "0.8" };
 }
 
 /** Adds Disallow lines after every `Allow: /` while unlaunched; returns the text unchanged once public. */
 export function patchRobots(text, cfg) {
-  if (cfg.public === true) return text;
+  if (hkSpamIsIndexable(cfg)) return text;
   const lines = hkSpamDisallowPaths(cfg).map((p) => `Disallow: ${p}`);
   if (text.includes(lines[0])) return text;
   return text.replace(/^Allow: \/[ \t]*$/gm, (m) => [m.trimEnd(), ...lines].join("\n"));
