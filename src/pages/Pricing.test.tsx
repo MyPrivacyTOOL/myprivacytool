@@ -97,3 +97,12 @@ describe("Pricing A/B tests (MPC-7638)", () => {
     expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", expect.not.objectContaining({ ab_pricing_cta: expect.anything() }));
   });
 });
+
+describe("Pricing family add-on (MPC-7650)", () => {
+  it("shows the family member add-on price and the privacy rule", () => {
+    renderPage(<Pricing />);
+    expect(screen.getByRole("heading", { name: /family members on pro and executive/i })).toBeTruthy();
+    expect(screen.getByText(/\$5\/month each/)).toBeTruthy();
+    expect(screen.getByText(/adults keep their reports private/)).toBeTruthy();
+  });
+});
