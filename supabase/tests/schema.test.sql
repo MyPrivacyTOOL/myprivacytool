@@ -311,6 +311,45 @@ with u as (update public.hk_spam_registrations set reminder_sent_at = now() wher
   select pg_temp.assert(count(*) = 0, 'claim is atomic: a second claim matches nothing') from u;
 reset role;
 
+-- ===== MPC-7538: marketing consent, 90-day retention job, deletion/access routes =====
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, marketing_consent) values ('ios', 'en', '2026-10-23', 'tips@example.com', true)$$) = '',
+  'hk_spam: anon may insert marketing_consent with an email');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, marketing_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514',
+  'hk_spam: marketing consent needs an email');
+select pg_temp.assert((select column_default from information_schema.columns where table_schema = 'public' and table_name = 'hk_spam_registrations' and column_name = 'marketing_consent') = 'false',
+  'hk_spam: marketing_consent defaults to false (unticked)');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_marketing_recipients$$) = '42501', 'hk_spam_marketing_recipients: anon must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_purge_expired_hk_spam(true)$$) = '42501', 'mpt_purge_expired_hk_spam: anon must not run');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_delete_hk_spam_by_email('a@example.com')$$) = '42501', 'mpt_delete_hk_spam_by_email: anon must not run');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.mpt_export_hk_spam_by_email('a@example.com')$$) = '42501', 'mpt_export_hk_spam_by_email: anon must not run');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_deletion_log$$) = '42501', 'hk_spam_deletion_log: anon must not read');
+
+set local role service_role;
+delete from public.hk_spam_registrations;
+insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, marketing_consent) values
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 91, 'old-reminder@example.com', true,  false),   -- past 90 days, no marketing: deleted
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 90, 'edge@example.com',         true,  false),   -- exactly 90 days: deleted
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 89, 'recent@example.com',       true,  false),   -- 89 days: kept
+  ('ios', 'yue', (now() at time zone 'Asia/Hong_Kong')::date - 200, 'tips@example.com',        true,  true),    -- marketing consent: kept
+  ('ios', 'yue', (now() at time zone 'Asia/Hong_Kong')::date - 200, 'unsub@example.com',       false, true),    -- unsubscribed: consent ends, then deleted
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 300, null,                      false, false);   -- no email: the row still goes
+insert into public.email_suppressions (email_hash, source) values (encode(sha256(convert_to('unsub@example.com', 'UTF8')), 'hex'), 'unsubscribe');
+select pg_temp.assert((select count(*) from public.hk_spam_marketing_recipients) = 1 and (select email from public.hk_spam_marketing_recipients) = 'tips@example.com',
+  'marketing recipients: only marketing_consent = true and not unsubscribed');
+select pg_temp.assert((public.mpt_purge_expired_hk_spam(true)->>'rows_deleted')::int = 4, 'purge dry run counts 4 rows');
+select pg_temp.assert((select count(*) from public.hk_spam_registrations) = 6, 'purge dry run deletes nothing');
+select pg_temp.assert((public.mpt_purge_expired_hk_spam()->>'rows_deleted')::int = 4, 'purge deletes 4 rows');
+select pg_temp.assert((select count(*) from public.hk_spam_registrations) = 2
+  and exists (select 1 from public.hk_spam_registrations where email = 'recent@example.com')
+  and exists (select 1 from public.hk_spam_registrations where email = 'tips@example.com'),
+  'purge keeps the 89-day row and the marketing-consent row');
+select pg_temp.assert((select count(*) from public.hk_spam_deletion_log where kind = 'purge' and rows_deleted = 4 and consent_ended = 1) = 1
+  and (select count(*) from public.hk_spam_deletion_log where kind = 'purge_dry_run') = 1, 'purge is logged, counts only');
+select pg_temp.assert((select count(*) from public.mpt_export_hk_spam_by_email(' TIPS@example.com ')) = 1, 'export finds the record by email');
+select pg_temp.assert(public.mpt_delete_hk_spam_by_email('Tips@Example.com') = 1, 'deletion by email reports one record');
+select pg_temp.assert(not exists (select 1 from public.hk_spam_registrations where email = 'tips@example.com'), 'deletion by email removes the record');
+reset role;
+
 -- ===== MPC-7465: web_scans + web_scan_contacts (service_role only) =====
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scans$$) = '42501', 'web_scans: anon must not read');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.web_scans (hexagon_count, results, results_bytes) values (1, '[{}]', 4)$$) = '42501', 'web_scans: anon must not insert');
