@@ -429,6 +429,20 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
     check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, `unknown wording version (${JSON.stringify(v)}) => 400, nothing stored`);
   }
 
+  // MPC-7494: the SEPARATE recognise consent. Optional; stored on the link only when given with save consent and a scan, with a known wording version.
+  check(link.recognise_consent_at === undefined && link.recognise_consent_version === undefined, 'MPC-7494: without the recognise box nothing about recognition is stored on the link');
+  o = await post(ON, req({ recognise_consent: true, recognise_consent_version: V }, 'rec'));
+  const rlink = o.F.db.web_scan_contacts[0];
+  check(o.rs.status === 200 && o.j.scan_saved === true && rlink.save_consent_at && rlink.recognise_consent_version === V && Math.abs(Date.now() - Date.parse(rlink.recognise_consent_at)) < 60000, 'MPC-7494: ticked recognise box is stored with the link (Worker clock time and wording version), beside the save consent');
+  o = await post(ON, { email: 'mpc7494+nosave@example.com', consent: true, recognise_consent: true, recognise_consent_version: V });
+  check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 0, 'MPC-7494: recognise_consent without save consent and a scan is refused (400), nothing stored or sent');
+  o = await post(ON, req({ recognise_consent: true, recognise_consent_version: V, save_consent: undefined }, 'nosv'));
+  check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, 'MPC-7494: recognise_consent with a scan but no save_consent is refused, nothing stored');
+  for (const [name, patch] of Object.entries({ 'unknown version': { recognise_consent: true, recognise_consent_version: '2020-01-01-v9' }, 'missing version': { recognise_consent: true }, 'consent false': { recognise_consent: false, recognise_consent_version: V }, 'consent "true"': { recognise_consent: 'true', recognise_consent_version: V }, 'version without consent': { recognise_consent_version: V } })) {
+    o = await post(ON, req(patch, 'bad'));
+    check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 0, `MPC-7494: invalid recognise consent is refused, nothing stored (${name})`);
+  }
+
   // repeat request within 24h: no second copy of the technical details
   { const F = fake();
     o = await post(ON, req({}, 'dup'), { F }); o = await post(ON, req({}, 'dup'), { F });

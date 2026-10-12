@@ -1,9 +1,9 @@
 import type { HexagonData } from "@/lib/deviceDetection";
-import { SCAN_API_URL, earlierScanNumber, saveWebScansEnabled, toPayload } from "@/lib/webScan";
+import { SCAN_API_URL, earlierScanNumber, recognitionEnabled, toPayload } from "@/lib/webScan";
 
 // MPC-7494 (F5, the open mirror). Recognition happens in the open: the visitor is told, shown how, and decides. Off unless the site save flag
 // AND VITE_RECOGNITION_ENABLED are exactly "true"; the Worker has its own switch (RECOGNITION_ENABLED). Contract: docs/open-mirror-mpc-7494.md.
-export const recognitionEnabled = (): boolean => saveWebScansEnabled() && import.meta.env.VITE_RECOGNITION_ENABLED === "true";
+export { recognitionEnabled };
 
 export interface Recognised {
   scan_number: string;

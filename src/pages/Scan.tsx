@@ -7,10 +7,11 @@ import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
+import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested } from "@/lib/analytics";
-import { SCAN_API_URL, canOfferScanSave, noteSaveResult, reportStep, scanSaveFields } from "@/lib/webScan";
+import { SCAN_API_URL, canOfferScanSave, noteSaveResult, recognitionEnabled, reportStep, scanSaveFields } from "@/lib/webScan";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -23,7 +24,8 @@ const SOURCE_TAG = "scan-page";
 // Who actually receives emails is still gated by RECIPIENT_ALLOWLIST on the Worker.
 // MPC-7470 (D12): when the visitor ticked the save box, the finished scan kept in this browser goes in the same request (save_consent: true).
 // A visitor who arrived here without a scan, or did not see the box, sends the email alone and nothing is saved.
-async function requestScanReport(email: string, saveScan: boolean): Promise<void> {
+// MPC-7494: the separate recognise box adds recognise_consent only when ticked, and only together with the save box.
+async function requestScanReport(email: string, saveScan: boolean, recognise: boolean): Promise<void> {
   if (!SCAN_API_URL) return;
   const q = new URLSearchParams(window.location.search);
   const res = await fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/scan`, {
@@ -33,7 +35,7 @@ async function requestScanReport(email: string, saveScan: boolean): Promise<void
       email,
       consent: true, // only called after the consent checkbox is ticked
       consent_source: "scan_page",
-      ...(saveScan ? scanSaveFields() : {}),
+      ...(saveScan ? scanSaveFields({ recognise }) : {}),
       utm_source: q.get("utm_source") ?? "",
       utm_medium: q.get("utm_medium") ?? "",
       utm_campaign: q.get("utm_campaign") ?? "",
@@ -51,6 +53,13 @@ const Scan = () => {
   // MPC-7470: the save box exists only while saving is on AND this browser holds a finished scan (the visitor ran the scan on the home page).
   const [offerSave] = useState(() => canOfferScanSave());
   const [saveConsent, setSaveConsent] = useState(false);
+  // MPC-7494: a second, separate, optional box, only while recognition is on; ticking it needs the save box ticked first.
+  const [offerRecognise] = useState(() => canOfferScanSave() && recognitionEnabled());
+  const [recogniseConsent, setRecogniseConsent] = useState(false);
+  const onSaveChange = (v: boolean) => {
+    setSaveConsent(v);
+    if (!v) setRecogniseConsent(false);   // un-ticking the save box withdraws the recognise tick
+  };
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -74,7 +83,7 @@ const Scan = () => {
         pageName: "Free exposure scan",
       });
       try {
-        await requestScanReport(email.trim(), offerSave && saveConsent);
+        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent);
         trackReportRequested("scan_page", offerSave && saveConsent);
       } catch (reportErr) {
         console.error("Scan report request failed", reportErr); // never block the HubSpot lead
@@ -110,7 +119,10 @@ const Scan = () => {
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
       {offerSave && (
         <>
-          <SaveScanConsentCheckbox id={`scan-save-consent-${idSuffix}`} checked={saveConsent} onChange={setSaveConsent} disabled={submitting} />
+          <SaveScanConsentCheckbox id={`scan-save-consent-${idSuffix}`} checked={saveConsent} onChange={onSaveChange} disabled={submitting} />
+          {offerRecognise && (
+            <RecogniseConsentCheckbox id={`scan-recognise-consent-${idSuffix}`} checked={recogniseConsent} onChange={setRecogniseConsent} disabled={submitting || !saveConsent} />
+          )}
           <ScanSavingNotice variant="contact" />
         </>
       )}

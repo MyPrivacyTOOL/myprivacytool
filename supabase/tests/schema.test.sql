@@ -506,7 +506,7 @@ select pg_temp.assert((select jsonb_array_length(j->'rows') = 2 from mv) and not
 select pg_temp.assert((select (r->>'requests')::int = 4 and (r->>'robots_fetches')::int = 1 and r->'pages' = '["/", "/blog/a"]'::jsonb from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: requests, robots.txt fetches and pages served (no robots.txt, no 404)');
 select pg_temp.assert((select r->>'first_ever' = '2031-03-01T01:00:00+00:00' from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: first_ever looks past the window');
 
--- ===== MPC-7494: recognition candidates (consent, retention, hash match, service_role only, no personal link) =====
+-- ===== MPC-7494: recognition candidates (save + recognise consent, retention, hash match, service_role only, no personal link) =====
 select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)$$) = '42501', 'mpt_recognition_candidates: anon must not execute');
 select pg_temp.assert(pg_temp.try_as('authenticated', $$select * from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)$$) = '42501', 'mpt_recognition_candidates: authenticated must not execute');
 insert into public.web_scans (id, created_at, hexagon_count, results, results_bytes) values
@@ -515,22 +515,29 @@ insert into public.web_scans (id, created_at, hexagon_count, results, results_by
   ('00000000-0000-4000-8000-0000000074f3', now() - interval '400 days', 2, '[{"id":"canvas-fingerprint","label":"c","value":"h1","status":"found"},{"id":"browser","label":"b","value":"Chrome 141","status":"found"}]', 200),  -- consented but past 12 months
   ('00000000-0000-4000-8000-0000000074f4', now() - interval '5 days',   2, '[{"id":"canvas-fingerprint","label":"c","value":"h1","status":"found"},{"id":"browser","label":"b","value":"Chrome 141","status":"found"}]', 200),  -- same values, never linked to any contact
   ('00000000-0000-4000-8000-0000000074f5', now() - interval '3 days',   2, '[{"id":"canvas-fingerprint","label":"c","value":"other","status":"found"},{"id":"audio-fingerprint","label":"a","value":"h2","status":"found"}]', 200);  -- consented, audio h2
-insert into public.web_scan_contacts (web_scan_id, channel, contact_id, save_consent_at, save_consent_version) values
-  ('00000000-0000-4000-8000-0000000074f1', 'email', gen_random_uuid(), now(), '2026-10-12-v1'),
-  ('00000000-0000-4000-8000-0000000074f2', 'email', gen_random_uuid(), null, null),
-  ('00000000-0000-4000-8000-0000000074f3', 'email', gen_random_uuid(), now() - interval '400 days', '2026-10-12-v1'),
-  ('00000000-0000-4000-8000-0000000074f5', 'email', gen_random_uuid(), now(), '2026-10-12-v1');
+insert into public.web_scans (id, created_at, hexagon_count, results, results_bytes) values
+  ('00000000-0000-4000-8000-0000000074f6', now() - interval '2 days', 2, '[{"id":"canvas-fingerprint","label":"c","value":"h1","status":"found"},{"id":"browser","label":"b","value":"Chrome 141","status":"found"}]', 200);   -- same values, save consent but NO recognise consent
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id, save_consent_at, save_consent_version, recognise_consent_at, recognise_consent_version) values
+  ('00000000-0000-4000-8000-0000000074f1', 'email', gen_random_uuid(), now(), '2026-10-12-v1', now(), '2026-10-12-v1'),
+  ('00000000-0000-4000-8000-0000000074f2', 'email', gen_random_uuid(), null, null, now(), '2026-10-12-v1'),   -- recognise consent but no save consent: not a candidate
+  ('00000000-0000-4000-8000-0000000074f3', 'email', gen_random_uuid(), now() - interval '400 days', '2026-10-12-v1', now() - interval '400 days', '2026-10-12-v1'),
+  ('00000000-0000-4000-8000-0000000074f5', 'email', gen_random_uuid(), now(), '2026-10-12-v1', now(), '2026-10-12-v1'),
+  ('00000000-0000-4000-8000-0000000074f6', 'email', gen_random_uuid(), now(), '2026-10-12-v1', null, null);
 set local role service_role;
-select pg_temp.assert((select array_agg(right(web_scan_id::text, 2)) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)) = array['f1'], 'recognition candidates: only the consented, unexpired scan with that hash (not the unconsented, expired or unlinked ones)');
+select pg_temp.assert((select array_agg(right(web_scan_id::text, 2)) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)) = array['f1'], 'recognition candidates: only the scan with BOTH consents, unexpired, with that hash (not the saved-but-not-recognise-consented, unconsented, expired or unlinked ones)');
 select pg_temp.assert((select array_agg(right(web_scan_id::text, 2) order by web_scan_id) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"},{"id":"audio-fingerprint","value":"h2"}]'::jsonb)) = array['f1','f5'], 'recognition candidates: any of the given hashes can bring a candidate');
 select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"nope"}]'::jsonb)) = 0, 'recognition candidates: no shared hash, no candidate');
 select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[]'::jsonb)) = 0 and (select count(*) from public.mpt_recognition_candidates('"x"'::jsonb)) = 0 and (select count(*) from public.mpt_recognition_candidates('[1,2]'::jsonb)) = 0, 'recognition candidates: empty or malformed input returns nothing');
 select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb, 0)) = 1, 'recognition candidates: the limit is clamped to at least 1');
 select pg_temp.assert((select array_agg(column_name::text order by ordinal_position) from information_schema.columns where table_name = 'web_scans' and table_schema = 'public' and column_name in ('id')) is not null
   and (select pg_get_function_result('public.mpt_recognition_candidates(jsonb, integer)'::regprocedure)) = 'TABLE(web_scan_id uuid, scanned_at timestamp with time zone, results jsonb)', 'recognition candidates: returns scan number, time and results only (no contact or user column)');
+select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb) where right(web_scan_id::text, 2) = 'f6') = 0, 'recognition candidates: a scan saved with the save consent but WITHOUT the recognise consent is NOT a candidate');
+select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb) where right(web_scan_id::text, 2) = 'f1') = 1, 'recognition candidates: a scan with the recognise consent is a candidate');
 -- reading candidates changes nothing and logs nothing
-select pg_temp.assert((select count(*) from public.web_scans where id::text like '00000000-0000-4000-8000-0000000074f%') = 5, 'recognition candidates: read-only, all five scans still there');
+select pg_temp.assert((select count(*) from public.web_scans where id::text like '00000000-0000-4000-8000-0000000074f%') = 6, 'recognition candidates: read-only, all six scans still there');
 reset role;
+select pg_temp.assert((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'web_scan_contacts' and column_name in ('recognise_consent_at', 'recognise_consent_version')) = 2, 'web_scan_contacts: has the recognise consent columns (MPC-7494)');
+select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and not has_function_privilege('authenticated', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and has_function_privilege('service_role', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute'), 'mpt_recognition_candidates: grants unchanged, service_role only');
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

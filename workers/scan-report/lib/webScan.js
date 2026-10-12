@@ -10,6 +10,8 @@
 // (for example a stale cached page with different wording) is rejected, so every stored consent record names text we can show.
 // Add a new entry here whenever the label in src/lib/saveConsent.ts changes.
 export const SAVE_CONSENT_VERSIONS = ['2026-10-12-v1'];
+// MPC-7494: versions of the SEPARATE "Recognise this device" tick box wording (src/lib/saveConsent.ts, RECOGNISE_CONSENT_LABEL). The Worker rejects a version it does not know.
+export const RECOGNISE_CONSENT_VERSIONS = ['2026-10-12-v1'];
 
 export const MAX_WEB_SCAN_BYTES = 64 * 1024;
 export const MAX_HEXAGONS = 100;
@@ -64,16 +66,24 @@ export function validateHexagons(list) {
 // who arrived without a scan), { error } when it asks for one wrongly, or { hexagons, version }.
 // A request that carries a scan but not save_consent === true is REJECTED, never saved (and never silently dropped).
 export function parseSaveRequest(b) {
-  if (!['scan', 'save_consent', 'save_consent_version', 'started_ms', 'previous_scan_number'].some((k) => k in b)) return { none: true };
+  if (!['scan', 'save_consent', 'save_consent_version', 'started_ms', 'previous_scan_number', 'recognise_consent', 'recognise_consent_version'].some((k) => k in b)) return { none: true };
   if (b.save_consent !== true) return { error: 'Save consent required' };
   if (typeof b.save_consent_version !== 'string' || !SAVE_CONSENT_VERSIONS.includes(b.save_consent_version)) return { error: 'Unknown consent wording' };
+  // MPC-7494: the separate consent to be recognised. Valid ONLY together with save_consent === true and a scan; recognise_consent must be exactly true
+  // (anything else, including false, is refused rather than guessed) and its version known. Otherwise nothing is stored or sent.
+  let recogniseVersion;
+  if ('recognise_consent' in b || 'recognise_consent_version' in b) {
+    if (b.recognise_consent !== true) return { error: 'Invalid request' };
+    if (typeof b.recognise_consent_version !== 'string' || !RECOGNISE_CONSENT_VERSIONS.includes(b.recognise_consent_version)) return { error: 'Unknown consent wording' };
+    recogniseVersion = b.recognise_consent_version;
+  }
   const v = validateHexagons(b.scan);
   if (v.error) return v;
   if (new TextEncoder().encode(JSON.stringify(v.hexagons)).length > MAX_WEB_SCAN_BYTES) return { error: 'Invalid hexagons' };   // matches the web_scans.results_bytes check
   // MPC-7493: how long the scan took and the scan number this browser already held (a return visit). Optional, and valid only together with a scan that is being saved.
   if (b.started_ms !== undefined && !(Number.isInteger(b.started_ms) && b.started_ms >= 0 && b.started_ms <= MAX_SCAN_MS)) return { error: 'Invalid request' };
   if (b.previous_scan_number !== undefined && !isScanNumber(b.previous_scan_number)) return { error: 'Invalid request' };
-  return { hexagons: v.hexagons, version: b.save_consent_version, startedMs: b.started_ms, previousScanNumber: b.previous_scan_number?.toLowerCase() };
+  return { hexagons: v.hexagons, version: b.save_consent_version, recogniseVersion, startedMs: b.started_ms, previousScanNumber: b.previous_scan_number?.toLowerCase() };
 }
 
 // Reads the body with a hard size cap (content-length can be missing or wrong), then parses it.
@@ -138,7 +148,7 @@ export function validateStep(body) {
 // Saves the scan and links it to the contact in one step, with the consent record (when and which wording) on the link.
 // Never throws: a failure must not cost the visitor their report. If the link cannot be written the scan row is removed again,
 // so a scan never stays stored without a contact and a consent record. Returns { saved, scanNumber }.
-export async function saveWebScanForContact(env, sb, { hexagons, contactId, version, startedMs, previousScanNumber, now = new Date() }) {
+export async function saveWebScanForContact(env, sb, { hexagons, contactId, version, recogniseVersion, startedMs, previousScanNumber, now = new Date() }) {
   if (!webScanEnabled(env) || !contactId || !SAVE_CONSENT_VERSIONS.includes(version)) return { saved: false };
   let scanNumber;
   try {
@@ -148,7 +158,9 @@ export async function saveWebScanForContact(env, sb, { hexagons, contactId, vers
     return { saved: false };
   }
   try {
-    await sb.insert('web_scan_contacts', { web_scan_id: scanNumber, channel: 'email', contact_id: contactId, save_consent_at: now.toISOString(), save_consent_version: version });
+    await sb.insert('web_scan_contacts', { web_scan_id: scanNumber, channel: 'email', contact_id: contactId, save_consent_at: now.toISOString(), save_consent_version: version,
+      // MPC-7494: only when the visitor ticked the separate recognise box (a known wording version); otherwise the link carries no recognition consent.
+      ...(RECOGNISE_CONSENT_VERSIONS.includes(recogniseVersion) ? { recognise_consent_at: now.toISOString(), recognise_consent_version: recogniseVersion } : {}) });
     await recordEvent(sb, scanNumber, 'contact_given');   // MPC-7493
     return { saved: true, scanNumber };
   } catch (e) {
