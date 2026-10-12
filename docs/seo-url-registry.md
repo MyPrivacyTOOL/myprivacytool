@@ -118,3 +118,5 @@ The site is a client-only SPA, so before MPC-7169 every URL returned the homepag
 
 ## 6. Change process
 Adding or renaming a URL: update this file, `scripts/generate-sitemap.mjs` (unless noindex), `src/data/pageMeta.json` (static routes; posts/guides are picked up from their JSON), and add a 301 for any renamed path.
+
+- MPC-7649: `/monitoring` (Pro/Executive monitoring dashboard preview) is `noindex`, not in the sitemap and redirects to `/pricing` in production unless `VITE_MONITORING_ENABLED=true`. It renders sample data until user accounts and the monitoring Worker exist.
