@@ -2,6 +2,9 @@ import type { Logger } from "./logger";
 
 export interface Env {
   X_CONSUMER_SECRET?: string;
+  /** MPC-7628 Mirror bot: app bearer token (public profile lookup) and user-context token with dm.write (DM replies). */
+  X_BEARER_TOKEN?: string;
+  X_USER_ACCESS_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;
