@@ -1,7 +1,7 @@
 // Cloudflare Pages middleware (MPC-7490): records the technical facts of a request as a raw visit and classifies it.
 // OBSERVES ONLY. The response is returned exactly as the site produced it; the write runs after, via waitUntil, and every error
 // is swallowed. OFF unless the Pages variable EDGE_CAPTURE_ENABLED is 1/true/on/yes (unset in production at merge).
-// It also only runs for the paths listed in public/_routes.json, which at merge covers /api/* only. See docs/edge-capture.md.
+// It also only runs for the paths listed in public/_routes.json, which covers pages and /api/* but not static assets. See docs/edge-capture.md.
 
 import { captureEnabled, captureVisit, type CaptureEnv } from "../shared/edge-capture/capture";
 
