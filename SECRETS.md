@@ -15,6 +15,8 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `X_CONSUMER_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_WEBHOOK_SECRET` (MPC-8301) | | ✅ |
 | `TELEGRAM_BOT_TOKEN` (MPC-7251, sends Telegram replies) | | ✅ |
+| `X_BEARER_TOKEN` (MPC-7628, public profile lookup for the Mirror bot) | | ✅ |
+| `X_USER_ACCESS_TOKEN` (MPC-7628, OAuth 2.0 user token with `dm.write`, sends Mirror DMs) | | ✅ |
 
 Each Worker only receives the secrets it needs (least privilege). Secrets are read in code as `env.NAME`.
 `wrangler.toml` cannot hold secret values, so it lists the names in comments and `EXPECTED_SECRETS.txt`.
@@ -113,3 +115,13 @@ Revoke and reissue at the provider, then update **both** the Worker (`wrangler s
 
 - Never paste real keys into code, issues, PRs or chat. Rotate immediately if one leaks.
 - Run `node scripts/ci/scan-secrets.mjs` before committing (CI also runs it and blocks the merge on a hit).
+
+## Stripe checkout (MPC-7626 follow-up, Cloudflare Pages variables)
+
+Set under Pages -> Settings -> Environment variables. Checkout stays off until `CHECKOUT_ENABLED` is 1/true/on/yes.
+
+- `STRIPE_SECRET_KEY` (secret), `STRIPE_WEBHOOK_SECRET` (secret, from the endpoint `https://<site>/api/stripe-webhook`)
+- `STRIPE_PRICE_BASIC`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_EXECUTIVE` (price ids; must match the approved $7.99 / $14.99 / $49.99)
+- `CHECKOUT_ENABLED`
+
+The webhook only verifies and acknowledges events; granting paid access needs an account/entitlement design first.

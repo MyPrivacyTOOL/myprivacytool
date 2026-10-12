@@ -41,6 +41,9 @@ Unsubscribe (needs `UNSUBSCRIBE_SECRET`): the website page `/unsubscribe` is the
 ## HK Spam day-10 email (MPC-7448)
 On the 5-minute cron's ticks at 01:00 to 04:00 UTC (09:00 HKT daily run + retries) (no separate cron: Workers Free allows 5 crons per account) the HK job instead of the report job reads `hk_spam_due_reminders` and sends the bilingual "you are now protected" email. Two switches: `HK_SPAM_ENABLED` (off = does nothing) and `HK_SPAM_EMAILS_LIVE` (default `false` = test mode, samples to `HK_SPAM_TEST_INBOXES` only). Opt-outs also write `email_suppressions` (hash only). Full design and go-live steps: `docs/hk-spam-day10-email-mpc-7448.md`. Test: `node workers/scan-report/hk-spam.test.mjs`.
 
+## Referral programme (MPC-7645)
+Off unless `REFERRALS_ENABLED = "true"`. Adds `ref` on `/api/scan`, `POST /api/referral/status` and `/api/referral/invite`, an invite block in the report email, and a free-Pro-month ledger credited when a referred friend's report is delivered. Needs `UNSUBSCRIBE_SECRET`. Design, privacy rules and go-live steps: `docs/referral-program-mpc-7645.md`. Test: `node workers/scan-report/referral.test.mjs`.
+
 ## Secrets (names only; set with `wrangler secret put`)
 `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`.
 
