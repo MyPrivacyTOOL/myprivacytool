@@ -486,6 +486,12 @@ export const trackReportRequested = (source: string, scanSaveTicked: boolean) =>
   attributedEvent('report_requested', { source, scan_save_ticked: scanSaveTicked });
 };
 
+// MPC-7535: the report request was NOT accepted by the Worker (so the visitor was told to try again). Counts only: the kind of failure and the
+// HTTP status (0 = never answered). The daily check compares report_requested with this and with the Worker's own accepted requests.
+export const trackReportFailed = (source: string, kind: string, status: number) => {
+  attributedEvent('report_request_failed', { source, kind, status });
+};
+
 // ---------------------------------------------------------------------------
 // Start page email capture (MPC-6977 follow-up B). Fire only after a confirmed
 // successful HubSpot submit.

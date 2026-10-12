@@ -14,8 +14,15 @@ const KEY = "mpt_web_scan_number";
 const PENDING_KEY = "mpt_pending_scan";
 export const SCAN_NUMBER_EVENT = "mpt-scan-number";
 const SCAN_NUMBER_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export const SCAN_API_URL =
-  (import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev";
+export const DEFAULT_SCAN_API_URL = "https://mpt-scan-report.myprivacytool.workers.dev";
+// MPC-7535: an EMPTY (or blank) VITE_SCAN_API_URL used to win over the default (`??` only skips unset), so one stray Pages variable silently turned
+// the report request into a no-op while the page still thanked the visitor. Blank now means "use the default"; the explicit off switch is "off".
+export const resolveScanApiUrl = (raw: unknown = import.meta.env.VITE_SCAN_API_URL): string => {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if (v.toLowerCase() === "off") return "";
+  return (v || DEFAULT_SCAN_API_URL).replace(/\/$/, "");
+};
+export const SCAN_API_URL = resolveScanApiUrl();
 
 export const saveWebScansEnabled = (): boolean => import.meta.env.VITE_SAVE_WEB_SCANS === "true";
 

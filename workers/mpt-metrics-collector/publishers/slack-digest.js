@@ -49,7 +49,7 @@ export async function failedSources(env, now = new Date()) {
   return [...new Set([...latest.values()].filter((r) => r.status === 'error').map((r) => r.source))].sort();
 }
 
-async function slack(env, method, params) {
+export async function slack(env, method, params) {
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },

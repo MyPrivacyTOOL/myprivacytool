@@ -7,15 +7,16 @@ import youtube from './collectors/youtube.js';
 import ga4Reports from './collectors/ga4.js';
 import hubspot from './collectors/hubspot.js';
 import learningLoop from './collectors/learning-loop.js';
+import scanGap from './collectors/scan-gap.js';
 import edgeMachines from './collectors/edge-machines.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 import { publishMachineMirror } from './publishers/machine-mirror.js';
 import { hkDate } from './lib/hk.js';
-import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText } from './publishers/slack-digest.js';
+import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, ...ga4Reports];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
@@ -37,6 +38,21 @@ async function insertRows(env, rows) {
     body: JSON.stringify(rows),
   });
   if (!res.ok) throw new Error(`insert ${[rows].flat().map((r) => r.source).join(',')} failed: HTTP ${res.status}`);
+}
+
+// MPC-7535: a collector may define alertText(row); a non-null text is posted to the usual Slack channel (the one the Monday digest uses).
+// Never throws: a Slack problem must not stop the metrics being stored, but it is logged so the missing alert is visible.
+export async function raiseAlerts(env, collectors, rows) {
+  for (const row of rows) {
+    const c = collectors.find((x) => x.source === row.source && x.report === row.report);
+    let text = null;
+    try { text = c?.alertText?.(row) ?? null; } catch { /* a broken alertText must not stop the run */ }
+    if (!text) continue;
+    console.error(`mpt-metrics-collector ALERT ${row.source}/${row.report}: ${SAFE(text, env)}`);
+    if (!(env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID)) { console.error('mpt-metrics-collector: alert not posted, SLACK_BOT_TOKEN / MPTSLACK_CHANNEL_ID not set'); continue; }
+    try { await slack(env, 'chat.postMessage', { channel: env.MPTSLACK_CHANNEL_ID, text: SAFE(text, env) }); }
+    catch (e) { console.error(`mpt-metrics-collector: alert post failed: ${SAFE(e?.message, env)}`); }
+  }
 }
 
 export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
@@ -61,6 +77,7 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
     rows.push(row);
   }
   if (!rows.length) return [];
+  await raiseAlerts(env, collectors, rows);
   const result = (row, stored, e) => (stored ? { source: row.source, status: row.status, stored: true } : { source: row.source, status: 'error', stored: false, error: SAFE(e?.message, env) });
   try { await insertRows(env, rows); return rows.map((r) => result(r, true)); }
   catch (batchError) {
