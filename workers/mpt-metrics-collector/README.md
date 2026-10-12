@@ -107,14 +107,14 @@ Channel OSINT (the X / LinkedIn / Telegram bots) tracked apart from website scan
 
 ## KPI scorecard on the MPT Dashboard (MPC-7618)
 
-`publishers/kpi-dashboard.js` + `lib/kpi.js`. A third cron, `*/30 * * * *`, rewrites **one callout block** at the top of Chris's MPT Dashboard page (id `DASHBOARD_PAGE_ID`; first line starts with `[mpt-metrics-collector KPI scorecard]`). It collects nothing and writes no raw rows; other blocks on the page (the four linked views) are never touched, and two marked blocks is an error, not a guess.
+`publishers/kpi-dashboard.js` + `lib/kpi.js`. The daily run (00:15 HKT, after the other publishes) rewrites **one callout block** at the top of Chris's MPT Dashboard page (id `DASHBOARD_PAGE_ID`; first line starts with `[mpt-metrics-collector KPI scorecard]`). It collects nothing and writes no raw rows; other blocks on the page (the four linked views) are never touched, and two marked blocks is an error, not a guess.
 
 - **Progress to the North Star:** scans vs 10,000, paid conversions vs 1,000, ARR vs $120,000 (MRR x 12), each with % complete and the weekly run rate needed to hit it by 2027-08-31 (`GOALS` in `lib/kpi.js`).
 - **Weekly growth:** new scans in the last full week against the week before (blank unless both exist and the earlier one is above zero), plus this week so far.
 - **Top 5 traffic sources:** GA4 `daily_source_medium` summed over the last 7 complete Hong Kong days (newest pull per day only).
 - **Funnel, 7 complete days:** GA4 sessions -> scans -> saved scans (visitors who gave a contact and ticked the save box, `web_scan_contacts.save_consent_at`) -> paid. Each step shows its rate against the previous step and the drop-off. A step with no data reads "not collected" and the steps after it show no rate.
 - **Last 7 days:** sessions, new scans, new users per day.
-- **Freshness:** scans, paid users and saved scans are live counts (up to 30 minutes old). Sessions and sources come from the daily GA4 pull, so today's sessions stay blank until tomorrow. Nothing is estimated.
+- **Freshness:** refreshed once a day at 00:15 HKT, and on demand with `POST /publish-kpi`. Scans, paid users and saved scans are live counts at refresh time. A 30-minute refresh needs a third cron (`*/30 * * * *`): the Cloudflare Free plan allows only 5 cron triggers per account (deploy error 10072, MPC-7618), so it needs Workers Paid or a freed slot; the Worker already handles that cron. Sessions and sources come from the daily GA4 pull, so today's sessions stay blank until tomorrow. Nothing is estimated.
 - **Known gap:** paid conversions in the funnel are "not collected" because paid history is not stored (only the current total is known). It fills in once a paid-date history exists.
 - **Secrets:** none new. It needs `NOTION_TOKEN` (the integration must be able to edit the MPT Dashboard page), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - **Manual refresh:** `POST /publish-kpi` with the collector bearer token.
