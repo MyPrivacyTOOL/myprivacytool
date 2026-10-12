@@ -91,6 +91,10 @@ AES-256-GCM encrypted in Supabase, and serves a sanitized PaPIT v1 profile at `G
 runs the full pipeline (see `.github/workflows/ci.yml`). Test layers, the merge gate, deploy smoke tests and the rollback
 runbook are in [docs/ci-cd-testing.md](docs/ci-cd-testing.md).
 
+## Welcome-back screen (MPC-7494, the open mirror)
+
+A returning visitor who saved a scan with consent can be told "Welcome back. We recognised your device without a cookie", shown which signals matched and when they were last here, and asked to keep or delete their record. Off by default: it needs the site flag `VITE_RECOGNITION_ENABLED=true` (and `VITE_SAVE_WEB_SCANS=true`) plus the Worker switch `RECOGNITION_ENABLED = "true"`. Rules, threshold and API: [docs/open-mirror-mpc-7494.md](docs/open-mirror-mpc-7494.md).
+
 ## Reddit channel (MPC-116)
 
 The same Worker also serves a Reddit behavioral channel (`/oauth/reddit/*`, `/channels/reddit/*`), off until the Reddit app credentials are set.

@@ -22,6 +22,7 @@ import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
 import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
+import WelcomeBack from '@/components/WelcomeBack';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
@@ -287,6 +288,7 @@ const Index = () => {
             <>
               <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
               <ScanSavingNotice variant="scan" />
+              <WelcomeBack hexagons={hexagons} />
               <ScanNumberNotice />
             </>
           )}
