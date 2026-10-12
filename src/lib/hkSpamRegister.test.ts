@@ -62,6 +62,14 @@ describe("buildRegistrationRow", () => {
     expect(buildRegistrationRow({ platform: "other", lang: "en", now: NOW }).language).toBe("en");
   });
 
+  it("marketing consent is separate, defaults false, and needs a valid address", () => {
+    const base = { platform: "ios", lang: "en", now: NOW } as const;
+    expect(buildRegistrationRow({ ...base, email: "me@example.com", reminderConsent: true }).marketing_consent).toBe(false);
+    const m = buildRegistrationRow({ ...base, email: "me@example.com", marketingConsent: true });
+    expect(m).toMatchObject({ email: "me@example.com", marketing_consent: true, reminder_consent: false });
+    expect(buildRegistrationRow({ ...base, email: "nope", marketingConsent: true })).toMatchObject({ email: null, marketing_consent: false });
+  });
+
   it("throws outside the holiday table rather than guessing a date", () => {
     expect(() => buildRegistrationRow({ platform: "ios", lang: "en", now: new Date("2031-01-01T00:00:00Z") })).toThrow();
   });

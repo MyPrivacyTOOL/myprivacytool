@@ -87,7 +87,7 @@ export default {
     // MPC-7448: the HK Spam day-10 email shares the 5-minute trigger (the free plan allows only 5 crons per account). On its four daily
     // slots (01:05 to 04:05 UTC) that tick runs only the HK job, to keep within the 50-subrequest limit; the report and follow-up jobs
     // run on every other tick, so a report waits at most 5 minutes longer.
-    if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
+    if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env, fetch, undefined, event?.scheduledTime ?? Date.now()).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
     else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
   },
 };
@@ -107,8 +107,8 @@ async function handleWebScanStep(env, request, origin, json) {
   return json({ recorded: await recordEvent(db(env), v.scanNumber, v.step, { seconds: v.seconds }) });
 }
 
-// MPC-7448: HK Spam day-10 email. Dry run (counts only) unless HK_SPAM_EMAIL_ENABLED === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
-export const runHkSpamJob = (env, fetchImpl = fetch, limit) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit });
+// MPC-7448: HK Spam day-10 email. Off unless HK_SPAM_ENABLED === 'true'; test inbox only unless HK_SPAM_EMAILS_LIVE === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
+export const runHkSpamJob = (env, fetchImpl = fetch, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
 
 // ------------------------------------------------------------------ submit path
 export async function handleScan(env, ctx, { email, consentSource, ip, utm }, fetchImpl = fetch) {

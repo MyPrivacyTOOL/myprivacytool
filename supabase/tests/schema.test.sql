@@ -274,6 +274,8 @@ select pg_temp.assert(pg_temp.try_as('authenticated', $$insert into public.hk_sp
   'hk_spam_registrations: authenticated has no insert');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date) values ('windows', 'en', '2026-10-23')$$) = '23514', 'platform is constrained');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, reminder_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514', 'consent needs an email');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, marketing_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514', 'marketing consent needs an email');
+select pg_temp.assert((select column_default from information_schema.columns where table_name = 'hk_spam_registrations' and column_name = 'marketing_consent') = 'false', 'marketing_consent defaults to false');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email) values ('ios', 'en', '2026-10-23', 'not-an-email')$$) = '23514', 'email shape is checked');
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_due_reminders$$) = '42501', 'hk_spam_due_reminders: anon must not read');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.hk_spam_due_reminders$$) = '', 'hk_spam_due_reminders: service_role reads');
@@ -291,7 +293,7 @@ reset role;
 -- ===== MPC-7448: reminder_sent_at (at-most-once) and email_suppressions =====
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, reminder_sent_at) values ('ios', 'en', '2026-10-23', now())$$) = '42501',
   'hk_spam_registrations: anon cannot set reminder_sent_at');
-select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, utm_source, source_page) values ('ios', 'yue', '2026-10-23', 'a@example.com', true, 'x', '/HongKongSpam')$$) = '',
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, marketing_consent, utm_source, source_page) values ('ios', 'yue', '2026-10-23', 'a@example.com', true, true, 'x', '/HongKongSpam')$$) = '',
   'hk_spam_registrations: anon can still insert all the form columns');
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.email_suppressions$$) = '42501', 'email_suppressions: anon must not read');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.email_suppressions (email_hash) values (repeat('a', 64))$$) = '42501', 'email_suppressions: anon must not insert');

@@ -37,6 +37,8 @@ jobs:
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/scan-report
       - name: Generate guides module
         run: node workers/scan-report/scripts/sync-guides.mjs
+      - name: Generate HK Spam email strings module
+        run: node workers/scan-report/scripts/sync-hk-email-copy.mjs
 
       - name: Test Worker (stubbed fetch)
         run: node workers/scan-report/worker.test.mjs && node workers/scan-report/hk-spam.test.mjs && node workers/scan-report/recognise.test.mjs

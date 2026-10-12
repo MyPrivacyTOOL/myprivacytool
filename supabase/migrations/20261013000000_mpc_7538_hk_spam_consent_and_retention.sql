@@ -1,8 +1,7 @@
 -- MPC-7538 (Gate B): consent and retention for the /HongKongSpam sign-up. Additive only.
 --
--- 1. hk_spam_registrations.marketing_consent: the separate, unticked-by-default "MyPrivacyTOOL privacy tips" box.
---    reminder_consent (existing) is the day-10 reminder box. Either one lets the address be stored; each is checked on its own.
---    anon may insert the new column (column-level grant, as for the others). No default other than false.
+-- 1. (MPC-7450 already added hk_spam_registrations.marketing_consent, default false, with its anon insert grant.) The separate,
+--    unticked-by-default "MyPrivacyTOOL privacy tips" box stores there; reminder_consent is the day-10 reminder box.
 -- 2. hk_spam_marketing_recipients: the ONLY source a marketing send may read. marketing_consent = true, an address, and not on
 --    email_suppressions (unsubscribe). service_role only. hk_spam_due_reminders (day-10) is unchanged and needs reminder_consent.
 -- 3. hk_spam_retention: the ONE place the retention period is set (single row, 90 days after protection_date).
@@ -16,22 +15,10 @@
 --   select cron.unschedule('mpt-purge-expired-hk-spam');   -- if pg_cron is present
 --   drop function if exists public.mpt_purge_expired_hk_spam(boolean), public.mpt_delete_hk_spam_by_email(text), public.mpt_export_hk_spam_by_email(text);
 --   drop view if exists public.hk_spam_marketing_recipients; drop table if exists public.hk_spam_deletion_log, public.hk_spam_retention;
---   alter table public.hk_spam_registrations drop constraint if exists hk_spam_marketing_needs_email, drop column if exists marketing_consent;
 
-alter table public.hk_spam_registrations
-  add column if not exists marketing_consent boolean not null default false;
+-- The marketing_consent column, its "needs an email" check and the anon insert grant came from MPC-7450
+-- (20261012120000_mpc_7450_hk_spam_marketing_consent.sql). This migration only documents it and builds on it.
 comment on column public.hk_spam_registrations.marketing_consent is 'MPC-7538. Ticked "Send me MyPrivacyTOOL privacy tips" box, unticked by default. No marketing email goes out unless true (read hk_spam_marketing_recipients). Rows with true are kept past the 90 days until unsubscribe or deletion.';
-
-do $$ begin
-  if not exists (select 1 from pg_constraint where conname = 'hk_spam_marketing_needs_email' and conrelid = 'public.hk_spam_registrations'::regclass) then
-    alter table public.hk_spam_registrations
-      add constraint hk_spam_marketing_needs_email check (email is not null or marketing_consent = false);
-  end if;
-end $$;
-
-revoke insert on public.hk_spam_registrations from anon;
-grant insert (platform, language, utm_source, utm_medium, utm_campaign, protection_date, email, reminder_consent, marketing_consent, source_page)
-  on public.hk_spam_registrations to anon;
 
 create or replace view public.hk_spam_marketing_recipients
   with (security_invoker = true) as

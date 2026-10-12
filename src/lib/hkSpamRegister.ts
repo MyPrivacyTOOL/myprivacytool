@@ -21,6 +21,7 @@ export interface RegistrationInput {
   lang: PageLang;
   email?: string;
   reminderConsent?: boolean;
+  /** Separate, unticked-by-default consent to marketing email (MPC-7538). Never implied by reminderConsent. */
   marketingConsent?: boolean;
   now?: Date;
 }
@@ -38,13 +39,11 @@ export interface RegistrationRow {
   source_page: string;
 }
 
-/**
- * The row to insert. Each consent only counts with a valid address (the table rejects consent without one), and the
- * address is stored only when at least one box is ticked. marketing_consent is true ONLY when its own box was ticked.
- */
+/** The row to insert. Consent only counts with a valid address (the table rejects consent without one). */
 export function buildRegistrationRow(input: RegistrationInput): RegistrationRow {
   const utm = getUtm();
   const email = input.email?.trim() ?? "";
+  // The address is stored only together with consent to be emailed; without consent it is dropped.
   const validEmail = EMAIL_RE.test(email) && email.length <= 254;
   const wantsReminder = validEmail && input.reminderConsent === true;
   const wantsMarketing = validEmail && input.marketingConsent === true;
