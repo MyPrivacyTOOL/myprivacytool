@@ -7,7 +7,7 @@ import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.
 // posted, in the same request as the email (POST /api/scan with save_consent:true), saved, linked to the contact and stored with a
 // consent record. A visitor who gives no contact has nothing saved. (MPC-7465 saved at completion; MPC-7488 gated it on a consent-tool
 // purpose that the Free consentmanager package cannot create. Both are replaced by this.)
-// OFF unless VITE_SAVE_WEB_SCANS is exactly "true"; the Worker has its own switch (WEB_SCAN_SAVE_ENABLED). Both stay off until Chris approves the wording.
+// OFF unless VITE_SAVE_WEB_SCANS is exactly "true"; the Worker has its own switch (WEB_SCAN_SAVE_ENABLED). The Worker flag is on since 2026-10-12 (MPC-7470); the site flag is a Cloudflare Pages build variable.
 // A saved scan is personal data: the visitor is shown the scan number afterwards and can quote it to have the scan deleted.
 // The number is kept in this browser (localStorage) so it is still there on this device later; sessionStorage marks "this visit".
 const KEY = "mpt_web_scan_number";

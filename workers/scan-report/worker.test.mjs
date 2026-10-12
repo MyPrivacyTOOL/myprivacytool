@@ -460,7 +460,7 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
     o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: v }, req());
     check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && !('scan_number' in o.j) && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 1, `switch off (${v}): email accepted, nothing saved, no scan number`);
   }
-  check(/WEB_SCAN_SAVE_ENABLED\s*=\s*"false"/.test((await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8')), 'wrangler.toml ships with the switch OFF');
+  check(/^WEB_SCAN_SAVE_ENABLED\s*=\s*"true"/m.test((await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8')), 'wrangler.toml has the switch ON (MPC-7470, 2026-10-12; set "false" to roll back, and update this line with it)');
 }
 
 // ---- MPC-7493: the learning loop, under D12 (MPC-7470). Funnel steps against the scan number; a scan exists only after the contact step,

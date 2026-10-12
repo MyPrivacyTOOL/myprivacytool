@@ -4,7 +4,7 @@
 // save-at-completion endpoint any more. The consent record (time + wording version) is stored on the contact link.
 // Everything in a scan comes from the visitor's browser, so it is untrusted text: strict shape, short strings, no control
 // characters, never logged. Values are stored as given (escaped later, when anything renders them).
-// Switch: WEB_SCAN_SAVE_ENABLED must be exactly "true" (wrangler.toml keeps it "false" until MPC-7470 signs off the wording).
+// Switch: WEB_SCAN_SAVE_ENABLED must be exactly "true" (wrangler.toml: "true" since 2026-10-12, MPC-7470; "false" is the rollback).
 
 // Wording versions of the tick-box label the visitor saw. The site sends the version with the request; an unknown version
 // (for example a stale cached page with different wording) is rejected, so every stored consent record names text we can show.
