@@ -29,7 +29,10 @@ The Company Page exists (`linkedin.com/company/myprivacytool/`, confirmed live b
 
 ## Workflow (Phase 0)
 1. **Schedule**: [`docs/linkedin-schedule-mpc-7504.csv`](../linkedin-schedule-mpc-7504.csv), 13 rows (Thursdays from 2026-10-08).
-   Week 1 is the pillar post `/blog/how-exposed-are-you`; later weeks promote that week's blog post.
+   Week 1 is the pillar post `/blog/how-exposed-are-you`; weeks 2 to 8 each promote a different post that exists in
+   `src/data/blogPosts.json` (Blogs 2 to 8, in the order of the Blog Deployment Runbook). Weeks 9 to 13 are `unassigned`
+   (empty title and URL) until more posts are published: add the slug to `LINKEDIN_ORDER` in the generator, regenerate, and
+   check the live page title matches the CSV title exactly (the weekly agent stops if it does not).
    Regenerate with `node scripts/generate-content-calendar.mjs --linkedin > docs/linkedin-schedule-mpc-7504.csv`.
 2. **Copy**: written by the content owner, reviewed by one other person, stored in the repo or the task. A draft for the
    GitHub launch already exists in `gtm/mpc-117/social-posts.md`. Do not publish anything from there until its launch gate passes.

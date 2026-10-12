@@ -61,9 +61,10 @@ function fake(opts = {}) {
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
+    if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); db[t] = db[t].filter((x) => x.id !== id); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
-      if (t === 'web_scan_contacts') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
+      if (t === 'web_scan_contacts') { if (opts.linkFail) return res(500, 'x'); const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
@@ -371,118 +372,146 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   check(o.cancelled === 6 && o.sent === 1 && F.db.scans.find((x) => x.email_scanned === 'real@example.com').report_status === 'sent' && resends(F).every((c) => JSON.parse(c.body).to[0] === 'real@example.com'), 'six cancelled scans ahead do not block the next real scan, and nothing is mailed to them');
 }
 
-// ---- MPC-7465: save every completed web scan, link the contact
+// ---- MPC-7470 (D12): a scan is saved only with an email AND save_consent, in the same POST /api/scan; the link carries the consent record
 {
   const ON = { ...env, WEB_SCAN_SAVE_ENABLED: 'true' };
+  const V = '2026-10-12-v1';
   const hex = (n = 3) => Array.from({ length: n }, (_, i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `Test value ${i} <b>&</b>`, icon: 'x', confidence: 80, risk: 'low', confirmed: i % 2 === 0, category: 'device' }));
-  const post = async (e, body, { path = '/api/web-scan', origin = 'https://myprivacytool.io', raw, headers = {}, F } = {}) => {
+  const post = async (e, body, { path = '/api/scan', origin = 'https://myprivacytool.io', raw, headers = {}, F } = {}) => {
     F = F || fake(); globalThis.fetch = F.f; const w = [];
     const rs = await worker.fetch(new Request(`https://x${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { Origin: origin } : {}), ...headers }, body: raw ?? JSON.stringify(body) }), e, { waitUntil: (pr) => w.push(pr) });
     await Promise.all(w); return { rs, F, j: await rs.clone().json().catch(() => null) };
   };
-  // save
-  let o = await post(ON, { consent: true, hexagons: hex() });
-  const saved = o.F.db.web_scans[0];
-  check(o.rs.status === 200 && o.j.saved === true && /^[0-9a-f-]{36}$/.test(o.j.scan_number) && saved.id === o.j.scan_number && saved.hexagon_count === 3 && saved.results.length === 3 && saved.results[0].value === 'Test value 0 <b>&</b>' && saved.results_bytes > 0, 'web scan: saved in full, scan number returned');
-  check(!('ip' in saved) && !('email' in saved) && !('user_id' in saved) && !JSON.stringify(saved).includes('1.2.3.4'), 'web scan: row carries no IP, email or user id');
-  // link: scan submit with the scan number
-  const F = fake(); const sn = (await post(ON, { consent: true, hexagons: hex() }, { F })).j.scan_number;
-  o = await post(ON, { email: 'mpc7465+link@example.com', consent: true, scan_number: sn }, { path: '/api/scan', F });
-  const link = F.db.web_scan_contacts[0];
-  check(o.rs.status === 200 && F.db.web_scan_contacts.length === 1 && link.web_scan_id === sn && link.channel === 'email' && link.contact_id === F.db.scans[0].id, 'link: email request with a scan number links the scan row to the saved scan');
-  o = await post(ON, { email: 'mpc7465+link@example.com', consent: true, scan_number: sn }, { path: '/api/scan', F });
-  check(o.rs.status === 200 && o.j.duplicate === true && F.db.web_scan_contacts.length === 1, 'link: repeat request is not double-linked and still answers normally');
-  // missing / bad / unknown scan number: no error, no link
-  const G = fake();
-  o = await post(ON, { email: 'mpc7465+none@example.com', consent: true }, { path: '/api/scan', F: G });
-  check(o.rs.status === 200 && o.j.success === true && G.db.web_scan_contacts.length === 0 && G.db.scans.length === 1, 'missing scan number: email accepted, no link, no error');
-  for (const bad of ['not-a-uuid', 12345, null, '00000000-0000-4000-8000-000000000000']) {
-    const H = fake();
-    o = await post(ON, { email: 'mpc7465+bad@example.com', consent: true, scan_number: bad }, { path: '/api/scan', F: H });
-    check(o.rs.status === 200 && o.j.success === true && H.db.web_scan_contacts.length === 0, `bad or unknown scan number (${JSON.stringify(bad)}): email accepted, no link, no error`);
+  const req = (extra = {}, n = 'a') => ({ email: `mpc7470+${n}@example.com`, consent: true, scan: hex(), save_consent: true, save_consent_version: V, ...extra });
+
+  // save with consent: scan stored in full, linked to the contact, consent record (time + wording version) on the link
+  let o = await post(ON, req());
+  const saved = o.F.db.web_scans[0]; const link = o.F.db.web_scan_contacts[0];
+  check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === true && saved.id === o.j.scan_number && saved.hexagon_count === 3 && saved.results[0].value === 'Test value 0 <b>&</b>' && saved.results_bytes > 0, 'save with consent: scan saved in full, scan number returned');
+  check(link.web_scan_id === saved.id && link.channel === 'email' && link.contact_id === o.F.db.scans[0].id && V === link.save_consent_version && Math.abs(Date.now() - Date.parse(link.save_consent_at)) < 60000, 'save with consent: linked to the contact, consent time and wording version stored on the link');
+  check(!('email' in saved) && !('user_id' in saved) && !('ip' in saved), 'save with consent: the scan row itself carries no email, user id or connection IP');
+
+  // no scan in the request (arrived at /scan directly) or no save fields: email accepted, nothing saved, no error
+  o = await post(ON, { email: 'mpc7470+none@example.com', consent: true });
+  check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && !('scan_number' in o.j) && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 1, 'no scan sent: email accepted, nothing saved, no error');
+
+  // a scan WITHOUT save_consent === true is rejected, nothing saved, nothing sent
+  for (const [name, patch] of Object.entries({ 'save_consent missing': { save_consent: undefined }, 'save_consent false': { save_consent: false }, 'save_consent "true"': { save_consent: 'true' }, 'save_consent 1': { save_consent: 1 }, 'only the generic consent': { save_consent: undefined, save_consent_version: undefined } })) {
+    o = await post(ON, req(patch));
+    check(o.rs.status === 400 && /consent/i.test(o.j.error) && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 0 && o.F.db.users.length === 0, `Worker rejects a save request lacking save_consent === true (${name}): 400, nothing stored`);
   }
-  // oversized
-  o = await post(ON, { consent: true, hexagons: hex() }, { headers: { 'content-length': '99999999' } });
-  check(o.rs.status === 413 && o.F.db.web_scans.length === 0, 'oversized (content-length) => 413, nothing saved');
-  o = await post(ON, null, { raw: JSON.stringify({ consent: true, hexagons: [{ id: 'a', label: 'a', value: 'x'.repeat(70 * 1024) }] }) });
-  check(o.rs.status === 413 && o.F.db.web_scans.length === 0, 'oversized (real body, no content-length check) => 413, nothing saved');
-  // MPC-7487: the status the site decided at capture is saved with the scan
-  o = await post(ON, { consent: true, hexagons: [{ id: 'screen', label: 'Screen Resolution', value: '1920x1080', status: 'found' }, { id: 'demographic', label: 'Estimated Profile', value: 'x', status: 'found', estimate: true }, { id: 'dns-leak', label: 'DNS Leak', value: 'Checking...', status: 'not_checked' }] });
-  check(o.rs.status === 200 && o.F.db.web_scans[0].results.map((h) => h.status).join() === 'found,found,not_checked' && o.F.db.web_scans[0].results[1].estimate === true, 'web scan: per-hexagon status and estimate flag are saved with the scan (MPC-7487)');
-  // malformed
+  o = await post(ON, { email: 'mpc7470+only@example.com', consent: true, save_consent: true });
+  check(o.rs.status === 400 && o.F.db.scans.length === 0, 'save_consent without a scan => 400, nothing stored');
+
+  // unknown / missing wording version
+  for (const v of [undefined, 'v1', '2020-01-01-v9', 5, '2026-10-12-v1; drop table']) {
+    o = await post(ON, req({ save_consent_version: v }));
+    check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, `unknown wording version (${JSON.stringify(v)}) => 400, nothing stored`);
+  }
+
+  // repeat request within 24h: no second copy of the technical details
+  { const F = fake();
+    o = await post(ON, req({}, 'dup'), { F }); o = await post(ON, req({}, 'dup'), { F });
+    check(o.rs.status === 200 && o.j.duplicate === true && o.j.scan_saved === false && F.db.web_scans.length === 1 && F.db.web_scan_contacts.length === 1, 'repeat request: answered normally, not saved twice'); }
+
+  // the scan row is removed again when the link (and so the consent record) cannot be written
+  { const F = fake({ linkFail: true });
+    o = await post(ON, req({}, 'linkfail'), { F });
+    check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && F.db.web_scans.length === 0 && F.db.scans.length === 1, 'link fails: email still accepted, no scan left stored without a consent record'); }
+
+  // malformed scans: 400, nothing stored or sent
   const malformed = {
-    'bad JSON': { raw: '{nope' }, 'array body': { body: [] }, 'no consent': { body: { hexagons: hex() } }, 'consent false': { body: { consent: false, hexagons: hex() } },
-    'no hexagons': { body: { consent: true } }, 'empty list': { body: { consent: true, hexagons: [] } }, 'too many': { body: { consent: true, hexagons: hex(101) } },
-    'hexagon not object': { body: { consent: true, hexagons: ['x'] } }, 'missing label': { body: { consent: true, hexagons: [{ id: 'a', value: 'v' }] } },
-    'unknown key': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'v', evil: 1 }] } }, 'bad id': { body: { consent: true, hexagons: [{ id: '../a', label: 'a', value: 'v' }] } },
-    'value not text': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: { x: 1 } }] } }, 'value too long': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'x'.repeat(1001) }] } },
-    'control character': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: 'v\u0000w' }] } }, 'duplicate id': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '' }, { id: 'a', label: 'b', value: '' }] } },
-    'bad status': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', status: 'FOUND' }] } }, 'estimate not boolean': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', estimate: 'yes' }] } },
-    'confidence out of range': { body: { consent: true, hexagons: [{ id: 'a', label: 'a', value: '', confidence: 500 }] } }, 'extra top-level key': { body: { consent: true, hexagons: hex(), admin: true } },
+    'not a list': { scan: 'x' }, 'empty list': { scan: [] }, 'too many': { scan: hex(101) },
+    'hexagon not object': { scan: ['x'] }, 'missing label': { scan: [{ id: 'a', value: 'v' }] },
+    'unknown key': { scan: [{ id: 'a', label: 'a', value: 'v', evil: 1 }] }, 'bad id': { scan: [{ id: '../a', label: 'a', value: 'v' }] },
+    'value not text': { scan: [{ id: 'a', label: 'a', value: { x: 1 } }] }, 'value too long': { scan: [{ id: 'a', label: 'a', value: 'x'.repeat(1001) }] },
+    'control character': { scan: [{ id: 'a', label: 'a', value: 'v\u0000w' }] }, 'duplicate id': { scan: [{ id: 'a', label: 'a', value: '' }, { id: 'a', label: 'b', value: '' }] },
+    'bad status': { scan: [{ id: 'a', label: 'a', value: '', status: 'FOUND' }] }, 'estimate not boolean': { scan: [{ id: 'a', label: 'a', value: '', estimate: 'yes' }] },
+    'confidence out of range': { scan: [{ id: 'a', label: 'a', value: '', confidence: 500 }] },
   };
-  for (const [name, c] of Object.entries(malformed)) {
-    o = await post(ON, c.body, { raw: c.raw });
-    check(o.rs.status === 400 && o.F.db.web_scans.length === 0, `malformed (${name}) => 400, nothing saved`);
+  for (const [name, patch] of Object.entries(malformed)) {
+    o = await post(ON, req(patch));
+    check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, `malformed scan (${name}) => 400, nothing stored`);
   }
-  // origin, rate limit
-  o = await post(ON, { consent: true, hexagons: hex() }, { origin: 'https://evil.example' });
-  check(o.rs.status === 403 && o.F.db.web_scans.length === 0, 'web scan: foreign origin => 403');
-  o = await post({ ...ON, RATE_LIMITER: { limit: async () => ({ success: false }) } }, { consent: true, hexagons: hex() });
-  check(o.rs.status === 429 && o.F.db.web_scans.length === 0, 'web scan: rate limit => 429');
-  // switch off (var absent, "false", or anything but "true")
+  // MPC-7487: the status the site decided at capture is saved with the scan
+  o = await post(ON, req({ scan: [{ id: 'screen', label: 'Screen Resolution', value: '1920x1080', status: 'found' }, { id: 'demographic', label: 'Estimated Profile', value: 'x', status: 'found', estimate: true }, { id: 'dns-leak', label: 'DNS Leak', value: 'Checking...', status: 'not_checked' }] }));
+  check(o.rs.status === 200 && o.F.db.web_scans[0].results.map((h) => h.status).join() === 'found,found,not_checked' && o.F.db.web_scans[0].results[1].estimate === true, 'per-hexagon status and estimate flag are saved with the scan (MPC-7487)');
+
+  // size: a scan up to the cap is accepted; an oversized body is refused, nothing stored
+  o = await post(ON, null, { headers: { 'content-length': '99999999' }, raw: JSON.stringify(req()) });
+  check(o.rs.status === 413 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, 'oversized (content-length) => 413, nothing stored');
+  o = await post(ON, req({ scan: [{ id: 'a', label: 'a', value: 'x'.repeat(80 * 1024) }] }));
+  check(o.rs.status === 413 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, 'oversized (real body) => 413, nothing stored');
+  // a scan that passes the field checks but is bigger than the stored cap is refused, nothing stored
+  o = await post(ON, req({ scan: Array.from({ length: 70 }, (_, i) => ({ id: `big-${i}`, label: 'big', value: 'x'.repeat(1000) })) }));
+  check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, 'scan over the stored size cap => 400, nothing stored');
+  // the old save-at-completion endpoint is gone: nothing can be saved without a contact
+  o = await post(ON, { consent: true, hexagons: hex() }, { path: '/api/web-scan' });
+  check(o.rs.status === 404 && o.F.db.web_scans.length === 0, 'POST /api/web-scan no longer exists: 404, nothing saved without a contact');
+
+  // origin and rate limit still apply
+  o = await post(ON, req(), { origin: 'https://evil.example' });
+  check(o.rs.status === 403 && o.F.db.web_scans.length === 0, 'foreign origin => 403');
+  o = await post({ ...ON, RATE_LIMITER: { limit: async () => ({ success: false }) } }, req());
+  check(o.rs.status === 429 && o.F.db.web_scans.length === 0, 'rate limit => 429');
+
+  // switch off (var absent, "false", or anything but "true"): email accepted, the scan is ignored, nothing saved
   for (const v of [undefined, 'false', 'TRUE', '1']) {
-    o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: v }, { consent: true, hexagons: hex() });
-    check(o.rs.status === 200 && o.j.saved === false && !o.j.scan_number && o.F.db.web_scans.length === 0, `switch off (${v}): nothing saved, no scan number, no error`);
+    o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: v }, req());
+    check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && !('scan_number' in o.j) && o.F.db.web_scans.length === 0 && o.F.db.web_scan_contacts.length === 0 && o.F.db.scans.length === 1, `switch off (${v}): email accepted, nothing saved, no scan number`);
   }
-  const OFF = fake(); const sn2 = (await post(ON, { consent: true, hexagons: hex() }, { F: OFF })).j.scan_number;
-  o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: 'false' }, { email: 'mpc7465+off@example.com', consent: true, scan_number: sn2 }, { path: '/api/scan', F: OFF });
-  check(o.rs.status === 200 && OFF.db.web_scan_contacts.length === 0, 'switch off: email request is accepted and nothing is linked');
   check(/WEB_SCAN_SAVE_ENABLED\s*=\s*"false"/.test((await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8')), 'wrangler.toml ships with the switch OFF');
 }
 
-// ---- MPC-7493: the learning loop. Funnel steps against the scan number, return visits by the scan number the browser already held.
+// ---- MPC-7493: the learning loop, under D12 (MPC-7470). Funnel steps against the scan number; a scan exists only after the contact step,
+// so these numbers cover only visitors who gave a contact and ticked the box. Return visits by the scan number the browser already held.
 {
   const ON = { ...env, WEB_SCAN_SAVE_ENABLED: 'true' };
+  const V = '2026-10-12-v1';
   const hex = () => [{ id: 'screen', label: 'Screen', value: '1920x1080', status: 'found' }, { id: 'dns-leak', label: 'DNS', value: 'x', status: 'not_checked' }];
-  const post = async (e, body, { path = '/api/web-scan', origin = 'https://myprivacytool.io', raw, F } = {}) => {
+  const post = async (e, body, { path = '/api/scan', origin = 'https://myprivacytool.io', raw, F } = {}) => {
     F = F || fake(); globalThis.fetch = F.f; const w = [];
     const rs = await worker.fetch(new Request(`https://x${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: raw ?? JSON.stringify(body) }), e, { waitUntil: (pr) => w.push(pr) });
     await Promise.all(w); return { rs, F, j: await rs.clone().json().catch(() => null) };
   };
+  let n = 0;
+  // a contact step with the save box ticked (a fresh address each time, so the 24h repeat rule does not apply)
+  const save = (extra = {}, { e = ON, F } = {}) => post(e, { email: `mpc7493+${++n}@example.com`, consent: true, scan: hex(), save_consent: true, save_consent_version: V, ...extra }, { F });
   const steps = (F, sn) => F.db.web_scan_events.filter((x) => x.web_scan_id === sn).map((x) => x.step).sort().join();
   const step = (F, sn, st, seconds) => post(ON, { scan_number: sn, step: st, ...(seconds !== undefined ? { seconds } : {}) }, { path: '/api/web-scan/step', F });
 
-  // step: scan started + scan finished are recorded when the scan is saved; started is dated by the scan duration
-  let o = await post(ON, { consent: true, hexagons: hex(), started_ms: 4000 });
+  // scan started + scan finished + contact given are recorded when the scan is saved at the contact step; started is dated by the scan duration
+  let o = await save({ started_ms: 4000 });
   let F = o.F; const sn = o.j.scan_number;
   const ev = (st) => F.db.web_scan_events.find((x) => x.step === st);
-  check(o.rs.status === 200 && steps(F, sn) === 'scan_finished,scan_started' && new Date(ev('scan_finished').occurred_at) - new Date(ev('scan_started').occurred_at) >= 3900, 'step scan_started + scan_finished: recorded with the saved scan, started dated by the scan duration');
-  o = await post(ON, { consent: true, hexagons: hex() });
-  check(steps(o.F, o.j.scan_number) === 'scan_finished', 'step scan_finished: recorded even when the site sends no start time');
-  // step: results_viewed, contact_step_opened
+  check(o.rs.status === 200 && o.j.scan_saved === true && steps(F, sn) === 'contact_given,scan_finished,scan_started' && new Date(ev('scan_finished').occurred_at) - new Date(ev('scan_started').occurred_at) >= 3900, 'steps: scan_started, scan_finished and contact_given are recorded when the scan is saved with its contact; started is dated by the scan duration');
+  o = await save();
+  check(steps(o.F, o.j.scan_number) === 'contact_given,scan_finished', 'step scan_finished: recorded even when the site sends no start time');
+  // results_viewed, contact_step_opened
   o = await step(F, sn, 'results_viewed');
   check(o.rs.status === 200 && o.j.recorded === true && steps(F, sn).includes('results_viewed'), 'step results_viewed: recorded');
   o = await step(F, sn, 'results_viewed');
   check(o.rs.status === 200 && o.j.recorded === false && F.db.web_scan_events.filter((x) => x.step === 'results_viewed').length === 1, 'step results_viewed: a repeat is not counted twice');
   o = await step(F, sn, 'contact_step_opened');
   check(o.j.recorded === true && steps(F, sn).includes('contact_step_opened'), 'step contact_step_opened: recorded');
-  // step: results_time keeps the longest, is capped
+  // results_time keeps the longest, is capped
   o = await step(F, sn, 'results_time', 12.4);
   check(o.j.recorded === true && F.db.web_scan_events.find((x) => x.step === 'results_time').seconds === 12, 'step results_time: seconds recorded');
   await step(F, sn, 'results_time', 30); await step(F, sn, 'results_time', 5);
   check(F.db.web_scan_events.filter((x) => x.step === 'results_time').length === 1 && F.db.web_scan_events.find((x) => x.step === 'results_time').seconds === 30, 'step results_time: keeps the longest time, one row');
   await step(F, sn, 'results_time', 99999);
   check(F.db.web_scan_events.find((x) => x.step === 'results_time').seconds === 3600, 'step results_time: capped at one hour');
-  // step: contact_given is recorded by the server when the contact is linked, not reported by the browser
-  o = await post(ON, { email: 'mpc7493+a@example.com', consent: true, scan_number: sn }, { path: '/api/scan', F });
-  check(o.rs.status === 200 && F.db.web_scan_contacts.length === 1 && steps(F, sn).includes('contact_given'), 'step contact_given: recorded when the contact is linked');
+  // contact_given is set by the server, never reported by the browser
   o = await step(F, sn, 'contact_given');
   check(o.rs.status === 400, 'step contact_given: the browser cannot report it');
-  // consent / nothing to attach to: unknown scan number records nothing, no personal data kept
+  // a step before the contact step: the browser has no scan number, so nothing is sent; an unknown scan number records nothing
   o = await step(F, '00000000-0000-4000-8000-000000000000', 'results_viewed');
   check(o.rs.status === 200 && o.j.recorded === false && F.db.web_scan_events.every((x) => x.web_scan_id === sn), 'steps: unknown scan number records nothing');
   const keys = new Set(F.db.web_scan_events.flatMap((x) => Object.keys(x)));
   check([...keys].every((k) => ['web_scan_id', 'step', 'occurred_at', 'seconds', 'id', 'created_at', 'report_status', 'report_attempts'].includes(k)), 'steps (id, created_at, report_* come from the stub store): a step row holds only scan number, step, time and seconds');
+  // a request that sends no scan (no box, or arrived without a scan) records no scan and no steps
+  { const G = fake(); o = await post(ON, { email: 'mpc7493+nosave@example.com', consent: true }, { F: G });
+    check(o.rs.status === 200 && o.j.scan_saved === false && G.db.web_scans.length === 0 && G.db.web_scan_events.length === 0, 'no scan sent: no scan and no steps are recorded'); }
   // invalid steps
   for (const [name, b] of Object.entries({ 'unknown step': { scan_number: sn, step: 'purchase' }, 'bad scan number': { scan_number: 'nope', step: 'results_viewed' }, 'extra key': { scan_number: sn, step: 'results_viewed', ua: 'x' }, 'seconds on a non-time step': { scan_number: sn, step: 'results_viewed', seconds: 3 }, 'time without seconds': { scan_number: sn, step: 'results_time' }, 'negative seconds': { scan_number: sn, step: 'results_time', seconds: -1 }, 'text seconds': { scan_number: sn, step: 'results_time', seconds: '9' } })) {
     const G = fake(); o = await post(ON, b, { path: '/api/web-scan/step', F: G });
@@ -493,27 +522,29 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   o = await post(ON, { scan_number: sn, step: 'results_viewed' }, { path: '/api/web-scan/step', origin: 'https://evil.example' }); check(o.rs.status === 403, 'step: foreign origin => 403');
   o = await post({ ...ON, RATE_LIMITER: { limit: async () => ({ success: false }) } }, { scan_number: sn, step: 'results_viewed' }, { path: '/api/web-scan/step' }); check(o.rs.status === 429, 'step: rate limit => 429');
   for (const v of [undefined, 'false', 'TRUE']) {
-    const G = fake(); const s2 = (await post(ON, { consent: true, hexagons: hex() }, { F: G })).j.scan_number; G.db.web_scan_events.length = 0;
+    const G = fake(); const s2 = (await save({}, { F: G })).j.scan_number; G.db.web_scan_events.length = 0;
     o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: v }, { scan_number: s2, step: 'results_viewed' }, { path: '/api/web-scan/step', F: G });
     check(o.rs.status === 200 && o.j.recorded === false && G.db.web_scan_events.length === 0, `step: switch off (${v}) records nothing`);
   }
-  // switch off at save: no steps either
-  o = await post({ ...env, WEB_SCAN_SAVE_ENABLED: 'false' }, { consent: true, hexagons: hex(), started_ms: 10 }); check(o.j.saved === false && o.F.db.web_scan_events.length === 0 && o.F.db.web_scan_returns.length === 0, 'switch off: no scan, no steps, no return link');
-  // a failing step store never costs the visitor the scan number
+  // switch off at save: no scan, no steps, no return link
+  o = await save({ started_ms: 10 }, { e: { ...env, WEB_SCAN_SAVE_ENABLED: 'false' } }); check(o.j.scan_saved === false && o.F.db.web_scans.length === 0 && o.F.db.web_scan_events.length === 0 && o.F.db.web_scan_returns.length === 0, 'switch off: no scan, no steps, no return link');
+  // a failing step store never costs the visitor the scan
   const H = fake(); const real = H.f; H.f = async (u, oo = {}) => (String(u).includes('web_scan_events') ? { ok: false, status: 500, headers: { get: () => null }, text: async () => 'boom' } : real(u, oo));
-  o = await post(ON, { consent: true, hexagons: hex(), started_ms: 10 }, { F: H }); check(o.rs.status === 200 && o.j.saved === true && /^[0-9a-f-]{36}$/.test(o.j.scan_number), 'a failing step store does not cost the visitor their scan number');
-  // save payload validation for the new optional fields
+  o = await save({ started_ms: 10 }, { F: H }); check(o.rs.status === 200 && o.j.scan_saved === true && /^[0-9a-f-]{36}$/.test(o.j.scan_number), 'a failing step store does not cost the visitor their scan number');
+  // validation of the optional fields: rejected with the scan, nothing stored
   for (const [name, extra] of Object.entries({ 'started_ms negative': { started_ms: -1 }, 'started_ms text': { started_ms: '5' }, 'started_ms too long': { started_ms: 99999999 }, 'previous not a uuid': { previous_scan_number: 'abc' }, 'previous a number': { previous_scan_number: 5 } })) {
-    o = await post(ON, { consent: true, hexagons: hex(), ...extra }); check(o.rs.status === 400 && o.F.db.web_scans.length === 0, `save with ${name} => 400, nothing saved`);
+    o = await save(extra); check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, `save with ${name} => 400, nothing stored`);
   }
+  // started_ms / previous_scan_number without a scan and save_consent are rejected too (they may only travel with the saved scan)
+  o = await post(ON, { email: 'mpc7493+lone@example.com', consent: true, started_ms: 100 }); check(o.rs.status === 400 && o.F.db.scans.length === 0, 'started_ms without a scan + save_consent => 400');
 
   // return visits: counted by the scan number the browser already held
-  const R = fake(); const first = (await post(ON, { consent: true, hexagons: hex() }, { F: R })).j.scan_number;
-  o = await post(ON, { consent: true, hexagons: hex(), previous_scan_number: first }, { F: R }); const second = o.j.scan_number;
+  const R = fake(); const first = (await save({}, { F: R })).j.scan_number;
+  o = await save({ previous_scan_number: first }, { F: R }); const second = o.j.scan_number;
   check(o.rs.status === 200 && R.db.web_scan_returns.length === 1 && R.db.web_scan_returns[0].web_scan_id === second && R.db.web_scan_returns[0].previous_scan_id === first, 'return visit: a scan made by a browser holding an earlier scan number is linked to it');
-  o = await post(ON, { consent: true, hexagons: hex(), previous_scan_number: '00000000-0000-4000-8000-000000000000' }, { F: R });
-  check(o.rs.status === 200 && o.j.saved === true && R.db.web_scan_returns.length === 1, 'return visit: an unknown or deleted earlier scan number does not stop the new scan being saved');
-  o = await post(ON, { consent: true, hexagons: hex() }, { F: R });
+  o = await save({ previous_scan_number: '00000000-0000-4000-8000-000000000000' }, { F: R });
+  check(o.rs.status === 200 && o.j.scan_saved === true && R.db.web_scan_returns.length === 1, 'return visit: an unknown or deleted earlier scan number does not stop the new scan being saved');
+  o = await save({}, { F: R });
   check(R.db.web_scan_returns.length === 1, 'return visit: no earlier scan number => no return recorded');
   const rk = new Set(R.db.web_scan_returns.flatMap((x) => Object.keys(x)));
   check([...rk].every((k) => ['web_scan_id', 'previous_scan_id', 'id', 'created_at', 'report_status', 'report_attempts'].includes(k)), 'return visit: only the two scan numbers are stored (no fingerprint, IP or other value)');

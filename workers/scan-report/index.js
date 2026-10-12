@@ -10,7 +10,7 @@ import { addSuppression } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
-import { MAX_WEB_SCAN_BYTES, linkWebScan, readCappedJson, recordEvent, saveWebScan, validateStep, validateWebScan, webScanEnabled } from './lib/webScan.js';
+import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -43,29 +43,36 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (url.pathname === '/api/unsubscribe' && (request.method === 'GET' || request.method === 'POST')) return handleUnsubscribe(env, url, request.method === 'POST', request, cors);
     if (request.method === 'POST' && url.pathname === '/api/unsubscribe-request') return handleUnsubscribeRequest(env, request, cors, json);
-    if (request.method === 'POST' && url.pathname === '/api/web-scan') return handleWebScan(env, request, origin, json);
     if (request.method === 'POST' && url.pathname === '/api/web-scan/step') return handleWebScanStep(env, request, origin, json);
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
-    if (Number(request.headers.get('content-length') || 0) > 8 * 1024) return json({ error: 'Payload too large' }, 413);
     if (await rateLimited(env, request)) return json({ error: 'Too many requests' }, 429);
     try {
-      let b;
-      try { b = await request.json(); } catch { return json({ error: 'Invalid request' }, 400); }
+      // MPC-7470: a request may carry the visitor's scan (only with the save tick box), so the body cap is larger while saving is on.
+      const read = await readCappedJson(request, webScanEnabled(env) ? MAX_WEB_SCAN_BYTES + 8 * 1024 : 8 * 1024);
+      if (read.status) return json({ error: read.status === 413 ? 'Payload too large' : 'Invalid request' }, read.status);
+      const b = read.body;
       if (!b || typeof b !== 'object' || Array.isArray(b)) return json({ error: 'Invalid request' }, 400);
       const email = clip(b.email, 255).trim().toLowerCase();
       if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
+      // MPC-7470 (D12): saving the scan needs its own consent (save_consent === true), given at this contact step. Checked before anything is stored or sent.
+      // Switch off: the save fields are ignored, the email request is handled as before.
+      const save = webScanEnabled(env) ? parseSaveRequest(b) : { none: true };
+      if (save.error) return json({ error: save.error }, 400);
       const result = await handleScan(env, ctx, {
         email,
         consentSource: clip(b.consent_source || 'scan_page', 64).replace(/[^a-z0-9_-]/gi, '') || 'scan_page',
         ip: request.headers.get('CF-Connecting-IP') || null,
         utm: { source: clip(b.utm_source, 100), medium: clip(b.utm_medium, 100), campaign: clip(b.utm_campaign, 100), content: clip(b.utm_content, 100), referrer: clip(b.referrer, 500) },
       });
-      // MPC-7465: link the saved web scan to this contact row. Best effort and silent: it never changes the response.
-      if (result.scanId && b.scan_number !== undefined) await linkWebScan(env, db(env), b.scan_number, 'email', result.scanId);
-      return json({ success: true, duplicate: result.duplicate });
+      // MPC-7470: save the scan and link it to this contact, with the consent record. Not for a repeat request within 24h (no new report,
+      // so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer to the email request.
+      const saved = save.hexagons && !result.duplicate && result.scanId
+        ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
+        : { saved: false };
+      return json({ success: true, duplicate: result.duplicate, scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}) });
     } catch (e) {
       console.error('scan submit failed:', String(e));
       return json({ error: 'Could not record your scan request' }, 500);
@@ -81,27 +88,9 @@ export default {
   },
 };
 
-// MPC-7465: POST /api/web-scan {consent:true, hexagons:[...]} -> {scan_number}. Saves a completed home-page scan (personal data, not anonymous: the values include browser-reported IP addresses).
-// Off (WEB_SCAN_SAVE_ENABLED != "true") it saves nothing and answers {saved:false}, so the site carries on without an error.
-async function handleWebScan(env, request, origin, json) {
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
-  if (!webScanEnabled(env)) return json({ saved: false });
-  if (await rateLimited(env, request, 'web-scan:')) return json({ error: 'Too many requests' }, 429);
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Unavailable' }, 503);
-  const read = await readCappedJson(request, MAX_WEB_SCAN_BYTES);
-  if (read.status) return json({ error: read.status === 413 ? 'Payload too large' : 'Invalid request' }, read.status);
-  const v = validateWebScan(read.body);
-  if (v.error) return json({ error: v.error }, 400);
-  try {
-    return json({ saved: true, scan_number: await saveWebScan(db(env), v.hexagons, v) });
-  } catch (e) {
-    console.error('web scan save failed:', e.status || 'error');   // status only: the message could carry visitor values
-    return json({ error: 'Could not save the scan' }, 500);
-  }
-}
-
-// MPC-7493: POST /api/web-scan/step {scan_number, step, seconds?} -> {recorded}. A funnel step for a scan that was saved with consent (results viewed,
+// MPC-7493: POST /api/web-scan/step {scan_number, step, seconds?} -> {recorded}. A funnel step for a scan that was saved (results viewed,
 // contact step opened, seconds on the results screen). An unknown scan number records nothing. Off with the same switch as saving the scan.
+// MPC-7470 (D12): a scan exists only after the contact step, so a browser only ever has a scan number to report against after saving.
 async function handleWebScanStep(env, request, origin, json) {
   if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
   if (!webScanEnabled(env)) return json({ recorded: false });

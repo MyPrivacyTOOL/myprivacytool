@@ -95,7 +95,15 @@ export const guideUrl = (h, { html = false } = {}) => {
   const amp = html ? '&amp;' : '&';
   return `${SITE}${GUIDES[h.category] || GUIDE}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=scan-report${amp}utm_content=${encodeURIComponent(h.id)}`;
 };
-const shown = (h) => clean(h.value, MAX_VALUE) + (Array.from(h.value).length > MAX_VALUE ? '…' : '');
+// An IP address is the most identifying value in a scan and an email can be forwarded or screenshotted, so it never appears in the body:
+// it stays in the attached JSON (the user's own file). Matches IPv4 and IPv6 (including ::1 and IPv4-mapped forms).
+const IP_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b|(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}|::[0-9a-f:.]+/gi;
+export const IP_HIDDEN = '[IP address hidden here; it is in your attached file]';
+const shown = (h) => {
+  const v = clean(h.value, 1000).replace(IP_RE, IP_HIDDEN);
+  const a = Array.from(v);
+  return a.slice(0, MAX_VALUE).join('') + (a.length > MAX_VALUE ? '…' : '');
+};
 const statusTag = (h) => `${PILL[h.status][0]}${h.estimate && h.status === 'found' ? ' · ESTIMATE' : ''}`;
 
 export function hexRow(h) {

@@ -33,3 +33,5 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
 ```
 
 Status rules: `found` has a value; `clear` means a check ran and found nothing (only possible for risk-check hexagons); `not_checked` means we could not tell. A hexagon absent from the saved scan is `not_checked`, never `clear`. Values came from a browser and are untrusted text: treat them as data, never as HTML or code.
+
+IP addresses: the email body never shows an IP address (an email can be forwarded or screenshotted). If a hexagon's value contains one, the email shows "[IP address hidden here; it is in your attached file]" and the full value stays in this JSON file.

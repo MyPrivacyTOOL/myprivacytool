@@ -40,3 +40,7 @@ Steps and return links cascade from `web_scans`, so deleting a scan by its numbe
 
 ## Tests
 `workers/scan-report/worker.test.mjs` (each step, returns, switch off, consent-less nothing), `workers/mpt-metrics-collector/learning-loop.test.mjs` (collector, each rollup as published, suppression, publisher), `supabase/tests/schema.test.sql` (tables, rollup numbers, cascade), `src/lib/webScan.test.ts` (site side).
+
+## Update, MPC-7470 decision D12 (2026-10-12)
+
+A scan is now saved only when the visitor gives an email on `/scan` and ticks the separate "save my scan result" box (the banner purpose this document mentions no longer exists). So every number here covers **only visitors who gave a contact**: a scan exists only after the contact step. `scan_started`, `scan_finished` and `contact_given` are all written when that scan is saved, and the site's `results_viewed`, `contact_step_opened` and `results_time` calls send nothing until a scan number exists. Drop-off before the contact step must come from the GA4 events `scan_started`, `privacy_scan_completed`, `funnel_step` and `report_requested` (consent-gated, no personal values). `started_ms` and `previous_scan_number` are sent only together with the scan at the contact step.

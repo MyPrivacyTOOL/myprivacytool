@@ -477,6 +477,16 @@ export const trackEnterpriseLead = (params?: Record<string, string>) => {
 };
 
 // ---------------------------------------------------------------------------
+// Report requested (MPC-7470, D12). The drop-off between "scan completed" (privacy_scan_completed, above) and "asked for the report" is
+// counted here instead of in the database: nothing is stored for a visitor who gives no contact. Like every event in this file it only
+// reaches GA4 once the visitor accepted analytics (gtag is loaded after consent). Carries NO personal values: no email, no scan
+// content, no scan number. Fire only after the request was accepted. `source` is the place: "scan_page" or "web_scan_summary".
+// ---------------------------------------------------------------------------
+export const trackReportRequested = (source: string, scanSaveTicked: boolean) => {
+  attributedEvent('report_requested', { source, scan_save_ticked: scanSaveTicked });
+};
+
+// ---------------------------------------------------------------------------
 // Start page email capture (MPC-6977 follow-up B). Fire only after a confirmed
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
