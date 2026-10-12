@@ -58,6 +58,8 @@ export async function agentStats(env) {
         amended: textProp(pr.Amendments) !== '',
         blocked: textProp(pr.Blocker_Reason) !== '',
         approval: pr.Approval_Status?.select?.name || pr.Approval_Status?.status?.name || null,
+        minutesSaved: numProp(pr.Minutes_Saved_Chris), errorsCaught: numProp(pr.Errors_Caught), revenueGbp: numProp(pr.Revenue_Impact_GBP),
+        override: pr.Override_Outcome?.select?.name || null,
       });
     }
     cursor = res.has_more ? res.next_cursor : undefined;

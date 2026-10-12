@@ -35,13 +35,16 @@ const st = summariseAgentTasks([
 check(st.total === 4 && st.done === 2 && st.successRatePct === (2 / 3) * 100 && st.amended === 2 && st.blocked === 2 && st.approved === 1 && st.rejected === 1, 'summariseAgentTasks counts');
 check(summariseAgentTasks([{ status: 'In progress' }]).successRatePct === null, 'no finished task => finish rate null, not 0');
 check(agentStatsText(st) === 'Agent tasks: 2 done of 4, 67% finish rate, 2 amended, 1 rejected, 2 blocked.' && agentStatsText(null) === 'Agent stats unavailable.', 'agentStatsText');
+const st2 = summariseAgentTasks([{ status: 'Done', minutesSaved: 30, errorsCaught: 1, override: 'Accepted as is' }, { status: 'Done', minutesSaved: 15, override: 'Amended' }, { status: 'Done' }]);
+check(st2.minutesSaved === 45 && st2.errorsCaught === 1 && st2.acceptedPct === 50 && st2.revenueGbp === null, 'new fields: sums, accepted %, blank revenue stays null');
+check(agentStatsText(st2).includes('45 min saved, 1 errors caught, 50% accepted as is') && !agentStatsText(st2).includes('revenue'), 'new fields shown only when recorded');
 const ds = buildDigest({ weekOf: 'w', current: cur, previous: prev, agentStats: st });
 check(ds.lines.length <= 5 && ds.text.includes('Agent plan: none recorded. Agent tasks: 2 done of 4'), 'agent stats ride the agent line, still <=5 lines');
 check(!buildDigest({ weekOf: 'w', current: cur, previous: prev }).text.includes('Agent tasks'), 'no agentStats arg => digest unchanged');
 
 // ---- stubs
 let calls, rawRows, notionRows, slackOk, tasksRows;
-const task = (status, amend = '', block = '') => ({ properties: { Status: { status: { name: status } }, Amendments: { rich_text: amend ? [{ plain_text: amend }] : [] }, Blocker_Reason: { rich_text: block ? [{ plain_text: block }] : [] }, Archived: { checkbox: false } } });
+const task = (status, amend = '', block = '') => ({ properties: { Status: { status: { name: status } }, Amendments: { rich_text: amend ? [{ plain_text: amend }] : [] }, Blocker_Reason: { rich_text: block ? [{ plain_text: block }] : [] }, Archived: { checkbox: false }, Minutes_Saved_Chris: { type: 'number', number: null } } });
 const reset = () => { calls = []; slackOk = true; tasksRows = [task('Done'), task('Done', 'x'), task('Cancelled', '', 'y'), task('Not started')]; notionRows = [page(120, '🔴 Behind'), page(100, '🟢 On Track')];
   rawRows = [{ source: 'ga4', report: 'daily_overview', status: 'error' }, { source: 'ga4', report: 'daily_overview', status: 'ok' }, { source: 'hubspot', report: 'contacts', status: 'error' }, { source: 'supabase', report: 'table_counts', status: 'ok' }]; };
 reset();
