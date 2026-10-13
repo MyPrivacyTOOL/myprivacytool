@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
+import { classifyTheme } from "./src/funnel";
 import { CONSENT_MESSAGE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
@@ -94,13 +95,13 @@ describe("MIRROR flow over the X webhook", () => {
     expect(JSON.parse((calls(f)[1][1] as RequestInit).body as string).text).toContain("couldn't complete");
   });
 
-  it("still forwards ordinary DMs to core-brain, and welcomes the sender straight away", async () => {
+  it("welcomes the sender straight away and leaves counting to the funnel (core-brain would log it twice)", async () => {
     const b = brain();
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     const r = await post(dm("42", "hello"), env(b));
     expect(r.status).toBe(200);
     await new Promise((x) => setTimeout(x, 0));
-    expect(b.fetch).toHaveBeenCalledTimes(1);
+    expect(b.fetch).not.toHaveBeenCalled();
     expect(calls(f)).toHaveLength(1);
     expect(String(calls(f)[0][0])).toContain("/dm_conversations/with/42/messages");
     expect(JSON.parse((calls(f)[0][1] as RequestInit).body as string).text).toBe(WELCOME_MESSAGE);
@@ -226,34 +227,34 @@ describe("bare Y / N answers (MPC-7628)", () => {
     expect(urls(f).some((u) => u.includes("/users/42"))).toBe(false);
     expect(JSON.parse((calls(f)[1][1] as RequestInit).body as string).text).toContain("Nothing was scanned");
   });
-  it("a bare Y with no consent request behind it is an ordinary message for core-brain", async () => {
+  it("a bare Y with no consent request behind it is an ordinary message: welcomed, no scan", async () => {
     const b = brain(); const f = x([{ sender_id: "42", text: "hi", created_at: ago(1000) }]);
     await post(dm("42", "y"), env(b));
     await settle();
     expect(urls(f).some((u) => u.includes("/users/"))).toBe(false);
-    expect(b.fetch).toHaveBeenCalledTimes(1);
+    expect(b.fetch).not.toHaveBeenCalled();
   });
   it("a bare Y after the mirror result (our last message was not the request) does not scan again", async () => {
     const b = brain(); const f = x([{ sender_id: "999", text: "🪞 Your Mirror (public information only)", created_at: ago(1000) }]);
     await post(dm("42", "yes"), env(b));
     await settle();
     expect(urls(f).some((u) => u.includes("/users/"))).toBe(false);
-    expect(b.fetch).toHaveBeenCalledTimes(1);
+    expect(b.fetch).not.toHaveBeenCalled();
   });
   it("a consent request older than 15 minutes has expired", async () => {
     const b = brain(); const f = x(asked(16 * 60_000));
     await post(dm("42", "y"), env(b));
     await settle();
     expect(urls(f).some((u) => u.includes("/users/"))).toBe(false);
-    expect(b.fetch).toHaveBeenCalledTimes(1);
+    expect(b.fetch).not.toHaveBeenCalled();
   });
-  it("is rate limited like any Mirror command and then falls back to core-brain", async () => {
+  it("is rate limited like any Mirror command and then gets nothing", async () => {
     const b = brain(); const f = x(asked());
     const limited = { limit: vi.fn(async () => ({ success: false })) };
     await post(dm("42", "y"), { ...env(b), RATE_LIMITER: limited });
     await settle();
     expect(calls(f)).toHaveLength(0);
-    expect(b.fetch).toHaveBeenCalledTimes(1);
+    expect(b.fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -379,5 +380,76 @@ describe("branding, welcome and simple Y (MPC-7628)", () => {
     await post(dm("42", "constructor"), env());
     await settle();
     expect(sentText(f)[0]).toContain("What brought you here?");
+  });
+});
+
+describe("Channel OSINT funnel counting (MPC-7628)", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+  const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
+  /** Fake X + Supabase: the RPC bodies are what we assert on. */
+  function fake(history: { sender_id: string; text: string; created_at: string }[] = []) {
+    const rpc: any[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+      const url = String(u);
+      if (url.includes("/rpc/mpt_brain_record")) { rpc.push(JSON.parse(init.body)); return new Response("{}"); }
+      if (url.includes("/dm_events")) return Response.json({ data: history });
+      if (url.includes("/users/42")) return Response.json({ data: { username: "alice_99", description: "secret bio words", protected: false } });
+      return new Response("{}");
+    });
+    return rpc;
+  }
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+  it("counts a welcomed DM once, by theme, with no sender id and no text", async () => {
+    const rpc = fake();
+    await post(dm("42", "someone is stalking me and I am scared"), e());
+    await settle();
+    expect(rpc).toHaveLength(1);
+    expect(rpc[0]).toMatchObject({ p_channel: "x", p_sender_id: null, p_intent: "help", p_intent_source: "rules", p_response_key: "x.welcome.safety" });
+    expect(JSON.stringify(rpc)).not.toMatch(/stalking|scared|42/);
+  });
+  it("counts a 1/2/3 choice by number", async () => {
+    const rpc = fake();
+    await post(dm("42", "2"), e());
+    await settle();
+    expect(rpc.map((r) => r.p_response_key)).toEqual(["x.intent.2"]);
+  });
+  it("counts MIRROR as a request and the consent as a scan request", async () => {
+    const rpc = fake();
+    await post(dm("42", "MIRROR"), e());
+    await post(dm("42", "MIRROR YES"), e());
+    await settle();
+    expect(rpc.map((r) => [r.p_intent, r.p_response_key])).toEqual([["help", "x.mirror.request"], ["scan", "x.mirror.consent"]]);
+    expect(rpc.every((r) => r.p_sender_id === null)).toBe(true);
+    expect(JSON.stringify(rpc)).not.toMatch(/secret bio|alice_99/);
+  });
+  it("a bare Y after the welcome counts as the consent (scan) and nothing else", async () => {
+    const rpc = fake([{ sender_id: "999", text: branded("alice_99", WELCOME_BODY), created_at: ago(20_000) }]);
+    await post(dm("42", "y"), e());
+    await settle();
+    expect(rpc.map((r) => r.p_response_key)).toEqual(["x.mirror.consent"]);
+  });
+  it("a DM we answer is not also forwarded to core-brain (no double count)", async () => {
+    fake();
+    const b = brain();
+    await post(dm("42", "hello"), { ...e(), CORE_BRAIN: b });
+    await settle();
+    expect(b.fetch).not.toHaveBeenCalled();
+  });
+  it("a failing funnel write never blocks the reply", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+      if (String(u).includes("/rpc/")) throw new Error("down");
+      return new Response("{}");
+    });
+    await post(dm("42", "hello"), e());
+    await settle();
+    expect(calls(f).some((c) => String(c[0]).includes("/messages"))).toBe(true);
+  });
+  it("classifies themes by keyword and records only the word", () => {
+    expect(classifyTheme("I got a scam text")).toBe("scam");
+    expect(classifyTheme("my passwords were leaked")).toBe("exposure");
+    expect(classifyTheme("we are a company looking at your API")).toBe("business");
+    expect(classifyTheme("just curious what is out there about me")).toBe("curious");
+    expect(classifyTheme("hello")).toBe("other");
   });
 });

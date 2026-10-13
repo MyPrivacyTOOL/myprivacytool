@@ -6,6 +6,7 @@ import type { Logger } from "./logger";
 import type { Env } from "./shared";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
+import { classifyTheme, recordXDm } from "./funnel";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
@@ -319,15 +320,18 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
     if (!dm.bare && !(await allowed(env, dm.senderId, log))) return; // dropped silently: replying would cost credits too (bare replies were limited by isConsentPending)
     if (dm.command === "request") {
       log.info("mirror_consent_requested");
+      await recordXDm(env, "help", "x.mirror.request", log);
       await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), CONSENT_MESSAGE), log);
       return;
     }
     if (dm.command === "decline") {
       log.info("mirror_consent_declined");
+      await recordXDm(env, "help", "x.mirror.decline", log);
       await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), DECLINE_MESSAGE), log);
       return;
     }
     log.info("mirror_consent_granted");
+    await recordXDm(env, "scan", "x.mirror.consent", log); // the Mirror is a scan: counts as a scan request in the funnel
     const profile = await fetchPublicProfile(env, dm.senderId);
     if (!profile) {
       log.warn("mirror_scan_failed");
@@ -347,7 +351,8 @@ export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: 
   if (!(await allowed(env, dm.senderId, log))) return;
   const choice = dm.text?.trim().replace(/[.!)]$/, "");
   const reply = choice && /^[123]$/.test(choice) ? INTENT_REPLIES[choice] : undefined;
-  if (reply) log.info("intent_choice", { choice }); // a count by number only, never tied to the sender
+  // Funnel row: the number they chose, or the theme of what they typed. Never the text, never who sent it.
+  await recordXDm(env, "help", reply ? `x.intent.${choice}` : `x.welcome.${classifyTheme(dm.text ?? "")}`, log);
   const username = await fetchUsername(env, dm.senderId);
   const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply + "\n\nThank you!") : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
