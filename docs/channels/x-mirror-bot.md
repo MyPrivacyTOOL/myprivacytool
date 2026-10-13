@@ -88,8 +88,7 @@ stored row, refresh (stored refresh token, else the `X_REFRESH_TOKEN` secret, wh
 `X_USER_ACCESS_TOKEN`. A 401 on a DM triggers one forced refresh and one retry. Logs: `x_token_refreshed`, `x_token_refresh_rejected`
 (status only), never token values.
 
-If the bot goes silent with `x_token_refresh_rejected`: generate a new OAuth 2.0 access token on the app's Keys & Tokens page, put its
-refresh token in `X_REFRESH_TOKEN`, delete the row (`delete from public.mpt_x_oauth_tokens;`) and re-run the deploy.
+If the bot goes silent with `x_token_refresh_rejected`: generate a new OAuth 2.0 access token on the app's Keys & Tokens page (logged in to x.com as @myprivacytool, with `dm.read` and `dm.write`), put its access and refresh tokens in `X_USER_ACCESS_TOKEN` and `X_REFRESH_TOKEN`, and re-run the deploy. When X refuses the stored refresh token, the bot now tries the `X_REFRESH_TOKEN` secret once, so the stored row no longer has to be deleted by hand. Then re-create the `dm.received` subscription on the Subscriptions tab if X says the user has not authorised `dm.read`.
 
 ## Event formats
 
