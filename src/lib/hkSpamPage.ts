@@ -23,8 +23,10 @@ export interface HkDialView {
   dial: string;
   /** Keys to display (in order). Empty when keys must not be shown (unverified, not a preview). */
   keys: IvrKey[];
-  /** True when the dial string itself sends the keys (Android, keys shown). */
+  /** True when the dial string itself sends the keys (Android and iPhone, keys shown). */
   autoKeys: boolean;
+  /** True when the on-screen keys are the main script or the iPhone backup, so they are shown in very large type. */
+  largeKeys: boolean;
   /** True when the keys on screen are placeholders: only ever true for an internal preview. */
   keysUnverified: boolean;
   /** True when the page must not list menu keys at all (unverified, public audience). */
@@ -47,6 +49,7 @@ export function resolveHkDial(platform: HkPlatform, lang: PageLang, preview: boo
       dial: buildDialString("other", { register: "all", language }).dial,
       keys: [],
       autoKeys: false,
+      largeKeys: false,
       keysUnverified: false,
       keysHidden: true,
       needsPhone: platform === "other",
@@ -56,6 +59,7 @@ export function resolveHkDial(platform: HkPlatform, lang: PageLang, preview: boo
     dial: full.dial,
     keys: getIvrKeys("all", language),
     autoKeys: full.autoKeys,
+    largeKeys: platform !== "android",
     keysUnverified: !full.verified,
     keysHidden: false,
     needsPhone: platform === "other",

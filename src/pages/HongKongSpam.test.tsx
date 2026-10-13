@@ -88,13 +88,13 @@ describe("hero, CTA and steps", () => {
     expect(text).not.toMatch(/automatic|sends? the keys|auto-?dial/i);
   });
 
-  it("PREVIEW on iPhone: large manual keys plus the unverified banner", () => {
+  it("PREVIEW on iPhone: pauses and keys in the link, large backup keys on screen, plus the unverified banner", () => {
     flags.preview = true;
     renderEn();
     expect(screen.getByTestId("hk-unverified")).toHaveTextContent(/UNVERIFIED/);
-    expect(dialLink().getAttribute("href")).toBe("tel:13571835000");
+    expect(dialLink().getAttribute("href")).toMatch(/^tel:13571835000,+\d/);
     expect(within(screen.getByTestId("hk-keys")).getAllByRole("listitem")).toHaveLength(6);
-    expect(screen.getByText("Press the keys shown")).toBeInTheDocument();
+    expect(screen.getByText("Watch the keys")).toBeInTheDocument();
   });
 
   it("PREVIEW on Android: dial string carries the pauses and keys, still flagged unverified", () => {

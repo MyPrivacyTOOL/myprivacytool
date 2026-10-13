@@ -70,8 +70,10 @@ describe("resolveHkDial", () => {
     expect(a.dial).toContain(",");
     expect(a.keys.map((k) => k.purpose)).toEqual(["language", "service", "register", "back", "service", "register"]);
     const i = resolveHkDial("ios", "en", true);
-    expect(i.autoKeys).toBe(false);
-    expect(i.dial).toBe("tel:13571835000");
+    expect(i.autoKeys).toBe(true);
+    expect(i.dial).toBe(a.dial);
+    expect(i.largeKeys).toBe(true);
+    expect(a.largeKeys).toBe(false);
     expect(i.keysUnverified).toBe(true);
   });
 

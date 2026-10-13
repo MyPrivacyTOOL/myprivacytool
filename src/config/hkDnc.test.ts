@@ -55,20 +55,21 @@ describe("hkDnc config", () => {
     expect(r.verified).toBe(false);
   });
 
-  it("ios: bare number, keys returned for on-screen display", () => {
+  it("ios: same pauses and keys in the dial string as Android, plus the keys on screen as a backup", () => {
     const r = buildDialString("ios", { register: "all", language: "yue" });
-    expect(r.dial).toBe("tel:13571835000");
-    expect(r.autoKeys).toBe(false);
+    expect(r.dial).toBe(buildDialString("android", { register: "all", language: "yue" }).dial);
+    expect(r.autoKeys).toBe(true);
     expect(r.manualKeys).toEqual(getIvrKeys("all", "yue"));
   });
 
-  it("unknown platforms behave like iOS", () => {
+  it("unknown platforms (desktop) get the bare number and the manual key script", () => {
     expect(buildDialString("other").dial).toBe("tel:13571835000");
     expect(buildDialString("other").manualKeys.length).toBeGreaterThan(0);
   });
 
   it("can drop the caller-ID prefix", () => {
-    expect(buildDialString("ios", { forceCallerId: false }).dial).toBe("tel:1835000");
+    expect(buildDialString("other", { forceCallerId: false }).dial).toBe("tel:1835000");
+    expect(buildDialString("ios", { forceCallerId: false }).dial.startsWith("tel:1835000,")).toBe(true);
   });
 
   it("percent-encodes * and # but keeps , as the pause", () => {
