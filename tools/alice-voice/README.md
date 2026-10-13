@@ -19,11 +19,15 @@ The script sentence uses "My Privacy Tool" for pronunciation (MPC-7411).
 
 ## Status
 
-- Script and settings written 2026-10-13. **Audio not yet generated:** the build
-  sandbox's network policy blocks PyPI (HTTP 403), so `sherpa-onnx` could not be
-  installed there. Run the script on a machine that has it (the Mac used for MPC-7411).
+- Generated 2026-10-13 on the Mac used for MPC-7411 (sherpa-onnx 1.13.8, ffmpeg from
+  imageio-ffmpeg): `out/A.wav` 12.0 s (24 kHz), `out/B.wav` about 16.6 s and
+  `out/C.wav` about 16.7 s (44.1 kHz mono, mastered). Durations for B and C are from file size.
+- **Not yet confirmed by ear:** that C sounds like a different voice from B (Emma, speaker 7)
+  and that B and C sound clean. If C sounds like Isabella, the speaker id is wrong.
 - The listener test and choosing a winner are Chris's (MPC-7725 part C). No audio of
   Alice is published until a sample passes the test.
+- The build sandbox's network policy blocks PyPI (HTTP 403), so the samples were
+  generated outside it.
 
 ## Licence notes
 
