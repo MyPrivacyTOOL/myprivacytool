@@ -5,6 +5,7 @@
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
 import { getUserAccessToken } from "./x-oauth";
+import { uploadDmVideo } from "./x-media";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
@@ -179,7 +180,8 @@ async function xFetch(env: Env, path: string, init: RequestInit & { token: strin
   try {
     return await fetch(`${X_API}${path}`, {
       ...rest,
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(rest.headers ?? {}) },
+      // A FormData body (media upload) needs the runtime to set its own multipart Content-Type.
+      headers: { Authorization: `Bearer ${token}`, ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(rest.headers ?? {}) },
       signal: ctl.signal,
     });
   } finally {
@@ -207,11 +209,23 @@ async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Pr
   return null;
 }
 
-/** Sends a DM with the user-context token (dm.write). Returns whether X accepted it. */
-export async function sendXDm(env: Env, recipientId: string, text: string, log?: Logger): Promise<boolean> {
+/**
+ * Sends a DM with the user-context token (dm.write). Returns whether X accepted it.
+ * With `video`, the Alice clip is attached; if it cannot be uploaded (or X refuses the attachment) the text goes alone.
+ */
+export async function sendXDm(env: Env, recipientId: string, text: string, log?: Logger, opts: { video?: boolean } = {}): Promise<boolean> {
   if (!/^\d+$/.test(recipientId)) return false;
   const quiet: Logger = log ?? { info() {}, warn() {}, error() {} };
-  const res = await xUser(env, quiet, `/dm_conversations/with/${recipientId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+  const path = `/dm_conversations/with/${recipientId}/messages`;
+  if (opts.video) {
+    const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init));
+    if (mediaId) {
+      const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) });
+      if (withVideo?.ok) return true;
+      quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0 });
+    }
+  }
+  const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) });
   return Boolean(res?.ok);
 }
 
@@ -275,7 +289,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, buildMirrorMessage(profile), log);
+    const sent = await sendXDm(env, dm.senderId, buildMirrorMessage(profile), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
@@ -285,6 +299,6 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
 /** Replies to a DM that is not a Mirror command. Same per-sender / global limits as Mirror, so it cannot be used to flood. */
 export async function handleOrdinaryDm(env: Env, dm: { senderId: string }, log: Logger): Promise<void> {
   if (!(await allowed(env, dm.senderId, log))) return;
-  const sent = await sendXDm(env, dm.senderId, WELCOME_MESSAGE, log);
+  const sent = await sendXDm(env, dm.senderId, WELCOME_MESSAGE, log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
 }
