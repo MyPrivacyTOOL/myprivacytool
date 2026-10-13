@@ -7,6 +7,8 @@ import { jsonResponse } from "@/test/render";
 import Invite from "./Invite";
 
 const TOKEN = "b".repeat(64);
+type Gtag = (kind: string, name: string, params?: Record<string, unknown>) => void;
+const gtagCalls = () => ((window as unknown as { gtag: ReturnType<typeof vi.fn> }).gtag.mock.calls as unknown[][]).map((c) => [c[1], c[2]]);
 const STATUS = { ok: true, share_url: "https://myprivacytool.io/invite?ref=ABCDEFGH", signed_up: 2, completed: 1, months_earned: 1, max_months: 12, invites_sent: 2, invites_left: 8 };
 
 const renderAt = (route: string) =>
@@ -19,8 +21,8 @@ const renderAt = (route: string) =>
     </MemoryRouter>,
   );
 
-beforeEach(() => sessionStorage.clear());
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+beforeEach(() => { sessionStorage.clear(); (window as unknown as { gtag: Gtag }).gtag = vi.fn(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); delete (window as unknown as { gtag?: Gtag }).gtag; });
 
 describe("Invite", () => {
   it("while the programme is off, everyone lands on /scan", () => {
@@ -76,6 +78,31 @@ describe("Invite", () => {
       expect(await screen.findByText(/sent 2 invitations/i)).toBeInTheDocument();
       const invite = f.mock.calls.find((c) => String(c[0]).endsWith("/invite")) as unknown as [string, RequestInit];
       expect(JSON.parse(invite[1].body as string)).toEqual({ code: "ABCDEFGH", token: TOKEN, emails: ["one@example.com", "two@example.com"] });
+    });
+
+    it("A/B (MPC-7645): the report-email wording in the private link is counted as an exposure and tagged on the invites sent; nothing is counted without it", async () => {
+      vi.stubGlobal("fetch", vi.fn(async (url: string) => (String(url).endsWith("/status") ? jsonResponse(STATUS) : jsonResponse({ ok: true, sent: 1, skipped: 0 }))));
+      const user = userEvent.setup();
+      renderAt(`/invite#c=ABCDEFGH&t=${TOKEN}&v=friend_first`);
+      await screen.findByLabelText("Your invitations");
+      expect(gtagCalls()).toContainEqual(["experiment_exposure", { experiment_id: "referral_report_block", variant_id: "friend_first" }]);
+      await user.type(screen.getByLabelText("Friend 1 email"), "one@example.com");
+      await user.click(screen.getByRole("button", { name: /send invitations/i }));
+      await screen.findByText(/sent 1 invitation/i);
+      expect(gtagCalls()).toContainEqual(["referral_invites_sent", { sent: 1, ab_referral_report_block: "friend_first" }]);
+    });
+
+    it("A/B: no experiment events when no test is running", async () => {
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(STATUS)));
+      renderAt(`/invite#c=ABCDEFGH&t=${TOKEN}`);
+      await screen.findByLabelText("Your invitations");
+      expect(gtagCalls().filter(([name]) => String(name).startsWith("experiment_"))).toEqual([]);
+    });
+
+    it("A/B: a friend arriving from an invitation counts the subject variant; an unknown label counts nothing", () => {
+      renderAt("/invite?ref=ABCDEFGH&iv=specific_subject");
+      expect(gtagCalls()).toContainEqual(["experiment_exposure", { experiment_id: "referral_invite_subject", variant_id: "specific_subject" }]);
+      expect(screen.getByRole("link", { name: /check my exposure/i })).toHaveAttribute("href", "/scan?ref=ABCDEFGH");
     });
 
     it("a wrong or old private link says so and offers no form", async () => {
