@@ -1,0 +1,118 @@
+name: Render Short
+
+# MPC-7415: renders an approved script file into a 9:16 Short (MP4 + .srt + thumbnail)
+# with Alice's voice, using tools/video-pipeline. Free tools only, NO secrets, and it
+# NEVER uploads anywhere: the files are attached to the run as a downloadable artifact.
+#
+# Triggers:
+#   - a pull request that adds or changes video-scripts/<name>.json renders those scripts;
+#   - "Run workflow" (workflow_dispatch) renders one script by path.
+# A person watches the output and approves it before anything is published.
+
+on:
+  pull_request:
+    paths:
+      - 'video-scripts/*.json'
+      - 'video-scripts/assets/**'
+      - 'tools/video-pipeline/**'
+      - '.github/workflows/render-short.yml'
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Script file, e.g. video-scripts/mpt-yt-s010.json'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-short-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Render Short(s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KOKORO_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick the script files
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_SCRIPT: ${{ github.event.inputs.script }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            printf '%s\n' "$INPUT_SCRIPT" > scripts.txt
+          else
+            git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" -- 'video-scripts/*.json' > scripts.txt
+          fi
+          # Only plain file names under video-scripts/ are accepted.
+          grep -E '^video-scripts/[A-Za-z0-9._-]+\.json$' scripts.txt > scripts.ok || true
+          if [ -s scripts.ok ]; then echo "found=true" >> "$GITHUB_OUTPUT"; else echo "found=false" >> "$GITHUB_OUTPUT"; fi
+          echo "Scripts to render:"; cat scripts.ok || true
+
+      - name: Pipeline unit tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-inter
+          python3 -m pip install --quiet sherpa-onnx==1.13.8 numpy pillow
+          python3 -m unittest discover -s tools/video-pipeline -t tools/video-pipeline -v
+
+      - name: Cache the Kokoro v0.19 voice model (Apache 2.0)
+        if: steps.pick.outputs.found == 'true'
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: kokoro-en-v0_19
+          key: kokoro-en-v0_19-sherpa-onnx
+
+      - name: Download the voice model
+        if: steps.pick.outputs.found == 'true' && steps.cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL --retry 4 --retry-delay 5 -o kokoro.tar.bz2 "$KOKORO_URL"
+          tar xjf kokoro.tar.bz2
+          rm kokoro.tar.bz2
+
+      - name: Render
+        if: steps.pick.outputs.found == 'true'
+        run: |
+          set -eu
+          ALICE=""
+          if [ -f video-scripts/assets/alice.png ]; then
+            ALICE="--alice video-scripts/assets/alice.png"
+          else
+            echo "::warning::video-scripts/assets/alice.png is missing: the pictures will have NO Alice. Layout check only."
+          fi
+          mkdir -p out
+          while read -r f; do
+            echo "== $f"
+            python3 tools/video-pipeline/build_short.py "$f" --model-dir kokoro-en-v0_19 $ALICE --out out
+          done < scripts.ok
+          ls -la out
+          {
+            echo "### Rendered files"
+            echo
+            echo "Download them from the Artifacts section of this run. **Nothing was uploaded to YouTube.** A person must watch each video and approve it before it is published."
+            echo
+            for v in out/*.mp4; do
+              d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$v")
+              echo "- \`$(basename "$v")\`: ${d%.*} s"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.pick.outputs.found == 'true'
+        with:
+          name: shorts
+          path: out
+          retention-days: 14
+          if-no-files-found: error
