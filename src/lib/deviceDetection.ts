@@ -1,3 +1,4 @@
+import { nicknameFromHash, friendlyGraphics } from './friendlyLabels';
 import { hexagonLabel } from '../../shared/hexagon-registry/registry.js';
 import {
   detectCanvasFingerprint,
@@ -102,6 +103,9 @@ export interface HexagonData {
   confidence: number;
   risk: string;
   confirmed: boolean;
+  /** CK-7805: display-only text. `value` stays the real captured value (report recognition and status use it). */
+  displayValue?: string;
+  explanation?: string;
   category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social' | 'security' | 'behavior';
 }
 
@@ -706,6 +710,8 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       id: 'canvas-fingerprint',
       label: 'Canvas Fingerprint',
       value: canvasResult.hash.substring(0, 8) + '...',
+      displayValue: nicknameFromHash(canvasResult.hash),
+      explanation: `Your browser draws a hidden test image in its own slightly different way, and that is enough to give it a nickname: ${nicknameFromHash(canvasResult.hash)} (technical ID ${canvasResult.hash.substring(0, 8)}). Sites can use it to recognise you without cookies. This one needs investigation to know how far it spreads.`,
       icon: '🎨',
       confidence: 100,
       risk: 'Unique image rendering signature. Canvas fingerprinting creates a unique identifier based on how your browser renders graphics.',
@@ -725,6 +731,8 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       id: 'webgl-fingerprint',
       label: 'WebGL Signature',
       value: webglValue,
+      displayValue: friendlyGraphics(webglResult.renderer),
+      explanation: `Your browser tells sites which kind of graphics chip you have (${friendlyGraphics(webglResult.renderer)}). On its own that is common, but together with other details it helps tell your device apart from others. This one needs investigation to know how far it spreads.`,
       icon: '🎮',
       confidence: 100,
       risk: 'Graphics card identification. Your GPU model and driver can uniquely identify your device across websites.',

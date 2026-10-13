@@ -3,6 +3,9 @@ import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
+import HexagonExplanation from './HexagonExplanation';
+import StrangerGuessCard from './StrangerGuessCard';
+import { generateFindings } from '@/lib/strangerGuess';
 import { interestRank } from '@/lib/hexagonInterestOrder';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
@@ -49,6 +52,10 @@ interface HexagonGridProps {
 // Define progressive reveal thresholds. The hexagon total shown to the user comes from the registry (HEXAGON_COUNT).
 // FINAL_SUMMARY_MIN_VISIBLE is the wave boundary after which the behavior wave has been revealed, not a count of hexagons.
 const FINAL_SUMMARY_MIN_VISIBLE = 46;
+// CK-7805: the 'what a stranger could guess' card appears with the language panel.
+const STRANGER_CARD_MIN_CONFIRMED = 8;
+// CK-7805 (owner suggestion): the fingerprint panel waits for 8 fingerprint confirmations, not 3.
+const FINGERPRINT_PANEL_MIN_CONFIRMED = 8;
 
 const REVEAL_THRESHOLDS = {
   initial: 5,           // Location, Device, Browser, ISP, Time Pattern
@@ -66,6 +73,8 @@ const REVEAL_THRESHOLDS = {
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
   const [visibleCount, setVisibleCount] = useState(5);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
+  // CK-7805: a tap selects a hexagon so its explanation stays visible on touch screens (no hover there).
+  const [selectedHexagonId, setSelectedHexagonId] = useState<string | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [confirmedHexagons, setConfirmedHexagons] = useState<Set<string>>(new Set());
   const [revealingHexagons, setRevealingHexagons] = useState<Set<string>>(new Set());
@@ -158,6 +167,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     [getOrderedHexagons, confirmedHexagons]
   );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
+  const selectedHexagon = selectedHexagonId ? visibleHexagons.find(h => h.id === selectedHexagonId) ?? null : null;
+  const strangerFindings = useMemo(
+    () => (confirmedCount >= STRANGER_CARD_MIN_CONFIRMED
+      ? generateFindings({ deviceData, hexagons: visibleHexagons, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '' })
+      : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [confirmedCount >= STRANGER_CARD_MIN_CONFIRMED, deviceData]
+  );
 
   // Lazy load fingerprint data when about to be revealed
   const loadFingerprintData = useCallback(async () => {
@@ -411,7 +428,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       if (hex.category === 'fingerprint') {
         setFingerprintConfirmedCount(c => {
           const newCount = c + 1;
-          if (newCount >= 3 && !showFingerprintPanel) {
+          if (newCount >= FINGERPRINT_PANEL_MIN_CONFIRMED && !showFingerprintPanel) {
             setShowFingerprintPanel(true);
           }
           return newCount;
@@ -629,6 +646,9 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         totalCount={Math.max(visibleCount, 8)} 
       />
 
+      {/* CK-7805: constant-height box above the grid: shows the tapped or hovered hexagon's meaning without shifting or covering the grid. */}
+      <HexagonExplanation hexagon={hoveredHexagon ?? selectedHexagon} />
+
       {/* Honeycomb Hexagon Grid */}
       <div ref={gridRef} className="flex justify-center mb-8" role="list" aria-label="Detected data points">
         <div 
@@ -670,6 +690,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
                   data={displayData}
                   onConfirm={handleConfirm}
                   onHover={handleHover}
+                  onSelect={(d) => setSelectedHexagonId(d.id)}
                   isRevealing={isRevealing}
                 />
               </div>
@@ -677,6 +698,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           })}
         </div>
       </div>
+
+      {strangerFindings.length > 0 && <StrangerGuessCard findings={strangerFindings} />}
 
       {/* Risk Score - now with fingerprint data */}
       <RiskScore 

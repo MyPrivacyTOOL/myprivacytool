@@ -7,6 +7,8 @@ interface HexagonProps {
   onConfirm: (id: string) => void;
   onHover: (data: HexagonData | null) => void;
   isRevealing?: boolean;
+  /** CK-7805: called on every tap or click so the explanation stays on screen (touch has no hover). */
+  onSelect?: (data: HexagonData) => void;
 }
 
 // Single palette treatment: deep green outline on a soft green tint (see index.css brand tokens).
@@ -16,10 +18,11 @@ const hexColors = {
   bg: ['hsl(var(--surface) / var(--surface-alpha))', 'hsl(var(--brand-soft) / var(--surface-alpha))'] as [string, string],
 };
 
-export default function Hexagon({ data, onConfirm, onHover, isRevealing = false }: HexagonProps) {
+export default function Hexagon({ data, onConfirm, onHover, isRevealing = false, onSelect }: HexagonProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = () => {
+    if (!isRevealing && data.id !== 'revealing') onSelect?.(data);
     if (!data.confirmed && !isRevealing && data.id !== 'revealing') {
       onConfirm(data.id);
     }
@@ -93,7 +96,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
           onMouseLeave={handleMouseLeave}
           onTouchStart={() => setIsHovered(true)}
           onTouchEnd={() => { setIsHovered(false); onHover(null); }}
-          aria-label={`${data.label}: ${data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Tap to confirm'}`}
+          aria-label={`${data.label}: ${data.displayValue ?? data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Tap to confirm'}`}
         >
           <defs>
             <filter id={`glow-${data.id}`} x="-50%" y="-50%" width="200%" height="200%">
@@ -181,7 +184,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false 
             style={{ fill: 'hsl(var(--foreground))' }}
             className="select-none"
           >
-            {data.value.length > 14 ? data.value.substring(0, 14) + '...' : data.value}
+            {(() => { const shown = data.displayValue ?? data.value; return shown.length > 14 ? shown.substring(0, 14) + '...' : shown; })()}
           </text>
 
           {/* Confidence with category color */}
