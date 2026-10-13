@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const FILES = { 'mpt-leads': 'workers/mpt-leads/wrangler.toml', 'scan-report': 'workers/scan-report/wrangler.toml' };
+const FILES = { 'mpt-leads': 'workers/mpt-leads/wrangler.toml', 'scan-report': 'workers/scan-report/wrangler.toml', 'social-listeners': 'workers/social-listeners/wrangler.toml' };
 
 describe.each(Object.entries(FILES))('%s rate-limit binding', (_name, path) => {
   const toml = readFileSync(path, 'utf8').replace(/^\s*#.*$/gm, '');

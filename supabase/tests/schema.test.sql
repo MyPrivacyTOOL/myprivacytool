@@ -672,3 +672,9 @@ select pg_temp.assert((select count(*) from public.referrals where referrer_user
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
+
+-- ===== MPC-7628: X OAuth token store (credentials, service_role only) =====
+select pg_temp.assert((select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.mpt_x_oauth_tokens'::regclass), 'mpt_x_oauth_tokens: RLS enabled and forced');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.mpt_x_oauth_tokens$$) = '', 'mpt_x_oauth_tokens: service_role can read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.mpt_x_oauth_tokens$$) = '42501', 'mpt_x_oauth_tokens: anon cannot read');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.mpt_x_oauth_tokens$$) = '42501', 'mpt_x_oauth_tokens: authenticated cannot read');

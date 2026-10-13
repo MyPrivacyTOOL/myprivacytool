@@ -5,6 +5,15 @@ export interface Env {
   /** MPC-7628 Mirror bot: app bearer token (public profile lookup) and user-context token with dm.write (DM replies). */
   X_BEARER_TOKEN?: string;
   X_USER_ACCESS_TOKEN?: string;
+  /** Token refresh (MPC-7628): OAuth 2.0 Client ID/Secret of the X app, and the first refresh token (bootstrap only; the rotating pair then lives in Supabase). */
+  X_CLIENT_ID?: string;
+  X_CLIENT_SECRET?: string;
+  X_REFRESH_TOKEN?: string;
+  SUPABASE_URL?: string;
+  SUPABASE_KEY?: string;
+  /** Workers Rate Limiting bindings for the Mirror bot (MPC-7628). Missing = no limit (fails open). */
+  RATE_LIMITER?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  RATE_LIMITER_GLOBAL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
   /** LinkedIn app Client Secret (MPC-7640): signs webhook challenges and deliveries. Unset = LinkedIn webhook fails closed. */
   LINKEDIN_CLIENT_SECRET?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;

@@ -4,8 +4,10 @@
 // only in memory for the length of one request, and logs carry event names only (no handles, ids or profile content).
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
+import { getUserAccessToken } from "./x-oauth";
 
-const SCAN_URL = "https://myprivacytool.io/scan";
+// Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
+const SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
 const X_API = "https://api.x.com/2";
 const X_TIMEOUT_MS = 5000;
 
@@ -28,21 +30,55 @@ export interface MirrorDm {
   command: Exclude<MirrorCommand, null>;
 }
 
-/** MIRROR commands in an Account Activity payload. Our own DM echoes (sender === for_user_id) are never commands. */
+const MAX_DEPTH = 8;
+
+/** The id of the account the event was delivered for (our bot), from either event system. */
+function selfId(p: any): string {
+  return String(p?.for_user_id ?? p?.data?.filter?.user_id ?? p?.filter?.user_id ?? p?.data?.payload?.filter?.user_id ?? "");
+}
+
+/** Sender id and text of one DM-shaped object, in the shapes X uses (legacy Account Activity and the newer dm.received event). */
+function dmFields(o: any): { sender: string; text: unknown } | null {
+  const sender = o.sender_id ?? o.sender?.id ?? o.from_user_id;
+  const text = o.text ?? o.message_data?.text ?? (typeof o.message === "string" ? o.message : o.message?.text) ?? o.dm_event?.text;
+  if ((typeof sender !== "string" && typeof sender !== "number") || typeof text !== "string") return null;
+  return { sender: String(sender), text };
+}
+
+/**
+ * MIRROR commands in an X webhook payload. Walks the JSON for DM-shaped objects so both the legacy Account Activity shape
+ * (direct_message_events[].message_create) and the newer dm.received shape are understood. Our own echoes (sender == the
+ * account the event was delivered for) are never commands.
+ */
 export function extractMirrorDms(payload: unknown): MirrorDm[] {
-  const p = payload as { for_user_id?: unknown; direct_message_events?: unknown } | null;
-  const self = String(p?.for_user_id ?? "");
-  const events = Array.isArray(p?.direct_message_events) ? (p!.direct_message_events as any[]) : [];
+  const self = selfId(payload);
   const out: MirrorDm[] = [];
-  for (const e of events) {
-    if (e?.type !== "message_create") continue;
-    const senderId = String(e.message_create?.sender_id ?? "");
-    const text = e.message_create?.message_data?.text;
-    const command = parseMirrorCommand(text);
-    if (!senderId || senderId === self || !command) continue;
-    out.push({ senderId, text, command });
-  }
+  const seen = new Set<string>();
+  const walk = (node: unknown, depth: number) => {
+    if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
+    if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1));
+    const f = dmFields(node);
+    if (f) {
+      const command = parseMirrorCommand(f.text);
+      const key = `${f.sender}|${f.text}`;
+      if (command && f.sender !== self && !seen.has(key)) {
+        seen.add(key);
+        out.push({ senderId: f.sender, text: f.text, command });
+      }
+    }
+    for (const v of Object.values(node)) walk(v, depth + 1);
+  };
+  walk(payload, 0);
   return out;
+}
+
+/** Event type and top-level key names only (no ids, no text), so an unrecognised event shape can be diagnosed from logs. */
+export function describeShape(payload: unknown): { event_type?: string; keys: string[] } {
+  const p = payload as any;
+  const raw = p?.event_type ?? p?.data?.event_type ?? p?.payload?.event_type;
+  const event_type = typeof raw === "string" && /^[a-z0-9_.]{1,48}$/i.test(raw) ? raw : undefined;
+  const keys = p && typeof p === "object" ? Object.keys(p).filter((k) => /^[a-z0-9_]{1,40}$/i.test(k)).slice(0, 12) : [];
+  return event_type ? { event_type, keys } : { keys };
 }
 
 export interface XProfile {
@@ -124,39 +160,61 @@ export async function fetchPublicProfile(env: Env, userId: string): Promise<XPro
   return ((await res.json()) as { data?: XProfile }).data ?? null;
 }
 
-/** Sends a DM with the user-context token (dm.write). Returns whether X accepted it. */
-export async function sendXDm(env: Env, recipientId: string, text: string): Promise<boolean> {
-  if (!env.X_USER_ACCESS_TOKEN || !/^\d+$/.test(recipientId)) return false;
-  const res = await xFetch(env, `/dm_conversations/with/${recipientId}/messages`, {
-    method: "POST",
-    token: env.X_USER_ACCESS_TOKEN,
-    body: JSON.stringify({ text }),
-  });
-  return res.ok;
+/** Sends a DM with the user-context token (dm.write). Refreshes the token and retries once on 401. Returns whether X accepted it. */
+export async function sendXDm(env: Env, recipientId: string, text: string, log?: Logger): Promise<boolean> {
+  if (!/^\d+$/.test(recipientId)) return false;
+  const quiet: Logger = log ?? { info() {}, warn() {}, error() {} };
+  for (const force of [false, true]) {
+    const token = await getUserAccessToken(env, quiet, force);
+    if (!token) return false;
+    const res = await xFetch(env, `/dm_conversations/with/${recipientId}/messages`, { method: "POST", token, body: JSON.stringify({ text }) });
+    if (res.status !== 401) return res.ok;
+  }
+  return false;
+}
+
+/** Per-sender and global limits on Mirror commands: each scan spends X API credits. Fails open when no binding is configured. */
+async function allowed(env: Env, senderId: string, log: Logger): Promise<boolean> {
+  for (const [name, limiter, key] of [
+    ["sender", env.RATE_LIMITER, `x:${senderId}`],
+    ["global", env.RATE_LIMITER_GLOBAL, "x-mirror"],
+  ] as const) {
+    if (!limiter) continue;
+    try {
+      if (!(await limiter.limit({ key })).success) {
+        log.warn("mirror_rate_limited", { scope: name });
+        return false;
+      }
+    } catch {
+      /* fail open */
+    }
+  }
+  return true;
 }
 
 /** Handles one MIRROR command end to end. Never throws; logs event names only. */
 export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promise<void> {
   try {
+    if (!(await allowed(env, dm.senderId, log))) return; // dropped silently: replying would cost credits too
     if (dm.command === "request") {
       log.info("mirror_consent_requested");
-      await sendXDm(env, dm.senderId, CONSENT_MESSAGE);
+      await sendXDm(env, dm.senderId, CONSENT_MESSAGE, log);
       return;
     }
     if (dm.command === "decline") {
       log.info("mirror_consent_declined");
-      await sendXDm(env, dm.senderId, DECLINE_MESSAGE);
+      await sendXDm(env, dm.senderId, DECLINE_MESSAGE, log);
       return;
     }
     log.info("mirror_consent_granted");
     const profile = await fetchPublicProfile(env, dm.senderId);
     if (!profile) {
       log.warn("mirror_scan_failed");
-      await sendXDm(env, dm.senderId, ERROR_MESSAGE);
+      await sendXDm(env, dm.senderId, ERROR_MESSAGE, log);
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, buildMirrorMessage(profile));
+    const sent = await sendXDm(env, dm.senderId, buildMirrorMessage(profile), log);
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
