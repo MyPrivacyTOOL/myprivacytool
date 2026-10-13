@@ -1,7 +1,7 @@
 # Alice voice samples (CK-7728 part A)
 
 Three samples for the Alice listener test (MPC-7725 part C). All read the same
-script (about 25 s, Alice's real site lines). Files are named **A, B, C only**
+script (Alice's real site lines; the kit says about 25 s, but A reads in 12.0 s at normal speed). Files are named **A, B, C only**
 and played in a different random order for each listener; this key is for the
 facilitator and must not be shown to listeners.
 
@@ -12,7 +12,7 @@ facilitator and must not be shown to listeners.
 | C | Kokoro v0.19 | `bf_emma` (speaker 7, from the model's speaker order; confirm against the model metadata) | Same delivery and mastering as B |
 
 Run: `python3 generate_samples.py --v019 <kokoro-en-v0_19> --v10 <kokoro-multi-lang-v1_0> --out out/`
-after `pip install sherpa-onnx soundfile numpy` (ffmpeg on PATH). Models:
+after `pip install sherpa-onnx soundfile numpy imageio-ffmpeg`. Models:
 <https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models>. Zero spend, all local.
 
 The script sentence uses "My Privacy Tool" for pronunciation (MPC-7411).

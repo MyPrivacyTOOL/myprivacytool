@@ -2,7 +2,7 @@
 """Generate the three Alice listener-test samples (CK-7728 part A): A.wav, B.wav, C.wav.
 
 Local and free: sherpa-onnx + Kokoro models, ffmpeg for mastering. Needs
-`pip install sherpa-onnx soundfile numpy` and ffmpeg on PATH.
+`pip install sherpa-onnx soundfile numpy imageio-ffmpeg` (imageio-ffmpeg supplies ffmpeg if none is on PATH).
 
   python3 generate_samples.py --v019 kokoro-en-v0_19 --v10 kokoro-multi-lang-v1_0 --out out/
 
@@ -11,6 +11,7 @@ https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models first.
 Files are named A, B, C only; the key to which is which is in README.md.
 """
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -44,7 +45,7 @@ def tts_for(folder: Path, v10: bool):
     )
     if v10:
         kokoro.update(lexicon=",".join(str(p) for p in sorted(folder.glob("lexicon-*.txt"))),
-                      dict_dir=str(folder / "dict"), lang="en-gb")
+                      dict_dir=str(folder / "dict"))
     cfg = sherpa_onnx.OfflineTtsConfig(
         model=sherpa_onnx.OfflineTtsModelConfig(
             vits=sherpa_onnx.OfflineTtsVitsModelConfig(),
@@ -65,15 +66,28 @@ def render(tts, spec, text):
     chunks, rate = [], None
     for c in clauses(text, spec["split_commas"]):
         audio = tts.generate(c, sid=spec["sid"], speed=spec["speed"])
+        if len(audio.samples) == 0:
+            sys.exit(f"No audio generated for: {c!r} (check the model folder and espeak-ng-data)")
         rate = audio.sample_rate
         chunks.append(np.asarray(audio.samples, dtype=np.float32))
         chunks.append(np.zeros(int(rate * spec["pause"]), dtype=np.float32))
     return np.concatenate(chunks), rate
 
 
+def ffmpeg_exe() -> str:
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        sys.exit("ffmpeg not found: install it or run `pip install imageio-ffmpeg`")
+
+
 def master(src: Path, dst: Path):
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ac", "1", "-ar", "44100",
+        [ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(src), "-ac", "1", "-ar", "44100",
          "-af", "highpass=f=70,alimiter=limit=0.89,loudnorm=I=-18:TP=-3:LRA=7", str(dst)],
         check=True)
 
@@ -98,8 +112,6 @@ def main():
             raw.rename(final)  # A stays as it sounds today: no extra processing
         info = sf.info(final)
         print(f"{name}: {info.duration:.1f} s, {info.samplerate} Hz -> {final}")
-        if not 20 <= info.duration <= 32:
-            print(f"  warning: {name} is {info.duration:.1f} s; the test script targets about 25 s", file=sys.stderr)
 
 
 if __name__ == "__main__":
