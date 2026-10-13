@@ -9,7 +9,7 @@ const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body
 const dm = (sender: string, text: string, forUser = "999") =>
   JSON.stringify({ for_user_id: forUser, direct_message_events: [{ type: "message_create", message_create: { sender_id: sender, message_data: { text } } }] });
 const brain = () => ({ fetch: vi.fn(async () => new Response("ok")) });
-const env = (b = brain()) => ({ X_CONSUMER_SECRET: "xs", X_BEARER_TOKEN: "bearer", X_USER_ACCESS_TOKEN: "user", CORE_BRAIN: b });
+const env = (b = brain()) => ({ MEDIA_VIDEO_URL: "off", X_CONSUMER_SECRET: "xs", X_BEARER_TOKEN: "bearer", X_USER_ACCESS_TOKEN: "user", CORE_BRAIN: b });
 const post = (body: string, e: object) =>
   worker.fetch(new Request("https://w/webhook/x", { method: "POST", body, headers: { "X-Twitter-Webhooks-Signature": sig(body) } }), e as never, { waitUntil: () => {} } as never);
 
@@ -259,5 +259,63 @@ describe("consent wording (MPC-7628)", () => {
   it("asks only for a Y and does not ask for a no", () => {
     expect(CONSENT_MESSAGE).toContain("just reply Y");
     expect(CONSENT_MESSAGE).not.toMatch(/reply N|MIRROR NO|cancel/i);
+  });
+});
+
+describe("Alice clip on DMs (MPC-7628)", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+  /** Fake X + site: the clip, the chunked upload, DM sends. `upload` decides how INIT answers. */
+  function fake(upload: "ok" | "forbidden" = "ok", dmWithVideoOk = true) {
+    const sent: any[] = [];
+    const steps: string[] = [];
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+      const url = String(u);
+      if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(2_500_000));
+      if (url.includes("/media/upload")) {
+        if (init?.method === "GET") return Response.json({ data: { processing_info: { state: "succeeded" } } });
+        const cmd = (init.body as FormData).get("command") as string;
+        steps.push(cmd);
+        if (upload === "forbidden") return new Response("{}", { status: 403 });
+        if (cmd === "INIT") return Response.json({ data: { id: "777" } });
+        if (cmd === "FINALIZE") return Response.json({ data: { id: "777" } });
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes("/messages")) {
+        const body = JSON.parse(init.body);
+        sent.push(body);
+        return new Response("{}", { status: body.attachments && !dmWithVideoOk ? 400 : 200 });
+      }
+      return new Response("{}");
+    });
+    return { f, sent, steps };
+  }
+  const e = () => ({ ...env(), MEDIA_VIDEO_URL: undefined });
+
+  it("uploads in 1 MB chunks and attaches the clip to the welcome", async () => {
+    const x = fake();
+    await post(dm("42", "hello"), e());
+    await settle();
+    expect(x.steps).toEqual(["INIT", "APPEND", "APPEND", "APPEND", "FINALIZE"]);
+    expect(x.sent).toHaveLength(1);
+    expect(x.sent[0]).toEqual({ text: WELCOME_MESSAGE, attachments: [{ media_id: "777" }] });
+  });
+  it("sends the welcome as text alone when the upload is refused (e.g. no media.write scope)", async () => {
+    const x = fake("forbidden");
+    await post(dm("42", "hello"), e());
+    await settle();
+    expect(x.sent).toEqual([{ text: WELCOME_MESSAGE }]);
+  });
+  it("retries as text alone when X refuses the attachment", async () => {
+    const x = fake("ok", false);
+    await post(dm("42", "hello"), e());
+    await settle();
+    expect(x.sent).toEqual([{ text: WELCOME_MESSAGE, attachments: [{ media_id: "777" }] }, { text: WELCOME_MESSAGE }]);
+  });
+  it("MEDIA_VIDEO_URL=off means text only and no upload", async () => {
+    const x = fake();
+    await post(dm("42", "hello"), env());
+    await settle();
+    expect(x.steps).toEqual([]);
+    expect(x.sent).toEqual([{ text: WELCOME_MESSAGE }]);
   });
 });
