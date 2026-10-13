@@ -35,6 +35,7 @@ const st = summariseAgentTasks([
 check(st.total === 4 && st.done === 2 && st.successRatePct === (2 / 3) * 100 && st.amended === 2 && st.blocked === 2 && st.approved === 1 && st.rejected === 1, 'summariseAgentTasks counts');
 check(summariseAgentTasks([{ status: 'In progress' }]).successRatePct === null, 'no finished task => finish rate null, not 0');
 check(agentStatsText(st) === 'Agent tasks: 2 done of 4, 67% finish rate, 1 rejected, 2 blocked.' && agentStatsText(null) === 'Agent stats unavailable.', 'agentStatsText');
+check(summariseAgentTasks([{ status: 'In progress', override: 'Rejected' }, { status: 'Done', approval: 'Rejected', override: 'Rejected' }, { status: 'Done', override: 'Accepted as is' }]).rejected === 2, 'rejected = Override_Outcome or Approval_Status rejected, counted once per task');
 const st2 = summariseAgentTasks([{ status: 'Done', minutesSaved: 30, errorsCaught: 1, override: 'Accepted as is' }, { status: 'Done', minutesSaved: 15, override: 'Amended' }, { status: 'Done' }]);
 check(st2.minutesSaved === 45 && st2.errorsCaught === 1 && st2.acceptedPct === 50 && st2.revenueGbp === null, 'new fields: sums, accepted %, blank revenue stays null');
 check(agentStatsText(st2).includes('45 min saved, 1 errors caught, 50% accepted as is') && !agentStatsText(st2).includes('revenue'), 'new fields shown only when recorded');
