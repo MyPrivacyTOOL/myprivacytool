@@ -43,18 +43,20 @@ async function timed(url: string, init: RequestInit): Promise<Response> {
   }
 }
 
-async function readRow(env: Env): Promise<Row | null> {
+/** The stored row; null when there is none; STORE_DOWN when the store cannot be read at all (not configured, table missing, error). */
+const STORE_DOWN = Symbol("x-token-store-down");
+async function readRow(env: Env): Promise<Row | null | typeof STORE_DOWN> {
   const s = supa(env);
-  if (!s) return null;
+  if (!s) return STORE_DOWN;
   try {
     const res = await timed(`${s.base}?id=eq.${ROW_ID}&select=access_token,refresh_token,expires_at`, {
       headers: { apikey: s.key, authorization: `Bearer ${s.key}` },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return STORE_DOWN;
     const rows = (await res.json()) as Row[];
     return rows[0] ?? null;
   } catch {
-    return null;
+    return STORE_DOWN;
   }
 }
 
@@ -119,7 +121,13 @@ const fresh = (row: Row) => Date.parse(row.expires_at) - SKEW_MS > Date.now();
 export async function getUserAccessToken(env: Env, log: Logger, force = false): Promise<string | null> {
   if (!force && memo && memo.expiresAt - SKEW_MS > Date.now()) return memo.token;
 
-  const row = await readRow(env);
+  const read = await readRow(env);
+  // A refresh token works once. If we cannot save the new pair, refreshing would burn the old one for nothing, so never refresh then.
+  if (read === STORE_DOWN) {
+    log.warn("x_token_store_unavailable");
+    return env.X_USER_ACCESS_TOKEN ?? null;
+  }
+  const row = read;
   if (!force && row && fresh(row)) {
     memo = { token: row.access_token, expiresAt: Date.parse(row.expires_at) };
     return row.access_token;
@@ -129,14 +137,15 @@ export async function getUserAccessToken(env: Env, log: Logger, force = false): 
   if (canRefresh) {
     const next = await refresh(env, row?.refresh_token ?? env.X_REFRESH_TOKEN ?? "", log);
     if (next) {
-      const stored = await writeRow(env, next);
-      log.info(stored ? "x_token_refreshed" : "x_token_refreshed_not_stored");
+      const stored = (await writeRow(env, next)) || (await writeRow(env, next)); // one retry: losing this pair loses the bot's access
+      if (stored) log.info("x_token_refreshed");
+      else log.error("x_token_refreshed_not_stored");
       memo = { token: next.access_token, expiresAt: Date.parse(next.expires_at) };
       return next.access_token;
     }
     // Refresh tokens are single use: another isolate may have just rotated it. Take its result if it is newer.
     const again = await readRow(env);
-    if (again && fresh(again) && again.access_token !== row?.access_token) {
+    if (again && again !== STORE_DOWN && fresh(again) && again.access_token !== row?.access_token) {
       memo = { token: again.access_token, expiresAt: Date.parse(again.expires_at) };
       return again.access_token;
     }
