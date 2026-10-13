@@ -99,9 +99,10 @@ export interface DialResult {
   platform: HkPlatform;
   /** Ready for <a href>. Percent-encoded. */
   dial: string;
-  /** Keys the user must press by hand and the page must show on screen. Empty when Android auto-sends them. */
+  /** Keys the page shows on screen: the manual script on desktop, and the backup (in large type) on iPhone.
+   *  Empty on Android, where the dial string sends them. */
   manualKeys: IvrKey[];
-  /** True when the dial string itself carries the keys (Android). */
+  /** True when the dial string itself carries the keys with pauses (Android and iPhone). */
   autoKeys: boolean;
   /** Always mirrors IVR_VERIFIED so callers cannot present unverified keys as working. */
   verified: boolean;
@@ -119,8 +120,8 @@ export function buildDialString(platform: HkPlatform, options: DialOptions = {})
   const number = (forceCallerId ? HK_CALLER_ID_PREFIX : "") + HK_DNC_HOTLINE;
   const keys = getIvrKeys(register, language);
 
-  if (platform === "android") {
-    // A longer wait before star lets the "registered" message play first.
+  if (platform === "android" || platform === "ios") {
+    // Both phones honour "," as a pause in a tel: link. A longer wait before star lets the "registered" message play first.
     const parts = keys.map((k, i) => {
       const pause = i === 0 ? PAUSES.beforeFirstKey : k.purpose === "back" ? PAUSES.afterRegister : PAUSES.betweenKeys;
       return ",".repeat(pause) + k.key;
@@ -128,13 +129,14 @@ export function buildDialString(platform: HkPlatform, options: DialOptions = {})
     return {
       platform,
       dial: `tel:${encodeTelSegment(number + parts.join(""))}`,
-      manualKeys: [],
+      // iPhone also gets the keys on screen as a backup in case the dialer ignores the pauses.
+      manualKeys: platform === "ios" ? keys : [],
       autoKeys: true,
       verified: IVR_VERIFIED,
     };
   }
 
-  // iOS (and desktop / unknown): bare number; the user presses the keys while the page shows them.
+  // Desktop / unknown: bare number; the user presses the keys while the page shows them.
   return {
     platform,
     dial: `tel:${encodeTelSegment(number)}`,
