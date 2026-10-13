@@ -22,15 +22,27 @@ Every DM we send opens with who we are and ends with the same signature, so it i
 
 The @handle comes from a public lookup of the sender (`fetchUsername`, bearer token); if it fails the greeting simply leaves the handle out.
 
-Any DM that is not a Mirror command gets the welcome straight away (`WELCOME_BODY`): what we do in one line, that this is an automated assistant, a "what brought you here?" question (reply 1, 2 or 3, or free text), then two simple options: reply **Y** for the Mirror, or the UTM-tagged free scan, and a thank-you. A plain **Y** (any case) right after the welcome, a 1/2/3 reply or the full consent request counts as consent: the Mirror offer carries the same `🪞 MyPrivacyTOOL Mirror` heading that `isConsentPending` looks for in our last message (15 minute window). Typing `MIRROR` still works.
+Any DM that is not a Mirror command gets the welcome straight away (`WELCOME_BODY`): what we do in one line, that this is an automated assistant, a "what brought you here?" question (reply 1, 2 or 3, or free text), then two simple options: reply **Y** for the Mirror, or the UTM-tagged free scan, and a thank-you. A plain **Y** (any case) right after the welcome, a 1/2/3 reply or the full consent request counts as consent: the Mirror offer carries the same `🪞 MyPrivacyTOOL Mirror` heading that `isConsentPending` looks for in our last message (15 minute window). Typing `MIRROR` still works. The welcome and the mirror result also carry a one-tap follow link (`FOLLOW_LINE`, X's follow intent page): a reply cannot make someone follow us, so we link it.
 
-1/2/3 get a tailored reply (`INTENT_REPLIES`) and log only `intent_choice` with the number (aggregate counts, never tied to the sender). No LLM; same per-sender and global rate limits as Mirror; never sent for our own messages or when the webhook does not carry our own account id. Legacy-shaped DMs are still forwarded to core-brain for its interaction log.
+1/2/3 get a tailored reply (`INTENT_REPLIES`). No LLM; same per-sender and global rate limits as Mirror; never sent for our own messages or when the webhook does not carry our own account id.
 
-Not yet built: capturing free-text intent (what they typed) for analysis. It needs a decision on what we may keep, because the Mirror promises to store nothing.
+### Intent and funnel counting (decision, 2026-10-13)
+
+What people type is never stored, and neither is who sent it. Each inbound DM we answer writes ONE row to `public.interaction_log` through `mpt_brain_record` (`funnel.ts`): channel `x`, **no sender id** (X is log-only), **no message text**, intent bucket, and an event key, kept 90 days. That row is what the Channel OSINT dashboard (`mpt_channel_osint_daily`, platform `x`) counts as `dms_received`, and consent rows count as `scan_requests`. So the Mirror's "I store nothing" stays true: only an anonymous counter row exists.
+
+| Event | intent | `response_key` |
+|---|---|---|
+| `MIRROR` | help | `x.mirror.request` |
+| consent (`Y`, `MIRROR YES`) | scan | `x.mirror.consent` |
+| decline | help | `x.mirror.decline` |
+| reply `1` / `2` / `3` | help | `x.intent.1` / `.2` / `.3` |
+| anything else | help | `x.welcome.<theme>`, theme = `safety`, `scam`, `exposure`, `business`, `curious` or `other` (keyword match, only the theme word is kept) |
+
+Because every DM we answer is counted here, it is not also forwarded to core-brain (it would be logged twice, and its text would go to the LLM). `consents_given` stays 0 for X (it needs a conversation state, which X does not have); use `scan_requests`.
 
 ## Alice clip on DMs
 
-The welcome reply and the mirror DM carry a 6 s clip of Alice opening the curtain (`public/media/alice-curtain.mp4`, served at `https://myprivacytool.io/media/alice-curtain.mp4`). The worker fetches it, uploads it to X with the chunked v2 flow (`x-media.ts`, `media_category=dm_video`) and attaches the media id to the DM. This needs the `media.write` scope on the user token. If the upload fails for any reason (missing scope, X error, clip unreachable) or X refuses the attachment, the same DM is sent as text alone. Set `MEDIA_VIDEO_URL=off` to turn the clip off.
+The welcome reply and the mirror DM carry a 6 s clip of Alice opening the curtain (`public/media/alice-curtain.mp4`, served at `https://myprivacytool.io/media/alice-curtain.mp4`). The worker fetches it, uploads it to X with the chunked v2 flow (`x-media.ts`, `media_category=dm_video`) and attaches the media id to the DM. X's console does not offer `media.write` on the OAuth 2.0 user token (the upload answered 403, `x_media_init_rejected`), so the upload is signed with OAuth 1.0a instead: the app's API key + the account's access token and secret (secrets `X_CONSUMER_KEY`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`, plus the existing `X_CONSUMER_SECRET`; `oauth1Header` in `x-media.ts`). Without those four the OAuth 2.0 call is tried and the DM goes out as text. If the upload fails for any reason (missing scope, X error, clip unreachable) or X refuses the attachment, the same DM is sent as text alone. Set `MEDIA_VIDEO_URL=off` to turn the clip off.
 
 ## Consent and no-retention guarantee
 

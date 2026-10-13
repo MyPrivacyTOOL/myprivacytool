@@ -6,6 +6,7 @@ import type { Logger } from "./logger";
 import type { Env } from "./shared";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
+import { classifyTheme, recordXDm } from "./funnel";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
@@ -134,6 +135,9 @@ export const CONSENT_MESSAGE =
 const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];
 const CONSENT_WINDOW_MS = 15 * 60_000;
 
+/** One-tap follow (X's own follow intent page). A reply cannot make someone follow us, so we link it. */
+export const FOLLOW_LINE = "👉 Follow @MyPrivacyTOOL for privacy alerts: https://x.com/intent/follow?screen_name=MyPrivacyTOOL";
+
 /** Every message we send opens with who we are (so it is easy to find in the inbox and remembered as the brand) and ends with the same signature. */
 export const SIGNATURE = "— @MyPrivacyTOOL · myprivacytool.io";
 export const greeting = (username?: string): string => `Hello${username ? ` @${username}` : ""}, this is @MyPrivacyTOOL 👋`;
@@ -155,6 +159,7 @@ export const WELCOME_BODY =
   "3. I'm just exploring\n\n" +
   `${MIRROR_OFFER}\n` +
   `🔎 Or run the free privacy scan: ${SCAN_URL}\n\n` +
+  `${FOLLOW_LINE}\n\n` +
   "Thank you for getting in touch.";
 export const WELCOME_MESSAGE = branded(undefined, WELCOME_BODY);
 
@@ -319,15 +324,18 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
     if (!dm.bare && !(await allowed(env, dm.senderId, log))) return; // dropped silently: replying would cost credits too (bare replies were limited by isConsentPending)
     if (dm.command === "request") {
       log.info("mirror_consent_requested");
+      await recordXDm(env, "help", "x.mirror.request", log);
       await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), CONSENT_MESSAGE), log);
       return;
     }
     if (dm.command === "decline") {
       log.info("mirror_consent_declined");
+      await recordXDm(env, "help", "x.mirror.decline", log);
       await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), DECLINE_MESSAGE), log);
       return;
     }
     log.info("mirror_consent_granted");
+    await recordXDm(env, "scan", "x.mirror.consent", log); // the Mirror is a scan: counts as a scan request in the funnel
     const profile = await fetchPublicProfile(env, dm.senderId);
     if (!profile) {
       log.warn("mirror_scan_failed");
@@ -335,7 +343,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile)), log, { video: true });
+    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile) + `\n\n${FOLLOW_LINE}`), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
@@ -347,7 +355,8 @@ export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: 
   if (!(await allowed(env, dm.senderId, log))) return;
   const choice = dm.text?.trim().replace(/[.!)]$/, "");
   const reply = choice && /^[123]$/.test(choice) ? INTENT_REPLIES[choice] : undefined;
-  if (reply) log.info("intent_choice", { choice }); // a count by number only, never tied to the sender
+  // Funnel row: the number they chose, or the theme of what they typed. Never the text, never who sent it.
+  await recordXDm(env, "help", reply ? `x.intent.${choice}` : `x.welcome.${classifyTheme(dm.text ?? "")}`, log);
   const username = await fetchUsername(env, dm.senderId);
   const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply + "\n\nThank you!") : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");

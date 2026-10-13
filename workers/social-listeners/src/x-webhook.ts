@@ -50,10 +50,11 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
     if (ctx?.waitUntil) ctx.waitUntil(work);
     else await work;
     const legacy = (payload as { direct_message_events?: any[] }).direct_message_events;
-    // Legacy payloads can mix MIRROR DMs with other events: forward only the rest (welcomed DMs still reach core-brain's log). Any other shape is fully handled here.
+    // Legacy payloads can mix MIRROR DMs with other events: forward only the rest (every DM we answer is counted in the funnel by funnel.ts instead, so core-brain does not log it twice). Any other shape is fully handled here.
     if (!Array.isArray(legacy)) return new Response("OK");
+    const handled = [...mirrorDms, ...welcomed];
     const rest = legacy.filter(
-      (e) => !mirrorDms.some((d) => d.senderId === String(e?.message_create?.sender_id) && d.text === e?.message_create?.message_data?.text),
+      (e) => !handled.some((d) => d.senderId === String(e?.message_create?.sender_id) && d.text === e?.message_create?.message_data?.text),
     );
     const others = { ...(payload as object), direct_message_events: rest } as { tweet_create_events?: unknown[] };
     if (rest.length === 0 && !others.tweet_create_events?.length) return new Response("OK");
