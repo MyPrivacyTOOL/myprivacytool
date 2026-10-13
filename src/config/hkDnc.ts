@@ -110,7 +110,8 @@ export interface DialResult {
 // tel: URIs: keep "," (pause) literal, percent-encode everything else (notably # and *, which would otherwise
 // be read as a URL fragment / reserved character).
 function encodeTelSegment(s: string): string {
-  return encodeURIComponent(s).replace(/%2C/gi, ",");
+  // encodeURIComponent leaves "*" alone, so encode it explicitly (star = back to menu); "#" is already encoded.
+  return encodeURIComponent(s).replace(/%2C/gi, ",").replace(/\*/g, "%2A");
 }
 
 export function buildDialString(platform: HkPlatform, options: DialOptions = {}): DialResult {
