@@ -42,7 +42,7 @@ Because every DM we answer is counted here, it is not also forwarded to core-bra
 
 ## Alice clip on DMs
 
-The welcome reply and the mirror DM carry a 6 s clip of Alice opening the curtain (`public/media/alice-curtain.mp4`, served at `https://myprivacytool.io/media/alice-curtain.mp4`). The worker fetches it, uploads it to X with the chunked v2 flow (`x-media.ts`, `media_category=dm_video`) and attaches the media id to the DM. This needs the `media.write` scope on the user token. If the upload fails for any reason (missing scope, X error, clip unreachable) or X refuses the attachment, the same DM is sent as text alone. Set `MEDIA_VIDEO_URL=off` to turn the clip off.
+The welcome reply and the mirror DM carry a 6 s clip of Alice opening the curtain (`public/media/alice-curtain.mp4`, served at `https://myprivacytool.io/media/alice-curtain.mp4`). The worker fetches it, uploads it to X with the chunked v2 flow (`x-media.ts`, `media_category=dm_video`) and attaches the media id to the DM. X's console does not offer `media.write` on the OAuth 2.0 user token (the upload answered 403, `x_media_init_rejected`), so the upload is signed with OAuth 1.0a instead: the app's API key + the account's access token and secret (secrets `X_CONSUMER_KEY`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`, plus the existing `X_CONSUMER_SECRET`; `oauth1Header` in `x-media.ts`). Without those four the OAuth 2.0 call is tried and the DM goes out as text. If the upload fails for any reason (missing scope, X error, clip unreachable) or X refuses the attachment, the same DM is sent as text alone. Set `MEDIA_VIDEO_URL=off` to turn the clip off.
 
 ## Consent and no-retention guarantee
 

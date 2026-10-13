@@ -19,6 +19,7 @@ MPT = MyPrivacyTOOL. Real values are **never** committed. Only `.env.example` (p
 | `X_BEARER_TOKEN` (MPC-7628, public profile lookup for the Mirror bot) | | ✅ |
 | `X_USER_ACCESS_TOKEN` (MPC-7628, OAuth 2.0 user token with `dm.read dm.write`, sends Mirror DMs; expires in ~2h, used only as a fallback once refresh works) | | ✅ |
 | `X_CLIENT_ID`, `X_CLIENT_SECRET` (MPC-7628, OAuth 2.0 keys of the X app, used to refresh the user token) | | ✅ |
+| `X_CONSUMER_KEY`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` (MPC-7628, OAuth 1.0a API key and the account's access token + secret from the X app's Keys and tokens page, with `X_CONSUMER_SECRET` above; they sign the Alice clip upload, which the OAuth 2.0 token cannot do) | | ✅ |
 | `X_REFRESH_TOKEN` (MPC-7628, the refresh token that came with the user token; seeds `public.mpt_x_oauth_tokens` on first use, after which the rotating pair lives in Supabase) | | ✅ |
 
 Each Worker only receives the secrets it needs (least privilege). Secrets are read in code as `env.NAME`.

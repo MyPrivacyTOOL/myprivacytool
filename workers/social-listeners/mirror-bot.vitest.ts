@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
+import { hasOAuth1, oauth1Header } from "./src/x-media";
 import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
 import { CONSENT_MESSAGE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
@@ -459,5 +460,37 @@ describe("follow link (MPC-7628)", () => {
   it("the welcome offers a one-tap follow", () => {
     expect(WELCOME_BODY).toContain(FOLLOW_LINE);
     expect(FOLLOW_LINE).toContain("https://x.com/intent/follow?screen_name=MyPrivacyTOOL");
+  });
+});
+
+describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
+  const keys = { X_CONSUMER_KEY: "xvz1evFS4wEEPTGEFPHBog", X_CONSUMER_SECRET: "kAcSOqF21Fu85e7zjz7ZN2U4ZRhfV3WpwPAoE3Z7kBw", X_ACCESS_TOKEN: "370773112-XmHxMAgYyLbNEtIKZeRNFsMKPR9EyMZeS9weJAEb", X_ACCESS_TOKEN_SECRET: "LswwdoUaIvS8ltyTt5jkRh4J50vUPVVHtR2YPi5kE" };
+  it("signs the published example request (expected value computed with an independent HMAC-SHA1 implementation)", async () => {
+    // The published example signs the body field too; here it is passed in the query string, which signs identically.
+    const h = await oauth1Header(keys as never, "POST", "https://api.twitter.com/1.1/statuses/update.json?include_entities=true&status=Hello%20Ladies%20%2B%20Gentlemen%2C%20a%20signed%20message%21", "kYjzVBB8Y0ZFabxSWbWovY3uYSQ2pTgmZeNu2VS4cg", "1318622958");
+    expect(h).toContain('oauth_signature="RXUC7HYbaO6l9hSiKJHZe8WpAxk%3D"');
+    expect(h.startsWith("OAuth ")).toBe(true);
+  });
+  it("is used only when all four keys are really set (a deploy placeholder does not count)", () => {
+    expect(hasOAuth1(keys as never)).toBe(true);
+    expect(hasOAuth1({ ...keys, X_ACCESS_TOKEN_SECRET: "placeholder" } as never)).toBe(false);
+    expect(hasOAuth1({ X_CONSUMER_SECRET: "xs" } as never)).toBe(false);
+  });
+  it("signs the upload calls with OAuth 1.0a when the keys are set", async () => {
+    const seen: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+      const url = String(u);
+      if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(10));
+      if (url.includes("/media/upload")) {
+        seen.push(init.headers.Authorization);
+        const cmd = (init.body as FormData).get("command");
+        return cmd === "INIT" ? Response.json({ data: { id: "9" } }) : Response.json({ data: { id: "9" } });
+      }
+      return new Response("{}");
+    });
+    await post(dm("42", "hello"), { ...env(), MEDIA_VIDEO_URL: undefined, ...keys, X_CONSUMER_SECRET: "xs" });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(seen.length > 0).toBe(true);
+    expect(seen.every((a) => a.startsWith("OAuth "))).toBe(true);
   });
 });

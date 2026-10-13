@@ -9,6 +9,10 @@ export interface Env {
   X_CLIENT_ID?: string;
   X_CLIENT_SECRET?: string;
   X_REFRESH_TOKEN?: string;
+  /** OAuth 1.0a keys (API key, account access token + secret): sign the clip upload, which the OAuth 2.0 token cannot do. */
+  X_CONSUMER_KEY?: string;
+  X_ACCESS_TOKEN?: string;
+  X_ACCESS_TOKEN_SECRET?: string;
   /** Override for the clip attached to Mirror/welcome DMs (default: https://myprivacytool.io/media/alice-curtain.mp4); "off" sends text only. */
   MEDIA_VIDEO_URL?: string;
   SUPABASE_URL?: string;
