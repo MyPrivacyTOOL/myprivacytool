@@ -41,7 +41,7 @@ export function summariseAgentTasks(rows) {
     total: rows.length, done, cancelled,
     successRatePct: done + cancelled ? (done / (done + cancelled)) * 100 : null,
     amended: n((r) => r.amended), blocked: n((r) => r.blocked),
-    approved: n((r) => r.approval === 'Approved'), rejected: n((r) => r.approval === 'Rejected'),
+    approved: n((r) => r.approval === 'Approved'), rejected: n((r) => r.override === 'Rejected' || r.approval === 'Rejected'),
     // MPC-7654 fields: null until at least one task has a value (blank stays blank, never 0).
     minutesSaved: sumField(rows, 'minutesSaved'), errorsCaught: sumField(rows, 'errorsCaught'), revenueGbp: sumField(rows, 'revenueGbp'),
     acceptedPct: (() => { const rev = rows.filter((r) => r.override); return rev.length ? (rev.filter((r) => r.override === 'Accepted as is').length / rev.length) * 100 : null; })(),
