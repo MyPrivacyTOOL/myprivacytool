@@ -299,7 +299,7 @@ const Pricing = () => {
             Protecting staff or executives? Tell us about your team and we will put a quote together.
           </p>
           <Button asChild variant="outline">
-            <Link to="/business">Talk to us about business plans</Link>
+            <Link to="/business" onClick={() => trackPricingPlanClick("business", "/business", liveVariants)}>Talk to us about business plans</Link>
           </Button>
         </section>
 
