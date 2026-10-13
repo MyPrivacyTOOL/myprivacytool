@@ -527,6 +527,11 @@ export const trackExperimentCta = (experimentId: string, variantId: string, forc
   trackEvent('experiment_cta_click', { experiment_id: experimentId, variant_id: variantId });
 };
 
+// MPC-7645: invitations sent from /invite. Counts only (no addresses). The A/B labels let the test be cut by what the person saw.
+export const trackReferralInvitesSent = (sent: number, ab: { layout?: string; block?: string }) => {
+  trackEvent('referral_invites_sent', { sent, ...(ab.layout ? { ab_referral_invite_layout: ab.layout } : {}), ...(ab.block ? { ab_referral_report_block: ab.block } : {}) });
+};
+
 // Client-side validation rejected a submit (no PII: only the form and field names).
 export const trackFormValidationError = (form: string, field: string) => {
   trackEvent('form_validation_error', { form, field });

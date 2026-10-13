@@ -1,7 +1,8 @@
 // MPC-7645: referral programme. Stubbed fetch, no network. Run: node workers/scan-report/referral.test.mjs
 import worker, { handleScan } from './index.js';
 import { referralTester, attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, mailbox, manageToken, manageUrl, newCode, referralsEnabled, shareUrl, verifyManageToken, CODE_RE, MAX_INVITES } from './lib/referral.js';
-import { referralBlock } from './lib/referralEmail.js';
+import { referralBlock, buildInviteEmail } from './lib/referralEmail.js';
+import { abOn, abVariant, isVariant, AB_TESTS } from './lib/referralAb.js';
 import { buildReportEmail, tagLinks } from './lib/email.js';
 import { computeScore } from './lib/score.js';
 import { emailHash } from './lib/suppression.js';
@@ -228,6 +229,35 @@ const mk = async (F, extra = {}) => { const u = user(F, 'me@example.com', { refe
   const inv = await worker.fetch(req('/api/referral/invite', { code: 'ABCDEFGH', token: tok, emails: ['pal@example.com'] }), ON, {});
   const st = await worker.fetch(req('/api/referral/status', { code: 'ABCDEFGH', token: tok }), ON, {});
   check(inv.status === 200 && st.status === 200 && (await worker.fetch(req('/api/referral/status', { code: 'ABCDEFGH', token: tok }), { ...ON, REFERRALS_ENABLED: 'false' }, {})).status === 404, 'worker routes /api/referral/invite and /api/referral/status (404 when off)');
+}
+
+// ---- A/B tests across the funnel (MPC-7645): off = control and nothing recorded; on = stable split, stored, tagged on the links
+{
+  const OFF = ON; const AB = { ...ON, REFERRAL_AB_INVITE_SUBJECT: 'true', REFERRAL_AB_REPORT_BLOCK: 'true' };
+  check(['', 'false', 'TRUE', '1', undefined].every((v) => !abOn({ REFERRAL_AB_INVITE_SUBJECT: v }, 'invite_subject')) && abOn(AB, 'report_block'), 'A/B: each test is on only when its switch is exactly "true"');
+  check((await abVariant(OFF, 'invite_subject', 'seed')) === 'control' && (await abVariant(OFF, 'report_block', 'seed')) === 'control', 'A/B off: always the control');
+  const seen = { report_block: new Set(), invite_subject: new Set() };
+  for (let i = 0; i < 200; i++) for (const id of Object.keys(seen)) seen[id].add(await abVariant(AB, id, `s${i}`));
+  check(Object.entries(seen).every(([id, set]) => set.size === AB_TESTS[id].variants.length && [...set].every((v) => isVariant(id, v))) && (await abVariant(AB, 'invite_subject', 'same')) === (await abVariant(AB, 'invite_subject', 'same')), 'A/B on: both variants are handed out, the same seed always gets the same one');
+  check(!isVariant('report_block', 'evil') && isVariant('invite_subject', 'specific_subject'), 'A/B: only known variants are accepted');
+
+  const ctl = buildInviteEmail({ shareLink: 'https://myprivacytool.io/invite?ref=ABCDEFGH', unsubscribeLink: 'https://x/u' });
+  const alt = buildInviteEmail({ shareLink: 'https://myprivacytool.io/invite?ref=ABCDEFGH', unsubscribeLink: 'https://x/u', variant: 'specific_subject' });
+  check(ctl.subject !== alt.subject && ctl.html.split(ctl.subject).join('') === alt.html.split(alt.subject).join('') && ctl.text === alt.text, 'invite email: only the subject line differs between variants');
+  const bc = referralBlock({ shareLink: 'https://myprivacytool.io/invite?ref=ABCDEFGH', manageLink: 'https://myprivacytool.io/invite#c=ABCDEFGH&t=x' });
+  const bf = referralBlock({ shareLink: 'https://myprivacytool.io/invite?ref=ABCDEFGH', manageLink: 'https://myprivacytool.io/invite#c=ABCDEFGH&t=x', variant: 'friend_first' });
+  check(bc.text.includes('INVITE 3 FRIENDS') && bf.text.includes('KNOW SOMEONE') && [bc, bf].every((b) => b.text.includes('not on sale yet') && b.html.includes('not on sale yet') && b.text.includes('#c=ABCDEFGH')), 'report block: both variants carry the same honest reward line and the private link');
+  check(referralBlock({ shareLink: 'x', manageLink: 'y', variant: 'nope' }).text.includes('INVITE 3 FRIENDS'), 'report block: an unknown variant falls back to the control');
+
+  // invitations record and tag the variant only while the test is on
+  const F = fake(); const { u, token } = await mk(F);
+  await handleReferralInvite(AB, req('/x', { code: 'ABCDEFGH', token, emails: ['a@example.com', 'b@example.com', 'c@example.com'] }), ORIGIN, json, deps(F));
+  const mails = F.sends();
+  check(mails.length === 3 && F.db.referrals.length === 3 && F.db.referrals.every((r) => isVariant('invite_subject', r.invite_variant)), 'A/B on: every invitation row records its variant');
+  check(mails.every((m, i) => { const row = F.db.referrals.find((r) => r.invitee_hash === m.key.slice(`referral-invite-${u.id}-`.length)); return m.subject === buildInviteEmail({ shareLink: 'x', unsubscribeLink: 'y', variant: row.invite_variant }).subject && m.text.includes(`&iv=${row.invite_variant}`); }), 'A/B on: the subject matches the recorded variant and the link carries it (iv=)');
+  const G = fake(); const g = await mk(G);
+  await handleReferralInvite(OFF, req('/x', { code: 'ABCDEFGH', token: g.token, emails: ['a@example.com'] }), ORIGIN, json, deps(G));
+  check(G.db.referrals.length === 1 && !('invite_variant' in G.db.referrals[0]) && !G.sends()[0].text.includes('iv=') && G.sends()[0].subject === ctl.subject, 'A/B off: control subject, no variant stored, no iv on the link');
 }
 
 // ---- tester mode: REFERRALS_TEST_RECIPIENTS limits every referral feature to the listed addresses

@@ -9,18 +9,26 @@ const tagged = (campaign, { subject, text, html }) => ({ subject, text: tagLinks
 export const REWARD_LINE = 'For every friend who gets their first privacy report, you earn one free month of Pro (up to 12). Pro is not on sale yet, so your months are saved on your account and start when it opens.';
 
 // The block inside the scan report email. `manageLink` is the referrer's private link (the secret is in its fragment): it is not tagged or shared.
-export function referralBlock({ shareLink, manageLink }) {
-  const text = ['INVITE 3 FRIENDS, EARN FREE PRO', REWARD_LINE, `Your invite link (anyone can use it): ${shareLink}`, `Send the invitations from us: ${manageLink}`, ''].join('\n');
+// A/B test report_block: 'friend_first' leads with the friend's benefit; the reward line is the same in both.
+const BLOCK = {
+  control: { title: 'Invite 3 friends, earn free Pro.', lead: '', textTitle: 'INVITE 3 FRIENDS, EARN FREE PRO', button: 'Invite friends' },
+  friend_first: { title: 'Know someone who would want to see this?', lead: 'Send them a free scan of what their browser and email address give away. ', textTitle: 'KNOW SOMEONE WHO WOULD WANT TO SEE THIS?', button: 'Send a friend a free scan' },
+};
+export function referralBlock({ shareLink, manageLink, variant = 'control' }) {
+  const b = BLOCK[variant] || BLOCK.control;
+  const text = [b.textTitle, `${b.lead}${REWARD_LINE}`, `Your invite link (anyone can use it): ${shareLink}`, `Send the invitations from us: ${manageLink}`, ''].join('\n');
   const html = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d">
-<strong>Invite 3 friends, earn free Pro.</strong> ${esc(REWARD_LINE)}
-${button(manageLink, 'Invite friends')}
+<strong>${esc(b.title)}</strong> ${esc(`${b.lead}${REWARD_LINE}`)}
+${button(manageLink, b.button)}
 <span style="font-size:13px;color:#374151">Or share your own link: <a href="${esc(shareLink)}" style="color:${BRAND}">${esc(shareLink)}</a></span></td></tr></table>`;
   return { text, html };
 }
 
 // To the friend. Sent once, only because the referrer asked us to, never repeated. No sender name or address is given.
-export function buildInviteEmail({ shareLink, unsubscribeLink }) {
-  const subject = 'A friend thought you would want to see this';
+// A/B test invite_subject: only the subject line differs.
+const INVITE_SUBJECT = { control: 'A friend thought you would want to see this', specific_subject: 'See what your browser and email address give away about you' };
+export function buildInviteEmail({ shareLink, unsubscribeLink, variant = 'control' }) {
+  const subject = INVITE_SUBJECT[variant] || INVITE_SUBJECT.control;
   const text = [
     'Hi,', '',
     'Someone who uses MyPrivacyTOOL asked us to send you this one email. They gave us only your email address. We used it to send this, and we keep just a scrambled (hashed) copy so we never send it twice.', '',

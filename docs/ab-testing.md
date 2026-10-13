@@ -26,6 +26,30 @@ Four independent tests on `/pricing`, all **off** until their flag is `true` on 
 - Social proof: no real testimonial or customer count exists, so the trust line only repeats what the Free plan states. Do not add numbers or quotes without a verified source.
 - Run at least 14 days. The 20%+ lift goal needs far more traffic than the sample-size rule suggests; use the guidance below and call a winner only at 95% confidence. Rolling out a winner: see "Rotating a winner" (for pricing, edit `HEADLINE`, `PAID_CTA_LABEL`, etc. in `src/pages/Pricing.tsx`).
 
+## Referral programme experiments (MPC-7645)
+Three tests across the referral funnel, all **off**. Copy needs Chris's approval first. Referral traffic is small (only people who got a report), so run one test at a time and treat early results as direction, not proof.
+| Step | Experiment | Switch | Variants | Chosen by | Read results from |
+|---|---|---|---|---|---|
+| Report email block | `referral_report_block` | Worker `REFERRAL_AB_REPORT_BLOCK="true"` | `control` "Invite 3 friends, earn free Pro" / `friend_first` "Know someone who would want to see this?" | Worker, hash of the referral code, stored in `users.referral_block_variant` | database (below) + GA4 `experiment_exposure` when the private page opens |
+| `/invite` page | `referral_invite_layout` | Pages `VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED=true` | `control` share link first / `email_first` | browser, per tab session | GA4 `experiment_exposure`, `experiment_cta_click`, `referral_invites_sent` |
+| Invitation email | `referral_invite_subject` | Worker `REFERRAL_AB_INVITE_SUBJECT="true"` | `control` "A friend thought you would want to see this" / `specific_subject` "See what your browser and email address give away about you" | Worker, hash of the invited address, stored in `referrals.invite_variant` | database (below) + GA4 `experiment_exposure` on the landing page (`iv` in the link) |
+- Apply migration `20261013110000_mpc_7645_referral_ab.sql` before turning a Worker switch on.
+- Only the subject line differs in the invitation email, and the block keeps the same honest reward line in both variants.
+- Server-chosen tests are counted from the database, so cookie consent does not hide anyone. Run in the Supabase SQL editor:
+```sql
+-- report block: users who were shown a code, and how many of them sent at least one invitation / had a friend complete
+select u.referral_block_variant as variant, count(*) as users_with_code,
+       count(*) filter (where exists (select 1 from referrals r where r.referrer_user_id = u.id and r.source = 'invite_email')) as sent_invites,
+       count(*) filter (where exists (select 1 from referrals r where r.referrer_user_id = u.id and r.status = 'completed')) as had_completion
+from users u where u.referral_block_variant is not null group by 1;
+-- invitation subject: friends mailed, signed up, got their report
+select invite_variant as variant, count(*) as mailed,
+       count(*) filter (where status in ('signed_up','completed')) as signed_up,
+       count(*) filter (where status = 'completed') as completed
+from referrals where invite_variant is not null group by 1;
+```
+- A winner needs 95% confidence (two-proportion test) and, given these volumes, will often be "no difference": then keep the control.
+
 ## Launch log
 | Date | Experiment | Event |
 |---|---|---|

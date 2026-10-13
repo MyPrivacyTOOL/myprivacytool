@@ -40,6 +40,9 @@ Pro is not on sale (`src/pages/Pricing.tsx`: "Get launch updates"), so the rewar
 ## Success criteria from the task
 "Feature live, tracking works, 10%+ of users send referrals." Tracking works (tables above). To measure the 10%: `select count(distinct referrer_user_id) filter (where source = 'invite_email') * 1.0 / (select count(*) from users where referral_code is not null) from referrals;` (people who invited at least one friend by email, of everyone who was shown a code). Link shares are not countable (a copied link leaves no trace until it is used).
 
+## A/B tests
+Three optional tests across the funnel (report block wording, `/invite` layout, invitation subject), all off. Design, switches and the SQL to read results: `docs/ab-testing.md`, section "Referral programme experiments". Needs migration `20261013110000_mpc_7645_referral_ab.sql`.
+
 ## Tester mode (REFERRALS_TEST_RECIPIENTS)
 `RECIPIENT_ALLOWLIST` is empty in production (open to everyone), so it cannot be used to test. Instead set the Worker **secret** `REFERRALS_TEST_RECIPIENTS` (comma separated; Cloudflare dashboard -> Workers -> mpt-scan-report -> Settings -> Variables and Secrets, add as a Secret; deploys never touch secrets). While it is set and `REFERRALS_ENABLED = "true"`, referral features apply to those addresses only: the invite block in their reports, the private page and invitations (and only to other listed addresses), a visitor's code being honoured, reward emails. Every other user's scan and report are unchanged. **Delete the secret to open the programme to everyone.** Unset = everyone, so set the secret before enabling the flag.
 

@@ -78,6 +78,17 @@ export const EXPERIMENTS = {
       { id: "below_plans", weight: 33 },
     ],
   },
+  // /invite for a signed-in referrer (MPC-7645): which action comes first. The other two referral tests (report email block, invitation subject) are chosen
+  // by the Worker and counted from the database; the page only reports the exposure for them (see docs/ab-testing.md).
+  referral_invite_layout: {
+    id: "referral_invite_layout",
+    description: "Order of the share link and the email form on /invite",
+    enabled: import.meta.env.VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // share link first, then "we email them for you"
+      { id: "email_first", weight: 50 }, // email form first, then the share link
+    ],
+  },
 } as const satisfies Record<string, Experiment>;
 
 export type ExperimentId = keyof typeof EXPERIMENTS;

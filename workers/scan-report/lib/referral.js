@@ -10,6 +10,7 @@ import { emailHash, suppressedAmong } from './suppression.js';
 import { buildInviteEmail, buildRewardEmail } from './referralEmail.js';
 import { sendEmail } from './email.js';
 import { readCappedJson } from './webScan.js';
+import { abOn, abVariant } from './referralAb.js';
 
 export const referralsEnabled = (env) => env.REFERRALS_ENABLED === 'true';
 // Tester mode: while REFERRALS_TEST_RECIPIENTS (a Worker secret, comma separated) lists addresses, referral features apply to those addresses ONLY
@@ -39,9 +40,10 @@ export async function verifyManageToken(secret, code, token) {
   let d = 0; for (let i = 0; i < want.length; i++) d |= want.charCodeAt(i) ^ String(token).charCodeAt(i);
   return d === 0;
 }
-export const shareUrl = (env, code) => `${env.SITE_URL || 'https://myprivacytool.io'}/invite?ref=${code}`;
+// `iv` = the invite_subject variant the friend was mailed under (only while that test runs), so the landing page can count the visit per variant.
+export const shareUrl = (env, code, iv) => `${env.SITE_URL || 'https://myprivacytool.io'}/invite?ref=${code}${iv ? `&iv=${iv}` : ''}`;
 // The token travels in the URL fragment: it is not sent to the site's server or logged by it, and the page removes it from the address bar.
-export async function manageUrl(env, code) { return `${env.SITE_URL || 'https://myprivacytool.io'}/invite#c=${code}&t=${await manageToken(env.UNSUBSCRIBE_SECRET, code)}`; }
+export async function manageUrl(env, code, v) { return `${env.SITE_URL || 'https://myprivacytool.io'}/invite#c=${code}&t=${await manageToken(env.UNSUBSCRIBE_SECRET, code)}${v ? `&v=${v}` : ''}`; }
 
 // gmail "+tag" and dots are ignored, so a person cannot refer themselves with a second spelling of the same mailbox.
 export const mailbox = (e) => { const [l, d] = String(e).trim().toLowerCase().split('@'); return d === 'gmail.com' || d === 'googlemail.com' ? `${l.split('+')[0].replace(/\./g, '')}@gmail.com` : `${l}@${d}`; };
@@ -144,14 +146,16 @@ export async function handleReferralInvite(env, request, origin, json, deps) {
 
   const blocked = await suppressedAmong(sb, room);
   const known = new Set((await sb.select(`users?email=in.${encodeURIComponent(`(${room.map((e) => `"${e}"`).join(',')})`)}&select=email`)).map((u) => u.email.toLowerCase()));
-  const link = shareUrl(env, String(read.body.code));
+  const code = String(read.body.code);
   let sent = 0;
   for (const email of room) {
     if (mailbox(email) === mailbox(me.email) || blocked.has(email) || known.has(email) || !allowed(env, email) || !referralTester(env, email)) continue;
     const hash = await emailHash(email);
-    try { await sb.insert('referrals', { referrer_user_id: me.id, invitee_hash: hash, source: 'invite_email' }); }
+    const iv = await abVariant(env, 'invite_subject', hash);          // 'control' when the test is off
+    const tracked = abOn(env, 'invite_subject');
+    try { await sb.insert('referrals', { referrer_user_id: me.id, invitee_hash: hash, source: 'invite_email', ...(tracked ? { invite_variant: iv } : {}) }); }
     catch (e) { if (e.status === 409) continue; throw e; }   // already invited by this person
-    const mail = buildInviteEmail({ shareLink: link, unsubscribeLink: await unsubscribePageUrl(env, email) });
+    const mail = buildInviteEmail({ shareLink: shareUrl(env, code, tracked ? iv : undefined), unsubscribeLink: await unsubscribePageUrl(env, email), variant: iv });
     const r = await sendEmail(env, { to: email, ...mail, idempotencyKey: `referral-invite-${me.id}-${hash}`,
       headers: { 'List-Unsubscribe': `<${await unsubscribeUrl(env, email)}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }, fetchImpl);
     if (r.sent) { sent++; await sb.patch(`referrals?referrer_user_id=eq.${me.id}&invitee_hash=eq.${hash}`, { invite_email_sent_at: new Date().toISOString() }).catch(() => {}); }

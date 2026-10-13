@@ -1,6 +1,7 @@
 // MPC-7645: the site's referral helpers. Off by default; the code in the address or this visit's storage goes to the Worker only while the switch is on.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getReferralCode, parseManageHash, parseReferralCode, rememberReferralCode, referralsEnabled } from "./referral";
+import { EXPERIMENTS } from "./abTest";
+import { getReferralCode, parseBlockVariant, parseInviteVariant, parseManageHash, parseReferralCode, rememberReferralCode, referralsEnabled } from "./referral";
 import { requestScanReport } from "./scanReport";
 import { CODE_RE } from "../../workers/scan-report/lib/referral.js";
 
@@ -75,5 +76,26 @@ describe("POST /api/scan carries the code", () => {
   it("on, nothing remembered: no ref field", async () => {
     vi.stubEnv("VITE_REFERRALS_ENABLED", "true");
     expect("ref" in (await body())).toBe(false);
+  });
+});
+
+describe("A/B labels in referral links (MPC-7645)", () => {
+  it("reads only known variants; the label never reaches the Worker", async () => {
+    expect(parseBlockVariant("friend_first")).toBe("friend_first");
+    expect(parseBlockVariant("evil")).toBeNull();
+    expect(parseInviteVariant("specific_subject")).toBe("specific_subject");
+    expect(parseInviteVariant("friend_first")).toBeNull();
+    expect(parseManageHash(`#c=ABCDEFGH&t=${TOKEN}&v=friend_first`)).toEqual({ code: "ABCDEFGH", token: TOKEN, block: "friend_first" });
+    expect(parseManageHash(`#c=ABCDEFGH&t=${TOKEN}&v=evil`)).toEqual({ code: "ABCDEFGH", token: TOKEN });
+    const f = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ sent: 1, skipped: 0 }) }) as unknown as Response);
+    vi.stubGlobal("fetch", f);
+    const { sendReferralInvites } = await import("./referral");
+    await sendReferralInvites({ code: "ABCDEFGH", token: TOKEN, block: "friend_first" }, ["a@example.com"]);
+    expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ code: "ABCDEFGH", token: TOKEN, emails: ["a@example.com"] });
+  });
+
+  it("the layout experiment ships off with the share link first", () => {
+    expect(EXPERIMENTS.referral_invite_layout.enabled).toBe(false);
+    expect(EXPERIMENTS.referral_invite_layout.variants[0].id).toBe("control");
   });
 });
