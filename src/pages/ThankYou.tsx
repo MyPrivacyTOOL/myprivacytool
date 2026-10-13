@@ -132,7 +132,7 @@ export default function ThankYou() {
             <ShieldCheck size={16} className="text-brand" aria-hidden="true" /> How we handle your data
           </h2>
           <p className="text-xs text-muted-foreground leading-relaxed mb-4">
-            The scan runs in your browser and its results aren't stored on our servers. We only keep what you choose to
+            The scan runs in your browser and its results aren't stored on our servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only keep what you choose to
             submit, such as your email address, and we use analytics only with your consent.
           </p>
           <ul className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
