@@ -8,14 +8,15 @@ account from public data. Code: `workers/social-listeners/src/mirror-bot.ts`, wi
 | User DM | Bot action |
 |---|---|
 | `MIRROR` | Sends the consent message (what is read, what is never read, no retention). **Scans nothing.** |
-| `MIRROR YES` | Consent. Looks up the sender's public profile, builds the mirror, DMs it. |
-| `MIRROR NO` | Confirms nothing was scanned or stored. |
+| `MIRROR YES`, or just `Y` / `YES` | Consent. Looks up the sender's public profile, builds the mirror, DMs it. |
+| `MIRROR NO`, or just `N` / `NO` | Confirms nothing was scanned or stored. |
 | anything else | Forwarded to core-brain as before. |
 
-Commands are case/punctuation-insensitive; our own DM echoes (`sender_id == for_user_id`) are ignored.
+Commands are case/punctuation-insensitive (`y`, `Y`, `Yes` all work); our own DM echoes (`sender_id == for_user_id`) are ignored.
 
 ## Consent and no-retention guarantee
 
+- **A bare Y/N counts only as an answer to our consent request.** Still stateless: `isConsentPending` asks X for the last 5 DMs in that conversation and requires that OUR most recent message to the sender is the consent request (it starts with `🪞 MyPrivacyTOOL Mirror`) and was sent in the last 15 minutes. Anything else (no request, an older one, or the mirror result was the last thing we sent) is treated as an ordinary message and goes to core-brain as before. The lookup is rate limited like any Mirror command and needs the `dm.read` scope.
 - **Consent is stateless.** The explicit `MIRROR YES` message is the consent; the scan only ever runs on that message, so there is
   no pending-consent store to keep. Consent events are logged as event names only (`mirror_consent_requested|granted|declined`).
 - **No data retention.** The profile is held in memory for one request, sent to the user and dropped. Nothing is written to

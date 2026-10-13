@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
-import { buildMirrorMessage, describeShape, extractMirrorDms, parseMirrorCommand } from "./src/mirror-bot";
+import { CONSENT_MESSAGE, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const dm = (sender: string, text: string, forUser = "999") =>
@@ -159,5 +159,77 @@ describe("rate limit, retry and tagging (MPC-7628)", () => {
   });
   it("tags the scan link for channel analytics", () => {
     expect(buildMirrorMessage({ protected: false })).toContain("utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply");
+  });
+});
+
+describe("bare Y / N answers (MPC-7628)", () => {
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+  /** Fake X: DM history for sender 42 (newest first), a profile lookup, and DM sends. */
+  function x(history: { sender_id: string; text: string; created_at: string }[]) {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+      const url = String(u);
+      if (url.includes("/dm_events")) return Response.json({ data: history });
+      if (url.includes("/users/42")) return Response.json({ data: { description: "hello world", protected: false } });
+      return new Response("{}");
+    });
+  }
+  const urls = (f: ReturnType<typeof x>) => f.mock.calls.map((c) => String(c[0]));
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  const asked = (ms = 60_000) => [{ sender_id: "999", text: CONSENT_MESSAGE, created_at: ago(ms) }, { sender_id: "42", text: "MIRROR", created_at: ago(ms + 5000) }];
+
+  it("parses Y / YES / N / NO in any case and nothing else", () => {
+    for (const t of ["Y", "y", "Yes", "YES", " yes! "]) expect(parseBareReply(t)).toBe("consent");
+    for (const t of ["N", "n", "No", "NO"]) expect(parseBareReply(t)).toBe("decline");
+    for (const t of ["yes please", "maybe", "", "yy", undefined]) expect(parseBareReply(t)).toBeNull();
+  });
+  it("marks bare replies so they can be checked first", () => {
+    expect(extractMirrorDms(JSON.parse(dm("42", "y")))).toEqual([{ senderId: "42", text: "y", command: "consent", bare: true }]);
+  });
+  it("a bare Y right after the consent request runs the scan and sends the mirror", async () => {
+    const b = brain(); const f = x(asked());
+    expect((await post(dm("42", "y"), env(b))).status).toBe(200);
+    await settle();
+    const u = urls(f);
+    expect(u[0]).toContain("/dm_conversations/with/42/dm_events");
+    expect(u[1]).toContain("/users/42");
+    expect(u[2]).toContain("/dm_conversations/with/42/messages");
+    expect(JSON.parse((f.mock.calls[2][1] as RequestInit).body as string).text).toContain("hello world");
+    expect(b.fetch).not.toHaveBeenCalled();
+  });
+  it("a bare N right after the request declines and scans nothing", async () => {
+    const f = x(asked());
+    await post(dm("42", "N"), env());
+    await settle();
+    expect(urls(f).some((u) => u.includes("/users/42"))).toBe(false);
+    expect(JSON.parse((f.mock.calls[1][1] as RequestInit).body as string).text).toContain("Nothing was scanned");
+  });
+  it("a bare Y with no consent request behind it is an ordinary message for core-brain", async () => {
+    const b = brain(); const f = x([{ sender_id: "42", text: "hi", created_at: ago(1000) }]);
+    await post(dm("42", "y"), env(b));
+    await settle();
+    expect(urls(f).some((u) => u.includes("/users/") || u.includes("/messages"))).toBe(false);
+    expect(b.fetch).toHaveBeenCalledTimes(1);
+  });
+  it("a bare Y after the mirror result (our last message was not the request) does not scan again", async () => {
+    const b = brain(); const f = x([{ sender_id: "999", text: "🪞 Your Mirror (public information only)", created_at: ago(1000) }]);
+    await post(dm("42", "yes"), env(b));
+    await settle();
+    expect(urls(f).some((u) => u.includes("/users/"))).toBe(false);
+    expect(b.fetch).toHaveBeenCalledTimes(1);
+  });
+  it("a consent request older than 15 minutes has expired", async () => {
+    const b = brain(); const f = x(asked(16 * 60_000));
+    await post(dm("42", "y"), env(b));
+    await settle();
+    expect(urls(f).some((u) => u.includes("/users/"))).toBe(false);
+    expect(b.fetch).toHaveBeenCalledTimes(1);
+  });
+  it("is rate limited like any Mirror command and then falls back to core-brain", async () => {
+    const b = brain(); const f = x(asked());
+    const limited = { limit: vi.fn(async () => ({ success: false })) };
+    await post(dm("42", "y"), { ...env(b), RATE_LIMITER: limited });
+    await settle();
+    expect(f).not.toHaveBeenCalled();
+    expect(b.fetch).toHaveBeenCalledTimes(1);
   });
 });
