@@ -1,6 +1,6 @@
 // X (Twitter) Account Activity API listener: DM + mention events. Validate and route only.
 import { createLogger } from "./logger";
-import { describeShape, extractMirrorDms, handleMirrorDm } from "./mirror-bot";
+import { type MirrorDm, describeShape, extractMirrorDms, handleMirrorDm, isConsentPending, selfId } from "./mirror-bot";
 import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
 const log = createLogger("social-listeners:x");
@@ -34,7 +34,11 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
 
   // MPC-7628: MIRROR DMs are answered here (consent -> public scan -> educational DM) and never stored or forwarded.
-  const mirrorDms = extractMirrorDms(payload);
+  // A bare Y/N counts only when it answers our consent request (checked against the DM history, nothing stored); otherwise it is an ordinary message.
+  const mirrorDms: MirrorDm[] = [];
+  for (const dm of extractMirrorDms(payload)) {
+    if (!dm.bare || (await isConsentPending(env, dm.senderId, selfId(payload), log))) mirrorDms.push(dm);
+  }
   if (mirrorDms.length > 0) {
     const work = Promise.all(mirrorDms.map((dm) => handleMirrorDm(env, dm, log)));
     if (ctx?.waitUntil) ctx.waitUntil(work);

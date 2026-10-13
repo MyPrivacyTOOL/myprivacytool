@@ -24,16 +24,31 @@ export function parseMirrorCommand(text: unknown): MirrorCommand {
   return null;
 }
 
+/**
+ * A bare answer to the consent question: any form of yes (y, Y, yes, yeah, yep, yup, in any case, punctuation ignored) or, quietly,
+ * any form of no. Only counts when our last DM to the sender was the consent request. The consent message only asks for the yes.
+ */
+export function parseBareReply(text: unknown): "consent" | "decline" | null {
+  if (typeof text !== "string") return null;
+  const words = text.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length !== 1) return null;
+  if (/^(y|ye|yes+|yeah|yea|yep|yup)$/.test(words[0])) return "consent";
+  if (/^(n|no|nope)$/.test(words[0])) return "decline";
+  return null;
+}
+
 export interface MirrorDm {
   senderId: string;
   text: string;
   command: Exclude<MirrorCommand, null>;
+  /** True for a bare Y/N: not yet known to answer our consent request, check with isConsentPending before acting. */
+  bare?: true;
 }
 
 const MAX_DEPTH = 8;
 
 /** The id of the account the event was delivered for (our bot), from either event system. */
-function selfId(p: any): string {
+export function selfId(p: any): string {
   return String(p?.for_user_id ?? p?.data?.filter?.user_id ?? p?.filter?.user_id ?? p?.data?.payload?.filter?.user_id ?? "");
 }
 
@@ -60,10 +75,11 @@ export function extractMirrorDms(payload: unknown): MirrorDm[] {
     const f = dmFields(node);
     if (f) {
       const command = parseMirrorCommand(f.text);
+      const bare = command ? null : parseBareReply(f.text);
       const key = `${f.sender}|${f.text}`;
-      if (command && f.sender !== self && !seen.has(key)) {
+      if ((command || bare) && f.sender !== self && !seen.has(key)) {
         seen.add(key);
-        out.push({ senderId: f.sender, text: f.text, command });
+        out.push(command ? { senderId: f.sender, text: f.text, command } : { senderId: f.sender, text: f.text, command: bare!, bare: true });
       }
     }
     for (const v of Object.values(node)) walk(v, depth + 1);
@@ -101,7 +117,11 @@ export const CONSENT_MESSAGE =
   "• I read your PUBLIC profile only (bio, location, link, join date, counts).\n" +
   "• I never read your DMs, email, phone, IP or private activity.\n" +
   "• I store nothing: no profile data, no message history. The result is built, sent to you and discarded.\n\n" +
-  "To start, reply: MIRROR YES\nTo cancel, reply: MIRROR NO";
+  "To start, just reply Y.";
+
+/** First line of CONSENT_MESSAGE: how a later bare Y/N is recognised as answering it. */
+const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];
+const CONSENT_WINDOW_MS = 15 * 60_000;
 
 export const DECLINE_MESSAGE = "No problem. Nothing was scanned and nothing was stored. Send MIRROR any time to try again.";
 export const ERROR_MESSAGE =
@@ -160,17 +180,23 @@ export async function fetchPublicProfile(env: Env, userId: string): Promise<XPro
   return ((await res.json()) as { data?: XProfile }).data ?? null;
 }
 
-/** Sends a DM with the user-context token (dm.write). Refreshes the token and retries once on 401. Returns whether X accepted it. */
+/** Calls X with the user-context token. Refreshes the token and retries once on 401. Null when no token can be had. */
+async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Promise<Response | null> {
+  for (const force of [false, true]) {
+    const token = await getUserAccessToken(env, log, force);
+    if (!token) return null;
+    const res = await xFetch(env, path, { ...init, token });
+    if (res.status !== 401) return res;
+  }
+  return null;
+}
+
+/** Sends a DM with the user-context token (dm.write). Returns whether X accepted it. */
 export async function sendXDm(env: Env, recipientId: string, text: string, log?: Logger): Promise<boolean> {
   if (!/^\d+$/.test(recipientId)) return false;
   const quiet: Logger = log ?? { info() {}, warn() {}, error() {} };
-  for (const force of [false, true]) {
-    const token = await getUserAccessToken(env, quiet, force);
-    if (!token) return false;
-    const res = await xFetch(env, `/dm_conversations/with/${recipientId}/messages`, { method: "POST", token, body: JSON.stringify({ text }) });
-    if (res.status !== 401) return res.ok;
-  }
-  return false;
+  const res = await xUser(env, quiet, `/dm_conversations/with/${recipientId}/messages`, { method: "POST", body: JSON.stringify({ text }) });
+  return Boolean(res?.ok);
 }
 
 /** Per-sender and global limits on Mirror commands: each scan spends X API credits. Fails open when no binding is configured. */
@@ -192,10 +218,29 @@ async function allowed(env: Env, senderId: string, log: Logger): Promise<boolean
   return true;
 }
 
+/**
+ * Is this sender answering our consent request? Stateless: asks X for the last few DMs in this conversation (nothing is stored on
+ * our side) and checks that OUR most recent message to them is the consent request, sent within the last 15 minutes. Rate limited
+ * like any Mirror command because the lookup costs X credits. False on any failure, so the message is then handled as ordinary.
+ */
+export async function isConsentPending(env: Env, senderId: string, selfId: string, log: Logger): Promise<boolean> {
+  if (!/^\d+$/.test(senderId) || !selfId) return false;
+  if (!(await allowed(env, senderId, log))) return false;
+  try {
+    const res = await xUser(env, log, `/dm_conversations/with/${senderId}/dm_events?max_results=5&event_types=MessageCreate&dm_event.fields=created_at,sender_id,text`, { method: "GET" });
+    if (!res?.ok) return false;
+    const events = ((await res.json()) as { data?: { sender_id?: string; text?: string; created_at?: string }[] }).data ?? [];
+    const mine = events.find((e) => String(e.sender_id) === selfId); // X lists newest first
+    return Boolean(mine?.text?.startsWith(CONSENT_MARKER) && Date.now() - Date.parse(mine.created_at ?? "") < CONSENT_WINDOW_MS);
+  } catch {
+    return false;
+  }
+}
+
 /** Handles one MIRROR command end to end. Never throws; logs event names only. */
 export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promise<void> {
   try {
-    if (!(await allowed(env, dm.senderId, log))) return; // dropped silently: replying would cost credits too
+    if (!dm.bare && !(await allowed(env, dm.senderId, log))) return; // dropped silently: replying would cost credits too (bare replies were limited by isConsentPending)
     if (dm.command === "request") {
       log.info("mirror_consent_requested");
       await sendXDm(env, dm.senderId, CONSENT_MESSAGE, log);
