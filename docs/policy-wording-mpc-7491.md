@@ -1,7 +1,7 @@
 # Policy wording for edge logging and device recognition (MPC-7491)
 
 Status: edge logging wording is live in `src/pages/Privacy.tsx` (sections 2.3 and 6), approved by Chris 2026-10-12 (PR 260).
-Device recognition wording below is **NOT LIVE YET**. It is held here and must not be added to the site until MPC-7494 ships and Chris approves the screen.
+Device recognition wording below is **in the code but NOT LIVE**: it is Privacy section 2.5 and the separate "recognise this device" tick box (MPC-7494 PR, draft), both rendered only when `VITE_RECOGNITION_ENABLED` is `"true"` (unset today). They go live in the same flip as the feature, after Chris approves the exact wording.
 
 ## Retention proposal (Chris decides)
 
@@ -15,6 +15,10 @@ A person whose browser hides its details used to be sorted as a bot (R6) and kee
 ## NOT LIVE YET: open device recognition (goes live with MPC-7494)
 
 > **Recognising your device.** If you choose to, we can tell you when we recognise the device you are using from the technical details its browser shows us, without using a cookie. We do this in the open: when it happens we show you that we recognised you, which details we used and how, and what you can do about it, including asking us to delete it. We do not recognise your device in the background. If you do nothing, we do not link a visit to you. Recognising a device is only used with your consent, and you can withdraw it at any time by contacting us or deleting your scan number record.
+
+Tick-box wording at the contact step (separate, optional, unticked, only enabled with the save box; `RECOGNISE_CONSENT_LABEL`, version 2026-10-12-v1; **needs Chris's written approval**):
+
+> Next time I visit, tell me if you recognise this device from its technical details, without a cookie. You will be shown when it happens, which details were used, and I can delete it any time.
 
 Decided by Chris 2026-10-12 (recommendations approved), for MPC-7494 to build:
 - Timing: offered after a scan is saved, as a clear "Recognise this device?" choice, not at the first visit.

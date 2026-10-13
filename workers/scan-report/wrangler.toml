@@ -19,18 +19,40 @@ RECIPIENT_ALLOWLIST = ""
 # With HIBP_API_KEY set, breaches are checked for real. Set "false" to HOLD reports until HIBP works.
 ALLOW_PARTIAL_REPORT = "true"
 
-# MPC-7448: HK Spam day-10 "you are now protected" email. OFF: anything but "true" is a dry run that only counts what is due.
-# Switch on only after Chris's go-live word (see docs/hk-spam-day10-email-mpc-7448.md). It runs on the */5 trigger at 01:05-04:05 UTC (09:05-12:05 HKT), see isHkSpamSlot in lib/hkSpam.js; no separate cron (Workers Free allows 5 per account).
-HK_SPAM_EMAIL_ENABLED = "false"
+# MPC-7448: HK Spam day-10 "you are now protected" email. Two switches, both anything-but-"true" = off:
+#  HK_SPAM_ENABLED     "false": the job does nothing at all (no database read, no email).
+#  HK_SPAM_EMAILS_LIVE "false": test mode. Nothing goes to registrants and no row is marked sent; the job only sends sample emails
+#                      (one per language that has someone due) to HK_SPAM_TEST_INBOXES (comma separated, a Worker secret/var, never real users).
+# Real sending is switched on at Chris's sign-off (MPC-7545), after the scan go-live (MPC-7385). See docs/hk-spam-day10-email-mpc-7448.md.
+# It runs on the */5 trigger at 01:00-04:00 UTC (09:00 HKT first run, hourly retries), see isHkSpamSlot in lib/hkSpam.js; no separate cron (Workers Free allows 5 per account).
+HK_SPAM_ENABLED = "true"
+HK_SPAM_EMAILS_LIVE = "false"
 
 # MPC-7465/7470: save the visitor's scan with the email request (POST /api/scan with scan + save_consent:true, the separate tick box at the contact step).
 # ON since 2026-10-12 (MPC-7470: wording approved by Chris, decision D12, production migrations applied). Anything but "true" saves nothing, so "false" is the rollback.
 # The site has a matching flag, VITE_SAVE_WEB_SCANS (a Cloudflare Pages build variable): the tick box only shows when BOTH are on.
 WEB_SCAN_SAVE_ENABLED = "true"
 
-# MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). OFF. Turn on only after Chris has seen the screen and
-# approved it, and only if the MPC-7491 device-recognition wording is live. Needs WEB_SCAN_SAVE_ENABLED too. Anything but "true" does nothing.
-RECOGNITION_ENABLED = "false"
+# MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). ON since 2026-10-12 on Chris's instruction, after he approved the
+# screen, the threshold and the exact opt-in wording, and after the recognise-opt-in migration (20261012240000) was applied. Recognition runs only for a browser
+# holding a scan saved with BOTH the save consent and the separate "recognise this device" consent. Needs WEB_SCAN_SAVE_ENABLED too. "false" is the rollback;
+# anything but "true" does nothing.
+RECOGNITION_ENABLED = "true"
+
+# MPC-7645: referral programme ("Invite 3 friends", one free month of Pro per friend who gets a report). OFF. Turn on only after Chris has approved the
+# email copy (lib/referralEmail.js) and the Privacy text, and migration 20261013100000_mpc_7645_referrals.sql is applied. Needs UNSUBSCRIBE_SECRET.
+# The site has a matching flag, VITE_REFERRALS_ENABLED. Anything but "true" does nothing: no link, no block in the report, no reward, endpoints answer 404.
+REFERRALS_ENABLED = "false"
+# Tester mode: set the Worker SECRET REFERRALS_TEST_RECIPIENTS (comma separated addresses, `wrangler secret put`, never in this file) to limit the programme to
+# those addresses while it is tested: the invite block, invite page, invitations (to listed addresses only) and reward emails. Everyone else is unchanged.
+# Delete the secret to open the programme to every user. Order matters: set the secret BEFORE setting REFERRALS_ENABLED = "true".
+
+# MPC-7645 A/B tests across the referral funnel, both OFF (anything but "true" = everyone gets the control and nothing is recorded). Copy needs Chris's approval before either goes on.
+#  REFERRAL_AB_REPORT_BLOCK   wording of the invite block in the report email (control / friend_first), stored in users.referral_block_variant
+#  REFERRAL_AB_INVITE_SUBJECT subject line of the invitation to the friend (control / specific_subject), stored in referrals.invite_variant
+# The site has a third, in-browser test (VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED). Reading results: docs/ab-testing.md.
+REFERRAL_AB_REPORT_BLOCK = "false"
+REFERRAL_AB_INVITE_SUBJECT = "false"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]

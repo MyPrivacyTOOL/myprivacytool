@@ -1,0 +1,44 @@
+{
+  "en": {
+    "lang": "en",
+    "subject": "You're now protected from spam texts",
+    "testPrefix": "[TEST] ",
+    "preheader": "Your Hong Kong Do-not-call registration is now in effect.",
+    "title": "You're now protected",
+    "intro": "Your Do-not-call registration, the one you started on our Stop Spam page, is now in effect. From today, businesses may not send you marketing SMS or pre-recorded calls unless you have given them consent.",
+    "notTitle": "What this does not cover",
+    "not": [
+      "Live calls from a real person. Hong Kong’s registers do not stop these.",
+      "Companies you already said yes to, such as a bank, a phone company or a shop. They can still contact you until you unsubscribe from each of them directly."
+    ],
+    "optOutLead": "To stop those companies, use the opt-out tool on our Stop Spam page:",
+    "optOutLink": "Stop companies you said yes to",
+    "cta": "Spam also follows your data around. Run a free privacy scan to see how your email address shows up online and what to do about it.",
+    "button": "Run your free privacy scan",
+    "sign": "The MyPrivacyTOOL team",
+    "why": "You are getting this once because you asked for a reminder on our Stop Spam page.",
+    "unsub": "Unsubscribe",
+    "help": "Questions, or want your data deleted? Reply to this email or write to {contact}. We never sell your data."
+  },
+  "yue": {
+    "lang": "zh-HK",
+    "subject": "你現已受保護，免受垃圾短訊騷擾",
+    "testPrefix": "【測試】",
+    "preheader": "你的「拒收訊息」登記由今日起生效。",
+    "title": "你現已受保護",
+    "intro": "你透過我們 Stop Spam 頁面登記的「拒收訊息」（Do-not-call）今日起生效。由今日起，商戶不得向你發送促銷短訊或預錄來電，除非你曾向對方表示同意。",
+    "notTitle": "以下情況不在保護範圍內",
+    "not": [
+      "真人打來的電話：香港的拒收訊息登記冊並不涵蓋真人來電。",
+      "你曾經同意接收訊息的公司（例如銀行、電訊商或商店）：在你直接向對方取消訂閱之前，他們仍可聯絡你。"
+    ],
+    "optOutLead": "如要停止這些公司的訊息，請使用 Stop Spam 頁面的退出通知工具：",
+    "optOutLink": "停止你曾答應接收的公司訊息",
+    "cta": "垃圾訊息往往跟著你的個人資料而來。立即做一次免費私隱掃描，看看你的電郵地址在網上的曝光情況，以及可以怎樣處理。",
+    "button": "立即免費私隱掃描",
+    "sign": "MyPrivacyTOOL 團隊",
+    "why": "你收到這封電郵（只會發送一次），是因為你在我們的 Stop Spam 頁面要求保護生效提醒。",
+    "unsub": "取消訂閱",
+    "help": "如有查詢或想刪除你的資料，請回覆此電郵或電郵至 {contact}。我們絕不出售你的資料。"
+  }
+}

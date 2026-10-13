@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Mail, ShieldCheck, Scale, Accessibility, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,7 @@ import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import SubmitButton from "@/components/SubmitButton";
 import { useLeadSubmit } from "@/hooks/useLeadSubmit";
+import { hkSpamContactPrefill } from "@/lib/hkSpamPage";
 import { suggestEmail, validateEmail } from "@/lib/formFeedback";
 import { trackFormSubmitError, trackFormValidationError } from "@/lib/analytics";
 
@@ -29,7 +30,8 @@ const DIRECT_CONTACTS = [
 ];
 
 const Contact = () => {
-  const [form, setForm] = useState({ name: "", email: "", topic: TOPICS[0], message: "" });
+  const [searchParams] = useSearchParams();
+  const [form, setForm] = useState({ name: "", email: "", topic: TOPICS[0], message: hkSpamContactPrefill(searchParams) });
   const [consent, setConsent] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [consentError, setConsentError] = useState("");

@@ -2,6 +2,11 @@ import type { Logger } from "./logger";
 
 export interface Env {
   X_CONSUMER_SECRET?: string;
+  /** MPC-7628 Mirror bot: app bearer token (public profile lookup) and user-context token with dm.write (DM replies). */
+  X_BEARER_TOKEN?: string;
+  X_USER_ACCESS_TOKEN?: string;
+  /** LinkedIn app Client Secret (MPC-7640): signs webhook challenges and deliveries. Unset = LinkedIn webhook fails closed. */
+  LINKEDIN_CLIENT_SECRET?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;
@@ -27,6 +32,8 @@ export async function hmacSha256(secret: string, data: string): Promise<Uint8Arr
   return new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(data)));
 }
 
+export const hex = (u8: Uint8Array) => Array.from(u8, (b) => b.toString(16).padStart(2, "0")).join("");
+
 export const base64 = (u8: Uint8Array) => btoa(String.fromCharCode(...u8));
 
 /** Reads the raw body (needed for signatures) with a hard size cap. Returns null if too large. */
@@ -38,7 +45,7 @@ export async function readRawBody(request: Request): Promise<string | null> {
 }
 
 export interface ForwardEnvelope {
-  source: "x" | "telegram";
+  source: "x" | "telegram" | "linkedin";
   receivedAt: string;
   /** Verified, parsed platform payload, passed through untouched. This Worker never inspects content. */
   payload: unknown;

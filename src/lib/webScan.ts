@@ -1,5 +1,5 @@
 import type { HexagonData } from "@/lib/deviceDetection";
-import { SAVE_CONSENT_VERSION } from "@/lib/saveConsent";
+import { RECOGNISE_CONSENT_VERSION, SAVE_CONSENT_VERSION } from "@/lib/saveConsent";
 import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.js";
 
 // MPC-7470 (decision D12): the finished scan stays in THIS browser (sessionStorage) and is never sent anywhere until the visitor
@@ -14,10 +14,22 @@ const KEY = "mpt_web_scan_number";
 const PENDING_KEY = "mpt_pending_scan";
 export const SCAN_NUMBER_EVENT = "mpt-scan-number";
 const SCAN_NUMBER_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export const SCAN_API_URL =
-  (import.meta.env.VITE_SCAN_API_URL as string | undefined) ?? "https://mpt-scan-report.myprivacytool.workers.dev";
+export const DEFAULT_SCAN_API_URL = "https://mpt-scan-report.myprivacytool.workers.dev";
+// MPC-7535: an EMPTY (or blank) VITE_SCAN_API_URL used to win over the default (`??` only skips unset), so one stray Pages variable silently turned
+// the report request into a no-op while the page still thanked the visitor. Blank now means "use the default"; the explicit off switch is "off".
+export const resolveScanApiUrl = (raw: unknown = import.meta.env.VITE_SCAN_API_URL): string => {
+  const v = typeof raw === "string" ? raw.trim() : "";
+  if (v.toLowerCase() === "off") return "";
+  return (v || DEFAULT_SCAN_API_URL).replace(/\/$/, "");
+};
+export const SCAN_API_URL = resolveScanApiUrl();
 
 export const saveWebScansEnabled = (): boolean => import.meta.env.VITE_SAVE_WEB_SCANS === "true";
+
+// MPC-7494: the site flag for device recognition (exactly "true"; unset = off). The feature needs saving on as well. The Privacy text about it
+// follows the flag alone, so the policy goes live in the same flip as the feature.
+export const recognitionFlagOn = (): boolean => import.meta.env.VITE_RECOGNITION_ENABLED === "true";
+export const recognitionEnabled = (): boolean => saveWebScansEnabled() && recognitionFlagOn();
 
 const read = (store: () => Storage): string | null => {
   try {
@@ -117,9 +129,9 @@ export const canOfferScanSave = (): boolean => saveWebScansEnabled() && pendingS
 
 /**
  * The extra fields for POST /api/scan when the visitor ticked the save box, or {} when there is nothing to save.
- * Call it only after the box is ticked.
+ * Call it only after the save box is ticked. `recognise` adds the separate recognise consent (MPC-7494) and only when that box was ticked too.
  */
-export function scanSaveFields(): Record<string, unknown> {
+export function scanSaveFields(opts: { recognise?: boolean } = {}): Record<string, unknown> {
   const scan = saveWebScansEnabled() ? pendingScan() : null;
   if (!scan) return {};
   // MPC-7493: how long the scan took, and the scan number this browser already held from an EARLIER visit (how a return visit is recognised: the
@@ -129,6 +141,8 @@ export function scanSaveFields(): Record<string, unknown> {
     scan,
     save_consent: true,
     save_consent_version: SAVE_CONSENT_VERSION,
+    // MPC-7494: the separate recognise consent, only when its box was ticked (and recognition is on); never implied by the save box.
+    ...(opts.recognise === true && recognitionEnabled() ? { recognise_consent: true, recognise_consent_version: RECOGNISE_CONSENT_VERSION } : {}),
     ...(scanStartedAt !== null ? { started_ms: Math.min(MAX_SCAN_MS, Math.max(0, Math.round(Date.now() - scanStartedAt))) } : {}),
     ...(earlier && earlier !== visitScanNumber() ? { previous_scan_number: earlier } : {}),
   };

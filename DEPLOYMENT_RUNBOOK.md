@@ -78,7 +78,8 @@ signature and forwards to core-brain over the `CORE_BRAIN` service binding with 
 
 1. Telegram: run Actions -> "Register Telegram webhook" (needs the repo secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`, after a green "Deploy core-brain & social-listeners"). It sets the webhook to social-listeners `/webhook/telegram` with `TELEGRAM_WEBHOOK_SECRET` as the secret token, then checks `getWebhookInfo` and probes the live Worker (wrong secret -> 401, real secret -> 200). No token is pasted anywhere (MPC-7251).
 2. X: set the Account Activity webhook URL to social-listeners `/webhook/x` (CRC check, signed POST).
-3. core-brain's workers.dev address is already retired (`workers_dev = false`, PR #159). Rollback is in section 5.
+3. LinkedIn (MPC-7640): set the webhook URL in the LinkedIn developer app to social-listeners `/webhook/linkedin` (challenge GET answered with `LINKEDIN_CLIENT_SECRET`, signed POST via `X-LI-Signature`). Needs the approved LinkedIn messaging product; roll out to the 20 beta users first, then public.
+4. core-brain's workers.dev address is already retired (`workers_dev = false`, PR #159). Rollback is in section 5.
 
 DNS: nothing to edit by hand. The apex, `www` (Pages), `channels` and the `send.` mail records are untouched. Do not deploy
 during an Email Routing record change on the same zone, so a failure has one obvious cause.

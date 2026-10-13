@@ -21,6 +21,8 @@ export interface RegistrationInput {
   lang: PageLang;
   email?: string;
   reminderConsent?: boolean;
+  /** Separate, unticked-by-default consent to marketing email (MPC-7538). Never implied by reminderConsent. */
+  marketingConsent?: boolean;
   now?: Date;
 }
 
@@ -33,6 +35,7 @@ export interface RegistrationRow {
   protection_date: string;
   email: string | null;
   reminder_consent: boolean;
+  marketing_consent: boolean;
   source_page: string;
 }
 
@@ -41,7 +44,9 @@ export function buildRegistrationRow(input: RegistrationInput): RegistrationRow 
   const utm = getUtm();
   const email = input.email?.trim() ?? "";
   // The address is stored only together with consent to be emailed; without consent it is dropped.
-  const wantsReminder = EMAIL_RE.test(email) && email.length <= 254 && input.reminderConsent === true;
+  const validEmail = EMAIL_RE.test(email) && email.length <= 254;
+  const wantsReminder = validEmail && input.reminderConsent === true;
+  const wantsMarketing = validEmail && input.marketingConsent === true;
   return {
     platform: input.platform,
     language: ivrLanguage(input.lang),
@@ -49,8 +54,9 @@ export function buildRegistrationRow(input: RegistrationInput): RegistrationRow 
     utm_medium: utm.utm_medium ?? null,
     utm_campaign: utm.utm_campaign ?? null,
     protection_date: protectionStartDate(input.now ?? new Date()),
-    email: wantsReminder ? email : null,
+    email: wantsReminder || wantsMarketing ? email : null,
     reminder_consent: wantsReminder,
+    marketing_consent: wantsMarketing,
     source_page: SOURCE_PAGE,
   };
 }

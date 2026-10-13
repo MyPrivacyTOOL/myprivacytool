@@ -1,10 +1,10 @@
 # MPC-7494 (F5): the open mirror, "Welcome back, we recognised your device"
 
-Status: **backend and welcome-back screen built, both switches OFF.** Chris approves the screen from screenshots before the switch goes on, and only if the MPC-7491 device-recognition wording (docs/policy-wording-mpc-7491.md) is live.
+Status: **ON (2026-10-12).** Backend (PR 283), welcome-back screen (PR 284) and the separate "Recognise this device?" opt-in (PR 286) are merged. The Worker switch `RECOGNITION_ENABLED = "true"` is deployed (PR 308). The Cloudflare Pages Production variables `VITE_SAVE_WEB_SCANS=true` and `VITE_RECOGNITION_ENABLED=true` are set (Chris, 2026-10-12); the site picks them up on its next build. Rollback: set `RECOGNITION_ENABLED = "false"` in `workers/scan-report/wrangler.toml` and/or delete `VITE_RECOGNITION_ENABLED` in Pages, then redeploy.
 
-Approval: Chris approved the welcome-back screen and the threshold (>=12 of 20 comparable points, one agreeing hash, no differing hash, >=0.85 agreement) on 2026-10-12 from the four screenshots in docs/screenshots/mpc-7494/ (mocked API). That approval does not turn any switch on.
+Approval: Chris approved the welcome-back screen and the threshold (>=12 of 20 comparable points, one agreeing hash, no differing hash, >=0.85 agreement) on 2026-10-12 from the four screenshots in docs/screenshots/mpc-7494/ (mocked API), chose the separate opt-in for the consent gap, approved the exact opt-in wording and Privacy 2.5, and asked for the switches on.
 
-**Open gap before any switch (for Chris):** the approved MPC-7491 wording says recognition is offered after a scan is saved as a separate "Recognise this device?" choice, used only with consent. This build recognises for any browser that holds a consented scan number, and the save tick-box text does not mention recognition. Either add a "Recognise this device?" opt-in at the contact step (new consent wording version), or change the MPC-7491 wording to match the existing save consent. Until then `RECOGNITION_ENABLED` and `VITE_RECOGNITION_ENABLED` stay off.
+**How consent works now:** only a browser whose held scan was saved with BOTH the save consent and the separate "Recognise this device?" consent (`save_consent_at` and `recognise_consent_at` on the contact link) is compared, and only against other scans with both. Scans saved before the opt-in existed are not recognition candidates. Not yet verified live: the end-to-end test (scan with both boxes ticked, then a second scan in the same browser) and the MPC-7471 `/scan` report-request check.
 
 Principle (Chris): MyPrivacyTOOL is not a tracker, it is a mirror. Recognition happens in the open, with consent, and is shown to the visitor with how it was done.
 
@@ -53,11 +53,21 @@ Why 0.85: browsers update every few weeks and screens get plugged in, so 1.0 wou
 
 `POST /api/recognise/delete` with `{scan_number}` (the matched `scan_number`) calls the MPC-7488 route `mpt_delete_web_scan` and answers `{"deleted": true|false}`. "Keep my record" needs no call: nothing was stored, and the record stays under the normal 12-month retention.
 
+## The recognise opt-in (consent gap closed, option (a))
+
+The approved MPC-7491 wording says recognition is only with consent, offered after a scan is saved as a clear choice. So being recognised is its **own** consent, separate from "save my scan result":
+
+- Contact step (`/scan`): a second, optional, UNTICKED box, shown only when saving is on AND `VITE_RECOGNITION_ENABLED` is `"true"`, and enabled only once the save box is ticked (un-ticking the save box clears it). Wording and version: `RECOGNISE_CONSENT_LABEL` / `RECOGNISE_CONSENT_VERSION` in `src/lib/saveConsent.ts`. Not needed for the report or the saving.
+- `POST /api/scan` accepts `recognise_consent: true` + `recognise_consent_version` ONLY with `save_consent: true` and a scan (otherwise 400, nothing stored or sent). Versions: `RECOGNISE_CONSENT_VERSIONS` in `workers/scan-report/lib/webScan.js`. Stored as `recognise_consent_at` (Worker clock) and `recognise_consent_version` on the `web_scan_contacts` link.
+- `handleRecognise` needs the held scan to have `recognise_consent_at` (as well as `save_consent_at`); otherwise the same `{recognised:false}`, no comparison.
+- `mpt_recognition_candidates` returns only scans whose link has `recognise_consent_at` (plus the save consent and retention checks). Migration `20261012240000_mpc_7494_recognise_optin.sql`. **Scans saved before this change are no longer recognition candidates.**
+- Privacy section 2.5 "Recognising Your Device" (the MPC-7491 paragraph) renders only when `VITE_RECOGNITION_ENABLED` is `"true"` (third-party information becomes 2.6), so the policy text goes live in the same flip as the feature.
+
 ## Before it can go on
 
 1. Apply `20261012230000_mpc_7494_recognition_candidates.sql` in production (Supabase SQL Editor; the connector times out on function DDL).
 2. ~~Build the screen~~ Built (this PR). It calls `/api/recognise` only when `VITE_SAVE_WEB_SCANS` and `VITE_RECOGNITION_ENABLED` are both `"true"` and this browser holds a scan number from an earlier visit. No match shows nothing. Keep makes no call; Delete calls `/api/recognise/delete` with the matched scan number, confirms, and clears the stored number if it was the same one. Analytics events are count-only (`welcome_back_shown`, `welcome_back_choice` with keep/delete), never the scan number, signals or values. Screenshots (mocked API): `docs/screenshots/mpc-7494/`.
-3. Chris approves screenshots and the threshold; MPC-7491 device-recognition wording goes live; MPC-7471 turns the site save flag on.
+3. Chris approves the exact opt-in wording and runs migration `20261012240000` in the Supabase SQL Editor; screenshots and the threshold are approved; MPC-7491 device-recognition wording goes live; MPC-7471 turns the site save flag on.
 
 ## Open decision for Chris
 

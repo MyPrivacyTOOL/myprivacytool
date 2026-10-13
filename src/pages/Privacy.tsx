@@ -1,7 +1,49 @@
+import { useEffect } from "react";
 import Seo from "@/components/Seo";
+import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from "@/data/hkSpamCopy";
 import pageMeta from "@/data/pageMeta.json";
+import { referralsEnabled } from "@/lib/referral";
+import { recognitionFlagOn } from "@/lib/webScan";
+
+// MPC-7538: one language of the HK Stop Spam section. Wording lives in src/data/hkSpamCopy.ts (MPC-7542 reviews the Chinese).
+const HkPolicyBlocks = ({ copy, id }: { copy: HkPolicyCopy; id: string }) => (
+  <div id={id} lang={copy.lang} className="scroll-mt-24">
+    <h2 className="mt-8 text-2xl font-bold text-foreground">{copy.title}</h2>
+    <p className="text-muted-foreground">{copy.intro}</p>
+    {copy.blocks.map((b) => (
+      <div key={b.heading}>
+        <h3 className="mt-4 text-xl font-semibold text-foreground">{b.heading}</h3>
+        {b.paragraphs?.map((t) => (
+          <p key={t} className="text-muted-foreground">
+            {t}
+          </p>
+        ))}
+        {b.bullets && (
+          <ul className="list-inside list-disc space-y-2 text-muted-foreground">
+            {b.bullets.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    ))}
+    <p className="text-muted-foreground">
+      <a href="https://www.dnc.gov.hk" target="_blank" rel="noopener noreferrer" className="text-brand underline hover:text-foreground">
+        {copy.ofcaLinkText}
+      </a>{" "}
+      <a href="https://www.pcpd.org.hk" target="_blank" rel="noopener noreferrer" className="text-brand underline hover:text-foreground">
+        {copy.pcpdLinkText}
+      </a>
+    </p>
+  </div>
+);
 
 const Privacy = () => {
+  // The consent line on /HongKongSpam links to #hk-stop-spam (or #hk-stop-spam-zh); the section renders after load, so scroll to it here.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (id) document.getElementById(id)?.scrollIntoView?.();
+  }, []);
 
   return (
     <>
@@ -217,8 +259,28 @@ const Privacy = () => {
                 with your scan number or the email address you used.
               </p>
 
+              {recognitionFlagOn() && (
+                <>
+                  <h3 className="mt-6 text-xl font-semibold text-foreground">
+                    2.5 Recognising Your Device
+                  </h3>
+                  <p className="text-muted-foreground">
+                    If you choose to, we can tell you when we recognise the device
+                    you are using from the technical details its browser shows us,
+                    without using a cookie. We do this in the open: when it happens
+                    we show you that we recognised you, which details we used and
+                    how, and what you can do about it, including asking us to
+                    delete it. We do not recognise your device in the background.
+                    If you do nothing, we do not link a visit to you. Recognising a
+                    device is only used with your consent, and you can withdraw it
+                    at any time by contacting us or deleting your scan number
+                    record.
+                  </p>
+                </>
+              )}
+
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.5 Information from Third Parties
+                {recognitionFlagOn() ? "2.6" : "2.5"} Information from Third Parties
               </h3>
               <p className="text-muted-foreground">
                 We may receive information about you from third-party sources,
@@ -673,6 +735,30 @@ const Privacy = () => {
                 </p>
               </div>
             </section>
+
+            <section className="mb-8">
+              <HkPolicyBlocks copy={HK_POLICY_EN} id={HK_POLICY_ANCHOR.en} />
+              <HkPolicyBlocks copy={HK_POLICY_ZH} id={HK_POLICY_ANCHOR.zh} />
+            </section>
+
+            {/* MPC-7645: shown only while the referral programme is on, so the policy goes live in the same flip as the feature. Draft wording for Chris and a lawyer. */}
+            {referralsEnabled() && (
+              <section className="mb-8" id="referrals">
+                <h2 className="mt-8 text-2xl font-bold text-foreground">16. Inviting Friends (Referral Programme)</h2>
+                <p className="text-muted-foreground">
+                  If you invite friends, we give you a personal referral code and a private link, both in your report email. We keep your code, how many friends signed up through it and how many got their first report, and the number of free Pro months you have earned. We do not keep your friends&apos; names, and we never tell you or them anything about each other&apos;s results.
+                </p>
+                <h3 className="mt-4 text-xl font-semibold text-foreground">If you ask us to email a friend</h3>
+                <p className="text-muted-foreground">
+                  You give us the address. We send that person one email saying someone who uses MyPrivacyTOOL asked us to, without saying who. We keep only a SHA-256 hash of the address, never the address itself, so we can tell if you invite the same person twice and match them if they later sign up through your link. We check it against our opt-out and suppression lists first, send no reminders, and the email has an unsubscribe link that stops us ever emailing that address. You may invite up to 10 people in total. Only invite people who would expect to hear from you.
+                </p>
+                <h3 className="mt-4 text-xl font-semibold text-foreground">If someone invites you</h3>
+                <p className="text-muted-foreground">
+                  Using a friend&apos;s link is your choice. If you run a scan through it, your friend learns only that you completed one, and earns a free month of Pro. You can ask us to delete your data at any time, which also removes the link between you and your friend.
+                </p>
+                <p className="text-muted-foreground">We keep referral records for as long as the accounts they belong to, and delete them with the account. Write to privacy@myprivacytool.io to see or delete yours.</p>
+              </section>
+            )}
 
             <section className="mb-12 rounded-lg bg-muted p-6">
               <h3 className="mb-4 text-lg font-semibold text-foreground">

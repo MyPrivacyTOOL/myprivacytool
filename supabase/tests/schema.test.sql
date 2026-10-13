@@ -274,6 +274,8 @@ select pg_temp.assert(pg_temp.try_as('authenticated', $$insert into public.hk_sp
   'hk_spam_registrations: authenticated has no insert');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date) values ('windows', 'en', '2026-10-23')$$) = '23514', 'platform is constrained');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, reminder_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514', 'consent needs an email');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, marketing_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514', 'marketing consent needs an email');
+select pg_temp.assert((select column_default from information_schema.columns where table_name = 'hk_spam_registrations' and column_name = 'marketing_consent') = 'false', 'marketing_consent defaults to false');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email) values ('ios', 'en', '2026-10-23', 'not-an-email')$$) = '23514', 'email shape is checked');
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_due_reminders$$) = '42501', 'hk_spam_due_reminders: anon must not read');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.hk_spam_due_reminders$$) = '', 'hk_spam_due_reminders: service_role reads');
@@ -291,7 +293,7 @@ reset role;
 -- ===== MPC-7448: reminder_sent_at (at-most-once) and email_suppressions =====
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, reminder_sent_at) values ('ios', 'en', '2026-10-23', now())$$) = '42501',
   'hk_spam_registrations: anon cannot set reminder_sent_at');
-select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, utm_source, source_page) values ('ios', 'yue', '2026-10-23', 'a@example.com', true, 'x', '/HongKongSpam')$$) = '',
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, marketing_consent, utm_source, source_page) values ('ios', 'yue', '2026-10-23', 'a@example.com', true, true, 'x', '/HongKongSpam')$$) = '',
   'hk_spam_registrations: anon can still insert all the form columns');
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.email_suppressions$$) = '42501', 'email_suppressions: anon must not read');
 select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.email_suppressions (email_hash) values (repeat('a', 64))$$) = '42501', 'email_suppressions: anon must not insert');
@@ -309,6 +311,45 @@ update public.hk_spam_registrations set reminder_sent_at = now() where email = '
 select pg_temp.assert((select count(*) from public.hk_spam_due_reminders where email = 'claim@example.com') = 0, 'due view: a claimed row is no longer listed');
 with u as (update public.hk_spam_registrations set reminder_sent_at = now() where email = 'claim@example.com' and reminder_sent_at is null returning 1)
   select pg_temp.assert(count(*) = 0, 'claim is atomic: a second claim matches nothing') from u;
+reset role;
+
+-- ===== MPC-7538: marketing consent, 90-day retention job, deletion/access routes =====
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, email, marketing_consent) values ('ios', 'en', '2026-10-23', 'tips@example.com', true)$$) = '',
+  'hk_spam: anon may insert marketing_consent with an email');
+select pg_temp.assert(pg_temp.try_as('anon', $$insert into public.hk_spam_registrations (platform, language, protection_date, marketing_consent) values ('ios', 'en', '2026-10-23', true)$$) = '23514',
+  'hk_spam: marketing consent needs an email');
+select pg_temp.assert((select column_default from information_schema.columns where table_schema = 'public' and table_name = 'hk_spam_registrations' and column_name = 'marketing_consent') = 'false',
+  'hk_spam: marketing_consent defaults to false (unticked)');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_marketing_recipients$$) = '42501', 'hk_spam_marketing_recipients: anon must not read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_purge_expired_hk_spam(true)$$) = '42501', 'mpt_purge_expired_hk_spam: anon must not run');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_delete_hk_spam_by_email('a@example.com')$$) = '42501', 'mpt_delete_hk_spam_by_email: anon must not run');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.mpt_export_hk_spam_by_email('a@example.com')$$) = '42501', 'mpt_export_hk_spam_by_email: anon must not run');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.hk_spam_deletion_log$$) = '42501', 'hk_spam_deletion_log: anon must not read');
+
+set local role service_role;
+delete from public.hk_spam_registrations;
+insert into public.hk_spam_registrations (platform, language, protection_date, email, reminder_consent, marketing_consent) values
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 91, 'old-reminder@example.com', true,  false),   -- past 90 days, no marketing: deleted
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 90, 'edge@example.com',         true,  false),   -- exactly 90 days: deleted
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 89, 'recent@example.com',       true,  false),   -- 89 days: kept
+  ('ios', 'yue', (now() at time zone 'Asia/Hong_Kong')::date - 200, 'tips@example.com',        true,  true),    -- marketing consent: kept
+  ('ios', 'yue', (now() at time zone 'Asia/Hong_Kong')::date - 200, 'unsub@example.com',       false, true),    -- unsubscribed: consent ends, then deleted
+  ('ios', 'en',  (now() at time zone 'Asia/Hong_Kong')::date - 300, null,                      false, false);   -- no email: the row still goes
+insert into public.email_suppressions (email_hash, source) values (encode(sha256(convert_to('unsub@example.com', 'UTF8')), 'hex'), 'unsubscribe');
+select pg_temp.assert((select count(*) from public.hk_spam_marketing_recipients) = 1 and (select email from public.hk_spam_marketing_recipients) = 'tips@example.com',
+  'marketing recipients: only marketing_consent = true and not unsubscribed');
+select pg_temp.assert((public.mpt_purge_expired_hk_spam(true)->>'rows_deleted')::int = 4, 'purge dry run counts 4 rows');
+select pg_temp.assert((select count(*) from public.hk_spam_registrations) = 6, 'purge dry run deletes nothing');
+select pg_temp.assert((public.mpt_purge_expired_hk_spam()->>'rows_deleted')::int = 4, 'purge deletes 4 rows');
+select pg_temp.assert((select count(*) from public.hk_spam_registrations) = 2
+  and exists (select 1 from public.hk_spam_registrations where email = 'recent@example.com')
+  and exists (select 1 from public.hk_spam_registrations where email = 'tips@example.com'),
+  'purge keeps the 89-day row and the marketing-consent row');
+select pg_temp.assert((select count(*) from public.hk_spam_deletion_log where kind = 'purge' and rows_deleted = 4 and consent_ended = 1) = 1
+  and (select count(*) from public.hk_spam_deletion_log where kind = 'purge_dry_run') = 1, 'purge is logged, counts only');
+select pg_temp.assert((select count(*) from public.mpt_export_hk_spam_by_email(' TIPS@example.com ')) = 1, 'export finds the record by email');
+select pg_temp.assert(public.mpt_delete_hk_spam_by_email('Tips@Example.com') = 1, 'deletion by email reports one record');
+select pg_temp.assert(not exists (select 1 from public.hk_spam_registrations where email = 'tips@example.com'), 'deletion by email removes the record');
 reset role;
 
 -- ===== MPC-7465: web_scans + web_scan_contacts (service_role only) =====
@@ -506,7 +547,7 @@ select pg_temp.assert((select jsonb_array_length(j->'rows') = 2 from mv) and not
 select pg_temp.assert((select (r->>'requests')::int = 4 and (r->>'robots_fetches')::int = 1 and r->'pages' = '["/", "/blog/a"]'::jsonb from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: requests, robots.txt fetches and pages served (no robots.txt, no 404)');
 select pg_temp.assert((select r->>'first_ever' = '2031-03-01T01:00:00+00:00' from mv, jsonb_array_elements(j->'rows') r where r->>'user_agent' = 'ExampleAIBot/1.0'), 'machine visits: first_ever looks past the window');
 
--- ===== MPC-7494: recognition candidates (consent, retention, hash match, service_role only, no personal link) =====
+-- ===== MPC-7494: recognition candidates (save + recognise consent, retention, hash match, service_role only, no personal link) =====
 select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)$$) = '42501', 'mpt_recognition_candidates: anon must not execute');
 select pg_temp.assert(pg_temp.try_as('authenticated', $$select * from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)$$) = '42501', 'mpt_recognition_candidates: authenticated must not execute');
 insert into public.web_scans (id, created_at, hexagon_count, results, results_bytes) values
@@ -515,22 +556,119 @@ insert into public.web_scans (id, created_at, hexagon_count, results, results_by
   ('00000000-0000-4000-8000-0000000074f3', now() - interval '400 days', 2, '[{"id":"canvas-fingerprint","label":"c","value":"h1","status":"found"},{"id":"browser","label":"b","value":"Chrome 141","status":"found"}]', 200),  -- consented but past 12 months
   ('00000000-0000-4000-8000-0000000074f4', now() - interval '5 days',   2, '[{"id":"canvas-fingerprint","label":"c","value":"h1","status":"found"},{"id":"browser","label":"b","value":"Chrome 141","status":"found"}]', 200),  -- same values, never linked to any contact
   ('00000000-0000-4000-8000-0000000074f5', now() - interval '3 days',   2, '[{"id":"canvas-fingerprint","label":"c","value":"other","status":"found"},{"id":"audio-fingerprint","label":"a","value":"h2","status":"found"}]', 200);  -- consented, audio h2
-insert into public.web_scan_contacts (web_scan_id, channel, contact_id, save_consent_at, save_consent_version) values
-  ('00000000-0000-4000-8000-0000000074f1', 'email', gen_random_uuid(), now(), '2026-10-12-v1'),
-  ('00000000-0000-4000-8000-0000000074f2', 'email', gen_random_uuid(), null, null),
-  ('00000000-0000-4000-8000-0000000074f3', 'email', gen_random_uuid(), now() - interval '400 days', '2026-10-12-v1'),
-  ('00000000-0000-4000-8000-0000000074f5', 'email', gen_random_uuid(), now(), '2026-10-12-v1');
+insert into public.web_scans (id, created_at, hexagon_count, results, results_bytes) values
+  ('00000000-0000-4000-8000-0000000074f6', now() - interval '2 days', 2, '[{"id":"canvas-fingerprint","label":"c","value":"h1","status":"found"},{"id":"browser","label":"b","value":"Chrome 141","status":"found"}]', 200);   -- same values, save consent but NO recognise consent
+insert into public.web_scan_contacts (web_scan_id, channel, contact_id, save_consent_at, save_consent_version, recognise_consent_at, recognise_consent_version) values
+  ('00000000-0000-4000-8000-0000000074f1', 'email', gen_random_uuid(), now(), '2026-10-12-v1', now(), '2026-10-12-v1'),
+  ('00000000-0000-4000-8000-0000000074f2', 'email', gen_random_uuid(), null, null, now(), '2026-10-12-v1'),   -- recognise consent but no save consent: not a candidate
+  ('00000000-0000-4000-8000-0000000074f3', 'email', gen_random_uuid(), now() - interval '400 days', '2026-10-12-v1', now() - interval '400 days', '2026-10-12-v1'),
+  ('00000000-0000-4000-8000-0000000074f5', 'email', gen_random_uuid(), now(), '2026-10-12-v1', now(), '2026-10-12-v1'),
+  ('00000000-0000-4000-8000-0000000074f6', 'email', gen_random_uuid(), now(), '2026-10-12-v1', null, null);
 set local role service_role;
-select pg_temp.assert((select array_agg(right(web_scan_id::text, 2)) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)) = array['f1'], 'recognition candidates: only the consented, unexpired scan with that hash (not the unconsented, expired or unlinked ones)');
+select pg_temp.assert((select array_agg(right(web_scan_id::text, 2)) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb)) = array['f1'], 'recognition candidates: only the scan with BOTH consents, unexpired, with that hash (not the saved-but-not-recognise-consented, unconsented, expired or unlinked ones)');
 select pg_temp.assert((select array_agg(right(web_scan_id::text, 2) order by web_scan_id) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"},{"id":"audio-fingerprint","value":"h2"}]'::jsonb)) = array['f1','f5'], 'recognition candidates: any of the given hashes can bring a candidate');
 select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"nope"}]'::jsonb)) = 0, 'recognition candidates: no shared hash, no candidate');
 select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[]'::jsonb)) = 0 and (select count(*) from public.mpt_recognition_candidates('"x"'::jsonb)) = 0 and (select count(*) from public.mpt_recognition_candidates('[1,2]'::jsonb)) = 0, 'recognition candidates: empty or malformed input returns nothing');
 select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb, 0)) = 1, 'recognition candidates: the limit is clamped to at least 1');
 select pg_temp.assert((select array_agg(column_name::text order by ordinal_position) from information_schema.columns where table_name = 'web_scans' and table_schema = 'public' and column_name in ('id')) is not null
   and (select pg_get_function_result('public.mpt_recognition_candidates(jsonb, integer)'::regprocedure)) = 'TABLE(web_scan_id uuid, scanned_at timestamp with time zone, results jsonb)', 'recognition candidates: returns scan number, time and results only (no contact or user column)');
+select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb) where right(web_scan_id::text, 2) = 'f6') = 0, 'recognition candidates: a scan saved with the save consent but WITHOUT the recognise consent is NOT a candidate');
+select pg_temp.assert((select count(*) from public.mpt_recognition_candidates('[{"id":"canvas-fingerprint","value":"h1"}]'::jsonb) where right(web_scan_id::text, 2) = 'f1') = 1, 'recognition candidates: a scan with the recognise consent is a candidate');
 -- reading candidates changes nothing and logs nothing
-select pg_temp.assert((select count(*) from public.web_scans where id::text like '00000000-0000-4000-8000-0000000074f%') = 5, 'recognition candidates: read-only, all five scans still there');
+select pg_temp.assert((select count(*) from public.web_scans where id::text like '00000000-0000-4000-8000-0000000074f%') = 6, 'recognition candidates: read-only, all six scans still there');
 reset role;
+select pg_temp.assert((select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'web_scan_contacts' and column_name in ('recognise_consent_at', 'recognise_consent_version')) = 2, 'web_scan_contacts: has the recognise consent columns (MPC-7494)');
+select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and not has_function_privilege('authenticated', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute') and has_function_privilege('service_role', 'public.mpt_recognition_candidates(jsonb, integer)', 'execute'), 'mpt_recognition_candidates: grants unchanged, service_role only');
+
+-- ===== MPC-7650: Family Plan households (5-profile cap, owner sees children only, adults private, RLS) =====
+insert into auth.users (id, email) values
+  ('00000000-0000-4000-8000-000000007650', 'owner@example.test'), ('00000000-0000-4000-8000-000000007651', 'adult@example.test'),
+  ('00000000-0000-4000-8000-000000007652', 'child@example.test'), ('00000000-0000-4000-8000-000000007653', 'other@example.test');
+insert into public.households (id, owner_user_id) values ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007650');
+insert into public.household_members (household_id, user_id, display_name, role, status) values
+  ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007650', 'Owner', 'owner', 'active'),
+  ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007651', 'Adult', 'adult', 'active'),
+  ('00000000-0000-4000-8000-0000000076a0', '00000000-0000-4000-8000-000000007652', 'Child', 'child', 'active');
+select pg_temp.assert(public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007650', '00000000-0000-4000-8000-000000007652'), 'household: the owner can view a child');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007650', '00000000-0000-4000-8000-000000007651'), 'household: the owner cannot view another adult');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007651', '00000000-0000-4000-8000-000000007650'), 'household: an adult cannot view the owner');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007652', '00000000-0000-4000-8000-000000007650'), 'household: a child cannot view the owner');
+select pg_temp.assert(public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007651', '00000000-0000-4000-8000-000000007651'), 'household: anyone can view their own reports');
+select pg_temp.assert(not public.mpt_household_can_view_reports('00000000-0000-4000-8000-000000007653', '00000000-0000-4000-8000-000000007652'), 'household: a stranger cannot view a child');
+insert into public.household_members (household_id, email, display_name, role) values
+  ('00000000-0000-4000-8000-0000000076a0', 'a@example.test', 'A', 'adult'), ('00000000-0000-4000-8000-0000000076a0', 'b@example.test', 'B', 'child');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.household_members (household_id, email, display_name, role) values ('00000000-0000-4000-8000-0000000076a0', 'c@example.test', 'C', 'child')$$) = '23514', 'household: a sixth profile is refused');
+update public.household_members set status = 'removed' where email = 'b@example.test';
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.household_members (household_id, email, display_name, role) values ('00000000-0000-4000-8000-0000000076a0', 'c@example.test', 'C', 'child')$$) = '', 'household: removing a profile frees its slot');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.household_members$$) = '42501', 'household_members: anon denied');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.households$$) = '42501', 'households: anon denied');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000007651","role":"authenticated"}', true);
+select pg_temp.assert((select count(*) from public.household_members) = 1, 'household_members: an adult sees only their own row');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000007650","role":"authenticated"}', true);
+select pg_temp.assert((select count(*) from public.household_members) = 6, 'household_members: the owner sees every profile in their household');
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-8000-000000007653","role":"authenticated"}', true);
+select pg_temp.assert((select count(*) from public.household_members) = 0 and (select count(*) from public.households) = 0, 'household: a stranger sees nothing');
+reset role;
+
+-- ===== MPC-7641: channel OSINT daily funnel (counts per platform, service_role only) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_channel_osint_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_channel_osint_daily: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_channel_osint_daily(now() - interval '1 day', now())$$) = '42501', 'mpt_channel_osint_daily: authenticated must not execute');
+delete from public.interaction_log;
+insert into public.interaction_log (channel, intent, intent_source, response_key, state_before, state_after, trust_before, trust_after, created_at) values
+  ('telegram', 'scan',    'rules', 'k', 'new',                   'awaiting_confirmation', 0, 0, '2031-04-02 01:00+00'),
+  ('telegram', 'unknown', 'rules', 'k', 'awaiting_confirmation', 'confirmed',             0, 1, '2031-04-02 01:05+00'),
+  ('telegram', 'help',    'rules', 'k', 'confirmed',             'confirmed',             1, 1, '2031-04-02 02:00+00'),
+  ('x',        'scan',    'qwen',  'k', 'new',                   'new',                   0, 0, '2031-04-02 03:00+00'),
+  ('x',        'scan',    'qwen',  'k', 'new',                   'new',                   0, 0, '2031-04-01 03:00+00');   -- outside the window
+insert into public.leads (email, utm_source, utm_medium, created_at) values
+  ('mpc7641a@example.com', 'LinkedIn', 'channel_osint', '2031-04-02 05:00+00'),
+  ('mpc7641b@example.com', 'x',        'email',         '2031-04-02 05:01+00'),                                              -- same platform, other medium: not a channel conversion
+  ('mpc7641c@example.com', 'x',        'channel_osint', '2031-04-01 05:00+00');                                              -- outside the window
+set local role service_role;
+create temp table co as select public.mpt_channel_osint_daily('2031-04-02 00:00+00', '2031-04-03 00:00+00') as j;
+select pg_temp.assert((select jsonb_array_length(j->'platforms') = 3 from co), 'channel osint: one row per platform seen (telegram, x, linkedin)');
+select pg_temp.assert((select (r->>'dms_received')::int = 3 and (r->>'scan_requests')::int = 1 and (r->>'consents_given')::int = 1 and (r->>'conversions')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'telegram'), 'channel osint: telegram DMs, scan requests, consent (awaiting_confirmation -> confirmed)');
+select pg_temp.assert((select (r->>'dms_received')::int = 1 and (r->>'consents_given')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'x'), 'channel osint: x counts only the in-window DM (other days excluded)');
+select pg_temp.assert((select (r->>'conversions')::int = 1 and (r->>'dms_received')::int = 0 from co, jsonb_array_elements(j->'platforms') r where r->>'platform' = 'linkedin'), 'channel osint: linkedin conversion counted case-insensitively; other medium and other days excluded');
+select pg_temp.assert((select not (j::text ~* '(@|example\.com)') from co), 'channel osint: no email or personal value in the output');
+reset role;
+-- ===== MPC-7645: referrals (service_role only, one referral per friend, atomic reward capped at 12, no readable address) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.referrals$$) = '42501' and pg_temp.try_as('authenticated', $$select 1 from public.referrals$$) = '42501', 'referrals: anon and authenticated must be denied');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.referrals$$) = '' and (select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.referrals'::regclass), 'referrals: service_role reads; RLS enabled and forced');
+select pg_temp.assert(not has_function_privilege('anon', 'public.mpt_complete_referral(uuid)', 'execute') and not has_function_privilege('authenticated', 'public.mpt_complete_referral(uuid)', 'execute') and has_function_privilege('service_role', 'public.mpt_complete_referral(uuid)', 'execute'), 'mpt_complete_referral: service_role only');
+select pg_temp.assert(not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'referrals' and column_name ilike any (array['email', '%\_email', '%address%'])), 'referrals: no readable email column (hash only)');
+insert into public.users (id, email, referral_code) values
+  ('00000000-0000-4000-8000-000000007645', 'referrer-7645@example.com', 'ABCDEFGH'),
+  ('00000000-0000-4000-8000-000000007646', 'friend-7645@example.com', null),
+  ('00000000-0000-4000-8000-000000007647', 'friend2-7645@example.com', null);
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.users (email, referral_code) values ('x-7645@example.com', 'ABCDEFGH')$$) = '23505', 'users.referral_code: unique');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.users (email, referral_code) values ('y-7645@example.com', 'abcdefgh')$$) = '23514' and pg_temp.try_as('service_role', $$insert into public.users (email, referral_code) values ('z-7645@example.com', 'ABCDEF01')$$) = '23514', 'users.referral_code: 8 characters from the unambiguous upper-case alphabet only');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, referee_user_id, status) values ('00000000-0000-4000-8000-000000007645', '00000000-0000-4000-8000-000000007645', 'signed_up')$$) = '23514', 'referrals: nobody can refer themselves');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, status) values ('00000000-0000-4000-8000-000000007645', 'signed_up')$$) = '23514', 'referrals: signed_up needs a referee');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, invitee_hash) values ('00000000-0000-4000-8000-000000007645', 'not-a-hash')$$) = '23514', 'referrals: invitee_hash must be a SHA-256 hex digest');
+insert into public.referrals (referrer_user_id, invitee_hash, source) values ('00000000-0000-4000-8000-000000007645', repeat('a', 64), 'invite_email');
+select pg_temp.assert(pg_temp.try_as('service_role', format($$insert into public.referrals (referrer_user_id, invitee_hash) values ('00000000-0000-4000-8000-000000007645', %L)$$, repeat('a', 64))) = '23505', 'referrals: the same friend cannot be invited twice by the same person');
+insert into public.referrals (referrer_user_id, referee_user_id, status, signed_up_at) values ('00000000-0000-4000-8000-000000007645', '00000000-0000-4000-8000-000000007646', 'signed_up', now());
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.referrals (referrer_user_id, referee_user_id, status) values ('00000000-0000-4000-8000-000000007647', '00000000-0000-4000-8000-000000007646', 'signed_up')$$) = '23505', 'referrals: a friend is referred only once');
+set local role service_role;
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007647')) = 0, 'mpt_complete_referral: a friend nobody referred changes nothing');
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007646') where rewarded and pro_months_earned = 1 and referrer_user_id = '00000000-0000-4000-8000-000000007645') = 1, 'mpt_complete_referral: the first completion rewards the referrer one month');
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007646')) = 0 and (select pro_months_earned from public.users where id = '00000000-0000-4000-8000-000000007645') = 1, 'mpt_complete_referral: completing the same friend again rewards nothing (at most once)');
+select pg_temp.assert((select status = 'completed' and completed_at is not null and rewarded_at is not null from public.referrals where referee_user_id = '00000000-0000-4000-8000-000000007646'), 'mpt_complete_referral: the row is marked completed and rewarded');
+update public.users set pro_months_earned = 12 where id = '00000000-0000-4000-8000-000000007645';
+insert into public.referrals (referrer_user_id, referee_user_id, status, signed_up_at) values ('00000000-0000-4000-8000-000000007645', '00000000-0000-4000-8000-000000007647', 'signed_up', now());
+select pg_temp.assert((select count(*) from public.mpt_complete_referral('00000000-0000-4000-8000-000000007647') where not rewarded and pro_months_earned = 12) = 1, 'mpt_complete_referral: at the 12-month cap the friend counts as completed but earns nothing');
+select pg_temp.assert((select status = 'completed' and rewarded_at is null from public.referrals where referee_user_id = '00000000-0000-4000-8000-000000007647') and (select pro_months_earned from public.users where id = '00000000-0000-4000-8000-000000007645') = 12, 'mpt_complete_referral: capped completion leaves rewarded_at empty and the ledger at 12');
+reset role;
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.users set pro_months_earned = 13 where id = '00000000-0000-4000-8000-000000007645'$$) = '23514', 'users.pro_months_earned: never above 12');
+select pg_temp.assert((select count(*) from information_schema.columns where table_schema = 'public' and ((table_name = 'users' and column_name = 'referral_block_variant') or (table_name = 'referrals' and column_name = 'invite_variant'))) = 2, 'referral A/B: both variant columns exist');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.users set referral_block_variant = 'nope' where id = '00000000-0000-4000-8000-000000007645'$$) = '23514' and pg_temp.try_as('service_role', $$update public.referrals set invite_variant = 'nope'$$) in ('23514', ''), 'referral A/B: variants are restricted to the known values');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.users set referral_block_variant = 'friend_first' where id = '00000000-0000-4000-8000-000000007645'$$) = '' and pg_temp.try_as('anon', $$select referral_block_variant from public.users$$) = '42501', 'referral A/B: service_role can record a variant, anon cannot read it');
+delete from public.users where id = '00000000-0000-4000-8000-000000007646';
+select pg_temp.assert((select count(*) from public.referrals where referee_user_id = '00000000-0000-4000-8000-000000007646') = 0, 'referrals: deleting a user (erasure) removes the referral row where they are the friend');
+delete from public.users where id = '00000000-0000-4000-8000-000000007645';
+select pg_temp.assert((select count(*) from public.referrals where referrer_user_id = '00000000-0000-4000-8000-000000007645') = 0, 'referrals: deleting a user removes the referral rows where they are the referrer');
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

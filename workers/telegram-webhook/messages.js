@@ -14,7 +14,8 @@ import fr from "../../locales/fr/main.json";
 import pt from "../../locales/pt/main.json";
 import ar from "../../locales/ar/main.json";
 
-const SCAN_URL = "https://myprivacytool.io/scan";
+// MPC-7641: tagged so GA4 and leads can attribute clicks, scans and sign-ups to this channel (utm_medium=channel_osint, utm_source = platform).
+const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=bot_reply";
 const CATALOGS = { en, ja, zh, ko, vi, es, de, fr, pt, ar };
 
 /** Telegram `language_code` (IETF tag, e.g. "pt-br", "zh-hans") -> a supported locale, else "en". */

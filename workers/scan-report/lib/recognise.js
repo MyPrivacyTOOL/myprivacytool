@@ -4,9 +4,10 @@
 // who is looking at the screen, with the signals that matched, and nothing about a match is stored or used anywhere else.
 //   - It never writes: no insert, patch or delete anywhere in the recognise path (the test checks the stubbed database saw only reads).
 //   - It runs only for a browser that holds the scan number of a scan the visitor SAVED WITH THE SPECIFIC CONSENT (the "save my scan
-//     result" box, MPC-7470: a save_consent_at record on the contact link). No consent record, no comparison.
-//   - It compares only against saved scans that carry that same consent record and are still inside the retention period (the database
-//     function mpt_recognition_candidates enforces both).
+//     result" box, MPC-7470: a save_consent_at record on the contact link) AND gave the separate "recognise this device" consent
+//     (recognise_consent_at on the same link, MPC-7494). No consent record, no comparison.
+//   - It compares only against saved scans that carry both consent records and are still inside the retention period (the database
+//     function mpt_recognition_candidates enforces all three).
 //   - It uses only hexagons the registry marks "measured", and only those the site recorded as FOUND at capture (MPC-7487).
 //   - It never tries to say WHO the visitor is: no contact, email or user id is read, compared or returned.
 //   - Switch: RECOGNITION_ENABLED must be exactly "true" (wrangler.toml: "false"), and saving (WEB_SCAN_SAVE_ENABLED) must be on.
@@ -134,8 +135,8 @@ export async function handleRecognise(env, request, origin, json, { allowedOrigi
   const v = validateHexagons(b.hexagons);
   if (v.error) return json({ error: v.error }, 400);
   try {
-    // 1. The visitor must hold a scan that was saved with the specific consent.
-    const consent = await sb.select(`web_scan_contacts?web_scan_id=eq.${b.held_scan_number.toLowerCase()}&save_consent_at=not.is.null&select=id&limit=1`);
+    // 1. The visitor must hold a scan that was saved with the specific save consent AND the separate "recognise this device" consent (MPC-7494).
+    const consent = await sb.select(`web_scan_contacts?web_scan_id=eq.${b.held_scan_number.toLowerCase()}&save_consent_at=not.is.null&recognise_consent_at=not.is.null&select=id&limit=1`);
     if (!consent?.length) return json({ recognised: false });
     // 2. Only the hash values go to the database, to find candidates; the database returns consented, unexpired scans only.
     const hashes = v.hexagons.filter((h) => HASH_IDS.includes(h.id) && usable(h)).map((h) => ({ id: h.id, value: h.value }));

@@ -67,12 +67,19 @@ const notFound = scan().map((h) => (h.id === 'canvas-fingerprint' ? { ...h, stat
 check(compareScans(notFound, scan()).matched.includes('canvas-fingerprint') === false, 'below threshold: a NOT CHECKED value is never compared');
 
 // ---- the handlers: stubbed database that records every call
+// consent: true = the held scan has the save consent AND the recognise consent; 'save-only' = save consent but no recognise consent; false = neither.
+// The stub answers the consent query the way the database would, by reading which columns the query requires.
 function stub({ consent = true, candidates = [], found = true } = {}) {
   const calls = [];
   return {
     calls,
     sb: {
-      async select(path) { calls.push(['select', path]); return consent ? [{ id: 'link' }] : []; },
+      async select(path) {
+        calls.push(['select', path]);
+        const needsRecognise = String(path).includes('recognise_consent_at=not.is.null'), needsSave = String(path).includes('save_consent_at=not.is.null');
+        const hasSave = consent === true || consent === 'save-only', hasRecognise = consent === true;
+        return (!needsSave || hasSave) && (!needsRecognise || hasRecognise) ? [{ id: 'link' }] : [];
+      },
       async rpc(fn, args) { calls.push(['rpc', fn, args]); return fn === 'mpt_delete_web_scan' ? { found, scans_deleted: found ? 1 : 0 } : candidates; },
       async insert() { calls.push(['WRITE', 'insert']); throw new Error('write attempted'); },
       async insertMany() { calls.push(['WRITE', 'insertMany']); throw new Error('write attempted'); },
@@ -108,7 +115,10 @@ check(res.body.recognised === false && Object.keys(res.body).length === 1, 'hand
 s = stub({ consent: false, candidates: [cand(SAVED, scan())] });
 res = await handleRecognise(env, req({ hexagons: scan(), held_scan_number: HELD }), '', json, deps(s.sb));
 check(res.body.recognised === false && !s.calls.some((c) => c[0] === 'rpc'), 'no consent: the held scan has no save-consent record => no comparison is run at all');
-check(String(s.calls[0][1]).includes('save_consent_at=not.is.null'), 'no consent: the check asks for the specific consent record (save_consent_at), not any link');
+check(String(s.calls[0][1]).includes('save_consent_at=not.is.null') && String(s.calls[0][1]).includes('recognise_consent_at=not.is.null'), 'no consent: the check asks for BOTH specific consent records (save_consent_at and recognise_consent_at), not any link');
+s = stub({ consent: 'save-only', candidates: [cand(SAVED, scan())] });
+res = await handleRecognise(env, req({ hexagons: scan(), held_scan_number: HELD }), '', json, deps(s.sb));
+check(res.body.recognised === false && Object.keys(res.body).length === 1 && !s.calls.some((c) => c[0] === 'rpc') && writes(s.calls) === 0, 'MPC-7494 opt-in: a held scan saved with the save consent but WITHOUT the recognise consent gets no comparison at all (same {recognised:false})');
 s = stub({ candidates: [cand(SAVED, scan())] });
 res = await handleRecognise({ ...env, RECOGNITION_ENABLED: 'false' }, req({ hexagons: scan(), held_scan_number: HELD }), '', json, deps(s.sb));
 check(res.body.recognised === false && s.calls.length === 0, 'switch off: answers {recognised:false} and never touches the database');

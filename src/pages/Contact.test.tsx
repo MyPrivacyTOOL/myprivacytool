@@ -1,6 +1,6 @@
 // MPC-7300: /contact form (the VITE_HUBSPOT_CONTACT_FORM_ID-unset mailto fallback and the HubSpot path).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderPage, jsonResponse } from "@/test/render";
 
@@ -93,3 +93,24 @@ describe("Contact (no form id: mailto fallback)", () => {
     expect(f).not.toHaveBeenCalled();
   });
 });
+
+describe("Contact (arriving from the Hong Kong Stop Spam 'Didn't work?' link)", () => {
+  it("prefills the message with the phone type and language, and ignores anything else in the query", async () => {
+    const { default: Contact } = await import("./Contact");
+    renderPage(<Contact />, "/contact?source=hk-spam&platform=android&lang=zh");
+    const box = screen.getByLabelText("Message") as HTMLTextAreaElement;
+    expect(box.value).toMatch(/did not work/i);
+    expect(box.value).toContain("Phone type: android");
+    expect(box.value).toContain("Page language: zh");
+  });
+
+  it("does not trust arbitrary values and stays empty for any other source", async () => {
+    const { default: Contact } = await import("./Contact");
+    renderPage(<Contact />, "/contact?source=hk-spam&platform=<script>&lang=%0Aevil");
+    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toContain("Phone type: unknown. Page language: unknown.");
+    cleanup();
+    renderPage(<Contact />, "/contact?platform=ios&lang=en");
+    expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("");
+  });
+});
+

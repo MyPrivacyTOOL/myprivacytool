@@ -1,6 +1,6 @@
 // Monday Slack digest (MPC-7383): reads the latest two weekly tracker rows from Notion, names any source whose latest
 // pull failed, and posts at most five lines to Chris. Blank stays blank; nothing is estimated. Counts and summaries only.
-import { buildDigest } from '../lib/digest.js';
+import { buildDigest, summariseAgentTasks } from '../lib/digest.js';
 import { notion, NOTION_VERSION, DEFAULT_WEEKLY_DS } from './notion.js';
 
 export { NOTION_VERSION };
@@ -37,6 +37,36 @@ export function rowFromPage(page) {
   };
 }
 
+const DEFAULT_TASKS_DS = '2dd28547-eaa7-8154-8a16-000ba5543325'; // Tasks Fleet Master - Database
+const AGENT_NAME = 'MyPrivacyToolClaw';
+
+/** MPC-7654: counts for the MPT agent's tasks (Assigned Actor = MyPrivacyToolClaw, not archived). Counts only. */
+export async function agentStats(env) {
+  const ds = env.NOTION_TASKS_DATA_SOURCE_ID || DEFAULT_TASKS_DS;
+  const rows = [];
+  let cursor;
+  do {
+    const res = await notion(env, 'POST', `/data_sources/${ds}/query`, {
+      filter: { property: 'Assigned Actor', multi_select: { contains: AGENT_NAME } },
+      page_size: 100, ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    for (const pg of res.results) {
+      const pr = pg.properties || {};
+      if (pr.Archived?.checkbox) continue;
+      rows.push({
+        status: pr.Status?.status?.name || pr.Status?.select?.name || null,
+        amended: textProp(pr.Amendments) !== '',
+        blocked: textProp(pr.Blocker_Reason) !== '',
+        approval: pr.Approval_Status?.select?.name || pr.Approval_Status?.status?.name || null,
+        minutesSaved: numProp(pr.Minutes_Saved_Chris), errorsCaught: numProp(pr.Errors_Caught), revenueGbp: numProp(pr.Revenue_Impact_GBP),
+        override: pr.Override_Outcome?.select?.name || null,
+      });
+    }
+    cursor = res.has_more ? res.next_cursor : undefined;
+  } while (cursor);
+  return summariseAgentTasks(rows);
+}
+
 /** Sources whose latest pull in the last 48h has status=error (latest per source+report). */
 export async function failedSources(env, now = new Date()) {
   const since = new Date(now.getTime() - 48 * 3600000).toISOString();
@@ -49,7 +79,7 @@ export async function failedSources(env, now = new Date()) {
   return [...new Set([...latest.values()].filter((r) => r.status === 'error').map((r) => r.source))].sort();
 }
 
-async function slack(env, method, params) {
+export async function slack(env, method, params) {
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
@@ -72,7 +102,9 @@ export async function buildDigestText(env, now = new Date()) {
     const [cur, prev] = rows;
     let failed;
     try { failed = await failedSources(env, now); } catch { failed = ['source-status (could not be read)']; }
-    return buildDigest({ weekOf: cur?.weekOf || 'unknown', current: cur || null, previous: prev || null, failedSources: failed }).text;
+    let stats;
+    try { stats = await agentStats(env); } catch { stats = null; }
+    return buildDigest({ weekOf: cur?.weekOf || 'unknown', current: cur || null, previous: prev || null, failedSources: failed, agentStats: stats }).text;
   } catch (e) {
     return `MPT weekly digest could not be built: ${String(e?.message ?? e).split(env.NOTION_TOKEN).join('[redacted]').slice(0, 200)}. No figures shown.`;
   }
