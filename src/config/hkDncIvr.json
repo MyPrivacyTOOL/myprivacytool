@@ -1,37 +1,29 @@
 {
-  "_readme": "The ONLY place to change the Hong Kong DNC hotline key presses and pause lengths (MPC-7450). Edit values here; no code change needed. status: UNVERIFIED = placeholder/guess, REPORTED = one person heard it on one call, VERIFIED = confirmed on a real call by someone who understood the menu in that language. Set IVR_VERIFIED=true in hkDnc.ts only when every key is VERIFIED (a unit test enforces this). Sequence pressed: language, menu (register a number), register choice, confirm. Procedure: docs/hk-dnc-ivr-procedure.md.",
+  "_readme": "The ONLY place to change the Hong Kong DNC hotline key presses and pause lengths (MPC-7450, rewritten from the 2026-10-13 hand-recorded call). Edit values here; no code change needed. status: UNVERIFIED = placeholder/guess, REPORTED = heard on a real call by Chris and a Mandarin speaker, typed by hand, VERIFIED = confirmed by the tap-to-dial flow on a real phone by someone who understood the menu in that language. Set IVR_VERIFIED=true in hkDnc.ts only when every key is VERIFIED (a unit test enforces this). Menu as recorded: intro in 3 languages (1 Cantonese, 2 Mandarin, 3 English); then the SAME service menu in that language: 1 = pre-recorded messages, 2 = fax (ignored on purpose, nobody uses it), 3 = short messages (SMS/MMS); then for each service: 1 = register YOUR number (the one you call from), 2 = register another number (the call tells you it cannot be done), 3 = follow up on a number already registered. Star goes back to the menu, hash ends the call. The call says the number is registered by the end of the day and the law applies after 10 days. There is no 'all three' option, so the combined flow chains: language, short messages, 1, star, pre-recorded, 1. Keys can be typed straight away, before the spoken menu ends. Procedure: docs/hk-dnc-ivr-procedure.md.",
   "pauses": {
-    "_note": "Each unit is one comma, about 2 seconds on Android. Chris heard about 10-12 s of greeting before the language menu. UNVERIFIED.",
-    "beforeFirstKey": 6,
-    "betweenKeys": 3
+    "_note": "Each unit is one comma, about 2 seconds on Android. Keys are accepted before the spoken menu finishes (type-ahead), so these are short but still UNVERIFIED on a real phone: the hotline answers after a moment and the greeting runs about 12 s before English is spoken. afterRegister is the wait after '1' before pressing star, so the 'registered by the end of the day / 10 days' message is not cut off: UNVERIFIED.",
+    "beforeFirstKey": 3,
+    "betweenKeys": 2,
+    "afterRegister": 8
   },
   "language": {
-    "_note": "Language menu as reported by Chris 2026-10-11: 1 Cantonese, 2 Putonghua (Mandarin, unused by us), 3 English.",
+    "_note": "Intro in 3 languages: 1 Cantonese, 2 Mandarin (unused by us), 3 English. Service and register keys are the same in every language (reported 2026-10-13).",
     "en": { "key": "3", "status": "REPORTED" },
     "yue": { "key": "1", "status": "REPORTED" }
   },
-  "menu": {
-    "_note": "Main menu: 1 = register a number (reported by Chris).",
+  "services": {
+    "_note": "Service menu after the language. 1 = pre-recorded messages, 3 = short messages (SMS/MMS). 2 = fax is ignored on purpose.",
+    "sms": { "key": "3", "status": "REPORTED" },
+    "prerecorded": { "key": "1", "status": "REPORTED" }
+  },
+  "register": {
+    "_note": "Per service: 1 = register YOUR number (the one calling). 2 = another number (cannot be done), 3 = follow up on a registered number.",
     "key": "1",
     "status": "REPORTED"
   },
-  "registers": {
-    "_note": "Each register: [register-choice key, confirm key]. Chris heard 3 options after 'register': 1 'do not call', 2 'do not call, long message', 3 'do not call, short message'. Which is pre-recorded / SMS / fax / all is a GUESS (needs a trilingual speaker). Confirm key is a GUESS. Fax has no key heard yet.",
-    "sms": [
-      { "key": "3", "status": "UNVERIFIED" },
-      { "key": "1", "status": "UNVERIFIED" }
-    ],
-    "prerecorded": [
-      { "key": "2", "status": "UNVERIFIED" },
-      { "key": "1", "status": "UNVERIFIED" }
-    ],
-    "fax": [
-      { "key": "4", "status": "UNVERIFIED" },
-      { "key": "1", "status": "UNVERIFIED" }
-    ],
-    "all": [
-      { "key": "1", "status": "UNVERIFIED" },
-      { "key": "1", "status": "UNVERIFIED" }
-    ]
+  "back": {
+    "_note": "Star goes back to the menu so a second service can be registered in the same call. Hash ends the call.",
+    "key": "*",
+    "status": "REPORTED"
   }
 }

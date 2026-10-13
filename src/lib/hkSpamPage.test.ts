@@ -68,7 +68,7 @@ describe("resolveHkDial", () => {
     expect(a.keysHidden).toBe(false);
     expect(a.autoKeys).toBe(true);
     expect(a.dial).toContain(",");
-    expect(a.keys.map((k) => k.purpose)).toEqual(["language", "menu", "register", "confirm"]);
+    expect(a.keys.map((k) => k.purpose)).toEqual(["language", "service", "register", "back", "service", "register"]);
     const i = resolveHkDial("ios", "en", true);
     expect(i.autoKeys).toBe(false);
     expect(i.dial).toBe("tel:13571835000");
@@ -81,7 +81,7 @@ describe("resolveHkDial", () => {
     expect(v.keysHidden).toBe(false);
     expect(v.keysUnverified).toBe(false);
     expect(v.autoKeys).toBe(true);
-    expect(v.keys).toHaveLength(4);
+    expect(v.keys).toHaveLength(6);
   });
 
   it("Traditional Chinese uses the Cantonese menu; desktop needs a phone", () => {

@@ -19,20 +19,28 @@ describe("hkDnc config", () => {
     expect(everyVerified).toBe(false);
   });
 
-  it("reported language menu: 1 Cantonese, 3 English; 'register a number' is 1", () => {
+  it("recorded menu: language 1 Cantonese / 3 English, service 3 SMS / 1 pre-recorded, then 1 = register this number", () => {
     expect(IVR_DATA.language.yue.key).toBe("1");
     expect(IVR_DATA.language.en.key).toBe("3");
-    expect(IVR_DATA.menu.key).toBe("1");
+    expect(IVR_DATA.services.sms.key).toBe("3");
+    expect(IVR_DATA.services.prerecorded.key).toBe("1");
+    expect(IVR_DATA.register.key).toBe("1");
+    expect(IVR_DATA.back.key).toBe("*");
+  });
+
+  it("fax is not offered (nobody uses it)", () => {
+    expect(HK_REGISTERS).toEqual(["sms", "prerecorded", "all"]);
   });
 
   it("the JSON only holds valid DTMF keys and known statuses", () => {
-    const keys = [IVR_DATA.language.en, IVR_DATA.language.yue, IVR_DATA.menu, ...HK_REGISTERS.flatMap((r) => IVR_DATA.registers[r])];
+    const keys = [IVR_DATA.language.en, IVR_DATA.language.yue, IVR_DATA.services.sms, IVR_DATA.services.prerecorded, IVR_DATA.register, IVR_DATA.back];
     for (const k of keys) {
       expect(k.key).toMatch(/^[0-9*#]$/);
       expect(["UNVERIFIED", "REPORTED", "VERIFIED"].includes(k.status)).toBe(true);
     }
-    expect(Number.isInteger(PAUSES.beforeFirstKey) && PAUSES.beforeFirstKey >= 0).toBe(true);
-    expect(Number.isInteger(PAUSES.betweenKeys) && PAUSES.betweenKeys >= 0).toBe(true);
+    for (const n of [PAUSES.beforeFirstKey, PAUSES.betweenKeys, PAUSES.afterRegister]) {
+      expect(Number.isInteger(n) && n >= 0).toBe(true);
+    }
   });
 
   it("android: pauses plus auto keys, prefix and hotline first", () => {
@@ -42,7 +50,8 @@ describe("hkDnc config", () => {
     expect(r.dial.startsWith("tel:13571835000" + ",".repeat(PAUSES.beforeFirstKey))).toBe(true);
     const keys = getIvrKeys("sms", "en").map((k) => k.key);
     const digits = r.dial.slice("tel:13571835000".length).replace(/,/g, "");
-    expect(digits).toBe(keys.join(""));
+    expect(digits.replace(/%2A/g, "*")).toBe(keys.join(""));
+    expect(keys.join("")).toBe("331");
     expect(r.verified).toBe(false);
   });
 
@@ -63,7 +72,6 @@ describe("hkDnc config", () => {
   });
 
   it("percent-encodes * and # but keeps , as the pause", () => {
-    // Keys are placeholders today; assert the encoder on a synthetic path by checking no raw # or * ever escapes.
     for (const r of HK_REGISTERS) {
       const { dial } = buildDialString("android", { register: r });
       expect(dial).not.toMatch(/[#*;\s]/);
@@ -71,10 +79,22 @@ describe("hkDnc config", () => {
     }
   });
 
-  it("every register has language, menu, register and confirm keys in that order", () => {
-    for (const r of HK_REGISTERS) {
-      expect(getIvrKeys(r).map((k) => k.purpose)).toEqual(["language", "menu", "register", "confirm"]);
-    }
+  it("single services are language, service, register; 'all' chains SMS then pre-recorded with star between", () => {
+    expect(getIvrKeys("sms", "en").map((k) => k.purpose)).toEqual(["language", "service", "register"]);
+    expect(getIvrKeys("prerecorded", "yue").map((k) => k.key).join("")).toBe("111");
+    expect(getIvrKeys("all", "en").map((k) => k.purpose)).toEqual(["language", "service", "register", "back", "service", "register"]);
+    expect(getIvrKeys("all", "en").map((k) => k.key).join("")).toBe("331*11");
+    expect(getIvrKeys("all", "yue").map((k) => k.key).join("")).toBe("131*11");
+  });
+
+  it("android 'all' dial string waits longer before star so the 'registered' message can play", () => {
+    const { dial } = buildDialString("android", { register: "all", language: "en" });
+    const body = dial.slice("tel:13571835000".length);
+    expect(body).toBe(
+      ",".repeat(PAUSES.beforeFirstKey) + "3" + ",".repeat(PAUSES.betweenKeys) + "3" + ",".repeat(PAUSES.betweenKeys) + "1" +
+        ",".repeat(PAUSES.afterRegister) + "%2A" + ",".repeat(PAUSES.betweenKeys) + "1" + ",".repeat(PAUSES.betweenKeys) + "1",
+    );
+    expect(PAUSES.afterRegister).toBeGreaterThan(PAUSES.betweenKeys);
   });
 });
 

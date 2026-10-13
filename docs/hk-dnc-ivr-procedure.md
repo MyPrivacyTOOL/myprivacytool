@@ -45,3 +45,6 @@ All key presses and pause lengths live in **`src/config/hkDncIvr.json`** (no cod
 5. Tell MPC-7446 the gate is clear.
 
 **Who can do the call:** ideally someone who understands Cantonese, Putonghua and English, so each language path and the register wording can be checked. Parked for now (2026-10-11); the tool works with the current values and the page stays noindex until `IVR_VERIFIED` is true.
+
+## Update 2026-10-13: first hand-recorded call
+Chris and a Mandarin speaker called by hand. Menu: intro in 3 languages (1 Cantonese, 2 Mandarin, 3 English), then the same service menu in that language: 1 pre-recorded messages, 2 fax (ignored), 3 short messages (SMS/MMS). For each service: 1 register the number you call from, 2 another number (the call says it cannot be done), 3 follow up on a registered number. `*` goes back to the menu, `#` ends the call. Keys can be typed immediately. The call says the number is registered by the end of the day and the law applies after 10 days. All keys in `hkDncIvr.json` are REPORTED, not VERIFIED, until the tap-to-dial flow works on real phones (MPC-7540). Phone numbers and video stay in private storage, never in the repo or Notion.
