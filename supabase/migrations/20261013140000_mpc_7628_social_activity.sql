@@ -6,7 +6,7 @@
 --           public.mpt_purge_expired_social_contacts(); drop table public.social_events, public.social_contacts;
 create table if not exists public.social_contacts (
   id               uuid primary key default gen_random_uuid(),
-  platform         text not null check (platform ~ '^[a-z][a-z0-9_]{1,31}$'),
+  platform         text not null check (platform ~ '^[a-z][a-z0-9_]{0,31}$'),
   platform_user_id text not null check (char_length(platform_user_id) between 1 and 64),
   handle           text check (char_length(handle) between 1 and 64),
   follows_us       boolean,
