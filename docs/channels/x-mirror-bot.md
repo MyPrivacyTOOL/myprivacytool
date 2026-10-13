@@ -8,11 +8,11 @@ account from public data. Code: `workers/social-listeners/src/mirror-bot.ts`, wi
 | User DM | Bot action |
 |---|---|
 | `MIRROR` | Sends the consent message (what is read, what is never read, no retention). **Scans nothing.** |
-| `MIRROR YES`, or just `Y` / `YES` | Consent. Looks up the sender's public profile, builds the mirror, DMs it. |
-| `MIRROR NO`, or just `N` / `NO` | Confirms nothing was scanned or stored. |
+| Just `Y` (or `yes`, `yeah`, `yep`, `yup`, any case; `MIRROR YES` also works) | Consent. Looks up the sender's public profile, builds the mirror, DMs it. |
+| `N` / `no` / `MIRROR NO` (accepted quietly; the consent message does not ask for it, ignoring it is a no) | Confirms nothing was scanned or stored. |
 | anything else | Forwarded to core-brain as before. |
 
-Commands are case/punctuation-insensitive (`y`, `Y`, `Yes` all work); our own DM echoes (`sender_id == for_user_id`) are ignored.
+Commands are case/punctuation-insensitive (`y`, `Y`, `Yes` all work; the consent message only asks the user to reply Y); our own DM echoes (`sender_id == for_user_id`) are ignored.
 
 ## Consent and no-retention guarantee
 

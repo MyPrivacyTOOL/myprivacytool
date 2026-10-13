@@ -24,13 +24,16 @@ export function parseMirrorCommand(text: unknown): MirrorCommand {
   return null;
 }
 
-/** A bare answer to the consent question: Y / YES / N / NO in any case. Only counts when our last DM to the sender was the consent request. */
+/**
+ * A bare answer to the consent question: any form of yes (y, Y, yes, yeah, yep, yup, in any case, punctuation ignored) or, quietly,
+ * any form of no. Only counts when our last DM to the sender was the consent request. The consent message only asks for the yes.
+ */
 export function parseBareReply(text: unknown): "consent" | "decline" | null {
   if (typeof text !== "string") return null;
   const words = text.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
   if (words.length !== 1) return null;
-  if (words[0] === "y" || words[0] === "yes") return "consent";
-  if (words[0] === "n" || words[0] === "no") return "decline";
+  if (/^(y|ye|yes+|yeah|yea|yep|yup)$/.test(words[0])) return "consent";
+  if (/^(n|no|nope)$/.test(words[0])) return "decline";
   return null;
 }
 
@@ -114,7 +117,7 @@ export const CONSENT_MESSAGE =
   "• I read your PUBLIC profile only (bio, location, link, join date, counts).\n" +
   "• I never read your DMs, email, phone, IP or private activity.\n" +
   "• I store nothing: no profile data, no message history. The result is built, sent to you and discarded.\n\n" +
-  "To start, reply Y (or MIRROR YES)\nTo cancel, reply N (or MIRROR NO)";
+  "To start, just reply Y.";
 
 /** First line of CONSENT_MESSAGE: how a later bare Y/N is recognised as answering it. */
 const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];

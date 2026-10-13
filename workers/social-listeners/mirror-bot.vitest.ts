@@ -59,7 +59,7 @@ describe("MIRROR flow over the X webhook", () => {
     const [url, init] = f.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/dm_conversations/with/42/messages");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer user");
-    expect(JSON.parse(init.body as string).text).toContain("MIRROR YES");
+    expect(JSON.parse(init.body as string).text).toContain("reply Y");
     expect(b.fetch).not.toHaveBeenCalled();
   });
 
@@ -178,9 +178,9 @@ describe("bare Y / N answers (MPC-7628)", () => {
   const asked = (ms = 60_000) => [{ sender_id: "999", text: CONSENT_MESSAGE, created_at: ago(ms) }, { sender_id: "42", text: "MIRROR", created_at: ago(ms + 5000) }];
 
   it("parses Y / YES / N / NO in any case and nothing else", () => {
-    for (const t of ["Y", "y", "Yes", "YES", " yes! "]) expect(parseBareReply(t)).toBe("consent");
-    for (const t of ["N", "n", "No", "NO"]) expect(parseBareReply(t)).toBe("decline");
-    for (const t of ["yes please", "maybe", "", "yy", undefined]) expect(parseBareReply(t)).toBeNull();
+    for (const t of ["Y", "y", "Yes", "YES", " yes! ", "yeah", "Yep", "yup", "YESS"]) expect(parseBareReply(t)).toBe("consent");
+    for (const t of ["N", "n", "No", "NO", "nope"]) expect(parseBareReply(t)).toBe("decline");
+    for (const t of ["yes please", "maybe", "", "yy", "you", "yo", "yesterday", undefined]) expect(parseBareReply(t)).toBeNull();
   });
   it("marks bare replies so they can be checked first", () => {
     expect(extractMirrorDms(JSON.parse(dm("42", "y")))).toEqual([{ senderId: "42", text: "y", command: "consent", bare: true }]);
@@ -196,7 +196,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     expect(JSON.parse((f.mock.calls[2][1] as RequestInit).body as string).text).toContain("hello world");
     expect(b.fetch).not.toHaveBeenCalled();
   });
-  it("a bare N right after the request declines and scans nothing", async () => {
+  it("a quiet N right after the request still declines and scans nothing", async () => {
     const f = x(asked());
     await post(dm("42", "N"), env());
     await settle();
@@ -231,5 +231,12 @@ describe("bare Y / N answers (MPC-7628)", () => {
     await settle();
     expect(f).not.toHaveBeenCalled();
     expect(b.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("consent wording (MPC-7628)", () => {
+  it("asks only for a Y and does not ask for a no", () => {
+    expect(CONSENT_MESSAGE).toContain("just reply Y");
+    expect(CONSENT_MESSAGE).not.toMatch(/reply N|MIRROR NO|cancel/i);
   });
 });
