@@ -7,6 +7,7 @@ import type { Env } from "./shared";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
 import { classifyTheme, recordXDm } from "./funnel";
+import { eraseContact, touchContact } from "./social";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
@@ -128,7 +129,7 @@ export const CONSENT_MESSAGE =
   "I can show you what a stranger can see about your X account using only public information.\n\n" +
   "• I read your PUBLIC profile only (bio, location, link, join date, counts).\n" +
   "• I never read your DMs, email, phone, IP or private activity.\n" +
-  "• I store nothing: no profile data, no message history. The result is built, sent to you and discarded.\n\n" +
+  "• I keep none of your profile data or messages: the result is built, sent to you and discarded. I only note that you got in touch (your @handle and the date). Send DELETE any time and I'll remove it.\n\n" +
   "To start, just reply Y.";
 
 /** The heading inside the consent request: how a later bare Y/N is recognised as answering it (the greeting comes before it). */
@@ -148,7 +149,7 @@ export const branded = (username: string | undefined, body: string): string => `
  * same CONSENT_MARKER as the full consent request, so a bare Y right after any of them counts as consent (see isConsentPending).
  */
 const MIRROR_OFFER =
-  `${CONSENT_MARKER}: reply Y and I'll show you what anyone can see on your PUBLIC X profile. I never read your DMs, and I store nothing.`;
+  `${CONSENT_MARKER}: reply Y and I'll show you what anyone can see on your PUBLIC X profile. I never read your DMs and keep none of your profile data.`;
 
 /** MPC-7628: answer to any other DM, sent straight away. No LLM. Asks what brought them here so the next step fits. */
 export const WELCOME_BODY =
@@ -160,6 +161,7 @@ export const WELCOME_BODY =
   `${MIRROR_OFFER}\n` +
   `🔎 Or run the free privacy scan: ${SCAN_URL}\n\n` +
   `${FOLLOW_LINE}\n\n` +
+  "Privacy: I only note that you got in touch (your @handle, never what you write). Send DELETE and I'll remove it.\n\n" +
   "Thank you for getting in touch.";
 export const WELCOME_MESSAGE = branded(undefined, WELCOME_BODY);
 
@@ -260,6 +262,25 @@ async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Pr
   return null;
 }
 
+/** Whether this person follows the account (user token, connection_status). Null when it cannot be told. */
+export async function fetchFollowsUs(env: Env, userId: string, log: Logger): Promise<boolean | null> {
+  if (!/^\d+$/.test(userId)) return null;
+  try {
+    const res = await xUser(env, log, `/users/${userId}?user.fields=connection_status`, { method: "GET" });
+    if (!res?.ok) return null;
+    const cs = ((await res.json()) as { data?: { connection_status?: unknown } }).data?.connection_status;
+    return Array.isArray(cs) ? cs.includes("followed_by") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Notes the activity in the CRM feed after the reply is out (so it never delays the reply). */
+async function noteContact(env: Env, senderId: string, handle: string | undefined, event: "dm" | "mirror_consent", log: Logger): Promise<void> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return;
+  await touchContact(env, senderId, handle, event, log, await fetchFollowsUs(env, senderId, log));
+}
+
 /**
  * Sends a DM with the user-context token (dm.write). Returns whether X accepted it.
  * With `video`, the Alice clip is attached; if it cannot be uploaded (or X refuses the attachment) the text goes alone.
@@ -325,13 +346,17 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
     if (dm.command === "request") {
       log.info("mirror_consent_requested");
       await recordXDm(env, "help", "x.mirror.request", log);
-      await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), CONSENT_MESSAGE), log);
+      const handle = await fetchUsername(env, dm.senderId);
+      await sendXDm(env, dm.senderId, branded(handle, CONSENT_MESSAGE), log);
+      await noteContact(env, dm.senderId, handle, "dm", log);
       return;
     }
     if (dm.command === "decline") {
       log.info("mirror_consent_declined");
       await recordXDm(env, "help", "x.mirror.decline", log);
-      await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), DECLINE_MESSAGE), log);
+      const handle = await fetchUsername(env, dm.senderId);
+      await sendXDm(env, dm.senderId, branded(handle, DECLINE_MESSAGE), log);
+      await noteContact(env, dm.senderId, handle, "dm", log);
       return;
     }
     log.info("mirror_consent_granted");
@@ -345,6 +370,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
     log.info("mirror_scan_complete");
     const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile) + `\n\n${FOLLOW_LINE}`), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
+    await noteContact(env, dm.senderId, profile.username, "mirror_consent", log);
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
@@ -360,4 +386,18 @@ export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: 
   const username = await fetchUsername(env, dm.senderId);
   const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply + "\n\nThank you!") : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
+  await noteContact(env, dm.senderId, username, "dm", log);
+}
+
+/** "Delete my data": removes the person from the CRM feed and says so. Rate limited like every DM we answer. */
+export async function handleDeleteDm(env: Env, dm: { senderId: string }, log: Logger): Promise<void> {
+  if (!(await allowed(env, dm.senderId, log))) return;
+  const done = await eraseContact(env, dm.senderId, log);
+  log.info(done ? "contact_erased" : "contact_erase_failed");
+  const username = await fetchUsername(env, dm.senderId);
+  await sendXDm(
+    env, dm.senderId,
+    branded(username, done ? "Done. I've removed your @handle and our record of your activity. We now hold nothing about you from X." : "Sorry, I couldn't remove that just now. Please send DELETE again in a few minutes."),
+    log,
+  );
 }
