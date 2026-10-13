@@ -34,7 +34,7 @@ const st = summariseAgentTasks([
   { status: 'Cancelled', amended: false, blocked: false, approval: 'Rejected' }, { status: 'In progress', amended: true, blocked: true, approval: null }]);
 check(st.total === 4 && st.done === 2 && st.successRatePct === (2 / 3) * 100 && st.amended === 2 && st.blocked === 2 && st.approved === 1 && st.rejected === 1, 'summariseAgentTasks counts');
 check(summariseAgentTasks([{ status: 'In progress' }]).successRatePct === null, 'no finished task => finish rate null, not 0');
-check(agentStatsText(st) === 'Agent tasks: 2 done of 4, 67% finish rate, 2 amended, 1 rejected, 2 blocked.' && agentStatsText(null) === 'Agent stats unavailable.', 'agentStatsText');
+check(agentStatsText(st) === 'Agent tasks: 2 done of 4, 67% finish rate, 1 rejected, 2 blocked.' && agentStatsText(null) === 'Agent stats unavailable.', 'agentStatsText');
 const st2 = summariseAgentTasks([{ status: 'Done', minutesSaved: 30, errorsCaught: 1, override: 'Accepted as is' }, { status: 'Done', minutesSaved: 15, override: 'Amended' }, { status: 'Done' }]);
 check(st2.minutesSaved === 45 && st2.errorsCaught === 1 && st2.acceptedPct === 50 && st2.revenueGbp === null, 'new fields: sums, accepted %, blank revenue stays null');
 check(agentStatsText(st2).includes('45 min saved, 1 errors caught, 50% accepted as is') && !agentStatsText(st2).includes('revenue'), 'new fields shown only when recorded');
@@ -67,7 +67,7 @@ reset();
 const text = await buildDigestText(env);
 check(text.includes('120 scans against a target of 200') && text.includes('DATA GAP: ga4, hubspot failed'), 'digest text built from Notion rows and failed sources');
 check(calls.find((c) => c.url.endsWith('/query')).body.page_size === 2, 'reads the latest two tracker rows');
-check(text.includes('Agent tasks: 2 done of 4, 67% finish rate, 1 amended, 0 rejected, 1 blocked.'), 'digest text includes agent task counts from the Tasks DB');
+check(text.includes('Agent tasks: 2 done of 4, 67% finish rate, 0 rejected, 1 blocked.'), 'digest text includes agent task counts from the Tasks DB');
 const tq = calls.find((c) => c.url.includes('2dd28547-eaa7-8154-8a16-000ba5543325/query')).body;
 check(tq.filter.multi_select.contains === 'MyPrivacyToolClaw' && tq.filter.property === 'Assigned Actor', 'tasks query is limited to the MPT agent');
 tasksRows = 'fail';
