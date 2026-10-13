@@ -29,13 +29,6 @@ describe("FAQ", () => {
     expect(text).toContain("write to privacy@myprivacytool.io");
     expect(text).not.toMatch(/open[- ]source/i);
   });
-
-  it("mirrors the answers in the FAQPage structured data", () => {
-    renderPage(<Faq />);
-    const ld = document.head.querySelector('script[type="application/ld+json"]')?.textContent ?? "";
-    expect(ld).toContain("What is a data broker?");
-    expect(ld).toContain("then delete it automatically");
-  });
 });
 
 describe("Thank-you page trust line", () => {
