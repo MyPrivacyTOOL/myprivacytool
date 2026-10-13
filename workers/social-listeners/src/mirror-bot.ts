@@ -53,7 +53,7 @@ export function selfId(p: any): string {
 }
 
 /** Sender id and text of one DM-shaped object, in the shapes X uses (legacy Account Activity and the newer dm.received event). */
-function dmFields(o: any): { sender: string; text: unknown } | null {
+function dmFields(o: any): { sender: string; text: string } | null {
   const sender = o.sender_id ?? o.sender?.id ?? o.from_user_id;
   const text = o.text ?? o.message_data?.text ?? (typeof o.message === "string" ? o.message : o.message?.text) ?? o.dm_event?.text;
   if ((typeof sender !== "string" && typeof sender !== "number") || typeof text !== "string") return null;
@@ -66,20 +66,30 @@ function dmFields(o: any): { sender: string; text: unknown } | null {
  * account the event was delivered for) are never commands.
  */
 export function extractMirrorDms(payload: unknown): MirrorDm[] {
-  const self = selfId(payload);
   const out: MirrorDm[] = [];
+  for (const { senderId, text } of extractDms(payload)) {
+    const command = parseMirrorCommand(text);
+    const bare = command ? null : parseBareReply(text);
+    if (command) out.push({ senderId, text, command });
+    else if (bare) out.push({ senderId, text, command: bare, bare: true });
+  }
+  return out;
+}
+
+/** Every inbound DM (any text) in an X webhook payload, own echoes excluded, duplicates collapsed. */
+export function extractDms(payload: unknown): { senderId: string; text: string }[] {
+  const self = selfId(payload);
+  const out: { senderId: string; text: string }[] = [];
   const seen = new Set<string>();
   const walk = (node: unknown, depth: number) => {
     if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
     if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1));
     const f = dmFields(node);
-    if (f) {
-      const command = parseMirrorCommand(f.text);
-      const bare = command ? null : parseBareReply(f.text);
+    if (f && f.sender !== self && f.text.trim()) {
       const key = `${f.sender}|${f.text}`;
-      if ((command || bare) && f.sender !== self && !seen.has(key)) {
+      if (!seen.has(key)) {
         seen.add(key);
-        out.push(command ? { senderId: f.sender, text: f.text, command } : { senderId: f.sender, text: f.text, command: bare!, bare: true });
+        out.push({ senderId: f.sender, text: f.text });
       }
     }
     for (const v of Object.values(node)) walk(v, depth + 1);
@@ -122,6 +132,12 @@ export const CONSENT_MESSAGE =
 /** First line of CONSENT_MESSAGE: how a later bare Y/N is recognised as answering it. */
 const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];
 const CONSENT_WINDOW_MS = 15 * 60_000;
+
+/** MPC-7628: answer to any other DM, sent straight away. No LLM, nothing stored. */
+export const WELCOME_MESSAGE =
+  "👋 Welcome to MyPrivacyTOOL. I'm an automated assistant, so I can't chat, but I can help in two ways:\n\n" +
+  "• Reply MIRROR for a free look at what your public X profile reveals. I ask for your OK first, and nothing is stored.\n" +
+  `• Or run our free privacy scan: ${SCAN_URL}`;
 
 export const DECLINE_MESSAGE = "No problem. Nothing was scanned and nothing was stored. Send MIRROR any time to try again.";
 export const ERROR_MESSAGE =
@@ -264,4 +280,11 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
+}
+
+/** Replies to a DM that is not a Mirror command. Same per-sender / global limits as Mirror, so it cannot be used to flood. */
+export async function handleOrdinaryDm(env: Env, dm: { senderId: string }, log: Logger): Promise<void> {
+  if (!(await allowed(env, dm.senderId, log))) return;
+  const sent = await sendXDm(env, dm.senderId, WELCOME_MESSAGE, log);
+  log.info(sent ? "welcome_sent" : "welcome_failed");
 }

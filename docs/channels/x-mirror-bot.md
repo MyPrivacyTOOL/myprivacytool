@@ -14,6 +14,10 @@ account from public data. Code: `workers/social-listeners/src/mirror-bot.ts`, wi
 
 Commands are case/punctuation-insensitive (`y`, `Y`, `Yes` all work; the consent message only asks the user to reply Y); our own DM echoes (`sender_id == for_user_id`) are ignored.
 
+## Other messages (instant welcome)
+
+Any DM that is not a Mirror command gets a fixed welcome straight away (`WELCOME_MESSAGE` in `mirror-bot.ts`): it says the account is automated, offers `MIRROR`, and links the UTM-tagged scan. No LLM and nothing stored. It uses the same per-sender and global rate limits as Mirror, and is never sent for our own messages or when the webhook does not carry our own account id. Legacy-shaped DMs are still forwarded to core-brain for its interaction log.
+
 ## Consent and no-retention guarantee
 
 - **A bare Y/N counts only as an answer to our consent request.** Still stateless: `isConsentPending` asks X for the last 5 DMs in that conversation and requires that OUR most recent message to the sender is the consent request (it starts with `🪞 MyPrivacyTOOL Mirror`) and was sent in the last 15 minutes. Anything else (no request, an older one, or the mirror result was the last thing we sent) is treated as an ordinary message and goes to core-brain as before. The lookup is rate limited like any Mirror command and needs the `dm.read` scope.

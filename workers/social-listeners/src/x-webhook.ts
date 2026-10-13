@@ -1,6 +1,6 @@
 // X (Twitter) Account Activity API listener: DM + mention events. Validate and route only.
 import { createLogger } from "./logger";
-import { type MirrorDm, describeShape, extractMirrorDms, handleMirrorDm, isConsentPending, selfId } from "./mirror-bot";
+import { type MirrorDm, describeShape, extractDms, extractMirrorDms, handleMirrorDm, handleOrdinaryDm, isConsentPending, selfId } from "./mirror-bot";
 import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
 const log = createLogger("social-listeners:x");
@@ -39,12 +39,18 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
   for (const dm of extractMirrorDms(payload)) {
     if (!dm.bare || (await isConsentPending(env, dm.senderId, selfId(payload), log))) mirrorDms.push(dm);
   }
-  if (mirrorDms.length > 0) {
-    const work = Promise.all(mirrorDms.map((dm) => handleMirrorDm(env, dm, log)));
+  // Any other DM gets the welcome reply straight away. Needs our own id so our own messages are never answered.
+  const me = selfId(payload);
+  const welcomed = me ? extractDms(payload).filter((d) => !mirrorDms.some((m) => m.senderId === d.senderId && m.text === d.text)) : [];
+  if (mirrorDms.length > 0 || welcomed.length > 0) {
+    const work = Promise.all([
+      ...mirrorDms.map((dm) => handleMirrorDm(env, dm, log)),
+      ...welcomed.map((dm) => handleOrdinaryDm(env, dm, log)),
+    ]);
     if (ctx?.waitUntil) ctx.waitUntil(work);
     else await work;
     const legacy = (payload as { direct_message_events?: any[] }).direct_message_events;
-    // Legacy payloads can mix MIRROR DMs with other events: forward only the rest. Any other shape is fully handled here.
+    // Legacy payloads can mix MIRROR DMs with other events: forward only the rest (welcomed DMs still reach core-brain's log). Any other shape is fully handled here.
     if (!Array.isArray(legacy)) return new Response("OK");
     const rest = legacy.filter(
       (e) => !mirrorDms.some((d) => d.senderId === String(e?.message_create?.sender_id) && d.text === e?.message_create?.message_data?.text),

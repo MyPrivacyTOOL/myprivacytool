@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
-import { CONSENT_MESSAGE, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
+import { CONSENT_MESSAGE, WELCOME_MESSAGE, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const dm = (sender: string, text: string, forUser = "999") =>
@@ -92,13 +92,34 @@ describe("MIRROR flow over the X webhook", () => {
     expect(JSON.parse((f.mock.calls[1][1] as RequestInit).body as string).text).toContain("couldn't complete");
   });
 
-  it("still forwards ordinary DMs to core-brain", async () => {
+  it("still forwards ordinary DMs to core-brain, and welcomes the sender straight away", async () => {
     const b = brain();
-    const f = vi.spyOn(globalThis, "fetch");
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     const r = await post(dm("42", "hello"), env(b));
     expect(r.status).toBe(200);
+    await new Promise((x) => setTimeout(x, 0));
     expect(b.fetch).toHaveBeenCalledTimes(1);
+    expect(f).toHaveBeenCalledTimes(1);
+    expect(String(f.mock.calls[0][0])).toContain("/dm_conversations/with/42/messages");
+    expect(JSON.parse((f.mock.calls[0][1] as RequestInit).body as string).text).toBe(WELCOME_MESSAGE);
+  });
+  it("never answers our own messages, or any DM when our own id is unknown", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+    await post(dm("999", "hello"), env());
+    await post(JSON.stringify({ direct_message_events: [{ type: "message_create", message_create: { sender_id: "42", message_data: { text: "hello" } } }] }), env());
+    await new Promise((x) => setTimeout(x, 0));
     expect(f).not.toHaveBeenCalled();
+  });
+  it("welcomes a dm.received DM that is not a command", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+    const body = JSON.stringify({ data: { event_type: "dm.received", filter: { user_id: "999" }, payload: { sender_id: "42", text: "hi there" } } });
+    expect((await post(body, env())).status).toBe(200);
+    await new Promise((x) => setTimeout(x, 0));
+    expect(String(f.mock.calls[0][0])).toContain("/dm_conversations/with/42/messages");
+  });
+  it("the welcome offers MIRROR and a tagged scan link", () => {
+    expect(WELCOME_MESSAGE).toContain("MIRROR");
+    expect(WELCOME_MESSAGE).toContain("utm_source=x&utm_medium=channel_osint");
   });
 });
 
@@ -207,7 +228,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     const b = brain(); const f = x([{ sender_id: "42", text: "hi", created_at: ago(1000) }]);
     await post(dm("42", "y"), env(b));
     await settle();
-    expect(urls(f).some((u) => u.includes("/users/") || u.includes("/messages"))).toBe(false);
+    expect(urls(f).some((u) => u.includes("/users/"))).toBe(false);
     expect(b.fetch).toHaveBeenCalledTimes(1);
   });
   it("a bare Y after the mirror result (our last message was not the request) does not scan again", async () => {
