@@ -31,6 +31,21 @@ describe("Pricing analytics (MPC-7376)", () => {
     });
     expect(screen.getByLabelText("Plan")).toHaveValue("Pro");
   });
+
+  // CK-7721 C: real plan interest, the only valid price evidence while paid plans are not open. No personal data in the event.
+  it("fires pricing_plan_click for the business quote link", () => {
+    renderPage(<Pricing />);
+    fireEvent.click(screen.getByRole("link", { name: "Talk to us about business plans" }));
+    expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", { plan: "business", cta_location: "pricing_card", destination: "/business" });
+  });
+
+  it("sends nothing and does not throw when analytics consent was not given (no gtag)", () => {
+    delete window.gtag;
+    renderPage(<Pricing />);
+    expect(() => fireEvent.click(screen.getAllByRole("button", { name: "Join the waitlist" })[1])).not.toThrow();
+    expect(() => fireEvent.click(screen.getByRole("link", { name: "Talk to us about business plans" }))).not.toThrow();
+    expect(gtag).not.toHaveBeenCalled();
+  });
 });
 
 describe("Pricing waitlist (MPC-7626)", () => {
