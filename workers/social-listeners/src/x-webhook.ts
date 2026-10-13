@@ -1,6 +1,7 @@
 // X (Twitter) Account Activity API listener: DM + mention events. Validate and route only.
 import { createLogger } from "./logger";
-import { type MirrorDm, describeShape, extractDms, extractMirrorDms, handleMirrorDm, handleOrdinaryDm, isConsentPending, selfId } from "./mirror-bot";
+import { type MirrorDm, describeShape, extractDms, extractMirrorDms, handleDeleteDm, handleMirrorDm, handleOrdinaryDm, isConsentPending, selfId } from "./mirror-bot";
+import { extractEngagement, isDeleteRequest, touchContact } from "./social";
 import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
 const log = createLogger("social-listeners:x");
@@ -33,7 +34,7 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
   const payload = parseJson(raw);
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
 
-  // MPC-7628: MIRROR DMs are answered here (consent -> public scan -> educational DM) and never stored or forwarded.
+  // MPC-7628: MIRROR DMs are answered here (consent -> public scan -> educational DM); the scan result and message text are never stored.
   // A bare Y/N counts only when it answers our consent request (checked against the DM history, nothing stored); otherwise it is an ordinary message.
   const mirrorDms: MirrorDm[] = [];
   for (const dm of extractMirrorDms(payload)) {
@@ -41,24 +42,36 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
   }
   // Any other DM gets the welcome reply straight away. Needs our own id so our own messages are never answered.
   const me = selfId(payload);
-  const welcomed = me ? extractDms(payload).filter((d) => !mirrorDms.some((m) => m.senderId === d.senderId && m.text === d.text)) : [];
-  if (mirrorDms.length > 0 || welcomed.length > 0) {
+  const others = me ? extractDms(payload).filter((d) => !mirrorDms.some((m) => m.senderId === d.senderId && m.text === d.text)) : [];
+  const deletes = others.filter((d) => isDeleteRequest(d.text));
+  const welcomed = others.filter((d) => !isDeleteRequest(d.text));
+
+  // Follows, likes, shares and mentions go into the CRM feed. They still flow on to core-brain below.
+  const engagement = me ? extractEngagement(payload, me) : [];
+  if (engagement.length > 0) {
+    const noted = Promise.all(engagement.map((e) => touchContact(env, e.userId, e.handle, e.event, log, e.event === "follow" ? true : undefined)));
+    if (ctx?.waitUntil) ctx.waitUntil(noted);
+    else await noted;
+  }
+
+  if (mirrorDms.length > 0 || welcomed.length > 0 || deletes.length > 0) {
     const work = Promise.all([
       ...mirrorDms.map((dm) => handleMirrorDm(env, dm, log)),
       ...welcomed.map((dm) => handleOrdinaryDm(env, dm, log)),
+      ...deletes.map((dm) => handleDeleteDm(env, dm, log)),
     ]);
     if (ctx?.waitUntil) ctx.waitUntil(work);
     else await work;
     const legacy = (payload as { direct_message_events?: any[] }).direct_message_events;
     // Legacy payloads can mix MIRROR DMs with other events: forward only the rest (every DM we answer is counted in the funnel by funnel.ts instead, so core-brain does not log it twice). Any other shape is fully handled here.
     if (!Array.isArray(legacy)) return new Response("OK");
-    const handled = [...mirrorDms, ...welcomed];
+    const handled = [...mirrorDms, ...welcomed, ...deletes];
     const rest = legacy.filter(
       (e) => !handled.some((d) => d.senderId === String(e?.message_create?.sender_id) && d.text === e?.message_create?.message_data?.text),
     );
-    const others = { ...(payload as object), direct_message_events: rest } as { tweet_create_events?: unknown[] };
-    if (rest.length === 0 && !others.tweet_create_events?.length) return new Response("OK");
-    return (await forwardToCoreBrain(env, { source: "x", receivedAt: new Date().toISOString(), payload: others }, log))
+    const remaining = { ...(payload as object), direct_message_events: rest } as { tweet_create_events?: unknown[] };
+    if (rest.length === 0 && !remaining.tweet_create_events?.length) return new Response("OK");
+    return (await forwardToCoreBrain(env, { source: "x", receivedAt: new Date().toISOString(), payload: remaining }, log))
       ? new Response("OK") : new Response("Upstream Unavailable", { status: 502 });
   }
   log.info("x_event_received", describeShape(payload)); // names only: lets an unfamiliar event shape be diagnosed from logs

@@ -676,5 +676,25 @@ select pg_temp.assert(pg_temp.try_as('service_role', $$select 1 from public.mpt_
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.mpt_x_oauth_tokens$$) = '42501', 'mpt_x_oauth_tokens: anon cannot read');
 select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.mpt_x_oauth_tokens$$) = '42501', 'mpt_x_oauth_tokens: authenticated cannot read');
 
+-- ===== MPC-7628: social activity feed (X people who follow / DM / like / share us; no message text) =====
+select pg_temp.assert((select bool_and(relforcerowsecurity and relrowsecurity) from pg_class where oid in ('public.social_contacts'::regclass, 'public.social_events'::regclass)), 'social_*: RLS enabled and forced');
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.social_contacts$$) = '42501' and pg_temp.try_as('authenticated', $$select 1 from public.social_events$$) = '42501', 'social_*: anon and authenticated cannot read');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_social_touch('x','1','a','dm')$$) = '42501', 'mpt_social_touch: anon cannot call it');
+set local role service_role;
+select public.mpt_social_touch('x', '777001', 'alice_99', 'dm', true);
+select public.mpt_social_touch('x', '777001', null, 'follow');
+select public.mpt_social_touch('x', '777002', 'bob', 'like');
+select pg_temp.assert((select event_count = 2 and handle = 'alice_99' and follows_us from public.social_contacts where platform_user_id = '777001'), 'mpt_social_touch: one contact per user, counts events, keeps the handle and follows_us when a later event has none');
+select pg_temp.assert((select count(*) from public.social_events e join public.social_contacts c on c.id = e.contact_id where c.platform_user_id = '777001') = 2, 'mpt_social_touch: one event row per call');
+select pg_temp.assert((select hubspot_synced_at is null from public.social_contacts where platform_user_id = '777001'), 'mpt_social_touch: new activity marks the contact as needing a HubSpot sync');
+reset role;
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_touch('x','1','a','nonsense')$$) = '22023', 'mpt_social_touch: unknown event types are refused');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_touch('X!','1','a','dm')$$) = '23514', 'social_contacts: platform must be a lower-case slug');
+set local role service_role;
+select pg_temp.assert(public.mpt_erase_social_contact('x', '777001') = 1 and (select count(*) from public.social_contacts where platform_user_id = '777001') = 0 and (select count(*) from public.social_events) = 1, 'mpt_erase_social_contact: removes the contact and its events, others stay');
+update public.social_contacts set retain_until = now() - interval '1 day' where platform_user_id = '777002';
+select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 1, 'mpt_purge_expired_social_contacts: removes expired contacts');
+reset role;
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
