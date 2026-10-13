@@ -82,6 +82,35 @@ describe("getUserAccessToken", () => {
     expect(await getUserAccessToken({}, log)).toBeNull();
   });
 
+  it("does NOT refresh when the token store cannot be read (the refresh token would be burned), and uses the static token", async () => {
+    const calls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+      calls.push(String(u));
+      if (String(u).startsWith("https://sb.test")) return new Response("relation does not exist", { status: 404 });
+      return Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 });
+    });
+    expect(await getUserAccessToken(base, log)).toBe("static");
+    expect(calls.some((c) => c.includes("api.x.com"))).toBe(false);
+  });
+
+  it("does not refresh when Supabase is not configured at all", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+    expect(await getUserAccessToken({ X_CLIENT_ID: "c", X_CLIENT_SECRET: "s", X_REFRESH_TOKEN: "r", X_USER_ACCESS_TOKEN: "static" }, log)).toBe("static");
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it("retries saving the new pair once, and still returns the new token if saving fails", async () => {
+    let writes = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+      const url = String(u);
+      if (url.startsWith("https://sb.test") && init?.method === "POST") { writes++; return new Response("no", { status: 500 }); }
+      if (url.startsWith("https://sb.test")) return Response.json([]);
+      return Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 });
+    });
+    expect(await getUserAccessToken(base, log)).toBe("new-access");
+    expect(writes).toBe(2);
+  });
+
   it("never logs token values", async () => {
     world(null);
     await getUserAccessToken(base, log);
