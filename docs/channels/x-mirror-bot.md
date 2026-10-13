@@ -22,7 +22,7 @@ Every DM we send opens with who we are and ends with the same signature, so it i
 
 The @handle comes from a public lookup of the sender (`fetchUsername`, bearer token); if it fails the greeting simply leaves the handle out.
 
-Any DM that is not a Mirror command gets the welcome straight away (`WELCOME_BODY`): what we do in one line, that this is an automated assistant, a "what brought you here?" question (reply 1, 2 or 3, or free text), then two simple options: reply **Y** for the Mirror, or the UTM-tagged free scan, and a thank-you. A plain **Y** (any case) right after the welcome, a 1/2/3 reply or the full consent request counts as consent: the Mirror offer carries the same `🪞 MyPrivacyTOOL Mirror` heading that `isConsentPending` looks for in our last message (15 minute window). Typing `MIRROR` still works.
+Any DM that is not a Mirror command gets the welcome straight away (`WELCOME_BODY`): what we do in one line, that this is an automated assistant, a "what brought you here?" question (reply 1, 2 or 3, or free text), then two simple options: reply **Y** for the Mirror, or the UTM-tagged free scan, and a thank-you. A plain **Y** (any case) right after the welcome, a 1/2/3 reply or the full consent request counts as consent: the Mirror offer carries the same `🪞 MyPrivacyTOOL Mirror` heading that `isConsentPending` looks for in our last message (15 minute window). Typing `MIRROR` still works. The welcome and the mirror result also carry a one-tap follow link (`FOLLOW_LINE`, X's follow intent page): a reply cannot make someone follow us, so we link it.
 
 1/2/3 get a tailored reply (`INTENT_REPLIES`). No LLM; same per-sender and global rate limits as Mirror; never sent for our own messages or when the webhook does not carry our own account id.
 

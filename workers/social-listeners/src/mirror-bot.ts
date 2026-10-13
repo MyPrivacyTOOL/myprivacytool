@@ -135,6 +135,9 @@ export const CONSENT_MESSAGE =
 const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];
 const CONSENT_WINDOW_MS = 15 * 60_000;
 
+/** One-tap follow (X's own follow intent page). A reply cannot make someone follow us, so we link it. */
+export const FOLLOW_LINE = "👉 Follow @MyPrivacyTOOL for privacy alerts: https://x.com/intent/follow?screen_name=MyPrivacyTOOL";
+
 /** Every message we send opens with who we are (so it is easy to find in the inbox and remembered as the brand) and ends with the same signature. */
 export const SIGNATURE = "— @MyPrivacyTOOL · myprivacytool.io";
 export const greeting = (username?: string): string => `Hello${username ? ` @${username}` : ""}, this is @MyPrivacyTOOL 👋`;
@@ -156,6 +159,7 @@ export const WELCOME_BODY =
   "3. I'm just exploring\n\n" +
   `${MIRROR_OFFER}\n` +
   `🔎 Or run the free privacy scan: ${SCAN_URL}\n\n` +
+  `${FOLLOW_LINE}\n\n` +
   "Thank you for getting in touch.";
 export const WELCOME_MESSAGE = branded(undefined, WELCOME_BODY);
 
@@ -339,7 +343,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile)), log, { video: true });
+    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile) + `\n\n${FOLLOW_LINE}`), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });

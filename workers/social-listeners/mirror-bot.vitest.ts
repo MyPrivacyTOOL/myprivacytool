@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
+import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
 import { CONSENT_MESSAGE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
 
@@ -451,5 +452,12 @@ describe("Channel OSINT funnel counting (MPC-7628)", () => {
     expect(classifyTheme("we are a company looking at your API")).toBe("business");
     expect(classifyTheme("just curious what is out there about me")).toBe("curious");
     expect(classifyTheme("hello")).toBe("other");
+  });
+});
+
+describe("follow link (MPC-7628)", () => {
+  it("the welcome offers a one-tap follow", () => {
+    expect(WELCOME_BODY).toContain(FOLLOW_LINE);
+    expect(FOLLOW_LINE).toContain("https://x.com/intent/follow?screen_name=MyPrivacyTOOL");
   });
 });
