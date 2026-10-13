@@ -691,9 +691,11 @@ reset role;
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_touch('x','1','a','nonsense')$$) = '22023', 'mpt_social_touch: unknown event types are refused');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_touch('X!','1','a','dm')$$) = '23514', 'social_contacts: platform must be a lower-case slug');
 set local role service_role;
-select pg_temp.assert(public.mpt_erase_social_contact('x', '777001') = 1 and (select count(*) from public.social_contacts where platform_user_id = '777001') = 0 and (select count(*) from public.social_events) = 1, 'mpt_erase_social_contact: removes the contact and its events, others stay');
+select pg_temp.assert(public.mpt_erase_social_contact('x', '777001') = 1, 'mpt_erase_social_contact: returns the number of contacts removed');
+select pg_temp.assert((select count(*) from public.social_contacts where platform_user_id = '777001') = 0 and (select count(*) from public.social_events) = 1, 'mpt_erase_social_contact: removes the contact and its events, others stay');
 update public.social_contacts set retain_until = now() - interval '1 day' where platform_user_id = '777002';
-select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 1, 'mpt_purge_expired_social_contacts: removes expired contacts');
+select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 1, 'mpt_purge_expired_social_contacts: returns the number removed');
+select pg_temp.assert((select count(*) from public.social_contacts) = 0, 'mpt_purge_expired_social_contacts: removes expired contacts');
 reset role;
 
 rollback;
