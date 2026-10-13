@@ -130,15 +130,49 @@ export const CONSENT_MESSAGE =
   "• I store nothing: no profile data, no message history. The result is built, sent to you and discarded.\n\n" +
   "To start, just reply Y.";
 
-/** First line of CONSENT_MESSAGE: how a later bare Y/N is recognised as answering it. */
+/** The heading inside the consent request: how a later bare Y/N is recognised as answering it (the greeting comes before it). */
 const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];
 const CONSENT_WINDOW_MS = 15 * 60_000;
 
-/** MPC-7628: answer to any other DM, sent straight away. No LLM, nothing stored. */
-export const WELCOME_MESSAGE =
-  "👋 Welcome to MyPrivacyTOOL. I'm an automated assistant, so I can't chat, but I can help in two ways:\n\n" +
-  "• Reply MIRROR for a free look at what your public X profile reveals. I ask for your OK first, and nothing is stored.\n" +
-  `• Or run our free privacy scan: ${SCAN_URL}`;
+/** Every message we send opens with who we are (so it is easy to find in the inbox and remembered as the brand) and ends with the same signature. */
+export const SIGNATURE = "— @MyPrivacyTOOL · myprivacytool.io";
+export const greeting = (username?: string): string => `Hello${username ? ` @${username}` : ""}, this is @MyPrivacyTOOL 👋`;
+export const branded = (username: string | undefined, body: string): string => `${greeting(username)}\n\n${body}\n\n${SIGNATURE}`;
+
+/**
+ * The Mirror offer used in the welcome and the follow-ups: a plain "reply Y". It names exactly what is read, and its heading is the
+ * same CONSENT_MARKER as the full consent request, so a bare Y right after any of them counts as consent (see isConsentPending).
+ */
+const MIRROR_OFFER =
+  `${CONSENT_MARKER}: reply Y and I'll show you what anyone can see on your PUBLIC X profile. I never read your DMs, and I store nothing.`;
+
+/** MPC-7628: answer to any other DM, sent straight away. No LLM. Asks what brought them here so the next step fits. */
+export const WELCOME_BODY =
+  "We show you what the internet can learn about you, and how to take control of it. I'm an automated assistant.\n\n" +
+  "What brought you here? Reply 1, 2 or 3, or tell us in your own words:\n" +
+  "1. I'm curious what's out there about me\n" +
+  "2. I'm worried about something specific\n" +
+  "3. I'm just exploring\n\n" +
+  `${MIRROR_OFFER}\n` +
+  `🔎 Or run the free privacy scan: ${SCAN_URL}\n\n` +
+  "Thank you for getting in touch.";
+export const WELCOME_MESSAGE = branded(undefined, WELCOME_BODY);
+
+/** Replies to "1" / "2" / "3". Only the number is logged (aggregate counts), never who sent it. */
+export const INTENT_REPLIES: Record<string, string> = {
+  "1":
+    "Thank you, that's exactly what we're here for.\n\n" +
+    `${MIRROR_OFFER}\n` +
+    `🔎 Or run the free scan to see what your browser, device and email reveal: ${SCAN_URL}`,
+  "2":
+    "Thank you for telling me, and I'm sorry you're dealing with that. If you feel unsafe, please contact your local authorities first.\n\n" +
+    `🔎 To see what about you is exposed and get step-by-step fixes, run the free scan: ${SCAN_URL}\n` +
+    MIRROR_OFFER,
+  "3":
+    "Welcome! MyPrivacyTOOL shows you what's visible about you online, explains why it matters in plain language, and walks you through taking it back.\n\n" +
+    `${MIRROR_OFFER}\n` +
+    `🔎 Or start with the free scan: ${SCAN_URL}`,
+};
 
 export const DECLINE_MESSAGE = "No problem. Nothing was scanned and nothing was stored. Send MIRROR any time to try again.";
 export const ERROR_MESSAGE =
@@ -196,6 +230,18 @@ export async function fetchPublicProfile(env: Env, userId: string): Promise<XPro
   const res = await xFetch(env, `/users/${userId}?user.fields=${fields}`, { method: "GET", token: env.X_BEARER_TOKEN });
   if (!res.ok) return null;
   return ((await res.json()) as { data?: XProfile }).data ?? null;
+}
+
+/** Public @handle for a user id (app bearer token), or undefined: the greeting then simply leaves the handle out. */
+export async function fetchUsername(env: Env, userId: string): Promise<string | undefined> {
+  if (!/^\d+$/.test(userId) || !env.X_BEARER_TOKEN) return undefined;
+  try {
+    const res = await xFetch(env, `/users/${userId}?user.fields=username`, { method: "GET", token: env.X_BEARER_TOKEN });
+    const u = res.ok ? ((await res.json()) as { data?: { username?: unknown } }).data?.username : undefined;
+    return typeof u === "string" && /^\w{1,15}$/.test(u) ? u : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Calls X with the user-context token. Refreshes the token and retries once on 401. Null when no token can be had. */
@@ -261,7 +307,7 @@ export async function isConsentPending(env: Env, senderId: string, selfId: strin
     if (!res?.ok) return false;
     const events = ((await res.json()) as { data?: { sender_id?: string; text?: string; created_at?: string }[] }).data ?? [];
     const mine = events.find((e) => String(e.sender_id) === selfId); // X lists newest first
-    return Boolean(mine?.text?.startsWith(CONSENT_MARKER) && Date.now() - Date.parse(mine.created_at ?? "") < CONSENT_WINDOW_MS);
+    return Boolean(mine?.text?.includes(CONSENT_MARKER) && Date.now() - Date.parse(mine.created_at ?? "") < CONSENT_WINDOW_MS);
   } catch {
     return false;
   }
@@ -273,23 +319,23 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
     if (!dm.bare && !(await allowed(env, dm.senderId, log))) return; // dropped silently: replying would cost credits too (bare replies were limited by isConsentPending)
     if (dm.command === "request") {
       log.info("mirror_consent_requested");
-      await sendXDm(env, dm.senderId, CONSENT_MESSAGE, log);
+      await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), CONSENT_MESSAGE), log);
       return;
     }
     if (dm.command === "decline") {
       log.info("mirror_consent_declined");
-      await sendXDm(env, dm.senderId, DECLINE_MESSAGE, log);
+      await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), DECLINE_MESSAGE), log);
       return;
     }
     log.info("mirror_consent_granted");
     const profile = await fetchPublicProfile(env, dm.senderId);
     if (!profile) {
       log.warn("mirror_scan_failed");
-      await sendXDm(env, dm.senderId, ERROR_MESSAGE, log);
+      await sendXDm(env, dm.senderId, branded(await fetchUsername(env, dm.senderId), ERROR_MESSAGE), log);
       return;
     }
     log.info("mirror_scan_complete");
-    const sent = await sendXDm(env, dm.senderId, buildMirrorMessage(profile), log, { video: true });
+    const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile)), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
@@ -297,8 +343,12 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
 }
 
 /** Replies to a DM that is not a Mirror command. Same per-sender / global limits as Mirror, so it cannot be used to flood. */
-export async function handleOrdinaryDm(env: Env, dm: { senderId: string }, log: Logger): Promise<void> {
+export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: string }, log: Logger): Promise<void> {
   if (!(await allowed(env, dm.senderId, log))) return;
-  const sent = await sendXDm(env, dm.senderId, WELCOME_MESSAGE, log, { video: true });
+  const choice = dm.text?.trim().replace(/[.!)]$/, "");
+  const reply = choice && /^[123]$/.test(choice) ? INTENT_REPLIES[choice] : undefined;
+  if (reply) log.info("intent_choice", { choice }); // a count by number only, never tied to the sender
+  const username = await fetchUsername(env, dm.senderId);
+  const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply + "\n\nThank you!") : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
 }

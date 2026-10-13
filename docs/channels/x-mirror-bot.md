@@ -14,9 +14,19 @@ account from public data. Code: `workers/social-listeners/src/mirror-bot.ts`, wi
 
 Commands are case/punctuation-insensitive (`y`, `Y`, `Yes` all work; the consent message only asks the user to reply Y); our own DM echoes (`sender_id == for_user_id`) are ignored.
 
-## Other messages (instant welcome)
+## Voice, welcome and intent (instant reply)
 
-Any DM that is not a Mirror command gets a fixed welcome straight away (`WELCOME_MESSAGE` in `mirror-bot.ts`): it says the account is automated, offers `MIRROR`, and links the UTM-tagged scan. No LLM and nothing stored. It uses the same per-sender and global rate limits as Mirror, and is never sent for our own messages or when the webhook does not carry our own account id. Legacy-shaped DMs are still forwarded to core-brain for its interaction log.
+Every DM we send opens with who we are and ends with the same signature, so it is easy to find in the inbox and the brand is remembered:
+
+`Hello @username, this is @MyPrivacyTOOL 👋` ... body ... `— @MyPrivacyTOOL · myprivacytool.io`
+
+The @handle comes from a public lookup of the sender (`fetchUsername`, bearer token); if it fails the greeting simply leaves the handle out.
+
+Any DM that is not a Mirror command gets the welcome straight away (`WELCOME_BODY`): what we do in one line, that this is an automated assistant, a "what brought you here?" question (reply 1, 2 or 3, or free text), then two simple options: reply **Y** for the Mirror, or the UTM-tagged free scan, and a thank-you. A plain **Y** (any case) right after the welcome, a 1/2/3 reply or the full consent request counts as consent: the Mirror offer carries the same `🪞 MyPrivacyTOOL Mirror` heading that `isConsentPending` looks for in our last message (15 minute window). Typing `MIRROR` still works.
+
+1/2/3 get a tailored reply (`INTENT_REPLIES`) and log only `intent_choice` with the number (aggregate counts, never tied to the sender). No LLM; same per-sender and global rate limits as Mirror; never sent for our own messages or when the webhook does not carry our own account id. Legacy-shaped DMs are still forwarded to core-brain for its interaction log.
+
+Not yet built: capturing free-text intent (what they typed) for analysis. It needs a decision on what we may keep, because the Mirror promises to store nothing.
 
 ## Alice clip on DMs
 

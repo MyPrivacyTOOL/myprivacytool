@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
-import { CONSENT_MESSAGE, WELCOME_MESSAGE, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
+import { CONSENT_MESSAGE, INTENT_REPLIES, WELCOME_BODY, WELCOME_MESSAGE, branded, greeting, buildMirrorMessage, describeShape, extractMirrorDms, parseBareReply, parseMirrorCommand } from "./src/mirror-bot";
 
 const sig = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const dm = (sender: string, text: string, forUser = "999") =>
@@ -13,6 +13,8 @@ const env = (b = brain()) => ({ MEDIA_VIDEO_URL: "off", X_CONSUMER_SECRET: "xs",
 const post = (body: string, e: object) =>
   worker.fetch(new Request("https://w/webhook/x", { method: "POST", body, headers: { "X-Twitter-Webhooks-Signature": sig(body) } }), e as never, { waitUntil: () => {} } as never);
 
+/** The fetch calls a test cares about: the greeting's @handle lookup is incidental. */
+const calls = (f: { mock: { calls: any[][] } }) => f.mock.calls.filter((c) => !String(c[0]).includes("user.fields=username"));
 afterEach(() => { vi.restoreAllMocks(); resetTokenCache(); });
 
 describe("parseMirrorCommand", () => {
@@ -55,8 +57,8 @@ describe("MIRROR flow over the X webhook", () => {
     const r = await post(dm("42", "MIRROR"), env(b));
     expect(r.status).toBe(200);
     await new Promise((x) => setTimeout(x, 0));
-    expect(f).toHaveBeenCalledTimes(1);
-    const [url, init] = f.mock.calls[0] as [string, RequestInit];
+    expect(calls(f)).toHaveLength(1);
+    const [url, init] = calls(f)[0] as [string, RequestInit];
     expect(url).toContain("/dm_conversations/with/42/messages");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer user");
     expect(JSON.parse(init.body as string).text).toContain("reply Y");
@@ -70,17 +72,17 @@ describe("MIRROR flow over the X webhook", () => {
     const r = await post(dm("42", "MIRROR YES"), env());
     expect(r.status).toBe(200);
     await new Promise((x) => setTimeout(x, 0));
-    const urls = f.mock.calls.map((c) => String(c[0]));
+    const urls = calls(f).map((c) => String(c[0]));
     expect(urls[0]).toContain("/users/42?user.fields=");
     expect(urls[1]).toContain("/dm_conversations/with/42/messages");
-    expect(JSON.parse((f.mock.calls[1][1] as RequestInit).body as string).text).toContain("hello world");
+    expect(JSON.parse((calls(f)[1][1] as RequestInit).body as string).text).toContain("hello world");
   });
 
   it("MIRROR NO scans nothing", async () => {
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     await post(dm("42", "mirror no"), env());
     await new Promise((x) => setTimeout(x, 0));
-    expect(f.mock.calls.map((c) => String(c[0])).some((u) => u.includes("/users/"))).toBe(false);
+    expect(calls(f).map((c) => String(c[0])).some((u) => u.includes("/users/"))).toBe(false);
   });
 
   it("sends an apology DM when the scan fails", async () => {
@@ -89,7 +91,7 @@ describe("MIRROR flow over the X webhook", () => {
     );
     await post(dm("42", "MIRROR YES"), env());
     await new Promise((x) => setTimeout(x, 0));
-    expect(JSON.parse((f.mock.calls[1][1] as RequestInit).body as string).text).toContain("couldn't complete");
+    expect(JSON.parse((calls(f)[1][1] as RequestInit).body as string).text).toContain("couldn't complete");
   });
 
   it("still forwards ordinary DMs to core-brain, and welcomes the sender straight away", async () => {
@@ -99,26 +101,26 @@ describe("MIRROR flow over the X webhook", () => {
     expect(r.status).toBe(200);
     await new Promise((x) => setTimeout(x, 0));
     expect(b.fetch).toHaveBeenCalledTimes(1);
-    expect(f).toHaveBeenCalledTimes(1);
-    expect(String(f.mock.calls[0][0])).toContain("/dm_conversations/with/42/messages");
-    expect(JSON.parse((f.mock.calls[0][1] as RequestInit).body as string).text).toBe(WELCOME_MESSAGE);
+    expect(calls(f)).toHaveLength(1);
+    expect(String(calls(f)[0][0])).toContain("/dm_conversations/with/42/messages");
+    expect(JSON.parse((calls(f)[0][1] as RequestInit).body as string).text).toBe(WELCOME_MESSAGE);
   });
   it("never answers our own messages, or any DM when our own id is unknown", async () => {
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     await post(dm("999", "hello"), env());
     await post(JSON.stringify({ direct_message_events: [{ type: "message_create", message_create: { sender_id: "42", message_data: { text: "hello" } } }] }), env());
     await new Promise((x) => setTimeout(x, 0));
-    expect(f).not.toHaveBeenCalled();
+    expect(calls(f)).toHaveLength(0);
   });
   it("welcomes a dm.received DM that is not a command", async () => {
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     const body = JSON.stringify({ data: { event_type: "dm.received", filter: { user_id: "999" }, payload: { sender_id: "42", text: "hi there" } } });
     expect((await post(body, env())).status).toBe(200);
     await new Promise((x) => setTimeout(x, 0));
-    expect(String(f.mock.calls[0][0])).toContain("/dm_conversations/with/42/messages");
+    expect(String(calls(f)[0][0])).toContain("/dm_conversations/with/42/messages");
   });
-  it("the welcome offers MIRROR and a tagged scan link", () => {
-    expect(WELCOME_MESSAGE).toContain("MIRROR");
+  it("the welcome offers the Mirror and a tagged scan link", () => {
+    expect(WELCOME_MESSAGE).toContain("Mirror");
     expect(WELCOME_MESSAGE).toContain("utm_source=x&utm_medium=channel_osint");
   });
 });
@@ -140,7 +142,7 @@ describe("new dm.received event shape (MPC-7628)", () => {
     const r = await post(body, env(b));
     expect(r.status).toBe(200);
     await new Promise((x) => setTimeout(x, 0));
-    expect(String(f.mock.calls[0][0])).toContain("/dm_conversations/with/42/messages");
+    expect(String(calls(f)[0][0])).toContain("/dm_conversations/with/42/messages");
     expect(b.fetch).not.toHaveBeenCalled();
   });
   it("describeShape reports names only", () => {
@@ -155,26 +157,26 @@ describe("rate limit, retry and tagging (MPC-7628)", () => {
     await post(dm("42", "MIRROR YES"), { ...env(), RATE_LIMITER: limited });
     await new Promise((x) => setTimeout(x, 0));
     expect(limited.limit).toHaveBeenCalledWith({ key: "x:42" });
-    expect(f).not.toHaveBeenCalled();
+    expect(calls(f)).toHaveLength(0);
   });
   it("fails open when the limiter throws", async () => {
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
     await post(dm("42", "MIRROR"), { ...env(), RATE_LIMITER: { limit: vi.fn(async () => { throw new Error("down"); }) } });
     await new Promise((x) => setTimeout(x, 0));
-    expect(f).toHaveBeenCalledTimes(1);
+    expect(calls(f)).toHaveLength(1);
   });
   it("retries the DM once with a refreshed token after a 401", async () => {
     let first = true;
     const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
       if (String(u).startsWith("https://sb.test")) return Response.json([]);
       if (String(u).includes("oauth2/token")) return Response.json({ access_token: "fresh", refresh_token: "r2", expires_in: 7200 });
-      if (first) { first = false; return new Response("expired", { status: 401 }); }
+      if (first && String(u).includes("/dm_conversations/")) { first = false; return new Response("expired", { status: 401 }); }
       return new Response("{}");
     });
     const e = { ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", X_CLIENT_ID: "c", X_CLIENT_SECRET: "s", X_REFRESH_TOKEN: "boot" };
     await post(dm("77", "MIRROR"), e);
     await new Promise((x) => setTimeout(x, 20));
-    const dms = f.mock.calls.filter((c) => String(c[0]).includes("/dm_conversations/"));
+    const dms = calls(f).filter((c) => String(c[0]).includes("/dm_conversations/"));
     expect(dms).toHaveLength(2);
     expect((dms[1][1]!.headers as Record<string, string>).Authorization).toBe("Bearer fresh");
   });
@@ -194,7 +196,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
       return new Response("{}");
     });
   }
-  const urls = (f: ReturnType<typeof x>) => f.mock.calls.map((c) => String(c[0]));
+  const urls = (f: ReturnType<typeof x>) => calls(f).map((c) => String(c[0]));
   const settle = () => new Promise((r) => setTimeout(r, 0));
   const asked = (ms = 60_000) => [{ sender_id: "999", text: CONSENT_MESSAGE, created_at: ago(ms) }, { sender_id: "42", text: "MIRROR", created_at: ago(ms + 5000) }];
 
@@ -214,7 +216,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     expect(u[0]).toContain("/dm_conversations/with/42/dm_events");
     expect(u[1]).toContain("/users/42");
     expect(u[2]).toContain("/dm_conversations/with/42/messages");
-    expect(JSON.parse((f.mock.calls[2][1] as RequestInit).body as string).text).toContain("hello world");
+    expect(JSON.parse((calls(f)[2][1] as RequestInit).body as string).text).toContain("hello world");
     expect(b.fetch).not.toHaveBeenCalled();
   });
   it("a quiet N right after the request still declines and scans nothing", async () => {
@@ -222,7 +224,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     await post(dm("42", "N"), env());
     await settle();
     expect(urls(f).some((u) => u.includes("/users/42"))).toBe(false);
-    expect(JSON.parse((f.mock.calls[1][1] as RequestInit).body as string).text).toContain("Nothing was scanned");
+    expect(JSON.parse((calls(f)[1][1] as RequestInit).body as string).text).toContain("Nothing was scanned");
   });
   it("a bare Y with no consent request behind it is an ordinary message for core-brain", async () => {
     const b = brain(); const f = x([{ sender_id: "42", text: "hi", created_at: ago(1000) }]);
@@ -250,7 +252,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     const limited = { limit: vi.fn(async () => ({ success: false })) };
     await post(dm("42", "y"), { ...env(b), RATE_LIMITER: limited });
     await settle();
-    expect(f).not.toHaveBeenCalled();
+    expect(calls(f)).toHaveLength(0);
     expect(b.fetch).toHaveBeenCalledTimes(1);
   });
 });
@@ -317,5 +319,65 @@ describe("Alice clip on DMs (MPC-7628)", () => {
     await settle();
     expect(x.steps).toEqual([]);
     expect(x.sent).toEqual([{ text: WELCOME_MESSAGE }]);
+  });
+});
+
+describe("branding, welcome and simple Y (MPC-7628)", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+  const sentText = (f: ReturnType<typeof vi.spyOn>) =>
+    calls(f as never).filter((c) => String(c[0]).includes("/messages")).map((c) => JSON.parse((c[1] as RequestInit).body as string).text as string);
+  /** Fake X: handle lookup, DM history for sender 42 (newest first) and DM sends. */
+  const x = (history: { sender_id: string; text: string; created_at: string }[] = []) =>
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+      const url = String(u);
+      if (url.includes("/dm_events")) return Response.json({ data: history });
+      if (url.includes("user.fields=username")) return Response.json({ data: { username: "alice_99" } });
+      if (url.includes("/users/42")) return Response.json({ data: { username: "alice_99", description: "hello", protected: false } });
+      return new Response("{}");
+    });
+
+  it("every message opens with who we are, using the person's @handle, and ends with the signature", async () => {
+    const f = x();
+    await post(dm("42", "hi"), env());
+    await settle();
+    const [text] = sentText(f);
+    expect(text.startsWith("Hello @alice_99, this is @MyPrivacyTOOL")).toBe(true);
+    expect(text.endsWith("— @MyPrivacyTOOL · myprivacytool.io")).toBe(true);
+  });
+  it("leaves the handle out when it cannot be looked up", () => {
+    expect(greeting()).toBe("Hello, this is @MyPrivacyTOOL 👋");
+    expect(greeting("bob")).toBe("Hello @bob, this is @MyPrivacyTOOL 👋");
+  });
+  it("the welcome asks for a simple Y, says what is read, and no longer asks for the word MIRROR", () => {
+    expect(WELCOME_BODY).toMatch(/reply Y/);
+    expect(WELCOME_BODY).toContain("PUBLIC X profile");
+    expect(WELCOME_BODY).not.toMatch(/reply MIRROR/i);
+  });
+  it("asks what brought them here", () => expect(WELCOME_BODY).toContain("What brought you here?"));
+  it("a Y straight after the welcome runs the Mirror, with thanks and the handle", async () => {
+    const f = x([{ sender_id: "999", text: branded("alice_99", WELCOME_BODY), created_at: new Date(Date.now() - 30_000).toISOString() }]);
+    await post(dm("42", "y"), env());
+    await settle();
+    const [text] = sentText(f);
+    expect(text).toContain("Thank you for saying yes.");
+    expect(text).toContain("Your Mirror");
+    expect(text.startsWith("Hello @alice_99")).toBe(true);
+  });
+  it("answers 1, 2 and 3 with a tailored next step that still takes a Y, and logs only the number", async () => {
+    for (const n of ["1", "2", "3"]) {
+      const f = x();
+      await post(dm("42", n), env());
+      await settle();
+      const [text] = sentText(f);
+      expect(text).toContain(INTENT_REPLIES[n].split("\n")[0]);
+      expect(text).toMatch(/reply Y/);
+      vi.restoreAllMocks();
+    }
+  });
+  it("does not treat object keys like 'constructor' as a choice", async () => {
+    const f = x();
+    await post(dm("42", "constructor"), env());
+    await settle();
+    expect(sentText(f)[0]).toContain("What brought you here?");
   });
 });
