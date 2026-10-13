@@ -2,9 +2,9 @@
 // sequences (MPC-7450). The landing page (MPC-7446) and the day-10 email (MPC-7448) read from here only.
 //
 // !! IVR_VERIFIED = false !!  The hotline, the 1357 caller-ID prefix and the 10-working-day rule come from the
-// OFCA public FAQ. The key presses live in hkDncIvr.json: the language keys and the "register a number" key were
-// REPORTED on one call (2026-10-11); the register and confirm keys are still guesses. They need a trilingual
-// speaker (MPC-7445 / MPC-7450-A2; docs/hk-dnc-ivr-procedure.md). While IVR_VERIFIED is false the page must stay noindex,
+// OFCA public FAQ. The key presses live in hkDncIvr.json: they were typed down by hand from a real call on 2026-10-13
+// (language, then service, then 1 = register the number you call from; star = back to menu). No key is VERIFIED until
+// the tap-to-dial flow has worked on real phones (MPC-7540). While IVR_VERIFIED is false the page must stay noindex,
 // unlinked and without paid traffic, and must not claim that the keys auto-send correctly.
 //
 // OFCA cannot register on the user's behalf: the call has to come from the number being registered, so the
@@ -31,7 +31,9 @@ export function parseHkSpamEnabled(raw: unknown): boolean {
 
 export const HK_SPAM_ENABLED: boolean = parseHkSpamEnabled(import.meta.env.VITE_HK_SPAM_ENABLED);
 
-export type HkRegister = "sms" | "prerecorded" | "fax" | "all";
+/** "all" registers short messages and then pre-recorded in ONE call (star goes back to the menu in between).
+ *  Fax is left out on purpose: the hotline offers it but nobody uses it. */
+export type HkRegister = "sms" | "prerecorded" | "all";
 export type HkLanguage = "en" | "yue";
 export type HkPlatform = "android" | "ios" | "other";
 
@@ -41,12 +43,12 @@ export interface IvrKey {
   /** DTMF character: 0-9, * or #. */
   key: string;
   /** What the key is for, shown on screen (iOS / desktop) as the manual script. */
-  purpose: "language" | "menu" | "register" | "confirm";
+  purpose: "language" | "service" | "register" | "back";
   /** UNVERIFIED = guess, REPORTED = heard once, VERIFIED = confirmed. */
   status: IvrStatus;
 }
 
-export const HK_REGISTERS: readonly HkRegister[] = ["sms", "prerecorded", "fax", "all"];
+export const HK_REGISTERS: readonly HkRegister[] = ["sms", "prerecorded", "all"];
 
 // The keys and pauses live in hkDncIvr.json so they can be changed later without touching code.
 interface KeyEntry {
@@ -54,28 +56,36 @@ interface KeyEntry {
   status: IvrStatus;
 }
 interface IvrData {
-  pauses: { beforeFirstKey: number; betweenKeys: number };
+  pauses: { beforeFirstKey: number; betweenKeys: number; afterRegister: number };
   language: Record<HkLanguage, KeyEntry>;
-  menu: KeyEntry;
-  registers: Record<HkRegister, [KeyEntry, KeyEntry]>;
+  services: Record<"sms" | "prerecorded", KeyEntry>;
+  register: KeyEntry;
+  back: KeyEntry;
 }
 export const IVR_DATA: IvrData = ivrJson as unknown as IvrData;
 
 /**
- * Android dialers treat "," as a ~2 second pause. UNVERIFIED: the real greeting and prompt lengths are only
- * roughly known (about 10-12 s before the language menu), so these are deliberately generous.
+ * Android dialers treat "," as a ~2 second pause. UNVERIFIED on a real phone. The hotline accepts keys before the
+ * spoken menu ends, so the pauses are short; afterRegister waits for the "registered" message before pressing star.
  */
 export const PAUSES = IVR_DATA.pauses;
 
-/** The ordered keys to press for a language and register: language, menu, register choice, confirm. */
-export function getIvrKeys(register: HkRegister, language: HkLanguage = "en"): IvrKey[] {
-  const [choice, confirm] = IVR_DATA.registers[register];
+/** Ordered keys for one service: service choice, then 1 = register the number you are calling from. */
+function serviceKeys(service: "sms" | "prerecorded"): IvrKey[] {
   return [
-    { ...IVR_DATA.language[language], purpose: "language" },
-    { ...IVR_DATA.menu, purpose: "menu" },
-    { ...choice, purpose: "register" },
-    { ...confirm, purpose: "confirm" },
+    { ...IVR_DATA.services[service], purpose: "service" },
+    { ...IVR_DATA.register, purpose: "register" },
   ];
+}
+
+/**
+ * The ordered keys to press: language, then service + register for each service. "all" chains short messages and
+ * pre-recorded in one call, pressing star (back to menu) in between.
+ */
+export function getIvrKeys(register: HkRegister, language: HkLanguage = "en"): IvrKey[] {
+  const lang: IvrKey = { ...IVR_DATA.language[language], purpose: "language" };
+  if (register === "sms" || register === "prerecorded") return [lang, ...serviceKeys(register)];
+  return [lang, ...serviceKeys("sms"), { ...IVR_DATA.back, purpose: "back" }, ...serviceKeys("prerecorded")];
 }
 
 export interface DialOptions {
@@ -100,7 +110,8 @@ export interface DialResult {
 // tel: URIs: keep "," (pause) literal, percent-encode everything else (notably # and *, which would otherwise
 // be read as a URL fragment / reserved character).
 function encodeTelSegment(s: string): string {
-  return encodeURIComponent(s).replace(/%2C/gi, ",");
+  // encodeURIComponent leaves "*" alone, so encode it explicitly (star = back to menu); "#" is already encoded.
+  return encodeURIComponent(s).replace(/%2C/gi, ",").replace(/\*/g, "%2A");
 }
 
 export function buildDialString(platform: HkPlatform, options: DialOptions = {}): DialResult {
@@ -109,7 +120,11 @@ export function buildDialString(platform: HkPlatform, options: DialOptions = {})
   const keys = getIvrKeys(register, language);
 
   if (platform === "android") {
-    const parts = keys.map((k, i) => ",".repeat(i === 0 ? PAUSES.beforeFirstKey : PAUSES.betweenKeys) + k.key);
+    // A longer wait before star lets the "registered" message play first.
+    const parts = keys.map((k, i) => {
+      const pause = i === 0 ? PAUSES.beforeFirstKey : k.purpose === "back" ? PAUSES.afterRegister : PAUSES.betweenKeys;
+      return ",".repeat(pause) + k.key;
+    });
     return {
       platform,
       dial: `tel:${encodeTelSegment(number + parts.join(""))}`,

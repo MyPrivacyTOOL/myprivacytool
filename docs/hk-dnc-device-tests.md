@@ -4,12 +4,12 @@
 
 **Status of this matrix:** the dial strings are exact (unit-tested). The sandbox that built this has no phone, no browser on a handset and no network route to a hotline, so **no cell below has been run on a real device**. "Expected" is what the platforms are documented/commonly reported to do; each one needs confirming on the handset named.
 
-## What the function returns (register `all`, language `en`; keys from `src/config/hkDncIvr.json`, language and menu keys reported once, register and confirm keys still guesses)
+## What the function returns (register `all`, language `en`; keys from `src/config/hkDncIvr.json`, typed down by hand from a real call on 2026-10-13: language 3 = English, then service 3 = short messages, 1 = register this number, `*` = back to menu, then service 1 = pre-recorded, 1 = register this number)
 
 | Platform | `dial` | `manualKeys` | `autoKeys` |
 |----------|--------|--------------|------------|
-| `android` | `tel:13571835000,,,,,,3,,,1,,,1,,,1` | `[]` | true |
-| `ios` | `tel:13571835000` | `[language, menu, register, confirm]` shown on screen | false |
+| `android` | `tel:13571835000,,,3,,3,,1,,,,,,,,%2A,,1,,1` | `[]` | true |
+| `ios` | `tel:13571835000` | `[language, service, register, back, service, register]` shown on screen | false |
 | `other` (desktop, unknown) | `tel:13571835000` | same as iOS | false |
 
 `,` = pause (about 2 s on Android; `PAUSES` in the config). `#` and `*`, if the real menu needs them, are percent-encoded (`%23`, `%2A`). `tel:1835000` without the 1357 prefix is available with `forceCallerId: false`.

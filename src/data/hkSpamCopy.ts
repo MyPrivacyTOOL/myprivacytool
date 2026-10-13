@@ -34,7 +34,7 @@ export interface HkCopy {
     keysHidden: HkStep;
     finish: HkStep;
   };
-  keyPurpose: { language: string; menu: string; register: string; confirm: string };
+  keyPurpose: { language: string; service: string; register: string; back: string };
   press: string;
   keysFallback: string;
   doneTitle: string;
@@ -119,10 +119,10 @@ export const EN: HkCopy = {
     dial: { title: "Your phone dials", body: "It dials 1357 first, so your caller ID is shown, then the hotline 1835000. It must be the phone you want to protect." },
     keysManual: { title: "Press the keys shown", body: "When the recording plays, press these keys on the keypad, in this order:" },
     keysAuto: { title: "Watch the keys", body: "Some Android dialers send the keys for you after short pauses. If the menu does not respond, press them yourself:" },
-    keysHidden: { title: "Follow the spoken menu", body: "Listen to the recording, choose the option to register this number (all registers if offered) and confirm when asked." },
+    keysHidden: { title: "Follow the spoken menu", body: "Choose your language, then pick the Short Messages service and choose the option to register the number you are calling from. Go back to the menu and do the same for Pre-recorded Messages." },
     finish: { title: "Hang up, then tap Done", body: "Hang up after the confirmation message, come back to this page and tap Done to see your protection date." },
   },
-  keyPurpose: { language: "language", menu: "register a number", register: "register", confirm: "confirm" },
+  keyPurpose: { language: "language", service: "service", register: "register this number", back: "back to menu" },
   press: "Press",
   keysFallback: "Keys on screen",
   doneTitle: "Finished the call?",
@@ -193,7 +193,7 @@ export const EN: HkCopy = {
     },
     {
       q: "Which registers does this cover?",
-      a: "Hong Kong has three: the Short Messages register, the Pre-recorded register and the Fax register. There is no email register.",
+      a: "Hong Kong has three: the Short Messages register, the Pre-recorded register and the Fax register. This page registers the first two, which cover SMS and MMS and pre-recorded calls. Fax is left out because it is rarely used. There is no email register.",
     },
     {
       q: "How do I check or cancel my registration?",
@@ -238,10 +238,10 @@ export const ZH: HkCopy = {
     dial: { title: "手機自動撥號", body: "先撥 1357 以顯示你的來電號碼，再撥熱線 1835000。必須使用你想登記的手機。" },
     keysManual: { title: "按下顯示的數字", body: "錄音播出時，請按次序在數字鍵盤按下：" },
     keysAuto: { title: "留意按鍵", body: "部分 Android 撥號程式會在短暫停頓後自動送出按鍵。如選單沒有反應，請自行按下：" },
-    keysHidden: { title: "跟隨語音選單", body: "留心收聽錄音，選擇登記此號碼的選項（如有提供，請選擇所有登記冊），並在提示時確認。" },
+    keysHidden: { title: "跟隨語音選單", body: "先選擇語言，再選「短訊」服務，並選擇登記你正在使用的號碼。然後返回選單，為「預錄訊息」重複同樣步驟。" },
     finish: { title: "掛線，然後按「完成」", body: "聽到確認訊息後掛線，返回本頁並按「完成」，便可看到保障生效日期。" },
   },
-  keyPurpose: { language: "語言", menu: "登記號碼", register: "登記冊", confirm: "確認" },
+  keyPurpose: { language: "語言", service: "服務", register: "登記此號碼", back: "返回選單" },
   press: "按",
   keysFallback: "畫面顯示的按鍵",
   doneTitle: "通話完成了嗎？",
@@ -311,7 +311,7 @@ export const ZH: HkCopy = {
     },
     {
       q: "這涵蓋哪些登記冊？",
-      a: "香港設有三個登記冊：短訊登記冊、預錄訊息登記冊和傳真登記冊。沒有電郵登記冊。",
+      a: "香港設有三個登記冊：短訊登記冊、預錄訊息登記冊和傳真登記冊。本頁登記首兩個，涵蓋短訊及多媒體訊息和預錄電話訊息；傳真登記冊甚少人使用，所以不包括在內。沒有電郵登記冊。",
     },
     {
       q: "如何查詢或取消登記？",
