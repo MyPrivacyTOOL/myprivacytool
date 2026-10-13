@@ -1,0 +1,23 @@
+# mpt-partner-api: B2B partner API (MPC-7651). MyPrivacyTOOL Cloudflare account.
+# NOT deployed by any workflow yet: see README.md "Before go-live". Logic: api.ts. Spec: GET /v1/openapi.json.
+name = "mpt-partner-api"
+main = "worker.ts"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+[vars]
+SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
+# No breach provider on purpose (same rule as mpt-mirror-risk, MPC-7252): with none every email lookup is "not_checked" and is NOT billed.
+# Set BREACH_PROVIDER = "hibp" and `wrangler secret put HIBP_API_KEY` only when the revenue phase licence is in place.
+
+[observability]
+enabled = true
+
+# Per-API-key limit (60 requests / 60s) and the same binding keyed by IP for failed auth. Code fails open if the binding is missing.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "7651001"
+simple = { limit = 60, period = 60 }
+
+# Secrets are not declared here. Expected names: EXPECTED_SECRETS.txt
