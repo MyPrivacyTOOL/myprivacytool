@@ -9,6 +9,8 @@ export interface Env {
   X_CLIENT_ID?: string;
   X_CLIENT_SECRET?: string;
   X_REFRESH_TOKEN?: string;
+  /** Override for the clip attached to Mirror/welcome DMs (default: https://myprivacytool.io/media/alice-curtain.mp4); "off" sends text only. */
+  MEDIA_VIDEO_URL?: string;
   SUPABASE_URL?: string;
   SUPABASE_KEY?: string;
   /** Workers Rate Limiting bindings for the Mirror bot (MPC-7628). Missing = no limit (fails open). */

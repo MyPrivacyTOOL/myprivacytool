@@ -18,6 +18,10 @@ Commands are case/punctuation-insensitive (`y`, `Y`, `Yes` all work; the consent
 
 Any DM that is not a Mirror command gets a fixed welcome straight away (`WELCOME_MESSAGE` in `mirror-bot.ts`): it says the account is automated, offers `MIRROR`, and links the UTM-tagged scan. No LLM and nothing stored. It uses the same per-sender and global rate limits as Mirror, and is never sent for our own messages or when the webhook does not carry our own account id. Legacy-shaped DMs are still forwarded to core-brain for its interaction log.
 
+## Alice clip on DMs
+
+The welcome reply and the mirror DM carry a 6 s clip of Alice opening the curtain (`public/media/alice-curtain.mp4`, served at `https://myprivacytool.io/media/alice-curtain.mp4`). The worker fetches it, uploads it to X with the chunked v2 flow (`x-media.ts`, `media_category=dm_video`) and attaches the media id to the DM. This needs the `media.write` scope on the user token. If the upload fails for any reason (missing scope, X error, clip unreachable) or X refuses the attachment, the same DM is sent as text alone. Set `MEDIA_VIDEO_URL=off` to turn the clip off.
+
 ## Consent and no-retention guarantee
 
 - **A bare Y/N counts only as an answer to our consent request.** Still stateless: `isConsentPending` asks X for the last 5 DMs in that conversation and requires that OUR most recent message to the sender is the consent request (it starts with `🪞 MyPrivacyTOOL Mirror`) and was sent in the last 15 minutes. Anything else (no request, an older one, or the mirror result was the last thing we sent) is treated as an ordinary message and goes to core-brain as before. The lookup is rate limited like any Mirror command and needs the `dm.read` scope.
