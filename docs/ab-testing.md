@@ -54,6 +54,7 @@ from referrals where invite_variant is not null group by 1;
 | Date | Experiment | Event |
 |---|---|---|
 | 2026-10-13 | `pricing_headline`, `pricing_cta`, `pricing_tiers`, `pricing_social_proof` | Copy approved; `VITE_AB_PRICING_*_ENABLED=true` set in Cloudflare Pages Production and the site rebuilt. Earliest readout 14 days after the start date (MPC-7638). |
+| 2026-10-13 | `pricing_tiers`, `pricing_social_proof` | Switched off (flags removed in Cloudflare Pages) to concentrate low traffic (about 6 sessions/day) on `pricing_headline` and `pricing_cta`. Code unchanged; unset flag means everyone sees the control. Headline and CTA data collected so far stays valid; ignore tiers/trust-line data from the first hours (MPC-7638). |
 
 ## How it behaves
 - Variant picked once per browser tab session (`sessionStorage`), weighted random. Closing the tab forgets it, so nothing identifies a person across visits.
