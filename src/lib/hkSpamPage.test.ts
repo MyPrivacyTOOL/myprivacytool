@@ -47,8 +47,8 @@ describe("detectHkPlatform", () => {
 });
 
 describe("resolveHkDial", () => {
-  it("the real engine flag is still unverified (do not flip before MPC-7445)", () => {
-    expect(IVR_VERIFIED).toBe(false);
+  it("the real engine flag is verified (keys confirmed on real calls, 2026-10-14)", () => {
+    expect(IVR_VERIFIED).toBe(true);
   });
 
   it("public audience while unverified: bare dial, no keys, no auto-key claim, on every platform", () => {
@@ -70,8 +70,10 @@ describe("resolveHkDial", () => {
     expect(a.dial).toContain(",");
     expect(a.keys.map((k) => k.purpose)).toEqual(["language", "service", "register", "back", "service", "register"]);
     const i = resolveHkDial("ios", "en", true);
-    expect(i.autoKeys).toBe(false);
-    expect(i.dial).toBe("tel:13571835000");
+    expect(i.autoKeys).toBe(true);
+    expect(i.dial).toBe(a.dial);
+    expect(i.largeKeys).toBe(true);
+    expect(a.largeKeys).toBe(false);
     expect(i.keysUnverified).toBe(true);
   });
 

@@ -1,0 +1,247 @@
+{
+  "library": "alice",
+  "version": "0.1.0-draft",
+  "locked": false,
+  "fps": 30,
+  "canvas": {
+    "vertical": [
+      1080,
+      1920
+    ],
+    "horizontal": [
+      1920,
+      1080
+    ],
+    "thumbnail": [
+      1280,
+      720
+    ]
+  },
+  "voice": {
+    "engine": "kokoro-en-v0_19 via sherpa-onnx",
+    "voice": "bf_isabella",
+    "speaker_id": 8,
+    "speed": 0.95,
+    "pitch_semitones": -1,
+    "loudness_lufs": -18
+  },
+  "proportions": {
+    "status": "provisional",
+    "head_units_full_height": 6.0,
+    "tolerance_pct": 3
+  },
+  "palette": {
+    "green": "#2EA05A"
+  },
+  "legacy_clips": {
+    "count": 15,
+    "size_px": [
+      560,
+      560
+    ],
+    "policy": "reference only; stored outside git until a person uploads them to reference-clips/"
+  },
+  "open_decisions": [
+    "Produce or commission the high-resolution master art (faces, poses, expressions, layered source). Not possible in-repo.",
+    "Measure the final art and replace provisional proportions (status -> measured).",
+    "Read and log Kokoro v0.19 bf_isabella voice-pack terms for commercial use.",
+    "Record provenance/licence of the master artwork (field `provenance`) before lock.",
+    "Upload the 15 legacy 560 px clips to reference-clips/ if they should be archived here."
+  ],
+  "provenance": null,
+  "assets": [
+    {
+      "id": "face-front",
+      "path": "faces/alice_face_front_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-three-quarter-left",
+      "path": "faces/alice_face_three-quarter-left_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-three-quarter-right",
+      "path": "faces/alice_face_three-quarter-right_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-profile-left",
+      "path": "faces/alice_face_profile-left_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-profile-right",
+      "path": "faces/alice_face_profile-right_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "pose-standing-neutral",
+      "path": "poses/alice_pose_standing-neutral_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-curtain-pull",
+      "path": "poses/alice_pose_curtain-pull_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-gesture-open",
+      "path": "poses/alice_pose_gesture-open_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-pointing",
+      "path": "poses/alice_pose_pointing_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-thinking",
+      "path": "poses/alice_pose_thinking_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-surprised",
+      "path": "poses/alice_pose_surprised_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "expr-neutral",
+      "path": "expressions/alice_expr_neutral_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "expr-curious",
+      "path": "expressions/alice_expr_curious_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "expr-concerned",
+      "path": "expressions/alice_expr_concerned_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "expr-surprised",
+      "path": "expressions/alice_expr_surprised_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "expr-warm-smile",
+      "path": "expressions/alice_expr_warm-smile_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "expr-thinking",
+      "path": "expressions/alice_expr_thinking_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "expr-reassuring",
+      "path": "expressions/alice_expr_reassuring_v1.0.png",
+      "kind": "expression",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 1024
+    },
+    {
+      "id": "anim-layered-master",
+      "path": "animations/alice_anim_layered-master_v1.0.psd",
+      "kind": "animation-source",
+      "required": true,
+      "status": "missing"
+    },
+    {
+      "id": "anim-curtain-reveal",
+      "path": "animations/alice_anim_curtain-reveal_v1.0.mp4",
+      "kind": "animation",
+      "required": true,
+      "status": "missing"
+    },
+    {
+      "id": "voice-ref-neutral",
+      "path": "voice/alice_voice_ref-neutral_v1.0.wav",
+      "kind": "voice",
+      "required": true,
+      "status": "missing"
+    },
+    {
+      "id": "voice-ref-question",
+      "path": "voice/alice_voice_ref-question_v1.0.wav",
+      "kind": "voice",
+      "required": true,
+      "status": "missing"
+    },
+    {
+      "id": "voice-ref-warning",
+      "path": "voice/alice_voice_ref-warning_v1.0.wav",
+      "kind": "voice",
+      "required": true,
+      "status": "missing"
+    },
+    {
+      "id": "interim-reference",
+      "path": "../../video-scripts/assets/alice.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x736 curtain-pull drawing with curtain/code. Soft when enlarged. Replace with the locked curtain-pull pose."
+    }
+  ],
+  "approved_decisions": [
+    "Proposed framing pixel rules (full/medium/close) and the 1920x1080 horizontal canvas are approved as the v1 working values.",
+    "Proposed blink, head, gesture and pause timings are approved as the v1 working values.",
+    "Proposed proportions are approved as provisional targets; they must be replaced by values measured from the final art before lock.",
+    "Voice stays Kokoro v0.19 bf_isabella as shipped; no paid TTS or custom recording for v1."
+  ]
+}

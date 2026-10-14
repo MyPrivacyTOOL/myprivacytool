@@ -40,9 +40,37 @@ function whoami(request, cors, rlState) {
   });
 }
 
+// CK-7721 fix 4: retention for the Notion leads database. The Privacy Policy keeps lead records for 24 months after last engagement; every
+// submission creates its own Notion page, so a page's created time is its last engagement. Older pages are ARCHIVED (Notion keeps archived
+// pages in its trash for 30 days, then deletes them). Counts only are logged: never a name or an email. Fail-soft; at most LEAD_PURGE_LIMIT per run.
+export const LEAD_RETENTION_MONTHS = 24;
+const LEAD_PURGE_LIMIT = 100;
+export async function purgeOldLeads(env, now = new Date(), fetchImpl = fetch) {
+  if (!env.NOTION_TOKEN || !env.LEADS_DB_ID) return { archived: 0, skipped: 'notion not configured' };
+  const cutoff = new Date(now); cutoff.setUTCMonth(cutoff.getUTCMonth() - LEAD_RETENTION_MONTHS);
+  const headers = { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' };
+  let archived = 0;
+  try {
+    const q = await fetchImpl(`https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ page_size: LEAD_PURGE_LIMIT, filter: { timestamp: 'created_time', created_time: { before: cutoff.toISOString() } } }),
+    });
+    if (!q.ok) { console.error('lead purge query failed:', q.status); return { archived, failed: `query ${q.status}` }; }
+    for (const page of (await q.json()).results || []) {
+      const r = await fetchImpl(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', headers, body: JSON.stringify({ archived: true }) });
+      if (r.ok) archived++; else console.error('lead purge archive failed:', r.status);
+    }
+  } catch (e) { console.error('lead purge error:', String(e).slice(0, 200)); }
+  if (archived) console.log(`lead purge: archived ${archived} Notion lead page(s) older than ${LEAD_RETENTION_MONTHS} months`);
+  return { archived };
+}
+
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweepPending(env).catch((e) => console.error('Sweep error:', String(e))));
+    // The cron runs every 5 minutes; the retention purge runs once a day, on the 19:00 UTC tick (03:00 HKT).
+    const t = new Date(event.scheduledTime ?? Date.now());
+    if (t.getUTCHours() === 19 && t.getUTCMinutes() < 5) ctx.waitUntil(purgeOldLeads(env, t).catch((e) => console.error('Lead purge error:', String(e))));
   },
 
   async fetch(request, env, ctx) {
@@ -249,7 +277,7 @@ export default {
           `Email: ${slackEsc(email)}`,
           phone ? `Phone: ${slackEsc(phone)}` : null,
           ``,
-          `IP: ${ip || '—'} | ${city || '—'}, ${country || '—'}`,
+          `Country: ${country || '—'}`,   // CK-7721 fix 4: no IP address or city in Slack (data minimisation); the full detail stays in the Notion lead row until it expires
           `Browser: ${browser || '—'} | OS: ${os || '—'} | Device: ${device || '—'}`,
           ``,
           `Other Info: ${slackEsc(otherInfo)}`,

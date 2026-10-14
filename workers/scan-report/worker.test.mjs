@@ -50,7 +50,7 @@ check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includ
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [] }; const calls = []; let n = 0;
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [] }; const calls = []; let n = 0;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -65,6 +65,7 @@ function fake(opts = {}) {
     }
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
+    if (o.method === 'DELETE' && q.get('email')) { const v = decodeURIComponent(q.get('email').replace(/^(eq|ilike)\./, '')).replace(/\\(.)/g, '$1').toLowerCase(); db[t] = db[t].filter((x) => String(x.email).toLowerCase() !== v); return res(204); }   // CK-7721 fix 3
     if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
@@ -232,6 +233,7 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const peek = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`), OB, {});
   const peekHtml = await peek.text();
   check(peek.status === 200 && !F.db.users[0].email_opt_out_at && /<form method="POST"/.test(peekHtml) && /noindex/.test(peekHtml) && !peekHtml.includes(EMAIL), 'unsubscribe: GET (what a mail scanner does) only shows a confirm page, opts nobody out, does not print the address');
+  F.db.subscribers.push({ id: 's1', email: EMAIL.replace(/^./, (c) => c.toUpperCase()) }, { id: 's2', email: 'other@example.com' });   // CK-7721 fix 3: the newsletter row, stored with different case
   const sentBefore = resendCount(F);
   const good = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
   check(good.status === 200 && F.db.users[0].email_opt_out_at && /You are unsubscribed/.test(await good.text()), 'unsubscribe: POST (button or one-click) opts the user out');
@@ -240,6 +242,8 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const ucBody = uc[0] ? JSON.parse(uc[0].body) : {};
   check(uc.length === 1 && ucBody.subject === 'You are unsubscribed' && /no more scan report or follow-up emails/.test(ucBody.text) && /privacy@myprivacytool\.io/.test(ucBody.text), 'unsubscribe: sends one plain confirmation email');
   check(!/<img|<a |<button|utm_|http/i.test(ucBody.html + ucBody.text) && !ucBody.headers, 'unsubscribe confirmation email: no images, buttons, links, UTM tags or unsubscribe header');
+  check(F.db.subscribers.length === 1 && F.db.subscribers[0].email === 'other@example.com', 'unsubscribe: deletes that address from the newsletter list (any case) and leaves other subscribers');
+  check(/removed you from our newsletter list/.test(ucBody.text), 'unsubscribe confirmation email says the newsletter row was removed');
   check(F.db.email_suppressions.length === 1 && /^[0-9a-f]{64}$/.test(F.db.email_suppressions[0].email_hash) && !JSON.stringify(F.db.email_suppressions).includes(EMAIL), 'unsubscribe: also writes an email-hash suppression (no readable address)');
   await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
   check(F.db.email_suppressions.length === 1 && resendCount(F) === sentBefore + 1, 'unsubscribe twice: suppression stays a single row and no second confirmation email');

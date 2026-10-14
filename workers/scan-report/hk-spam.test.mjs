@@ -26,6 +26,7 @@ function fake({ regs = [], users = [], suppressions = [], resendFail = false } =
     }
     if (url.includes('/rest/v1/users')) { const list = decodeURIComponent(q.get('email').replace(/^in\./, '')); return res(200, db.users.filter((u) => u.email_opt_out_at && list.includes(`"${u.email}"`)).map((u) => ({ email: u.email }))); }
     if (url.includes('/email_suppressions')) { const list = q.get('email_hash').replace(/^in\./, ''); return res(200, db.suppressions.filter((s) => list.includes(s.email_hash))); }
+    if (url.includes('/rest/v1/subscribers') && o.method === 'DELETE') return res(204);   // CK-7721 fix 3: unsubscribe also removes the newsletter row
     return res(404, 'unexpected ' + url.split('?')[0]);
   };
   return { f, db, calls, sends: () => calls.filter((c) => c.url.includes('resend')) };

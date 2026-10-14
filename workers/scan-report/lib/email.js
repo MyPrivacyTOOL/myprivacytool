@@ -161,7 +161,7 @@ export function buildUnsubscribedEmail() {
   const text = [
     'You are unsubscribed.',
     '',
-    'We will send no more scan report or follow-up emails.',
+    'We will send no more scan report or follow-up emails, and we have removed you from our newsletter list.',
     '',
     'To have your data deleted, write to privacy@myprivacytool.io.',
     '',
@@ -169,7 +169,7 @@ export function buildUnsubscribedEmail() {
   ].join('\n');
   const html = shell(subject, 'You will get no more scan report or follow-up emails.',
     `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">You are unsubscribed</h1>
-${para('We will send no more scan report or follow-up emails.')}
+${para('We will send no more scan report or follow-up emails, and we have removed you from our newsletter list.')}
 ${para('To have your data deleted, write to privacy@myprivacytool.io.')}`, null, { footer: 'MyPrivacyTOOL' });
   return { subject, text, html };
 }

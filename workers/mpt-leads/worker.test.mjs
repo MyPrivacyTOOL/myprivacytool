@@ -55,4 +55,30 @@ const limited={...env,RATE_LIMITER:{limit:async()=>({success:false})}}; r=await 
 const brokenRl={...env,RATE_LIMITER:{limit:async()=>{throw new Error('x')}}}; r=await raw({email:'a@b.co'},{e:brokenRl}); check(r.status===200,'rate limiter error fails open');
 await raw({email:'a@b.co',name:'<b>x</b> & <https://evil|click>'}); const slack=calls.find(c=>c.url.includes('slack.com')); check(slack&&!/<b>|<https:/.test(JSON.parse(slack.body).text.split('\n').filter(l=>l.startsWith('Name:')).join('')),'Slack text escapes user-supplied < > &');
 r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.find(c=>c.url.includes('api.notion.com/v1/pages')); check(r.status===200&&!JSON.parse(nb.body).properties.Referrer,'non-http(s) referrer dropped');
+
+// CK-7721 fix 4: Slack carries no IP address or city; the Notion lead page is archived after 24 months, once a day.
+{
+  const slackCalls=()=>calls.filter(c=>c.url.includes('slack.com'));
+  calls=[]; const waits=[]; const sreq=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'203.0.113.7'},body:JSON.stringify({email:'s@t.co',name:'S T'})});
+  await worker.fetch(sreq,env,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
+  const slackText=JSON.parse(slackCalls()[0].body).text;
+  check(!slackText.includes('203.0.113.7')&&!/\bIP:/.test(slackText)&&!/City/i.test(slackText)&&slackText.includes('Email: s@t.co'),'Slack lead post carries no IP address or city');
+}
+{
+  const realFetch=globalThis.fetch; const seen=[];
+  globalThis.fetch=async (url,opts)=>{ seen.push({url:String(url),method:opts?.method,body:opts?.body});
+    if (String(url).includes('/databases/abc-def/query')) return {ok:true,status:200,json:async()=>({results:[{id:'old1'},{id:'old2'}]}),text:async()=>''};
+    return {ok:true,status:200,json:async()=>({results:[],has_more:false}),text:async()=>''}; };
+  const tick=async (iso)=>{ seen.length=0; const w=[]; await worker.scheduled({scheduledTime:Date.parse(iso)},env,{waitUntil:p=>w.push(p)}); await Promise.all(w); return seen.slice(); };
+  let s1=await tick('2026-10-14T19:00:00Z');
+  const q=s1.find(x=>x.url.includes('/databases/abc-def/query')); const cutoff=JSON.parse(q.body).filter.created_time.before;
+  check(q&&cutoff.startsWith('2024-10-14T19:00'),'daily tick queries Notion for leads created before now minus 24 months');
+  check(s1.filter(x=>x.method==='PATCH'&&/\/v1\/pages\/old[12]$/.test(x.url)&&JSON.parse(x.body).archived===true).length===2,'each lead page older than 24 months is archived');
+  s1=await tick('2026-10-14T19:05:00Z'); check(!s1.some(x=>x.url.includes('/databases/abc-def/query')),'other 5-minute ticks do not run the retention purge');
+  s1=await tick('2026-10-14T07:00:00Z'); check(!s1.some(x=>x.url.includes('/databases/abc-def/query')),'purge does not run at other hours');
+  globalThis.fetch=async (url)=>({ok:false,status:500,json:async()=>({}),text:async()=>'x'});
+  let threw=false; try { await tick('2026-10-14T19:00:00Z'); } catch { threw=true; } check(!threw,'a Notion failure during the purge never breaks the scheduled run');
+  globalThis.fetch=realFetch;
+}
+
 process.exit(ok?0:1);
