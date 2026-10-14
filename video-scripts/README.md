@@ -11,3 +11,6 @@ run as an artifact. Nothing is uploaded to YouTube: a person watches it and appr
 - Alice's drawing is `video-scripts/assets/alice.png` (the text-free reference, 820 px wide, so
   it looks soft when enlarged). Replace it with a full-size text-free file when one exists.
   Without a file there, the render has no Alice and is a layout check only.
+
+Alice's look, motion and voice specs live in `assets/alice/` (MPC-7797). Check
+`assets/alice/spec/validation-checklist.md` before a video ships.
