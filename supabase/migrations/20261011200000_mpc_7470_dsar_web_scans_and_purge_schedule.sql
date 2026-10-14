@@ -68,11 +68,11 @@ grant execute on function public.mpt_dsar_export(text), public.mpt_dsar_erase(te
 
 comment on table public.web_scans is 'MPC-7465. One row per completed web scan. id = anonymous scan number. results = per-hexagon {id,label,value,icon,confidence,risk,confirmed,category} as sent by the browser (untrusted text). No email or user id, and no connection IP; BUT values the browser reports (WebRTC/DNS-leak IP addresses, fingerprint values) ARE stored. Retention (MPC-7470): 90 days unlinked, 12 months linked; purge with public.mpt_purge_expired_web_scans(). service_role only.';
 
--- Daily at 19:10 UTC (03:10 HKT). Idempotent. Skipped where pg_cron is not installed (local test databases).
+-- daily at 19:30 UTC (03:30 HKT). Idempotent. Skipped where pg_cron is not installed (local test databases).
 do $$
 begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
     perform cron.unschedule(jobid) from cron.job where jobname = 'mpt-purge-expired-web-scans';
-    perform cron.schedule('mpt-purge-expired-web-scans', '10 19 * * *', 'select public.mpt_purge_expired_web_scans();');
+    perform cron.schedule('mpt-purge-expired-web-scans', '30 19 * * *', 'select public.mpt_purge_expired_web_scans();');
   end if;
 end $$;
