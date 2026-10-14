@@ -204,15 +204,15 @@ end $$;
 revoke all on function public.mpt_dsar_export(text), public.mpt_dsar_erase(text) from public, anon, authenticated;
 grant execute on function public.mpt_dsar_export(text), public.mpt_dsar_erase(text) to service_role;
 
--- ===== BLOCK 9: schedule the daily purge (03:10 HKT) and remove the leftover probe function. =====
+-- ===== BLOCK 9: schedule the daily purge (03:30 HKT) and remove the leftover probe function. =====
 do $$ begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    perform cron.schedule('mpt-purge-expired-web-scans', '10 19 * * *', 'select public.mpt_purge_expired_web_scans(false)');
+    perform cron.schedule('mpt-purge-expired-web-scans', '30 19 * * *', 'select public.mpt_purge_expired_web_scans(false)');
   end if;
 end $$;
 drop function if exists public.mpt_probe_7470();
 
--- ===== BLOCK 10: verify. Expect: purge_is_real = true, 6 functions listed, job_schedule = 10 19 * * *, probe_left = 0. =====
+-- ===== BLOCK 10: verify. Expect: purge_is_real = true, 6 functions listed, job_schedule = 30 19 * * *, probe_left = 0. =====
 select (select pg_get_functiondef(p.oid) like '%web_scan_retention%' from pg_proc p where p.proname='mpt_purge_expired_web_scans' and p.pronamespace='public'::regnamespace) as purge_is_real,
        (select string_agg(p.oid::regprocedure::text, ', ' order by p.proname) from pg_proc p where pronamespace='public'::regnamespace and proname in ('mpt_dsar_export','mpt_dsar_erase','mpt_purge_expired_web_scans','mpt_delete_web_scan','mpt_export_web_scan')) as functions,
        (select schedule from cron.job where jobname = 'mpt-purge-expired-web-scans') as job_schedule,

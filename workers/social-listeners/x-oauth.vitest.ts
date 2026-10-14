@@ -116,4 +116,38 @@ describe("getUserAccessToken", () => {
     await getUserAccessToken(base, log);
     expect(JSON.stringify([log.info.mock.calls, log.warn.mock.calls])).not.toMatch(/new-access|new-refresh|boot-refresh|csec/);
   });
+
+  it("falls back to the X_REFRESH_TOKEN secret when X refuses the stored refresh token (the owner generated a new token)", async () => {
+    const bodies: string[] = [];
+    let stored: any = { access_token: "old", refresh_token: "revoked-refresh", expires_at: hours(-1) };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+      const url = String(u);
+      if (url.startsWith("https://sb.test") && (!init || !init.method || init.method === "GET")) return Response.json([stored]);
+      if (url.startsWith("https://sb.test")) { stored = JSON.parse(init!.body as string); return new Response(null, { status: 201 }); }
+      bodies.push(String(init!.body));
+      return String(init!.body).includes("refresh_token=boot-refresh")
+        ? Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 })
+        : new Response("revoked", { status: 400 });
+    });
+    expect(await getUserAccessToken(base, log)).toBe("new-access");
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0]).toContain("refresh_token=revoked-refresh");
+    expect(bodies[1]).toContain("refresh_token=boot-refresh");
+    expect(stored.refresh_token).toBe("new-refresh");
+  });
+
+  it("does not retry with the bootstrap secret when it is the same token or a deploy placeholder", async () => {
+    let n = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+      const url = String(u);
+      if (url.startsWith("https://sb.test")) return Response.json([{ access_token: "old", refresh_token: "same", expires_at: hours(-1) }]);
+      n++;
+      return new Response("no", { status: 400 });
+    });
+    await getUserAccessToken({ ...base, X_REFRESH_TOKEN: "same" }, log);
+    expect(n).toBe(1);
+    resetTokenCache();
+    await getUserAccessToken({ ...base, X_REFRESH_TOKEN: "placeholder" }, log);
+    expect(n).toBe(2);
+  });
 });

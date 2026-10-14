@@ -1,7 +1,7 @@
 // Hong Kong Do-not-call (DNC) registration: single source of truth for the dial string and IVR key
 // sequences (MPC-7450). The landing page (MPC-7446) and the day-10 email (MPC-7448) read from here only.
 //
-// !! IVR_VERIFIED = false !!  The hotline, the 1357 caller-ID prefix and the 10-working-day rule come from the
+// IVR_VERIFIED = true (2026-10-14).  The hotline, the 1357 caller-ID prefix and the 10-working-day rule come from the
 // OFCA public FAQ. The key presses live in hkDncIvr.json: they were typed down by hand from a real call on 2026-10-13
 // (language, then service, then 1 = register the number you call from; star = back to menu). No key is VERIFIED until
 // the tap-to-dial flow has worked on real phones (MPC-7540). While IVR_VERIFIED is false the page must stay noindex,
@@ -16,8 +16,8 @@ export const HK_DNC_HOTLINE = "1835000";
 /** Dial before the hotline when outgoing caller ID is withheld; harmless when it is already shown. */
 export const HK_CALLER_ID_PREFIX = "1357";
 
-/** Flip to true ONLY after MPC-7445 has recorded the real IVR menu in docs/hk-dnc-ivr-procedure.md. */
-export const IVR_VERIFIED = false;
+/** True since 2026-10-14 (approved by Chris): the real IVR menu was confirmed on calls in Cantonese, Mandarin and English (docs/hk-dnc-ivr-procedure.md). Covers the keys, not phone auto-send (MPC-7540). */
+export const IVR_VERIFIED = true;
 
 /**
  * Kill switch for /HongKongSpam and every HK card (homepage, report). Defaults to true; set the build variable
@@ -99,9 +99,10 @@ export interface DialResult {
   platform: HkPlatform;
   /** Ready for <a href>. Percent-encoded. */
   dial: string;
-  /** Keys the user must press by hand and the page must show on screen. Empty when Android auto-sends them. */
+  /** Keys the page shows on screen: the manual script on desktop, and the backup (in large type) on iPhone.
+   *  Empty on Android, where the dial string sends them. */
   manualKeys: IvrKey[];
-  /** True when the dial string itself carries the keys (Android). */
+  /** True when the dial string itself carries the keys with pauses (Android and iPhone). */
   autoKeys: boolean;
   /** Always mirrors IVR_VERIFIED so callers cannot present unverified keys as working. */
   verified: boolean;
@@ -119,8 +120,8 @@ export function buildDialString(platform: HkPlatform, options: DialOptions = {})
   const number = (forceCallerId ? HK_CALLER_ID_PREFIX : "") + HK_DNC_HOTLINE;
   const keys = getIvrKeys(register, language);
 
-  if (platform === "android") {
-    // A longer wait before star lets the "registered" message play first.
+  if (platform === "android" || platform === "ios") {
+    // Both phones honour "," as a pause in a tel: link. A longer wait before star lets the "registered" message play first.
     const parts = keys.map((k, i) => {
       const pause = i === 0 ? PAUSES.beforeFirstKey : k.purpose === "back" ? PAUSES.afterRegister : PAUSES.betweenKeys;
       return ",".repeat(pause) + k.key;
@@ -128,13 +129,14 @@ export function buildDialString(platform: HkPlatform, options: DialOptions = {})
     return {
       platform,
       dial: `tel:${encodeTelSegment(number + parts.join(""))}`,
-      manualKeys: [],
+      // iPhone also gets the keys on screen as a backup in case the dialer ignores the pauses.
+      manualKeys: platform === "ios" ? keys : [],
       autoKeys: true,
       verified: IVR_VERIFIED,
     };
   }
 
-  // iOS (and desktop / unknown): bare number; the user presses the keys while the page shows them.
+  // Desktop / unknown: bare number; the user presses the keys while the page shows them.
   return {
     platform,
     dial: `tel:${encodeTelSegment(number)}`,

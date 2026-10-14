@@ -26,6 +26,15 @@ Any DM that is not a Mirror command gets the welcome straight away (`WELCOME_BOD
 
 1/2/3 get a tailored reply (`INTENT_REPLIES`). No LLM; same per-sender and global rate limits as Mirror; never sent for our own messages or when the webhook does not carry our own account id.
 
+### CRM feed: who got in touch (decision, 2026-10-13)
+
+HubSpot is the CRM. X people mostly have no email, so they cannot arrive through the lead form. `social.ts` writes every follow, DM, like, share, mention and Mirror consent to the Supabase **feed** (`public.social_contacts` + `social_events`, via `mpt_social_touch`): the X user id, the public @handle, whether they follow us (`connection_status`), first/last seen, an event count, and the event type and time. **Never message text, never the scan result.** A sync into HubSpot (contacts with custom properties) reads rows where `hubspot_synced_at is null`; it is not built yet and needs a HubSpot private-app token that can write contacts and create custom properties.
+
+- **Events:** `dm`, `mirror_consent`, plus `follow`, `like`, `share`, `mention` from the Account Activity shapes (`follow_events`, `favorite_events`, `tweet_create_events`). The newer `dm.received` / activity shapes are only recognised for DMs; other new shapes are logged by name (`x_event_received`) so they can be added. Views of our profile are not available from X. Likes need the person's consent or follow in X's rules and may not arrive.
+- **Wording:** the Mirror no longer says "I store nothing". It says it keeps none of the profile data or messages and only notes that the person got in touch (@handle and date), and that sending `DELETE` removes it.
+- **DELETE:** `DELETE` / `delete my data` calls `mpt_erase_social_contact` (events cascade) and confirms. Contacts also expire after 2 years (`retain_until`, `mpt_purge_expired_social_contacts`).
+- **Funnel counts** (below) are separate and anonymous: no id at all.
+
 ### Intent and funnel counting (decision, 2026-10-13)
 
 What people type is never stored, and neither is who sent it. Each inbound DM we answer writes ONE row to `public.interaction_log` through `mpt_brain_record` (`funnel.ts`): channel `x`, **no sender id** (X is log-only), **no message text**, intent bucket, and an event key, kept 90 days. That row is what the Channel OSINT dashboard (`mpt_channel_osint_daily`, platform `x`) counts as `dms_received`, and consent rows count as `scan_requests`. So the Mirror's "I store nothing" stays true: only an anonymous counter row exists.
@@ -79,8 +88,7 @@ stored row, refresh (stored refresh token, else the `X_REFRESH_TOKEN` secret, wh
 `X_USER_ACCESS_TOKEN`. A 401 on a DM triggers one forced refresh and one retry. Logs: `x_token_refreshed`, `x_token_refresh_rejected`
 (status only), never token values.
 
-If the bot goes silent with `x_token_refresh_rejected`: generate a new OAuth 2.0 access token on the app's Keys & Tokens page, put its
-refresh token in `X_REFRESH_TOKEN`, delete the row (`delete from public.mpt_x_oauth_tokens;`) and re-run the deploy.
+If the bot goes silent with `x_token_refresh_rejected`: generate a new OAuth 2.0 access token on the app's Keys & Tokens page (logged in to x.com as @myprivacytool, with `dm.read` and `dm.write`), put its access and refresh tokens in `X_USER_ACCESS_TOKEN` and `X_REFRESH_TOKEN`, and re-run the deploy. When X refuses the stored refresh token, the bot now tries the `X_REFRESH_TOKEN` secret once, so the stored row no longer has to be deleted by hand. Then re-create the `dm.received` subscription on the Subscriptions tab if X says the user has not authorised `dm.read`.
 
 ## Event formats
 

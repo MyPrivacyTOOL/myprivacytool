@@ -3,7 +3,7 @@
 // Supabase (public.mpt_x_oauth_tokens, service_role only). Order of preference:
 //   1. in-memory copy (per isolate) while still valid
 //   2. the stored row while still valid
-//   3. refresh (stored refresh token, else the bootstrap secret X_REFRESH_TOKEN), then store the new pair
+//   3. refresh (stored refresh token; if X refuses it, the bootstrap secret X_REFRESH_TOKEN), then store the new pair
 //   4. the static X_USER_ACCESS_TOKEN secret (works only until it expires)
 // Logs carry event names and HTTP status only, never tokens.
 import type { Logger } from "./logger";
@@ -135,7 +135,11 @@ export async function getUserAccessToken(env: Env, log: Logger, force = false): 
 
   const canRefresh = Boolean(env.X_CLIENT_ID && env.X_CLIENT_SECRET);
   if (canRefresh) {
-    const next = await refresh(env, row?.refresh_token ?? env.X_REFRESH_TOKEN ?? "", log);
+    // The stored pair is tried first. If X refuses it (revoked, e.g. the owner generated a new token), the bootstrap secret is the
+    // owner's newer pair: try it once, so replacing the secrets heals the bot without anyone clearing the table.
+    const boot = env.X_REFRESH_TOKEN && env.X_REFRESH_TOKEN !== "placeholder" ? env.X_REFRESH_TOKEN : undefined;
+    let next = await refresh(env, row?.refresh_token ?? boot ?? "", log);
+    if (!next && row?.refresh_token && boot && boot !== row.refresh_token) next = await refresh(env, boot, log);
     if (next) {
       const stored = (await writeRow(env, next)) || (await writeRow(env, next)); // one retry: losing this pair loses the bot's access
       if (stored) log.info("x_token_refreshed");

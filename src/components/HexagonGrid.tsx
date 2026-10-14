@@ -3,6 +3,7 @@ import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
+import { interestRank } from '@/lib/hexagonInterestOrder';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
 import { startBehaviorTracking, stopBehaviorTracking, getAllBehaviorData } from '@/lib/behaviorDetection';
@@ -131,16 +132,18 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
 
   // Get visible hexagons based on count, with proper ordering
   const getOrderedHexagons = useCallback(() => {
-    // Define category order for progressive reveal - behavior is last
+    // CK-7799: most interesting first (see hexagonInterestOrder.ts). Ids not on the list keep the old
+    // category order after the listed ones. Array.sort is stable, so ties keep their incoming order.
     const categoryOrder = ['device', 'network', 'privacy', 'profile', 'language', 'orientation', 'fingerprint', 'storage', 'social', 'security', 'behavior'];
-    
-    // Sort hexagons by category order
+
     const sorted = [...allHexagons].sort((a, b) => {
+      const byInterest = interestRank(a.id) - interestRank(b.id);
+      if (byInterest !== 0) return byInterest;
       const catA = a.category || 'device';
       const catB = b.category || 'device';
       return categoryOrder.indexOf(catA) - categoryOrder.indexOf(catB);
     });
-    
+
     return sorted;
   }, [allHexagons]);
 

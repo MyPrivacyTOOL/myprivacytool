@@ -323,12 +323,12 @@ const HongKongSpamPage = () => {
                       {view.keys.map((k, n) => (
                         <li
                           key={`${k.purpose}-${n}`}
-                          className={`rounded-lg border border-border bg-background px-3 py-2 text-center ${view.autoKeys ? "" : "min-w-[5.5rem]"}`}
+                          className={`rounded-lg border border-border bg-background px-3 py-2 text-center ${view.largeKeys ? "min-w-[5.5rem]" : ""}`}
                         >
                           <span className="block text-xs text-muted-foreground">
                             {copy.press} ({copy.keyPurpose[k.purpose]})
                           </span>
-                          <span className={`block font-mono font-bold ${view.autoKeys ? "text-2xl" : "text-5xl"}`}>{k.key}</span>
+                          <span className={`block font-mono font-bold ${view.largeKeys ? "text-5xl" : "text-2xl"}`}>{k.key}</span>
                         </li>
                       ))}
                     </ul>

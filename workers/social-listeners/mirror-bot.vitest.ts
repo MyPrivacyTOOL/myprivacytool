@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
+import { extractEngagement, isDeleteRequest } from "./src/social";
 import { hasOAuth1, oauth1Header } from "./src/x-media";
 import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
@@ -492,5 +493,95 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(seen.length > 0).toBe(true);
     expect(seen.every((a) => a.startsWith("OAuth "))).toBe(true);
+  });
+});
+
+describe("X activity feed for the CRM (MPC-7628)", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 20));
+  const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
+  function fake(followedBy = true) {
+    const touch: any[] = [];
+    const erase: any[] = [];
+    const sent: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+      const url = String(u);
+      if (url.includes("/rpc/mpt_social_touch")) { touch.push(JSON.parse(init.body)); return new Response("{}"); }
+      if (url.includes("/rpc/mpt_erase_social_contact")) { erase.push(JSON.parse(init.body)); return new Response("1"); }
+      if (url.includes("/rpc/")) return new Response("{}");
+      if (url.includes("connection_status")) return Response.json({ data: { connection_status: followedBy ? ["followed_by"] : [] } });
+      if (url.includes("user.fields=username")) return Response.json({ data: { username: "alice_99" } });
+      if (url.includes("/users/42")) return Response.json({ data: { username: "alice_99", description: "secret bio words", protected: false } });
+      if (url.includes("/messages")) sent.push(JSON.parse(init.body).text);
+      return new Response("{}");
+    });
+    return { touch, erase, sent };
+  }
+
+  it("a DM is noted with the handle, whether they follow us, and never the text", async () => {
+    const x = fake(true);
+    await post(dm("42", "my private worry about a stalker"), e());
+    await settle();
+    expect(x.touch).toEqual([{ p_platform: "x", p_user_id: "42", p_handle: "alice_99", p_event: "dm", p_follows_us: true }]);
+    expect(JSON.stringify(x.touch)).not.toMatch(/stalker|worry/);
+  });
+  it("records that someone does not follow us yet", async () => {
+    const x = fake(false);
+    await post(dm("42", "hi"), e());
+    await settle();
+    expect(x.touch[0].p_follows_us).toBe(false);
+  });
+  it("a Mirror consent is noted as mirror_consent with the profile handle and none of the profile", async () => {
+    const x = fake();
+    await post(dm("42", "MIRROR YES"), e());
+    await settle();
+    expect(x.touch.map((t) => t.p_event)).toEqual(["mirror_consent"]);
+    expect(JSON.stringify(x.touch)).not.toMatch(/secret bio/);
+  });
+  it("follows, likes, shares and mentions of us are noted (our own actions are not)", async () => {
+    const x = fake();
+    const body = JSON.stringify({
+      for_user_id: "999",
+      follow_events: [{ type: "follow", target: { id: "999" }, source: { id: "51", screen_name: "fan" } }, { type: "follow", target: { id: "52" }, source: { id: "999" } }],
+      favorite_events: [{ user: { id: "53", screen_name: "liker" } }],
+      tweet_create_events: [
+        { user: { id: "54", screen_name: "sharer" }, retweeted_status: { user: { id: "999" } } },
+        { user: { id: "55", screen_name: "mentioner" }, entities: { user_mentions: [{ id_str: "999", id: 999 }] } },
+        { user: { id: "999" }, entities: { user_mentions: [{ id: 999 }] } },
+      ],
+    });
+    await post(body, { ...e(), CORE_BRAIN: brain() });
+    await settle();
+    expect(x.touch.map((t) => [t.p_user_id, t.p_event, t.p_handle]).sort()).toEqual([["51", "follow", "fan"], ["53", "like", "liker"], ["54", "share", "sharer"], ["55", "mention", "mentioner"]]);
+    expect(x.touch.find((t) => t.p_event === "follow").p_follows_us).toBe(true);
+  });
+  it("extractEngagement ignores shapes it does not know", () => {
+    expect(extractEngagement({ data: { event_type: "something.new" } }, "999")).toEqual([]);
+    expect(extractEngagement(null, "999")).toEqual([]);
+  });
+  it("DELETE erases the person, confirms, and is not welcomed or noted again", async () => {
+    const x = fake();
+    await post(dm("42", "Delete my data"), e());
+    await settle();
+    expect(x.erase).toEqual([{ p_platform: "x", p_user_id: "42" }]);
+    expect(x.touch).toEqual([]);
+    expect(x.sent).toHaveLength(1);
+    expect(x.sent[0]).toContain("removed your @handle");
+    expect(x.sent[0].includes("What brought you here")).toBe(false);
+  });
+  it("recognises delete requests and nothing near them", () => {
+    for (const t of ["delete", "DELETE", "Delete my data", "please delete my info!", " delete. "]) expect(isDeleteRequest(t)).toBe(true);
+    for (const t of ["how do I delete my account", "deleted", "", "undelete", 5]) expect(isDeleteRequest(t as never)).toBe(false);
+  });
+  it("the promise now says what we note and how to remove it", () => {
+    expect(CONSENT_MESSAGE).toContain("only note that you got in touch");
+    expect(CONSENT_MESSAGE).toContain("Send DELETE");
+    expect(CONSENT_MESSAGE).not.toMatch(/store nothing/i);
+    expect(WELCOME_BODY).toContain("Send DELETE");
+  });
+  it("nothing is sent to Supabase when it is not configured", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+    await post(dm("42", "hi"), env());
+    await settle();
+    expect(f.mock.calls.some((c) => String(c[0]).includes("/rpc/"))).toBe(false);
   });
 });

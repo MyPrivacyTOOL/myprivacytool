@@ -5,19 +5,28 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { renderPage } from "@/test/render";
 
-const flags = vi.hoisted(() => ({ preview: false, enabled: true, hk: true }));
+const flags = vi.hoisted(() => ({ preview: false, enabled: true, hk: true, verified: false }));
 
 vi.mock("@/config/hkSpamPage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/config/hkSpamPage")>()),
   isHkSpamPreview: () => flags.preview,
 }));
 
-vi.mock("@/config/hkDnc", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/config/hkDnc")>()),
-  get HK_SPAM_ENABLED() {
-    return flags.enabled;
-  },
-}));
+// The real engine is verified now (keys confirmed on real calls); the "unverified" public view is still tested by
+// forcing the result flag off here, like src/lib/hkSpamPage.test.ts does.
+vi.mock("@/config/hkDnc", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/config/hkDnc")>();
+  return {
+    ...actual,
+    get HK_SPAM_ENABLED() {
+      return flags.enabled;
+    },
+    buildDialString: (...args: Parameters<typeof actual.buildDialString>) => ({
+      ...actual.buildDialString(...args),
+      verified: flags.verified,
+    }),
+  };
+});
 
 // The geo lookup is its own module (MPC-7450); the page tests decide the answer so fetch counts stay exact.
 vi.mock("@/lib/hkVisitor", () => ({
@@ -50,6 +59,7 @@ const noNavigate = (el: HTMLElement) => el.addEventListener("click", (e) => e.pr
 
 beforeEach(() => {
   flags.preview = false;
+  flags.verified = false;
   flags.enabled = true;
   flags.hk = true;
   localStorage.clear();
@@ -88,13 +98,23 @@ describe("hero, CTA and steps", () => {
     expect(text).not.toMatch(/automatic|sends? the keys|auto-?dial/i);
   });
 
-  it("PREVIEW on iPhone: large manual keys plus the unverified banner", () => {
+  it("VERIFIED keys: the public view lists the keys, no unverified banner, and says the phone sends them", () => {
+    flags.verified = true;
+    setUa(ANDROID);
+    renderEn();
+    expect(screen.queryByTestId("hk-unverified")).not.toBeInTheDocument();
+    expect(dialLink().getAttribute("href")).toMatch(/^tel:13571835000,+3/);
+    expect(within(screen.getByTestId("hk-keys")).getAllByRole("listitem")).toHaveLength(6);
+    expect(screen.getByText("Watch the keys")).toBeInTheDocument();
+  });
+
+  it("PREVIEW on iPhone: pauses and keys in the link, large backup keys on screen, plus the unverified banner", () => {
     flags.preview = true;
     renderEn();
     expect(screen.getByTestId("hk-unverified")).toHaveTextContent(/UNVERIFIED/);
-    expect(dialLink().getAttribute("href")).toBe("tel:13571835000");
+    expect(dialLink().getAttribute("href")).toMatch(/^tel:13571835000,+\d/);
     expect(within(screen.getByTestId("hk-keys")).getAllByRole("listitem")).toHaveLength(6);
-    expect(screen.getByText("Press the keys shown")).toBeInTheDocument();
+    expect(screen.getByText("Watch the keys")).toBeInTheDocument();
   });
 
   it("PREVIEW on Android: dial string carries the pauses and keys, still flagged unverified", () => {
@@ -355,9 +375,10 @@ describe("scan CTA, opt-out generator, spam log, FAQ, disclaimer", () => {
 });
 
 describe("SEO head and routing", () => {
-  it("is noindex while the launch flag is off, with canonical, hreflang and FAQPage + HowTo JSON-LD", async () => {
+  it("is indexable now (launch flag on, no noindex tag), with canonical, hreflang and FAQPage + HowTo JSON-LD", async () => {
     renderEn();
-    await waitFor(() => expect(document.head.querySelector('meta[name="robots"][content="noindex"]')).not.toBeNull());
+    await waitFor(() => expect(document.head.querySelector('link[rel="canonical"]')).not.toBeNull());
+    expect(document.head.querySelector('meta[name="robots"][content="noindex"]')).toBeNull();
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://www.myprivacytool.io/HongKongSpam");
     expect(document.head.querySelector('link[rel="alternate"][hreflang="en-HK"]')).not.toBeNull();
     expect(document.head.querySelector('link[rel="alternate"][hreflang="zh-HK"]')?.getAttribute("href")).toContain("?lang=zh");

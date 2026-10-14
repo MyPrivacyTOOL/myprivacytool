@@ -9,7 +9,7 @@
 --                                deletes nothing, and a log row either way (kind 'purge' or 'purge_dry_run').
 -- 4. mpt_delete_web_scan(p_scan_number)       deletes one saved scan and its contact link(s) by scan number. Logged (kind 'by_scan_number').
 -- 5. mpt_export_web_scan(p_scan_number)       returns the saved scan for that number (the visitor's right of access by scan number).
--- 6. daily pg_cron job mpt-purge-expired-web-scans (19:10 UTC = 03:10 HKT), skipped where pg_cron is absent. Same name and time as
+-- 6. daily pg_cron job mpt-purge-expired-web-scans (19:30 UTC = 03:30 HKT), skipped where pg_cron is absent. Same name and time as
 --    the job in PR #251, so applying both is harmless (cron.schedule replaces a job of the same name).
 -- 7. corrects the table comments: no connection IP is stored in a column, but the results hold browser-reported values, which
 --    include IP addresses (and fingerprint-style values). A saved scan is personal data, not anonymous.
@@ -145,6 +145,6 @@ comment on column public.web_scans.id is 'The scan number shown to the visitor a
 
 do $$ begin
   if exists (select 1 from pg_extension where extname = 'pg_cron') then
-    perform cron.schedule('mpt-purge-expired-web-scans', '10 19 * * *', 'select public.mpt_purge_expired_web_scans(false)');
+    perform cron.schedule('mpt-purge-expired-web-scans', '30 19 * * *', 'select public.mpt_purge_expired_web_scans(false)');
   end if;
 end $$;
