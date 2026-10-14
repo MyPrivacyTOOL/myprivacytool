@@ -31,6 +31,7 @@ import AliceHDBadge from './AliceHDBadge';
 import AliceHDModal from './AliceHDModal';
 import FreeVoiceBadge from './FreeVoiceBadge';
 import { trackUpgradeModalOpened } from '@/lib/analytics';
+import { scanHint } from '@/lib/scanCopy';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface VoiceAIProps {
@@ -1182,7 +1183,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           {/* Voice AI Button */}
           <div className="w-full text-center">
             <p className="text-muted-foreground text-sm leading-relaxed mb-2">
-              Hover over any hexagon to see what I found, then click to confirm if it's correct.
+              {scanHint()}
             </p>
             
             {/* Free Voice Badge */}
