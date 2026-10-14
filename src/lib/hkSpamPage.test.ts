@@ -47,8 +47,8 @@ describe("detectHkPlatform", () => {
 });
 
 describe("resolveHkDial", () => {
-  it("the real engine flag is still unverified (do not flip before MPC-7445)", () => {
-    expect(IVR_VERIFIED).toBe(false);
+  it("the real engine flag is verified (keys confirmed on real calls, 2026-10-14)", () => {
+    expect(IVR_VERIFIED).toBe(true);
   });
 
   it("public audience while unverified: bare dial, no keys, no auto-key claim, on every platform", () => {
