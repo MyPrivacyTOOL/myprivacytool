@@ -26,7 +26,7 @@
     "loudness_lufs": -18
   },
   "proportions": {
-    "status": "proposed",
+    "status": "provisional",
     "head_units_full_height": 6.0,
     "tolerance_pct": 3
   },
@@ -42,11 +42,10 @@
     "policy": "reference only; stored outside git until a person uploads them to reference-clips/"
   },
   "open_decisions": [
-    "Commission or produce the high-resolution master art (faces, poses, expressions, layered source). Art is not in the repo and cannot be generated here.",
-    "Confirm proposed proportions by measuring the final art.",
+    "Produce or commission the high-resolution master art (faces, poses, expressions, layered source). Not possible in-repo.",
+    "Measure the final art and replace provisional proportions (status -> measured).",
     "Read and log Kokoro v0.19 bf_isabella voice-pack terms for commercial use.",
-    "Confirm provenance/licence of the master artwork (field `provenance` must be set before lock).",
-    "Approve proposed framing pixel rules and 16:9 canvas.",
+    "Record provenance/licence of the master artwork (field `provenance`) before lock.",
     "Upload the 15 legacy 560 px clips to reference-clips/ if they should be archived here."
   ],
   "provenance": null,
@@ -238,5 +237,11 @@
       "status": "reference-only",
       "note": "820x736 curtain-pull drawing with curtain/code. Soft when enlarged. Replace with the locked curtain-pull pose."
     }
+  ],
+  "approved_decisions": [
+    "Proposed framing pixel rules (full/medium/close) and the 1920x1080 horizontal canvas are approved as the v1 working values.",
+    "Proposed blink, head, gesture and pause timings are approved as the v1 working values.",
+    "Proposed proportions are approved as provisional targets; they must be replaced by values measured from the final art before lock.",
+    "Voice stays Kokoro v0.19 bf_isabella as shipped; no paid TTS or custom recording for v1."
   ]
 }
