@@ -6,6 +6,7 @@ import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generat
 import HexagonExplanation from './HexagonExplanation';
 import StrangerGuessCard from './StrangerGuessCard';
 import { generateFindings } from '@/lib/strangerGuess';
+import { DNS_BANNER } from '@/lib/scanCopy';
 import { interestRank } from '@/lib/hexagonInterestOrder';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
@@ -339,7 +340,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       if (dnsResult.isLeaking) {
         setCriticalSecurityAlert({
           type: 'dns',
-          message: `Your DNS requests are visible to your ISP. Location shown: ${dnsResult.actualLocation}`,
+          message: DNS_BANNER,
         });
         // Auto-show the fix guide after a short delay
         setTimeout(() => setShowDNSFixGuide(true), 2000);
@@ -470,7 +471,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           if (label.includes('dns') && value.includes('leak')) {
             setCriticalSecurityAlert({
               type: 'dns',
-              message: 'DNS leak detected. Your browsing history is visible to your ISP.',
+              message: DNS_BANNER,
             });
           }
           return newCount;

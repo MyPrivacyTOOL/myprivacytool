@@ -64,7 +64,7 @@ export function generateFindings(input: {
     const vpnSigns = /^VPN Protected/i.test(hexValue(hexagons, 'webrtc-leak')) || /^VPN Protected/i.test(hexValue(hexagons, 'dns-leak'));
     const band: Band = vpnSigns ? 'long-shot' : deviceData.language?.hasLocationMismatch ? 'possible' : 'likely';
     const evidence = [`Your internet address maps to ${city}${deviceData.location.region ? `, ${deviceData.location.region}` : ''}.`];
-    if (vpnSigns) evidence.push('Your connection may be passing through a VPN, so this place may not be where you are.');
+    if (vpnSigns) evidence.push('Your connection looks like it may be using a VPN, so this place may not be where you are.');
     else if (deviceData.language?.hasLocationMismatch) evidence.push('Your language settings point somewhere else, so this is less certain.');
     out.push({
       id: 'region',

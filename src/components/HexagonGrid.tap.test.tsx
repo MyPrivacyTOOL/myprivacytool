@@ -68,6 +68,15 @@ describe('CK-7805 tap to explain (no hover on touch)', () => {
     expect(screen.getByTestId('hexagon-explanation-text')).toHaveTextContent('Plain reason 0');
   });
 
+  it('keeps one fixed height whether it shows the hint or a long explanation (no grid jump)', () => {
+    render(<HexagonGrid hexagons={makeHexagons()} />);
+    const box = screen.getByTestId('hexagon-explanation');
+    const before = box.className;
+    expect(before).toMatch(/\bh-\[13\.5rem\]/);
+    fireEvent.click(hexButtons()[0]);
+    expect(screen.getByTestId('hexagon-explanation').className).toBe(before);
+  });
+
   it('shows a hint before any tap, in a box that is always present', () => {
     render(<HexagonGrid hexagons={makeHexagons()} />);
     expect(screen.getByTestId('hexagon-explanation-hint')).toBeInTheDocument();

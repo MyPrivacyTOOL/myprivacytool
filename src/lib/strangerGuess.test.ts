@@ -27,7 +27,7 @@ describe('stranger guess findings (CK-7805)', () => {
     expect(generateFindings({ deviceData: mism, hexagons: [], userAgent: 'x' }).find((x) => x.id === 'region')!.band).toBe('possible');
     const vpn = generateFindings({ deviceData: dd(), hexagons: [hex('webrtc-leak', 'VPN Protected')], userAgent: 'x' }).find((x) => x.id === 'region')!;
     expect(vpn.band).toBe('long-shot');
-    expect(vpn.evidence.join(' ')).toContain('may be passing through a VPN');
+    expect(vpn.evidence.join(' ')).toContain('looks like it may be using a VPN');
   });
   it('omits the language finding without a mismatch and the in-app finding without an app', () => {
     const ids = generateFindings({ deviceData: dd(), hexagons: [], userAgent: 'Mozilla Safari' }).map((f) => f.id);

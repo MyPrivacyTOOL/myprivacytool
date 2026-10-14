@@ -105,6 +105,8 @@ export interface HexagonData {
   confirmed: boolean;
   /** CK-7805: display-only text. `value` stays the real captured value (report recognition and status use it). */
   displayValue?: string;
+  /** Short plain heading shown above the explanation (CK-7805, owner-approved wording). */
+  headline?: string;
   explanation?: string;
   category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social' | 'security' | 'behavior';
 }
@@ -848,23 +850,34 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     let webrtcValue = 'Blocked';
     let webrtcRisk = 'WebRTC is blocked. Your real IP is protected.';
     let webrtcConfidence = 100;
-    
+    // CK-7805: owner-approved plain wording (calm, "may", always one action). `value` and `risk` keep their old meaning.
+    let webrtcHeadline = 'Your browser shared only some network details';
+    let webrtcExplanation = 'Your browser let this page see some network details, but not a clear real address. This one needs investigation to know what else is visible.';
+
     if (webrtcResult.localIPs.length === 0 && webrtcResult.publicIPs.length === 0) {
       webrtcValue = 'No Leak Detected';
       webrtcRisk = 'WebRTC is not leaking your IP address. Good for privacy!';
+      webrtcHeadline = 'No address slipped out';
+      webrtcExplanation = 'We could not see your network addresses from this page. Good. Some video-call sites may not work if your browser blocks this feature on purpose.';
     } else if (webrtcResult.isLeaking) {
       const leakedIPs = webrtcResult.publicIPs.slice(0, 2).join(', ');
       webrtcValue = `Leaking: ${leakedIPs.substring(0, 15)}${leakedIPs.length > 15 ? '...' : ''}`;
       webrtcRisk = `CRITICAL: Your real IP (${webrtcResult.publicIPs[0]}) is exposed! ${webrtcResult.vpnDetected ? 'VPN detected but IP still leaking.' : 'Attackers can see your real location.'}`;
+      webrtcHeadline = 'Your real address may be showing';
+      webrtcExplanation = 'Your browser let this page see an internet address that may be your real one, even if you use a VPN. This can happen because browsers use a feature called WebRTC (made for video calls) that can share network details. This one needs investigation to know who else can see it. Switching off WebRTC in your browser settings, or using a VPN with leak protection, usually closes this.';
     } else if (webrtcResult.vpnDetected) {
       webrtcValue = 'VPN Protected';
       webrtcRisk = 'VPN detected and working. Only local IPs visible.';
+      webrtcHeadline = 'Your real address looks hidden';
+      webrtcExplanation = 'The address we can see looks like it belongs to a VPN or similar service, so your own is likely hidden. We cannot be certain from here.';
     }
     
     fingerprintHexagons.push({
       id: 'webrtc-leak',
       label: 'WebRTC Leak',
       value: webrtcValue,
+      headline: webrtcHeadline,
+      explanation: webrtcExplanation,
       icon: '🌐',
       confidence: webrtcConfidence,
       risk: webrtcRisk,
@@ -1241,6 +1254,8 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     id: 'dns-leak',
     label: 'DNS Leak',
     value: 'Checking...',
+    headline: 'Checking how your lookups travel',
+    explanation: 'When you open a website, your device first asks a service where it lives (a DNS lookup). We are checking which service yours asks.',
     icon: '🔓',
     confidence: 100,
     risk: 'Checking for DNS leaks that could expose your real location...',
@@ -1355,14 +1370,20 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       if (dnsResult.isLeaking) {
         dnsHexagon.value = `Leaking (${dnsResult.actualLocation.substring(0, 12)}...)`;
         dnsHexagon.icon = '🔓';
+        dnsHexagon.headline = 'Your lookups may be going the long way';
+        dnsHexagon.explanation = 'When you open a website, your device first asks a service where it lives (a DNS lookup). Yours may be asking your internet provider instead of your VPN, so they could see which sites you visit. This one needs investigation to know how much is visible. Your VPN app often has a DNS leak protection switch; our guide shows how.';
         dnsHexagon.risk = `CRITICAL: DNS leak detected! Your real location (${dnsResult.actualLocation}) is exposed. ${dnsResult.vpnDetected ? 'VPN is not protecting your DNS queries.' : 'ISP can see all your browsing.'}`;
       } else if (dnsResult.vpnDetected) {
         dnsHexagon.value = 'VPN Protected';
         dnsHexagon.icon = '🔒';
+        dnsHexagon.headline = 'Your lookups appear to go through your VPN';
+        dnsHexagon.explanation = 'Your website lookups appear to go through your VPN, which is what you want.';
         dnsHexagon.risk = 'DNS is routed through VPN. Your real location is hidden.';
       } else {
         dnsHexagon.value = 'No Leak Detected';
         dnsHexagon.icon = '✅';
+        dnsHexagon.headline = 'Your lookups look normal';
+        dnsHexagon.explanation = 'We did not see your lookups leaving through an unexpected route.';
         dnsHexagon.risk = 'No DNS leak detected. Your DNS queries are not exposing your location.';
       }
     }
@@ -1370,6 +1391,8 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     const dnsHexagon = baseHexagons.find(h => h.id === 'dns-leak');
     if (dnsHexagon) {
       dnsHexagon.value = 'Check Failed';
+      dnsHexagon.headline = 'We could not finish this check';
+      dnsHexagon.explanation = 'The lookup check did not complete, which can happen on restricted networks. This one needs investigation.';
       dnsHexagon.risk = 'Could not complete DNS leak test. This may indicate network restrictions.';
     }
   });
