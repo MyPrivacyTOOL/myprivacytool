@@ -1,5 +1,6 @@
 // Stubbed-fetch tests: no network, no secrets. Run: node workers/scan-report/worker.test.mjs
 import worker, { handleScan, runReportJob, runFollowUpJob, recipientAllowed } from './index.js';
+import { emailHash } from './lib/suppression.js';
 import { computeScore, breachRisk } from './lib/score.js';
 import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity } from './lib/hubspot.js';
@@ -87,7 +88,9 @@ function fake(opts = {}) {
     let rows = db[t]; const uid = q.get('id')?.replace('eq.', ''); if (uid) rows = rows.filter((x) => x.id === uid);
     if (t === 'scans' && q.get('report_status') === 'eq.sent') rows = rows.filter((x) => x.report_status === 'sent' && (x.followup_stage ?? 0) < 2 && x.report_sent_at && new Date(x.report_sent_at) < new Date(decodeURIComponent(q.get('report_sent_at').replace('lt.', ''))));
     const rc = q.get('referral_code'); if (rc?.startsWith('eq.')) rows = rows.filter((x) => x.referral_code === rc.slice(3));
-    const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
+    const e = q.get('email')?.replace('eq.', ''); if (e && !e.startsWith('ilike.')) rows = rows.filter((x) => x.email === decodeURIComponent(e));
+    if (q.get('email')?.startsWith('ilike.')) { const v = decodeURIComponent(q.get('email').slice(6)).replace(/\\(.)/g, '$1').toLowerCase(); rows = rows.filter((x) => String(x.email).toLowerCase() === v); }
+    const eh = q.get('email_hash'); if (eh?.startsWith('eq.')) rows = rows.filter((x) => x.email_hash === eh.slice(3));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
@@ -373,6 +376,15 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   F.db.users[0].email_opt_out_at = new Date().toISOString();
   await reqUnsub(F, EMAIL);
   check(sentTo(F).length === before + 1, 'unsubscribe request: already-unsubscribed address gets no email');
+  // MPC-7789: a newsletter-only subscriber (no users row) gets the link too; an already-suppressed one does not
+  F.db.users.length = 0; F.db.subscribers.push({ id: 's9', email: EMAIL.replace(/^./, (c) => c.toUpperCase()) });
+  const b4 = sentTo(F).length;
+  await reqUnsub(F, EMAIL);
+  const newsMail = sentTo(F).slice(b4);
+  check(newsMail.length === 1 && newsMail[0].to[0] === EMAIL && /unsubscribe\?e=/.test(newsMail[0].text), 'unsubscribe request: newsletter-only subscriber (no users row) gets the confirmation email');
+  F.db.email_suppressions.push({ email_hash: await emailHash(EMAIL), source: 'unsubscribe' });
+  await reqUnsub(F, EMAIL);
+  check(sentTo(F).length === b4 + 1, 'unsubscribe request: already-suppressed subscriber gets no email');
   check((await reqUnsub(F, 'not-an-email')).status === 400, 'unsubscribe request: invalid email => 400');
   check((await reqUnsub(F, EMAIL, 'https://evil.example')).status === 403, 'unsubscribe request: foreign browser origin => 403');
   const limited = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, RATE_LIMITER: { limit: async () => ({ success: false }) } }, {});

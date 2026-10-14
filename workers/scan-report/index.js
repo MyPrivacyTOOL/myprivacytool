@@ -406,10 +406,17 @@ async function handleUnsubscribeRequest(env, request, cors, json) {
   if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
   if (!env.UNSUBSCRIBE_SECRET || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Unavailable' }, 503);
   try {
-    const user = (await db(env).select(`users?email=eq.${encodeURIComponent(email)}&select=id,email_opt_out_at&limit=1`))[0];
-    if (user && !user.email_opt_out_at && recipientAllowed(env, email)) {
+    const sb = db(env);
+    const user = (await sb.select(`users?email=eq.${encodeURIComponent(email)}&select=id,email_opt_out_at&limit=1`))[0];
+    // MPC-7789: newsletter-only subscribers (public.subscribers) and HK Spam registrants have no users row; the footer form must reach them too.
+    // Same ilike escaping as the removal in handleUnsubscribe (an address containing * is matched exactly).
+    const star = /\*/.test(email);
+    const subscriber = user ? null : (await sb.select(`subscribers?email=${star ? 'eq.' : 'ilike.'}${encodeURIComponent(star ? email : email.replace(/[\\%_]/g, '\\$&'))}&select=id&limit=1`))[0];
+    const hash = await emailHash(email);
+    const suppressed = Boolean(user?.email_opt_out_at) || (await sb.select(`email_suppressions?email_hash=eq.${hash}&select=email_hash&limit=1`)).length > 0;
+    if ((user || subscriber) && !suppressed && recipientAllowed(env, email)) {
       const mail = buildUnsubscribeRequestEmail({ link: await unsubscribePageUrl(env, email) });
-      const r = await sendEmail(env, { to: email, ...mail, idempotencyKey: `unsubreq-${user.id}-${new Date().toISOString().slice(0, 13)}` });
+      const r = await sendEmail(env, { to: email, ...mail, idempotencyKey: `unsubreq-${hash.slice(0, 16)}-${new Date().toISOString().slice(0, 13)}` });
       if (!r.sent) console.error('unsubscribe request email not sent:', r.reason);
     }
   } catch (e) { console.error('unsubscribe request failed', String(e)); }
