@@ -11,12 +11,12 @@ import {
 } from "./hkDnc";
 
 describe("hkDnc config", () => {
-  it("IVR_VERIFIED is false until every key is VERIFIED (and only then may it be true)", () => {
+  it("IVR_VERIFIED may only be true when every key is VERIFIED, and is true now that real calls confirmed them", () => {
     const all = HK_REGISTERS.flatMap((r) => (["en", "yue"] as const).flatMap((l) => getIvrKeys(r, l)));
     const everyVerified = all.every((k) => k.status === "VERIFIED");
-    expect(IVR_VERIFIED).toBe(false);
+    expect(IVR_VERIFIED).toBe(true);
     if (IVR_VERIFIED) expect(everyVerified).toBe(true);
-    expect(everyVerified).toBe(false);
+    expect(everyVerified).toBe(true);
   });
 
   it("recorded menu: language 1 Cantonese / 3 English, service 3 SMS / 1 pre-recorded, then 1 = register this number", () => {
@@ -52,7 +52,7 @@ describe("hkDnc config", () => {
     const digits = r.dial.slice("tel:13571835000".length).replace(/,/g, "");
     expect(digits.replace(/%2A/g, "*")).toBe(keys.join(""));
     expect(keys.join("")).toBe("331");
-    expect(r.verified).toBe(false);
+    expect(r.verified).toBe(true);
   });
 
   it("ios: same pauses and keys in the dial string as Android, plus the keys on screen as a backup", () => {
