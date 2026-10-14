@@ -1,6 +1,6 @@
 {
   "library": "alice",
-  "version": "0.1.1-draft",
+  "version": "0.1.2-draft",
   "locked": false,
   "fps": 30,
   "canvas": {
@@ -71,9 +71,10 @@
       "id": "face-three-quarter-right",
       "path": "faces/alice_face_three-quarter-right_v1.0.png",
       "kind": "face",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 2048
+      "min_long_edge_px": 2048,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "face-profile-left",
@@ -87,9 +88,10 @@
       "id": "face-profile-right",
       "path": "faces/alice_face_profile-right_v1.0.png",
       "kind": "face",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 2048
+      "min_long_edge_px": 2048,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "pose-p1-curious-ready",
@@ -143,49 +145,55 @@
       "id": "expr-curious",
       "path": "expressions/alice_expr_curious_v1.0.png",
       "kind": "expression",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 1024
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "expr-observant",
       "path": "expressions/alice_expr_observant_v1.0.png",
       "kind": "expression",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 1024
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "expr-concerned",
       "path": "expressions/alice_expr_concerned_v1.0.png",
       "kind": "expression",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 1024
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "expr-purposeful",
       "path": "expressions/alice_expr_purposeful_v1.0.png",
       "kind": "expression",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 1024
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "expr-inviting",
       "path": "expressions/alice_expr_inviting_v1.0.png",
       "kind": "expression",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 1024
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "expr-anticipatory",
       "path": "expressions/alice_expr_anticipatory_v1.0.png",
       "kind": "expression",
-      "required": true,
+      "required": false,
       "status": "missing",
-      "min_long_edge_px": 1024
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "voice-ref-approved-sample",
@@ -206,8 +214,9 @@
       "id": "anim-curtain-reveal",
       "path": "animations/alice_anim_curtain-reveal_v1.0.mp4",
       "kind": "animation",
-      "required": true,
-      "status": "missing"
+      "required": false,
+      "status": "missing",
+      "note": "Deferred to a later minor version (not needed for v1.0)."
     },
     {
       "id": "interim-reference",
@@ -222,7 +231,9 @@
     "Proposed framing pixel rules (full/medium/close) and the 1920x1080 horizontal canvas are approved as the v1 working values.",
     "Proposed blink, head, gesture and pause timings are approved as the v1 working values.",
     "Voice stays Kokoro v0.19 bf_isabella as shipped; no paid TTS or custom recording for v1.",
-    "Proportions: MPC-7438 example (head = 1/7 of body) adopted as the provisional target; must be measured from the final art before lock."
+    "Proportions: MPC-7438 example (head = 1/7 of body) adopted as the provisional target; must be measured from the final art before lock.",
+    "v1.0 scope reduced to six poses, layered master, three head views and the voice reference (2026-10-14)."
   ],
-  "authority": "Notion MPC-7438 Alice Character Sheet, approved by Chris 2026-10-12"
+  "authority": "Notion MPC-7438 Alice Character Sheet, approved by Chris 2026-10-12",
+  "v1_scope": "Six poses P1-P6, layered master (Alice/curtain/code), three head views (front, three-quarter, profile), approved voice reference. Other faces, expressions and the curtain-reveal animation ship as later minor versions."
 }

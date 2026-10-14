@@ -12,3 +12,6 @@
 - Aligned with the approved MPC-7438 sheet: poses P1-P6, striped stockings, `#00FF00` code colour,
   curtain reveal 0.5-1.5 s, expressions per pose mood, 7-head proportion target (provisional).
 - Voice licence recorded from MPC-7438 (Apache 2.0, commercial use permitted); approved sample added as the voice reference.
+
+## 0.1.2-draft (MPC-7797)
+- v1.0 scope reduced (approved): six poses P1-P6, layered master, three head views (front, three-quarter-left, profile-left) and the voice reference. Remaining faces, the six expression crops and the curtain-reveal animation are optional, for later minor versions.
