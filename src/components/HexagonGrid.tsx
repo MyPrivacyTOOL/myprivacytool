@@ -4,6 +4,7 @@ import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
 import { interestRank } from '@/lib/hexagonInterestOrder';
+import { buildTeaser } from '@/lib/exposureCopy';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
 import { startBehaviorTracking, stopBehaviorTracking, getAllBehaviorData } from '@/lib/behaviorDetection';
@@ -592,7 +593,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           YOUR DIGITAL SHADOW
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">
-          We found {visibleCount} data points about you without asking.
+          {buildTeaser(orderedHexagons.map(h => h.id), Object.fromEntries(orderedHexagons.map(h => [h.id, h.label.toLowerCase()])))}
           {visibleCount < orderedHexagons.length && (
             <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
