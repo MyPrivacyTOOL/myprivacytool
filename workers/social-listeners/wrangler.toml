@@ -14,6 +14,10 @@ workers_dev = true
 #   X_CONSUMER_SECRET, LINKEDIN_CLIENT_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward),
 #   TELEGRAM_BOT_TOKEN (BotFather token; sends the reply core-brain chose. Without it Telegram messages are ingested but not answered)
 
+# Channel probe reader (test-only, docs/channel-probe.md): plain vars, NOT secrets. Both unset = off. PROBE_MODE="on" plus
+# PROBE_TELEGRAM_IDS="<our test account ids>" saves raw payloads and public-lookup results for those accounts only (7 day expiry).
+# Set them in the Cloudflare dashboard (Worker > Settings > Variables) or `wrangler deploy --var PROBE_MODE:on`; never commit real ids.
+
 [observability]
 enabled = true
 

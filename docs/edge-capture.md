@@ -41,8 +41,14 @@ inventory section 1). HTML pages, `robots.txt`, `sitemap.xml` and `/api/*` are r
 
 ## Row contents (`public.edge_visits`)
 
-`seen_at, host, path (no query string), method, status, user_agent, ip, country, asn, network, colo, referrer (origin+path only),
+`seen_at, host, path (query string in its own redacted column), method, status, user_agent, ip, country, asn, network, colo, referrer (origin+path only),
 headers (a short allow-list: accept*, sec-fetch-*, sec-ch-ua*, dnt, via; never cookie or authorization), class, rule, ruleset_version`.
+Decision D-A (Chris, 2026-10-14: capture everything raw, from day one) adds four columns, migration `20261014120000_edge_visits_capture_everything.sql`:
+`query` (query string; values redacted where the key looks like a token, key, secret, password, code, session, signature or email), `ip_version` (4 or 6),
+`cf` (every property Cloudflare put on `request.cf`: city, region, coordinates, postal code, timezone, TLS version and cipher, round-trip times, and bot fields where the plan has them; capped at 8 KB, larger objects keep only top-level plain values) and
+`all_headers` (every request header except `cookie`, `authorization`, `proxy-authorization`, `set-cookie` and any name containing token, secret, password, api-key, session, bearer, credential or starting `cf-access-`; the `referer` header is reduced to origin and path like the `referrer` column).
+The old columns and the class rules are unchanged. **Deploy order: apply the migration first**, otherwise the insert fails on the unknown columns and visits are silently dropped. Capture is still behind `EDGE_CAPTURE_ENABLED`.
+IP retention (`edge_visit_retention`, 30 days) is unchanged and not covered by this decision; it was set aside on request.
 RLS enabled and forced; `service_role` only (anon and authenticated are denied; tested).
 
 ## Classifier
