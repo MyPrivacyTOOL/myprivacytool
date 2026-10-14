@@ -112,6 +112,7 @@ jobs:
             ${{ secrets.X_CLIENT_SECRET != '' && 'X_CLIENT_SECRET' || '' }}
             ${{ secrets.X_REFRESH_TOKEN != '' && 'X_REFRESH_TOKEN' || '' }}
             ${{ secrets.X_CONSUMER_KEY != '' && 'X_CONSUMER_KEY' || '' }}
+            ${{ secrets.X_API_KEY != '' && 'X_API_KEY' || '' }}
             ${{ secrets.X_ACCESS_TOKEN != '' && 'X_ACCESS_TOKEN' || '' }}
             ${{ secrets.X_ACCESS_TOKEN_SECRET != '' && 'X_ACCESS_TOKEN_SECRET' || '' }}
         env:
@@ -131,5 +132,6 @@ jobs:
           X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET || 'placeholder' }}
           X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN || 'placeholder' }}
           X_CONSUMER_KEY: ${{ secrets.X_CONSUMER_KEY || 'placeholder' }}
+          X_API_KEY: ${{ secrets.X_API_KEY || 'placeholder' }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN || 'placeholder' }}
           X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET || 'placeholder' }}

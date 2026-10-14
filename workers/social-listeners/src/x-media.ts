@@ -15,14 +15,17 @@ const POLLS = 5;
 const MISSING = (v?: string) => !v || v === "placeholder";
 const rfc3986 = (v: string) => encodeURIComponent(v).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 
+/** The app's API key (a.k.a. consumer key): X_CONSUMER_KEY, or X_API_KEY (the name already used in the secret inventory). */
+const consumerKey = (env: Env): string | undefined => [env.X_CONSUMER_KEY, env.X_API_KEY].find((v) => !MISSING(v));
+
 export const hasOAuth1 = (env: Env): boolean =>
-  ![env.X_CONSUMER_KEY, env.X_CONSUMER_SECRET, env.X_ACCESS_TOKEN, env.X_ACCESS_TOKEN_SECRET].some(MISSING);
+  Boolean(consumerKey(env)) && ![env.X_CONSUMER_SECRET, env.X_ACCESS_TOKEN, env.X_ACCESS_TOKEN_SECRET].some(MISSING);
 
 /** OAuth 1.0a (HMAC-SHA1) Authorization header. Only the oauth_* fields and the query string are signed, not a multipart body. */
 export async function oauth1Header(env: Env, method: string, url: string, nonce = crypto.randomUUID().replace(/-/g, ""), ts = String(Math.floor(Date.now() / 1000))): Promise<string> {
   const u = new URL(url);
   const oauth: Record<string, string> = {
-    oauth_consumer_key: env.X_CONSUMER_KEY!,
+    oauth_consumer_key: consumerKey(env)!,
     oauth_nonce: nonce,
     oauth_signature_method: "HMAC-SHA1",
     oauth_timestamp: ts,

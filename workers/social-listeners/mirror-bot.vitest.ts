@@ -476,6 +476,11 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
     expect(hasOAuth1(keys as never)).toBe(true);
     expect(hasOAuth1({ ...keys, X_ACCESS_TOKEN_SECRET: "placeholder" } as never)).toBe(false);
     expect(hasOAuth1({ X_CONSUMER_SECRET: "xs" } as never)).toBe(false);
+    // X_API_KEY is accepted in place of X_CONSUMER_KEY (and a placeholder X_CONSUMER_KEY does not hide it)
+    const { X_CONSUMER_KEY, ...rest } = keys;
+    expect(hasOAuth1({ ...rest, X_API_KEY: X_CONSUMER_KEY } as never)).toBe(true);
+    expect(hasOAuth1({ ...rest, X_CONSUMER_KEY: "placeholder", X_API_KEY: X_CONSUMER_KEY } as never)).toBe(true);
+    expect(hasOAuth1({ ...rest } as never)).toBe(false);
   });
   it("signs the upload calls with OAuth 1.0a when the keys are set", async () => {
     const seen: string[] = [];
