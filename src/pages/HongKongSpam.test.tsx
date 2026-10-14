@@ -375,9 +375,10 @@ describe("scan CTA, opt-out generator, spam log, FAQ, disclaimer", () => {
 });
 
 describe("SEO head and routing", () => {
-  it("is noindex while the launch flag is off, with canonical, hreflang and FAQPage + HowTo JSON-LD", async () => {
+  it("is indexable now (launch flag on, no noindex tag), with canonical, hreflang and FAQPage + HowTo JSON-LD", async () => {
     renderEn();
-    await waitFor(() => expect(document.head.querySelector('meta[name="robots"][content="noindex"]')).not.toBeNull());
+    await waitFor(() => expect(document.head.querySelector('link[rel="canonical"]')).not.toBeNull());
+    expect(document.head.querySelector('meta[name="robots"][content="noindex"]')).toBeNull();
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe("https://www.myprivacytool.io/HongKongSpam");
     expect(document.head.querySelector('link[rel="alternate"][hreflang="en-HK"]')).not.toBeNull();
     expect(document.head.querySelector('link[rel="alternate"][hreflang="zh-HK"]')?.getAttribute("href")).toContain("?lang=zh");
