@@ -6,7 +6,7 @@ MPC-7438 wins and this file is corrected.
 
 Style: 1865 Wonderland wood-engraving (Tenniel). Pen-and-ink line, cross-hatching for shade, no
 colour fills. Palette: **white paper and black ink**. The only colour in any frame is Matrix green
-(`#00FF00`) code on black behind the curtain, never on Alice herself.
+(`#27AE60`) code on black behind the curtain, never on Alice herself.
 
 Marked **[ref]** = read off the current reference (`video-scripts/assets/alice.png`, 820x736).
 Marked **[proposed]** = a decision needing sign-off before v1.0; measure and replace with real

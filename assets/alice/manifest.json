@@ -32,8 +32,8 @@
     "source": "MPC-7438 example (head = 1/7 of body)"
   },
   "palette": {
-    "code_green": "#00FF00",
-    "note": "only colour; behind the curtain on black"
+    "code_green": "#27AE60",
+    "note": "only colour; behind the curtain on black. Brand Matrix Green; measured ~RGB 78/199/67 in the approved clip, a lighter glow tint is fine where it spills out of the curtain"
   },
   "legacy_clips": {
     "count": 15,

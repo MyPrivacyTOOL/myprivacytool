@@ -12,3 +12,6 @@
 - Aligned with the approved MPC-7438 sheet: poses P1-P6, striped stockings, `#00FF00` code colour,
   curtain reveal 0.5-1.5 s, expressions per pose mood, 7-head proportion target (provisional).
 - Voice licence recorded from MPC-7438 (Apache 2.0, commercial use permitted); approved sample added as the voice reference.
+
+## 0.1.2-draft
+- Corrected code colour from `#00FF00` to Matrix Green `#27AE60` (locked brand palette, 2026-07-31). `#00FF00` was never approved as a hex; the approved reference clip measures about RGB 78/199/67, nearer `#27AE60`. Notion (Brand Guidelines Part 8A, MPC-7438) corrected the same day. The 0.1.1 entry above is left as written for audit.
