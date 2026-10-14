@@ -39,10 +39,11 @@ WEB_SCAN_SAVE_ENABLED = "true"
 # anything but "true" does nothing.
 RECOGNITION_ENABLED = "true"
 
+# MPC-7645 ON 2026-10-14 IN TESTER MODE: the Worker secret REFERRALS_TEST_RECIPIENTS limits every referral feature to the listed test addresses. Deleting that secret opens the programme to ALL users. Rollback: "false".
 # MPC-7645: referral programme ("Invite 3 friends", one free month of Pro per friend who gets a report). OFF. Turn on only after Chris has approved the
 # email copy (lib/referralEmail.js) and the Privacy text, and migration 20261013100000_mpc_7645_referrals.sql is applied. Needs UNSUBSCRIBE_SECRET.
 # The site has a matching flag, VITE_REFERRALS_ENABLED. Anything but "true" does nothing: no link, no block in the report, no reward, endpoints answer 404.
-REFERRALS_ENABLED = "false"
+REFERRALS_ENABLED = "true"
 # Tester mode: set the Worker SECRET REFERRALS_TEST_RECIPIENTS (comma separated addresses, `wrangler secret put`, never in this file) to limit the programme to
 # those addresses while it is tested: the invite block, invite page, invitations (to listed addresses only) and reward emails. Everyone else is unchanged.
 # Delete the secret to open the programme to every user. Order matters: set the secret BEFORE setting REFERRALS_ENABLED = "true".
