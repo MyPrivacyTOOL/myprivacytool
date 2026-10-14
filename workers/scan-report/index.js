@@ -375,6 +375,10 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
   try {
     const sb = db(env);
     await sb.patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
+    // CK-7721 fix 3: also delete the address from the newsletter list (public.subscribers), so the stored email goes too, not just the mail.
+    // Case-insensitive, with LIKE wildcards escaped; an address containing * (a PostgREST wildcard) is matched exactly instead. Done BEFORE the
+    // suppression row so a failure leaves nothing half-done: the person can simply retry the link.
+    await sb.remove(`subscribers?email=${/\*/.test(email) ? 'eq.' : 'ilike.'}${encodeURIComponent(/\*/.test(email) ? email : email.replace(/[\\%_]/g, '\\$&'))}`);
     const firstTime = await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
     const hs = await pushEmailOptOut(env, { email });   // best effort: HubSpot must not mail them either; a failure never blocks the unsubscribe
     if (hs.failed) console.error('HubSpot opt-out failed:', hs.failed);
@@ -385,7 +389,7 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
         if (!r.sent) console.error('unsubscribe confirmation email not sent:', r.reason);
       } catch (e) { console.error('unsubscribe confirmation email failed', String(e).replace(/\S+@\S+/g, '[email]')); }
     }
-    return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails.');
+    return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails, and we have removed you from our newsletter list.');
   } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
 }
 
