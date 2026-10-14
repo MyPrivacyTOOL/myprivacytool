@@ -13,7 +13,8 @@ Video id: ______  Library version used: ______  Reviewer: ______  Date: ______
 ## B. Look (compare to `faces/` and `poses/` side by side)
 - [ ] Same face, hair, costume and shoes (no drift in hair length, eyes, apron, pocket side)
 - [ ] Proportions within +/- 3% of the locked head-to-body ratio
-- [ ] Palette: white, black, brand green only
+- [ ] Palette: white and black only; the only colour is `#00FF00` code behind the curtain
+- [ ] Pose is one of P1-P6 and matches MPC-7438
 - [ ] Engraving line weight and hatching match; no smoothing, glow or colour
 
 ## C. Framing and motion

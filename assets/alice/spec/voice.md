@@ -34,13 +34,14 @@ Claims must be on the approved claims list (MPC-7402).
   generated audio. Keep the licence text and model version in the release notes of each video.
 - Generated audio carries no per-video fee. Record the model version and speaker id in each video's
   metadata so any video can be re-rendered identically.
-- **Open item, needs human confirmation:** the v0.19 voice pack's upstream attribution/terms for
-  `bf_isabella` should be read once and the result logged in `manifest.json` (`open_decisions`).
-  Until then, treat commercial use as "believed permitted, not yet confirmed".
+- Per the approved sheet (MPC-7438): Apache 2.0, commercial use permitted, no credit required
+  (courtesy attribution welcome). Approved sample: `A_note-spec_v019.mp3`, approved by Chris
+  2026-10-11, held in Google Drive, MPT YouTube / 03-brand-assets / Voice.
 - If the voice is ever replaced by a human recording, obtain a signed licence covering all media,
   all videos, perpetual, plus consent for synthetic derivatives.
 
 ## Reference renders
 
-`voice/` holds approved 10-second reference renders of three fixed test lines (neutral, question,
-warning) so any future render can be compared by ear and by loudness/spectrogram.
+The approved reference is `A_note-spec_v019.mp3` ("I'm Alice. I help you see what's out there about
+you, and take it back.", 5.8 s). Copy it into `voice/` as `alice_voice_ref-approved-sample_v1.0.mp3`
+so any future render can be compared by ear and by loudness.

@@ -53,22 +53,32 @@ added, it is a MINOR version and needs its own viseme sheet.
 
 ## 4. Expression mapping
 
-| Expression | Brows | Eyes | Mouth | Head |
-|---|---|---|---|---|
-| neutral | level, relaxed | normal | closed, flat | straight |
-| curious | one brow raised 2 px of head height | slightly wide | small closed | tilt 6 degrees toward raised brow |
-| concerned | inner ends up, together | normal, gaze down-left | closed, slight down-turn | tilt 3 degrees down |
-| surprised | both high | wide, +15% | open small "o" | back 4 degrees |
-| warm-smile | softly raised | normal | closed smile | tilt 3 degrees |
-| thinking | one brow slightly lowered | gaze up-right | closed, pursed | tilt 8 degrees |
-| reassuring | relaxed | soft, steady gaze | gentle closed smile | slow nod, 12 frames |
+One expression per MPC-7438 pose mood. Fine values are proposed.
 
-Hold each expression at least 0.5 s; transitions 6-9 frames. "Scared" is deliberately omitted: Alice
-informs, she does not alarm. Use `concerned` or `surprised`.
+| Expression (pose) | Brows | Eyes | Mouth | Head |
+|---|---|---|---|---|
+| curious (P1) | one brow raised 2 px of head height | open, alert | slight smile | tilt 6 degrees toward raised brow |
+| observant (P2) | level, slightly lowered | focused on a spot, gaze down | closed, flat | tilt 4 degrees down |
+| concerned (P3) | inner ends up | slightly wide, +10% | closed, no smile | straight, still |
+| purposeful (P4) | level, firm | forward, steady | closed, jaw set | straight |
+| inviting (P5) | softly raised | meeting the viewer | slight smile | tilt 3 degrees |
+| anticipatory (P6) | relaxed | toward the curtain then camera | closed, slight hold | turn toward camera, 12 frames |
+
+Hold each expression at least 0.5 s; transitions 6-9 frames. No fear expressions: Alice informs,
+she does not alarm (brand no-fear rule).
+
+## 4a. Curtain and code reveal (MPC-7438 deliverable 4)
+
+- Reveal takes 0.5 to 1.5 s (15-45 frames at 30 fps), eased, never jerky.
+- Curtain: white, line-drawn folds in the engraving style. Behind it: black, then green code
+  (`#00FF00`), large and readable on mobile, 40-60% fill, monospace, swirling or cascading
+  gracefully, never chaotic.
+- Every curtain moment uses the same folds, code colour and motion speed in every video.
+- Fix scene: curtain closes or code fades, replaced by an action element (button, letter, door).
 
 ## 5. Layer and file structure for animation
 
-Master art is layered: `alice` / `curtain` / `code` (green falling characters) / `background`.
+Master art is layered: `alice` / `curtain` / `code` (Matrix green `#00FF00` characters on black) / `background`.
 The curtain-reveal animation needs these separate (known gap in `tools/video-pipeline/README.md`).
 Source: layered PSD or SVG. Delivery: PNG sequence or ProRes 4444 with alpha, then MP4 via ffmpeg.
 
