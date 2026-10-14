@@ -31,6 +31,7 @@ import AliceHDBadge from './AliceHDBadge';
 import AliceHDModal from './AliceHDModal';
 import FreeVoiceBadge from './FreeVoiceBadge';
 import { trackUpgradeModalOpened } from '@/lib/analytics';
+import { TOP_SIX_EXPLAINERS } from '@/lib/exposureCopy';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface VoiceAIProps {
@@ -159,14 +160,13 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   
   // CORE FINGERPRINTING HEXAGONS
   if (label.includes('canvas fingerprint')) {
-    return "I detected your canvas fingerprint. This is a unique signature created by how your browser renders images. Even tiny differences in graphics hardware and software create a distinct pattern. This makes you 99% trackable across websites, even without cookies.";
+    return TOP_SIX_EXPLAINERS['canvas-fingerprint'];
   }
   if (label.includes('webgl')) {
-    const gpuName = value.length > 3 ? value.replace('...', '') : 'your graphics card';
-    return `Your WebGL signature reveals your graphics card: ${gpuName}. This is one of the most powerful fingerprinting methods because GPU configurations are highly unique. Combined with other factors, this makes you extremely identifiable.`;
+    return TOP_SIX_EXPLAINERS['webgl-fingerprint'];
   }
   if (label.includes('audio signature') || label.includes('audio fingerprint')) {
-    return "I found your audio fingerprint. Your browser's audio processing creates tiny variations that are unique to your device. While less reliable than canvas or WebGL, it still contributes to your overall trackability.";
+    return TOP_SIX_EXPLAINERS['audio-fingerprint'];
   }
   if (label.includes('installed fonts') || label.includes('font')) {
     const fontMatch = value.match(/(\d+)/);
