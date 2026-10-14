@@ -698,5 +698,25 @@ select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 1, 'mpt_purge
 select pg_temp.assert((select count(*) from public.social_contacts) = 0, 'mpt_purge_expired_social_contacts: removes expired contacts');
 reset role;
 
+-- ===== MPC-7502: plans (pricing source of truth) =====
+select pg_temp.assert((select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.plans'::regclass), 'plans: RLS enabled and forced');
+select pg_temp.assert((select count(*) = 4 and string_agg(slug || ':' || monthly_price_cents, ',' order by sort_order) = 'free:0,basic:799,pro:1499,executive:4999' from public.plans), 'plans: seeded with the four approved tiers and prices');
+select pg_temp.assert(pg_temp.try_as('anon', $$select slug, name, monthly_price_cents, scans_label, sort_order from public.plans$$) = '', 'plans: anon can read the public columns');
+select pg_temp.assert(pg_temp.try_as('anon', $$select stripe_price_id from public.plans$$) = '42501', 'plans: anon cannot read stripe_price_id');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.plans$$) = '42501', 'plans: anon select * is denied (stripe_price_id is not granted)');
+select pg_temp.assert(pg_temp.try_as('anon', $$update public.plans set monthly_price_cents = 1$$) = '42501', 'plans: anon cannot update');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$insert into public.plans (slug, name, monthly_price_cents, scans_label, sort_order) values ('x','X',1,'x',99)$$) = '42501', 'plans: authenticated cannot insert');
+set local role service_role;
+update public.plans set active = false where slug = 'executive';
+reset role;
+set local role anon;
+select pg_temp.assert((select count(*) from public.plans) = 3, 'plans: anon sees active plans only');
+reset role;
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.plans (slug, name, monthly_price_cents, scans_label, sort_order) values ('Bad Slug','X',1,'x',98)$$) = '23514', 'plans: slug must be a lower-case slug');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.plans (slug, name, monthly_price_cents, scans_label, sort_order) values ('neg','X',-1,'x',97)$$) = '23514', 'plans: price cannot be negative');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.plans set stripe_price_id = 'price_abc123' where slug = 'free'$$) = '23514', 'plans: the free plan cannot have a Stripe price');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.plans set stripe_price_id = 'not-a-price' where slug = 'pro'$$) = '23514', 'plans: stripe_price_id must look like price_...');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.plans set stripe_price_id = 'price_1AbC' where slug = 'pro'$$) = '', 'plans: a paid plan can hold a Stripe price id');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
