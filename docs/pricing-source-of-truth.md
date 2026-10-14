@@ -12,3 +12,11 @@
 - If Supabase is unreachable or the data fails validation, the build keeps the committed snapshot and carries on. Set `SKIP_PLANS_SYNC=1` to skip the fetch deliberately.
 - The fetch uses the public publishable key (the same one `/newsletter` uses); anon can read active rows and only the non-Stripe columns.
 - Stripe price ids live in the same table (`stripe_price_id`, service role only). Checkout does not read them yet (still `STRIPE_PRICE_*` Pages variables); that is the next step.
+
+## Stripe price check (step 4)
+`scripts/check-stripe-prices.mjs` (weekly via `.github/workflows/check-stripe-prices.yml`, or by hand) compares each paid plan's Stripe price with the table: same amount in cents, USD, billed every 1 month, price active. It only reads; it never creates or edits Stripe prices (a Stripe price cannot be edited once created, so a price change means creating a new price and putting its id in `plans.stripe_price_id`).
+
+- Needs the repository secret `STRIPE_SECRET_KEY`: create a Stripe **restricted** key with read-only access to **Prices** and nothing else. Until it exists the workflow skips and stays green.
+- Price ids come from `plans.stripe_price_id` when the `SUPABASE_SERVICE_ROLE_KEY` repository secret is set, otherwise from the `STRIPE_PRICE_BASIC` / `_PRO` / `_EXECUTIVE` repository secrets.
+- Exit 1 = a price does not match (the log names the plan and both amounts); exit 2 = the check could not run (Stripe or Supabase error).
+- By hand: `STRIPE_SECRET_KEY=rk_... STRIPE_PRICE_BASIC=price_... node scripts/check-stripe-prices.mjs --require`
