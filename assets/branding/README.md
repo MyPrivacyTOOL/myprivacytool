@@ -10,4 +10,4 @@ Placeholder for Chris to upload high-resolution photos and brand imagery.
 Do not commit anything private or unreleased. Until files are added, agents should treat this folder as empty and not invent imagery.
 
 ## Files
-_None yet._
+- `logo/`: draft SVG logo vectors traced from the approved PNG (see `logo/README.md`). Brand asset, not a personal photo.
