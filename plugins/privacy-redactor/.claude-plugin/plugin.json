@@ -1,0 +1,35 @@
+{
+  "name": "privacy-redactor",
+  "displayName": "Privacy Redactor",
+  "version": "1.0.0",
+  "description": "Redact personal identifiable information (PII) from text and documents while preserving semantic meaning. Local-only processing with explicit user consent. Logs redaction patterns to enable Shadow Risk Score validation.",
+  "author": {
+    "name": "MyPrivacyTOOL",
+    "url": "https://myprivacytool.io"
+  },
+  "license": "MIT",
+  "contact": {
+    "support": "support@myprivacytool.io"
+  },
+  "capabilities": {
+    "skills": true,
+    "localProcessing": true,
+    "mcp": false,
+    "externalDataSharing": false
+  },
+  "privacyPolicy": {
+    "dataProcessed": "Text and documents containing PII",
+    "dataLocation": "Local user device only",
+    "externalSharing": "None — all processing is client-side",
+    "logging": "Redaction event metadata (category counts, timestamp) logged to Supabase only with explicit user consent",
+    "retention": "Redaction logs retained for 30 days; user can delete anytime"
+  },
+  "keywords": [
+    "privacy",
+    "redaction",
+    "PII",
+    "data-minimization",
+    "agent-privacy",
+    "local-processing"
+  ]
+}
