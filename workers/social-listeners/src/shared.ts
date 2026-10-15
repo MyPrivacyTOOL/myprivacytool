@@ -25,10 +25,14 @@ export interface Env {
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;
-  /** Channel probe reader (test-only): "on" enables it; anything else (default) is off. See docs/channel-probe.md. */
+  /** Channel probe reader: "on" = allow-listed test accounts only, "all" = every non-bot sender; anything else (default) is off. See docs/channel-probe.md. */
   PROBE_MODE?: string;
   /** Comma-separated numeric Telegram ids of our own test accounts; only these are ever captured by the probe reader. */
   PROBE_TELEGRAM_IDS?: string;
+  /** Mode "all": skip the public lookups for a sender looked up within this many hours (default 24). */
+  PROBE_LOOKUP_HOURS?: string;
+  /** Mode "all": days until a row's expires_at (default 90, clamped 1-365). */
+  PROBE_RETENTION_DAYS?: string;
   /** Preferred: service binding to the core-brain Worker (MPC-8601). */
   CORE_BRAIN?: { fetch(request: Request): Promise<Response> };
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */
