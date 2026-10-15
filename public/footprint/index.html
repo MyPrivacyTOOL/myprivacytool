@@ -32,6 +32,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
   padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
@@ -123,10 +124,14 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .pop{animation:hexpop .4s ease-out}
 @keyframes hexpop{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
 
-.curtain{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#fff;
-  transition:opacity 1.3s ease,transform 1.5s cubic-bezier(.65,.05,.3,1)}
-.curtain img{max-width:88%;max-height:78%;object-fit:contain;display:block}
+.curtain{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--cur-bg,#fff);
+  transition:opacity var(--open-ms,1300ms) ease,transform var(--open-ms,1300ms) cubic-bezier(.65,.05,.3,1)}
+.curtain img,.curtain video{max-width:var(--cur-w,88%);max-height:var(--cur-h,78%);object-fit:var(--cur-fit,contain);display:block;background:var(--cur-bg,#fff)}
 .curtain.open{opacity:0;transform:translateX(-9%);pointer-events:none}
+.curtain[data-slide="right"].open{transform:translateX(9%)}
+.curtain[data-slide="up"].open{transform:translateY(-9%)}
+.curtain[data-slide="fade"].open{transform:none}
+.curtain.playing button{opacity:0;pointer-events:none}
 .curtain button{background:var(--green);border-color:var(--green);color:#fff;font:700 16px var(--body);padding:11px 22px;border-radius:99px}
 .curtain.open button{opacity:0}
 
@@ -140,6 +145,14 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
 .panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .panel dd{margin:0}
+.help{align-self:center;width:100%;max-width:560px;display:flex;flex-direction:column;gap:10px;align-items:center}
+button.linkbtn{background:none;border:0;padding:6px 10px;color:var(--ink);text-decoration:underline;text-underline-offset:3px;font-weight:600}
+.helpbox{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.helpbox h3{font:700 18px/1.2 var(--body);margin:0}
+.helpbox ol{margin:0;padding-left:22px;display:grid;gap:8px}
+.helpbox .acts{display:flex;gap:8px;flex-wrap:wrap}
+.bounce{animation:bob 1.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .learn{margin-top:12px;font-size:14px;color:var(--muted);border-left:3px solid var(--ask);padding-left:10px}
 
 .summary{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
@@ -162,7 +175,7 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .chip span{font-size:13px;line-height:1.2}
 .chip small{display:block;color:var(--muted);font-size:11.5px}
 .principle{font-size:14px;color:var(--muted);text-align:center;text-wrap:balance}
-@media (max-width:560px){.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
+@media (max-width:560px){body.pre .sub,body.pre .btns,body.pre .views,body.pre .summary,body.pre .legend,body.pre #panel,body.pre .principle{display:none}.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
 @media (max-width:480px){.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -209,8 +222,22 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
       </defs>
     </svg>
     <div class="curtain" id="curtain">
-      <img src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.remove()">
+      <img id="curtainImg" src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.hidden=true">
+      <video id="curtainVideo" hidden playsinline muted preload="none"></video>
       <button id="openCurtain">Open the curtain</button>
+    </div>
+  </section>
+
+  <section class="help">
+    <button id="helpBtn" class="linkbtn" aria-expanded="false" aria-controls="helpbox">Need help?</button>
+    <div class="helpbox" id="helpbox" hidden>
+      <h3>Three quick steps</h3>
+      <ol>
+        <li><b>Open the curtain.</b> Tap the green button on the picture.</li>
+        <li><b>Tap a purple hexagon.</b> Purple means we found something that may be you.</li>
+        <li><b>Say yes or no.</b> Yes if it is you, no if it is not. Green means confirmed. Red appears only if something is exposed.</li>
+      </ol>
+      <div class="acts"><button id="helpGo" class="primary">Open the curtain</button><button id="helpClose">Close</button></div>
     </div>
   </section>
 
@@ -347,7 +374,8 @@ function select(i){sel=i;paint();showPanel();
 
 const cleanRisk=it=>/text chosen|\(\)/.test(it.risk)?'Your real IP address is exposed even when you use a VPN, so sites and trackers can still see where you are.':it.risk;
 function showPanel(){
-  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Start here</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
+  if(sel<0&&!curtainOpen){panel.innerHTML=`<div class="badge"><svg width="61" height="68" viewBox="0 0 100 100" aria-hidden="true"><path d="${HEX}" fill="url(#gSoft)" stroke="var(--ink)" stroke-width="5"/><path d="M50 72V30M32 47l18-18 18 18" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" class="bounce"/></svg></div><div><div class="tag">Start here</div><h2>Open the curtain to start &uarr;</h2><p>Tap the green <b>Open the curtain</b> button above. Hexagons appear one by one as MPT finds them.</p></div>`;return}
+  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Next</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
   const it=ITEMS[sel],s=st[sel];
   let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
   if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
@@ -386,7 +414,7 @@ const PLAY_LABEL='▶ Replay the journey';
 document.getElementById('reset').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;reset()};
 playBtn.onclick=()=>{
   reset();playing=true;playBtn.textContent='Playing…';
-  const wait=curtainOpen?0:3400;if(!curtainOpen)openCurtain();
+  const wait=curtainOpen?0:(vidEl.getAttribute('src')?CUR.videoMaxSeconds*1000+2400:CUR.openMs+2100);if(!curtainOpen)openCurtain();
   let t=600+wait;
   const step=(fn,ms)=>{t+=ms;later(t,fn)};
   const tap=(id,a,gap)=>{step(()=>select(idx(id)),gap||1000);step(()=>act(a),900)};
@@ -435,10 +463,51 @@ grid.inert=true;zOut.disabled=true;
 function setView(v,ms){view=v;grid.classList.toggle('zoomed',v==='zoom');
   zIn.disabled=v==='zoom';zOut.disabled=v==='overview';
   animateTo(v==='zoom'?zoomTarget():FULL,ms||900)}
-function openCurtain(){if(curtainOpen)return;curtainOpen=true;curtainEl.classList.add('open');grid.inert=false;
-  autoZoom=setTimeout(()=>setView('zoom',1300),2900)}
-function closeCurtain(){curtainOpen=false;clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
+/* Curtain settings come from curtain.json next to this page (image, video, size, timing). The defaults below match the file. */
+const CUR_DEFAULTS={image:'alice-curtain.jpg',imageAlt:'Alice drawing back a curtain on a wall of green code',video:'',videoPoster:'',videoMaxSeconds:8,
+  buttonLabel:'Open the curtain',maxWidthPct:88,maxHeightPct:78,fit:'contain',background:'#ffffff',slide:'left',openMs:1300,zoomDelayMs:2900};
+let CUR={...CUR_DEFAULTS};
+const imgEl=document.getElementById('curtainImg'),vidEl=document.getElementById('curtainVideo'),openBtn=document.getElementById('openCurtain');
+const num=(v,d,lo,hi)=>{v=Number(v);return Number.isFinite(v)?Math.min(hi,Math.max(lo,v)):d};
+function applyCurtain(c){
+  CUR={...CUR_DEFAULTS,...(c&&typeof c==='object'?c:{})};
+  CUR.maxWidthPct=num(CUR.maxWidthPct,88,20,100);CUR.maxHeightPct=num(CUR.maxHeightPct,78,20,100);
+  CUR.openMs=num(CUR.openMs,1300,0,6000);CUR.zoomDelayMs=num(CUR.zoomDelayMs,2900,0,20000);CUR.videoMaxSeconds=num(CUR.videoMaxSeconds,8,1,60);
+  if(!['contain','cover'].includes(CUR.fit))CUR.fit='contain';
+  if(!['left','right','up','fade'].includes(CUR.slide))CUR.slide='left';
+  if(!/^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(String(CUR.background)))CUR.background='#ffffff';
+  const s=curtainEl.style;
+  s.setProperty('--cur-w',CUR.maxWidthPct+'%');s.setProperty('--cur-h',CUR.maxHeightPct+'%');s.setProperty('--cur-fit',CUR.fit);
+  s.setProperty('--cur-bg',CUR.background);s.setProperty('--open-ms',CUR.openMs+'ms');curtainEl.dataset.slide=CUR.slide;
+  if(CUR.image){if(!imgEl.src.endsWith(CUR.image))imgEl.src=CUR.image;imgEl.alt=CUR.imageAlt||'';imgEl.hidden=false}else imgEl.hidden=true;
+  if(CUR.video&&!window.matchMedia('(prefers-reduced-motion:reduce)').matches){vidEl.src=CUR.video;vidEl.poster=CUR.videoPoster||CUR.image||'';vidEl.setAttribute('aria-label',CUR.imageAlt||'')}
+  else{vidEl.removeAttribute('src');vidEl.load()}
+  openBtn.textContent=CUR.buttonLabel||'Open the curtain';
+}
+let opening=false;
+function openCurtain(){
+  if(curtainOpen||opening)return;
+  if(vidEl.getAttribute('src')){ /* play the video, then open */
+    opening=true;curtainEl.classList.add('playing');imgEl.hidden=true;vidEl.hidden=false;vidEl.currentTime=0;
+    let done=false;const finish=()=>{if(done)return;done=true;opening=false;curtainEl.classList.remove('playing');doOpen()};
+    vidEl.onended=finish;setTimeout(finish,CUR.videoMaxSeconds*1000);
+    const p=vidEl.play();if(p&&p.catch)p.catch(finish);
+  }else doOpen();
+}
+function doOpen(){curtainOpen=true;document.body.classList.remove('pre');syncHelp();if(sel<0)showPanel();curtainEl.classList.add('open');grid.inert=false;
+  autoZoom=setTimeout(()=>setView('zoom',1300),CUR.zoomDelayMs)}
+function closeCurtain(){curtainOpen=false;opening=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open','playing');grid.inert=true;
+  vidEl.pause();vidEl.hidden=true;if(CUR.image)imgEl.hidden=false;setView('overview',600)}
+fetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
 document.getElementById('openCurtain').onclick=openCurtain;
+/* Help: three yes-steps that end on the curtain button. */
+const helpBtn=document.getElementById('helpBtn'),helpBox=document.getElementById('helpbox'),helpGo=document.getElementById('helpGo');
+function syncHelp(){helpGo.textContent=curtainOpen?'Got it':'Open the curtain'}
+function toggleHelp(show){helpBox.hidden=!show;helpBtn.setAttribute('aria-expanded',show)}
+helpBtn.onclick=()=>toggleHelp(helpBox.hidden);
+document.getElementById('helpClose').onclick=()=>toggleHelp(false);
+helpGo.onclick=()=>{toggleHelp(false);openCurtain()};
+document.body.classList.add('pre');syncHelp();
 zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
 zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
 document.getElementById('vCurtain').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;closeCurtain();timers.forEach(clearTimeout);timers=[];setTimeout(openCurtain,700)};
