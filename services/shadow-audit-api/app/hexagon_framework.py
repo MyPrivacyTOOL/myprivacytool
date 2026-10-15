@@ -10,8 +10,9 @@ Each risk is defined as:
 - remediation: Recommended fix
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from app.models import AuditPillar, RiskLevel
+import re
 
 
 # MVP Risk Catalog (Top 10)
@@ -118,7 +119,70 @@ HEXAGON_RISKS: Dict[str, Dict] = {
 }
 
 
-def get_risk(risk_id: str) -> Dict | None:
+# PII Detection Patterns
+PII_PATTERNS = {
+    "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+    "phone": re.compile(r"\b(?:\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})\b"),
+    "ssn": re.compile(r"\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0{4})\d{4}\b"),
+    "credit_card": re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"),
+    "passport": re.compile(r"\b[A-Z]{1,2}\d{6,9}\b"),
+}
+
+# Credential Detection Patterns
+CREDENTIAL_PATTERNS = {
+    "api_key": re.compile(r"(api[_-]?key|apikey|api_secret|secret[_-]?key)\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{20,})['\"]?", re.IGNORECASE),
+    "bearer_token": re.compile(r"bearer\s+([A-Za-z0-9._\-]+)", re.IGNORECASE),
+    "aws_key": re.compile(r"AKIA[0-9A-Z]{16}"),
+    "github_token": re.compile(r"gh[pousr]{1}_[A-Za-z0-9_]{36,255}"),
+    "database_url": re.compile(r"(mysql|postgres|mongodb)://[^/]+:[^@]+@[^/]+"),
+}
+
+
+def detect_pii_exposure(text: str) -> List[Dict]:
+    """
+    Scan text for PII exposure patterns.
+    
+    Returns list of detected PII with type and location.
+    """
+    detections = []
+    
+    for pii_type, pattern in PII_PATTERNS.items():
+        matches = pattern.finditer(text)
+        for match in matches:
+            detections.append({
+                "type": pii_type,
+                "match": match.group(0),
+                "start": match.start(),
+                "end": match.end(),
+                "risk_id": "HX-1-01",
+            })
+    
+    return detections
+
+
+def detect_credential_exposure(text: str) -> List[Dict]:
+    """
+    Scan text for credential exposure patterns.
+    
+    Returns list of detected credentials with type and location.
+    """
+    detections = []
+    
+    for cred_type, pattern in CREDENTIAL_PATTERNS.items():
+        matches = pattern.finditer(text)
+        for match in matches:
+            detections.append({
+                "type": cred_type,
+                "match": match.group(0)[:20] + "...",  # Truncate for safety
+                "start": match.start(),
+                "end": match.end(),
+                "risk_id": "HX-1-02",
+            })
+    
+    return detections
+
+
+def get_risk(risk_id: str) -> Optional[Dict]:
     """Retrieve a single risk definition by ID."""
     return HEXAGON_RISKS.get(risk_id)
 
@@ -136,3 +200,31 @@ def get_risks_by_severity(severity: RiskLevel) -> List[Dict]:
 def get_all_risks() -> List[Dict]:
     """Return all risks in the MVP catalog."""
     return list(HEXAGON_RISKS.values())
+
+
+def score_risk_detection(detected_risks: List[Dict]) -> float:
+    """
+    Compute risk score (0-100) based on detected risks.
+    
+    Scoring logic:
+    - CRITICAL risks: +25 points each
+    - HIGH risks: +15 points each
+    - MEDIUM risks: +8 points each
+    - LOW risks: +3 points each
+    - Capped at 100
+    """
+    score = 0.0
+    severity_weights = {
+        RiskLevel.CRITICAL: 25,
+        RiskLevel.HIGH: 15,
+        RiskLevel.MEDIUM: 8,
+        RiskLevel.LOW: 3,
+    }
+    
+    for risk in detected_risks:
+        risk_def = get_risk(risk["risk_id"])
+        if risk_def:
+            severity = risk_def["severity"]
+            score += severity_weights.get(severity, 0)
+    
+    return min(score, 100.0)
