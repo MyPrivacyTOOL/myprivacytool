@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendHexagonInteraction } from './hexagonInteractionApi';
+import { fetchDeepDiveScan, fetchFinalScore, finalizeDeepDive, sendHexagonInteraction } from './hexagonInteractionApi';
 
 const SCAN = '11111111-1111-4111-8111-111111111111';
 const BASE = 'https://dd.example';
@@ -23,5 +23,23 @@ describe('sendHexagonInteraction', () => {
     expect(await sendHexagonInteraction(SCAN, 'h', 'confirmed', f as unknown as typeof fetch, '')).toBe(false);
     expect(await sendHexagonInteraction('', 'h', 'confirmed', f as unknown as typeof fetch, BASE)).toBe(false);
     expect(f).not.toHaveBeenCalled();
+  });
+});
+
+describe('deep-dive reads', () => {
+  it('fetch the scan and the score by scan_id, and finalize with a POST', async () => {
+    const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ hexagons: [], finalized: false }) });
+    expect(await fetchDeepDiveScan(SCAN, f as unknown as typeof fetch, BASE)).toEqual({ hexagons: [], finalized: false });
+    expect(f.mock.calls[0][0]).toBe(`https://dd.example/api/scan/deep-dive?scan_id=${SCAN}`);
+    await fetchFinalScore(SCAN, f as unknown as typeof fetch, BASE);
+    expect(f.mock.calls[1][0]).toBe(`https://dd.example/api/scan/final-risk-score?scan_id=${SCAN}`);
+    await finalizeDeepDive(SCAN, f as unknown as typeof fetch, BASE);
+    expect(f.mock.calls[2][1].method).toBe('POST');
+    expect(JSON.parse(f.mock.calls[2][1].body)).toEqual({ scan_id: SCAN });
+  });
+  it('return null on offline, a 404, or no base URL', async () => {
+    expect(await fetchDeepDiveScan(SCAN, vi.fn().mockRejectedValue(new Error('x')) as unknown as typeof fetch, BASE)).toBeNull();
+    expect(await fetchDeepDiveScan(SCAN, vi.fn().mockResolvedValue({ ok: false, status: 404 }) as unknown as typeof fetch, BASE)).toBeNull();
+    expect(await fetchFinalScore(SCAN, vi.fn() as unknown as typeof fetch, '')).toBeNull();
   });
 });
