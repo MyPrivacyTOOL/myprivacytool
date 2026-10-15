@@ -149,7 +149,14 @@ const Privacy = () => {
                   a person. We keep it for up to 90 days, then it is deleted
                   automatically. Our team can see it on a restricted basis; it is
                   not shared publicly. You can ask us to delete everything linked
-                  to your Telegram id at any time: {"{contact}"}
+                  to your Telegram id at any time by writing to{" "}
+                  <a
+                    href="mailto:privacy@myprivacytool.io"
+                    className="text-brand underline hover:text-foreground"
+                  >
+                    privacy@myprivacytool.io
+                  </a>
+                  .
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
