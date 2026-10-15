@@ -14,15 +14,27 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+const EXPOSED_VISUALS = {
+  className: 'bg-red-100 border-red-500 text-red-800',
+  icon: '!',
+  tooltip: 'Exposure confirmed. Open to see the next step.',
+};
+
 interface Props {
   hexagon: Hexagon;
   onConfirm: (id: string, isMatch: boolean) => void;
   onDispute: (id: string) => void;
+  /** When set, a tap on a guess calls this instead of opening the built-in prompt (the dashboard shows its own modal). */
+  onSelect?: (hexagon: Hexagon) => void;
+  /** The user finished the remediation step: a confirmed exposure shows green instead of red. */
+  fixed?: boolean;
+  className?: string;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute }: Props) => {
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, className }: Props) => {
   const [asking, setAsking] = useState(false);
-  const visuals = getHexagonVisuals(hexagon.status);
+  const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
+  const visuals = exposed ? EXPOSED_VISUALS : getHexagonVisuals(hexagon.status);
   const requiresConfirmation = canConfirm(hexagon);
   const allowsDispute = canDispute(hexagon);
 
@@ -32,10 +44,15 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute }: Props)
         type="button"
         className={cn(
           'w-28 h-28 flex flex-col items-center justify-center border-2 rounded-lg transition-all',
-          requiresConfirmation ? 'cursor-pointer' : 'cursor-default',
+          requiresConfirmation || (exposed && onSelect) ? 'cursor-pointer' : 'cursor-default',
           visuals.className,
+          className,
         )}
-        onClick={() => requiresConfirmation && setAsking(true)}
+        onClick={() => {
+          // A confirmed, unfixed exposure reopens its action plan; a guess opens the question.
+          if (onSelect && (requiresConfirmation || exposed)) onSelect(hexagon);
+          else if (requiresConfirmation) setAsking(true);
+        }}
         aria-disabled={!requiresConfirmation}
         title={visuals.tooltip}
       >
