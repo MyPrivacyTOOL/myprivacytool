@@ -145,6 +145,12 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
 .panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .panel dd{margin:0}
+.startcard{display:none;min-height:0}
+body.pre .startcard.show{display:grid;animation:popin .45s cubic-bezier(.2,.9,.3,1.15) both}
+@keyframes popin{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.stage + .startcard{margin-top:-10px}
+.startcard h2{font-size:20px}
+.help{margin-top:18px}
 .help{align-self:center;width:100%;max-width:560px;display:flex;flex-direction:column;gap:10px;align-items:center}
 button.linkbtn{background:none;border:0;padding:6px 10px;color:var(--ink);text-decoration:underline;text-underline-offset:3px;font-weight:600}
 .helpbox{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -175,8 +181,9 @@ button.linkbtn{background:none;border:0;padding:6px 10px;color:var(--ink);text-d
 .chip span{font-size:13px;line-height:1.2}
 .chip small{display:block;color:var(--muted);font-size:11.5px}
 .principle{font-size:14px;color:var(--muted);text-align:center;text-wrap:balance}
-@media (max-width:560px){body.pre .sub,body.pre .btns,body.pre .views,body.pre .summary,body.pre .legend,body.pre #panel,body.pre .principle{display:none}.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
-@media (max-width:480px){.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
+body.pre .views,body.pre .summary,body.pre .legend,body.pre #panel,body.pre .principle{display:none}
+@media (max-width:560px){body.pre .sub,body.pre .btns{display:none}.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
+@media (max-width:480px){.panel.startcard{grid-template-columns:auto 1fr;gap:12px;padding:14px}.panel.startcard .badge{width:44px;height:50px}.startcard .badge svg{width:100%;height:100%}.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -222,10 +229,15 @@ button.linkbtn{background:none;border:0;padding:6px 10px;color:var(--ink);text-d
       </defs>
     </svg>
     <div class="curtain" id="curtain">
-      <img id="curtainImg" src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.hidden=true">
+      <img id="curtainImg" src="alice-curtain.jpg?v=2" fetchpriority="high" decoding="async" alt="Alice drawing back a curtain on a wall of green code" onerror="this.hidden=true">
       <video id="curtainVideo" hidden playsinline muted preload="none"></video>
       <button id="openCurtain">Open the curtain</button>
     </div>
+  </section>
+
+  <section class="panel startcard" id="startcard" aria-label="Start here">
+    <div class="badge"><svg width="61" height="68" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z" fill="url(#gSoft)" stroke="var(--ink)" stroke-width="5"/><path d="M50 72V30M32 47l18-18 18 18" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" class="bounce"/></svg></div>
+    <div><div class="tag">Start here</div><h2>Open the curtain to start &uarr;</h2><p>Tap the green <b>Open the curtain</b> button above. Hexagons appear one by one as MPT finds them.</p></div>
   </section>
 
   <section class="help">
@@ -374,7 +386,6 @@ function select(i){sel=i;paint();showPanel();
 
 const cleanRisk=it=>/text chosen|\(\)/.test(it.risk)?'Your real IP address is exposed even when you use a VPN, so sites and trackers can still see where you are.':it.risk;
 function showPanel(){
-  if(sel<0&&!curtainOpen){panel.innerHTML=`<div class="badge"><svg width="61" height="68" viewBox="0 0 100 100" aria-hidden="true"><path d="${HEX}" fill="url(#gSoft)" stroke="var(--ink)" stroke-width="5"/><path d="M50 72V30M32 47l18-18 18 18" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" class="bounce"/></svg></div><div><div class="tag">Start here</div><h2>Open the curtain to start &uarr;</h2><p>Tap the green <b>Open the curtain</b> button above. Hexagons appear one by one as MPT finds them.</p></div>`;return}
   if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Next</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
   const it=ITEMS[sel],s=st[sel];
   let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
@@ -449,11 +460,15 @@ playBtn.onclick=()=>{
       for(let c=0;c<cols.length;c++){const row=cols[c].head-t;if(row<0||row>rows)continue;ctx.fillText(cols[c].g[t],c*FS,row*FS)}}
     ctx.globalAlpha=1}
   function stepFn(){for(const c of cols){c.head++;c.g.unshift(rg());c.g.length=TRAIL;if(c.head-TRAIL>rows&&Math.random()>.975)c.head=0}}
-  function tick(now){requestAnimationFrame(tick);if(now-last<STEP)return;last=now;stepFn();draw()}
+  let wanted=false,active=false,raf=0;
+  function tick(now){raf=requestAnimationFrame(tick);if(now-last<STEP)return;last=now;stepFn();draw()}
+  /* The rain is hidden behind the closed curtain and in the By pattern view, so it only animates when it can be seen (and the tab is visible). */
+  function sync(){const run=wanted&&!still&&!document.hidden;if(run&&!active){active=true;raf=requestAnimationFrame(tick)}else if(!run&&active){active=false;cancelAnimationFrame(raf)}}
+  window.rainSetActive=a=>{wanted=a;sync()};
+  document.addEventListener('visibilitychange',sync);
   window.rainRefresh=()=>{tokens();draw()};
   size();
   if('ResizeObserver' in window)new ResizeObserver(size).observe(stage);else window.addEventListener('resize',size);
-  if(!still)requestAnimationFrame(tick);
 })();
 
 /* Two views and the curtain: the hive is first seen whole behind Alice's curtain; it opens, then the camera zooms in. */
@@ -487,6 +502,7 @@ function applyCurtain(c){
 let opening=false;
 function openCurtain(){
   if(curtainOpen||opening)return;
+  clearTimeout(idleTimer);startCard.classList.remove('show');if(mode==='hive')window.rainSetActive(true);
   if(vidEl.getAttribute('src')){ /* play the video, then open */
     opening=true;curtainEl.classList.add('playing');imgEl.hidden=true;vidEl.hidden=false;vidEl.currentTime=0;
     let done=false;const finish=()=>{if(done)return;done=true;opening=false;curtainEl.classList.remove('playing');doOpen()};
@@ -496,7 +512,7 @@ function openCurtain(){
 }
 function doOpen(){curtainOpen=true;document.body.classList.remove('pre');syncHelp();if(sel<0)showPanel();curtainEl.classList.add('open');grid.inert=false;
   autoZoom=setTimeout(()=>setView('zoom',1300),CUR.zoomDelayMs)}
-function closeCurtain(){curtainOpen=false;opening=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open','playing');grid.inert=true;
+function closeCurtain(){window.rainSetActive(false);armIdle();curtainOpen=false;opening=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open','playing');grid.inert=true;
   vidEl.pause();vidEl.hidden=true;if(CUR.image)imgEl.hidden=false;setView('overview',600)}
 fetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
 document.getElementById('openCurtain').onclick=openCurtain;
@@ -531,13 +547,20 @@ function renderBoxes(){
     return `<section class="box"><h3>${name}<small>${done}/${ids.length}</small></h3><div class="tiles">${cells}</div></section>`}).join('');
   boxesEl.querySelectorAll('.tile').forEach(b=>b.onclick=()=>select(+b.dataset.i));
 }
-function setMode(m){mode=m;
+function setMode(m){mode=m;window.rainSetActive(m==='hive'&&(curtainOpen||opening));
   mHive.setAttribute('aria-pressed',m==='hive');mBoxes.setAttribute('aria-pressed',m==='boxes');
   stageEl.hidden=m==='boxes';boxesEl.hidden=m==='hive';
   document.querySelectorAll('.hiveonly').forEach(e=>e.hidden=m==='boxes');
   if(m==='boxes'){clearTimeout(autoZoom);renderBoxes()}
   if(sel>=0)showPanel()}
 mHive.onclick=()=>setMode('hive');mBoxes.onclick=()=>setMode('boxes');
+/* If nobody has touched anything for 5 seconds with the curtain closed, pop up the start card under the button. */
+const startCard=document.getElementById('startcard');let idleTimer=0;
+function armIdle(){clearTimeout(idleTimer);startCard.classList.remove('show');
+  idleTimer=setTimeout(()=>{if(!curtainOpen&&!opening)startCard.classList.add('show')},5000)}
+function noteAct(){clearTimeout(idleTimer);startCard.classList.remove('show')}
+['pointerdown','keydown','wheel','touchstart'].forEach(ev=>document.addEventListener(ev,noteAct,{passive:true}));
+armIdle();
 reset();
 </script>
 
