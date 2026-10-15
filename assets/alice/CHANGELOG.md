@@ -18,3 +18,6 @@
 
 ## 0.1.3-draft (MPC-7797)
 - Code colour corrected from `#00FF00` to Matrix Green `#27AE60` (locked brand palette; `#00FF00` was never approved as a hex). Matches the corrected MPC-7438.
+
+## 0.1.4-draft (MPC-7797)
+- Added `reference/alice_ref_still03-text-free_v0.png`: text-free 820x959 crop of the locked "What your channel reveals" still (Drive). Reference and test renders only; the full-size layered master still needs the original file or an artist.
