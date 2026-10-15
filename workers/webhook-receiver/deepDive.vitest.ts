@@ -8,12 +8,12 @@ const WA = '85212345678';
 const ENV = { DEEP_DIVE_SECRET: SECRET, GCP_PROJECT_ID: 'p', FIRESTORE_SA_TOKEN: 't', SUPABASE_SERVICE_ROLE_KEY: 'svc',
   WHATSAPP_PHONE_NUMBER_ID: '999', META_WHATSAPP_KEY: 'tok', RAPIDAPI_KEY: 'rk', RAPIDAPI_WHATSAPP_HOST: 'wa.example', SPAM_API_URL: 'https://spam.example/v1', SPAM_API_KEY: 'sk' };
 
-let docs: Record<string, any>; let calls: string[]; let metaStatus: number; let spamMode: 'ok' | 'hang'; let engagement: any[];
+let docs: Record<string, any>; let calls: string[]; let metaStatus: number; let spamMode: 'ok' | 'hang'; let engagement: any[]; let interactions: any[]; let tuning: any[];
 const enc = (o: any) => { const f: any = {}; for (const [k, v] of Object.entries(o)) f[k] = typeof v === 'string' ? { stringValue: v } : typeof v === 'number' ? { integerValue: String(v) } : { booleanValue: v }; return f; };
 const dec = (f: any) => Object.fromEntries(Object.entries<any>(f).map(([k, v]) => [k, v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.booleanValue)]));
 
 beforeEach(() => {
-  docs = { [`whatsapp:${WA}`]: { profileName: 'Alex', inbound_message_timestamp: 1760000000 } }; calls = []; metaStatus = 200; spamMode = 'ok'; engagement = [];
+  docs = { [`whatsapp:${WA}`]: { profileName: 'Alex', inbound_message_timestamp: 1760000000 } }; calls = []; metaStatus = 200; spamMode = 'ok'; engagement = []; interactions = []; tuning = [];
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     const url = String(input); calls.push(url);
     if (url.includes('firestore.googleapis.com')) {
@@ -25,6 +25,8 @@ beforeEach(() => {
     if (url.startsWith('https://spam.example')) { if (spamMode === 'hang') return new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(new Error('aborted')))); return new Response(JSON.stringify({ flags: 0 })); }
     if (url.includes('graph.facebook.com')) return metaStatus === 200 ? new Response(JSON.stringify({ messages: [{ id: 'wamid.OK' }] })) : new Response(JSON.stringify({ error: { code: 131047, message: 're-engagement' } }), { status: 400 });
     if (url.includes('/rest/v1/mpt_user_engagement')) { engagement.push(JSON.parse(init.body)); return new Response('', { status: 201 }); }
+    if (url.includes('/rest/v1/mpt_hexagon_interactions')) { interactions.push(JSON.parse(init.body)); return new Response('', { status: 201 }); }
+    if (url.includes('/rest/v1/osint_engine_tuning_log')) { tuning.push(JSON.parse(init.body)); return new Response('', { status: 201 }); }
     throw new Error('unexpected fetch ' + url);
   });
 });
@@ -65,10 +67,17 @@ describe('deep dive flow', () => {
     // photo is a 0.85 "checked" finding, so the user may dispute it
     let r = await call('/api/scan/hexagon-interaction', { scan_id, hexagon_id: 'hex_contact_profile_pic', action: 'dispute' }, web);
     expect(r.status).toBe(200); expect((await r.json() as any).hexagon.status).toBe('disputed');
+    // learning loop: a dispute is written to BOTH tables, with the provider, and carries no wa_id or finding value
+    expect(interactions).toEqual([{ scan_session_id: scan_id, hexagon_id: 'hex_contact_profile_pic', user_action: 'disputed', original_confidence_score: 0.85, osint_source: expect.any(String) }]);
+    expect(tuning).toEqual([{ hexagon_id: 'hex_contact_profile_pic', osint_source: interactions[0].osint_source, action_type: 'dispute_rate' }]);
+    expect(JSON.stringify([interactions, tuning])).not.toContain(WA);
     r = await call('/api/scan/hexagon-interaction', { scan_id, hexagon_id: 'hex_contact_profile_pic', action: 'confirm' }, web);
     expect(r.status).toBe(409);                                                   // already answered
+    expect(interactions).toHaveLength(1);                                         // a refused answer is not persisted
     r = await call(`/api/scan/final-risk-score?scan_id=${scan_id}`, undefined, web, 'GET');
-    expect(await r.json()).toMatchObject({ verified_exposure_count: 1 });         // only the Meta display name remains an exposure
+    expect(await r.json()).toMatchObject({ verified_exposure_count: 1, confirmed_hexagon_ids: ['hex_contact_display_name'] });   // only the Meta display name remains an exposure; the disputed photo is out
+    const score = (await (await call(`/api/scan/final-risk-score?scan_id=${scan_id}`, undefined, web, 'GET')).json() as any).score;
+    expect(score).toBe(16.7);                                                  // 1 verified exposure over this scan's 6 hexagons
     r = await call('/api/scan/finalize', { scan_id, verified_exposure_count: 99 }, web);   // a count from the browser is ignored
     const out = await r.json() as any;
     expect(out).toMatchObject({ success: true, message_id: 'wamid.OK', verified_exposure_count: 1 });

@@ -2,8 +2,8 @@
 /**
  * WhatsApp deep dive: OSINT scan -> user confirms findings on the web -> "complete" template back on WhatsApp.
  *   POST /api/scan/start-deep-dive       server-to-server (X-Webhook-Secret = DEEP_DIVE_SECRET). {wa_id} -> {scan_id, hexagons}
- *   POST /api/scan/hexagon-interaction   browser, scan_id is the bearer. {scan_id, hexagon_id, action: confirm|reject|dispute}
- *   GET  /api/scan/final-risk-score      browser, ?scan_id=
+ *   POST /api/scan/hexagon-interaction   browser, scan_id is the bearer. {scan_id, hexagon_id, action: confirm|reject|dispute}; each accepted answer is persisted (persistInteraction)
+ *   GET  /api/scan/final-risk-score      browser, ?scan_id= -> {verified_exposure_count, score, confirmed_hexagon_ids, not_checked_count}
  *   POST /api/scan/finalize              browser, {scan_id}: computes the count SERVER-side and sends the template (once)
  *   POST /api/whatsapp/notify-complete   server-to-server (same secret). {wa_id, verified_exposure_count, web_dashboard_url}
  * Imported lazily from index.js so the Node-run security test never loads TypeScript.
@@ -11,9 +11,9 @@
 import { getConversationState, saveConversationState } from './firestore-client.js';
 import { insertMptRow } from './supabase-client.js';
 import { corsFor, clip, timingSafeEqual, unauthorized } from './security.js';
-import { runOsintScan, verifiedExposureCount, ProofOfPossessionError, type OsintProviders, type ProviderCall } from '../../src/services/osintOrchestrator';
+import { runOsintScan, verifiedExposureCount, verifiedExposureIds, ProofOfPossessionError, type OsintProviders, type ProviderCall } from '../../src/services/osintOrchestrator';
 import { sendTemplate, validateNotify, NotifyInputError, type SendResult } from '../../src/services/whatsappNotify';
-import { confirmHexagon, disputeHexagon } from '../../src/lib/identityConfirmation';
+import { confirmHexagon, disputeHexagon, type LearningSignal } from '../../src/lib/identityConfirmation';
 import type { Hexagon } from '../../src/types/hexagon';
 
 type Env = Record<string, string | undefined>;
@@ -68,6 +68,23 @@ async function loadScan(env: Env, scanId: unknown) {
 }
 const saveScan = (env: Env, scanId: string, state: any, hexagons: Hexagon[]) =>
   saveConversationState(env, `deepdive:${scanId}`, { ...state, hexagons: JSON.stringify(hexagons) });
+
+/**
+ * Persist one accepted answer (the learning loop). scan_id is the session id: this is only reached for a scan that exists, is
+ * unexpired and belongs to a wa_id that messaged us. Rejected / disputed also go to the tuning log, but only when the finding names its
+ * provider (the engine tunes per provider). Fail-soft like every write in supabase-client.js: a database problem never blocks the answer.
+ */
+export async function persistInteraction(env: Env, scanId: string, s: LearningSignal): Promise<void> {
+  await insertMptRow(env, 'mpt_hexagon_interactions', {
+    scan_session_id: scanId, hexagon_id: s.hexagonId, user_action: s.outcome,
+    original_confidence_score: s.confidence_score, osint_source: s.source,
+  });
+  if ((s.outcome === 'rejected' || s.outcome === 'disputed') && s.source) {
+    await insertMptRow(env, 'osint_engine_tuning_log', {
+      hexagon_id: s.hexagonId, osint_source: s.source, action_type: s.outcome === 'rejected' ? 'false_positive_rate' : 'dispute_rate',
+    });
+  }
+}
 
 /** Browser endpoints: CORS limited to our own origins. */
 function browserGate(req: Request, methods: string) {
@@ -133,6 +150,7 @@ export async function handleDeepDive(request: Request, env: Env): Promise<Respon
     const t = action === 'dispute' ? disputeHexagon({ hexagons: scan.hexagons }, b.hexagon_id) : confirmHexagon({ hexagons: scan.hexagons }, b.hexagon_id, action === 'confirm');
     if (!t.signal) return jsonRes({ error: 'transition_not_allowed' }, 409, g.headers);   // e.g. answering twice, or disputing a low-confidence finding
     await saveScan(env, scan.scanId, scan.state, t.next.hexagons);
+    await persistInteraction(env, scan.scanId, t.signal);
     return jsonRes({ hexagon: t.next.hexagons.find((h) => h.id === b.hexagon_id) }, 200, g.headers);
   }
 
@@ -143,8 +161,12 @@ export async function handleDeepDive(request: Request, env: Env): Promise<Respon
     if (!g.allowed) return jsonRes({ error: 'Forbidden origin' }, 403, g.headers);
     const scan = await loadScan(env, new URL(request.url).searchParams.get('scan_id'));
     if (!scan) return jsonRes({ error: 'scan_not_found' }, 404, g.headers);
+    const ids = verifiedExposureIds(scan.hexagons);   // confirmed or checked exposures; false_positive, disputed, guess, not_checked never appear
     return jsonRes({
-      verified_exposure_count: verifiedExposureCount(scan.hexagons),
+      verified_exposure_count: ids.length,
+      // percent of this scan's hexagons that are verified exposures (the denominator is every hexagon in the scan, answered or not)
+      score: scan.hexagons.length ? Math.round((ids.length / scan.hexagons.length) * 1000) / 10 : 0,
+      confirmed_hexagon_ids: ids,
       not_checked_count: scan.hexagons.filter((h) => h.status === 'not_checked').length,
     }, 200, g.headers);
   }
