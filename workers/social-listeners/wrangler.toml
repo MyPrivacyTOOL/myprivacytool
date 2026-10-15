@@ -14,9 +14,15 @@ workers_dev = true
 #   X_CONSUMER_SECRET, LINKEDIN_CLIENT_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward),
 #   TELEGRAM_BOT_TOKEN (BotFather token; sends the reply core-brain chose. Without it Telegram messages are ingested but not answered)
 
-# Channel probe reader (test-only, docs/channel-probe.md): plain vars, NOT secrets. Both unset = off. PROBE_MODE="on" plus
-# PROBE_TELEGRAM_IDS="<our test account ids>" saves raw payloads and public-lookup results for those accounts only (7 day expiry).
+# Channel probe reader (docs/channel-probe.md): plain vars, NOT secrets. PROBE_MODE unset (or anything but "on"/"all") = off.
+#   PROBE_MODE="on"  + PROBE_TELEGRAM_IDS="<our test account ids>": allow-listed test accounts only (7 day expiry).
+#   PROBE_MODE="all": EVERY non-bot sender is captured, with wider public lookups. Stores real-user PII (PROBE_RETENTION_DAYS, default 90,
+#   clamp 1-365; PROBE_LOOKUP_HOURS, default 24, throttles repeat lookups). Do not enable until the stored-data rules and privacy wording are aligned.
+# Full event log (docs/channel-probe.md): only with PROBE_MODE="on", for senders in PROBE_TELEGRAM_IDS or PROBE_LOG_OPTIN_IDS (comma-separated numeric
+#   ids). Saves inbound updates, outbound Bot API calls and the core-brain answer to telegram_event_log. PROBE_LOG_RETENTION_DAYS: default 90,
+#   clamp 1-365, or "forever" (no expiry). Mode "all" never writes to it.
 # Set them in the Cloudflare dashboard (Worker > Settings > Variables) or `wrangler deploy --var PROBE_MODE:on`; never commit real ids.
+# Rollback: unset PROBE_MODE.
 
 [observability]
 enabled = true
