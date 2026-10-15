@@ -34,6 +34,9 @@ import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
+import { toTile, riskProfile, riskProfileParts, HexagonTile } from '@/lib/hexagonTile';
+import { captureContext } from '@/lib/webScan';
 
 // MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
 const StoragePanel = lazy(() => import('./StoragePanel'));
@@ -72,6 +75,8 @@ const REVEAL_THRESHOLDS = {
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
+  // MPC-7916: honest tiles (colour, transparency and words say how we know). Off unless the flag is on.
+  const v2 = useMemo(() => hexTileV2Enabled(), []);
   const [visibleCount, setVisibleCount] = useState(5);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   // CK-7805: a tap selects a hexagon so its explanation stays visible on touch screens (no hover there).
@@ -162,12 +167,24 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const orderedHexagons = useMemo(
     () => getOrderedHexagons().map(h =>
       confirmedHexagons.has(h.id)
-        ? { ...h, confirmed: true, confidence: Math.min(h.confidence + 5, 99) }
+        // MPC-7916: a tap is "seen", not a confirmation, so with the honest tiles on it no longer adds to the confidence.
+        ? { ...h, confirmed: true, confidence: v2 ? h.confidence : Math.min(h.confidence + 5, 99) }
         : { ...h, confirmed: false }
     ),
-    [getOrderedHexagons, confirmedHexagons]
+    [getOrderedHexagons, confirmedHexagons, v2]
   );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
+
+  // MPC-7916: what each visible tile says, decided in one place from the captured value and the registry.
+  const tiles = useMemo(() => {
+    const map = new Map<string, HexagonTile>();
+    if (!v2) return map;
+    const ctx = captureContext(allHexagons);
+    for (const h of visibleHexagons) map.set(h.id, toTile({ id: h.id, value: h.value }, ctx));
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v2, allHexagons, visibleCount]);
+  const profileParts = useMemo(() => riskProfileParts(riskProfile([...tiles.values()])), [tiles]);
   const selectedHexagon = selectedHexagonId ? visibleHexagons.find(h => h.id === selectedHexagonId) ?? null : null;
   const strangerFindings = useMemo(
     () => (confirmedCount >= STRANGER_CARD_MIN_CONFIRMED
@@ -276,10 +293,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackFunnelStep('all_hexagons_confirmed');
       trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
-      // Trigger celebration confetti
-      triggerCompletionCelebration();
+      // Trigger celebration confetti. MPC-7916: not with the honest tiles on: finishing the taps is not a result.
+      if (!v2) triggerCompletionCelebration();
     }
-  }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData]);
+  }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData, v2]);
 
   // Start behavior tracking on mount
   useEffect(() => {
@@ -419,8 +436,11 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         isFirstConfirmation.current = false;
       }
       
-      trackHexagonConfirm(hex.id, hex.label, true);
-      trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
+      // MPC-7916: with the honest tiles on a tap is "seen", so no confirmation event is sent for it.
+      if (!v2) {
+        trackHexagonConfirm(hex.id, hex.label, true);
+        trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
+      }
       
       setConfirmedCount(c => c + 1);
       setConfirmedHexagons(prev => new Set(prev).add(id));
@@ -610,14 +630,26 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           YOUR DIGITAL SHADOW
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">
-          We found {visibleCount} data points about you without asking.
+          {v2
+            ? `Showing ${visibleCount} hexagons. Grey means we could not check it.`
+            : `We found ${visibleCount} data points about you without asking.`}
           {visibleCount < orderedHexagons.length && (
             <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
         </p>
       </div>
 
-      {/* Confirmation progress */}
+      {/* MPC-7916: the risk profile. Counts, never a score: no percentage, no "N of M", no Low / Medium / High. */}
+      {v2 ? (
+        <div className="max-w-xl mx-auto mb-4 px-4" data-testid="risk-profile">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1 text-center">Your risk profile</p>
+          <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm font-mono" aria-live="polite" aria-atomic="true">
+            {profileParts.map((p) => (
+              <span key={p.key} data-testid={`risk-profile-${p.key}`}>{p.text}</span>
+            ))}
+          </p>
+        </div>
+      ) : (
       <div className="max-w-md mx-auto mb-4 px-4" data-testid="confirmation-progress">
         <div className="flex items-center justify-between text-sm mb-1">
           <span className="text-muted-foreground">Confirmed</span>
@@ -639,6 +671,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           />
         </div>
       </div>
+      )}
 
       {/* Voice AI */}
       <VoiceAI 
@@ -693,6 +726,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
                   onHover={handleHover}
                   onSelect={(d) => setSelectedHexagonId(d.id)}
                   isRevealing={isRevealing}
+                  tile={v2 ? tiles.get(hex.id) : undefined}
                 />
               </div>
             );
@@ -703,12 +737,15 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {strangerFindings.length > 0 && <StrangerGuessCard findings={strangerFindings} />}
 
       {/* Risk Score - now with fingerprint data */}
-      <RiskScore 
-        confirmed={confirmedCount} 
-        total={visibleCount}
-        hexagons={visibleHexagons}
-        fingerprint={fingerprintData}
-      />
+      {/* MPC-7916: the percentage and "Medium Risk" card gives a rating from partly checked data, so it is replaced by the risk profile above. */}
+      {!v2 && (
+        <RiskScore 
+          confirmed={confirmedCount} 
+          total={visibleCount}
+          hexagons={visibleHexagons}
+          fingerprint={fingerprintData}
+        />
+      )}
 
       {/* Panel Display Order: Language -> Fingerprint -> Final Summary */}
       
@@ -771,7 +808,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Completion Celebration Banner */}
-      {showCompletionCelebration && (
+      {!v2 && showCompletionCelebration && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-surface border border-surface-border shadow-card px-8 py-6 rounded-2xl animate-scale-in text-center pointer-events-auto">
             <div className="flex items-center justify-center gap-3 mb-2">
@@ -799,7 +836,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Final Summary Panel - shown after all hexagons confirmed */}
-      {showFinalSummary && (
+      {!v2 && showFinalSummary && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <FinalSummaryPanel
