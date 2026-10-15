@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
-import { HexagonTile, tileAriaLabel } from '@/lib/hexagonTile';
+import { HexagonTile, tileAriaLabel, tileIcon } from '@/lib/hexagonTile';
 import { cn } from '@/lib/utils';
 
 interface HexagonProps {
@@ -194,7 +194,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
             fontSize="18"
             className={cn("select-none", isRevealing && "hexagon-icon pulse")}
           >
-            {data.icon}
+            {t ? tileIcon(data.id, data.icon, t.kind) : data.icon}
           </text>
 
           {/* Label with category color */}

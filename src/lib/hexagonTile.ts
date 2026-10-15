@@ -115,3 +115,11 @@ export function tileAriaLabel(label: string, value: string, tile: HexagonTile): 
   const shown = tile.showValue ? `${value}. ` : '';
   return `${label}: ${shown}${tile.line}.`;
 }
+
+// A status emoji from the detector (a green tick) says "safe". Only a clear tile may keep it: any other tile shows the registry's
+// own picture for that hexagon instead, so the icon never contradicts the words under it.
+const STATUS_EMOJI = /^(✅|✔️?|☑️|👍|🟢)$/u;
+export function tileIcon(id: string, icon: string, kind: TileKind): string {
+  if (kind === 'clear' || !STATUS_EMOJI.test(String(icon ?? '').trim())) return icon;
+  return getHexagon(id)?.artwork.emoji || '•';
+}

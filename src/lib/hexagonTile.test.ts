@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, type TileKind } from './hexagonTile';
+import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, tileIcon, type TileKind } from './hexagonTile';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus } from '../../shared/hexagon-registry/status.js';
 
@@ -90,5 +90,17 @@ describe('risk profile (MPC-7916)', () => {
 
   it('an empty scan is all zeros, never "clear"', () => {
     expect(riskProfile([])).toEqual({ clear: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 });
+  });
+});
+
+describe('tile icon (MPC-7916)', () => {
+  it('a green-tick icon is kept only on a clear tile', () => {
+    expect(tileIcon('cookies-status', '✅', 'clear')).toBe('✅');
+    expect(tileIcon('dns-leak', '✅', 'cant_check_here')).toBe('🔓');
+    expect(tileIcon('webrtc-leak', '✅', 'couldnt_check')).toBe('🌐');
+  });
+  it('any other icon is left alone', () => {
+    expect(tileIcon('dns-leak', '🔓', 'cant_check_here')).toBe('🔓');
+    expect(tileIcon('canvas-fingerprint', '🎨', 'needs_fixing')).toBe('🎨');
   });
 });

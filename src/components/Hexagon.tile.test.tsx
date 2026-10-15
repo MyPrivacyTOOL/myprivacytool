@@ -61,3 +61,13 @@ describe('Hexagon tile (MPC-7916)', () => {
     expect(container.querySelector('.confirmed')).toBeNull();
   });
 });
+
+describe('Hexagon tile icon (MPC-7916)', () => {
+  it('a grey tile never keeps a green-tick icon', () => {
+    const data = hex({ id: 'dns-leak', label: 'DNS Leak', value: 'No Leak Detected', icon: '✅' });
+    const tile = toTile({ id: data.id, value: data.value });
+    const { container } = render(<Hexagon data={data} onConfirm={noop} onHover={noop} tile={tile} />);
+    expect(container.textContent).not.toMatch(/✅/);
+    expect(container.textContent).toMatch(/🔓/);
+  });
+});
