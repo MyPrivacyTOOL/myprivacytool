@@ -32,6 +32,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
   padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
@@ -140,6 +141,12 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
 .panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .panel dd{margin:0}
+.help{align-self:center;width:100%;max-width:560px;display:flex;flex-direction:column;gap:10px;align-items:center}
+button.linkbtn{background:none;border:0;padding:6px 10px;color:var(--ink);text-decoration:underline;text-underline-offset:3px;font-weight:600}
+.helpbox{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.helpbox h3{font:700 18px/1.2 var(--body);margin:0}
+.helpbox ol{margin:0;padding-left:22px;display:grid;gap:8px}
+.helpbox .acts{display:flex;gap:8px;flex-wrap:wrap}
 .bounce{animation:bob 1.4s ease-in-out infinite}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .learn{margin-top:12px;font-size:14px;color:var(--muted);border-left:3px solid var(--ask);padding-left:10px}
@@ -164,7 +171,7 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .chip span{font-size:13px;line-height:1.2}
 .chip small{display:block;color:var(--muted);font-size:11.5px}
 .principle{font-size:14px;color:var(--muted);text-align:center;text-wrap:balance}
-@media (max-width:560px){.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
+@media (max-width:560px){body.pre .sub,body.pre .btns,body.pre .views,body.pre .summary,body.pre .legend,body.pre #panel,body.pre .principle{display:none}.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
 @media (max-width:480px){.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -213,6 +220,19 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
     <div class="curtain" id="curtain">
       <img src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.remove()">
       <button id="openCurtain">Open the curtain</button>
+    </div>
+  </section>
+
+  <section class="help">
+    <button id="helpBtn" class="linkbtn" aria-expanded="false" aria-controls="helpbox">Need help?</button>
+    <div class="helpbox" id="helpbox" hidden>
+      <h3>Three quick steps</h3>
+      <ol>
+        <li><b>Open the curtain.</b> Tap the green button on the picture.</li>
+        <li><b>Tap a purple hexagon.</b> Purple means we found something that may be you.</li>
+        <li><b>Say yes or no.</b> Yes if it is you, no if it is not. Green means confirmed. Red appears only if something is exposed.</li>
+      </ol>
+      <div class="acts"><button id="helpGo" class="primary">Open the curtain</button><button id="helpClose">Close</button></div>
     </div>
   </section>
 
@@ -438,10 +458,18 @@ grid.inert=true;zOut.disabled=true;
 function setView(v,ms){view=v;grid.classList.toggle('zoomed',v==='zoom');
   zIn.disabled=v==='zoom';zOut.disabled=v==='overview';
   animateTo(v==='zoom'?zoomTarget():FULL,ms||900)}
-function openCurtain(){if(curtainOpen)return;curtainOpen=true;if(sel<0)showPanel();curtainEl.classList.add('open');grid.inert=false;
+function openCurtain(){if(curtainOpen)return;curtainOpen=true;document.body.classList.remove('pre');syncHelp();if(sel<0)showPanel();curtainEl.classList.add('open');grid.inert=false;
   autoZoom=setTimeout(()=>setView('zoom',1300),2900)}
-function closeCurtain(){curtainOpen=false;if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
+function closeCurtain(){curtainOpen=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
 document.getElementById('openCurtain').onclick=openCurtain;
+/* Help: three yes-steps that end on the curtain button. */
+const helpBtn=document.getElementById('helpBtn'),helpBox=document.getElementById('helpbox'),helpGo=document.getElementById('helpGo');
+function syncHelp(){helpGo.textContent=curtainOpen?'Got it':'Open the curtain'}
+function toggleHelp(show){helpBox.hidden=!show;helpBtn.setAttribute('aria-expanded',show)}
+helpBtn.onclick=()=>toggleHelp(helpBox.hidden);
+document.getElementById('helpClose').onclick=()=>toggleHelp(false);
+helpGo.onclick=()=>{toggleHelp(false);openCurtain()};
+document.body.classList.add('pre');syncHelp();
 zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
 zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
 document.getElementById('vCurtain').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;closeCurtain();timers.forEach(clearTimeout);timers=[];setTimeout(openCurtain,700)};
