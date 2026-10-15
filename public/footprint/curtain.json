@@ -12,5 +12,6 @@
   "background": "#ffffff",
   "slide": "left",
   "openMs": 1300,
-  "zoomDelayMs": 2900
+  "zoomDelayMs": 2900,
+  "dataset": ""
 }
