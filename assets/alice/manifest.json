@@ -1,6 +1,6 @@
 {
   "library": "alice",
-  "version": "0.1.2-draft",
+  "version": "0.1.4-draft",
   "locked": false,
   "fps": 30,
   "canvas": {
@@ -32,7 +32,7 @@
     "source": "MPC-7438 example (head = 1/7 of body)"
   },
   "palette": {
-    "code_green": "#00FF00",
+    "code_green": "#27AE60",
     "note": "only colour; behind the curtain on black"
   },
   "legacy_clips": {
@@ -225,6 +225,14 @@
       "required": false,
       "status": "reference-only",
       "note": "820x736 curtain-pull drawing with curtain/code. Soft when enlarged. Replace with the locked curtain-pull pose."
+    },
+    {
+      "id": "interim-reference-still03",
+      "path": "reference/alice_ref_still03-text-free_v0.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959 text-free crop of the locked still 'What your channel reveals' (Drive 1haDIyC-5safbe87C6GxKmMK4jOJiToWV, 1920x1080). About 1.4x taller than video-scripts/assets/alice.png but still a raster of the same drawing, curtain cut at the right edge. Reference and test renders only; not the locked master."
     }
   ],
   "approved_decisions": [
