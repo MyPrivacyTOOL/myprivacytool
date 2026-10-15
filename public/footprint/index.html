@@ -162,6 +162,7 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .chip span{font-size:13px;line-height:1.2}
 .chip small{display:block;color:var(--muted);font-size:11.5px}
 .principle{font-size:14px;color:var(--muted);text-align:center;text-wrap:balance}
+@media (max-width:560px){.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
 @media (max-width:480px){.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -264,7 +265,7 @@ const PAD=10,vx=Math.min(...pos.map(p=>p.x))-50-PAD,vy=Math.min(...pos.map(p=>p.
 const FULL={x:vx,y:vy,w:Math.max(...pos.map(p=>p.x))+50+PAD-vx,h:Math.max(...pos.map(p=>p.y))+50+PAD-vy};
 let cur={...FULL},anim=0,view='overview',lastKey='';
 grid.style.aspectRatio=FULL.w+'/'+FULL.h;
-function setVB(b){cur=b;grid.setAttribute('viewBox',`${b.x} ${b.y} ${b.w} ${b.h}`)}
+function setVB(b){cur=b;grid.setAttribute('viewBox',`${b.x} ${b.y} ${b.w} ${b.h}`);grid.style.aspectRatio=b.w+'/'+b.h}
 function animateTo(b,ms){cancelAnimationFrame(anim);const a={...cur},t0=performance.now(),ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
   (function f(now){const k=Math.min(1,(now-t0)/ms),e=ease(k);
     setVB({x:a.x+(b.x-a.x)*e,y:a.y+(b.y-a.y)*e,w:a.w+(b.w-a.w)*e,h:a.h+(b.h-a.h)*e});
@@ -272,8 +273,7 @@ function animateTo(b,ms){cancelAnimationFrame(anim);const a={...cur},t0=performa
 function zoomTarget(){
   const on=pos.filter((p,i)=>st[i]!=='none');if(!on.length)return {...FULL};
   const x0=Math.min(...on.map(p=>p.x))-50-8,x1=Math.max(...on.map(p=>p.x))+50+8,y0=Math.min(...on.map(p=>p.y))-50-8,y1=Math.max(...on.map(p=>p.y))+50+8;
-  const AR=FULL.w/FULL.h;let w=Math.max(x1-x0,340),h=Math.max(y1-y0,340/AR);
-  if(w/h<AR)w=h*AR;else h=w/AR;
+  let w=Math.max(x1-x0,300),h=Math.max(y1-y0,240);
   w=Math.min(w,FULL.w);h=Math.min(h,FULL.h);
   return {x:(x0+x1)/2-w/2,y:(y0+y1)/2-h/2,w,h}}
 function retarget(){const key=st.map(x=>x!=='none'?1:0).join('');
