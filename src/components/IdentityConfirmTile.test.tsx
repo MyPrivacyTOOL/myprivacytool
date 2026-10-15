@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { renderHook, act } from '@testing-library/react';
 import { IdentityConfirmTile } from './IdentityConfirmTile';
 import { useIdentityConfirmation } from '@/hooks/useIdentityConfirmation';
-import type { IdentityFinding } from '@/lib/identityConfirmation';
+import type { IdentityFinding } from '@/lib/findingConfirmation';
 
 const base: IdentityFinding = {
   id: 'e1', pillar: 'email', label: 'Linked email', status: 'guess', data: 'a@b.c', source: 'p',
