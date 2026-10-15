@@ -12,7 +12,6 @@ import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
-import { handleFinalRiskScore, handleHexagonInteraction } from './lib/hitl.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
 import { abOn, abVariant } from './lib/referralAb.js';
@@ -41,7 +40,7 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const cors = {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin',
     };
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
@@ -52,9 +51,6 @@ export default {
     // MPC-7494: the open mirror. Off unless RECOGNITION_ENABLED is "true". Read-only apart from the visitor's own delete button.
     if (request.method === 'POST' && url.pathname === '/api/recognise') return handleRecognise(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/recognise/delete') return handleRecogniseDelete(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
-    // HITL loop: both answer 403 unless the scan session is bound to a verified wa_id (lib/hitl.js).
-    if (request.method === 'POST' && url.pathname === '/api/scan/hexagon-interaction') return handleHexagonInteraction(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
-    if (request.method === 'GET' && url.pathname === '/api/scan/final-risk-score') return handleFinalRiskScore(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     // MPC-7645: referral programme. Both answer 404 unless REFERRALS_ENABLED is "true". Authorised by the signed manage link in the referrer's report email.
     if (request.method === 'POST' && url.pathname === '/api/referral/status') return handleReferralStatus(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/referral/invite') return handleReferralInvite(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });

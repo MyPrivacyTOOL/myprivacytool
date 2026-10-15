@@ -1,59 +1,47 @@
-import { useCallback, useState } from "react";
-import { SCAN_API_URL } from "@/lib/webScan";
-
-export type HexagonUserAction = "confirmed" | "rejected" | "disputed";
-
-export interface InteractionMeta {
-  originalConfidenceScore?: number;
-  osintSource?: string;
-}
-
-/** Sends one interaction to the backend. Never throws: a network or server failure resolves to false. */
-export async function sendHexagonInteraction(
-  scanSessionId: string,
-  hexagonId: string,
-  action: HexagonUserAction,
-  meta: InteractionMeta = {},
-  fetchImpl: typeof fetch = fetch,
-): Promise<boolean> {
-  try {
-    const res = await fetchImpl(`${SCAN_API_URL}/api/scan/hexagon-interaction`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        scan_session_id: scanSessionId,
-        hexagon_id: hexagonId,
-        user_action: action,
-        ...(meta.originalConfidenceScore !== undefined && { original_confidence_score: meta.originalConfidenceScore }),
-        ...(meta.osintSource && { osint_source: meta.osintSource }),
-      }),
-      keepalive: true,
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+import { useCallback, useRef, useState } from 'react';
+import type { ScanResult } from '@/types/hexagon';
+import {
+  confirmHexagon,
+  disputeHexagon,
+  scoredHexagons,
+  type LearningSignal,
+  type TransitionResult,
+} from '@/lib/identityConfirmation';
+import { sendHexagonInteraction } from '@/lib/hexagonInteractionApi';
 
 /**
- * Per-hexagon confirm / reject / dispute state. The UI updates at once (optimistic); the backend call is best effort and a failure
- * (offline, 403 for an unbound session) never reverts or blocks the UI. Without a scanSessionId nothing is sent.
+ * Holds the scan result and applies the user's confirm / dispute answers.
+ * `onLearningSignal` receives one signal per accepted answer (no finding data).
+ * With a `scanId` (the deep-dive scan the page was opened for) each accepted answer is also sent to the backend, best effort: the UI has
+ * already updated, and a network failure or a refusal changes nothing on screen.
  */
-export function useHexagonState(scanSessionId?: string) {
-  const [actions, setActions] = useState<Record<string, HexagonUserAction>>({});
+export const useHexagonState = (
+  initialData: ScanResult,
+  onLearningSignal?: (s: LearningSignal) => void,
+  scanId?: string,
+) => {
+  const [scanResult, setScanResult] = useState(initialData);
+  // Mirror of the latest state, so two quick taps in one tick both see the first answer.
+  const latest = useRef(initialData);
 
-  const record = useCallback(
-    (hexagonId: string, action: HexagonUserAction, meta?: InteractionMeta) => {
-      setActions((prev) => ({ ...prev, [hexagonId]: action }));
-      if (scanSessionId) void sendHexagonInteraction(scanSessionId, hexagonId, action, meta);
+  const apply = useCallback(
+    (transition: (s: ScanResult) => TransitionResult) => {
+      const { next, signal } = transition(latest.current);
+      if (!signal) return;
+      latest.current = next;
+      setScanResult(next);
+      // THE LEARNING LOOP: the server stores the answer and, for a reject or dispute, tunes the provider. id and action only go out.
+      if (scanId) void sendHexagonInteraction(scanId, signal.hexagonId, signal.outcome);
+      onLearningSignal?.(signal);
     },
-    [scanSessionId],
+    [onLearningSignal, scanId],
   );
 
-  return {
-    actions,
-    confirm: (id: string, meta?: InteractionMeta) => record(id, "confirmed", meta),
-    reject: (id: string, meta?: InteractionMeta) => record(id, "rejected", meta),
-    dispute: (id: string, meta?: InteractionMeta) => record(id, "disputed", meta),
-  };
-}
+  const handleConfirm = useCallback(
+    (id: string, isMatch: boolean) => apply((s) => confirmHexagon(s, id, isMatch)),
+    [apply],
+  );
+  const handleDispute = useCallback((id: string) => apply((s) => disputeHexagon(s, id)), [apply]);
+
+  return { scanResult, scoredHexagons: scoredHexagons(scanResult), handleConfirm, handleDispute };
+};

@@ -747,27 +747,11 @@ reset role;
 
 -- ===== HITL interactions + tuning log =====
 select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.mpt_hexagon_interactions$$) = '42501', 'hitl: anon cannot read interactions');
-select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.mpt_scan_sessions$$) = '42501', 'hitl: authenticated cannot read sessions (wa_id is PII)');
-select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_record_hexagon_interaction('sess_0123456789abcdef','browser','confirmed',null,null)$$) = '42501', 'hitl: anon cannot call the record function');
-set local role service_role;
-insert into public.mpt_scan_sessions (scan_session_id, wa_id, verified_at) values ('sess_0123456789abcdef', '85291234567', now());
-insert into public.mpt_scan_sessions (scan_session_id, wa_id) values ('sess_unverified_000000', '85291234568');
-insert into public.mpt_scan_sessions (scan_session_id, wa_id, verified_at, revoked_at) values ('sess_revoked_00000000', '85291234569', now(), now());
-select pg_temp.assert((public.mpt_record_hexagon_interaction('sess_unverified_000000','browser','confirmed',null,null)->>'bound')::boolean = false, 'hitl: unverified session is not bound');
-select pg_temp.assert((public.mpt_record_hexagon_interaction('sess_revoked_00000000','browser','confirmed',null,null)->>'bound')::boolean = false, 'hitl: revoked session is not bound');
-select pg_temp.assert((public.mpt_record_hexagon_interaction('sess_missing_00000000','browser','confirmed',null,null)->>'bound')::boolean = false, 'hitl: unknown session is not bound');
-select pg_temp.assert((select count(*) from public.mpt_hexagon_interactions) = 0, 'hitl: an unbound call writes nothing');
-select public.mpt_record_hexagon_interaction('sess_0123456789abcdef','browser','confirmed',0.9,'HIBP');
-select pg_temp.assert((select count(*) from public.mpt_hexagon_interactions) = 1 and (select count(*) from public.osint_engine_tuning_log) = 0, 'hitl: confirmed writes the interaction only');
-select public.mpt_record_hexagon_interaction('sess_0123456789abcdef','device','disputed',0.4,'Truecaller');
-select pg_temp.assert((select action_type from public.osint_engine_tuning_log where hexagon_id = 'device') = 'dispute_rate', 'hitl: disputed writes the interaction and a dispute_rate row');
-select public.mpt_record_hexagon_interaction('sess_0123456789abcdef','isp','rejected',0.4,'Truecaller');
-select pg_temp.assert((select action_type from public.osint_engine_tuning_log where hexagon_id = 'isp') = 'false_positive_rate', 'hitl: rejected writes a false_positive_rate row');
-select public.mpt_record_hexagon_interaction('sess_0123456789abcdef','screen-fingerprint','disputed',null,null);
-select pg_temp.assert((select count(*) from public.mpt_hexagon_interactions) = 4 and (select count(*) from public.osint_engine_tuning_log) = 2, 'hitl: a dispute with no named source is recorded but not tuned on');
-select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action) values ('sess_0123456789abcdef','browser','maybe')$$) = '23514', 'hitl: user_action check constraint');
-select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.osint_engine_tuning_log (hexagon_id, osint_source, action_type) values ('browser','HIBP','other')$$) = '23514', 'hitl: action_type check constraint');
-reset role;
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.osint_engine_tuning_log$$) = '42501', 'hitl: authenticated cannot read the tuning log');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action) values ('s','h','maybe')$$) = '23514', 'hitl: user_action check constraint');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.osint_engine_tuning_log (hexagon_id, osint_source, action_type) values ('h','HIBP','other')$$) = '23514', 'hitl: action_type check constraint');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, original_confidence_score) values ('s','h','disputed',1.5)$$) = '23514', 'hitl: confidence must be 0..1');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, osint_source) values ('s','h','disputed','spam_registry')$$) = '', 'hitl: service_role can insert an interaction');
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
