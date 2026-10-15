@@ -33,6 +33,10 @@ export interface Env {
   PROBE_LOOKUP_HOURS?: string;
   /** Mode "all": days until a row's expires_at (default 90, clamped 1-365). */
   PROBE_RETENTION_DAYS?: string;
+  /** Full event log (mode "on" only): comma-separated numeric Telegram ids of people who opted in, logged in addition to PROBE_TELEGRAM_IDS. */
+  PROBE_LOG_OPTIN_IDS?: string;
+  /** Full event log: days until a row expires (default 90, clamped 1-365), or "forever" for no expiry. */
+  PROBE_LOG_RETENTION_DAYS?: string;
   /** Preferred: service binding to the core-brain Worker (MPC-8601). */
   CORE_BRAIN?: { fetch(request: Request): Promise<Response> };
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */

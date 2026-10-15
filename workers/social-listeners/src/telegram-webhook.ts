@@ -1,4 +1,5 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
+import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
 import { sendTelegramReply } from "./reply";
@@ -23,20 +24,26 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   const payload = parseJson(raw);
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
 
+  // Full event log: only PROBE_MODE=on and an allow-listed or opted-in sender; null otherwise (docs/channel-probe.md, "Full event log").
+  const events = createEventLog(env, payload, log, ctx);
+  events?.in(payload);
+  const done = async (res: Response): Promise<Response> => { if (!ctx) await events?.drain(); return res; };
+
   // Channel probe reader (off unless PROBE_MODE is "on" (allow-listed test accounts) or "all" (every non-bot sender)); docs/channel-probe.md.
   const mode = probeMode(env);
   if (mode !== "off") {
     const run = (p: Promise<void>) => (ctx?.waitUntil ? (ctx.waitUntil(p), undefined) : p);
-    if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log)); return new Response("OK"); }
-    if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log));
+    if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log, events)); return done(new Response("OK")); }
+    if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
   }
 
   const brain = await callCoreBrain(env, { source: "telegram", receivedAt: new Date().toISOString(), payload }, log);
-  if (brain === RATE_LIMITED) return new Response("OK"); // throttled sender: acknowledge so Telegram does not retry
-  if (!brain) return new Response("Upstream Unavailable", { status: 502 });
+  events?.brain(brain === RATE_LIMITED ? "rate_limited" : brain);
+  if (brain === RATE_LIMITED) return done(new Response("OK")); // throttled sender: acknowledge so Telegram does not retry
+  if (!brain) return done(new Response("Upstream Unavailable", { status: 502 }));
   // Answer Telegram right away; sending the reply must never delay or fail the webhook (a non-2xx makes Telegram retry).
-  const send = sendTelegramReply(env, payload, brain, log);
+  const send = sendTelegramReply(env, payload, brain, log, events);
   if (ctx?.waitUntil) ctx.waitUntil(send);
   else await send;
-  return new Response("OK");
+  return done(new Response("OK"));
 }

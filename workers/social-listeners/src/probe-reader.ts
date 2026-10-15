@@ -3,6 +3,7 @@
 // PROBE_MODE=all (decision D-A, "capture everywhere"): every non-bot sender, from any update type, with a wider set of public lookups.
 // Rows go to public.channel_probe_captures (service_role only; 7 day expiry in "on", PROBE_RETENTION_DAYS in "all").
 // PROBE_MODE defaults to off; any other value counts as off.
+import type { EventLog } from "./event-log";
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
 
@@ -95,7 +96,13 @@ async function save(env: Env, rows: Row[], log: Logger): Promise<void> {
 }
 
 /** One Bot API call. Returns what Telegram answered (including errors) so refusals are recorded as evidence. Never throws, never logs the URL. */
-async function telegram(env: Env, method: string, body: Record<string, unknown>): Promise<{ status: number; response: unknown }> {
+async function telegram(env: Env, method: string, body: Record<string, unknown>, events?: EventLog | null): Promise<{ status: number; response: unknown }> {
+  const result = await call(env, method, body);
+  events?.out(method, body, result); // full event log (mode "on", logged senders only); never passed in mode "all"
+  return result;
+}
+
+async function call(env: Env, method: string, body: Record<string, unknown>): Promise<{ status: number; response: unknown }> {
   try {
     const res = await fetch(`${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
       method: "POST",
@@ -191,19 +198,19 @@ async function captureAll(env: Env, update: unknown, log: Logger): Promise<void>
 }
 
 /** Mode "on": raw update, then the raw result of each public lookup on an allow-listed sender. */
-async function captureOn(env: Env, update: unknown, log: Logger): Promise<void> {
+async function captureOn(env: Env, update: unknown, log: Logger, events?: EventLog | null): Promise<void> {
   const sender = telegramSender(update);
   if (!sender) return;
   const rows: Row[] = [{ platform: "telegram", sender_id: sender.id, kind: "message", payload: update }];
   if (env.TELEGRAM_BOT_TOKEN) {
-    const chat = await telegram(env, "getChat", { chat_id: sender.id });
+    const chat = await telegram(env, "getChat", { chat_id: sender.id }, events);
     rows.push({ platform: "telegram", sender_id: sender.id, kind: "lookup:getChat", payload: chat });
-    const photos = await telegram(env, "getUserProfilePhotos", { user_id: Number(sender.id), limit: 5 });
+    const photos = await telegram(env, "getUserProfilePhotos", { user_id: Number(sender.id), limit: 5 }, events);
     rows.push({ platform: "telegram", sender_id: sender.id, kind: "lookup:getUserProfilePhotos", payload: photos });
     // A profile can show a personal channel: look it up too, since its public posts are part of what OSINT could see.
     const personalId = (chat.response as { result?: { personal_chat?: { id?: unknown } } } | null)?.result?.personal_chat?.id;
     if (typeof personalId === "number") {
-      const personal = await telegram(env, "getChat", { chat_id: personalId });
+      const personal = await telegram(env, "getChat", { chat_id: personalId }, events);
       rows.push({ platform: "telegram", sender_id: sender.id, kind: "lookup:getChat(personal_chat)", payload: personal });
     }
   } else {
@@ -214,22 +221,22 @@ async function captureOn(env: Env, update: unknown, log: Logger): Promise<void> 
 }
 
 /** Saves the raw update and the public lookups for the current PROBE_MODE. Never throws. */
-export async function runTelegramProbe(env: Env, update: unknown, log: Logger): Promise<void> {
+export async function runTelegramProbe(env: Env, update: unknown, log: Logger, events?: EventLog | null): Promise<void> {
   try {
     const mode = probeMode(env);
     if (mode === "all") await captureAll(env, update, log);
-    else if (mode === "on") await captureOn(env, update, log);
+    else if (mode === "on") await captureOn(env, update, log, events);
   } catch (err) {
     log.warn("probe_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
 }
 
 /** Answers "/probeid" with the sender's own numeric id (nothing else). Never throws. */
-export async function replyProbeId(env: Env, update: unknown, log: Logger): Promise<void> {
+export async function replyProbeId(env: Env, update: unknown, log: Logger, events?: EventLog | null): Promise<void> {
   try {
     const sender = telegramSender(update);
     if (!sender || !env.TELEGRAM_BOT_TOKEN) return;
-    await telegram(env, "sendMessage", { chat_id: sender.chatId, text: `Your Telegram id is ${sender.id}` });
+    await telegram(env, "sendMessage", { chat_id: sender.chatId, text: `Your Telegram id is ${sender.id}` }, events);
   } catch (err) {
     log.warn("probe_reply_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
