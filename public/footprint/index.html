@@ -54,7 +54,22 @@ button.corner{position:absolute;top:0;right:0;border-radius:99px}
 button:disabled{opacity:.35;cursor:default}
 button:disabled:hover{border-color:var(--line)}
 .views{width:100%;max-width:560px;align-self:center;display:flex;gap:8px;justify-content:flex-end}
+.views{justify-content:space-between;align-items:center}
+.views .grp{display:flex;gap:8px;align-items:center}
+.modectl{display:flex}
+.modectl button:first-child{border-radius:8px 0 0 8px;border-right-width:0}
+.modectl button:last-child{border-radius:0 8px 8px 0}
+.modectl button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .zoomctl{display:flex}
+.boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;width:100%}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 8px}
+.box h3{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.box h3 small{color:var(--muted);font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:0;padding:6px 2px 8px;font:400 12.5px/1.15 var(--body);color:var(--fg);cursor:pointer;border-radius:10px;min-width:0}
+.tile:hover{background:var(--soft)}
+.tile.sel{outline:2px solid var(--fg)}
+.tile span{text-align:center;overflow-wrap:anywhere}
 .zoomctl button:first-child{border-radius:8px 0 0 8px;border-right-width:0}
 .zoomctl button:last-child{border-radius:0 8px 8px 0}
 
@@ -169,10 +184,16 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
   </header>
 
   <div class="views">
+    <div class="modectl" role="group" aria-label="Layout">
+      <button id="mHive" class="icon" aria-pressed="true" aria-label="Beehive view" title="Beehive: hexagons appear out of the rain"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l8 4.6v9.8l-8 4.6-8-4.6V7.1z"/></svg></button>
+      <button id="mBoxes" class="icon" aria-pressed="false" aria-label="By pattern view" title="By pattern: the same hexagons grouped into boxes"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></button>
+    </div>
+    <div class="grp hiveonly">
     <button id="vCurtain" class="icon" aria-label="Rewind to the curtain" title="Rewind: close the curtain and open it again"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M11 6v12L2.5 12zM21.5 6v12L13 12z"/></svg></button>
-    <div class="zoomctl" role="group" aria-label="Zoom">
-      <button id="zOut" class="icon" aria-label="Zoom out" title="Zoom out to the whole hive">&minus;</button>
-      <button id="zIn" class="icon" aria-label="Zoom in" title="Zoom in on the revealed hexagons">+</button>
+      <div class="zoomctl" role="group" aria-label="Zoom">
+        <button id="zOut" class="icon" aria-label="Zoom out" title="Zoom out to the whole hive">&minus;</button>
+        <button id="zIn" class="icon" aria-label="Zoom in" title="Zoom in on the revealed hexagons">+</button>
+      </div>
     </div>
   </div>
   <section class="stage" id="stage">
@@ -191,6 +212,8 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
       <button id="openCurtain">Open the curtain</button>
     </div>
   </section>
+
+  <section class="boxes" id="boxes" hidden aria-label="Data points grouped by pattern"></section>
 
   <section class="panel" id="panel" aria-live="polite"></section>
 
@@ -309,6 +332,7 @@ function paint(){
   const L=[['confirmed','Confirmed','Verified by you',['confirmed','fixed']],['found','Found','Tap to confirm',['found']],['ask','Needs input','Is this you?',['ask','scan']],['told','You told us','Optional check',['told']],['risk','Confirmed risk','Fix it',['risk']],['false','Not you','Nothing to do',['false']],['none','Unknown','Hidden in the rain',['none']]];
   document.getElementById('legend').innerHTML=L.map(([k,t,s,arr])=>`<div class="chip">${mini(k,30)}<span>${t}<small>${s}</small></span><b>${n(arr)}</b></div>`).join('');
   retarget();
+  if(mode==='boxes')renderBoxes();
 }
 const MSTY={found:['url(#gSoft)','var(--ink)',3,'',.7],confirmed:['url(#gSoft)','var(--ink)',5,'',1],fixed:['url(#gSoft)','var(--ink)',5,'',1],ask:['var(--ask-bg)','var(--ask)',5,'',1],told:['var(--told-bg)','var(--told)',5,'12 8',1],risk:['var(--bad-bg)','var(--bad)',5,'',1],false:['var(--dim)','var(--dim-fg)',4,'',.8],none:['transparent','var(--green)',4,'8 8',.9],scan:['var(--soft)','var(--ink)',5,'8 6',1]};
 function mini(state,h,emoji){
@@ -326,7 +350,7 @@ function showPanel(){
   if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Start here</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
   const it=ITEMS[sel],s=st[sel];
   let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
-  if(s==='none'){title='Unknown';tag='Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
+  if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
   else{
     extra=`<dl><div><dt>What we capture</dt><dd>${it.cap}</dd></div><div><dt>Why it matters</dt><dd>${it.val}</dd></div>${(s==='ask'||s==='risk')&&it.risk?`<div><dt>Risk</dt><dd>${cleanRisk(it)}</dd></div>`:''}</dl>`;
     const ex=it.ex?`<div class="ex">Example value: <b>${it.ex}</b>${it.conf?' · confidence '+it.conf+'%':''}</div>`:'';
@@ -418,6 +442,33 @@ document.getElementById('openCurtain').onclick=openCurtain;
 zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
 zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
 document.getElementById('vCurtain').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;closeCurtain();timers.forEach(clearTimeout);timers=[];setTimeout(openCurtain,700)};
+/* By pattern: the same 54 hexagons grouped into labelled boxes (6 to 12 per box). Same states, same panel. */
+const GROUPS=[
+ ['Core identity',['demographic','user-profile','location','primary-language','language-fallbacks','language-mismatch']],
+ ['Device and network',['device','browser','isp','time','screen','privacy','connection','referrer','battery']],
+ ['Motion and sensors',['orientation','rotation-angle','tilt-beta','tilt-gamma','motion-sensors']],
+ ['Browser fingerprint',['canvas-fingerprint','webgl-fingerprint','audio-fingerprint','font-detection','extension-detection','fingerprint-protection','webrtc-leak','hardware-profile','screen-fingerprint','timezone-locale','battery-fingerprint','media-devices']],
+ ['Storage and cookies',['cookies-status','localstorage-status','sessionstorage-status','indexeddb-status','cache-status']],
+ ['Social and accounts',['google-services','meta-services','microsoft-services','social-platforms','cross-site-identity']],
+ ['Security and exposure',['dns-leak','https-status','mixed-content','security-headers','browser-security','tls-config']],
+ ['Behavior and habits',['mouse-tracking','typing-patterns','click-patterns','scroll-behavior','session-duration','engagement-map']]];
+const boxesEl=document.getElementById('boxes'),stageEl=document.getElementById('stage'),mHive=document.getElementById('mHive'),mBoxes=document.getElementById('mBoxes');
+let mode='hive';
+function renderBoxes(){
+  boxesEl.innerHTML=GROUPS.map(([name,ids])=>{
+    const cells=ids.map(id=>{const i=idx(id),s=st[i],it=ITEMS[i];
+      return `<button class="tile${i===sel?' sel':''}" data-i="${i}" aria-label="${it.label}: ${STATES[s]}">${mini(s,54,s==='none'?'':it.emoji)}<span>${it.label}</span></button>`}).join('');
+    const done=ids.filter(id=>['confirmed','fixed'].includes(st[idx(id)])).length;
+    return `<section class="box"><h3>${name}<small>${done}/${ids.length}</small></h3><div class="tiles">${cells}</div></section>`}).join('');
+  boxesEl.querySelectorAll('.tile').forEach(b=>b.onclick=()=>select(+b.dataset.i));
+}
+function setMode(m){mode=m;
+  mHive.setAttribute('aria-pressed',m==='hive');mBoxes.setAttribute('aria-pressed',m==='boxes');
+  stageEl.hidden=m==='boxes';boxesEl.hidden=m==='hive';
+  document.querySelectorAll('.hiveonly').forEach(e=>e.hidden=m==='boxes');
+  if(m==='boxes'){clearTimeout(autoZoom);renderBoxes()}
+  if(sel>=0)showPanel()}
+mHive.onclick=()=>setMode('hive');mBoxes.onclick=()=>setMode('boxes');
 reset();
 </script>
 
