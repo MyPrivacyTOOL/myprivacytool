@@ -22,20 +22,23 @@ Saved from the working session that built [#375](https://github.com/MyPrivacyTOO
 | 6 | Status colours run dark green (counts most) through white (neutral) to dark red (strongest objection). | User request, see image 04. |
 | 7 | The browser sends answers only when `VITE_DEEP_DIVE_API_URL` is set. | The Worker has no confirmed public address, so nothing is guessed. |
 | 8 | Deploying the Worker and setting the Pages variable is done by the owner, not from a coding session. | Agreed in the session. |
+| 9 | Keep main's contract: `scan_id`, `action` and 404 for an unknown or expired scan. Not renamed to `scan_session_id`, `user_action` and 403. | Shipped, tested and used by the browser hook. Neither status code reveals much, so renaming adds churn and no security gain. Agreed 2026-10-16. |
+| 10 | `given` keeps counting toward the verified score. | The Meta display name is a real exposure, and excluding it would contradict main's tested rule. Agreed 2026-10-16. |
+| 11 | Showing findings to anyone holding the 24-hour scan link is acceptable for now. Revisit with MPC-7902. | The link goes to the person's own WhatsApp and expires. MPC-7902 (proof-of-possession, prefetch-resistant links) should harden it. Agreed 2026-10-16. |
+| 12 | A person reviews the new page wording before any real link is sent. The feature stays off until `VITE_DEEP_DIVE_API_URL` is set. | Nothing is exposed in the meantime. Agreed 2026-10-16. |
+| 13 | Apply `20261015200000_whatsapp_notify_engagement_log.sql` together with the Worker deploy, after reading it. | It changes an existing table (`mpt_user_engagement.user_id` becomes nullable). Agreed 2026-10-16. |
 
 ## Open
 
-- **`given` counts toward the score**, as main already does. The original brief said to exclude it. Needs a decision.
-- **Field names and status codes.** Main uses `scan_id`, `action` and 404 for an unknown scan. The brief used `scan_session_id`, `user_action` and 403. Not decided.
-- **Reading findings by link.** `GET /api/scan/deep-dive` returns a person's findings to anyone holding the scan link, the same trust as the confirm and finish routes. Not yet confirmed as acceptable, or whether it needs a second check.
-- **Copy review.** The deep-dive page has new wording ("Is this you?", the expired-link message, the button labels). No copy review has been done.
-- **`!` badge clash** (image 03). In the shipped tile, a small `!` means "Not me?", a dispute. In the mockup, red hexagons with `!` and "Needs fixing" read as risk. Settle which one `!` means before both ship.
+- **`!` badge clash** (image 03). In the shipped tile, a small `!` means "Not me?", a dispute. In the mockup, red hexagons with `!` and "Needs fixing" read as risk. Settle which one `!` means before both ship. This belongs to the hexagon visual chat.
+- **Copy review** of the `/scan/deep-dive` wording (decision 12) is still to be done by a person.
 
-## Production status (as of this doc)
+## Production status (as of 2026-10-16 01:26 HKT)
 
-- Migration `20261016000000_hexagon_hitl_interactions.sql` is **not applied** to the live project `xmdmkumwxpgahmlweuug`. Approval was given. Three attempts through the Supabase migration tool each timed out after 60s and left the database unchanged (no tables, no stuck queries, no locks).
-- `20261015200000_whatsapp_notify_engagement_log.sql` is also not applied.
-- The webhook-receiver Worker on Cloudflare was last deployed on 14 Oct, before the deep-dive code. It needs deploying.
+- **Applied:** the two tables from `20261016000000_hexagon_hitl_interactions.sql` exist on the live project `xmdmkumwxpgahmlweuug`, with forced RLS, no access for `anon` or `authenticated`, `service_role` only, the check constraints and indexes, and 0 rows. The migration tool and a combined script timed out, so it was run as the same statements in small steps. Supabase's migration history does not list it. The file is idempotent, so a later push of it is harmless.
+- **Not applied:** `20261015200000_whatsapp_notify_engagement_log.sql` (decision 13).
+- **Not deployed:** the webhook-receiver Worker on Cloudflare was last deployed on 14 Oct, before the deep-dive code.
+- **Go-live order (owner):** 1) deploy the Worker with the new code and secrets, 2) apply `20261015200000`, 3) copy review, 4) set `VITE_DEEP_DIVE_API_URL` on the Pages project last. Until step 4 the site sends nothing.
 
 ## Images
 
