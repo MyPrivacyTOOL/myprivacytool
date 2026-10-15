@@ -1,16 +1,18 @@
 """
-Core domain models for Shadow Audit API.
-Pydantic schemas for request/response validation and serialization.
+Data models for Agent Shadow Audit API.
+- Pydantic schemas for FastAPI request/response
+- Enums for risk levels, pillars, etc.
+- W3C VC-compatible Agent Passport schema
 """
 
-from datetime import datetime
-from enum import Enum
-from typing import Optional, Dict, List
 from pydantic import BaseModel, Field
+from enum import Enum
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
 
 
 class RiskLevel(str, Enum):
-    """Risk severity levels (Hexagon Framework)."""
+    """Risk severity levels."""
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -19,117 +21,159 @@ class RiskLevel(str, Enum):
 
 
 class AuditPillar(str, Enum):
-    """Five audit pillars from Hexagon Framework."""
+    """The 5 pillars of the Hexagon Framework."""
     DATA_EXPOSURE = "data_exposure"
-    CONSENT_VALIDITY = "consent_validity"
     CREDENTIAL_SECURITY = "credential_security"
+    CONSENT_VALIDITY = "consent_validity"
     PROCESS_INTEGRITY = "process_integrity"
     EXTERNAL_RISK = "external_risk"
 
 
 class RiskDetection(BaseModel):
-    """Represents a single detected risk (Hexagon framework)."""
-    risk_id: str = Field(..., description="Unique risk identifier (e.g., HX-001)")
+    """Represents a detected risk."""
+    risk_id: str = Field(..., description="Hexagon risk ID (e.g., HX-1-01)")
     risk_name: str = Field(..., description="Human-readable risk name")
-    pillar: AuditPillar = Field(..., description="Audit pillar this risk belongs to")
-    severity: RiskLevel = Field(..., description="Risk severity level")
-    description: str = Field(..., description="Detailed risk description")
-    recommendation: str = Field(..., description="Remediation action")
-    evidence: Optional[Dict] = Field(default=None, description="Evidence supporting detection")
-    confidence: float = Field(..., ge=0, le=1, description="Confidence score (0-1)")
+    pillar: AuditPillar = Field(..., description="Which pillar this risk belongs to")
+    severity: RiskLevel = Field(..., description="Risk severity")
+    description: str = Field(..., description="What was detected and why it's a risk")
+    recommendation: str = Field(..., description="How to remediate")
+    confidence: float = Field(..., ge=0, le=1, description="Detection confidence (0.0-1.0)")
+    detected_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        use_enum_values = True
 
 
 class RiskScore(BaseModel):
     """Risk score for a single pillar."""
-    pillar: AuditPillar
-    score: float = Field(..., ge=0, le=100, description="Pillar score (0-100)")
+    pillar: AuditPillar = Field(..., description="The pillar being scored")
+    score: int = Field(..., ge=0, le=100, description="Risk score 0-100 (100=safe)")
     detected_risks: List[RiskDetection] = Field(default_factory=list)
-    remediation_priority: int = Field(..., ge=1, le=5, description="1=highest, 5=lowest")
+    remediation_priority: int = Field(..., ge=1, le=5, description="1=urgent, 5=backlog")
+    
+    class Config:
+        use_enum_values = False
+
+
+class AuditRequest(BaseModel):
+    """Request body for POST /api/v1/audit/run."""
+    agent_id: str = Field(..., description="Agent UUID to audit")
+    context: Dict = Field(
+        default_factory=dict,
+        description="Agent context: logs, environment, consent, config"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "agent_id": "agent-xyz-123",
+                "context": {
+                    "logs": "...",
+                    "system_context": "...",
+                    "env_config": {},
+                    "consent_log": {},
+                    "audit_config": {},
+                }
+            }
+        }
 
 
 class AuditResult(BaseModel):
-    """Complete audit result for an agent."""
+    """Response from POST /api/v1/audit/run."""
     audit_id: str = Field(..., description="Unique audit identifier")
-    agent_id: str = Field(..., description="Agent being audited")
+    agent_id: str = Field(..., description="The agent audited")
+    overall_risk_score: int = Field(
+        ..., ge=0, le=100,
+        description="Overall risk 0-100 (100=safe, 0=critical risk)"
+    )
+    total_risks_detected: int = Field(default=0, description="Total risks found")
+    critical_count: int = Field(default=0, description="Number of CRITICAL risks")
+    high_count: int = Field(default=0, description="Number of HIGH risks")
+    pillar_scores: Optional[Dict[str, RiskScore]] = Field(
+        default_factory=dict,
+        description="Risk scores by pillar"
+    )
+    detected_risks: Optional[List[RiskDetection]] = Field(
+        default_factory=list,
+        description="All detected risks"
+    )
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
-    # Pillar scores
-    pillar_scores: Dict[str, RiskScore] = Field(default_factory=dict)
-    
-    # Overall metrics
-    overall_risk_score: float = Field(..., ge=0, le=100, description="Aggregate risk (0-100)")
-    total_risks_detected: int = Field(default=0)
-    critical_count: int = Field(default=0)
-    high_count: int = Field(default=0)
-    
-    # Status
-    status: str = Field(default="pending", description="audit|pending|completed|failed")
-    error_message: Optional[str] = None
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat(),
+            RiskLevel: lambda v: v.value,
+            AuditPillar: lambda v: v.value,
+        }
 
 
 class PassportClaim(BaseModel):
-    """Individual claim in an Agent Passport (W3C Verifiable Credential)."""
-    claim_id: str
-    claim_type: str  # e.g., "risk_score", "consent_validity", "data_handling"
-    issuer: str = "myprivacytool-shadow-audit"
-    issued_at: datetime
-    expires_at: Optional[datetime] = None
-    evidence: Dict = Field(default_factory=dict)
-    status: str = "active"  # active | revoked | expired
+    """A single verifiable claim in an Agent Passport."""
+    claim_id: str = Field(..., description="Unique claim ID")
+    claim_type: str = Field(
+        ...,
+        description="Type of claim (e.g., risk_assessment, data_exposure_score)"
+    )
+    claim_value: str = Field(..., description="The claim value")
+    context: str = Field(default="", description="Additional context")
+    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime = Field(
+        default_factory=lambda: datetime.utcnow() + timedelta(days=30),
+        description="When this claim expires (30 days by default)"
+    )
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat(),
+        }
 
 
 class AgentPassport(BaseModel):
     """
-    W3C Verifiable Credential format for Agent Passport.
-    Represents audit results as cryptographically signed credentials.
+    Agent Passport credential (W3C VC-compatible).
+    
+    Schema:
+    - passport_id: unique identifier
+    - agent_id: the agent holding this passport
+    - audit_id: the audit this credential is based on
+    - claims: list of verifiable claims
+    - risk_level: overall risk rating
+    - overall_score: numeric risk score
     """
-    passport_id: str = Field(..., description="Unique credential ID")
-    agent_id: str
-    issuer: str = "myprivacytool-shadow-audit"
+    passport_id: str = Field(..., description="Unique passport ID")
+    agent_id: str = Field(..., description="Agent UUID")
+    audit_id: str = Field(..., description="Source audit ID")
+    claims: List[PassportClaim] = Field(default_factory=list, description="Verifiable claims")
     issued_at: datetime = Field(default_factory=datetime.utcnow)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime = Field(
+        default_factory=lambda: datetime.utcnow() + timedelta(days=30)
+    )
+    risk_level: str = Field(
+        default="APPROVED",
+        description="Risk rating: APPROVED, APPROVED_WITH_CONSTRAINTS, UNDER_REVIEW, REJECTED"
+    )
+    overall_score: int = Field(default=100, ge=0, le=100, description="Overall risk score")
     
-    # Claims
-    claims: List[PassportClaim] = Field(default_factory=list)
-    
-    # Signature (Ed25519)
-    proof: Optional[Dict] = None  # Will contain signature + verification method
-    
-    # Reference to audit
-    audit_id: Optional[str] = None
-    audit_result: Optional[AuditResult] = None
-
-
-class TriggerAuditRequest(BaseModel):
-    """Request to trigger an audit for an agent."""
-    agent_id: str
-    audit_type: str = "shadow"  # shadow | invasive | spot-check
-    include_passport: bool = True
-
-
-class TriggerAuditResponse(BaseModel):
-    """Response to audit trigger."""
-    audit_id: str
-    agent_id: str
-    status: str
-    created_at: datetime
-
-
-class RetrieveAuditRequest(BaseModel):
-    """Request to retrieve audit results."""
-    audit_id: str
-
-
-class RemediateAuditRequest(BaseModel):
-    """Request to remediate detected risks."""
-    audit_id: str
-    risks_to_remediate: List[str]  # List of risk_ids
-    remediation_actions: Dict[str, str]  # {risk_id: action_description}
-
-
-class HealthCheckResponse(BaseModel):
-    """Health check response."""
-    status: str
-    timestamp: datetime
-    version: str = "1.0.0"
-    services: Dict[str, str] = Field(default_factory=dict)  # {service: status}
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat(),
+        }
+        schema_extra = {
+            "example": {
+                "passport_id": "passport-abc123def456",
+                "agent_id": "agent-xyz-123",
+                "audit_id": "audit-789ghi",
+                "claims": [
+                    {
+                        "claim_id": "claim-001",
+                        "claim_type": "risk_assessment",
+                        "claim_value": "75",
+                        "context": "Overall risk score",
+                        "issued_at": "2026-10-15T16:20:00Z",
+                        "expires_at": "2026-11-14T16:20:00Z"
+                    }
+                ],
+                "risk_level": "APPROVED_WITH_CONSTRAINTS",
+                "overall_score": 75
+            }
+        }
