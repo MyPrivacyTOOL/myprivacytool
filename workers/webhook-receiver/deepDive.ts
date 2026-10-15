@@ -103,12 +103,15 @@ export function logFinalized(env: Env, scanId: string) {
  * summary text, otherwise the "still processing" text. The caller sends it with the ordinary text endpoint (no template).
  */
 export const PROCESSING_TEXT = 'Your Deep Dive is still processing. Please check back in a few minutes.';
+export const EXPIRED_TEXT = 'Your last Deep Dive link expired (they last 24 hours). You can start a new one at https://myprivacytool.io/scan';
 export async function resultsReply(env: Env, waId: string): Promise<string> {
   const ptr: any = await getConversationState(env, `deepdive_latest:${waId}`);
   const scan = ptr?.scan_id ? await loadScan(env, ptr.scan_id) : null;
+  if (ptr?.scan_id && !scan) return EXPIRED_TEXT;   // had a scan, it is past its 24h life
   if (!scan || scan.state.wa_id !== waId || !scan.state.finalized_at) return PROCESSING_TEXT;
   const verified = verifiedExposureCount(scan.hexagons);
-  const action = scan.hexagons.filter((h) => h.status === 'guess' || h.status === 'not_checked').length;   // findings still needing the person's attention
+  const ids = new Set(verifiedExposureIds(scan.hexagons));
+  const action = scan.hexagons.filter((h) => ids.has(h.id) && h.remediation).length;   // verified exposures that have a fix for the person to do
   return `Your MPT Deep Dive is complete. ✅ Verified: ${verified} exposures. ⚠️ Action required: ${action} items. Tap here for your secure dashboard: ${dashboardUrl(env, scan.scanId)}`;
 }
 const dashboardUrl = (env: Env, scanId: string) => `${env.DEEP_DIVE_DASHBOARD_URL || 'https://myprivacytool.io/scan/deep-dive'}?scan=${scanId}`;

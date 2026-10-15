@@ -122,6 +122,13 @@ describe('deep dive flow', () => {
     expect(metaBodies.every((b) => b.type === 'text')).toBe(true);
   });
 
+  it('RESULTS after the scan expired says so and points to a new scan', async () => {
+    const { j } = await start(); await call('/api/scan/finalize', { scan_id: j.scan_id }, web);
+    docs[`deepdive:${j.scan_id}`].expires_at = Date.now() - 1;
+    await whatsapp('RESULTS');
+    expect(metaBodies[0].text.body).toContain('expired');
+  });
+
   it('RESULTS only reads the sender\'s own scan', async () => {
     const { j } = await start(); await call('/api/scan/finalize', { scan_id: j.scan_id }, web);
     await whatsapp('RESULTS', '85299999999');
