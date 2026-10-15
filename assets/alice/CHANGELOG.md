@@ -15,3 +15,6 @@
 
 ## 0.1.2-draft (MPC-7797)
 - v1.0 scope reduced (approved): six poses P1-P6, layered master, three head views (front, three-quarter-left, profile-left) and the voice reference. Remaining faces, the six expression crops and the curtain-reveal animation are optional, for later minor versions.
+
+## 0.1.3-draft (MPC-7797)
+- Code colour corrected from `#00FF00` to Matrix Green `#27AE60` (locked brand palette; `#00FF00` was never approved as a hex). Matches the corrected MPC-7438.

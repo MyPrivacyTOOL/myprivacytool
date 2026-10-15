@@ -1,6 +1,6 @@
 {
   "library": "alice",
-  "version": "0.1.2-draft",
+  "version": "0.1.3-draft",
   "locked": false,
   "fps": 30,
   "canvas": {
@@ -32,7 +32,7 @@
     "source": "MPC-7438 example (head = 1/7 of body)"
   },
   "palette": {
-    "code_green": "#00FF00",
+    "code_green": "#27AE60",
     "note": "only colour; behind the curtain on black"
   },
   "legacy_clips": {
