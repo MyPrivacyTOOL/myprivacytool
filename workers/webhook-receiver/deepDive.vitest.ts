@@ -62,6 +62,19 @@ describe('deep dive flow', () => {
     expect((await r.json() as any).hexagons.find((h: any) => h.id === 'hex_security_spam_flag')).toMatchObject({ status: 'not_checked', data: null });
   });
 
+  it('deep-dive page data: the scan owner link returns the findings (never the wa_id); unknown scan 404, bad origin 403', async () => {
+    const { j } = await start();
+    let r = await call(`/api/scan/deep-dive?scan_id=${j.scan_id}`, undefined, web, 'GET');
+    const out = await r.json() as any;
+    expect(r.status).toBe(200);
+    expect(out.finalized).toBe(false);
+    expect(out.hexagons.map((h: any) => h.id)).toEqual(j.hexagons.map((h: any) => h.id));
+    expect(JSON.stringify(out)).not.toContain(WA);
+    expect(r.headers.get('Cache-Control')).toBe('no-store');
+    expect((await call('/api/scan/deep-dive?scan_id=00000000-0000-4000-8000-000000000000', undefined, web, 'GET')).status).toBe(404);
+    expect((await call(`/api/scan/deep-dive?scan_id=${j.scan_id}`, undefined, { Origin: 'https://evil.example' }, 'GET')).status).toBe(403);
+  });
+
   it('end to end: start -> interact -> score -> finalize -> template with message id, logged, sent once', async () => {
     const { j } = await start(); const scan_id = j.scan_id;
     // photo is a 0.85 "checked" finding, so the user may dispute it

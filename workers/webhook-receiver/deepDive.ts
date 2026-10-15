@@ -2,6 +2,7 @@
 /**
  * WhatsApp deep dive: OSINT scan -> user confirms findings on the web -> "complete" template back on WhatsApp.
  *   POST /api/scan/start-deep-dive       server-to-server (X-Webhook-Secret = DEEP_DIVE_SECRET). {wa_id} -> {scan_id, hexagons}
+ *   GET  /api/scan/deep-dive             browser, ?scan_id= -> {hexagons, finalized}: what the "Is this you?" page shows (scan_id is the bearer, as for the routes below)
  *   POST /api/scan/hexagon-interaction   browser, scan_id is the bearer. {scan_id, hexagon_id, action: confirm|reject|dispute}; each accepted answer is persisted (persistInteraction)
  *   GET  /api/scan/final-risk-score      browser, ?scan_id= -> {verified_exposure_count, score, confirmed_hexagon_ids, not_checked_count}
  *   POST /api/scan/finalize              browser, {scan_id}: computes the count SERVER-side and sends the template (once)
@@ -134,6 +135,17 @@ export async function handleDeepDive(request: Request, env: Env): Promise<Respon
       if (e instanceof ProofOfPossessionError) return jsonRes({ error: 'proof_of_possession_failed' }, 403);
       throw e;
     }
+  }
+
+  if (path === '/api/scan/deep-dive') {
+    const g = browserGate(request, 'GET, OPTIONS');
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: g.headers });
+    if (request.method !== 'GET') return new Response('Not Found', { status: 404 });
+    if (!g.allowed) return jsonRes({ error: 'Forbidden origin' }, 403, g.headers);
+    const scan = await loadScan(env, new URL(request.url).searchParams.get('scan_id'));
+    if (!scan) return jsonRes({ error: 'scan_not_found' }, 404, g.headers);
+    // The findings belong to the person holding the link (the link went to their own WhatsApp). No wa_id is in the hexagons.
+    return jsonRes({ hexagons: scan.hexagons, finalized: !!scan.state.notified_at }, 200, g.headers);
   }
 
   if (path === '/api/scan/hexagon-interaction') {
