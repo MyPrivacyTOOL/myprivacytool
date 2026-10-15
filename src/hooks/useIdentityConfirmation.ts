@@ -6,7 +6,7 @@ import {
   disputeFinding,
   learningEvent,
   riskFindings,
-} from '@/lib/identityConfirmation';
+} from '@/lib/findingConfirmation';
 
 /**
  * Holds the findings and applies the person's answers to them.

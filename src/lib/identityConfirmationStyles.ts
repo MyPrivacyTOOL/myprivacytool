@@ -1,4 +1,4 @@
-import type { FindingStatus } from './identityConfirmation';
+import type { FindingStatus } from './findingConfirmation';
 
 export interface FindingVisuals {
   className: string;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   IdentityFinding, confirmFinding, disputeFinding, canDispute, countsTowardRisk, riskFindings, learningEvent,
-} from './identityConfirmation';
+} from './findingConfirmation';
 
 const f = (over: Partial<IdentityFinding>): IdentityFinding => ({
   id: 'x', pillar: 'email', label: 'Email', status: 'guess', data: 'a@b.c', source: 'provider-a',

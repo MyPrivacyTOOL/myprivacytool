@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { IdentityFinding, canDispute, needsConfirmation } from '@/lib/identityConfirmation';
+import { IdentityFinding, canDispute, needsConfirmation } from '@/lib/findingConfirmation';
 import { getFindingVisuals } from '@/lib/identityConfirmationStyles';
 import { cn } from '@/lib/utils';
 
