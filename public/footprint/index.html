@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MPT Digital Footprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@500&display=swap">
+<style>
+/* Layout: the website's own hexagon (src/components/Hexagon.tsx) packed into a beehive over matrix rain.
+   Colours are the brand tokens from src/index.css. Unknown cells are not drawn: the rain shows through. */
+:root{
+  --bg:#ffffff; --surface:#ffffff; --fg:#1a1a1a; --muted:#595959; --line:#e3e3e3; --off:#f4f4f4;
+  --green:#27AE60; --ink:#19703a; --soft:#eaf6ef; --green-hover:#1e8449;
+  --ask:#8b5cf6; --ask-bg:#f1ebff; --ask-fg:#5b34c9;
+  --told:#c78a05; --told-bg:#fff6dc;
+  --bad:#e74c3c; --bad-bg:#fdecea; --bad-fg:#b3261e;
+  --dim:#e5e5e5; --dim-fg:#8f8f8f;
+  --rain-glyph:#27AE60; --rain-lead:#1E8449; --rain-ga:.26; --rain-la:.42;
+  --body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'Fira Code',ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --surface:#1a1a1a; --fg:#ffffff; --muted:#b3b3b3; --line:#2a2a2a; --off:#1a1a1a;
+  --ink:#27AE60; --soft:#10301d; --green-hover:#27AE60;
+  --ask:#a78bfa; --ask-bg:#251a45; --ask-fg:#c4b5fd;
+  --told:#f0b92e; --told-bg:#2b2410;
+  --bad:#ff6a5c; --bad-bg:#3a1512; --bad-fg:#ff9a90;
+  --dim:#2a2a2a; --dim-fg:#7a7a7a;
+  --rain-glyph:#27AE60; --rain-lead:#6be59a; --rain-ga:.34; --rain-la:.6;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
+  padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font:700 clamp(26px,5.5vw,38px)/1.08 var(--body);margin:0;text-wrap:balance;letter-spacing:-.02em}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink)}
+.sub{color:var(--muted);margin:6px 0 0;max-width:60ch}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+button{font:600 14px var(--body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:focus-visible,svg g.cell:focus-visible{outline:3px solid var(--ask);outline-offset:2px}
+button.primary{background:var(--green);border-color:var(--green);color:#fff}
+button.violet{background:var(--ask);border-color:var(--ask);color:#fff}
+button.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+
+.wrap{position:relative}
+header{padding-right:54px}
+button.icon{width:40px;height:40px;padding:0;display:grid;place-items:center;font-size:24px;font-weight:500;line-height:1}
+button.corner{position:absolute;top:0;right:0;border-radius:99px}
+button:disabled{opacity:.35;cursor:default}
+button:disabled:hover{border-color:var(--line)}
+.views{width:100%;max-width:560px;align-self:center;display:flex;gap:8px;justify-content:flex-end}
+.zoomctl{display:flex}
+.zoomctl button:first-child{border-radius:8px 0 0 8px;border-right-width:0}
+.zoomctl button:last-child{border-radius:0 8px 8px 0}
+
+.stage{width:100%;max-width:560px;align-self:center;position:relative;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:8px;overflow:hidden}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage svg{position:relative;display:block;width:100%;height:auto}
+.stage .cap{position:relative;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);padding:2px 6px 6px;text-shadow:0 0 6px var(--bg),0 0 2px var(--bg)}
+
+/* The website hexagon */
+g.cell{cursor:pointer;outline:none}
+g.cell .hx{transform-box:fill-box;transform-origin:center;transition:transform .3s}
+g.cell:hover .hx{transform:scale(1.05)}
+g.cell:active .hx{transform:scale(.95)}
+g.cell .fill{fill:url(#gSoft)}
+g.cell .bd{fill:none;stroke:var(--ink);stroke-width:2;opacity:.6;transition:all .3s}
+g.cell:hover .bd{stroke-width:2.5;opacity:.85;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--ink) 45%,transparent))}
+g.cell text{text-anchor:middle;pointer-events:none;user-select:none;transition:opacity .5s,fill .3s}
+g.cell .emo{font-size:18px;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif}
+g.cell .lbl{font:600 6px var(--body);letter-spacing:.05em;fill:var(--ink)}
+g.cell .val{font:500 7px var(--body);fill:var(--fg)}
+g.cell .cnf{font:italic 400 6px var(--body);fill:var(--ink)}
+g.cell .ck circle{fill:var(--ink)}
+g.cell .ck path{stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+g.cell .ck{display:none}
+g.cell.sel .bd{stroke:var(--fg);stroke-width:3.5;opacity:1}
+.stage svg:not(.zoomed) g.cell .lbl,.stage svg:not(.zoomed) g.cell .val,.stage svg:not(.zoomed) g.cell .cnf{opacity:0}
+
+g.cell.s-none .fill{fill:transparent;pointer-events:all}
+g.cell.s-none .bd{stroke:transparent;opacity:1}
+g.cell.s-none:hover .bd{stroke:var(--green);stroke-dasharray:4 4;opacity:.8;filter:none}
+g.cell.s-none text,g.cell.s-none .ck{display:none}
+g.cell.s-none .hx{transform:none!important}
+
+g.cell.s-confirmed .bd,g.cell.s-fixed .bd{stroke-width:3;opacity:1;animation:hexglow 2s ease-in-out infinite}
+g.cell.s-confirmed .ck,g.cell.s-fixed .ck{display:block}
+g.cell.s-ask .fill{fill:url(#gAsk)}
+g.cell.s-ask .bd{stroke:var(--ask);stroke-width:2.5;opacity:1;animation:pulse 1.6s ease-in-out infinite}
+g.cell.s-ask .lbl,g.cell.s-ask .cnf{fill:var(--ask-fg)}
+g.cell.s-told .fill{fill:url(#gTold)}
+g.cell.s-told .bd{stroke:var(--told);stroke-width:2.5;opacity:1;stroke-dasharray:6 4}
+g.cell.s-told .lbl,g.cell.s-told .cnf{fill:var(--told)}
+g.cell.s-risk .fill{fill:url(#gBad)}
+g.cell.s-risk .bd{stroke:var(--bad);stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infinite;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--bad) 50%,transparent))}
+g.cell.s-risk .lbl,g.cell.s-risk .cnf{fill:var(--bad-fg)}
+g.cell.s-false .fill{fill:var(--dim)}
+g.cell.s-false .bd{stroke:var(--dim-fg);opacity:.7}
+g.cell.s-false text{fill:var(--dim-fg)}g.cell.s-false .val{text-decoration:line-through}
+g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes hexglow{0%,100%{filter:brightness(1) drop-shadow(0 0 6px color-mix(in srgb,var(--ink) 35%,transparent))}50%{filter:brightness(1.2) drop-shadow(0 0 10px color-mix(in srgb,var(--ink) 50%,transparent))}}
+.pop{animation:hexpop .4s ease-out}
+@keyframes hexpop{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+.curtain{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#fff;
+  transition:opacity 1.3s ease,transform 1.5s cubic-bezier(.65,.05,.3,1)}
+.curtain img{max-width:88%;max-height:78%;object-fit:contain;display:block}
+.curtain.open{opacity:0;transform:translateX(-9%);pointer-events:none}
+.curtain button{background:var(--green);border-color:var(--green);color:#fff;font:700 16px var(--body);padding:11px 22px;border-radius:99px}
+.curtain.open button{opacity:0}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start;min-height:150px}
+.panel .badge{width:60px;height:68px}
+.panel h2{font:700 22px/1.15 var(--body);margin:0 0 4px;letter-spacing:-.01em}
+.panel p{margin:0 0 10px;max-width:62ch}
+.panel .acts{display:flex;gap:8px;flex-wrap:wrap}
+.panel .tag{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.panel .ex{color:var(--muted);font-size:14px}
+.panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
+.panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.panel dd{margin:0}
+.learn{margin-top:12px;font-size:14px;color:var(--muted);border-left:3px solid var(--ask);padding-left:10px}
+
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.donut{position:relative;width:112px;height:112px;flex:none}.donut svg{width:100%;height:100%;display:block}
+.donut .pct{position:absolute;inset:0;display:grid;place-items:center;font:700 28px var(--body);font-variant-numeric:tabular-nums}
+.sum-r{flex:1;min-width:220px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.pill{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:99px;padding:5px 15px;font:700 16px var(--body)}
+.pill.low{background:var(--soft);border-color:var(--green)}.pill.med{background:var(--told-bg);border-color:var(--told)}.pill.high{background:var(--bad-bg);border-color:var(--bad)}
+.big{font:400 21px/1.2 var(--body);color:var(--muted)}.big b{color:var(--ink);font-weight:700}
+.row2{display:flex;gap:8px;flex-wrap:wrap}
+.c2{border:1px solid var(--line);border-radius:99px;padding:3px 12px;font-size:13px;background:var(--bg)}
+.c2.warn{background:var(--bad-bg);border-color:var(--bad)}.c2.ok{background:var(--soft);border-color:var(--green)}
+.bar{height:10px;border-radius:99px;background:var(--dim);overflow:hidden;width:100%}
+.bar i{display:block;height:100%;width:0;background:var(--green);border-radius:99px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+.chip{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:0}
+.chip svg{flex:none}
+.chip b{font:500 18px var(--mono);margin-left:auto;font-variant-numeric:tabular-nums}
+.chip span{font-size:13px;line-height:1.2}
+.chip small{display:block;color:var(--muted);font-size:11.5px}
+.principle{font-size:14px;color:var(--muted);text-align:center;text-wrap:balance}
+@media (max-width:480px){.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">MyPrivacyTOOL · Your Digital Shadow</div>
+      <h1>Your Digital Footprint</h1>
+      <p class="sub">The same 54 hexagons as the website, hidden in the rain until MPT looks. Tap the rain to scan a spot. Green means confirmed, purple needs your answer, and red appears only when you confirm something is exposed.</p>
+    </div>
+    <div class="btns">
+      <button id="play" class="violet">▶ Replay the journey</button>
+      <button id="reset" title="Clear everything you have scanned or answered and go back to the first 9 hexagons">Start over</button>
+    </div>
+    <button id="theme" class="icon corner" title="Switch between white and dark"></button>
+  </header>
+
+  <div class="views">
+    <button id="vCurtain" class="icon" aria-label="Rewind to the curtain" title="Rewind: close the curtain and open it again"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M11 6v12L2.5 12zM21.5 6v12L13 12z"/></svg></button>
+    <div class="zoomctl" role="group" aria-label="Zoom">
+      <button id="zOut" class="icon" aria-label="Zoom out" title="Zoom out to the whole hive">&minus;</button>
+      <button id="zIn" class="icon" aria-label="Zoom in" title="Zoom in on the revealed hexagons">+</button>
+    </div>
+  </div>
+  <section class="stage" id="stage">
+    <canvas id="rain" aria-hidden="true"></canvas>
+    <div class="cap">Hexagons appear as MPT learns · tap the rain to scan</div>
+    <svg id="grid" role="group" aria-label="54 data points">
+      <defs>
+        <linearGradient id="gSoft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--surface)"/><stop offset="1" style="stop-color:var(--soft)"/></linearGradient>
+        <linearGradient id="gAsk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--surface)"/><stop offset="1" style="stop-color:var(--ask-bg)"/></linearGradient>
+        <linearGradient id="gTold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--surface)"/><stop offset="1" style="stop-color:var(--told-bg)"/></linearGradient>
+        <linearGradient id="gBad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--surface)"/><stop offset="1" style="stop-color:var(--bad-bg)"/></linearGradient>
+      </defs>
+    </svg>
+    <div class="curtain" id="curtain">
+      <img src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.remove()">
+      <button id="openCurtain">Open the curtain</button>
+    </div>
+  </section>
+
+  <section class="panel" id="panel" aria-live="polite"></section>
+
+  <section class="summary" aria-live="polite">
+    <div class="donut"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--dim)" stroke-width="10"/><circle id="ring" cx="60" cy="60" r="50" fill="none" stroke="var(--fg)" stroke-width="10" stroke-linecap="round" stroke-dasharray="0 314.16" transform="rotate(-90 60 60)" style="transition:stroke-dasharray .6s"/></svg><span class="pct" id="pct">6%</span></div>
+    <div class="sum-r">
+      <span class="pill low" id="riskpill">Medium risk</span>
+      <div class="big" id="nudge"></div>
+      <div class="row2"><span class="c2" id="c2a"></span><span class="c2" id="c2b"></span><span class="c2" id="c2c"></span></div>
+      <div class="bar"><i id="barfill"></i></div>
+    </div>
+  </section>
+
+  <section class="legend" id="legend"></section>
+
+  <p class="principle">Hexagons, labels and example values come from the MPT hexagon registry. No shame, only opportunity: scan the unknown, confirm what's yours, fix what's exposed.</p>
+</div>
+
+<script>
+const themeBtn=document.getElementById('theme');
+const ICON_MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>';
+const ICON_SUN='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+function applyTheme(t,save){document.documentElement.dataset.theme=t;themeBtn.innerHTML=t==='dark'?ICON_SUN:ICON_MOON;themeBtn.setAttribute('aria-label',t==='dark'?'Switch to white background':'Switch to dark background');
+  if(window.rainRefresh)window.rainRefresh();if(save){try{localStorage.setItem('mpt-theme',t)}catch(e){}}}
+themeBtn.onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark',true);
+(function(){let t='light';try{t=localStorage.getItem('mpt-theme')==='dark'?'dark':'light'}catch(e){}applyTheme(t,false)})();
+
+/* The 54 web-scan hexagons, from shared/hexagon-registry/registry.js */
+const REG=[{"id": "location", "label": "Location", "group": "Device & Network", "cat": "device", "emoji": "📍", "ex": "Springfield, Exampleshire", "conf": 95, "risk": "Attackers use your location to create localized phishing scams targeting your area.", "sens": "medium", "cap": "The approximate city and region your internet connection appears to be in, looked up from your IP address by our own server.", "val": "Shows how much a website learns about where you are before you type anything, which is the first thing a scammer uses to sound local.", "presence": "always"}, {"id": "device", "label": "Device Type", "group": "Device & Network", "cat": "device", "emoji": "💻", "ex": "Desktop (Windows 11)", "conf": 92, "risk": "Device info helps attackers target OS-specific malware and exploits.", "sens": "low", "cap": "Whether you are on a desktop, mobile or tablet, and which operating system, as your browser announces it.", "val": "Shows what every site you visit can tell about your equipment, which decides which exploits and fake update prompts are aimed at you.", "presence": "always"}, {"id": "browser", "label": "Browser", "group": "Device & Network", "cat": "device", "emoji": "🌐", "ex": "Chrome 141", "conf": 100, "risk": "Browser version reveals if you're vulnerable to known security exploits.", "sens": "low", "cap": "Which browser and which major version you are using.", "val": "Shows whether you are running something old enough to have known security holes.", "presence": "always"}, {"id": "isp", "label": "Internet Provider", "group": "Device & Network", "cat": "network", "emoji": "📡", "ex": "Example Broadband", "conf": 90, "risk": "ISP data helps attackers spoof legitimate service provider emails.", "sens": "medium", "cap": "The name of the company that provides your internet connection, looked up from your IP address by our own server.", "val": "Shows how easily a scammer can pose as your provider, which is a common phishing disguise.", "presence": "always"}, {"id": "time", "label": "Time Pattern", "group": "Device & Network", "cat": "device", "emoji": "⏰", "ex": "Sun, 02:14 PM", "conf": 100, "risk": "Activity patterns reveal your timezone and daily schedule to potential attackers.", "sens": "low", "cap": "The local day and time on your device at the moment the scan ran.", "val": "Shows that your daily schedule is visible to every site, which lets scammers time their messages for when you are least alert.", "presence": "always"}, {"id": "screen", "label": "Screen Resolution", "group": "Device & Network", "cat": "device", "emoji": "🖥️", "ex": "1920×1080", "conf": 100, "risk": "Screen size helps fingerprint your device uniquely across websites.", "sens": "low", "cap": "The width and height of your screen in pixels.", "val": "Shows one of the small details that makes your device recognisable among millions.", "presence": "always"}, {"id": "privacy", "label": "Privacy Settings", "group": "Device & Network", "cat": "privacy", "emoji": "🛡️", "ex": "DNT Disabled", "conf": 100, "risk": "DNT is enabled, but many websites ignore this signal. / Do Not Track is disabled - your activity is being tracked.", "sens": "low", "cap": "Whether your browser is set to send the Do Not Track request.", "val": "Shows whether you have asked sites not to follow you, and the honest answer that most ignore the request.", "presence": "always"}, {"id": "connection", "label": "Connection Type", "group": "Device & Network", "cat": "network", "emoji": "📶", "ex": "Fast (4G/5G)", "conf": 85, "risk": "Public WiFi? Attackers can intercept unencrypted traffic.", "sens": "low", "cap": "The kind of connection your browser says it is on (fast mobile, Wi-Fi and so on).", "val": "Shows whether you may be on a public network, where other people can watch unprotected traffic.", "presence": "always"}, {"id": "referrer", "label": "How You Found Us", "group": "Device & Network", "cat": "privacy", "emoji": "🔍", "ex": "Google Search", "conf": 100, "risk": "Your browsing patterns and interests are tracked across websites.", "sens": "low", "cap": "Which kind of site sent you here (search engine, social network, a link, or directly).", "val": "Shows how a website learns where you came from and what you were interested in before arriving.", "presence": "always"}, {"id": "battery", "label": "Device Status", "group": "Device & Network", "cat": "device", "emoji": "🔋", "ex": "Battery 64%", "conf": 90, "risk": "Battery level patterns reveal your daily routine and when you might be vulnerable.", "sens": "low", "cap": "Your battery percentage and whether it is charging, where the browser allows it.", "val": "Shows that a site can read device state that reveals your routine and when your phone is running low.", "presence": "conditional"}, {"id": "primary-language", "label": "Primary Language", "group": "Language Intelligence", "cat": "language", "emoji": "🗣️", "ex": "English (UK)", "conf": 95, "risk": "Your language preference reveals your cultural background and can be used for targeted phishing.", "sens": "low", "cap": "The main language your browser is set to.", "val": "Shows that your language choice tells sites your background and lets scammers write in the right tone.", "presence": "always"}, {"id": "language-fallbacks", "label": "Language Fallbacks", "group": "Language Intelligence", "cat": "language", "emoji": "🔄", "ex": "French, German", "conf": 88, "risk": "Multiple languages suggest you travel or live abroad - valuable for social engineering.", "sens": "low", "cap": "The extra languages your browser lists after the main one.", "val": "Shows that a list of languages can suggest you travel or live abroad.", "presence": "conditional"}, {"id": "language-mismatch", "label": "Locale Mismatch", "group": "Language Intelligence", "cat": "language", "emoji": "⚠️", "ex": "Detected", "conf": 85, "risk": "Your language settings don't match your timezone location. (or the detail text from the detector)", "sens": "medium", "cap": "Whether your language setting looks out of step with the timezone you are in.", "val": "Shows that a mismatch can hint you are travelling, abroad or using a VPN, which is useful to anyone profiling you.", "presence": "conditional"}, {"id": "demographic", "label": "Estimated Profile", "group": "Device & Network", "cat": "profile", "emoji": "👤", "ex": "Adult (30-55)", "conf": 60, "risk": "Age-targeted scams (retirement fraud, health scams) are tailored to your demographic.", "sens": "high", "cap": "A rough age-band guess that the site makes from your operating system, browser and the time of day.", "val": "Shows how crude the guessing behind targeted scams can be, and why a profile of you may be wrong yet still used.", "presence": "always"}, {"id": "user-profile", "label": "User Profile", "group": "Device & Network", "cat": "profile", "emoji": "🏠", "ex": "Traveler", "conf": null, "risk": "Detected as <description>. This reveals lifestyle patterns valuable for targeted attacks.", "sens": "medium", "cap": "A one-word lifestyle label (local, traveler, expatriate, multilingual) worked out from your language settings.", "val": "Shows the kind of story a profiler could tell about you from language settings alone.", "presence": "always"}, {"id": "orientation", "label": "Orientation", "group": "Device Orientation", "cat": "orientation", "emoji": "🔄", "ex": "Landscape", "conf": 100, "risk": "Screen orientation reveals how you hold your device and your usage patterns.", "sens": "low", "cap": "Whether your screen is held upright or sideways.", "val": "Shows that a site can see how you hold your device.", "presence": "always"}, {"id": "rotation-angle", "label": "Rotation", "group": "Device Orientation", "cat": "orientation", "emoji": "↻", "ex": "0°", "conf": 100, "risk": "Rotation angle can be used for device fingerprinting and behavioral analysis.", "sens": "low", "cap": "The angle your screen is rotated to, in degrees.", "val": "Shows another small detail that adds to a recognisable device profile.", "presence": "always"}, {"id": "tilt-beta", "label": "Tilt Forward/Back", "group": "Device Orientation", "cat": "orientation", "emoji": "⬆️", "ex": "12°", "conf": null, "risk": "Forward/back tilt reveals your posture and device handling habits.", "sens": "low", "cap": "How far your device is tilted forward or back, if it has a motion sensor and has permission.", "val": "Shows that sensors can reveal how you hold and move your phone.", "presence": "always"}, {"id": "tilt-gamma", "label": "Tilt Left/Right", "group": "Device Orientation", "cat": "orientation", "emoji": "⬅️", "ex": "-4°", "conf": null, "risk": "Left/right tilt can indicate dominant hand and typing patterns.", "sens": "low", "cap": "How far your device is tilted left or right, if it has a motion sensor and has permission.", "val": "Shows that sensors can hint at which hand you use.", "presence": "always"}, {"id": "motion-sensors", "label": "Motion Sensors", "group": "Device Orientation", "cat": "orientation", "emoji": "📊", "ex": "Inactive", "conf": 100, "risk": "Motion sensors can track your movements and physical activity patterns. / Motion sensors unavailable - limited behavioral tracking.", "sens": "low", "cap": "Whether your device has a motion sensor (gyroscope) a site could read.", "val": "Shows whether your device can be tracked through how it physically moves.", "presence": "always"}, {"id": "canvas-fingerprint", "label": "Canvas Fingerprint", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🎨", "ex": "a3f9c21e...", "conf": 100, "risk": "Unique image rendering signature. Canvas fingerprinting creates a unique identifier based on how your browser renders graphics.", "sens": "medium", "cap": "A short code produced by asking your browser to draw a hidden image; different devices draw it slightly differently.", "val": "Shows how a site can recognise your device without cookies, and why clearing cookies does not stop it.", "presence": "conditional"}, {"id": "webgl-fingerprint", "label": "WebGL Signature", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🎮", "ex": "ANGLE (Exam...", "conf": 100, "risk": "Graphics card identification. Your GPU model and driver can uniquely identify your device across websites.", "sens": "medium", "cap": "The graphics card and driver name your browser reports.", "val": "Shows another way your exact hardware makes you recognisable.", "presence": "conditional"}, {"id": "audio-fingerprint", "label": "Audio Signature", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🔊", "ex": "7be04d11...", "conf": 95, "risk": "Audio processing signature. The way your device processes audio creates a unique identifier.", "sens": "medium", "cap": "A short code produced by processing a silent sound in your browser; devices differ slightly.", "val": "Shows a third hidden way a site can tell your device apart, with no cookie involved.", "presence": "conditional"}, {"id": "font-detection", "label": "Installed Fonts", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🔤", "ex": "38 fonts", "conf": 90, "risk": "System fonts reveal OS/setup. Your installed fonts create a unique profile that reveals your operating system and installed software.", "sens": "low", "cap": "How many fonts from a test list are installed on your device.", "val": "Shows that the fonts you have installed form a pattern that helps single you out.", "presence": "conditional"}, {"id": "extension-detection", "label": "Extensions", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🧩", "ex": "Ad Blocker: Yes", "conf": 85, "risk": "Plugins and extensions. Browser extensions and plugins add to your unique fingerprint.", "sens": "low", "cap": "Whether an ad blocker or browser plug-ins could be detected.", "val": "Shows that your extensions can make you more recognisable, and tells you if your blocker is visible to sites.", "presence": "always"}, {"id": "fingerprint-protection", "label": "Fingerprint Protection", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🛡️", "ex": "None Detected", "conf": 100, "risk": "Excellent / Good / Some protection from extensions, or 'Your browser has no fingerprint protection.' (text chosen by branch)", "sens": "low", "cap": "Whether your browser has a known fingerprint shield (Tor, Brave Shields, Firefox protection or a blocking extension).", "val": "Shows whether anything is hiding your device from the recognition tricks in this scan.", "presence": "conditional"}, {"id": "webrtc-leak", "label": "WebRTC Leak", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🌐", "ex": "Leaking: 203.0.113.7", "conf": 100, "risk": "CRITICAL: Your real IP (<ip>) is exposed! ... (text chosen by branch; can embed the raw IP)", "sens": "high", "cap": "Whether your browser reveals your real internet address to a website even when you use a VPN.", "val": "Shows whether a VPN is really hiding you, which is the main reason people buy one.", "presence": "conditional"}, {"id": "hardware-profile", "label": "CPU Cores", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🖥️", "ex": "8 cores / 8GB", "conf": 100, "risk": "Hardware class: <class>. Device specs help identify you uniquely.", "sens": "low", "cap": "How many processor cores, and how much memory where reported, your device says it has.", "val": "Shows that your hardware class is visible and helps separate you from other visitors.", "presence": "always"}, {"id": "screen-fingerprint", "label": "Display Profile", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "📺", "ex": "1920×1080 @1x", "conf": 100, "risk": "Screen: <resolution>, <depth>-bit color, <ratio>x pixel ratio. (plus a commonness note)", "sens": "low", "cap": "Your screen size, colour depth and pixel density together.", "val": "Shows how several small display details add up to a more specific profile.", "presence": "always"}, {"id": "timezone-locale", "label": "Timezone/Locale", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🌍", "ex": "London (en-GB)", "conf": 100, "risk": "Timezone: <tz>, Date: <format>, Numbers: <format>. (plus a mismatch note)", "sens": "medium", "cap": "Your timezone and the regional format your browser uses for dates and numbers.", "val": "Shows that your timezone and formats place you in a region even without your IP address.", "presence": "always"}, {"id": "battery-fingerprint", "label": "Battery Status", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🔋", "ex": "64% Discharging", "conf": 90, "risk": "Battery level <n>%, charging/discharging ... / Battery API not available. Good for privacy.", "sens": "low", "cap": "The battery level and charging state, or a note that the browser hides it.", "val": "Shows whether your browser blocks a battery reading that trackers like to use.", "presence": "conditional"}, {"id": "media-devices", "label": "Connected Devices", "group": "Browser Fingerprint", "cat": "fingerprint", "emoji": "🎥", "ex": "1 cam, 1 mic, 2 spk", "conf": 85, "risk": "Detected <n> camera(s), <n> microphone(s), <n> speaker(s). ... / No media devices detected or access blocked.", "sens": "low", "cap": "How many cameras, microphones and speakers your browser can see, without turning them on.", "val": "Shows that a site can count your connected gear, which adds to how recognisable you are.", "presence": "conditional"}, {"id": "cookies-status", "label": "Cookies", "group": "Storage Analysis", "cat": "storage", "emoji": "🍪", "ex": "4 cookies (1 tracking)", "conf": 100, "risk": "N tracking cookies detected. ... / Many cookies stored. / Cookies are being used for session management.", "sens": "low", "cap": "How many cookies myprivacytool.io has stored in your browser, and how many look like trackers.", "val": "Shows how many small tracking notes sites leave on your device.", "presence": "always"}, {"id": "localstorage-status", "label": "Local Storage", "group": "Storage Analysis", "cat": "storage", "emoji": "💾", "ex": "6 items (2 KB)", "conf": 100, "risk": "N tracking keys detected: <names>. ... / LocalStorage is used for site preferences and data caching.", "sens": "low", "cap": "How many items this site has saved in your browser's local storage, and how big.", "val": "Shows how much a site can keep on your device that survives closing the browser.", "presence": "always"}, {"id": "sessionstorage-status", "label": "Session Storage", "group": "Storage Analysis", "cat": "storage", "emoji": "⏱️", "ex": "Empty", "conf": 100, "risk": "Session storage is cleared when you close the tab. Lower tracking risk than localStorage.", "sens": "low", "cap": "How many items this site holds in session storage for this tab, and how big.", "val": "Shows storage that disappears when the tab closes, the lower-risk kind.", "presence": "always"}, {"id": "indexeddb-status", "label": "IndexedDB", "group": "Storage Analysis", "cat": "storage", "emoji": "🗄️", "ex": "Not Used", "conf": 95, "risk": "Tracking databases detected: <names>. ... / IndexedDB stores complex data locally.", "sens": "low", "cap": "How many databases this site has created in your browser.", "val": "Shows the heavier kind of hidden storage a site can use to keep large amounts of data on your device.", "presence": "conditional"}, {"id": "cache-status", "label": "Cache & SW", "group": "Storage Analysis", "cat": "storage", "emoji": "📦", "ex": "Not Active", "conf": 100, "risk": "Service Worker active. Can intercept network requests ... / Cache API stores offline resources.", "sens": "low", "cap": "Whether this site has a background service worker or saved offline files in your browser.", "val": "Shows that a site can run code in the background and keep files after you leave.", "presence": "conditional"}, {"id": "google-services", "label": "Google Account", "group": "Social Accounts", "cat": "social", "emoji": "🔍", "ex": "Not Detected", "conf": 100, "risk": "Logged into Google: <services>. ... / No Google login detected. ... (text chosen by branch)", "sens": "medium", "cap": "Whether Google sign-in cookies are visible to this page.", "val": "Shows whether Google could link your browsing to your Google profile, which matters because it is the largest tracker.", "presence": "always"}, {"id": "meta-services", "label": "Meta Services", "group": "Social Accounts", "cat": "social", "emoji": "📘", "ex": "Not Detected", "conf": 100, "risk": "Logged into Meta: <services>. ... / No Meta login detected. ... (text chosen by branch)", "sens": "medium", "cap": "Whether Facebook or Instagram sign-in cookies are visible to this page.", "val": "Shows whether Meta could link your browsing to your social profile.", "presence": "always"}, {"id": "microsoft-services", "label": "Microsoft Account", "group": "Social Accounts", "cat": "social", "emoji": "🪟", "ex": "Not Detected", "conf": 100, "risk": "Logged into Microsoft: <services>. ... / No Microsoft login detected on this browser.", "sens": "medium", "cap": "Whether Microsoft sign-in cookies are visible to this page.", "val": "Shows whether your Office and Bing activity could be linked to one account.", "presence": "always"}, {"id": "social-platforms", "label": "Social Platforms", "group": "Social Accounts", "cat": "social", "emoji": "📱", "ex": "No Platforms", "conf": 95, "risk": "Connected to: <names>. ... / No social media logins detected. ... (text chosen by branch)", "sens": "medium", "cap": "Whether sign-in cookies for LinkedIn, TikTok, Reddit and other social platforms are visible to this page.", "val": "Shows how many social networks could be building a profile of you from this browser.", "presence": "always"}, {"id": "cross-site-identity", "label": "Cross-Site Identity", "group": "Social Accounts", "cat": "social", "emoji": "🔗", "ex": "Not Linked", "conf": 90, "risk": "CRITICAL: SSO detected! <networks> can link your identity ... / No cross-site identity linking detected. ...", "sens": "medium", "cap": "Whether tracking cookies from ad networks and single sign-on are visible to this page.", "val": "Shows whether your identity could be joined up across unrelated websites.", "presence": "always"}, {"id": "dns-leak", "label": "DNS Leak", "group": "Security Status", "cat": "security", "emoji": "🔓", "ex": "No Leak Detected", "conf": 100, "risk": "CRITICAL: DNS leak detected! ... / DNS is routed through VPN. ... / No DNS leak detected. ... (text chosen by branch)", "sens": "high", "cap": "A test labelled 'DNS leak' that is really a second WebRTC probe for your network addresses.", "val": "Shows whether a VPN is hiding which sites you visit, which is why people care about DNS leaks.", "presence": "always"}, {"id": "https-status", "label": "Connection Security", "group": "Security Status", "cat": "security", "emoji": "🔒", "ex": "Secure (HTTPS) + HSTS", "conf": 100, "risk": "Connection is encrypted. ... / CRITICAL: Connection is NOT encrypted! ...", "sens": "low", "cap": "Whether you reached this site over an encrypted connection.", "val": "Shows whether your connection to the site could be read by others on the same network.", "presence": "always"}, {"id": "mixed-content", "label": "Mixed Content", "group": "Security Status", "cat": "security", "emoji": "⚠️", "ex": "None", "conf": 100, "risk": "WARNING: <n> insecure resources ... / No mixed content detected. ...", "sens": "low", "cap": "Whether this page loaded any resources over an unencrypted connection.", "val": "Shows whether the page you are on is leaking anything over plain text.", "presence": "always"}, {"id": "security-headers", "label": "Security Headers", "group": "Security Status", "cat": "security", "emoji": "🛡️", "ex": "Strong", "conf": 90, "risk": "Missing: <headers>. ... / All security headers present. ...", "sens": "low", "cap": "A score for how many protective web headers this site appears to send.", "val": "Shows whether the site you are on is set up to defend you against common attacks.", "presence": "always"}, {"id": "browser-security", "label": "Browser Status", "group": "Security Status", "cat": "security", "emoji": "🌐", "ex": "Up to date", "conf": 95, "risk": "CRITICAL: <version> has known vulnerabilities. / <version> is current. ... / may be outdated. ...", "sens": "low", "cap": "Whether your browser version is older than a cut-off the code keeps in a list.", "val": "Shows whether you are due a browser update, which is the simplest security fix there is.", "presence": "always"}, {"id": "tls-config", "label": "Encryption", "group": "Security Status", "cat": "security", "emoji": "🔐", "ex": "TLS 1.3 (likely)", "conf": 100, "risk": "Using <version>. Modern encryption ... / CRITICAL: No TLS encryption. ...", "sens": "low", "cap": "Which version of encryption your connection is likely using.", "val": "Shows whether the encryption protecting your connection is modern.", "presence": "always"}, {"id": "mouse-tracking", "label": "Mouse Tracking", "group": "Behavior Tracking", "cat": "behavior", "emoji": "🖱️", "ex": "212 movements", "conf": null, "risk": "Pattern: <pattern>. Avg speed: <n> px/s. ...", "sens": "low", "cap": "How many mouse movements the site recorded while you used this page.", "val": "Shows that your mouse movement alone can be recorded and can single you out.", "presence": "always"}, {"id": "typing-patterns", "label": "Keystroke Dynamics", "group": "Behavior Tracking", "cat": "behavior", "emoji": "⌨️", "ex": "No input yet", "conf": null, "risk": "Typing speed: ~<n> WPM. Pattern detected! ... (only timing, never the key content)", "sens": "low", "cap": "How many keystrokes were timed (not what you typed) while you were on this page.", "val": "Shows that the rhythm of your typing can identify you, even though no letters are recorded.", "presence": "always"}, {"id": "click-patterns", "label": "Click Patterns", "group": "Behavior Tracking", "cat": "behavior", "emoji": "👆", "ex": "47 clicks", "conf": null, "risk": "Pattern: <pattern>. Rate: <n>/min. ...", "sens": "low", "cap": "How many clicks the site recorded and how fast you click.", "val": "Shows that your clicking habits reveal your interests and how you decide.", "presence": "always"}, {"id": "scroll-behavior", "label": "Scroll Behavior", "group": "Behavior Tracking", "cat": "behavior", "emoji": "📜", "ex": "62% depth", "conf": 100, "risk": "Engagement: <level>. <n> scrolls. ...", "sens": "low", "cap": "How far down the page you scrolled and how you scrolled.", "val": "Shows that scrolling reveals what you read and how long you stay interested.", "presence": "always"}, {"id": "session-duration", "label": "Session Duration", "group": "Behavior Tracking", "cat": "behavior", "emoji": "⏱️", "ex": "6m 12s", "conf": 100, "risk": "Active: <t>, Idle: <t>, Tab switches: <n>. ...", "sens": "low", "cap": "How long you have been on this page, how long active, idle, and how many times you switched tabs.", "val": "Shows that your time on a page and your attention are recorded.", "presence": "always"}, {"id": "engagement-map", "label": "Engagement Map", "group": "Behavior Tracking", "cat": "behavior", "emoji": "🔥", "ex": "5 hotspots", "conf": null, "risk": "Engagement score: <n>/100. Heatmaps show exactly where you focus attention ...", "sens": "low", "cap": "A map of where on the page you moved and clicked the most (hotspots).", "val": "Shows that sites can see exactly where your attention goes on a page.", "presence": "always"}];
+const START_ORDER=['location','webrtc-leak','demographic','isp','browser','dns-leak','tls-config','primary-language','timezone-locale'];
+const START={location:'ask','webrtc-leak':'ask',demographic:'ask',isp:'ask',browser:'confirmed','dns-leak':'confirmed','tls-config':'confirmed','primary-language':'told','timezone-locale':'told'};
+const EXPOSURE=new Set(['webrtc-leak','dns-leak','language-mismatch','canvas-fingerprint','cross-site-identity']);
+const ITEMS=[...REG].sort((a,b)=>{const i=START_ORDER.indexOf(a.id),j=START_ORDER.indexOf(b.id);return (i<0?99:i)-(j<0?99:j)});
+const STATES={none:'Unknown',scan:'Scanning',found:'Found, tap to confirm',ask:'Needs your input',told:'You told us',risk:'Confirmed exposure',confirmed:'Confirmed',fixed:'You fixed this',false:'Not you'};
+
+let st=[],sel=-1,timers=[],playing=false;
+const grid=document.getElementById('grid'),panel=document.getElementById('panel');
+const HEX='M50 0 L93.3 25 L93.3 75 L50 100 L6.7 75 L6.7 25 Z';
+
+/* Beehive: a hexagon of radius 4 (61 cells) minus its 6 corners, trimmed to 54. Filled from the centre outward,
+   so the 9 known hexagons form one tight cluster and the hive grows as MPT scans. Pitch matches Hexagon.tsx (0.87 x 100 + gap). */
+const P=90.6,pos=[];
+for(let q=-4;q<=4;q++)for(let r=-4;r<=4;r++){const t=-q-r;if(Math.abs(t)>4)continue;
+  const d=Math.max(Math.abs(q),Math.abs(r),Math.abs(t));if(d===4&&(q===0||r===0||t===0))continue;
+  const x=P*(q+r/2),y=P*.866*r;pos.push({d,x,y,a:Math.atan2(y,x)})}
+pos.sort((u,v)=>u.d-v.d||u.a-v.a);pos.length=54;
+const PAD=10,vx=Math.min(...pos.map(p=>p.x))-50-PAD,vy=Math.min(...pos.map(p=>p.y))-50-PAD;
+const FULL={x:vx,y:vy,w:Math.max(...pos.map(p=>p.x))+50+PAD-vx,h:Math.max(...pos.map(p=>p.y))+50+PAD-vy};
+let cur={...FULL},anim=0,view='overview',lastKey='';
+grid.style.aspectRatio=FULL.w+'/'+FULL.h;
+function setVB(b){cur=b;grid.setAttribute('viewBox',`${b.x} ${b.y} ${b.w} ${b.h}`)}
+function animateTo(b,ms){cancelAnimationFrame(anim);const a={...cur},t0=performance.now(),ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+  (function f(now){const k=Math.min(1,(now-t0)/ms),e=ease(k);
+    setVB({x:a.x+(b.x-a.x)*e,y:a.y+(b.y-a.y)*e,w:a.w+(b.w-a.w)*e,h:a.h+(b.h-a.h)*e});
+    if(k<1)anim=requestAnimationFrame(f)})(t0)}
+function zoomTarget(){
+  const on=pos.filter((p,i)=>st[i]!=='none');if(!on.length)return {...FULL};
+  const x0=Math.min(...on.map(p=>p.x))-50-8,x1=Math.max(...on.map(p=>p.x))+50+8,y0=Math.min(...on.map(p=>p.y))-50-8,y1=Math.max(...on.map(p=>p.y))+50+8;
+  const AR=FULL.w/FULL.h;let w=Math.max(x1-x0,340),h=Math.max(y1-y0,340/AR);
+  if(w/h<AR)w=h*AR;else h=w/AR;
+  w=Math.min(w,FULL.w);h=Math.min(h,FULL.h);
+  return {x:(x0+x1)/2-w/2,y:(y0+y1)/2-h/2,w,h}}
+function retarget(){const key=st.map(x=>x!=='none'?1:0).join('');
+  if(key!==lastKey){lastKey=key;if(view==='zoom')animateTo(zoomTarget(),700)}}
+setVB(FULL);
+
+const NS='http://www.w3.org/2000/svg';
+ITEMS.forEach((it,i)=>{
+  const g=document.createElementNS(NS,'g');
+  g.setAttribute('class','cell');g.setAttribute('tabindex','0');g.setAttribute('role','button');
+  g.setAttribute('transform',`translate(${pos[i].x-50} ${pos[i].y-50})`);
+  g.innerHTML=`<g class="hx"><path class="fill" d="${HEX}"/><path class="bd" d="${HEX}"/>
+    <text class="emo" x="50" y="32"></text><text class="lbl" x="50" y="48"></text><text class="val" x="50" y="60"></text><text class="cnf" x="50" y="72"></text>
+    <g class="ck" transform="translate(65 8)"><circle cx="10" cy="10" r="10"/><path d="M6 10 L9 13 L15 7"/></g></g>`;
+  g.addEventListener('click',()=>select(i));
+  g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(i)}});
+  grid.appendChild(g);
+});
+
+function reset(){
+  timers.forEach(clearTimeout);timers=[];
+  st=ITEMS.map(it=>START[it.id]||'none');sel=-1;
+  paint();showPanel();
+}
+const idx=id=>ITEMS.findIndex(x=>x.id===id);
+const trunc=s=>s.length>14?s.substring(0,14)+'...':s;
+function set(i,s,celebrate){
+  st[i]=s;paint();
+  if(celebrate){const hx=grid.children[i+1].querySelector('.hx');hx.classList.remove('pop');void hx.getBoundingClientRect();hx.classList.add('pop')}
+}
+function updateCell(g,i){const s=st[i],it=ITEMS[i];if(s==='none')return;
+  const q=sel=>g.querySelector(sel);
+  if(s==='scan'){q('.emo').textContent='🔍';q('.lbl').textContent='SCANNING...';q('.val').textContent='Data Point Revealed';q('.cnf').textContent='';return}
+  let c=it.conf;if(c&&(s==='confirmed'||s==='fixed'))c=Math.min(c+5,99);
+  q('.emo').textContent=it.emoji;q('.lbl').textContent=it.label.toUpperCase();q('.val').textContent=trunc(it.ex||'');q('.cnf').textContent=c?c+'%':''}
+function paint(){
+  [...grid.querySelectorAll('g.cell')].forEach((g,i)=>{
+    g.setAttribute('class','cell s-'+st[i]+(i===sel?' sel':''));
+    g.setAttribute('aria-label',st[i]==='none'?'Unknown data point, tap to scan':ITEMS[i].label+': '+STATES[st[i]]);
+    updateCell(g,i);
+    const old=g.querySelector('title');if(old)old.remove();
+    if(st[i]!=='none'){const t=document.createElementNS(NS,'title');t.textContent=ITEMS[i].label;g.prepend(t)}
+  });
+  const n=k=>st.filter(s=>k.includes(s)).length;
+  const green=n(['confirmed','fixed']),pct=Math.round(green/54*100),risk=n(['risk']),ask=n(['ask','scan','found']);
+  document.getElementById('pct').textContent=pct+'%';
+  document.getElementById('barfill').style.width=pct+'%';
+  document.getElementById('ring').setAttribute('stroke-dasharray',`${(314.16*pct/100).toFixed(1)} 314.16`);
+  document.getElementById('nudge').innerHTML=`<b>${green}</b> of <b>54</b> data points confirmed`;
+  const rp=document.getElementById('riskpill');rp.className='pill '+(risk?'high':ask?'med':'low');rp.textContent=risk?'High risk':ask?'Medium risk':'Low risk';
+  const a=document.getElementById('c2a'),b=document.getElementById('c2b'),c=document.getElementById('c2c');
+  a.textContent='Security: '+(risk?'Needs attention':'Looking good');a.className='c2 '+(risk?'warn':'ok');
+  const beh=ITEMS.filter((it,i)=>it.cat==='behavior'&&st[i]!=='none').length;
+  b.textContent='Behavior: '+beh+' tracked';
+  c.textContent='Revealed: '+(54-n(['none']))+' of 54';
+  const L=[['confirmed','Confirmed','Verified by you',['confirmed','fixed']],['found','Found','Tap to confirm',['found']],['ask','Needs input','Is this you?',['ask','scan']],['told','You told us','Optional check',['told']],['risk','Confirmed risk','Fix it',['risk']],['false','Not you','Nothing to do',['false']],['none','Unknown','Hidden in the rain',['none']]];
+  document.getElementById('legend').innerHTML=L.map(([k,t,s,arr])=>`<div class="chip">${mini(k,30)}<span>${t}<small>${s}</small></span><b>${n(arr)}</b></div>`).join('');
+  retarget();
+}
+const MSTY={found:['url(#gSoft)','var(--ink)',3,'',.7],confirmed:['url(#gSoft)','var(--ink)',5,'',1],fixed:['url(#gSoft)','var(--ink)',5,'',1],ask:['var(--ask-bg)','var(--ask)',5,'',1],told:['var(--told-bg)','var(--told)',5,'12 8',1],risk:['var(--bad-bg)','var(--bad)',5,'',1],false:['var(--dim)','var(--dim-fg)',4,'',.8],none:['transparent','var(--green)',4,'8 8',.9],scan:['var(--soft)','var(--ink)',5,'8 6',1]};
+function mini(state,h,emoji){
+  const m=MSTY[state]||MSTY.found,ck=(state==='confirmed'||state==='fixed')?`<g transform="translate(65 8)"><circle cx="10" cy="10" r="12" fill="var(--ink)"/><path d="M6 10 L9 13 L15 7" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`:'';
+  const q=state==='none'?'<text x="50" y="62" text-anchor="middle" font-size="36" font-family="Fira Code,monospace" fill="var(--green)">?</text>':'';
+  const e=(emoji&&state!=='none')?`<text x="50" y="62" text-anchor="middle" font-size="40" font-family="Apple Color Emoji,Segoe UI Emoji,Noto Color Emoji,sans-serif">${emoji}</text>`:'';
+  const s=state==='false'?'<line x1="30" y1="52" x2="70" y2="52" stroke="var(--dim-fg)" stroke-width="5" stroke-linecap="round"/>':'';
+  return `<svg width="${h*.9}" height="${h}" viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="gSoftM" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--surface)"/><stop offset="1" style="stop-color:var(--soft)"/></linearGradient></defs><path d="${HEX}" fill="${m[0].replace('#gSoft','#gSoftM')}" stroke="${m[1]}" stroke-width="${m[2]}" stroke-dasharray="${m[3]}" opacity="${m[4]}"/>${q}${e}${s}${ck}</svg>`;
+}
+function select(i){sel=i;paint();showPanel();
+  if(window.matchMedia('(max-width:700px)').matches&&!playing)panel.scrollIntoView({behavior:'smooth',block:'nearest'})}
+
+const cleanRisk=it=>/text chosen|\(\)/.test(it.risk)?'Your real IP address is exposed even when you use a VPN, so sites and trackers can still see where you are.':it.risk;
+function showPanel(){
+  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Start here</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
+  const it=ITEMS[sel],s=st[sel];
+  let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
+  if(s==='none'){title='Unknown';tag='Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
+  else{
+    extra=`<dl><div><dt>What we capture</dt><dd>${it.cap}</dd></div><div><dt>Why it matters</dt><dd>${it.val}</dd></div>${(s==='ask'||s==='risk')&&it.risk?`<div><dt>Risk</dt><dd>${cleanRisk(it)}</dd></div>`:''}</dl>`;
+    const ex=it.ex?`<div class="ex">Example value: <b>${it.ex}</b>${it.conf?' · confidence '+it.conf+'%':''}</div>`:'';
+    if(s==='found'){body=`We found this about you without asking. Is it accurate?`;acts=`<button class="primary" data-a="confirm">Confirm</button><button data-a="no">Not me</button>`}
+    else if(s==='ask'){body=`We think this is you. Is it?`;acts=`<button class="violet" data-a="yes">Yes, that's me</button><button data-a="no">No, not me</button>`}
+    else if(s==='risk'){body='Confirmed exposure. Fix it, then mark it done.';acts=`<button class="primary" data-a="fixed">I fixed it</button>`}
+    else if(s==='told'){body='You told us this one. Verifying it takes a few seconds and turns it green.';acts=`<button class="primary" data-a="confirm">Verify it</button>`}
+    else if(s==='scan'){body='Scanning…'}
+    else if(s==='fixed'){body='You closed this one. Nice work. No action needed.'}
+    else if(s==='confirmed'){body='Confirmed by you. No action needed.'}
+    else if(s==='false'){body='You said this is not you. It is greyed out and will not come back.'}
+    body=`<p>${body}</p>${ex}`;
+  }
+  panel.innerHTML=`<div class="badge">${mini(s,68,it.emoji)}</div><div><div class="tag">${tag}</div><h2>${title}</h2>${s==='none'?`<p>${body}</p>`:body}<div class="acts" style="margin-top:10px">${acts}</div>${extra}</div>`;
+  panel.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>act(b.dataset.a));
+}
+function act(a){
+  const i=sel;if(i<0)return;const it=ITEMS[i];
+  if(a==='yes')set(i,EXPOSURE.has(it.id)?'risk':'confirmed',!EXPOSURE.has(it.id));
+  else if(a==='confirm')set(i,'confirmed',true);
+  else if(a==='no')set(i,'false');
+  else if(a==='fixed')set(i,'fixed',true);
+  else if(a==='scan'){set(i,'scan');showPanel();timers.push(setTimeout(()=>{
+      set(i,(it.sens==='high'||it.sens==='medium')?'ask':'found');
+      if(sel===i)showPanel()},1100));return}
+  showPanel();
+}
+
+/* Replay: a short journey through the board, tapping for you. */
+function later(ms,fn){timers.push(setTimeout(fn,ms))}
+const playBtn=document.getElementById('play');
+const PLAY_LABEL='▶ Replay the journey';
+document.getElementById('reset').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;reset()};
+playBtn.onclick=()=>{
+  reset();playing=true;playBtn.textContent='Playing…';
+  const wait=curtainOpen?0:3400;if(!curtainOpen)openCurtain();
+  let t=600+wait;
+  const step=(fn,ms)=>{t+=ms;later(t,fn)};
+  const tap=(id,a,gap)=>{step(()=>select(idx(id)),gap||1000);step(()=>act(a),900)};
+  tap('primary-language','confirm',0);tap('timezone-locale','confirm');
+  tap('location','yes');tap('webrtc-leak','yes');step(()=>act('fixed'),1500);
+  tap('demographic','no');tap('isp','yes');
+  step(()=>select(idx('canvas-fingerprint')),1100);step(()=>act('scan'),900);
+  step(()=>select(idx('cookies-status')),1900);step(()=>act('scan'),900);
+  step(()=>select(idx('screen')),1900);step(()=>act('scan'),900);
+  step(()=>{playing=false;playBtn.textContent=PLAY_LABEL},1800);
+};
+
+/* Matrix rain, same algorithm as src/components/MatrixRain.tsx, scoped to the board */
+(function(){
+  const stage=document.getElementById('stage'),cv=document.getElementById('rain'),ctx=cv.getContext('2d');
+  const CH='アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const FS=16,TRAIL=14,STEP=50;let w=0,h=0,rows=0,cols=[],last=0,glyph='#27AE60',lead='#1E8449',ga=.26,la=.42;
+  const still=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const rg=()=>CH[Math.random()*CH.length|0];
+  const nc=sc=>({head:sc?Math.floor(Math.random()*(rows+TRAIL)):-Math.floor(Math.random()*rows*.6),g:Array.from({length:TRAIL},rg)});
+  function tokens(){const cs=getComputedStyle(document.documentElement),g=n=>cs.getPropertyValue(n).trim();
+    glyph=g('--rain-glyph')||glyph;lead=g('--rain-lead')||lead;ga=parseFloat(g('--rain-ga'))||ga;la=parseFloat(g('--rain-la'))||la}
+  function size(){
+    const dpr=Math.min(window.devicePixelRatio||1,2);w=stage.clientWidth;h=stage.clientHeight;
+    cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.font=FS+'px "Fira Code",monospace';ctx.textBaseline='top';
+    rows=Math.ceil(h/FS);cols=Array.from({length:Math.ceil(w/FS)},()=>nc(true));tokens();draw()}
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    for(let t=0;t<TRAIL;t++){
+      if(t===0){ctx.fillStyle=lead;ctx.globalAlpha=la}else{ctx.fillStyle=glyph;ctx.globalAlpha=ga*(1-t/TRAIL)}
+      for(let c=0;c<cols.length;c++){const row=cols[c].head-t;if(row<0||row>rows)continue;ctx.fillText(cols[c].g[t],c*FS,row*FS)}}
+    ctx.globalAlpha=1}
+  function stepFn(){for(const c of cols){c.head++;c.g.unshift(rg());c.g.length=TRAIL;if(c.head-TRAIL>rows&&Math.random()>.975)c.head=0}}
+  function tick(now){requestAnimationFrame(tick);if(now-last<STEP)return;last=now;stepFn();draw()}
+  window.rainRefresh=()=>{tokens();draw()};
+  size();
+  if('ResizeObserver' in window)new ResizeObserver(size).observe(stage);else window.addEventListener('resize',size);
+  if(!still)requestAnimationFrame(tick);
+})();
+
+/* Two views and the curtain: the hive is first seen whole behind Alice's curtain; it opens, then the camera zooms in. */
+const curtainEl=document.getElementById('curtain'),zIn=document.getElementById('zIn'),zOut=document.getElementById('zOut');
+let curtainOpen=false,autoZoom=0;
+grid.inert=true;zOut.disabled=true;
+function setView(v,ms){view=v;grid.classList.toggle('zoomed',v==='zoom');
+  zIn.disabled=v==='zoom';zOut.disabled=v==='overview';
+  animateTo(v==='zoom'?zoomTarget():FULL,ms||900)}
+function openCurtain(){if(curtainOpen)return;curtainOpen=true;curtainEl.classList.add('open');grid.inert=false;
+  autoZoom=setTimeout(()=>setView('zoom',1300),2900)}
+function closeCurtain(){curtainOpen=false;clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
+document.getElementById('openCurtain').onclick=openCurtain;
+zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
+zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
+document.getElementById('vCurtain').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;closeCurtain();timers.forEach(clearTimeout);timers=[];setTimeout(openCurtain,700)};
+reset();
+</script>
+
+</body>
+</html>
