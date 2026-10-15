@@ -16,7 +16,7 @@ export const HitlConfirmModal = ({ hexagon, isOpen, onClose, onConfirm }: Props)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-sm:bottom-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-t-2xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto max-sm:bottom-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-t-2xl">
         <DialogHeader className="items-center text-center sm:text-center">
           <div
             aria-hidden="true"

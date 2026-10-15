@@ -43,12 +43,10 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
   const secured = countSecured(scanResult.hexagons, fixedIds);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 p-4">
+    <div className="min-h-screen bg-white text-gray-900">
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-8">
       <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{title}</h1>
-          <p className="text-sm text-gray-600">{secured}/{TOTAL} Secured</p>
-        </div>
+        <h1 className="text-2xl font-bold sm:text-3xl">{title}</h1>
         <ProgressRing securedCount={secured} totalCount={TOTAL} />
       </header>
       <HexagonGrid
@@ -64,6 +62,7 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
           <RemediationPanel hexagon={active} isOpen={phase === 'remediate'} onClose={close} onMarkFixed={onMarkFixed} />
         </>
       )}
+    </div>
     </div>
   );
 };

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Hexagon } from '@/types/hexagon';
-import { getHexagonVisuals } from '@/utils/hexagonStyles';
+import { getHexagonVisuals, getHexPaint } from '@/utils/hexagonStyles';
 import { canConfirm, canDispute } from '@/lib/identityConfirmation';
 import { cn } from '@/lib/utils';
+import { getHexagon } from '../../shared/hexagon-registry/registry.js';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,11 +15,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const EXPOSED_VISUALS = {
-  className: 'bg-red-100 border-red-500 text-red-800',
-  icon: '!',
-  tooltip: 'Exposure confirmed. Open to see the next step.',
-};
+const EXPOSED_TOOLTIP = 'Exposure confirmed. Open to see the next step.';
+// Pointy-top hexagon in a 100 x 115.47 box, inset so the stroke is not clipped.
+const POINTS = '50,2 98,28.7 98,86.8 50,113.5 2,86.8 2,28.7';
+const WAITING = new Set<Hexagon['status']>(['not_checked', 'false_positive']);
 
 interface Props {
   hexagon: Hexagon;
@@ -28,44 +28,67 @@ interface Props {
   onSelect?: (hexagon: Hexagon) => void;
   /** The user finished the remediation step: a confirmed exposure shows green instead of red. */
   fixed?: boolean;
+  /** Small tiles (a phone held upright) show the icon and name only. */
+  compact?: boolean;
+  /** Positions the tile; the hexagon fills it. */
   className?: string;
+  style?: CSSProperties;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, className }: Props) => {
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, compact = false, className, style }: Props) => {
   const [asking, setAsking] = useState(false);
   const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
-  const visuals = exposed ? EXPOSED_VISUALS : getHexagonVisuals(hexagon.status);
+  const visuals = getHexagonVisuals(hexagon.status);
+  const paint = getHexPaint(hexagon.status, exposed);
   const requiresConfirmation = canConfirm(hexagon);
   const allowsDispute = canDispute(hexagon);
+  const actionable = requiresConfirmation || (exposed && !!onSelect);
+  const secured = !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
+  const emoji = WAITING.has(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
+  const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status);
 
   return (
-    <div className="relative inline-block">
+    <div className={cn('group/tile relative', className)} style={style}>
       <button
         type="button"
         className={cn(
-          'w-28 h-28 flex flex-col items-center justify-center border-2 rounded-lg transition-all',
-          requiresConfirmation || (exposed && onSelect) ? 'cursor-pointer' : 'cursor-default',
-          visuals.className,
-          className,
+          'group absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-center focus-visible:outline-none',
+          actionable ? 'cursor-pointer' : 'cursor-default',
+          paint.ink,
+          hexagon.status === 'guess' && 'animate-pulse motion-reduce:animate-none',
         )}
         onClick={() => {
-          // A confirmed, unfixed exposure reopens its action plan; a guess opens the question.
-          if (onSelect && (requiresConfirmation || exposed)) onSelect(hexagon);
+          // A guess opens the question; a confirmed, unfixed exposure reopens its action plan.
+          if (onSelect && actionable) onSelect(hexagon);
           else if (requiresConfirmation) setAsking(true);
         }}
-        aria-disabled={!requiresConfirmation}
-        title={visuals.tooltip}
+        aria-disabled={!actionable}
+        title={exposed ? EXPOSED_TOOLTIP : visuals.tooltip}
       >
-        <span className="text-2xl font-bold" aria-hidden="true">{visuals.icon}</span>
-        <span className="text-xs mt-1 text-center px-1 truncate w-full">{hexagon.label}</span>
-        <span className="sr-only">{visuals.tooltip}</span>
+        <svg viewBox="0 0 100 115.47" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+          <polygon
+            points={POINTS}
+            strokeWidth={3}
+            strokeLinejoin="round"
+            className={cn(paint.polygon, paint.dashed && '[stroke-dasharray:7_5]', 'transition-colors group-focus-visible:stroke-blue-500')}
+          />
+        </svg>
+        {secured && (
+          <span aria-hidden="true" className="absolute right-[12%] top-[12%] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-green-600 text-[10px] text-white">
+            ✓
+          </span>
+        )}
+        <span className="relative text-xl leading-none" aria-hidden="true">{emoji}</span>
+        <span className="relative w-[68%] text-[9px] font-semibold uppercase leading-tight tracking-wide">{hexagon.label}</span>
+        {showValue && <span className="relative w-[68%] truncate text-[10px] text-gray-900">{hexagon.data}</span>}
+        <span className="sr-only">{exposed ? EXPOSED_TOOLTIP : visuals.tooltip}</span>
       </button>
 
       {allowsDispute && (
         <button
           type="button"
           onClick={() => onDispute(hexagon.id)}
-          className="absolute top-1 right-1 text-xs bg-white text-orange-600 rounded-full w-5 h-5 flex items-center justify-center border border-orange-600 before:absolute before:-inset-3 before:content-['']"
+          className="absolute left-[12%] top-[12%] z-10 hidden h-5 w-5 items-center justify-center rounded-full border border-orange-600 bg-white text-xs text-orange-600 opacity-0 before:absolute before:-inset-3 before:content-[''] focus-visible:opacity-100 group-hover/tile:opacity-100 [@media(hover:hover)]:flex"
           title="Not me?"
           aria-label={`Not me: dispute ${hexagon.label}`}
         >

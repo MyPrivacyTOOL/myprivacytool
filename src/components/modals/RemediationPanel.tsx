@@ -32,7 +32,7 @@ export const RemediationPanel = ({ hexagon, isOpen, onClose, onMarkFixed }: Prop
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-sm:bottom-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-t-2xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto max-sm:bottom-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-t-2xl">
         <DialogHeader>
           <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">Exposure Confirmed</span>
           <DialogTitle>{hexagon.label}</DialogTitle>

@@ -38,3 +38,32 @@ export function getHexagonVisuals(status: ObservationStatus): HexagonVisuals {
       return { className: 'bg-gray-100 border-gray-300 text-gray-500', icon: '–', tooltip: 'Not checked.' };
   }
 }
+
+export interface HexPaint {
+  /** Tailwind classes for the hexagon outline and fill (SVG polygon). */
+  polygon: string;
+  /** Text colour inside the hexagon. */
+  ink: string;
+  dashed: boolean;
+}
+
+/** Calm palette on white: green safe or fixed, amber given, purple needs input, grey not checked, red confirmed exposure. */
+export function getHexPaint(status: ObservationStatus, exposed = false): HexPaint {
+  if (exposed) return { polygon: 'fill-red-50 stroke-red-500', ink: 'text-red-700', dashed: false };
+  switch (status) {
+    case 'checked':
+    case 'confirmed':
+      return { polygon: 'fill-green-50 stroke-green-600', ink: 'text-green-700', dashed: false };
+    case 'given':
+      return { polygon: 'fill-amber-50 stroke-amber-500', ink: 'text-amber-700', dashed: true };
+    case 'guess':
+      return { polygon: 'fill-purple-50 stroke-purple-500', ink: 'text-purple-700', dashed: false };
+    case 'disputed':
+      return { polygon: 'fill-orange-50 stroke-orange-500', ink: 'text-orange-700', dashed: false };
+    case 'false_positive':
+      return { polygon: 'fill-gray-50 stroke-gray-200', ink: 'text-gray-400 line-through', dashed: false };
+    case 'not_checked':
+    default:
+      return { polygon: 'fill-gray-50 stroke-gray-200', ink: 'text-gray-400', dashed: false };
+  }
+}
