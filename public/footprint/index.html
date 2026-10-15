@@ -47,9 +47,16 @@ button.primary{background:var(--green);border-color:var(--green);color:#fff}
 button.violet{background:var(--ask);border-color:var(--ask);color:#fff}
 button.bad{background:var(--bad);border-color:var(--bad);color:#fff}
 
-.views{width:100%;max-width:560px;align-self:center;display:flex;gap:6px;flex-wrap:wrap}
-.views button{flex:1;min-width:0;padding:8px 10px;font-size:13px}
-.views button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.wrap{position:relative}
+header{padding-right:54px}
+button.icon{width:40px;height:40px;padding:0;display:grid;place-items:center;font-size:24px;font-weight:500;line-height:1}
+button.corner{position:absolute;top:0;right:0;border-radius:99px}
+button:disabled{opacity:.35;cursor:default}
+button:disabled:hover{border-color:var(--line)}
+.views{width:100%;max-width:560px;align-self:center;display:flex;gap:8px;justify-content:flex-end}
+.zoomctl{display:flex}
+.zoomctl button:first-child{border-radius:8px 0 0 8px;border-right-width:0}
+.zoomctl button:last-child{border-radius:0 8px 8px 0}
 
 .stage{width:100%;max-width:560px;align-self:center;position:relative;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:8px;overflow:hidden}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -156,15 +163,17 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
     </div>
     <div class="btns">
       <button id="play" class="violet">▶ Replay the journey</button>
-      <button id="reset">Reset</button>
-      <button id="theme" aria-label="Switch background"></button>
+      <button id="reset" title="Clear everything you have scanned or answered and go back to the first 9 hexagons">Start over</button>
     </div>
+    <button id="theme" class="icon corner" title="Switch between white and dark"></button>
   </header>
 
-  <div class="views" role="group" aria-label="View">
-    <button id="vOver" aria-pressed="true">Overview</button>
-    <button id="vZoom" aria-pressed="false">Zoomed in</button>
-    <button id="vCurtain">Replay curtain</button>
+  <div class="views">
+    <button id="vCurtain" class="icon" aria-label="Rewind to the curtain" title="Rewind: close the curtain and open it again"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M11 6v12L2.5 12zM21.5 6v12L13 12z"/></svg></button>
+    <div class="zoomctl" role="group" aria-label="Zoom">
+      <button id="zOut" class="icon" aria-label="Zoom out" title="Zoom out to the whole hive">&minus;</button>
+      <button id="zIn" class="icon" aria-label="Zoom in" title="Zoom in on the revealed hexagons">+</button>
+    </div>
   </div>
   <section class="stage" id="stage">
     <canvas id="rain" aria-hidden="true"></canvas>
@@ -201,8 +210,10 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 </div>
 
 <script>
-const themeBtn=document.getElementById('theme'),THEME_LABEL={light:'Dark mode',dark:'White mode'};
-function applyTheme(t,save){document.documentElement.dataset.theme=t;themeBtn.textContent=THEME_LABEL[t];
+const themeBtn=document.getElementById('theme');
+const ICON_MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>';
+const ICON_SUN='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+function applyTheme(t,save){document.documentElement.dataset.theme=t;themeBtn.innerHTML=t==='dark'?ICON_SUN:ICON_MOON;themeBtn.setAttribute('aria-label',t==='dark'?'Switch to white background':'Switch to dark background');
   if(window.rainRefresh)window.rainRefresh();if(save){try{localStorage.setItem('mpt-theme',t)}catch(e){}}}
 themeBtn.onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark',true);
 (function(){let t='light';try{t=localStorage.getItem('mpt-theme')==='dark'?'dark':'light'}catch(e){}applyTheme(t,false)})();
@@ -394,18 +405,18 @@ playBtn.onclick=()=>{
 })();
 
 /* Two views and the curtain: the hive is first seen whole behind Alice's curtain; it opens, then the camera zooms in. */
-const curtainEl=document.getElementById('curtain'),vOver=document.getElementById('vOver'),vZoom=document.getElementById('vZoom');
+const curtainEl=document.getElementById('curtain'),zIn=document.getElementById('zIn'),zOut=document.getElementById('zOut');
 let curtainOpen=false,autoZoom=0;
-grid.inert=true;
+grid.inert=true;zOut.disabled=true;
 function setView(v,ms){view=v;grid.classList.toggle('zoomed',v==='zoom');
-  vOver.setAttribute('aria-pressed',v==='overview');vZoom.setAttribute('aria-pressed',v==='zoom');
+  zIn.disabled=v==='zoom';zOut.disabled=v==='overview';
   animateTo(v==='zoom'?zoomTarget():FULL,ms||900)}
 function openCurtain(){if(curtainOpen)return;curtainOpen=true;curtainEl.classList.add('open');grid.inert=false;
   autoZoom=setTimeout(()=>setView('zoom',1300),2900)}
 function closeCurtain(){curtainOpen=false;clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
 document.getElementById('openCurtain').onclick=openCurtain;
-vOver.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
-vZoom.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
+zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
+zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
 document.getElementById('vCurtain').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;closeCurtain();timers.forEach(clearTimeout);timers=[];setTimeout(openCurtain,700)};
 reset();
 </script>
