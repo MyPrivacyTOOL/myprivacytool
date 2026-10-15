@@ -140,6 +140,8 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
 .panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .panel dd{margin:0}
+.bounce{animation:bob 1.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .learn{margin-top:12px;font-size:14px;color:var(--muted);border-left:3px solid var(--ask);padding-left:10px}
 
 .summary{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
@@ -347,7 +349,8 @@ function select(i){sel=i;paint();showPanel();
 
 const cleanRisk=it=>/text chosen|\(\)/.test(it.risk)?'Your real IP address is exposed even when you use a VPN, so sites and trackers can still see where you are.':it.risk;
 function showPanel(){
-  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Start here</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
+  if(sel<0&&!curtainOpen){panel.innerHTML=`<div class="badge"><svg width="61" height="68" viewBox="0 0 100 100" aria-hidden="true"><path d="${HEX}" fill="url(#gSoft)" stroke="var(--ink)" stroke-width="5"/><path d="M50 72V30M32 47l18-18 18 18" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" class="bounce"/></svg></div><div><div class="tag">Start here</div><h2>Open the curtain to start &uarr;</h2><p>Tap the green <b>Open the curtain</b> button above. Hexagons appear one by one as MPT finds them.</p></div>`;return}
+  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Next</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
   const it=ITEMS[sel],s=st[sel];
   let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
   if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
@@ -435,9 +438,9 @@ grid.inert=true;zOut.disabled=true;
 function setView(v,ms){view=v;grid.classList.toggle('zoomed',v==='zoom');
   zIn.disabled=v==='zoom';zOut.disabled=v==='overview';
   animateTo(v==='zoom'?zoomTarget():FULL,ms||900)}
-function openCurtain(){if(curtainOpen)return;curtainOpen=true;curtainEl.classList.add('open');grid.inert=false;
+function openCurtain(){if(curtainOpen)return;curtainOpen=true;if(sel<0)showPanel();curtainEl.classList.add('open');grid.inert=false;
   autoZoom=setTimeout(()=>setView('zoom',1300),2900)}
-function closeCurtain(){curtainOpen=false;clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
+function closeCurtain(){curtainOpen=false;if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
 document.getElementById('openCurtain').onclick=openCurtain;
 zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
 zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
