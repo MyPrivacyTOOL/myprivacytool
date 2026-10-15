@@ -16,7 +16,7 @@ const FIRST_HEXAGON = `🔍 *Here's what the free MyPrivacyTOOL scan looks at:*
 • Data broker databases: not searched yet, and I'll say so plainly in your report
 
 ---
-I can't see your Telegram profile, phone number or contacts, only what you type here. Want to run the scan now?
+I can see the public details of your Telegram profile (such as your name, @handle, photo and bio, depending on your Telegram privacy settings), and what you type here. I don't get your phone number or contacts. I save what you send and those public details for up to 90 days to run your scan. Want to run the scan now?
 
 Reply *Y* and I'll send you the link.
 

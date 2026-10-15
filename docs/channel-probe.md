@@ -40,7 +40,7 @@ That is the two-part test: what the message delivers, then what a public lookup 
 - **Retention:** `expires_at = now + PROBE_RETENTION_DAYS` (default 90, clamped 1-365). Purge with `select public.mpt_purge_expired_channel_probe_captures()`.
 - **Safety:** every Telegram call and the save are wrapped with a 5s timeout; the webhook always forwards to core-brain and returns 200. The bot token is never written to a row or a log.
 - **Rollback:** unset `PROBE_MODE`. Stored rows expire on their own, or delete them: `delete from public.channel_probe_captures where expires_at > now() + interval '7 days';`.
-- The table comment and migration header still describe test accounts only; update them with the stored-data rules before enabling.
+- The table comment was updated by migration 20261015150000; the original migration header (already applied) still says test accounts only.
 
 ## Full event log
 **Mode `on` only.** A complete record of one conversation, for allow-listed or opted-in accounts. Mode `all` never writes to it (no message-content, outbound or brain logging there) and mode `off` does nothing.
