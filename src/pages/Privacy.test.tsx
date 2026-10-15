@@ -114,12 +114,13 @@ describe("Privacy: referral programme section", () => {
 });
 
 describe("Privacy: Telegram bot (draft wording, unreviewed)", () => {
-  it("says message text and public profile details are received, the 90 day keep, and shows the contact placeholder", () => {
+  it("says message text and public profile details are received, the 90 day keep, and gives the privacy address for deletion", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("we receive what you send (including message text)");
     expect(text).toContain("the public details of your profile that Telegram makes available to bots");
     expect(text).toContain("We keep it for up to 90 days, then it is deleted automatically.");
-    expect(text).toContain("{contact}");
+    expect(text).toContain("delete everything linked to your Telegram id at any time by writing to privacy@myprivacytool.io");
+    expect(text).not.toContain("{contact}");
   });
 });
