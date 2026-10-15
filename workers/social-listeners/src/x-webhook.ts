@@ -1,8 +1,10 @@
 // X (Twitter) Account Activity API listener: DM + mention events. Validate and route only.
 import { createLogger } from "./logger";
 import { type MirrorDm, describeShape, extractDms, extractMirrorDms, handleDeleteDm, handleMirrorDm, handleOrdinaryDm, isConsentPending, selfId } from "./mirror-bot";
+import { probeMode } from "./probe-reader";
 import { extractEngagement, isDeleteRequest, touchContact } from "./social";
 import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, readRawBody, timingSafeEqual } from "./shared";
+import { runXProbe } from "./x-probe";
 
 const log = createLogger("social-listeners:x");
 
@@ -33,6 +35,13 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
   }
   const payload = parseJson(raw);
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
+
+  // Channel probe (test-only, off unless PROBE_MODE=on): saves events from OUR OWN allow-listed test accounts (PROBE_X_IDS / PROBE_X_HANDLES) and the public lookups; everyone else is untouched. docs/channel-probe-x.md.
+  if (probeMode(env) === "on") {
+    const probe = runXProbe(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(probe);
+    else await probe;
+  }
 
   // MPC-7628: MIRROR DMs are answered here (consent -> public scan -> educational DM); the scan result and message text are never stored.
   // A bare Y/N counts only when it answers our consent request (checked against the DM history, nothing stored); otherwise it is an ordinary message.
