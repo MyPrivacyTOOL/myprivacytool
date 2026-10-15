@@ -49,3 +49,7 @@ autoplay).
 
 `public/_headers` makes `/footprint/` and `/footprint/curtain.json` revalidate on every visit, so a changed
 `curtain.json` shows up right after the deploy.
+
+## Dataset (`dataset`)
+
+Leave `""` to use the built-in 54 web hexagons. Set it to the path of a JSON array (up to 5000 items) to load any dataset; see `docs/footprint-data.md`.
