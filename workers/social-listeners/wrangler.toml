@@ -18,6 +18,9 @@ workers_dev = true
 #   PROBE_MODE="on"  + PROBE_TELEGRAM_IDS="<our test account ids>": allow-listed test accounts only (7 day expiry).
 #   PROBE_MODE="all": EVERY non-bot sender is captured, with wider public lookups. Stores real-user PII (PROBE_RETENTION_DAYS, default 90,
 #   clamp 1-365; PROBE_LOOKUP_HOURS, default 24, throttles repeat lookups). Do not enable until the stored-data rules and privacy wording are aligned.
+# Full event log (docs/channel-probe.md): only with PROBE_MODE="on", for senders in PROBE_TELEGRAM_IDS or PROBE_LOG_OPTIN_IDS (comma-separated numeric
+#   ids). Saves inbound updates, outbound Bot API calls and the core-brain answer to telegram_event_log. PROBE_LOG_RETENTION_DAYS: default 90,
+#   clamp 1-365, or "forever" (no expiry). Mode "all" never writes to it.
 # Set them in the Cloudflare dashboard (Worker > Settings > Variables) or `wrangler deploy --var PROBE_MODE:on`; never commit real ids.
 # Rollback: unset PROBE_MODE.
 
