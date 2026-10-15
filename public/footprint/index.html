@@ -32,6 +32,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font:16px/1.5 var(--body);
   padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
@@ -54,7 +55,22 @@ button.corner{position:absolute;top:0;right:0;border-radius:99px}
 button:disabled{opacity:.35;cursor:default}
 button:disabled:hover{border-color:var(--line)}
 .views{width:100%;max-width:560px;align-self:center;display:flex;gap:8px;justify-content:flex-end}
+.views{justify-content:space-between;align-items:center}
+.views .grp{display:flex;gap:8px;align-items:center}
+.modectl{display:flex}
+.modectl button:first-child{border-radius:8px 0 0 8px;border-right-width:0}
+.modectl button:last-child{border-radius:0 8px 8px 0}
+.modectl button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .zoomctl{display:flex}
+.boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;width:100%}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 8px}
+.box h3{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.box h3 small{color:var(--muted);font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:0;padding:6px 2px 8px;font:400 12.5px/1.15 var(--body);color:var(--fg);cursor:pointer;border-radius:10px;min-width:0}
+.tile:hover{background:var(--soft)}
+.tile.sel{outline:2px solid var(--fg)}
+.tile span{text-align:center;overflow-wrap:anywhere}
 .zoomctl button:first-child{border-radius:8px 0 0 8px;border-right-width:0}
 .zoomctl button:last-child{border-radius:0 8px 8px 0}
 
@@ -108,10 +124,14 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .pop{animation:hexpop .4s ease-out}
 @keyframes hexpop{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
 
-.curtain{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:#fff;
-  transition:opacity 1.3s ease,transform 1.5s cubic-bezier(.65,.05,.3,1)}
-.curtain img{max-width:88%;max-height:78%;object-fit:contain;display:block}
+.curtain{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--cur-bg,#fff);
+  transition:opacity var(--open-ms,1300ms) ease,transform var(--open-ms,1300ms) cubic-bezier(.65,.05,.3,1)}
+.curtain img,.curtain video{max-width:var(--cur-w,88%);max-height:var(--cur-h,78%);object-fit:var(--cur-fit,contain);display:block;background:var(--cur-bg,#fff)}
 .curtain.open{opacity:0;transform:translateX(-9%);pointer-events:none}
+.curtain[data-slide="right"].open{transform:translateX(9%)}
+.curtain[data-slide="up"].open{transform:translateY(-9%)}
+.curtain[data-slide="fade"].open{transform:none}
+.curtain.playing button{opacity:0;pointer-events:none}
 .curtain button{background:var(--green);border-color:var(--green);color:#fff;font:700 16px var(--body);padding:11px 22px;border-radius:99px}
 .curtain.open button{opacity:0}
 
@@ -125,6 +145,14 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
 .panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .panel dd{margin:0}
+.help{align-self:center;width:100%;max-width:560px;display:flex;flex-direction:column;gap:10px;align-items:center}
+button.linkbtn{background:none;border:0;padding:6px 10px;color:var(--ink);text-decoration:underline;text-underline-offset:3px;font-weight:600}
+.helpbox{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.helpbox h3{font:700 18px/1.2 var(--body);margin:0}
+.helpbox ol{margin:0;padding-left:22px;display:grid;gap:8px}
+.helpbox .acts{display:flex;gap:8px;flex-wrap:wrap}
+.bounce{animation:bob 1.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 .learn{margin-top:12px;font-size:14px;color:var(--muted);border-left:3px solid var(--ask);padding-left:10px}
 
 .summary{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
@@ -147,6 +175,7 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .chip span{font-size:13px;line-height:1.2}
 .chip small{display:block;color:var(--muted);font-size:11.5px}
 .principle{font-size:14px;color:var(--muted);text-align:center;text-wrap:balance}
+@media (max-width:560px){body.pre .sub,body.pre .btns,body.pre .views,body.pre .summary,body.pre .legend,body.pre #panel,body.pre .principle{display:none}.stage{width:100vw;max-width:none;border-radius:0;border-left-width:0;border-right-width:0}}
 @media (max-width:480px){.panel{grid-template-columns:1fr}.panel .badge{width:46px;height:52px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -169,10 +198,16 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
   </header>
 
   <div class="views">
+    <div class="modectl" role="group" aria-label="Layout">
+      <button id="mHive" class="icon" aria-pressed="true" aria-label="Beehive view" title="Beehive: hexagons appear out of the rain"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l8 4.6v9.8l-8 4.6-8-4.6V7.1z"/></svg></button>
+      <button id="mBoxes" class="icon" aria-pressed="false" aria-label="By pattern view" title="By pattern: the same hexagons grouped into boxes"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></button>
+    </div>
+    <div class="grp hiveonly">
     <button id="vCurtain" class="icon" aria-label="Rewind to the curtain" title="Rewind: close the curtain and open it again"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M11 6v12L2.5 12zM21.5 6v12L13 12z"/></svg></button>
-    <div class="zoomctl" role="group" aria-label="Zoom">
-      <button id="zOut" class="icon" aria-label="Zoom out" title="Zoom out to the whole hive">&minus;</button>
-      <button id="zIn" class="icon" aria-label="Zoom in" title="Zoom in on the revealed hexagons">+</button>
+      <div class="zoomctl" role="group" aria-label="Zoom">
+        <button id="zOut" class="icon" aria-label="Zoom out" title="Zoom out to the whole hive">&minus;</button>
+        <button id="zIn" class="icon" aria-label="Zoom in" title="Zoom in on the revealed hexagons">+</button>
+      </div>
     </div>
   </div>
   <section class="stage" id="stage">
@@ -187,10 +222,26 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
       </defs>
     </svg>
     <div class="curtain" id="curtain">
-      <img src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.remove()">
+      <img id="curtainImg" src="alice-curtain.jpg?v=2" alt="Alice drawing back a curtain on a wall of green code" onerror="this.hidden=true">
+      <video id="curtainVideo" hidden playsinline muted preload="none"></video>
       <button id="openCurtain">Open the curtain</button>
     </div>
   </section>
+
+  <section class="help">
+    <button id="helpBtn" class="linkbtn" aria-expanded="false" aria-controls="helpbox">Need help?</button>
+    <div class="helpbox" id="helpbox" hidden>
+      <h3>Three quick steps</h3>
+      <ol>
+        <li><b>Open the curtain.</b> Tap the green button on the picture.</li>
+        <li><b>Tap a purple hexagon.</b> Purple means we found something that may be you.</li>
+        <li><b>Say yes or no.</b> Yes if it is you, no if it is not. Green means confirmed. Red appears only if something is exposed.</li>
+      </ol>
+      <div class="acts"><button id="helpGo" class="primary">Open the curtain</button><button id="helpClose">Close</button></div>
+    </div>
+  </section>
+
+  <section class="boxes" id="boxes" hidden aria-label="Data points grouped by pattern"></section>
 
   <section class="panel" id="panel" aria-live="polite"></section>
 
@@ -241,7 +292,7 @@ const PAD=10,vx=Math.min(...pos.map(p=>p.x))-50-PAD,vy=Math.min(...pos.map(p=>p.
 const FULL={x:vx,y:vy,w:Math.max(...pos.map(p=>p.x))+50+PAD-vx,h:Math.max(...pos.map(p=>p.y))+50+PAD-vy};
 let cur={...FULL},anim=0,view='overview',lastKey='';
 grid.style.aspectRatio=FULL.w+'/'+FULL.h;
-function setVB(b){cur=b;grid.setAttribute('viewBox',`${b.x} ${b.y} ${b.w} ${b.h}`)}
+function setVB(b){cur=b;grid.setAttribute('viewBox',`${b.x} ${b.y} ${b.w} ${b.h}`);grid.style.aspectRatio=b.w+'/'+b.h}
 function animateTo(b,ms){cancelAnimationFrame(anim);const a={...cur},t0=performance.now(),ease=t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
   (function f(now){const k=Math.min(1,(now-t0)/ms),e=ease(k);
     setVB({x:a.x+(b.x-a.x)*e,y:a.y+(b.y-a.y)*e,w:a.w+(b.w-a.w)*e,h:a.h+(b.h-a.h)*e});
@@ -249,8 +300,7 @@ function animateTo(b,ms){cancelAnimationFrame(anim);const a={...cur},t0=performa
 function zoomTarget(){
   const on=pos.filter((p,i)=>st[i]!=='none');if(!on.length)return {...FULL};
   const x0=Math.min(...on.map(p=>p.x))-50-8,x1=Math.max(...on.map(p=>p.x))+50+8,y0=Math.min(...on.map(p=>p.y))-50-8,y1=Math.max(...on.map(p=>p.y))+50+8;
-  const AR=FULL.w/FULL.h;let w=Math.max(x1-x0,340),h=Math.max(y1-y0,340/AR);
-  if(w/h<AR)w=h*AR;else h=w/AR;
+  let w=Math.max(x1-x0,300),h=Math.max(y1-y0,240);
   w=Math.min(w,FULL.w);h=Math.min(h,FULL.h);
   return {x:(x0+x1)/2-w/2,y:(y0+y1)/2-h/2,w,h}}
 function retarget(){const key=st.map(x=>x!=='none'?1:0).join('');
@@ -309,6 +359,7 @@ function paint(){
   const L=[['confirmed','Confirmed','Verified by you',['confirmed','fixed']],['found','Found','Tap to confirm',['found']],['ask','Needs input','Is this you?',['ask','scan']],['told','You told us','Optional check',['told']],['risk','Confirmed risk','Fix it',['risk']],['false','Not you','Nothing to do',['false']],['none','Unknown','Hidden in the rain',['none']]];
   document.getElementById('legend').innerHTML=L.map(([k,t,s,arr])=>`<div class="chip">${mini(k,30)}<span>${t}<small>${s}</small></span><b>${n(arr)}</b></div>`).join('');
   retarget();
+  if(mode==='boxes')renderBoxes();
 }
 const MSTY={found:['url(#gSoft)','var(--ink)',3,'',.7],confirmed:['url(#gSoft)','var(--ink)',5,'',1],fixed:['url(#gSoft)','var(--ink)',5,'',1],ask:['var(--ask-bg)','var(--ask)',5,'',1],told:['var(--told-bg)','var(--told)',5,'12 8',1],risk:['var(--bad-bg)','var(--bad)',5,'',1],false:['var(--dim)','var(--dim-fg)',4,'',.8],none:['transparent','var(--green)',4,'8 8',.9],scan:['var(--soft)','var(--ink)',5,'8 6',1]};
 function mini(state,h,emoji){
@@ -323,10 +374,11 @@ function select(i){sel=i;paint();showPanel();
 
 const cleanRisk=it=>/text chosen|\(\)/.test(it.risk)?'Your real IP address is exposed even when you use a VPN, so sites and trackers can still see where you are.':it.risk;
 function showPanel(){
-  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Start here</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
+  if(sel<0&&!curtainOpen){panel.innerHTML=`<div class="badge"><svg width="61" height="68" viewBox="0 0 100 100" aria-hidden="true"><path d="${HEX}" fill="url(#gSoft)" stroke="var(--ink)" stroke-width="5"/><path d="M50 72V30M32 47l18-18 18 18" fill="none" stroke="var(--ink)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" class="bounce"/></svg></div><div><div class="tag">Start here</div><h2>Open the curtain to start &uarr;</h2><p>Tap the green <b>Open the curtain</b> button above. Hexagons appear one by one as MPT finds them.</p></div>`;return}
+  if(sel<0){panel.innerHTML=`<div class="badge">${mini('ask',68,'🔍')}</div><div><div class="tag">Next</div><h2>Tap a pulsing purple hexagon</h2><p>Purple means MPT found something that may be you. Answer it to turn it green (confirmed) or red (a real exposure to fix). Tap anywhere in the rain to scan a hidden spot.</p></div>`;return}
   const it=ITEMS[sel],s=st[sel];
   let body='',acts='',title=it.label,tag=`${it.group} · ${STATES[s]}`,extra='';
-  if(s==='none'){title='Unknown';tag='Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
+  if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
   else{
     extra=`<dl><div><dt>What we capture</dt><dd>${it.cap}</dd></div><div><dt>Why it matters</dt><dd>${it.val}</dd></div>${(s==='ask'||s==='risk')&&it.risk?`<div><dt>Risk</dt><dd>${cleanRisk(it)}</dd></div>`:''}</dl>`;
     const ex=it.ex?`<div class="ex">Example value: <b>${it.ex}</b>${it.conf?' · confidence '+it.conf+'%':''}</div>`:'';
@@ -362,7 +414,7 @@ const PLAY_LABEL='▶ Replay the journey';
 document.getElementById('reset').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;reset()};
 playBtn.onclick=()=>{
   reset();playing=true;playBtn.textContent='Playing…';
-  const wait=curtainOpen?0:3400;if(!curtainOpen)openCurtain();
+  const wait=curtainOpen?0:(vidEl.getAttribute('src')?CUR.videoMaxSeconds*1000+2400:CUR.openMs+2100);if(!curtainOpen)openCurtain();
   let t=600+wait;
   const step=(fn,ms)=>{t+=ms;later(t,fn)};
   const tap=(id,a,gap)=>{step(()=>select(idx(id)),gap||1000);step(()=>act(a),900)};
@@ -411,13 +463,81 @@ grid.inert=true;zOut.disabled=true;
 function setView(v,ms){view=v;grid.classList.toggle('zoomed',v==='zoom');
   zIn.disabled=v==='zoom';zOut.disabled=v==='overview';
   animateTo(v==='zoom'?zoomTarget():FULL,ms||900)}
-function openCurtain(){if(curtainOpen)return;curtainOpen=true;curtainEl.classList.add('open');grid.inert=false;
-  autoZoom=setTimeout(()=>setView('zoom',1300),2900)}
-function closeCurtain(){curtainOpen=false;clearTimeout(autoZoom);curtainEl.classList.remove('open');grid.inert=true;setView('overview',600)}
+/* Curtain settings come from curtain.json next to this page (image, video, size, timing). The defaults below match the file. */
+const CUR_DEFAULTS={image:'alice-curtain.jpg',imageAlt:'Alice drawing back a curtain on a wall of green code',video:'',videoPoster:'',videoMaxSeconds:8,
+  buttonLabel:'Open the curtain',maxWidthPct:88,maxHeightPct:78,fit:'contain',background:'#ffffff',slide:'left',openMs:1300,zoomDelayMs:2900};
+let CUR={...CUR_DEFAULTS};
+const imgEl=document.getElementById('curtainImg'),vidEl=document.getElementById('curtainVideo'),openBtn=document.getElementById('openCurtain');
+const num=(v,d,lo,hi)=>{v=Number(v);return Number.isFinite(v)?Math.min(hi,Math.max(lo,v)):d};
+function applyCurtain(c){
+  CUR={...CUR_DEFAULTS,...(c&&typeof c==='object'?c:{})};
+  CUR.maxWidthPct=num(CUR.maxWidthPct,88,20,100);CUR.maxHeightPct=num(CUR.maxHeightPct,78,20,100);
+  CUR.openMs=num(CUR.openMs,1300,0,6000);CUR.zoomDelayMs=num(CUR.zoomDelayMs,2900,0,20000);CUR.videoMaxSeconds=num(CUR.videoMaxSeconds,8,1,60);
+  if(!['contain','cover'].includes(CUR.fit))CUR.fit='contain';
+  if(!['left','right','up','fade'].includes(CUR.slide))CUR.slide='left';
+  if(!/^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(String(CUR.background)))CUR.background='#ffffff';
+  const s=curtainEl.style;
+  s.setProperty('--cur-w',CUR.maxWidthPct+'%');s.setProperty('--cur-h',CUR.maxHeightPct+'%');s.setProperty('--cur-fit',CUR.fit);
+  s.setProperty('--cur-bg',CUR.background);s.setProperty('--open-ms',CUR.openMs+'ms');curtainEl.dataset.slide=CUR.slide;
+  if(CUR.image){if(!imgEl.src.endsWith(CUR.image))imgEl.src=CUR.image;imgEl.alt=CUR.imageAlt||'';imgEl.hidden=false}else imgEl.hidden=true;
+  if(CUR.video&&!window.matchMedia('(prefers-reduced-motion:reduce)').matches){vidEl.src=CUR.video;vidEl.poster=CUR.videoPoster||CUR.image||'';vidEl.setAttribute('aria-label',CUR.imageAlt||'')}
+  else{vidEl.removeAttribute('src');vidEl.load()}
+  openBtn.textContent=CUR.buttonLabel||'Open the curtain';
+}
+let opening=false;
+function openCurtain(){
+  if(curtainOpen||opening)return;
+  if(vidEl.getAttribute('src')){ /* play the video, then open */
+    opening=true;curtainEl.classList.add('playing');imgEl.hidden=true;vidEl.hidden=false;vidEl.currentTime=0;
+    let done=false;const finish=()=>{if(done)return;done=true;opening=false;curtainEl.classList.remove('playing');doOpen()};
+    vidEl.onended=finish;setTimeout(finish,CUR.videoMaxSeconds*1000);
+    const p=vidEl.play();if(p&&p.catch)p.catch(finish);
+  }else doOpen();
+}
+function doOpen(){curtainOpen=true;document.body.classList.remove('pre');syncHelp();if(sel<0)showPanel();curtainEl.classList.add('open');grid.inert=false;
+  autoZoom=setTimeout(()=>setView('zoom',1300),CUR.zoomDelayMs)}
+function closeCurtain(){curtainOpen=false;opening=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open','playing');grid.inert=true;
+  vidEl.pause();vidEl.hidden=true;if(CUR.image)imgEl.hidden=false;setView('overview',600)}
+fetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
 document.getElementById('openCurtain').onclick=openCurtain;
+/* Help: three yes-steps that end on the curtain button. */
+const helpBtn=document.getElementById('helpBtn'),helpBox=document.getElementById('helpbox'),helpGo=document.getElementById('helpGo');
+function syncHelp(){helpGo.textContent=curtainOpen?'Got it':'Open the curtain'}
+function toggleHelp(show){helpBox.hidden=!show;helpBtn.setAttribute('aria-expanded',show)}
+helpBtn.onclick=()=>toggleHelp(helpBox.hidden);
+document.getElementById('helpClose').onclick=()=>toggleHelp(false);
+helpGo.onclick=()=>{toggleHelp(false);openCurtain()};
+document.body.classList.add('pre');syncHelp();
 zOut.onclick=()=>{clearTimeout(autoZoom);setView('overview')};
 zIn.onclick=()=>{clearTimeout(autoZoom);setView('zoom')};
 document.getElementById('vCurtain').onclick=()=>{playing=false;playBtn.textContent=PLAY_LABEL;closeCurtain();timers.forEach(clearTimeout);timers=[];setTimeout(openCurtain,700)};
+/* By pattern: the same 54 hexagons grouped into labelled boxes (6 to 12 per box). Same states, same panel. */
+const GROUPS=[
+ ['Core identity',['demographic','user-profile','location','primary-language','language-fallbacks','language-mismatch']],
+ ['Device and network',['device','browser','isp','time','screen','privacy','connection','referrer','battery']],
+ ['Motion and sensors',['orientation','rotation-angle','tilt-beta','tilt-gamma','motion-sensors']],
+ ['Browser fingerprint',['canvas-fingerprint','webgl-fingerprint','audio-fingerprint','font-detection','extension-detection','fingerprint-protection','webrtc-leak','hardware-profile','screen-fingerprint','timezone-locale','battery-fingerprint','media-devices']],
+ ['Storage and cookies',['cookies-status','localstorage-status','sessionstorage-status','indexeddb-status','cache-status']],
+ ['Social and accounts',['google-services','meta-services','microsoft-services','social-platforms','cross-site-identity']],
+ ['Security and exposure',['dns-leak','https-status','mixed-content','security-headers','browser-security','tls-config']],
+ ['Behavior and habits',['mouse-tracking','typing-patterns','click-patterns','scroll-behavior','session-duration','engagement-map']]];
+const boxesEl=document.getElementById('boxes'),stageEl=document.getElementById('stage'),mHive=document.getElementById('mHive'),mBoxes=document.getElementById('mBoxes');
+let mode='hive';
+function renderBoxes(){
+  boxesEl.innerHTML=GROUPS.map(([name,ids])=>{
+    const cells=ids.map(id=>{const i=idx(id),s=st[i],it=ITEMS[i];
+      return `<button class="tile${i===sel?' sel':''}" data-i="${i}" aria-label="${it.label}: ${STATES[s]}">${mini(s,54,s==='none'?'':it.emoji)}<span>${it.label}</span></button>`}).join('');
+    const done=ids.filter(id=>['confirmed','fixed'].includes(st[idx(id)])).length;
+    return `<section class="box"><h3>${name}<small>${done}/${ids.length}</small></h3><div class="tiles">${cells}</div></section>`}).join('');
+  boxesEl.querySelectorAll('.tile').forEach(b=>b.onclick=()=>select(+b.dataset.i));
+}
+function setMode(m){mode=m;
+  mHive.setAttribute('aria-pressed',m==='hive');mBoxes.setAttribute('aria-pressed',m==='boxes');
+  stageEl.hidden=m==='boxes';boxesEl.hidden=m==='hive';
+  document.querySelectorAll('.hiveonly').forEach(e=>e.hidden=m==='boxes');
+  if(m==='boxes'){clearTimeout(autoZoom);renderBoxes()}
+  if(sel>=0)showPanel()}
+mHive.onclick=()=>setMode('hive');mBoxes.onclick=()=>setMode('boxes');
 reset();
 </script>
 

@@ -1,0 +1,16 @@
+{
+  "_help": "Settings for the Alice curtain on /footprint/. Edit and deploy; no code change needed. See docs/footprint-curtain.md.",
+  "image": "alice-curtain.jpg?v=2",
+  "imageAlt": "Alice drawing back a curtain on a wall of green code",
+  "video": "",
+  "videoPoster": "",
+  "videoMaxSeconds": 8,
+  "buttonLabel": "Open the curtain",
+  "maxWidthPct": 88,
+  "maxHeightPct": 78,
+  "fit": "contain",
+  "background": "#ffffff",
+  "slide": "left",
+  "openMs": 1300,
+  "zoomDelayMs": 2900
+}
