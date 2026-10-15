@@ -1,6 +1,6 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { createLogger } from "./logger";
-import { isProbeIdRequest, isProbeSender, probeOn, replyProbeId, runTelegramProbe } from "./probe-reader";
+import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
 import { sendTelegramReply } from "./reply";
 import { type Env, RATE_LIMITED, callCoreBrain, parseJson, readRawBody, timingSafeEqual } from "./shared";
 
@@ -23,13 +23,11 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   const payload = parseJson(raw);
   if (payload === null || typeof payload !== "object") return new Response("Bad Request", { status: 400 });
 
-  // Channel probe reader (test-only, off unless PROBE_MODE=on): captures allow-listed test accounts only; everyone else is untouched.
-  if (probeOn(env)) {
+  // Channel probe reader (off unless PROBE_MODE is "on" (allow-listed test accounts) or "all" (every non-bot sender)); docs/channel-probe.md.
+  const mode = probeMode(env);
+  if (mode !== "off") {
     const run = (p: Promise<void>) => (ctx?.waitUntil ? (ctx.waitUntil(p), undefined) : p);
-    if (isProbeIdRequest(payload)) {
-      await run(replyProbeId(env, payload, log));
-      return new Response("OK");
-    }
+    if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log)); return new Response("OK"); }
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log));
   }
 
