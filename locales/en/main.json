@@ -20,5 +20,5 @@
   "bot.unknown.body": "Say *\"scan me\"* and I'll tell you what our free scan looks at and send you the link to run it.",
   "bot.unknown.free": "It's free. You'll be asked for your email so we can send your report.",
   "bot.confirm_prompt": "Reply *Y* to get the link to the free scan, or *N* if you'd rather not.",
-  "bot.contact_unsupported": "📧 I can't take an email address or phone number in this chat yet, and I haven't saved what you sent. Say *\"scan me\"* and I'll send you the link to the free scan instead."
+  "bot.contact_unsupported": "📧 I can't take an email address or phone number in this chat yet, so please don't send one here. Say *\"scan me\"* and I'll send you the link to the free scan instead."
 }
