@@ -21,8 +21,11 @@ describe("bot English wording does not over-promise", () => {
     ["says no signup/email is needed", /no signup/i],
   ])("does not contain: %s", (_name, re) => expect(ALL).not.toMatch(re));
 
-  it("says what the bot cannot see and that brokers are not searched yet", () => {
-    expect(en["bot.first_hexagon.question"]).toMatch(/can't see your Telegram profile, phone number or contacts/);
+  it("says what the bot can see and keep, what it cannot see, and that brokers are not searched yet", () => {
+    expect(en["bot.first_hexagon.question"]).toMatch(/public details of your Telegram profile/);
+    expect(en["bot.first_hexagon.question"]).toMatch(/don't get your phone number or contacts/);
+    expect(en["bot.first_hexagon.question"]).toMatch(/up to 90 days/);
+    expect(en["bot.first_hexagon.question"]).not.toMatch(/can't see your Telegram profile/);
     expect(en["bot.first_hexagon.brokers"]).toMatch(/not searched yet/i);
   });
   it("tells the user an email is asked for", () => {

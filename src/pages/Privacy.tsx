@@ -138,7 +138,18 @@ const Privacy = () => {
                   <strong>Messaging Channel Data:</strong> If you contact us through
                   a messaging channel (currently Telegram and the web start page),
                   we store your channel ID, display name, your replies, and your
-                  conversation stage so we can continue the conversation
+                  conversation stage so we can continue the conversation. When you
+                  message our Telegram bot we receive what you send (including
+                  message text), your Telegram user id, and the public details of
+                  your profile that Telegram makes available to bots, such as your
+                  name, @handle, profile photo details, bio and, where public, a
+                  linked personal channel. We do not receive your phone number or
+                  contacts unless you share them. We use this to run your privacy
+                  scan and to measure what a messaging channel makes visible about
+                  a person. We keep it for up to 90 days, then it is deleted
+                  automatically. Our team can see it on a restricted basis; it is
+                  not shared publicly. You can ask us to delete everything linked
+                  to your Telegram id at any time: {"{contact}"}
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
