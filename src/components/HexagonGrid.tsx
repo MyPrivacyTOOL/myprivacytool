@@ -30,6 +30,9 @@ import {
   trackActivity,
   trackScanStarted
 } from '@/lib/analytics';
+import { hexagonTilesEnabled, toTile, summarize, cannotCheckLast, type HexagonTile } from '@/lib/hexagonTile';
+import { captureContext } from '@/lib/webScan';
+import { SUMMARY_LABELS } from '@/lib/scanCopy';
 import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
@@ -72,6 +75,9 @@ const REVEAL_THRESHOLDS = {
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
+  // VITE_HEXAGON_TILES: tiles are drawn by class, a tap means "seen" (no confidence bump), cannot-check tiles sort last, and the counts
+  // become three integers. Off by default; with it off nothing here changes.
+  const tilesOn = hexagonTilesEnabled();
   const [visibleCount, setVisibleCount] = useState(5);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   // CK-7805: a tap selects a hexagon so its explanation stays visible on touch screens (no hover there).
@@ -154,20 +160,31 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       return categoryOrder.indexOf(catA) - categoryOrder.indexOf(catB);
     });
 
-    return sorted;
-  }, [allHexagons]);
+    return tilesOn ? cannotCheckLast(sorted) : sorted;
+  }, [allHexagons, tilesOn]);
 
   // Confirmation is derived from React state, not stored on the hexagon objects,
   // so it survives the parent regenerating `allHexagons` (orientation/motion updates).
   const orderedHexagons = useMemo(
     () => getOrderedHexagons().map(h =>
       confirmedHexagons.has(h.id)
-        ? { ...h, confirmed: true, confidence: Math.min(h.confidence + 5, 99) }
+        ? { ...h, confirmed: true, confidence: tilesOn ? h.confidence : Math.min(h.confidence + 5, 99) }
         : { ...h, confirmed: false }
     ),
-    [getOrderedHexagons, confirmedHexagons]
+    [getOrderedHexagons, confirmedHexagons, tilesOn]
   );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
+  // Tile state per visible hexagon, from the captured value (the tap never changes it).
+  const tiles = useMemo(() => {
+    const map = new Map<string, HexagonTile>();
+    if (!tilesOn) return map;
+    const ctx = captureContext(allHexagons);
+    for (const h of visibleHexagons) if (!revealingHexagons.has(h.id)) map.set(h.id, toTile(h, ctx));
+    return map;
+  }, [tilesOn, allHexagons, visibleHexagons, revealingHexagons]);
+  const boardSummary = useMemo(() => summarize([...tiles.values()]), [tiles]);
+  const allVerifiedRef = useRef(false);
+  allVerifiedRef.current = tilesOn && boardSummary.not_yet_checked === 0;
   const selectedHexagon = selectedHexagonId ? visibleHexagons.find(h => h.id === selectedHexagonId) ?? null : null;
   const strangerFindings = useMemo(
     () => (confirmedCount >= STRANGER_CARD_MIN_CONFIRMED
@@ -276,10 +293,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackFunnelStep('all_hexagons_confirmed');
       trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
-      // Trigger celebration confetti
-      triggerCompletionCelebration();
+      // Trigger celebration confetti (tile mode: only when every tile is verified; "all tapped" is not "all checked")
+      if (!tilesOn || allVerifiedRef.current) triggerCompletionCelebration();
     }
-  }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData]);
+  }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData, tilesOn]);
 
   // Start behavior tracking on mount
   useEffect(() => {
@@ -419,7 +436,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         isFirstConfirmation.current = false;
       }
       
-      trackHexagonConfirm(hex.id, hex.label, true);
+      trackHexagonConfirm(hex.id, hex.label, true, tiles.get(hex.id)?.class);
       trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
       
       setConfirmedCount(c => c + 1);
@@ -610,14 +627,24 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           YOUR DIGITAL SHADOW
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">
-          We found {visibleCount} data points about you without asking.
+          {tilesOn
+            ? `We looked at ${visibleCount} things about your device and connection.`
+            : `We found ${visibleCount} data points about you without asking.`}
           {visibleCount < orderedHexagons.length && (
             <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
         </p>
       </div>
 
-      {/* Confirmation progress */}
+      {/* Confirmation progress. Tile mode: three integers, no total, no ratio, no percentage. */}
+      {tilesOn ? (
+        <div className="max-w-md mx-auto mb-4 px-4 text-center text-sm" data-testid="board-summary">
+          <p className="font-semibold text-foreground" aria-live="polite" aria-atomic="true">
+            {boardSummary.verified} {SUMMARY_LABELS.verified} · {boardSummary.self_attested_fixes} {SUMMARY_LABELS.fixes} · {boardSummary.not_yet_checked} {SUMMARY_LABELS.notYet}
+          </p>
+          <p className="text-muted-foreground" data-testid="confirmation-counter">Seen: {confirmedCount}</p>
+        </div>
+      ) : (
       <div className="max-w-md mx-auto mb-4 px-4" data-testid="confirmation-progress">
         <div className="flex items-center justify-between text-sm mb-1">
           <span className="text-muted-foreground">Confirmed</span>
@@ -639,6 +666,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           />
         </div>
       </div>
+      )}
 
       {/* Voice AI */}
       <VoiceAI 
@@ -693,6 +721,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
                   onHover={handleHover}
                   onSelect={(d) => setSelectedHexagonId(d.id)}
                   isRevealing={isRevealing}
+                  tile={isRevealing ? undefined : tiles.get(hex.id)}
                 />
               </div>
             );
@@ -776,10 +805,12 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           <div className="bg-surface border border-surface-border shadow-card px-8 py-6 rounded-2xl animate-scale-in text-center pointer-events-auto">
             <div className="flex items-center justify-center gap-3 mb-2">
               <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
-              <h2 className="text-2xl font-bold text-foreground">Complete Digital Shadow Revealed!</h2>
+              <h2 className="text-2xl font-bold text-foreground">{tilesOn ? 'Every hexagon looked at' : 'Complete Digital Shadow Revealed!'}</h2>
               <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
             </div>
-            <p className="text-muted-foreground text-sm">All {HEXAGON_COUNT} hexagons analyzed across {HEXAGON_GROUP_COUNT} categories</p>
+            <p className="text-muted-foreground text-sm">
+              {tilesOn ? `All ${HEXAGON_COUNT} hexagons looked at across ${HEXAGON_GROUP_COUNT} categories` : `All ${HEXAGON_COUNT} hexagons analyzed across ${HEXAGON_GROUP_COUNT} categories`}
+            </p>
             <div className="flex items-center justify-center gap-4 mt-4">
               <div className="text-center">
                 <p className="text-3xl font-bold text-brand">{HEXAGON_COUNT}</p>
@@ -790,8 +821,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
                 <p className="text-xs text-muted-foreground">Categories</p>
               </div>
               <div className="text-center">
-                <p className="text-3xl font-bold text-brand">100%</p>
-                <p className="text-xs text-muted-foreground">Complete</p>
+                <p className="text-3xl font-bold text-brand">{tilesOn ? boardSummary.verified : '100%'}</p>
+                <p className="text-xs text-muted-foreground">{tilesOn ? 'Verified' : 'Complete'}</p>
               </div>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { cn } from '@/lib/utils';
+import { bandFor, type HexagonTile } from '@/lib/hexagonTile';
+import { TILE_CLASS_LABEL, TILE_ESTIMATE_LABEL, TILE_UNKNOWN_SHORT } from '@/lib/scanCopy';
 
 interface HexagonProps {
   data: HexagonData;
@@ -9,6 +11,8 @@ interface HexagonProps {
   isRevealing?: boolean;
   /** CK-7805: called on every tap or click so the explanation stays on screen (touch has no hover). */
   onSelect?: (data: HexagonData) => void;
+  /** Tile state (VITE_HEXAGON_TILES). When set, the tile is drawn by class and never shows a bare percentage. */
+  tile?: HexagonTile;
 }
 
 // Single palette treatment: deep green outline on a soft green tint (see index.css brand tokens).
@@ -18,7 +22,7 @@ const hexColors = {
   bg: ['hsl(var(--surface) / var(--surface-alpha))', 'hsl(var(--brand-soft) / var(--surface-alpha))'] as [string, string],
 };
 
-export default function Hexagon({ data, onConfirm, onHover, isRevealing = false, onSelect }: HexagonProps) {
+export default function Hexagon({ data, onConfirm, onHover, isRevealing = false, onSelect, tile }: HexagonProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = () => {
@@ -66,9 +70,22 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
     return colors.primary;
   };
 
+  // Tile mode: Unknown tiles say why they are unknown and carry no value or number; Verified/Inferred say how sure we are in words.
+  const unknownShort = tile?.class === 'unknown' ? TILE_UNKNOWN_SHORT[tile.unknown_reason ?? 'check_unavailable'] : null;
+  const band = tile && tile.class !== 'unknown' ? bandFor(data.confidence) : null;
+  const classLabel = tile ? TILE_CLASS_LABEL[tile.class] : null;
+  const ariaLabel = tile
+    ? tile.class === 'unknown'
+      ? `${data.label}: ${classLabel}. ${unknownShort}. ${data.confirmed ? 'Seen' : 'Tap to see details'}`
+      : `${data.label}: ${data.displayValue ?? data.value}. ${classLabel}${tile.is_estimate ? `, ${TILE_ESTIMATE_LABEL}` : ''}, ${band?.word}. ${data.confirmed ? 'Seen' : 'Tap to see details'}`
+    : `${data.label}: ${data.displayValue ?? data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Tap to confirm'}`;
+  const cls = tile?.class;
+  const tileGlyph = cls === 'verified' ? '✓' : cls === 'inferred' ? '~' : cls === 'self_attested' ? '•' : cls === 'unknown' ? '?' : null;
+
   return (
     <div className={cn(
       "animate-fade-in hexagon-wrapper",
+      cls && `hexagon-tile hexagon-tile-${cls}`,
       data.confirmed && "confirmed",
       isHovered && "hovered",
       isRevealing && "hexagon revealing revealing-wrapper"
@@ -96,9 +113,12 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
           onMouseLeave={handleMouseLeave}
           onTouchStart={() => setIsHovered(true)}
           onTouchEnd={() => { setIsHovered(false); onHover(null); }}
-          aria-label={`${data.label}: ${data.displayValue ?? data.value}. Confidence: ${data.confidence}%. ${data.confirmed ? 'Confirmed' : 'Tap to confirm'}`}
+          aria-label={ariaLabel}
         >
           <defs>
+            <pattern id={`hatch-${data.id}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" style={{ stroke: 'hsl(var(--brand-ink) / 0.35)' }} strokeWidth="1.5" />
+            </pattern>
             <filter id={`glow-${data.id}`} x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
               <feMerge>
@@ -122,17 +142,22 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
             </linearGradient>
           </defs>
 
-          {/* Background hexagon fill */}
-          <path
-            d={hexPath}
-            fill={`url(#hexGradient-${data.id})`}
-          />
+          {/* Background hexagon fill. Unknown tiles are empty; Inferred tiles are hatched. */}
+          {cls !== 'unknown' && (
+            <path
+              d={hexPath}
+              fill={`url(#hexGradient-${data.id})`}
+            />
+          )}
+          {cls === 'inferred' && <path d={hexPath} fill={`url(#hatch-${data.id})`} />}
 
           {/* Border with category-based coloring */}
           <path
             d={hexPath}
             fill="none"
             strokeWidth={isRevealing ? "3" : data.confirmed ? "3" : isHovered ? "2.5" : "2"}
+            strokeDasharray={cls === 'unknown' ? '3 3' : cls === 'self_attested' ? '1 4' : undefined}
+            strokeLinecap={cls === 'self_attested' ? 'round' : undefined}
             opacity={isRevealing ? 1 : data.confirmed ? 1 : isHovered ? 0.85 : 0.6}
             filter={isRevealing || data.confirmed || isHovered ? `url(#glow-${data.id})` : undefined}
             className={cn(
@@ -140,7 +165,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
               isRevealing && "animate-pulse"
             )}
             style={{ 
-              stroke: getStrokeColor(),
+              stroke: cls === 'unknown' ? 'hsl(var(--muted-foreground))' : getStrokeColor(),
               transition: 'all 0.3s ease',
               filter: isRevealing 
                 ? 'drop-shadow(0 0 6px hsl(var(--brand-ink) / 0.4))' 
@@ -184,11 +209,13 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
             style={{ fill: 'hsl(var(--foreground))' }}
             className="select-none"
           >
-            {(() => { const shown = data.displayValue ?? data.value; return shown.length > 14 ? shown.substring(0, 14) + '...' : shown; })()}
+            {unknownShort
+              ? (unknownShort.length > 20 ? unknownShort.substring(0, 20) + '...' : unknownShort)
+              : (() => { const shown = data.displayValue ?? data.value; return shown.length > 14 ? shown.substring(0, 14) + '...' : shown; })()}
           </text>
 
           {/* Confidence with category color */}
-          {!isRevealing && data.confidence > 0 && (
+          {!isRevealing && !tile && data.confidence > 0 && (
             <text
               x="50"
               y="72"
@@ -202,8 +229,42 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
             </text>
           )}
 
+          {/* Tile mode: how sure we are, in words and a bar. Nothing at all for Unknown tiles. */}
+          {!isRevealing && tile && band && (
+            <g data-testid="tile-confidence">
+              <text x="50" y="70" textAnchor="middle" fontSize="5.5" fontStyle="italic" style={{ fill: colors.primary }} className="select-none">
+                {band.word}
+              </text>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <rect key={n} x={34 + (n - 1) * 7} y="74" width="5" height="2" rx="1"
+                  style={{ fill: colors.primary }} opacity={n <= band.bar ? 0.9 : 0.2} />
+              ))}
+            </g>
+          )}
+          {!isRevealing && tile && classLabel && (
+            <text x="50" y="84" textAnchor="middle" fontSize="4.5" fontWeight="600" className="uppercase tracking-wider select-none"
+              style={{ fill: cls === 'unknown' ? 'hsl(var(--muted-foreground))' : colors.primary }}>
+              {classLabel}{tile.is_estimate ? ` · ${TILE_ESTIMATE_LABEL}` : ''}
+            </text>
+          )}
+          {/* Glyph so the class never depends on texture or colour alone. */}
+          {!isRevealing && tileGlyph && (
+            <text x="29" y="32" textAnchor="middle" fontSize="10" fontWeight="700" aria-hidden="true"
+              style={{ fill: cls === 'unknown' ? 'hsl(var(--muted-foreground))' : colors.primary }} className="select-none">
+              {tileGlyph}
+            </text>
+          )}
+
+          {/* Tapped marker. Tile mode: a small ring ("seen"), never the check that Verified uses. */}
+          {data.confirmed && !isRevealing && tile && (
+            <g transform="translate(65, 8)" data-testid="tile-seen">
+              <circle cx="10" cy="10" r="8" fill="none" strokeWidth="2" style={{ stroke: colors.primary }} />
+              <circle cx="10" cy="10" r="2.5" style={{ fill: colors.primary }} />
+            </g>
+          )}
+
           {/* Confirmed checkmark with category color */}
-          {data.confirmed && !isRevealing && (
+          {data.confirmed && !isRevealing && !tile && (
             <g transform="translate(65, 8)">
               <circle cx="10" cy="10" r="10" style={{ fill: colors.primary }} />
               <path
