@@ -14,6 +14,11 @@ const SUB_PROCESSORS = [
   { name: "Telegram", purpose: "Messaging channel, only if you choose to talk to us there" },
   { name: "Google (Analytics 4, Cloud APIs)", purpose: "Usage analytics (after consent) and Google-hosted services we use" },
   { name: "Consentmanager", purpose: "Cookie consent banner and consent records" },
+  {
+    name: "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
+    purpose:
+      "Language models used to work out what a message sent through a messaging channel is about. They receive the message text only, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data",
+  },
 ];
 
 const DPA = () => {
@@ -142,7 +147,8 @@ const DPA = () => {
               <p className="text-muted-foreground">
                 We are based in Hong Kong and our providers operate globally, so
                 personal data may be processed outside your country, including in
-                the United States and the EU/EEA. Where GDPR or UK GDPR applies, we
+                the United States, the EU/EEA and any country where one of our AI
+                model providers runs its service. Where GDPR or UK GDPR applies, we
                 rely on Standard Contractual Clauses or the UK Addendum, or another
                 lawful transfer mechanism, and on equivalent terms with our sub-processors.
               </p>
