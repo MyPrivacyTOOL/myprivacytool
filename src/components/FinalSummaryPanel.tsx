@@ -724,7 +724,7 @@ export default function FinalSummaryPanel({
     const report = {
       generatedAt: new Date().toISOString(),
       summary: tilesOn
-        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
+        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, youToldUs: board.youToldUs, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
         : {
         totalDataPoints: HEXAGON_COUNT,
         confirmedDataPoints: confirmedCount,
@@ -838,8 +838,8 @@ Test yours at: ${window.location.origin}`;
 
       <CardContent className="space-y-6 pt-6">
         {tilesOn ? (
-          <div className="grid grid-cols-3 gap-3" data-testid="final-board-summary">
-            {([['clear', board.clear], ['fixing', board.needsFixing], ['notYet', board.notChecked]] as const).map(([k, n]) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="final-board-summary">
+            {([['clear', board.clear], ['fixing', board.needsFixing], ...(board.youToldUs > 0 ? [['toldUs', board.youToldUs] as const] : []), ['notYet', board.notChecked]] as const).map(([k, n]) => (
               <div key={k} className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
                 <p className="text-2xl font-bold text-foreground">{n}</p>
                 <p className="text-xs text-muted-foreground">{SUMMARY_LABELS[k]}</p>
