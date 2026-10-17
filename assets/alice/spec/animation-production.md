@@ -71,14 +71,14 @@ she does not alarm (brand no-fear rule).
 
 - Reveal takes 0.5 to 1.5 s (15-45 frames at 30 fps), eased, never jerky.
 - Curtain: white, line-drawn folds in the engraving style. Behind it: black, then green code
-  (`#00FF00`), large and readable on mobile, 40-60% fill, monospace, swirling or cascading
+  (`#27AE60`), large and readable on mobile, 40-60% fill, monospace, swirling or cascading
   gracefully, never chaotic.
 - Every curtain moment uses the same folds, code colour and motion speed in every video.
 - Fix scene: curtain closes or code fades, replaced by an action element (button, letter, door).
 
 ## 5. Layer and file structure for animation
 
-Master art is layered: `alice` / `curtain` / `code` (Matrix green `#00FF00` characters on black) / `background`.
+Master art is layered: `alice` / `curtain` / `code` (Matrix green `#27AE60` characters on black) / `background`.
 The curtain-reveal animation needs these separate (known gap in `tools/video-pipeline/README.md`).
 Source: layered PSD or SVG. Delivery: PNG sequence or ProRes 4444 with alpha, then MP4 via ffmpeg.
 

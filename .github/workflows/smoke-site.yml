@@ -3,7 +3,7 @@ name: Live smoke test
 # MPC-7300: confirms the live site and Workers actually serve traffic.
 #   - after every push to main: the marketing site auto-deploys via Cloudflare Pages (not from this repo's
 #     Actions), so we wait for it with retries (up to ~10 minutes) before declaring the deploy healthy
-#   - every 6 hours and on demand: a standing check of the site and the public Workers (mpt-leads, oauth-poc, core-brain)
+#   - every 6 hours and on demand: a standing check of the site and the public Workers (mpt-leads, oauth-poc, core-brain, webhook-receiver)
 # Read-only: GET requests, a CORS preflight, and the side-effect-free @healthcheck.io probe on mpt-leads.
 # A red run on a push means the deploy needs attention: use the Pages "Rollback to this deployment" button
 # (docs/ci-cd-testing.md#rollback).
@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [site, mpt-leads, oauth-poc, core-brain]
+        target: [site, mpt-leads, oauth-poc, core-brain, webhook-receiver]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

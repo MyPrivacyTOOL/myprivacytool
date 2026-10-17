@@ -745,5 +745,13 @@ select pg_temp.assert(public.mpt_purge_expired_telegram_event_log() = 1, 'mpt_pu
 select pg_temp.assert((select count(*) from public.telegram_event_log where update_id in (9002, 9003)) = 1 and (select count(*) from public.telegram_event_log where update_id = 9001) = 4, 'mpt_purge_expired_telegram_event_log: keeps unexpired and never-expiring rows');
 reset role;
 
+-- ===== HITL interactions + tuning log =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.mpt_hexagon_interactions$$) = '42501', 'hitl: anon cannot read interactions');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.osint_engine_tuning_log$$) = '42501', 'hitl: authenticated cannot read the tuning log');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action) values ('s','h','maybe')$$) = '23514', 'hitl: user_action check constraint');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.osint_engine_tuning_log (hexagon_id, osint_source, action_type) values ('h','HIBP','other')$$) = '23514', 'hitl: action_type check constraint');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, original_confidence_score) values ('s','h','disputed',1.5)$$) = '23514', 'hitl: confidence must be 0..1');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, osint_source) values ('s','h','disputed','spam_registry')$$) = '', 'hitl: service_role can insert an interaction');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
