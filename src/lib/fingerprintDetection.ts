@@ -10,7 +10,7 @@ export interface FingerprintResult {
   hash: string;
   technique: string;
   risk: 'low' | 'medium' | 'high';
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface CanvasFingerprintResult extends FingerprintResult {
@@ -283,7 +283,7 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
     const extensions = gl.getSupportedExtensions() || [];
     
     // Get various WebGL parameters
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
     const paramNames = [
       'MAX_VERTEX_ATTRIBS',
       'MAX_VERTEX_UNIFORM_VECTORS',
@@ -300,7 +300,7 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
     
     paramNames.forEach(name => {
       try {
-        const param = (gl as any)[name];
+        const param = (gl as unknown as Record<string, number | undefined>)[name];
         if (param !== undefined) {
           params[name] = gl.getParameter(param);
         }
@@ -348,7 +348,7 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
 export async function detectAudioFingerprint(): Promise<AudioFingerprintResult | null> {
   try {
     // Check if AudioContext is available
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) {
       console.warn('[FingerprintDetection] AudioContext not available');
       return null;

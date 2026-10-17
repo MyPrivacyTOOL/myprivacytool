@@ -42,6 +42,7 @@ import {
   getPredictionComparisons,
   exportPerformanceReport,
 } from '@/lib/languagePredictor';
+import type { PerformanceStats } from '@/lib/languagePredictor';
 import { 
   getRewardStats, 
   getAllRewards,
@@ -91,7 +92,7 @@ export default function ModelDashboard() {
   const [rewardStats, setRewardStats] = useState<RewardStats | null>(null);
   const [learningStatus, setLearningStatus] = useState<LocalLearningStatus | null>(null);
   const [federatedEnabled, setFederatedEnabled] = useState(false);
-  const [performanceStats, setPerformanceStats] = useState<any>(null);
+  const [performanceStats, setPerformanceStats] = useState<PerformanceStats | null>(null);
   
   useEffect(() => {
     // Load all data
@@ -324,7 +325,7 @@ export default function ModelDashboard() {
                       border: '1px solid hsl(var(--surface-border))',
                       borderRadius: '8px',
                     }}
-                    formatter={(value: number, name: string, props: any) => [
+                    formatter={(value: number, name: string, props: { payload: { avgReward?: number } }) => [
                       `${value} predictions (Avg reward: ${props.payload.avgReward?.toFixed(2) || 0})`,
                       name
                     ]}

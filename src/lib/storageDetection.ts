@@ -290,8 +290,8 @@ export async function detectIndexedDB(): Promise<IndexedDBResult> {
 
     if ('databases' in indexedDB) {
       try {
-        const dbs = await (indexedDB as any).databases();
-        databases = dbs.map((db: { name: string }) => db.name || 'unknown');
+        const dbs = await indexedDB.databases();
+        databases = dbs.map((db) => db.name || 'unknown');
       } catch {
         // databases() not supported
       }
