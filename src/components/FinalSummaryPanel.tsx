@@ -14,10 +14,14 @@ import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
+import { SUMMARY_LABELS } from '@/lib/scanCopy';
 
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
   confirmedCount: number;
+  /** Tile state (VITE_HEXAGON_TILES). When set, "confirmed" means verified by a check, not tapped, and no score, percentage or ratio is shown. */
+  tiles?: Map<string, HexagonTile>;
   fingerprint?: CompositeFingerprint | null;
   languagePrediction?: LanguagePrediction | null;
   onStartOver?: () => void;
@@ -44,13 +48,23 @@ interface PrivacyConcern {
 }
 
 export default function FinalSummaryPanel({
-  hexagons,
-  confirmedCount,
+  hexagons: rawHexagons,
+  confirmedCount: tappedCount,
+  tiles,
   fingerprint,
   languagePrediction,
   onStartOver,
 }: FinalSummaryPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const tilesOn = !!tiles;
+  // Tile mode: a hexagon counts as "confirmed" only if a check verified it. A tap means "seen" and says nothing about the value, so
+  // concerns, positives and category counts below no longer follow taps or the raw values of tiles that could not be checked.
+  const hexagons = useMemo(
+    () => (tiles ? rawHexagons.map((h) => ({ ...h, confirmed: tiles.get(h.id)?.kind === 'clear' })) : rawHexagons),
+    [rawHexagons, tiles]
+  );
+  const board = useMemo(() => riskProfile(tiles ? [...tiles.values()] : []), [tiles]);
+  const confirmedCount = tilesOn ? board.clear : tappedCount;
 
   // Calculate category stats for all 8 categories
   const categoryStats = useMemo((): CategoryStats[] => {
@@ -709,7 +723,9 @@ export default function FinalSummaryPanel({
   const handleExportJSON = () => {
     const report = {
       generatedAt: new Date().toISOString(),
-      summary: {
+      summary: tilesOn
+        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
+        : {
         totalDataPoints: HEXAGON_COUNT,
         confirmedDataPoints: confirmedCount,
         overallPrivacyRisk: overallRisk,
@@ -720,10 +736,10 @@ export default function FinalSummaryPanel({
       categories: categoryStats.map((cat) => ({
         name: cat.name,
         detectedItems: cat.total,
-        confirmedItems: cat.confirmed,
+        ...(tilesOn ? {} : { confirmedItems: cat.confirmed }),
         criticalIssues: cat.criticalIssues,
         warnings: cat.warnings,
-        accuracyRate: cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0,
+        ...(tilesOn ? { verifiedItems: cat.confirmed, notYetChecked: cat.total - cat.confirmed } : { accuracyRate: cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0 }),
       })),
       topConcerns: topConcerns.map(c => ({
         title: c.title,
@@ -767,7 +783,14 @@ export default function FinalSummaryPanel({
   };
 
   const handleShare = () => {
-    const shareText = `🎯 My Complete Digital Shadow - Final Report
+    const shareText = tilesOn
+      ? `🎯 My Digital Shadow
+
+🔍 ${board.clear} ${SUMMARY_LABELS.clear} · ${board.needsFixing} ${SUMMARY_LABELS.fixing} · ${board.notChecked} ${SUMMARY_LABELS.notYet}
+${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
+
+Test yours at: ${window.location.origin}`
+      : `🎯 My Complete Digital Shadow - Final Report
 
 📊 ${HEXAGON_COUNT} data points analyzed
 🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%)
@@ -805,14 +828,26 @@ Test yours at: ${window.location.origin}`;
               </Badge>
             </CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
-              Complete analysis of {HEXAGON_COUNT} data points across {HEXAGON_GROUP_COUNT} categories
+              {tilesOn
+                ? `${HEXAGON_COUNT} hexagons looked at across ${HEXAGON_GROUP_COUNT} categories`
+                : `Complete analysis of ${HEXAGON_COUNT} data points across ${HEXAGON_GROUP_COUNT} categories`}
             </p>
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-6 pt-6">
-        {/* Overall Statistics */}
+        {tilesOn ? (
+          <div className="grid grid-cols-3 gap-3" data-testid="final-board-summary">
+            {([['clear', board.clear], ['fixing', board.needsFixing], ['notYet', board.notChecked]] as const).map(([k, n]) => (
+              <div key={k} className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
+                <p className="text-2xl font-bold text-foreground">{n}</p>
+                <p className="text-xs text-muted-foreground">{SUMMARY_LABELS[k]}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
             <p className="text-2xl font-bold text-risk-low">{HEXAGON_COUNT}</p>
@@ -858,6 +893,8 @@ Test yours at: ${window.location.origin}`;
             {getRiskLabel(overallRisk)}
           </div>
         </div>
+          </>
+        )}
 
         {/* Category Breakdown */}
         <div className="space-y-3">
@@ -879,14 +916,18 @@ Test yours at: ${window.location.origin}`;
                             {cat.criticalIssues} high priority
                           </Badge>
                         )}
-                        <span className="text-xs text-muted-foreground">{cat.confirmed}/{cat.total}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {tilesOn ? `${cat.confirmed} ${SUMMARY_LABELS.clear} · ${cat.total - cat.confirmed} ${SUMMARY_LABELS.notYet}` : `${cat.confirmed}/${cat.total}`}
+                        </span>
                       </div>
                     </div>
-                    <Progress value={percentage} className="h-1.5 bg-risk-low-soft" />
+                    {!tilesOn && <Progress value={percentage} className="h-1.5 bg-risk-low-soft" />}
                   </div>
-                  <span className={`text-sm font-mono ${percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-foreground' : 'text-risk-low'}`}>
-                    {percentage}%
-                  </span>
+                  {!tilesOn && (
+                    <span className={`text-sm font-mono ${percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-foreground' : 'text-risk-low'}`}>
+                      {percentage}%
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -974,10 +1015,12 @@ Test yours at: ${window.location.origin}`;
 
         {/* Action Buttons */}
         <div className="grid grid-cols-3 gap-3">
+          {!tilesOn && (
           <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-risk-low/30 text-foreground hover:bg-risk-low-soft">
             <FileText className="w-4 h-4 mr-2" />
             {isExporting ? 'Generating...' : 'Export PDF'}
           </Button>
+          )}
           <Button variant="outline" onClick={handleExportJSON} className="border-brand/30 text-foreground hover:bg-muted">
             <FileJson className="w-4 h-4 mr-2" />
             Export JSON
@@ -1003,7 +1046,11 @@ Test yours at: ${window.location.origin}`;
         <div className="flex items-center gap-3 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
           <span className="text-xl">🔒</span>
           <p className="text-xs text-risk-low">
-            <strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.
+            {tilesOn ? (
+              <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.</>
+            ) : (
+              <><strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.</>
+            )}
           </p>
         </div>
       </CardContent>

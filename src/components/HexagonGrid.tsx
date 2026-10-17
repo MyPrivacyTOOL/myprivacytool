@@ -189,7 +189,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const selectedHexagon = selectedHexagonId ? visibleHexagons.find(h => h.id === selectedHexagonId) ?? null : null;
   const strangerFindings = useMemo(
     () => (confirmedCount >= STRANGER_CARD_MIN_CONFIRMED
-      ? generateFindings({ deviceData, hexagons: visibleHexagons, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '' })
+      ? generateFindings({ deviceData, hexagons: v2 ? visibleHexagons.filter((h) => !['not_checked', 'couldnt_check', 'cant_check_here'].includes(tiles.get(h.id)?.kind ?? '')) : visibleHexagons, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '' })
       : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [confirmedCount >= STRANGER_CARD_MIN_CONFIRMED, deviceData]
@@ -845,6 +845,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <FinalSummaryPanel
               hexagons={visibleHexagons}
               confirmedCount={confirmedCount}
+              tiles={v2 ? tiles : undefined}
               fingerprint={fingerprintData}
               languagePrediction={languagePrediction}
               onStartOver={handleStartOver}
