@@ -43,8 +43,8 @@ export default {
     if (path === '/webhook/email')     return handleEmail(request, env);
     if (path === '/webhook/leads')     return handleLeads(request, env);
 
-    // WhatsApp deep dive (OSINT -> web confirm -> template back). Lazy import: it is TypeScript, and the Node security test never reaches it.
-    if (path.startsWith('/api/scan/') || path === '/api/whatsapp/notify-complete') {
+    // WhatsApp deep dive (OSINT -> web confirm -> person replies RESULTS). Lazy import: it is TypeScript, and the Node security test never reaches it.
+    if (path.startsWith('/api/scan/')) {
       try {
         const { handleDeepDive } = await import('./deepDive.ts');
         const res = await handleDeepDive(request, env);
@@ -180,6 +180,15 @@ async function handleWhatsApp(request, env) {
     // Proof of possession for the deep dive: Meta's contact record (name) and the time of the person's own message.
     const profileName = clip(body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name, 64);
     const inboundTs   = Number(msg.timestamp) || Math.floor(Date.now() / 1000);
+
+    // Pull model: the person asks for their deep-dive result. Plain text reply, never a Meta template.
+    const cmd = text.trim().toUpperCase();
+    if (cmd === 'RESULTS' || cmd === 'STATUS') {
+      const { resultsReply } = await import('./deepDive.ts');
+      await sendWhatsApp(env, from, await resultsReply(env, from));
+      return ok();
+    }
+
     const state = await getConversationState(env, `whatsapp:${from}`);
 
     if (!state || state.stage === 'new') {

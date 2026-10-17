@@ -8,7 +8,7 @@ import { useHexagonState } from "@/hooks/useHexagonState";
 import { fetchDeepDiveScan, fetchFinalScore, finalizeDeepDive, type FinalScore } from "@/lib/hexagonInteractionApi";
 import type { Hexagon } from "@/types/hexagon";
 
-// The page behind the WhatsApp "your deep dive is ready" link: /scan/deep-dive?scan=<scan id>. The person answers "Is this you?" per finding;
+// The page behind the secure link sent in reply to RESULTS on WhatsApp: /scan/deep-dive?scan=<scan id>. The person answers "Is this you?" per finding;
 // each answer is sent to the API (best effort), and the score shown is the server's, counted from confirmed and checked findings only.
 
 function Findings({ scanId, initial, finalized }: { scanId: string; initial: Hexagon[]; finalized: boolean }) {
@@ -41,9 +41,10 @@ function Findings({ scanId, initial, finalized }: { scanId: string; initial: Hex
       </p>
       <div className="text-center mt-6">
         <Button onClick={finish} disabled={sent === "sending" || sent === "sent"}>
-          {sent === "sent" ? "Summary sent to WhatsApp" : sent === "sending" ? "Sending…" : "Finish and send my summary"}
+          {sent === "sent" ? "Deep Dive submitted" : sent === "sending" ? "Submitting…" : "Approve Deep Dive"}
         </Button>
-        {sent === "failed" && <p className="text-sm text-destructive mt-2" role="alert">We could not send it. Try again in a moment.</p>}
+        {sent === "sent" && <p className="text-sm mt-3" role="status">Your Deep Dive is processing in the background. Return to WhatsApp and reply RESULTS to get your secure link.</p>}
+        {sent === "failed" && <p className="text-sm text-destructive mt-2" role="alert">We could not submit it. Try again in a moment.</p>}
       </div>
     </>
   );
