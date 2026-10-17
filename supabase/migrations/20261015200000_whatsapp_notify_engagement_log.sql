@@ -1,3 +1,6 @@
+-- ARCHIVED 2026-10-17: SUPERSEDED, DO NOT APPLY. The Meta template send was removed (PR #389).
+-- Never applied to production. The live column is mpt_user_engagement.channel (20261017070000_mpt_user_engagement_channel.sql).
+-- Kept for history only.
 -- WhatsApp deep dive: log the "deep dive complete" template send (Meta message id or error) on mpt_user_engagement.
 -- Additive: 4 nullable columns, plus user_id becomes nullable because a WhatsApp-only person has no auth.users row
 -- (with NOT NULL + FK, every channel write from the webhook worker was being rejected). Rows with a null user_id are
