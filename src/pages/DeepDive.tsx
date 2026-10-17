@@ -5,7 +5,7 @@ import pageMeta from "@/data/pageMeta.json";
 import { InteractiveHexagonTile } from "@/components/InteractiveHexagonTile";
 import { Button } from "@/components/ui/button";
 import { useHexagonState } from "@/hooks/useHexagonState";
-import { fetchDeepDiveScan, fetchFinalScore, finalizeDeepDive, type FinalScore } from "@/lib/hexagonInteractionApi";
+import { fetchDeepDiveScan, fetchFinalScore, finalizeDeepDive, isDeepDiveApiConfigured, type FinalScore } from "@/lib/hexagonInteractionApi";
 import type { Hexagon } from "@/types/hexagon";
 
 // The page behind the secure link sent in reply to RESULTS on WhatsApp: /scan/deep-dive?scan=<scan id>. The person answers "Is this you?" per finding;
@@ -50,26 +50,50 @@ function Findings({ scanId, initial, finalized }: { scanId: string; initial: Hex
   );
 }
 
+type Failure = "no_link" | "expired" | "unavailable";
+
+// One plain message per cause. None of them shows the "Is this you?" heading, because there is nothing to confirm.
+const FAILURE_COPY: Record<Failure, { title: string; body: string }> = {
+  no_link: { title: "We couldn't open this deep dive", body: "This page needs the link from your WhatsApp message. Open that link to see your findings." },
+  expired: { title: "We couldn't open this deep dive", body: "The link may have expired (they last 24 hours), so ask for a new one on WhatsApp." },
+  unavailable: { title: "This page isn't available yet", body: "Please check back soon." },
+};
+
 export default function DeepDive() {
   const [params] = useSearchParams();
   const scanId = params.get("scan") ?? "";
-  const [state, setState] = useState<{ status: "loading" } | { status: "missing" } | { status: "ready"; hexagons: Hexagon[]; finalized: boolean }>({ status: "loading" });
+  const [state, setState] = useState<{ status: "loading" } | { status: "failed"; why: Failure } | { status: "ready"; hexagons: Hexagon[]; finalized: boolean }>(
+    !scanId ? { status: "failed", why: "no_link" } : !isDeepDiveApiConfigured() ? { status: "failed", why: "unavailable" } : { status: "loading" },
+  );
 
   useEffect(() => {
+    if (!scanId || !isDeepDiveApiConfigured()) return;
     let live = true;
-    void fetchDeepDiveScan(scanId).then((r) => { if (live) setState(r ? { status: "ready", hexagons: r.hexagons, finalized: r.finalized } : { status: "missing" }); });
+    void fetchDeepDiveScan(scanId).then((r) => {
+      if (live) setState(r ? { status: "ready", hexagons: r.hexagons, finalized: r.finalized } : { status: "failed", why: "expired" });
+    });
     return () => { live = false; };
   }, [scanId]);
+
+  const showsIntro = state.status !== "failed";
+  const failure = state.status === "failed" ? FAILURE_COPY[state.why] : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Seo {...pageMeta["/scan/deep-dive"]} path="/scan/deep-dive" />
       <section className="max-w-3xl mx-auto px-6 pt-16 pb-12">
-        <h1 className="text-3xl font-bold text-center">Is this you?</h1>
-        <p className="text-center text-muted-foreground mt-2">Confirm what is yours and flag what is wrong. Only findings you confirm, and ones we checked ourselves, count toward your score.</p>
+        {showsIntro && (
+          <>
+            <h1 className="text-3xl font-bold text-center">Is this you?</h1>
+            <p className="text-center text-muted-foreground mt-2">Confirm what is yours and flag what is wrong. Only findings you confirm, and ones we checked ourselves, count toward your score.</p>
+          </>
+        )}
         {state.status === "loading" && <p className="text-center mt-10" role="status">Loading your findings…</p>}
-        {state.status === "missing" && (
-          <p className="text-center mt-10" role="alert">We could not open this deep dive. The link may have expired (they last 24 hours), so ask for a new one on WhatsApp.</p>
+        {failure && (
+          <div className="text-center" role="alert">
+            <h1 className="text-3xl font-bold">{failure.title}</h1>
+            <p className="text-muted-foreground mt-2">{failure.body}</p>
+          </div>
         )}
         {state.status === "ready" && <Findings scanId={scanId} initial={state.hexagons} finalized={state.finalized} />}
       </section>

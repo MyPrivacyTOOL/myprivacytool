@@ -4,6 +4,9 @@ import type { Hexagon } from '@/types/hexagon';
 // The deep-dive API (webhook-receiver Worker). Unset = not deployed to a public URL yet = nothing is sent (no guessed host).
 const BASE = ((import.meta.env.VITE_DEEP_DIVE_API_URL as string | undefined) ?? '').trim().replace(/\/+$/, '');
 
+/** True when the deep-dive API address is set. Unset means the feature is not switched on, which the page says differently from an expired link. */
+export const isDeepDiveApiConfigured = (base: string = BASE): boolean => !!base;
+
 const ACTION: Record<LearningOutcome, 'confirm' | 'reject' | 'dispute'> = { confirmed: 'confirm', rejected: 'reject', disputed: 'dispute' };
 
 /**
