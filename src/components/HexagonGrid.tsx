@@ -35,7 +35,9 @@ import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { hexTileV2Enabled, hexScreenV2Enabled } from '@/config/hexagonTile';
-import { toTile, riskProfile, riskProfileParts, withUserStatement, cannotCheckLast, HexagonTile } from '@/lib/hexagonTile';
+import { toTile, riskProfile, riskProfileParts, withUserStatement, withGuessAnswer, cannotCheckLast, HexagonTile, type GuessOutcome } from '@/lib/hexagonTile';
+import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
+import GuessCheckCard from './hexagon/GuessCheckCard';
 import { fixStepFor } from '@/lib/hexagonFix';
 import NextStepCard from './hexagon/NextStepCard';
 import DetailLadder, { type DetailLevel } from './hexagon/DetailLadder';
@@ -88,6 +90,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   // everything else (panels, the stranger card, the score) out of the way. Built on the honest tiles.
   const screenV2 = useMemo(() => v2 && hexScreenV2Enabled(), [v2]);
   const [toldFixed, setToldFixed] = useState<Set<string>>(new Set());
+  // Guess check (prototype): the visitor's answer and/or their device's verdict, per guessed tile. Kept in this tab only, never sent or stored.
+  const [guessState, setGuessState] = useState<Record<string, { answer?: 'yes' | 'no'; device?: DeviceCheckResult }>>({});
   const [laterIds, setLaterIds] = useState<Set<string>>(new Set());
   const [detailLevel, setDetailLevel] = useState<DetailLevel>(1);
   const [unlockCount, setUnlockCount] = useState(0);
@@ -198,11 +202,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     for (const h of visibleHexagons) {
       const t = toTile({ id: h.id, value: h.value }, ctx);
       // The visitor said a red tile is fixed: their word, shown lighter than a check, until we check again.
-      map.set(h.id, t.kind === 'needs_fixing' && toldFixed.has(h.id) ? withUserStatement(t) : t);
+      const g = guessState[h.id];
+      // The device's verdict beats the visitor's word; a "near" verdict changes nothing.
+      const outcome: GuessOutcome | null = g?.device?.verdict === 'agrees' ? 'device_agrees' : g?.device?.verdict === 'far' ? 'device_far' : g?.answer ?? null;
+      map.set(h.id, t.kind === 'needs_fixing' && toldFixed.has(h.id) ? withUserStatement(t) : outcome ? withGuessAnswer(t, outcome) : t);
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [v2, allHexagons, visibleCount, toldFixed]);
+  }, [v2, allHexagons, visibleCount, toldFixed, guessState]);
   // Phase 2: the red tiles still waiting, in the order they appear. The first one is the next step.
   const stepsLeft = useMemo(
     () => (screenV2
@@ -727,6 +734,26 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         hexagon={hoveredHexagon ?? selectedHexagon}
         tile={v2 && (hoveredHexagon ?? selectedHexagon) ? tiles.get((hoveredHexagon ?? selectedHexagon)!.id) : undefined}
       />
+
+      {/* Guess check (prototype): a guess is only worth showing if it can be made true. Shown for the selected guessed tile that has a check. */}
+      {v2 && selectedHexagon && guessCheckFor(selectedHexagon.id) && ['our_guess', 'you_confirmed', 'device_agrees', 'guess_wrong'].includes(tiles.get(selectedHexagon.id)?.kind ?? '') && (() => {
+        const g = guessState[selectedHexagon.id];
+        const spec = guessCheckFor(selectedHexagon.id)!;
+        const answered = g?.device?.verdict === 'agrees' ? 'device_agrees' : g?.device?.verdict === 'far' ? 'device_far' : g?.answer ?? null;
+        const loc = deviceData?.location;
+        return (
+          <GuessCheckCard
+            key={selectedHexagon.id}
+            label={selectedHexagon.label}
+            value={selectedHexagon.displayValue ?? selectedHexagon.value}
+            spec={spec}
+            guess={loc && (loc.latitude || loc.longitude) ? { lat: loc.latitude, lon: loc.longitude } : undefined}
+            answered={answered}
+            onAnswer={(a) => setGuessState((prev) => ({ ...prev, [selectedHexagon.id]: { ...prev[selectedHexagon.id], answer: a } }))}
+            onDevice={(r) => setGuessState((prev) => ({ ...prev, [selectedHexagon.id]: { ...prev[selectedHexagon.id], device: r } }))}
+          />
+        );
+      })()}
 
       {/* Honeycomb Hexagon Grid */}
       <div ref={gridRef} className="flex justify-center mb-8" role="list" aria-label="Detected data points">

@@ -81,7 +81,7 @@ describe('risk profile (MPC-7916)', () => {
       { kind: 'clear' }, { kind: 'needs_fixing' }, { kind: 'needs_fixing' }, { kind: 'our_guess' },
       { kind: 'seen_low_risk' }, { kind: 'not_checked' }, { kind: 'couldnt_check' }, { kind: 'cant_check_here' },
     ]);
-    expect(p).toEqual({ clear: 1, youToldUs: 0, needsFixing: 2, ourGuess: 1, seenLowRisk: 1, notChecked: 3 });
+    expect(p).toEqual({ clear: 1, youToldUs: 0, confirmed: 0, needsFixing: 2, ourGuess: 1, seenLowRisk: 1, notChecked: 3 });
   });
 
   it('is plain counts: no percentage, no "of", no rating word', () => {
@@ -91,7 +91,7 @@ describe('risk profile (MPC-7916)', () => {
   });
 
   it('an empty scan is all zeros, never "clear"', () => {
-    expect(riskProfile([])).toEqual({ clear: 0, youToldUs: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 });
+    expect(riskProfile([])).toEqual({ clear: 0, youToldUs: 0, confirmed: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 });
   });
 });
 
@@ -171,5 +171,35 @@ describe('"Your browser says this" tick', () => {
 
   it('WebRTC Leak still needs fixing even though the browser says it', () => {
     expect(toTile({ id: 'webrtc-leak', value: 'Leaking: 203.0.113.7' }).kind).toBe('needs_fixing');
+  });
+});
+
+import { withGuessAnswer } from './hexagonTile';
+
+describe('guess answers (prototype)', () => {
+  const guess = () => toTile({ id: 'location', value: 'Springfield, Exampleshire' });
+  it('a guess answered yes is the visitor\'s word; the device agreeing is its own kind; wrong hides the wrong value', () => {
+    expect(guess().kind).toBe('our_guess');
+    expect(withGuessAnswer(guess(), 'yes')).toMatchObject({ kind: 'you_confirmed', line: 'You said yes', showValue: true });
+    expect(withGuessAnswer(guess(), 'device_agrees')).toMatchObject({ kind: 'device_agrees', line: 'Your device agrees', showValue: true });
+    expect(withGuessAnswer(guess(), 'no')).toMatchObject({ kind: 'guess_wrong', line: 'Our guess was wrong', showValue: false });
+    expect(withGuessAnswer(guess(), 'device_far')).toMatchObject({ kind: 'guess_wrong', showValue: false });
+  });
+  it('only a guess can be answered', () => {
+    const measured = toTile({ id: 'browser', value: 'Chrome 141' });
+    expect(withGuessAnswer(measured, 'yes')).toBe(measured);
+  });
+  it('confirmed guesses are counted as "confirmed", and only shown when there are some', () => {
+    const p = riskProfile([withGuessAnswer(guess(), 'yes'), withGuessAnswer(guess(), 'device_agrees'), guess()]);
+    expect(p).toMatchObject({ confirmed: 2, ourGuess: 1 });
+    expect(riskProfileParts(p).map((x) => x.text)).toContain('2 confirmed');
+    expect(riskProfileParts(riskProfile([guess()])).map((x) => x.text).join(' ')).not.toMatch(/confirmed/);
+  });
+  it('the explanation says whose word it is, and why a wrong guess is not a fact', () => {
+    const yes = tileExplanation('Location', 'Springfield', withGuessAnswer(guess(), 'yes'), undefined, 'Shows ...');
+    expect(yes.text).toMatch(/your word, not our proof/);
+    const wrong = tileExplanation('Location', 'Springfield', withGuessAnswer(guess(), 'no'));
+    expect(wrong.headline).toBe('Location: Our guess was wrong');
+    expect(wrong.text).toMatch(/not a fact/);
   });
 });

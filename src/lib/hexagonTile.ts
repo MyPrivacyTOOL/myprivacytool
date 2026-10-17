@@ -17,6 +17,9 @@ export type TileKind =
   | 'our_guess'
   | 'seen_low_risk'
   | 'you_told_us'
+  | 'you_confirmed'
+  | 'device_agrees'
+  | 'guess_wrong'
   | 'not_checked'
   | 'couldnt_check'
   | 'cant_check_here';
@@ -56,6 +59,11 @@ export const TILE_COPY: Record<TileKind, { line: string; glyph: string; colour: 
   seen_low_risk: { line: 'Seen · low risk', glyph: 'i', colour: 'grey', level: 'solid', showValue: true },
   // Phase 2: the visitor said they fixed it. Their word, not our proof: medium, never solid, and it only becomes clear when we re-check.
   you_told_us: { line: 'You told us', glyph: '✓', colour: 'green', level: 'medium', showValue: true },
+  // Guess check (prototype): the visitor answered "Are you in X?". Their word is shown as theirs; only the device check is independent.
+  you_confirmed: { line: 'You said yes', glyph: '✓', colour: 'grey', level: 'solid', showValue: true },
+  device_agrees: { line: 'Your device agrees', glyph: '✓', colour: 'grey', level: 'solid', showValue: true },
+  // Our guess was wrong: the wrong value is not shown again.
+  guess_wrong: { line: 'Our guess was wrong', glyph: '×', colour: 'grey', level: 'solid', showValue: false },
   not_checked: { line: 'Not checked yet', glyph: '–', colour: 'grey', level: 'solid', showValue: false },
   couldnt_check: { line: "Couldn't check", glyph: '↻', colour: 'grey', level: 'solid', showValue: false },
   cant_check_here: { line: "Can't check from here", glyph: '–', colour: 'grey', level: 'solid', showValue: false },
@@ -92,6 +100,15 @@ export function withUserStatement(tile: HexagonTile): HexagonTile {
   return { ...tile, kind: 'you_told_us', colour: c.colour, level: c.level, glyph: c.glyph, line: c.line, showValue: c.showValue };
 }
 
+/** The visitor (or their device) answered the question that turns one of our guesses into a fact or a miss. */
+export type GuessOutcome = 'yes' | 'no' | 'device_agrees' | 'device_far';
+export function withGuessAnswer(tile: HexagonTile, outcome: GuessOutcome): HexagonTile {
+  if (tile.kind !== 'our_guess') return tile;
+  const kind: TileKind = outcome === 'yes' ? 'you_confirmed' : outcome === 'device_agrees' ? 'device_agrees' : 'guess_wrong';
+  const c = TILE_COPY[kind];
+  return { ...tile, kind, colour: c.colour, level: c.level, glyph: c.glyph, line: c.line, showValue: c.showValue };
+}
+
 export function toTile(input: TileInput, ctx: TileContext = {}): HexagonTile {
   const kind = tileKind(input, ctx);
   const c = TILE_COPY[kind];
@@ -104,6 +121,8 @@ export function toTile(input: TileInput, ctx: TileContext = {}): HexagonTile {
 export interface RiskProfile {
   clear: number;
   youToldUs: number;
+  /** Guesses the visitor said yes to, or their device agreed with. */
+  confirmed: number;
   needsFixing: number;
   ourGuess: number;
   seenLowRisk: number;
@@ -115,10 +134,11 @@ export interface RiskProfile {
  * There is no percentage and no Low / Medium / High rating (Chris, 2026-10-16).
  */
 export function riskProfile(tiles: Pick<HexagonTile, 'kind'>[]): RiskProfile {
-  const p: RiskProfile = { clear: 0, youToldUs: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 };
+  const p: RiskProfile = { clear: 0, youToldUs: 0, confirmed: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 };
   for (const t of tiles) {
     if (t.kind === 'clear') p.clear++;
     else if (t.kind === 'you_told_us') p.youToldUs++;
+    else if (t.kind === 'you_confirmed' || t.kind === 'device_agrees') p.confirmed++;
     else if (t.kind === 'needs_fixing') p.needsFixing++;
     else if (t.kind === 'our_guess') p.ourGuess++;
     else if (t.kind === 'seen_low_risk') p.seenLowRisk++;
@@ -132,6 +152,7 @@ export function riskProfileParts(p: RiskProfile): { key: keyof RiskProfile; text
     { key: 'clear', text: `${p.clear} clear` },
     // Only shown once the visitor has said something, so the Phase 1 line is unchanged until then.
     ...(p.youToldUs > 0 ? [{ key: 'youToldUs' as const, text: `${p.youToldUs} you told us` }] : []),
+    ...(p.confirmed > 0 ? [{ key: 'confirmed' as const, text: `${p.confirmed} confirmed` }] : []),
     { key: 'needsFixing', text: `${p.needsFixing} need${p.needsFixing === 1 ? 's' : ''} fixing` },
     { key: 'ourGuess', text: `${p.ourGuess} our guess` },
     { key: 'seenLowRisk', text: `${p.seenLowRisk} seen, low risk` },
@@ -160,6 +181,10 @@ export const TILE_EXPLANATION: Partial<Record<TileKind, { headline: string; text
     headline: "We couldn't check this",
     text: 'The check was blocked or did not finish. That is not the same as finding nothing, so we make no claim either way.',
   },
+  guess_wrong: {
+    headline: 'Our guess was wrong',
+    text: "That is exactly why a guess is not a fact. A lookup from your internet address can land on your provider's hub, a VPN or an office instead of where you are.",
+  },
   cant_check_here: {
     headline: "A web page can't check this",
     text: 'This can only be checked another way, so we make no claim either way. A real check needs something you start yourself.',
@@ -169,6 +194,8 @@ export const TILE_EXPLANATION: Partial<Record<TileKind, { headline: string; text
 export function tileExplanation(label: string, value: string, tile: HexagonTile, fallbackHeadline?: string, fallbackText?: string): { headline: string; text: string } {
   const own = TILE_EXPLANATION[tile.kind];
   if (own) return { headline: `${label}: ${own.headline}`, text: own.text };
+  if (tile.kind === 'you_confirmed') return { headline: fallbackHeadline ?? `${label}: ${value}`, text: `You told us this is right. That is your word, not our proof. ${fallbackText ?? ''}`.trim() };
+  if (tile.kind === 'device_agrees') return { headline: fallbackHeadline ?? `${label}: ${value}`, text: `Your device's own location agrees with our guess. ${fallbackText ?? ''}`.trim() };
   const headline = fallbackHeadline ?? `${label}: ${value}`;
   const text = fallbackText ?? '';
   if (tile.kind === 'our_guess') return { headline, text: `This is our guess, not a measurement. ${text}`.trim() };
