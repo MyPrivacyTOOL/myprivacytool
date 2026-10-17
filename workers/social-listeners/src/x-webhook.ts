@@ -3,7 +3,7 @@ import { createLogger } from "./logger";
 import { type MirrorDm, describeShape, extractDms, extractMirrorDms, handleDeleteDm, handleMirrorDm, handleOrdinaryDm, isConsentPending, selfId } from "./mirror-bot";
 import { probeMode } from "./probe-reader";
 import { extractEngagement, isDeleteRequest, touchContact } from "./social";
-import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, readRawBody, timingSafeEqual } from "./shared";
+import { type Env, base64, forwardToCoreBrain, hmacSha256, parseJson, pick, readRawBody, timingSafeEqual } from "./shared";
 import { runXProbe } from "./x-probe";
 
 const log = createLogger("social-listeners:x");
@@ -71,12 +71,12 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
     ]);
     if (ctx?.waitUntil) ctx.waitUntil(work);
     else await work;
-    const legacy = (payload as { direct_message_events?: any[] }).direct_message_events;
+    const legacy = (payload as { direct_message_events?: unknown[] }).direct_message_events;
     // Legacy payloads can mix MIRROR DMs with other events: forward only the rest (every DM we answer is counted in the funnel by funnel.ts instead, so core-brain does not log it twice). Any other shape is fully handled here.
     if (!Array.isArray(legacy)) return new Response("OK");
     const handled = [...mirrorDms, ...welcomed, ...deletes];
     const rest = legacy.filter(
-      (e) => !handled.some((d) => d.senderId === String(e?.message_create?.sender_id) && d.text === e?.message_create?.message_data?.text),
+      (e) => !handled.some((d) => d.senderId === String(pick(e, "message_create", "sender_id")) && d.text === pick(e, "message_create", "message_data", "text")),
     );
     const remaining = { ...(payload as object), direct_message_events: rest } as { tweet_create_events?: unknown[] };
     if (rest.length === 0 && !remaining.tweet_create_events?.length) return new Response("OK");

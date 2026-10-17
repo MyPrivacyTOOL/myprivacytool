@@ -124,6 +124,16 @@ export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, lo
 }
 
 /** Parses JSON (already signature-verified). Null on malformed input. */
+/** Reads a nested key path from untyped JSON; undefined at the first non-object step (what `a?.b?.c` gave on a parsed payload). */
+export function pick(value: unknown, ...path: string[]): unknown {
+  let cur = value;
+  for (const key of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
+}
+
 export function parseJson(raw: string): unknown | null {
   try { return JSON.parse(raw); } catch { return null; }
 }

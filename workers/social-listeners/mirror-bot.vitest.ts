@@ -19,7 +19,7 @@ const post = (body: string, e: object) =>
   worker.fetch(new Request("https://w/webhook/x", { method: "POST", body, headers: { "X-Twitter-Webhooks-Signature": sig(body) } }), e as never, { waitUntil: () => {} } as never);
 
 /** The fetch calls a test cares about: the greeting's @handle lookup is incidental. */
-const calls = (f: { mock: { calls: any[][] } }) => f.mock.calls.filter((c) => !String(c[0]).includes("user.fields=username"));
+const calls = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.filter((c) => !String(c[0]).includes("user.fields=username"));
 afterEach(() => { vi.restoreAllMocks(); resetTokenCache(); });
 
 describe("parseMirrorCommand", () => {
@@ -172,7 +172,7 @@ describe("rate limit, retry and tagging (MPC-7628)", () => {
   });
   it("retries the DM once with a refreshed token after a 401", async () => {
     let first = true;
-    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
       if (String(u).startsWith("https://sb.test")) return Response.json([]);
       if (String(u).includes("oauth2/token")) return Response.json({ access_token: "fresh", refresh_token: "r2", expires_in: 7200 });
       if (first && String(u).includes("/dm_conversations/")) { first = false; return new Response("expired", { status: 401 }); }
@@ -194,7 +194,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
   const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
   /** Fake X: DM history for sender 42 (newest first), a profile lookup, and DM sends. */
   function x(history: { sender_id: string; text: string; created_at: string }[]) {
-    return vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
       const url = String(u);
       if (url.includes("/dm_events")) return Response.json({ data: history });
       if (url.includes("/users/42")) return Response.json({ data: { description: "hello world", protected: false } });
@@ -273,14 +273,14 @@ describe("Alice clip on DMs (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 20));
   /** Fake X + site: the clip, the chunked upload, DM sends. `upload` decides how INIT answers. */
   function fake(upload: "ok" | "forbidden" = "ok", dmWithVideoOk = true) {
-    const sent: any[] = [];
+    const sent: Record<string, unknown>[] = [];
     const steps: string[] = [];
-    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
       if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(2_500_000));
       if (url.includes("/media/upload")) {
         if (init?.method === "GET") return Response.json({ data: { processing_info: { state: "succeeded" } } });
-        const cmd = (init.body as FormData).get("command") as string;
+        const cmd = (init!.body as FormData).get("command") as string;
         steps.push(cmd);
         if (upload === "forbidden") return new Response("{}", { status: 403 });
         if (cmd === "INIT") return Response.json({ data: { id: "777" } });
@@ -288,7 +288,7 @@ describe("Alice clip on DMs (MPC-7628)", () => {
         return new Response(null, { status: 204 });
       }
       if (url.includes("/messages")) {
-        const body = JSON.parse(init.body);
+        const body = JSON.parse(init!.body as string);
         sent.push(body);
         return new Response("{}", { status: body.attachments && !dmWithVideoOk ? 400 : 200 });
       }
@@ -333,7 +333,7 @@ describe("branding, welcome and simple Y (MPC-7628)", () => {
     calls(f as never).filter((c) => String(c[0]).includes("/messages")).map((c) => JSON.parse((c[1] as RequestInit).body as string).text as string);
   /** Fake X: handle lookup, DM history for sender 42 (newest first) and DM sends. */
   const x = (history: { sender_id: string; text: string; created_at: string }[] = []) =>
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
       const url = String(u);
       if (url.includes("/dm_events")) return Response.json({ data: history });
       if (url.includes("user.fields=username")) return Response.json({ data: { username: "alice_99" } });
@@ -392,10 +392,10 @@ describe("Channel OSINT funnel counting (MPC-7628)", () => {
   const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
   /** Fake X + Supabase: the RPC bodies are what we assert on. */
   function fake(history: { sender_id: string; text: string; created_at: string }[] = []) {
-    const rpc: any[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+    const rpc: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.includes("/rpc/mpt_brain_record")) { rpc.push(JSON.parse(init.body)); return new Response("{}"); }
+      if (url.includes("/rpc/mpt_brain_record")) { rpc.push(JSON.parse(init!.body as string)); return new Response("{}"); }
       if (url.includes("/dm_events")) return Response.json({ data: history });
       if (url.includes("/users/42")) return Response.json({ data: { username: "alice_99", description: "secret bio words", protected: false } });
       return new Response("{}");
@@ -441,7 +441,7 @@ describe("Channel OSINT funnel counting (MPC-7628)", () => {
     expect(b.fetch).not.toHaveBeenCalled();
   });
   it("a failing funnel write never blocks the reply", async () => {
-    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+    const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
       if (String(u).includes("/rpc/")) throw new Error("down");
       return new Response("{}");
     });
@@ -480,12 +480,12 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
   });
   it("signs the upload calls with OAuth 1.0a when the keys are set", async () => {
     const seen: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
       if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(10));
       if (url.includes("/media/upload")) {
-        seen.push(init.headers.Authorization);
-        const cmd = (init.body as FormData).get("command");
+        seen.push((init!.headers as Record<string, string>).Authorization);
+        const cmd = (init!.body as FormData).get("command");
         return cmd === "INIT" ? Response.json({ data: { id: "9" } }) : Response.json({ data: { id: "9" } });
       }
       return new Response("{}");
@@ -501,18 +501,18 @@ describe("X activity feed for the CRM (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 20));
   const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
   function fake(followedBy = true) {
-    const touch: any[] = [];
-    const erase: any[] = [];
+    const touch: Record<string, unknown>[] = [];
+    const erase: Record<string, unknown>[] = [];
     const sent: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.includes("/rpc/mpt_social_touch")) { touch.push(JSON.parse(init.body)); return new Response("{}"); }
-      if (url.includes("/rpc/mpt_erase_social_contact")) { erase.push(JSON.parse(init.body)); return new Response("1"); }
+      if (url.includes("/rpc/mpt_social_touch")) { touch.push(JSON.parse(init!.body as string)); return new Response("{}"); }
+      if (url.includes("/rpc/mpt_erase_social_contact")) { erase.push(JSON.parse(init!.body as string)); return new Response("1"); }
       if (url.includes("/rpc/")) return new Response("{}");
       if (url.includes("connection_status")) return Response.json({ data: { connection_status: followedBy ? ["followed_by"] : [] } });
       if (url.includes("user.fields=username")) return Response.json({ data: { username: "alice_99" } });
       if (url.includes("/users/42")) return Response.json({ data: { username: "alice_99", description: "secret bio words", protected: false } });
-      if (url.includes("/messages")) sent.push(JSON.parse(init.body).text);
+      if (url.includes("/messages")) sent.push(JSON.parse(init!.body as string).text);
       return new Response("{}");
     });
     return { touch, erase, sent };
@@ -553,7 +553,7 @@ describe("X activity feed for the CRM (MPC-7628)", () => {
     await post(body, { ...e(), CORE_BRAIN: brain() });
     await settle();
     expect(x.touch.map((t) => [t.p_user_id, t.p_event, t.p_handle]).sort()).toEqual([["51", "follow", "fan"], ["53", "like", "liker"], ["54", "share", "sharer"], ["55", "mention", "mentioner"]]);
-    expect(x.touch.find((t) => t.p_event === "follow").p_follows_us).toBe(true);
+    expect(x.touch.find((t) => t.p_event === "follow")?.p_follows_us).toBe(true);
   });
   it("extractEngagement ignores shapes it does not know", () => {
     expect(extractEngagement({ data: { event_type: "something.new" } }, "999")).toEqual([]);
@@ -592,18 +592,18 @@ describe("HubSpot sync of the X feed (MPC-7628)", () => {
   const e = (extra: object = {}) => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs-token", ...extra });
   /** Fake X, Supabase and HubSpot. `existing` = the HubSpot contact id returned by search. */
   function fake(opts: { existing?: string; propertyStatus?: number } = {}) {
-    const hs: { method: string; path: string; body: any; auth: string }[] = [];
-    const sbPatch: any[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+    const hs: { method: string; path: string; body: unknown; auth: string }[] = [];
+    const sbPatch: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
       if (url.startsWith("https://api.hubapi.com")) {
         const path = url.replace("https://api.hubapi.com", "");
-        hs.push({ method: init.method, path, body: init.body ? JSON.parse(init.body) : undefined, auth: init.headers.Authorization });
+        hs.push({ method: init!.method, path, body: init!.body ? JSON.parse(init!.body as string) : undefined, auth: (init!.headers as Record<string, string>).Authorization });
         if (path === "/crm/v3/properties/contacts") return new Response("{}", { status: opts.propertyStatus ?? 201 });
         if (path === "/crm/v3/objects/contacts/search") return Response.json({ results: opts.existing ? [{ id: opts.existing }] : [] });
-        return new Response("{}", { status: init.method === "DELETE" ? 204 : 200 });
+        return new Response("{}", { status: init!.method === "DELETE" ? 204 : 200 });
       }
-      if (url.includes("/rest/v1/social_contacts") && init?.method === "PATCH") { sbPatch.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
+      if (url.includes("/rest/v1/social_contacts") && init?.method === "PATCH") { sbPatch.push(JSON.parse(init!.body as string)); return new Response(null, { status: 204 }); }
       if (url.includes("/rpc/")) return new Response("{}");
       if (url.includes("connection_status")) return Response.json({ data: { connection_status: ["followed_by"] } });
       if (url.includes("user.fields=username")) return Response.json({ data: { username: "alice_99" } });
