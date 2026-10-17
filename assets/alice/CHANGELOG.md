@@ -21,3 +21,8 @@
 
 ## 0.1.4-draft (MPC-7797)
 - Added `reference/alice_ref_still03-text-free_v0.png`: text-free 820x959 crop of the locked "What your channel reveals" still (Drive). Reference and test renders only; the full-size layered master still needs the original file or an artist.
+
+## 0.1.5-draft (MPC-7797)
+- $0 route (no artist, no paid tools): interim layered split of the curtain-pull pose (`animations/alice_p6_layers_v0/`: Alice, curtain, code) made with `tools/alice-library/split_p6_layers.py`. Soft 820 px source, so reference-only.
+- Added `reference/alice_ref_still-remove-yourself_pose2_v0.png`, a second existing Alice pose from the published stills (reference-only).
+- Neither changes the lock status: v1.0 still needs full-resolution art.

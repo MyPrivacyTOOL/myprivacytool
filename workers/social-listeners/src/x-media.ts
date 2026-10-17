@@ -4,7 +4,7 @@
 // caller's OAuth 2.0 call is tried instead. Every failure returns null: the caller then sends the text alone.
 // Chunked v2 flow: INIT -> APPEND (1 MB chunks) -> FINALIZE (-> STATUS while X processes the video).
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, pick } from "./shared";
 
 export const VIDEO_URL = "https://myprivacytool.io/media/alice-curtain.mp4";
 const UPLOAD = "/media/upload";
@@ -41,8 +41,10 @@ export async function oauth1Header(env: Env, method: string, url: string, nonce 
 /** The authenticated call the caller already uses for DMs (user token, one refresh on 401). */
 export type XUserCall = (path: string, init: RequestInit) => Promise<Response | null>;
 
-const idOf = (b: any): string | null => {
-  const id = b?.data?.id ?? b?.media_id_string ?? b?.id;
+type ProcessingInfo = { state?: string; check_after_secs?: unknown };
+
+const idOf = (b: unknown): string | null => {
+  const id = pick(b, "data", "id") ?? pick(b, "media_id_string") ?? pick(b, "id");
   return typeof id === "string" || typeof id === "number" ? String(id) : null;
 };
 
@@ -92,13 +94,14 @@ export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall
 
     const fin = await api({ command: "FINALIZE", media_id: id });
     if (!fin?.ok) return fail(log, "x_media_finalize_rejected", { status: fin?.status ?? 0 });
-    let info = ((await fin.json()) as any)?.data?.processing_info ?? null;
+    let info = (pick(await fin.json(), "data", "processing_info") ?? null) as ProcessingInfo | null;
     for (let n = 0; info && n < POLLS; n++) {
       if (info.state === "succeeded") break;
       if (info.state === "failed") return fail(log, "x_media_processing_failed");
-      await new Promise((r) => setTimeout(r, Math.min(Math.max(Number(info.check_after_secs) || 1, 1), 3) * 1000));
+      const waitSecs = Math.min(Math.max(Number(info.check_after_secs) || 1, 1), 3);
+      await new Promise((r) => setTimeout(r, waitSecs * 1000));
       const st = await call(`${UPLOAD}?command=STATUS&media_id=${id}`, { method: "GET" });
-      info = st?.ok ? (((await st.json()) as any)?.data?.processing_info ?? null) : info;
+      info = st?.ok ? ((pick(await st.json(), "data", "processing_info") ?? null) as ProcessingInfo | null) : info;
     }
     if (info && info.state !== "succeeded") return fail(log, "x_media_processing_timeout");
     return id;

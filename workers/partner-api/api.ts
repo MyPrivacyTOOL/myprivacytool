@@ -55,6 +55,9 @@ async function limited(env: PartnerEnv, key: string): Promise<boolean> {
   try { return !(await env.RATE_LIMITER.limit({ key })).success; } catch { return false; }
 }
 
+/** One Supabase (PostgREST) row: the select lists above name its columns. */
+type Row = Record<string, unknown>;
+
 function sb(env: PartnerEnv) {
   const base = `${env.SUPABASE_URL || DEFAULT_SUPABASE}/rest/v1`;
   const headers = (prefer?: string): Record<string, string> => ({
@@ -63,21 +66,24 @@ function sb(env: PartnerEnv) {
     'Content-Type': 'application/json',
     ...(prefer ? { Prefer: prefer } : {}),
   });
-  async function call(method: string, path: string, body?: unknown, prefer?: string): Promise<any> {
+  async function call(method: string, path: string, body?: unknown, prefer?: string): Promise<Row[]> {
     const res = await fetch(`${base}/${path}`, { method, headers: headers(prefer), body: body === undefined ? undefined : JSON.stringify(body) });
     const text = await res.text();
     if (!res.ok) {
       console.error(`partner-api supabase ${method} ${path.split('?')[0]} ${res.status}: ${text.slice(0, 200)}`);
       throw fail(500, 'internal_error', 'Request failed');
     }
-    return text ? JSON.parse(text) : null;
+    return (text ? JSON.parse(text) : null) as Row[];
   }
   return {
     select: (path: string) => call('GET', path),
-    insert: (table: string, row: unknown) => call('POST', table, row, 'return=representation').then((r) => (Array.isArray(r) ? r[0] : r)),
+    insert: (table: string, row: unknown) => call('POST', table, row, 'return=representation').then((r): Row => (Array.isArray(r) ? r[0] : (r as unknown as Row))),
     patch: (path: string, row: unknown) => call('PATCH', path, row, 'return=representation'),
   };
 }
+
+/** The partner_api_keys columns authenticate() selects, with the joined partner. */
+interface KeyRow { id: string; partner_id: string; last_used_at: string | null; partners?: { status?: string; monthly_scan_cap?: number | null } | null }
 
 interface Caller { keyId: string; partnerId: string; cap: number | null; lastUsed: string | null }
 
@@ -89,10 +95,10 @@ async function authenticate(request: Request, env: PartnerEnv, db: ReturnType<ty
   if (!/^mpt_(live|test)_[A-Za-z0-9_-]{32,64}$/.test(key)) throw fail(401, 'invalid_api_key', 'Missing or invalid API key');
   const hash = await sha256Hex(key);
   const rows = await db.select(`partner_api_keys?key_hash=eq.${hash}&revoked_at=is.null&select=id,partner_id,last_used_at,partners(status,monthly_scan_cap)`);
-  const row = rows?.[0];
+  const row = rows?.[0] as unknown as KeyRow | undefined;
   if (!row) throw fail(401, 'invalid_api_key', 'Missing or invalid API key');
   if (row.partners?.status !== 'active') throw fail(403, 'partner_suspended', 'This partner account is suspended');
-  return { keyId: row.id, partnerId: row.partner_id, cap: row.partners.monthly_scan_cap ?? null, lastUsed: row.last_used_at };
+  return { keyId: row.id, partnerId: row.partner_id, cap: row.partners?.monthly_scan_cap ?? null, lastUsed: row.last_used_at };
 }
 
 async function readJson(request: Request): Promise<Record<string, unknown>> {
@@ -125,7 +131,7 @@ async function billableCount(db: ReturnType<typeof sb>, partnerId: string, month
   return rows.length;
 }
 
-const scanView = (r: any) => ({ scan_id: r.id, created_at: r.created_at, type: r.input_type, reference: r.reference ?? null, status: r.status, billable: r.billable, result: r.result });
+const scanView = (r: Row) => ({ scan_id: r.id, created_at: r.created_at, type: r.input_type, reference: r.reference ?? null, status: r.status, billable: r.billable, result: r.result });
 
 async function postScan(request: Request, env: PartnerEnv, db: ReturnType<typeof sb>, who: Caller): Promise<Response> {
   const subject = parseSubject(await readJson(request));
@@ -172,7 +178,7 @@ function parseWebhook(raw: unknown): string {
   return u.toString();
 }
 
-const monitorView = (r: any) => ({ monitor_id: r.id, created_at: r.created_at, type: r.input_type, reference: r.reference ?? null, webhook_url: r.webhook_url, last_checked_at: r.last_checked_at ?? null });
+const monitorView = (r: Row) => ({ monitor_id: r.id, created_at: r.created_at, type: r.input_type, reference: r.reference ?? null, webhook_url: r.webhook_url, last_checked_at: r.last_checked_at ?? null });
 
 async function postMonitor(request: Request, db: ReturnType<typeof sb>, who: Caller): Promise<Response> {
   const body = await readJson(request);

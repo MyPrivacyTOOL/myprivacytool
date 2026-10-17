@@ -108,3 +108,17 @@
   color: hsl(var(--muted-foreground));
   font-style: italic;
 }
+
+/* MPC-7916: the "waiting for your answer / our guess" tile breathes slowly. Still for people who ask for less motion. */
+@keyframes tileBreathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.tile-breathe {
+  animation: tileBreathe 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-breathe {
+    animation: none;
+  }
+}

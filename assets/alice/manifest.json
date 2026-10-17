@@ -1,6 +1,6 @@
 {
   "library": "alice",
-  "version": "0.1.4-draft",
+  "version": "0.1.5-draft",
   "locked": false,
   "fps": 30,
   "canvas": {
@@ -208,7 +208,8 @@
       "path": "animations/alice_anim_layered-master_v1.0.psd",
       "kind": "animation-source",
       "required": true,
-      "status": "missing"
+      "status": "missing",
+      "note": "Interim split of the curtain-pull drawing exists (animations/alice_p6_layers_v0/) but its source is the soft 820 px raster; a master needs a full-resolution source."
     },
     {
       "id": "anim-curtain-reveal",
@@ -233,6 +234,46 @@
       "required": false,
       "status": "reference-only",
       "note": "820x959 text-free crop of the locked still 'What your channel reveals' (Drive 1haDIyC-5safbe87C6GxKmMK4jOJiToWV, 1920x1080). About 1.4x taller than video-scripts/assets/alice.png but still a raster of the same drawing, curtain cut at the right edge. Reference and test renders only; not the locked master."
+    },
+    {
+      "id": "interim-reference-still03-2560h",
+      "path": "reference/alice_ref_still03-text-free_2560h_interim.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "2189x2560 Lanczos upscale of interim-reference-still03 with light sharpening (2026-10-17, approved by Chris for the channel honeycomb visuals). No new drawing: same pixels, enlarged, so it is softer than a true master. Not the locked master; replace it with art generated from the locked still."
+    },
+    {
+      "id": "interim-p6-layer-alice",
+      "path": "animations/alice_p6_layers_v0/alice.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959, hand-masked from interim-reference-still03 (soft source). Alice only (figure, hand), transparent elsewhere. Same canvas as the curtain and code layers."
+    },
+    {
+      "id": "interim-p6-layer-curtain",
+      "path": "animations/alice_p6_layers_v0/curtain.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959, hand-masked from interim-reference-still03 (soft source). Curtain fabric in front of the code, opaque white with ink folds."
+    },
+    {
+      "id": "interim-p6-layer-code",
+      "path": "animations/alice_p6_layers_v0/code.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959, hand-masked from interim-reference-still03 (soft source). Matrix code backdrop, extended column by column behind the curtain so the curtain can move. Extension is synthetic, not drawn."
+    },
+    {
+      "id": "interim-pose2-still",
+      "path": "reference/alice_ref_still-remove-yourself_pose2_v0.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "1807x1791 crop of Alice from the 'REMOVE YOURSELF' still (Drive PDF, 3840x2160 page), background cleaned to white. Leaning, pointing pose (nearest to P2 Observant). Right hand is cut off by the original canvas edge. Reference only; origin of the underlying drawing not recorded."
     }
   ],
   "approved_decisions": [
