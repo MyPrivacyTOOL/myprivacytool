@@ -44,4 +44,11 @@ describe('aliceTileMessage', () => {
     for (const m of [intro, next]) expect(m).not.toMatch(/\d|%|confirm|without asking|data points/i);
     expect(intro).not.toBe(next);
   });
+
+  it('says "Your browser says this" for a tile that carries the tick, and not otherwise', () => {
+    const tz = hex({ id: 'timezone-locale', label: 'Timezone/Locale', value: 'London (en-GB)' });
+    expect(aliceTileMessage(tz, tileOf(tz), 3)).toMatch(/Seen, low risk\. Your browser says this\./);
+    const d = hex();
+    expect(aliceTileMessage(d, tileOf(d), 3)).not.toMatch(/Your browser says this/);
+  });
 });

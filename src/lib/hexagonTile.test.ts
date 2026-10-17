@@ -145,3 +145,31 @@ describe('cannotCheckLast (from the first tile PR)', () => {
     expect(cannotCheckLast(ids).map((i) => i.id)).toEqual(['canvas-fingerprint', 'device', 'webrtc-leak', 'dns-leak', 'social-platforms']);
   });
 });
+
+import { TILE_BROWSER_SAYS } from './hexagonTile';
+
+describe('"Your browser says this" tick', () => {
+  it('Timezone/Locale is seen, not a fault, and carries the tick', () => {
+    const t = toTile({ id: 'timezone-locale', value: 'London (en-GB)' });
+    expect(t.kind).toBe('seen_low_risk');
+    expect(t.browserSays).toBe(true);
+    expect(tileAriaLabel('Timezone/Locale', 'London (en-GB)', t)).toMatch(new RegExp(`${TILE_BROWSER_SAYS}\\.$`));
+  });
+
+  it('every measured tile held at confidence 100 gets the tick when it has a real reading; nothing else does', () => {
+    // measured at 100: tick
+    for (const [id, value] of [['browser', 'Chrome 141'], ['time', 'Sun, 02:14 PM'], ['orientation', 'Landscape'], ['webrtc-leak', 'Leaking: 203.0.113.7'], ['canvas-fingerprint', 'a3f9c21e....']] as const) {
+      expect(toTile({ id, value }).browserSays).toBe(true);
+    }
+    // measured below 100, estimates, cannot-be-checked, and failed or placeholder readings: no tick
+    expect(toTile({ id: 'device', value: 'Desktop (Windows 11)' }).browserSays).toBe(false); // confidence 92
+    expect(toTile({ id: 'location', value: 'Springfield' }).browserSays).toBe(false); // estimate
+    expect(toTile({ id: 'dns-leak', value: 'No Leak Detected' }).browserSays).toBe(false); // cannot be checked
+    expect(toTile({ id: 'timezone-locale', value: 'Check failed' }).browserSays).toBe(false);
+    expect(toTile({ id: 'browser', value: 'Unknown' }).browserSays).toBe(false);
+  });
+
+  it('WebRTC Leak still needs fixing even though the browser says it', () => {
+    expect(toTile({ id: 'webrtc-leak', value: 'Leaking: 203.0.113.7' }).kind).toBe('needs_fixing');
+  });
+});

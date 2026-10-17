@@ -39,13 +39,7 @@ const FIX_STEPS: Record<string, FixStep> = {
       'Reload this page and look at this hexagon again.',
     ],
   },
-  'timezone-locale': {
-    why: 'Your time zone and language settings tell a site roughly where you are and who you might be.',
-    steps: [
-      'If you want this hidden, use a browser mode that reports a generic time zone and language.',
-      'Reload this page and look at this hexagon again.',
-    ],
-  },
+  // Timezone/Locale has no fix step: every browser reports it, so it is "seen" (with the browser-says tick), never red.
 };
 
 export function fixStepFor(id: string): FixStep | undefined {

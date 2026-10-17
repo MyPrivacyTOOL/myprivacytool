@@ -31,6 +31,11 @@ export interface HexagonTile {
   line: string;
   /** False for the three grey "no claim" kinds that must not show the detector's value. */
   showValue: boolean;
+  /**
+   * True when the browser itself hands this value to every site (registry: measured, held confidence 100) and we have a real reading.
+   * It says "this is what your browser reports", not that it is safe and not where the visitor is. Drawn as a small outlined tick.
+   */
+  browserSays: boolean;
 }
 
 export interface TileContext {
@@ -56,6 +61,12 @@ export const TILE_COPY: Record<TileKind, { line: string; glyph: string; colour: 
   cant_check_here: { line: "Can't check from here", glyph: '–', colour: 'grey', level: 'solid', showValue: false },
 };
 
+/** The line under a tile that carries the browser-says tick. */
+export const TILE_BROWSER_SAYS = 'Your browser says this';
+
+// Measured findings the visitor cannot act on: every browser reports them, so they are "seen", not "needs fixing".
+const NOT_A_FAULT = new Set(['timezone-locale']);
+
 // A failed or blocked read, as opposed to "nothing has looked yet".
 const FAILED_VALUE = /^(check failed|blocked|api blocked|permission required)$/i;
 
@@ -71,6 +82,7 @@ export function tileKind(input: TileInput, ctx: TileContext = {}): TileKind {
   if (status === 'clear') return 'clear';
   // FOUND. An estimate is a guess, whatever number the detector holds. A measured finding is judged by how much it matters.
   if (isEstimate(input.id)) return 'our_guess';
+  if (NOT_A_FAULT.has(input.id)) return 'seen_low_risk';
   return reg?.truth.sensitivity === 'low' ? 'seen_low_risk' : 'needs_fixing';
 }
 
@@ -83,7 +95,10 @@ export function withUserStatement(tile: HexagonTile): HexagonTile {
 export function toTile(input: TileInput, ctx: TileContext = {}): HexagonTile {
   const kind = tileKind(input, ctx);
   const c = TILE_COPY[kind];
-  return { kind, colour: c.colour, level: c.level, glyph: c.glyph, line: c.line, showValue: c.showValue };
+  const reg = getHexagon(input.id);
+  // Only with a real reading (the grey no-claim kinds hide the value), and only where the registry holds confidence 100 for a measured value.
+  const browserSays = c.showValue && reg?.truth.level === 'measured' && reg.truth.confidence.number === 100;
+  return { kind, colour: c.colour, level: c.level, glyph: c.glyph, line: c.line, showValue: c.showValue, browserSays };
 }
 
 export interface RiskProfile {
@@ -126,7 +141,7 @@ export function riskProfileParts(p: RiskProfile): { key: keyof RiskProfile; text
 
 export function tileAriaLabel(label: string, value: string, tile: HexagonTile): string {
   const shown = tile.showValue ? `${value}. ` : '';
-  return `${label}: ${shown}${tile.line}.`;
+  return `${label}: ${shown}${tile.line}.${tile.browserSays ? ` ${TILE_BROWSER_SAYS}.` : ''}`;
 }
 
 // A status emoji from the detector (a green tick) says "safe". Only a clear tile may keep it: any other tile shows the registry's
