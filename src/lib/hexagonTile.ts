@@ -147,7 +147,7 @@ export const TILE_EXPLANATION: Partial<Record<TileKind, { headline: string; text
   },
   cant_check_here: {
     headline: "A web page can't check this",
-    text: 'This can only be checked another way, so we make no claim either way. A real check is offered separately.',
+    text: 'This can only be checked another way, so we make no claim either way. A real check needs something you start yourself.',
   },
 };
 
