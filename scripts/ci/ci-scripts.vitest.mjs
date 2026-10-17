@@ -117,6 +117,18 @@ describe("smoke-test targets", () => {
     const f = async (u, o = {}) => (u.endsWith("/health") ? resp(200, { json: { ok: true, worker: "core-brain", configured: true } }) : u.endsWith("/webhook") ? resp(o.method === "POST" ? 200 : 405) : resp(404));
     expect((await targets["core-brain"]("https://b", f)).filter((x) => !x.ok).map((x) => x.name)).toEqual(["POST /webhook without the secret -> 401"]);
   });
+  const hookOk = (over = {}) => async (u, o = {}) => {
+    const route = `${o.method || "GET"} ${new URL(u).pathname}`;
+    const table = { "GET /health": resp(200, { json: { status: "ok" } }), "POST /webhook/whatsapp": resp(401), "GET /webhook/whatsapp": resp(403), "POST /api/scan/start-deep-dive": resp(401), ...over };
+    return table[route] ?? resp(404);
+  };
+  it("webhook-receiver: passes against a Worker that rejects unsigned and unauthenticated calls", async () => {
+    expect((await targets["webhook-receiver"]("https://h", hookOk())).every((x) => x.ok)).toBe(true);
+  });
+  it("webhook-receiver: fails if an unsigned WhatsApp POST is accepted or the deep-dive route is open", async () => {
+    const r = await targets["webhook-receiver"]("https://h", hookOk({ "POST /webhook/whatsapp": resp(200), "POST /api/scan/start-deep-dive": resp(500) }));
+    expect(r.filter((x) => !x.ok).map((x) => x.name)).toEqual(["unsigned POST /webhook/whatsapp -> 401", "POST /api/scan/start-deep-dive without the secret -> 401"]);
+  });
   it("core-brain: defaults to the production custom domain", () => {
     expect(DEFAULTS["core-brain"]).toBe("https://brain.myprivacytool.io");
   });
