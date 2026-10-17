@@ -68,7 +68,7 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
       ? 'hsl(var(--surface) / var(--surface-alpha))'
       : t.level === 'solid'
         ? tileHsl
-        : `hsl(var(--tile-${t.colour}) / 0.16)`;
+        : `hsl(var(--tile-${t.colour}) / ${t.level === 'medium' ? 0.42 : 0.16})`;
   // Grey text uses the muted foreground so it stays readable; colour carries the rest.
   const tileLabelColor = !t ? '' : tileSolidColoured ? 'hsl(var(--brand-white))' : t.colour === 'grey' ? 'hsl(var(--muted-foreground))' : tileHsl;
   const tileValueColor = !t ? '' : tileSolidColoured ? 'hsl(var(--brand-white))' : 'hsl(var(--foreground))';
