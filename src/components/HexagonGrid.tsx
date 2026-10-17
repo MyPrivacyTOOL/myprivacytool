@@ -188,7 +188,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   const selectedHexagon = selectedHexagonId ? visibleHexagons.find(h => h.id === selectedHexagonId) ?? null : null;
   const strangerFindings = useMemo(
     () => (confirmedCount >= STRANGER_CARD_MIN_CONFIRMED
-      ? generateFindings({ deviceData, hexagons: visibleHexagons, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '' })
+      ? generateFindings({ deviceData, hexagons: tilesOn ? visibleHexagons.filter((h) => tiles.get(h.id)?.class !== 'unknown') : visibleHexagons, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '' })
       : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [confirmedCount >= STRANGER_CARD_MIN_CONFIRMED, deviceData]
@@ -676,7 +676,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       />
 
       {/* CK-7805: constant-height box above the grid: shows the tapped or hovered hexagon's meaning without shifting or covering the grid. */}
-      <HexagonExplanation hexagon={hoveredHexagon ?? selectedHexagon} />
+      <HexagonExplanation hexagon={hoveredHexagon ?? selectedHexagon} tile={tilesOn ? tiles.get((hoveredHexagon ?? selectedHexagon)?.id ?? '') : undefined} />
 
       {/* Honeycomb Hexagon Grid */}
       <div ref={gridRef} className="flex justify-center mb-8" role="list" aria-label="Detected data points">
@@ -732,12 +732,16 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       {strangerFindings.length > 0 && <StrangerGuessCard findings={strangerFindings} />}
 
       {/* Risk Score - now with fingerprint data */}
-      <RiskScore 
-        confirmed={confirmedCount} 
-        total={visibleCount}
-        hexagons={visibleHexagons}
-        fingerprint={fingerprintData}
-      />
+      {/* Tile mode: this score is a function of how many tiles were tapped (and reads raw values), not of what was checked, and
+          the registry's trust_score is not defined yet, so there is no honest number to show. The board summary above replaces it. */}
+      {!tilesOn && (
+        <RiskScore 
+          confirmed={confirmedCount} 
+          total={visibleCount}
+          hexagons={visibleHexagons}
+          fingerprint={fingerprintData}
+        />
+      )}
 
       {/* Panel Display Order: Language -> Fingerprint -> Final Summary */}
       
@@ -836,6 +840,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <FinalSummaryPanel
               hexagons={visibleHexagons}
               confirmedCount={confirmedCount}
+              tiles={tilesOn ? tiles : undefined}
               fingerprint={fingerprintData}
               languagePrediction={languagePrediction}
               onStartOver={handleStartOver}

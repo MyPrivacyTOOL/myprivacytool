@@ -42,4 +42,7 @@ export const TILE_UNKNOWN_LONG = {
   not_yet_checked: 'We have not checked this yet.',
   stale: 'This is out of date and needs a re-check.',
 } as const;
+// Hero copy (home page) with tiles on: no "found N data points without asking", no "click the ones that are correct".
+export const HERO_TILES_LINE1 = 'See what your browser tells every website, and how sure we are about each thing.';
+export const HERO_TILES_LINE2 = 'Tap a hexagon to see what we found.';
 export const SUMMARY_LABELS = { verified: 'verified', fixes: 'fixes you told us about', notYet: 'not yet checked' } as const;

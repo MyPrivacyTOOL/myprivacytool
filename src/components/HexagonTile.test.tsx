@@ -6,7 +6,7 @@ import { toTile } from '@/lib/hexagonTile';
 import type { HexagonData } from '@/lib/deviceDetection';
 
 vi.mock('./VoiceAI', () => ({ default: () => null }));
-vi.mock('./RiskScore', () => ({ default: () => null }));
+vi.mock('./RiskScore', () => ({ default: () => <div data-testid="risk-score" /> }));
 vi.mock('./LanguageIntelligencePanel', () => ({ default: () => null }));
 vi.mock('./FingerprintPanel', () => ({ default: () => null }));
 vi.mock('./StoragePanel', () => ({ default: () => null }));
@@ -119,6 +119,26 @@ describe('HexagonGrid with VITE_HEXAGON_TILES on', () => {
     expect(isp().getAttribute('aria-label')).toMatch(/Not known/);
     expect(isp().getAttribute('aria-label')).not.toMatch(/\d+%/);
     expect(trackHexagonConfirm).toHaveBeenCalledWith('isp', 'ISP', true, 'unknown');
+  });
+
+  it('hides the tap-driven RiskScore with the flag on, and keeps it with the flag off', () => {
+    vi.stubEnv('VITE_HEXAGON_TILES', 'true');
+    const { unmount } = render(<HexagonGrid hexagons={grid()} />);
+    expect(screen.queryByTestId('risk-score')).toBeNull();
+    unmount();
+    vi.unstubAllEnvs();
+    render(<HexagonGrid hexagons={grid()} />);
+    expect(screen.getByTestId('risk-score')).toBeInTheDocument();
+  });
+
+  it('explains an unknown tile by why it is unknown, not by its placeholder value or risk text', () => {
+    vi.stubEnv('VITE_HEXAGON_TILES', 'true');
+    render(<HexagonGrid hexagons={grid()} />);
+    fireEvent.click(screen.getByLabelText(/^ISP/));
+    const box = screen.getByTestId('hexagon-explanation');
+    expect(box).toHaveTextContent(/ISP: Not known/);
+    expect(box).toHaveTextContent(/did not complete/);
+    expect(box.textContent).not.toMatch(/Check failed|risk/);
   });
 
   it('with the flag off the old counter, progress bar and +5 behaviour are unchanged', () => {
