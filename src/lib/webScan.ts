@@ -55,7 +55,7 @@ const text = (v: unknown, n: number) => String(v ?? "").replace(CONTROL, "").sli
 
 // MPC-7487: the status is decided here, at capture, so the report can show FOUND with the real value instead of guessing later.
 // The Network Information API is the only source for the connection type; without it the "WiFi" on screen is an assumed default.
-function captureContext(hexagons: HexagonData[]) {
+export function captureContext(hexagons: HexagonData[]) {
   const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { connection?: { effectiveType?: string; type?: string } }) : undefined;
   const browser = hexagons.find((h) => h.id === "browser")?.value ?? "";
   return {
