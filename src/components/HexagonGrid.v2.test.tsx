@@ -36,7 +36,7 @@ const h = (id: string, label: string, value: string, confidence = 99): HexagonDa
 });
 // The first five by the interest order (webrtc, canvas, dns, typing, webgl), then three more.
 const makeHexagons = (): HexagonData[] => [
-  h('webrtc-leak', 'WebRTC Leak', 'No Leak Detected'),
+  h('webrtc-leak', 'WebRTC Leak', 'Leaking: 203.0.113.9'),
   h('canvas-fingerprint', 'Canvas Fingerprint', 'Vale Tulip'),
   h('dns-leak', 'DNS Leak', 'No Leak Detected'),
   h('typing-patterns', 'Typing Patterns', 'No input yet', 5),
@@ -62,11 +62,12 @@ describe('HexagonGrid with the honest tiles on (MPC-7916)', () => {
   it('shows the risk profile as plain counts and removes the percentage bar and the score card', () => {
     render(<HexagonGrid hexagons={makeHexagons()} />);
     const profile = screen.getByTestId('risk-profile');
-    // visible first five: webrtc (couldn't check), canvas (needs fixing), dns (can't check), typing (not checked), webgl (needs fixing)
+    // visible first five (DNS, which a web page cannot check, sorts last): webrtc (leaking: needs fixing), canvas (needs fixing),
+    // typing (not checked), webgl (needs fixing), location (our guess)
     expect(profile).toHaveTextContent('0 clear');
-    expect(profile).toHaveTextContent('2 need fixing');
-    expect(profile).toHaveTextContent('0 our guess');
-    expect(profile).toHaveTextContent('3 not checked yet');
+    expect(profile).toHaveTextContent('3 need fixing');
+    expect(profile).toHaveTextContent('1 our guess');
+    expect(profile).toHaveTextContent('1 not checked yet');
     expect(profile.textContent).not.toMatch(/%| of /);
     expect(screen.queryByTestId('confirmation-progress')).toBeNull();
     expect(screen.queryByTestId('risk-score-card')).toBeNull();
@@ -82,13 +83,14 @@ describe('HexagonGrid with the honest tiles on (MPC-7916)', () => {
     expect(container.textContent).not.toMatch(/We found \d+ data points/);
   });
 
-  it('a tap means seen: the reveal works as before, nothing is sent as a confirmation, and nothing is drawn as confirmed', () => {
+  it('a tap means seen: the reveal works as before, the event carries the tile kind, and nothing is drawn as confirmed', () => {
     render(<HexagonGrid hexagons={makeHexagons()} />);
     expect(screen.getAllByRole('button')).toHaveLength(5);
     tapFiveAndWaitForReveal();
     expect(screen.getAllByRole('button')).toHaveLength(8);
-    expect(analytics.trackHexagonConfirm).not.toHaveBeenCalled();
-    expect(analytics.trackHexagonAccuracy).not.toHaveBeenCalled();
+    // as on main: the funnel event is still sent, now with the tile kind so a tap on a grey tile can be told from one on a red tile
+    expect(analytics.trackHexagonConfirm).toHaveBeenCalledWith('webrtc-leak', 'WebRTC Leak', true, 'needs_fixing');
+    expect(analytics.trackHexagonConfirm).toHaveBeenCalledWith('typing-patterns', 'Typing Patterns', true, 'not_checked');
     expect(document.querySelector('.animate-hexagon-confirm')).toBeNull();
   });
 
@@ -124,16 +126,37 @@ describe('HexagonGrid with the flag off (MPC-7916)', () => {
 
 describe('HexagonGrid explanation box with the honest tiles on (MPC-7916)', () => {
   beforeEach(() => { vi.stubEnv('VITE_HEX_TILE_V2', 'true'); Element.prototype.scrollIntoView = vi.fn(); });
-  afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); vi.useRealTimers(); });
+  const tapFiveAndWaitForReveal = () => {
+    vi.useFakeTimers();
+    for (const b of screen.getAllByRole('button').slice(0, 5)) fireEvent.click(b);
+    act(() => { vi.advanceTimersByTime(12000); });
+  };
   it('tapping the grey DNS tile never says the lookups look normal', () => {
     const hexes = makeHexagons().map((x) => (x.id === 'dns-leak'
       ? { ...x, headline: 'Your lookups look normal', explanation: 'We did not see your lookups leaving through an unexpected route.' }
       : x));
     render(<HexagonGrid hexagons={hexes} />);
+    // DNS sorts last, so reveal the rest first
+    tapFiveAndWaitForReveal();
     const dns = screen.getAllByRole('button').find((b) => /DNS Leak/.test(b.getAttribute('aria-label') ?? ''))!;
     fireEvent.click(dns);
     const box = screen.getByTestId('hexagon-explanation');
     expect(box).toHaveTextContent("A web page can't check this");
     expect(box.textContent).not.toMatch(/look normal|did not see/i);
+  });
+});
+
+
+describe('the older switch name still works (VITE_HEXAGON_TILES, from main)', () => {
+  beforeEach(() => { vi.stubEnv('VITE_HEXAGON_TILES', 'true'); Element.prototype.scrollIntoView = vi.fn(); });
+  afterEach(() => vi.unstubAllEnvs());
+  it('turns the honest tiles on', () => {
+    render(<HexagonGrid hexagons={makeHexagons()} />);
+    expect(screen.getByTestId('risk-profile')).toBeInTheDocument();
+  });
+  it('cannot-check tiles sort last: DNS is not among the first five', () => {
+    render(<HexagonGrid hexagons={makeHexagons()} />);
+    expect(screen.queryByLabelText(/^DNS Leak/)).toBeNull();
   });
 });

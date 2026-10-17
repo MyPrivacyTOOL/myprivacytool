@@ -14,6 +14,10 @@ describe('hex tile flag (MPC-7916)', () => {
     vi.stubEnv('VITE_HEX_TILE_V2', 'true');
     expect(hexTileV2Enabled('')).toBe(true);
   });
+  it('the older name VITE_HEXAGON_TILES (from main) turns it on too', () => {
+    vi.stubEnv('VITE_HEXAGON_TILES', 'true');
+    expect(hexTileV2Enabled('')).toBe(true);
+  });
   it('turns on for one tab with ?hex_v2=1 and for nothing else', () => {
     expect(hexTileV2Enabled('?hex_v2=1')).toBe(true);
     expect(hexTileV2Enabled('?a=b&hex_v2=1')).toBe(true);

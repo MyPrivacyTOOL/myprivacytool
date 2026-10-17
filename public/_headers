@@ -15,6 +15,10 @@
 # Unhashed static files: cache a day at the browser, a week at the edge, serve stale while refreshing.
 /*.jpg
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/footprint/
+  Cache-Control: public, max-age=0, must-revalidate
+/footprint/curtain.json
+  Cache-Control: public, max-age=0, must-revalidate
 /blog/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /media/*

@@ -14,8 +14,9 @@ export function hexTileV2Enabled(search?: string): boolean {
   } catch {
     /* no window or blocked: use the build setting */
   }
+  // VITE_HEXAGON_TILES is the older name for the same switch (it was on main before this one); either turns the tiles on.
   // The one-job-per-screen layout (Phase 2) is built on the honest tiles, so turning it on turns them on too.
-  return parseHexTileV2(import.meta.env.VITE_HEX_TILE_V2) || parseHexTileV2(import.meta.env.VITE_HEX_SCREEN_V2);
+  return parseHexTileV2(import.meta.env.VITE_HEX_TILE_V2) || parseHexTileV2(import.meta.env.VITE_HEXAGON_TILES) || parseHexTileV2(import.meta.env.VITE_HEX_SCREEN_V2);
 }
 
 // MPC-7916 Phase 2: one job per screen (hexagons first, one next step at a time, the four-level detail ladder, the help page).

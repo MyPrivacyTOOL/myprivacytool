@@ -121,12 +121,13 @@ export const trackDeviceProfile = (deviceData: {
 };
 
 // Hexagon tracking events
-export const trackHexagonConfirm = (hexagonId: string, label: string, confirmed: boolean) => {
+export const trackHexagonConfirm = (hexagonId: string, label: string, confirmed: boolean, tileClass?: string) => {
   trackActivity();
   trackEvent('hexagon_confirm', {
     hexagon_id: hexagonId,
     hexagon_label: label,
     action: confirmed ? 'confirmed' : 'unconfirmed',
+    ...(tileClass ? { tile_class: tileClass } : {}),
   });
 };
 

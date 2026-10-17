@@ -136,3 +136,12 @@ describe('you told us (MPC-7916 Phase 2)', () => {
     expect(riskProfileParts(riskProfile([])).map((x) => x.text).join(' ')).not.toMatch(/told us/);
   });
 });
+
+import { cannotCheckLast } from './hexagonTile';
+
+describe('cannotCheckLast (from the first tile PR)', () => {
+  it('moves cannot-check ids to the end, keeping the rest in order', () => {
+    const ids = ['dns-leak', 'canvas-fingerprint', 'social-platforms', 'device', 'webrtc-leak'].map((id) => ({ id }));
+    expect(cannotCheckLast(ids).map((i) => i.id)).toEqual(['canvas-fingerprint', 'device', 'webrtc-leak', 'dns-leak', 'social-platforms']);
+  });
+});

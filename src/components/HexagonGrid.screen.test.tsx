@@ -111,7 +111,8 @@ describe('HexagonGrid, one job per screen (MPC-7916 Phase 2)', () => {
     fireEvent.click(screen.getByTestId('show-more'));
     act(() => { vi.advanceTimersByTime(12000); });
     expect(tiles()).toHaveLength(8);
-    expect(analytics.trackHexagonConfirm).not.toHaveBeenCalled();
+    // the funnel event still goes out (as on main) with the tile kind: a tap is "seen", it unlocked nothing
+    expect(analytics.trackHexagonConfirm).toHaveBeenCalledWith('webrtc-leak', 'WebRTC Leak', true, 'needs_fixing');
   });
 
   it('the extras are out of the way: no stranger card, no panels, no final summary, no confetti', async () => {
@@ -132,14 +133,15 @@ describe('HexagonGrid, one job per screen (MPC-7916 Phase 2)', () => {
     render(<HexagonGrid hexagons={makeHexagons()} />);
     expect(screen.queryByTestId('detail-level-2')).toBeNull();
     fireEvent.click(screen.getByText('Reasons'));
-    expect(screen.getByTestId('detail-level-2')).toHaveTextContent('A web page cannot check this.');
+    expect(screen.getByTestId('detail-level-2')).toHaveTextContent('A tracker can read this and it matters.');
+    expect(screen.getByTestId('detail-level-2')).toHaveTextContent('We have not looked at this yet.');
     expect(screen.queryByTestId('pro-detail')).toBeNull();
     fireEvent.click(screen.getByText('Pro mode'));
     const pro = screen.getAllByTestId('pro-detail').map((n) => n.textContent ?? '');
     expect(pro.some((t) => /Read from your browser/.test(t))).toBe(true);
     // a tile that makes no claim never says it was read
-    expect(pro.filter((t) => /No reading used/.test(t))).toHaveLength(2);
-    expect(pro.filter((t) => /Cannot be checked|Read from your browser/.test(t) && /No reading used/.test(t))).toHaveLength(0);
+    expect(pro.filter((t) => /No reading used/.test(t))).toHaveLength(1);
+    expect(pro.filter((t) => /Read from your browser/.test(t) && /No reading used/.test(t))).toHaveLength(0);
     fireEvent.click(screen.getByText('Expert mode'));
     expect(screen.getAllByTestId('expert-detail')).not.toHaveLength(0);
     expect(screen.getByTestId('detail-ladder').textContent).not.toMatch(/\d+%/);

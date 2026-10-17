@@ -19,6 +19,8 @@ const TABLES = new Set([
   'mpt_user_engagement',
   'mpt_api_rate_limits',
   'mpt_channel_metrics',
+  'mpt_hexagon_interactions',
+  'osint_engine_tuning_log',
 ]);
 
 /**
