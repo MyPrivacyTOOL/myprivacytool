@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2 } from '@/lib/scanCopy';
 import HexagonGrid from '@/components/HexagonGrid';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
@@ -247,12 +249,23 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
-          <p className="text-sm sm:text-lg text-foreground">
-            <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
-          </p>
-          <p className="text-sm sm:text-lg text-foreground">
-            Click the ones that are correct.
-          </p>
+          {hexTileV2Enabled() ? (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span>: {HERO_TILES_LINE1}
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">{HERO_TILES_LINE2}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">
+                Click the ones that are correct.
+              </p>
+            </>
+          )}
         </section>
 
         {/* Live Device Tracking Hero */}
