@@ -59,8 +59,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # The Cloudflare script name comes from wrangler.toml ("myprivacytool-webhook-receiver"), not the folder name.
+          name=$(sed -n 's/^name *= *"\(.*\)"/\1/p' workers/webhook-receiver/wrangler.toml | head -1)
+          echo "WORKER_NAME=$name" >> "$GITHUB_ENV"; export WORKER_NAME="$name"
           curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/webhook-receiver/secrets" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER_NAME/secrets" \
             | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.before
           echo "secret names before:"; cat /tmp/secrets.before
           sort workers/webhook-receiver/EXPECTED_SECRETS.txt > /tmp/secrets.expected
@@ -85,7 +88,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/webhook-receiver/secrets" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER_NAME/secrets" \
             | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
           echo "secret names after:"; cat /tmp/secrets.after
           if ! diff -q /tmp/secrets.before /tmp/secrets.after >/dev/null; then echo "::error::secret names changed across deploy"; diff /tmp/secrets.before /tmp/secrets.after; exit 1; fi
