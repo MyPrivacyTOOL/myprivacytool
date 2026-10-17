@@ -10,12 +10,13 @@ import { captureStatus, isEstimate } from '../../shared/hexagon-registry/status.
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
 
 export type TileColour = 'green' | 'red' | 'purple' | 'grey';
-export type TileLevel = 'solid' | 'faint';
+export type TileLevel = 'solid' | 'medium' | 'faint';
 export type TileKind =
   | 'clear'
   | 'needs_fixing'
   | 'our_guess'
   | 'seen_low_risk'
+  | 'you_told_us'
   | 'not_checked'
   | 'couldnt_check'
   | 'cant_check_here';
@@ -48,6 +49,8 @@ export const TILE_COPY: Record<TileKind, { line: string; glyph: string; colour: 
   needs_fixing: { line: 'Needs fixing', glyph: '!', colour: 'red', level: 'solid', showValue: true },
   our_guess: { line: 'Our guess', glyph: '?', colour: 'purple', level: 'faint', showValue: true },
   seen_low_risk: { line: 'Seen · low risk', glyph: 'i', colour: 'grey', level: 'solid', showValue: true },
+  // Phase 2: the visitor said they fixed it. Their word, not our proof: medium, never solid, and it only becomes clear when we re-check.
+  you_told_us: { line: 'You told us', glyph: '✓', colour: 'green', level: 'medium', showValue: true },
   not_checked: { line: 'Not checked yet', glyph: '–', colour: 'grey', level: 'solid', showValue: false },
   couldnt_check: { line: "Couldn't check", glyph: '↻', colour: 'grey', level: 'solid', showValue: false },
   cant_check_here: { line: "Can't check from here", glyph: '–', colour: 'grey', level: 'solid', showValue: false },
@@ -71,6 +74,12 @@ export function tileKind(input: TileInput, ctx: TileContext = {}): TileKind {
   return reg?.truth.sensitivity === 'low' ? 'seen_low_risk' : 'needs_fixing';
 }
 
+/** The visitor says a red tile is fixed. Their word, not our proof, so it is medium green and never solid. */
+export function withUserStatement(tile: HexagonTile): HexagonTile {
+  const c = TILE_COPY.you_told_us;
+  return { ...tile, kind: 'you_told_us', colour: c.colour, level: c.level, glyph: c.glyph, line: c.line, showValue: c.showValue };
+}
+
 export function toTile(input: TileInput, ctx: TileContext = {}): HexagonTile {
   const kind = tileKind(input, ctx);
   const c = TILE_COPY[kind];
@@ -79,6 +88,7 @@ export function toTile(input: TileInput, ctx: TileContext = {}): HexagonTile {
 
 export interface RiskProfile {
   clear: number;
+  youToldUs: number;
   needsFixing: number;
   ourGuess: number;
   seenLowRisk: number;
@@ -90,9 +100,10 @@ export interface RiskProfile {
  * There is no percentage and no Low / Medium / High rating (Chris, 2026-10-16).
  */
 export function riskProfile(tiles: Pick<HexagonTile, 'kind'>[]): RiskProfile {
-  const p: RiskProfile = { clear: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 };
+  const p: RiskProfile = { clear: 0, youToldUs: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 };
   for (const t of tiles) {
     if (t.kind === 'clear') p.clear++;
+    else if (t.kind === 'you_told_us') p.youToldUs++;
     else if (t.kind === 'needs_fixing') p.needsFixing++;
     else if (t.kind === 'our_guess') p.ourGuess++;
     else if (t.kind === 'seen_low_risk') p.seenLowRisk++;
@@ -104,6 +115,8 @@ export function riskProfile(tiles: Pick<HexagonTile, 'kind'>[]): RiskProfile {
 export function riskProfileParts(p: RiskProfile): { key: keyof RiskProfile; text: string }[] {
   return [
     { key: 'clear', text: `${p.clear} clear` },
+    // Only shown once the visitor has said something, so the Phase 1 line is unchanged until then.
+    ...(p.youToldUs > 0 ? [{ key: 'youToldUs' as const, text: `${p.youToldUs} you told us` }] : []),
     { key: 'needsFixing', text: `${p.needsFixing} need${p.needsFixing === 1 ? 's' : ''} fixing` },
     { key: 'ourGuess', text: `${p.ourGuess} our guess` },
     { key: 'seenLowRisk', text: `${p.seenLowRisk} seen, low risk` },

@@ -21,3 +21,20 @@ describe('hex tile flag (MPC-7916)', () => {
     expect(hexTileV2Enabled('?xhex_v2=1')).toBe(false);
   });
 });
+
+import { hexScreenV2Enabled } from './hexagonTile';
+
+describe('hex screen flag (MPC-7916 Phase 2)', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('is off by default and for ?hex_v2=1 (tiles only)', () => {
+    expect(hexScreenV2Enabled('')).toBe(false);
+    expect(hexScreenV2Enabled('?hex_v2=1')).toBe(false);
+  });
+  it('turns on for ?hex_v2=2 or the build variable, and either turns the tiles on too', () => {
+    expect(hexScreenV2Enabled('?hex_v2=2')).toBe(true);
+    expect(hexTileV2Enabled('?hex_v2=2')).toBe(true);
+    vi.stubEnv('VITE_HEX_SCREEN_V2', 'true');
+    expect(hexScreenV2Enabled('')).toBe(true);
+    expect(hexTileV2Enabled('')).toBe(true);
+  });
+});
