@@ -1,0 +1,112 @@
+name: Deploy webhook-receiver Worker
+
+# The WhatsApp / Telegram / SMS / email webhook receiver (deep dive RESULTS command) deploys from this repo to the
+# MyPrivacyTOOL Cloudflare account on merge to main.
+#
+# Repo secrets required (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
+#   CLOUDFLARE_ACCOUNT_ID  (same as the other Worker deploys)
+#
+# Safety: runs the pre-deploy config checks and the Worker's tests first; after deploy it lists the Worker's secret
+# NAMES via the API and FAILS if the set changed across the deploy (a dropped secret silently breaks the channels and
+# cannot be recovered by an API call). Names in EXPECTED_SECRETS.txt that were never set only warn: some are optional
+# (unset OSINT providers report not_checked).
+# MPC-7300: then smoke-tests the live Worker and auto-rolls back if that fails.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/webhook-receiver/**'
+      - 'src/services/osintOrchestrator.ts'
+      - 'src/lib/identityConfirmation.ts'
+      - 'src/types/hexagon.ts'
+      - 'src/utils/remediationMapper.ts'
+      - '.github/workflows/deploy-webhook-receiver.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-webhook-receiver
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Pre-deployment checks. Fails BEFORE anything ships if repo secrets are missing, wrangler.toml
+      # still has REPLACE_* placeholders, or EXPECTED_SECRETS.txt holds anything but secret NAMES.
+      - name: Pre-deployment checks (secrets present, Worker config valid)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/webhook-receiver
+
+      - name: Test Worker (stubbed fetch)
+        run: |
+          node workers/webhook-receiver/security.test.mjs
+          npm ci --no-audit --no-fund
+          npx vitest run workers/webhook-receiver
+
+      - name: Snapshot secret names before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/webhook-receiver/secrets" \
+            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.before
+          echo "secret names before:"; cat /tmp/secrets.before
+          sort workers/webhook-receiver/EXPECTED_SECRETS.txt > /tmp/secrets.expected
+          missing=$(comm -13 /tmp/secrets.before /tmp/secrets.expected)
+          [ -z "$missing" ] || echo "::warning::expected secrets not set on the Worker (channels using them are inactive): $(echo $missing)"
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        # The action runs `npm i wrangler@3.90.0` from the repo's npm workspace; a peer-dependency conflict from the
+        # core-brain workspace (wrangler 4 wants workers-types 5) makes that fail with ERESOLVE and blocks every deploy.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/webhook-receiver
+          command: deploy
+
+      - name: Verify secrets survived the deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/webhook-receiver/secrets" \
+            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
+          echo "secret names after:"; cat /tmp/secrets.after
+          if ! diff -q /tmp/secrets.before /tmp/secrets.after >/dev/null; then echo "::error::secret names changed across deploy"; diff /tmp/secrets.before /tmp/secrets.after; exit 1; fi
+          echo "OK: secret names unchanged"
+
+      # Post-deployment smoke test against the LIVE Worker (CORS preflight + the side-effect-free
+      # watchdog healthcheck POST). If it fails, roll back to the previous version and re-check; the job still
+      # ends red so the incident is visible. See docs/ci-cd-testing.md#rollback.
+      - name: Smoke test live Worker
+        id: smoke
+        run: node scripts/ci/smoke-test.mjs webhook-receiver --retries 4 --delay-ms 10000
+
+      - name: Roll back to the previous Worker version (smoke test failed)
+        if: failure() && steps.smoke.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/webhook-receiver
+          command: 'rollback --yes --message "auto-rollback, smoke test failed for ${{ github.sha }}"'
+
+      - name: Re-run smoke test after rollback
+        if: failure() && steps.smoke.outcome == 'failure'
+        run: node scripts/ci/smoke-test.mjs webhook-receiver --retries 3 --delay-ms 10000

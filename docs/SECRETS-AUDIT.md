@@ -94,7 +94,7 @@ human has to set it.
 | oauth-poc | `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY` | `workers/oauth-poc/` | ❌ | ✅ |
 | oauth-poc | `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_URL`) | `workers/oauth-poc/supabase.js` (optional account linking) | ❌ | optional, omitted on purpose |
 | telegram-webhook | `TELEGRAM_BOT_TOKEN`, `HUBSPOT_API_KEY`, `WEBHOOK_SECRET` | `workers/telegram-webhook/` | ❌ | ✅ |
-| webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` | `workers/webhook-receiver/` | ❌ (no deploy workflow) | ✅ (not enforced: no deploy workflow) |
+| webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` | `workers/webhook-receiver/` | ✅ `deploy-webhook-receiver.yml` | ✅ (names verified unchanged across each deploy) |
 | mirror-risk | none | — | — | ✅ (empty) |
 
 ## 4. Upstream source of each credential (where it is minted or rotated)
