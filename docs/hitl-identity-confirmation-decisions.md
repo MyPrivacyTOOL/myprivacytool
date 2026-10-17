@@ -42,6 +42,8 @@ Saved from the working session that built [#375](https://github.com/MyPrivacyTOO
 
 ## Images
 
+The flow diagram and score-rules page is saved as `images/hitl/hitl-flow-and-score-rules.html` (open it in a browser). It was first published as a private claude.ai artifact.
+
 | File | What it shows |
 |------|---------------|
 | `images/hitl/01-disputed-vs-false-positive-table-first-version.png` | First version of the score table, where the two statuses looked identical |
