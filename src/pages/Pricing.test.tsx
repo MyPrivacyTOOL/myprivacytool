@@ -104,7 +104,7 @@ describe("Pricing A/B tests (MPC-7638)", () => {
     // The hook reads window.location.search, not the router, so set the real URL.
     window.history.replaceState({}, "", "/pricing?ab_pricing_headline=free_first&ab_pricing_cta=notify_text&ab_pricing_social_proof=above_plans");
     renderPage(<Pricing />);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Know your exposure for free. Pay to remove it.");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Know your exposure for free. Removal is planned.");
     expect(screen.getAllByRole("button", { name: "Notify me when plans open" })).toHaveLength(3);
     expect(screen.getByText("The scan is free and needs no credit card.")).toBeTruthy();
     fireEvent.click(screen.getAllByRole("button", { name: "Notify me when plans open" })[0]);

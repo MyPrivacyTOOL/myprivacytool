@@ -1,5 +1,5 @@
 import { hexTileV2Enabled } from '@/config/hexagonTile';
-import { tileExplanation, type HexagonTile } from '@/lib/hexagonTile';
+import { tileExplanation, TILE_BROWSER_SAYS, type HexagonTile } from '@/lib/hexagonTile';
 
 // CK-7805: owner-approved wording (2026-10-14). One place so the hint and the voice panel stay in step.
 export const HINT_TOUCH = 'Tap a hexagon to see what we found. Tapping also confirms it looks right to you.';
@@ -25,7 +25,7 @@ export function aliceTileMessage(
     const said = tileExplanation(hex.label, spokenValue(hex.displayValue ?? hex.value), tile, undefined, hex.explanation ?? hex.risk);
     // A tile that shows its value also says how we know it (the tile's own bottom line); a tile that makes no claim says only why.
     // "Our guess" is already said by the explanation, so its line is not repeated. The line's "·" is a pause, not a word to read out.
-    const line = tile.kind === 'our_guess' ? '' : ` ${tile.line.replace(/\s*·\s*/g, ', ')}.`;
+    const line = (tile.kind === 'our_guess' ? '' : ` ${tile.line.replace(/\s*·\s*/g, ', ')}.`) + (tile.browserSays ? ` ${TILE_BROWSER_SAYS}.` : '');
     return (tile.showValue ? `${said.headline}.${line} ${said.text}` : `${said.headline}. ${said.text}`).replace(/\s+/g, ' ').trim();
   }
   return seenCount === 0 ? ALICE_TILES_INTRO : ALICE_TILES_NEXT;

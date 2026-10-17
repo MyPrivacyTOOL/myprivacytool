@@ -71,3 +71,25 @@ describe('Hexagon tile icon (MPC-7916)', () => {
     expect(container.textContent).toMatch(/🔓/);
   });
 });
+
+describe('Hexagon "your browser says this" tick', () => {
+  it('shows the outlined tick and its caption on Timezone/Locale, and says it in the aria label', () => {
+    const data = hex({ id: 'timezone-locale', label: 'Timezone/Locale', value: 'London (en-GB)' });
+    const tile = toTile({ id: data.id, value: data.value });
+    render(<Hexagon data={data} onConfirm={noop} onHover={noop} tile={tile} />);
+    expect(screen.getByTestId('browser-says')).toBeInTheDocument();
+    expect(screen.getByTestId('browser-says-caption')).toHaveTextContent('Your browser says this');
+    expect(screen.getByRole('button').getAttribute('aria-label')).toMatch(/Your browser says this\.$/);
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Seen · low risk');
+  });
+
+  it('no tick on a tile with a lower held confidence, and none without a tile', () => {
+    const lower = hex({ id: 'device', label: 'Device Type', value: 'Desktop' });
+    const { unmount } = render(<Hexagon data={lower} onConfirm={noop} onHover={noop} tile={toTile({ id: lower.id, value: lower.value })} />);
+    expect(screen.queryByTestId('browser-says')).toBeNull();
+    unmount();
+    const plain = hex({ id: 'timezone-locale', label: 'Timezone/Locale', value: 'London (en-GB)' });
+    render(<Hexagon data={plain} onConfirm={noop} onHover={noop} />);
+    expect(screen.queryByTestId('browser-says')).toBeNull();
+  });
+});

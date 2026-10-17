@@ -87,7 +87,8 @@ describe('HexagonGrid with the honest tiles on (MPC-7916)', () => {
     render(<HexagonGrid hexagons={makeHexagons()} />);
     expect(screen.getAllByRole('button')).toHaveLength(5);
     tapFiveAndWaitForReveal();
-    expect(screen.getAllByRole('button')).toHaveLength(8);
+    // the tapped Location tile also opens its guess-check card (Yes / No / Check with my device), so count only the tiles
+    expect(screen.getAllByRole('button').filter((b) => !b.closest('[data-testid="guess-check"]'))).toHaveLength(8);
     // as on main: the funnel event is still sent, now with the tile kind so a tap on a grey tile can be told from one on a red tile
     expect(analytics.trackHexagonConfirm).toHaveBeenCalledWith('webrtc-leak', 'WebRTC Leak', true, 'needs_fixing');
     expect(analytics.trackHexagonConfirm).toHaveBeenCalledWith('typing-patterns', 'Typing Patterns', true, 'not_checked');

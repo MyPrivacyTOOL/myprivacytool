@@ -77,8 +77,8 @@ const PLANS: Plan[] = PLAN_ROWS.map((p) => ({
 // MPC-7638: A/B tests (docs/ab-testing.md). Every variant string below is truthful for a page with no
 // checkout yet; the trust line makes no claim beyond what the Free plan already states.
 const HEADLINE = {
-  control: { h1: "Pricing", sub: "The scan is free. Paid plans remove your data from brokers and keep it off." },
-  free_first: { h1: "Know your exposure for free. Pay to remove it.", sub: "Paid plans remove your data from brokers and keep it off." },
+  control: { h1: "Pricing", sub: "The scan is free. Paid plans are planned to remove your data from brokers and keep it off; they are not open yet." },
+  free_first: { h1: "Know your exposure for free. Removal is planned.", sub: "Paid plans are planned to remove your data from brokers and keep it off; they are not open yet." },
 } as const;
 const TRUST_LINE = "The scan is free and needs no credit card.";
 const PRICING_TESTS = ["pricing_headline", "pricing_cta", "pricing_tiers", "pricing_social_proof"] as const;
