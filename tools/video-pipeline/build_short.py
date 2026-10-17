@@ -233,6 +233,15 @@ class Cue:
     text: str
 
 
+def _two_lines(words: list[str]) -> str:
+    """Break a caption of more than 4 words into two balanced lines at a word boundary, so the
+    renderer never has to wrap inside a hyphenated word such as Do-Not-Call."""
+    if len(words) <= 4:
+        return " ".join(words)
+    half = math.ceil(len(words) / 2)
+    return " ".join(words[:half]) + "\n" + " ".join(words[half:])
+
+
 def make_cues(script: Script, tl: Timeline, max_words: int = MAX_CAPTION_WORDS) -> list[Cue]:
     """Captions are the narration word for word. A beat is split into chunks of at
     most `max_words` words, each timed by its share of the beat's letters."""
@@ -241,7 +250,7 @@ def make_cues(script: Script, tl: Timeline, max_words: int = MAX_CAPTION_WORDS) 
         words = beat.narration.split()
         n_chunks = max(1, math.ceil(len(words) / max_words))
         per = math.ceil(len(words) / n_chunks)
-        chunks = [" ".join(words[i:i + per]) for i in range(0, len(words), per)]
+        chunks = [_two_lines(words[i:i + per]) for i in range(0, len(words), per)]
         weights = [max(1, len(c)) for c in chunks]
         total_w = sum(weights)
         t = start
@@ -300,7 +309,13 @@ def render_frame(beat: Beat, alice_path: Path | None, out_png: Path) -> None:
 
     img = Image.new("RGB", (W, H), WHITE)
     d = ImageDraw.Draw(img)
-    bold = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), 92)
+    # Shrink the headline until its longest word (e.g. a URL) fits inside the side margins.
+    headline_size = 92
+    bold = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), headline_size)
+    if beat.on_screen:
+        while headline_size > 48 and max(d.textlength(w, font=bold) for w in beat.on_screen.split()) > W - 140:
+            headline_size -= 4
+            bold = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), headline_size)
     small = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), 40)
     d.text((70, 80), "MyPrivacyTOOL", font=small, fill=BLACK)
 

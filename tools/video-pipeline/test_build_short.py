@@ -69,6 +69,11 @@ class TimingTests(unittest.TestCase):
         for a, b in zip(cues, cues[1:]):
             self.assertLessEqual(a.end, b.start + 1e-6)
 
+    def test_long_captions_break_at_word_boundaries_in_two_lines(self):
+        text = bs._two_lines("There are three free Do-Not-Call registers, for".split())
+        self.assertEqual(text, "There are three free\nDo-Not-Call registers, for")
+        self.assertEqual(bs._two_lines("It is free".split()), "It is free")
+
     def test_srt_format(self):
         srt = bs.to_srt(bs.make_cues(self.script, self.tl))
         self.assertTrue(srt.startswith("1\n00:00:00,2"))
@@ -90,6 +95,20 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual((st["width"], st["height"]), (1080, 1920))
             self.assertTrue(paths["srt"].read_text().strip())
             self.assertLess(paths["thumb"].stat().st_size, 2_000_000)
+
+
+@unittest.skipUnless(bs.INTER_DIR.exists(), "needs the Inter font")
+class FrameLayoutTest(unittest.TestCase):
+    def test_long_url_headline_stays_inside_the_side_margins(self):
+        from PIL import Image
+
+        beat = bs.Beat(narration="Check your exposure.", on_screen="Check your exposure: myprivacytool.io/scan")
+        with tempfile.TemporaryDirectory() as out:
+            png = Path(out) / "f.png"
+            bs.render_frame(beat, None, png)
+            im = Image.open(png).convert("L").crop((0, 200, bs.W, 620))
+            xs = [x for x in range(im.width) for y in range(0, im.height, 2) if im.getpixel((x, y)) < 100]
+            self.assertLessEqual(max(xs), bs.W - 60)
 
 
 if __name__ == "__main__":
