@@ -55,6 +55,14 @@ class TimingTests(unittest.TestCase):
             self.assertAlmostEqual(tl.starts[i + 1] - tl.ends[i], bs.PAUSE_S, places=2)
         self.assertAlmostEqual(tl.total - tl.ends[-1], bs.TAIL_S, places=2)
 
+    def test_holds_lengthen_only_the_lead_in_and_tail(self):
+        _, held = bs.build_voice_track(self.script, bs.SilentVoice(), hold_in=1.5, hold_out=2.0)
+        self.assertAlmostEqual(held.starts[0], bs.LEAD_IN_S + 1.5, places=2)
+        self.assertAlmostEqual(held.total - held.ends[-1], bs.TAIL_S + 2.0, places=2)
+        self.assertAlmostEqual(held.total - self.tl.total, 3.5, places=2)
+        for i in range(len(held.starts) - 1):
+            self.assertAlmostEqual(held.starts[i + 1] - held.ends[i], bs.PAUSE_S, places=2)
+
     def test_audio_length_matches_timeline(self):
         self.assertAlmostEqual(len(self.samples) / 24000, self.tl.total, places=1)
 
@@ -95,6 +103,22 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual((st["width"], st["height"]), (1080, 1920))
             self.assertTrue(paths["srt"].read_text().strip())
             self.assertLess(paths["thumb"].stat().st_size, 2_000_000)
+
+    def test_sting_with_holds_adds_exactly_the_hold_seconds(self):
+        sting = HERE.parent.parent / "assets" / "branding" / "audio" / "mpt-sting_v1.0.wav"
+        self.assertTrue(sting.exists(), "the approved brand sting is missing")
+
+        def duration(path):
+            out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                                 capture_output=True, text=True, check=True)
+            return float(out.stdout)
+
+        with tempfile.TemporaryDirectory() as out:
+            script = bs.load_script(EXAMPLE)
+            script.beats = script.beats[:2]
+            plain = bs.build(script, bs.SilentVoice(), Path(out) / "a", alice=None)
+            held = bs.build(script, bs.SilentVoice(), Path(out) / "b", alice=None, sting=sting, hold_in=1.5, hold_out=2.0)
+            self.assertAlmostEqual(duration(held["video"]) - duration(plain["video"]), 3.5, delta=0.15)
 
 
 @unittest.skipUnless(bs.INTER_DIR.exists(), "needs the Inter font")
