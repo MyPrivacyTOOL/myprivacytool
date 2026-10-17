@@ -34,16 +34,35 @@ describe('InteractiveHexagonTile', () => {
     fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
     expect(onConfirm).not.toHaveBeenCalled();
   });
-  it('shows the dispute button only for checked findings above 0.8, and it does not open the prompt', () => {
+  it('has no `!` badge: a checked finding above 0.8 opens a labelled dispute prompt, and only its button disputes', () => {
     const onDispute = vi.fn();
-    const { rerender } = render(<InteractiveHexagonTile hexagon={hex({ status: 'checked', confidence_score: 0.95 })} onConfirm={vi.fn()} onDispute={onDispute} />);
-    fireEvent.click(screen.getByTitle('Not me?'));
-    expect(onDispute).toHaveBeenCalledWith('h1');
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'checked', confidence_score: 0.95 })} onConfirm={vi.fn()} onDispute={onDispute} />);
+    expect(screen.queryByTitle('Not me?')).toBeNull();
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    rerender(<InteractiveHexagonTile hexagon={hex({ status: 'checked', confidence_score: 0.7 })} onConfirm={vi.fn()} onDispute={onDispute} />);
-    expect(screen.queryByTitle('Not me?')).toBeNull();
+    fireEvent.click(screen.getByTitle('Checked.'));
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+    expect(onDispute).not.toHaveBeenCalled();          // opening the prompt records nothing
+    fireEvent.click(screen.getByRole('button', { name: /this isn't right/i }));
+    expect(onDispute).toHaveBeenCalledWith('h1');
+  });
+  it('Keep it and Escape close the dispute prompt without disputing', () => {
+    const onDispute = vi.fn();
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'checked', confidence_score: 0.95 })} onConfirm={vi.fn()} onDispute={onDispute} />);
+    fireEvent.click(screen.getByTitle('Checked.'));
+    fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
+    fireEvent.click(screen.getByTitle('Checked.'));
+    fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+    expect(onDispute).not.toHaveBeenCalled();
+  });
+  it('opens no prompt for a checked finding at 0.8 or below, or one already disputed', () => {
+    const onDispute = vi.fn();
+    const { rerender } = render(<InteractiveHexagonTile hexagon={hex({ status: 'checked', confidence_score: 0.7 })} onConfirm={vi.fn()} onDispute={onDispute} />);
+    fireEvent.click(screen.getByTitle('Checked.'));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     rerender(<InteractiveHexagonTile hexagon={hex({ status: 'disputed', confidence_score: 0.95 })} onConfirm={vi.fn()} onDispute={onDispute} />);
-    expect(screen.queryByTitle('Not me?')).toBeNull();
+    fireEvent.click(screen.getByTitle(/you disputed/i));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(onDispute).not.toHaveBeenCalled();
   });
 });
 

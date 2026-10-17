@@ -27,11 +27,11 @@ Saved from the working session that built [#375](https://github.com/MyPrivacyTOO
 | 11 | Showing findings to anyone holding the 24-hour scan link is acceptable for now. Revisit with MPC-7902. | The link goes to the person's own WhatsApp and expires. MPC-7902 (proof-of-possession, prefetch-resistant links) should harden it. Agreed 2026-10-16. |
 | 12 | A person reviews the new page wording before any real link is sent. The feature stays off until `VITE_DEEP_DIVE_API_URL` is set. | Nothing is exposed in the meantime. Agreed 2026-10-16. |
 | 13 | Apply `20261015200000_whatsapp_notify_engagement_log.sql` together with the Worker deploy, after reading it. | It changes an existing table (`mpt_user_engagement.user_id` becomes nullable). Agreed 2026-10-16. |
+| 14 | `!` means risk only. Disputing is a labelled "This isn't right" button inside its own prompt ("Does this look wrong?", with "Keep it" to close), opened by tapping a checked finding above 0.8. The small `!` "Not me?" badge is gone from both tiles. | The same findings are both "needs fixing" (risk) and the only ones that can be disputed, so one `!` could not mean both. A dispute is rare and should be deliberate, not a stray tap. The `dispute` action, tables and score rules are unchanged. Agreed 2026-10-17. |
 
 ## Open
 
-- **`!` badge clash** (image 03). In the shipped tile, a small `!` means "Not me?", a dispute. In the mockup, red hexagons with `!` and "Needs fixing" read as risk. Settle which one `!` means before both ship. This belongs to the hexagon visual chat.
-- **Copy review** of the `/scan/deep-dive` wording (decision 12) is still to be done by a person.
+- **Copy review** of the `/scan/deep-dive` wording (decision 12) and of the new dispute prompt wording (decision 14) is still to be done by a person.
 
 ## Production status (as of 2026-10-16 01:26 HKT)
 
