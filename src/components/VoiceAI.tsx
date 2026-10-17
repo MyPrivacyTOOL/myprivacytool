@@ -862,24 +862,27 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
   const [showRateLimitModal, setShowRateLimitModal] = useState(false);
   const { toast } = useToast();
 
-  // Get current risk score for debug panel
-  const { score: currentRiskScore } = calculateRiskScore(confirmedCount, totalCount);
+  // Get current risk score for debug panel. With the honest tiles on there is no score at all: the old one is a function of how many
+  // tiles were tapped, so it is neither computed, stored, logged nor shown (MPC-7916).
+  const currentRiskScore = v2 ? null : calculateRiskScore(confirmedCount, totalCount).score;
 
   // Update previous risk score when confirmed count changes
   useEffect(() => {
+    if (v2) return;
     const { score } = calculateRiskScore(confirmedCount, totalCount);
     // Store current as previous for next comparison
     return () => {
       setPreviousRiskScore(score);
     };
-  }, [confirmedCount, totalCount]);
+  }, [confirmedCount, totalCount, v2]);
 
   // Simulate completing all hexagons (for debug panel)
   const handleSimulateComplete = useCallback(() => {
     // This would need to be passed up to parent, for now just track
+    if (v2) return; // debug simulation of the old tap-based score and scan count: nothing to simulate with the honest tiles
     incrementScansCompleted();
     updateBestRiskScore(0);
-  }, []);
+  }, [v2]);
 
   const handleVoiceClick = useCallback(() => {
     if (isSpeaking) {
@@ -921,10 +924,12 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
         trackVoiceIntroPlayed();
       }
       
-      // Update previous score after generating response
-      const { score } = calculateRiskScore(confirmedCount, totalCount);
-      setPreviousRiskScore(score);
-      updateBestRiskScore(score);
+      // Update previous score after generating response (old tap-based score; not computed or stored with the honest tiles)
+      const score = v2 ? null : calculateRiskScore(confirmedCount, totalCount).score;
+      if (score !== null) {
+        setPreviousRiskScore(score);
+        updateBestRiskScore(score);
+      }
       
       // Track hexagon if one is selected
       if (hexagonData?.id && hexagonData?.label) {
@@ -941,11 +946,12 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
         trackVoiceSessionComplete({
           hexagonsCompleted: confirmedCount,
           totalHexagons: totalCount,
-          userCompletedScan: confirmedCount === totalCount && totalCount > 0,
+          // With the honest tiles a tap only means "seen", so tapping every tile is not a completed scan.
+          userCompletedScan: !v2 && confirmedCount === totalCount && totalCount > 0,
         });
         
-        // If scan is complete, track it
-        if (confirmedCount === totalCount && totalCount > 0) {
+        // If scan is complete, track it (old tap-based completion and score; not tracked with the honest tiles)
+        if (!v2 && score !== null && confirmedCount === totalCount && totalCount > 0) {
           incrementScansCompleted();
           trackVoiceScanCompleted(totalCount, score);
         }
@@ -1235,7 +1241,8 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
       </div>
 
       {/* Stats badge for users */}
-      <VoiceStatsBadge />
+      {/* The badge shows a stored best risk score and a scan count, both derived from taps: not shown with the honest tiles. */}
+      {!v2 && <VoiceStatsBadge />}
 
       {/* Debug panel for developers */}
       <VoiceDebugPanel 
