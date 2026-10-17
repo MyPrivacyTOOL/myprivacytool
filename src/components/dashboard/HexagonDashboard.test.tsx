@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { HexagonDashboard } from './HexagonDashboard';
 import { countSecured } from './countSecured';
@@ -52,5 +52,17 @@ describe('HexagonDashboard', () => {
     fireEvent.click(screen.getByTitle(/tap to confirm/i));
     fireEvent.click(screen.getByRole('button', { name: /yes, that's me/i }));
     expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('Export report downloads the honeycomb as one HTML file', async () => {
+    const created: Blob[] = [];
+    URL.createObjectURL = vi.fn((b: Blob) => { created.push(b); return 'blob:x'; });
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    render(<HexagonDashboard initialData={data} title="Sarah" />);
+    fireEvent.click(screen.getByRole('button', { name: /export report/i }));
+    expect(click).toHaveBeenCalledOnce();
+    expect(await created[0].text()).toContain('<title>Sarah</title>');
+    click.mockRestore();
   });
 });

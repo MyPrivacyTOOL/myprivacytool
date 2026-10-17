@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { Hexagon, ScanResult } from '@/types/hexagon';
+import { Button } from '@/components/ui/button';
 import { useHexagonState } from '@/hooks/useHexagonState';
 import { HexagonGrid } from '@/components/dashboard/HexagonGrid';
 import { ProgressRing } from '@/components/dashboard/ProgressRing';
 import { HitlConfirmModal } from '@/components/modals/HitlConfirmModal';
 import { countSecured } from '@/components/dashboard/countSecured';
+import { buildReportHtml } from '@/lib/honeycombReport';
 import { RemediationPanel } from '@/components/modals/RemediationPanel';
 
 const TOTAL = 54;
@@ -40,6 +42,18 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
     close();
   };
 
+  const exportReport = () => {
+    const html = buildReportHtml(scanResult.hexagons, {
+      title, fixedIds, total: TOTAL, date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+    });
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'digital-footprint-report.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const secured = countSecured(scanResult.hexagons, fixedIds);
 
   return (
@@ -47,7 +61,10 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-8">
       <header className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold sm:text-3xl">{title}</h1>
-        <ProgressRing securedCount={secured} totalCount={TOTAL} />
+        <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={exportReport}>Export report</Button>
+          <ProgressRing securedCount={secured} totalCount={TOTAL} />
+        </div>
       </header>
       <HexagonGrid
         scanResult={scanResult}
