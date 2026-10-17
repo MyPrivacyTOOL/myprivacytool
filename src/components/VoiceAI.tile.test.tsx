@@ -3,6 +3,8 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import VoiceAI from './VoiceAI';
 import { toTile } from '@/lib/hexagonTile';
 import type { HexagonData } from '@/lib/deviceDetection';
+import * as analytics from '@/lib/analytics';
+import { getVoiceData } from '@/lib/voiceStorage';
 
 vi.mock('@/lib/analytics', async (orig) => {
   const real = await orig<Record<string, unknown>>();
@@ -11,11 +13,14 @@ vi.mock('@/lib/analytics', async (orig) => {
 
 // What Alice says aloud (the Voice AI button): captured from the utterance handed to speechSynthesis.
 let spoken: string[] = [];
+let utterances: { text: string; onend: (() => void) | null }[] = [];
 beforeEach(() => {
   spoken = [];
+  utterances = [];
+  vi.mocked(analytics.trackVoiceScanCompleted).mockClear();
   class Utterance { text: string; rate = 1; pitch = 1; volume = 1; onend: (() => void) | null = null; voice: unknown; constructor(t: string) { this.text = t; } }
   vi.stubGlobal('SpeechSynthesisUtterance', Utterance);
-  vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn(), speak: (u: { text: string }) => spoken.push(u.text) });
+  vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn(), speak: (u: { text: string; onend: (() => void) | null }) => { spoken.push(u.text); utterances.push(u); } });
   localStorage.clear();
 });
 afterEach(() => { cleanup(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -49,5 +54,26 @@ describe('VoiceAI spoken text with tiles on', () => {
     press();
     expect(spoken[0]).toMatch(/Alice/);
     expect(spoken[0]).not.toMatch(/I look at what your browser tells every website/);
+  });
+
+  it('logs, stores and shows no tap-derived risk score or completed scan, even when every tile has been tapped', () => {
+    vi.stubEnv('VITE_HEX_TILE_V2', 'true');
+    const { container } = render(<VoiceAI hexagonData={null} confirmedCount={5} totalCount={5} />);
+    press();
+    utterances[0].onend?.();
+    expect(analytics.trackVoiceScanCompleted).not.toHaveBeenCalled();
+    const stored = getVoiceData();
+    expect(stored.bestRiskScore).toBe(100);
+    expect(stored.totalScansCompleted).toBe(0);
+    expect(container.textContent).not.toMatch(/Best:|\bscans?\b/);
+    expect(screen.queryByText(/Best:/)).toBeNull();
+  });
+
+  it('with the flag off the old completed-scan tracking and stored best score still happen', () => {
+    render(<VoiceAI hexagonData={null} confirmedCount={5} totalCount={5} />);
+    press();
+    utterances[0].onend?.();
+    expect(analytics.trackVoiceScanCompleted).toHaveBeenCalledTimes(1);
+    expect(getVoiceData().totalScansCompleted).toBe(1);
   });
 });

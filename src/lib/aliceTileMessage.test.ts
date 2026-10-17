@@ -21,6 +21,21 @@ describe('aliceTileMessage', () => {
     expect(m).not.toMatch(/No Leak|\d|%|Attackers|safe|clean|looks normal/i);
   });
 
+  it('a code or a value cut short with dots is not read out; the pause dot in a tile line is not spoken', () => {
+    const c = hex({ id: 'canvas-fingerprint', label: 'Canvas Fingerprint', value: 'a3f9c21e....' });
+    expect(aliceTileMessage(c, tileOf(c), 3)).toMatch(/^Canvas Fingerprint: a long technical code\. /);
+    expect(aliceTileMessage(c, tileOf(c), 3)).not.toMatch(/a3f9|\.{2,}|…/);
+    const d = hex();
+    expect(aliceTileMessage(d, tileOf(d), 3)).toMatch(/Seen, low risk\./);
+    expect(aliceTileMessage(d, tileOf(d), 3)).not.toMatch(/·/);
+  });
+
+  it('a guess says it is a guess once, not twice', () => {
+    const h = hex({ id: 'location', label: 'Location', value: 'Springfield', explanation: 'Looked up from your IP address.' });
+    const m = aliceTileMessage(h, tileOf(h), 3);
+    expect(m.match(/our guess/gi)).toHaveLength(1);
+  });
+
   it('a guess says it is a guess; with nothing hovered she gives the intro, then the nudge, without counts or "confirm"', () => {
     const h = hex({ id: 'location', label: 'Location', value: 'Springfield', explanation: 'Looked up from your IP address.' });
     expect(aliceTileMessage(h, tileOf(h), 0)).toMatch(/our guess/i);
