@@ -70,7 +70,7 @@ describe('deep dive flow', () => {
 
   it('deep-dive page data: the scan owner link returns the findings (never the wa_id); unknown scan 404, bad origin 403', async () => {
     const { j } = await start();
-    let r = await call(`/api/scan/deep-dive?scan_id=${j.scan_id}`, undefined, web, 'GET');
+    const r = await call(`/api/scan/deep-dive?scan_id=${j.scan_id}`, undefined, web, 'GET');
     const out = await r.json() as any;
     expect(r.status).toBe(200);
     expect(out.finalized).toBe(false);

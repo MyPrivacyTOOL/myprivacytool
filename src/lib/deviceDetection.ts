@@ -849,7 +849,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   if (webrtcResult) {
     let webrtcValue = 'Blocked';
     let webrtcRisk = 'WebRTC is blocked. Your real IP is protected.';
-    let webrtcConfidence = 100;
+    const webrtcConfidence = 100;
     // CK-7805: owner-approved plain wording (calm, "may", always one action). `value` and `risk` keep their old meaning.
     let webrtcHeadline = 'Your browser shared only some network details';
     let webrtcExplanation = 'Your browser let this page see some network details, but not a clear real address. This one needs investigation to know what else is visible.';
@@ -926,7 +926,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   if (batteryResult) {
     let batteryValue = 'API Blocked';
     let batteryRisk = 'Battery API not available. Good for privacy - this API is used for fingerprinting.';
-    let batteryConfidence = 90;
+    const batteryConfidence = 90;
     
     if (batteryResult.available) {
       batteryValue = `${batteryResult.level}% ${batteryResult.charging ? 'Charging' : 'Discharging'}`;

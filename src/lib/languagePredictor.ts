@@ -149,7 +149,7 @@ export function getPredictionMode(): PredictionMode {
     if (mode === 'trained' || mode === 'heuristic' || mode === 'best') {
       return mode;
     }
-  } catch {}
+  } catch { /* storage unavailable: use the default */ }
   return 'best'; // Default to best of both
 }
 
@@ -178,7 +178,7 @@ export function getPredictionComparisons(): PredictionComparison[] {
     if (stored) {
       return JSON.parse(stored);
     }
-  } catch {}
+  } catch { /* storage unavailable: use the default */ }
   return [];
 }
 
