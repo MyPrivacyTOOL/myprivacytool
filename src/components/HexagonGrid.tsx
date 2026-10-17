@@ -715,6 +715,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       ) : (
       <VoiceAI 
         hexagonData={hoveredHexagon} 
+        tile={v2 && hoveredHexagon ? tiles.get(hoveredHexagon.id) : undefined}
         confirmedCount={confirmedCount} 
         totalCount={Math.max(visibleCount, 8)} 
       />
