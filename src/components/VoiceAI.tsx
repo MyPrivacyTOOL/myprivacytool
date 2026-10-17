@@ -31,11 +31,15 @@ import AliceHDBadge from './AliceHDBadge';
 import AliceHDModal from './AliceHDModal';
 import FreeVoiceBadge from './FreeVoiceBadge';
 import { trackUpgradeModalOpened } from '@/lib/analytics';
-import { scanHint } from '@/lib/scanCopy';
+import { scanHint, aliceTileMessage } from '@/lib/scanCopy';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
+import type { HexagonTile } from '@/lib/hexagonTile';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
+  /** Tile state of hexagonData (honest tiles flag, MPC-7916). With the flag on Alice says what the tile says, with no counts, percentages or "click to confirm". */
+  tile?: HexagonTile;
   confirmedCount: number;
   totalCount: number;
 }
@@ -846,7 +850,8 @@ const speakText = (text: string, onEnd?: () => void) => {
   return false;
 };
 
-export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: VoiceAIProps) {
+export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount }: VoiceAIProps) {
+  const v2 = hexTileV2Enabled();
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -904,7 +909,9 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       
       // Use introduction for first interaction, then 4-part response
       const isFirstInteraction = !hasIntroduced;
-      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction, previousRiskScore);
+      const structuredResponse = v2
+        ? aliceTileMessage(hexagonData, tile, confirmedCount)
+        : generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction, previousRiskScore);
       
       // Add response to history for debug panel
       addResponseToHistory(structuredResponse);
@@ -944,7 +951,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         }
       });
     }
-  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced, previousRiskScore]);
+  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced, previousRiskScore, v2, tile]);
 
   useEffect(() => {
     // Load voices (some browsers need this)
@@ -957,7 +964,9 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
     const category = hexagonData?.category || '';
 
     // Determine the message based on state
-    if (hexagonData && !hexagonData.confirmed) {
+    if (v2) {
+      newMessage = aliceTileMessage(hexagonData, tile, confirmedCount);
+    } else if (hexagonData && !hexagonData.confirmed) {
       // Special messages for fingerprint hexagons
       if (category === 'fingerprint') {
         if (label.includes('canvas')) {
@@ -1146,7 +1155,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         setIsTyping(false);
       }, 150);
     }
-  }, [confirmedCount, totalCount, hexagonData, message]);
+  }, [confirmedCount, totalCount, hexagonData, message, v2, tile]);
 
   return (
     <>
