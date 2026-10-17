@@ -10,12 +10,13 @@ const HASH = createHash('sha256').update(KEY).digest('hex');
 const PARTNER = '11111111-1111-4111-8111-111111111111';
 const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc' };
 
-interface Store { keys: any[]; scans: any[]; monitors: any[]; calls: string[] }
+type Row = Record<string, unknown>;
+interface Store { keys: Row[]; scans: Row[]; monitors: Row[]; calls: string[] }
 let store: Store;
 
 // In-memory PostgREST stub: only the query shapes api.ts issues.
 function stubSupabase() {
-  vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
+  vi.stubGlobal('fetch', async (input: unknown, init: RequestInit = {}) => {
     const url = new URL(String(input));
     const method = init.method || 'GET';
     const table = url.pathname.split('/').pop()!;
@@ -42,9 +43,9 @@ function stubSupabase() {
   });
 }
 
-const call = (path: string, init: RequestInit = {}, env: any = ENV) =>
-  worker.fetch(new Request('https://api.test' + path, { ...init, headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', ...(init.headers as any) } }), env);
-const post = (path: string, body: unknown, env: any = ENV) => call(path, { method: 'POST', body: JSON.stringify(body) }, env);
+const call = (path: string, init: RequestInit = {}, env: Record<string, unknown> = ENV) =>
+  worker.fetch(new Request('https://api.test' + path, { ...init, headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', ...(init.headers as Record<string, string>) } }), env);
+const post = (path: string, body: unknown, env: Record<string, unknown> = ENV) => call(path, { method: 'POST', body: JSON.stringify(body) }, env);
 
 beforeEach(() => {
   store = { keys: [{ id: 'key-1', hash: HASH, revoked: false, partner: { status: 'active', monthly_scan_cap: null } }], scans: [], monitors: [], calls: [] };
@@ -99,7 +100,7 @@ describe('POST /v1/scan', () => {
     expect(JSON.stringify(row)).not.toContain('jane@example.com');
   });
   it('bills a real check', async () => {
-    vi.stubGlobal('fetch', ((orig) => async (u: any, i: any) => {
+    vi.stubGlobal('fetch', ((orig) => async (u: unknown, i: unknown) => {
       if (String(u).includes('xposedornot')) return new Response(JSON.stringify({ breaches: [['Adobe']] }), { status: 200 });
       return orig(u, i);
     })(globalThis.fetch));

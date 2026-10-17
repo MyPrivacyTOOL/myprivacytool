@@ -544,7 +544,7 @@ export default function FinalSummaryPanel({
         }
       });
 
-      yPos = (pdf as any).lastAutoTable.finalY + 15;
+      yPos = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
 
       // Draw a simple bar chart for categories
       checkNewPage(60);
