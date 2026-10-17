@@ -3,6 +3,7 @@
 // text. A "delete my data" DM erases the person (eraseContact). Failures only mean one uncounted event; they never block a reply.
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
+import { deleteFromHubSpot, syncToHubSpot } from "./hubspot-sync";
 
 export type SocialEvent = "dm" | "follow" | "like" | "share" | "mention" | "mirror_consent";
 
@@ -26,6 +27,7 @@ export async function touchContact(
       p_platform: "x", p_user_id: userId, p_handle: handle ?? null, p_event: event, p_follows_us: followsUs ?? null,
     });
     if (res && !res.ok) log.warn("social_touch_failed", { status: res.status });
+    if (!res || res.ok) await syncToHubSpot(env, { userId, handle, event, followsUs }, log); // the CRM copy; skipped without HUBSPOT_SOCIAL_TOKEN
   } catch (err) {
     log.warn("social_touch_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
@@ -35,10 +37,11 @@ export async function touchContact(
 export async function eraseContact(env: Env, userId: string, log: Logger): Promise<boolean> {
   if (!/^\d+$/.test(userId)) return false;
   try {
+    const gone = await deleteFromHubSpot(env, userId, log); // the CRM copy goes too
     const res = await rpc(env, "mpt_erase_social_contact", { p_platform: "x", p_user_id: userId });
-    if (res === null) return true; // nothing is stored when Supabase is not configured
+    if (res === null) return gone; // nothing is stored in Supabase when it is not configured
     if (!res.ok) log.warn("social_erase_failed", { status: res.status });
-    return res.ok;
+    return res.ok && gone;
   } catch (err) {
     log.warn("social_erase_failed", { error: err instanceof Error ? err.name : "unknown" });
     return false;

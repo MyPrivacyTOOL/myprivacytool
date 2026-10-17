@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { createHmac } from "node:crypto";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { resetTokenCache } from "./src/x-oauth";
 import { extractEngagement, isDeleteRequest } from "./src/social";
+import { resetHubSpotCache } from "./src/hubspot-sync";
 import { hasOAuth1, oauth1Header } from "./src/x-media";
 import { FOLLOW_LINE } from "./src/mirror-bot";
 import { classifyTheme } from "./src/funnel";
@@ -583,5 +584,76 @@ describe("X activity feed for the CRM (MPC-7628)", () => {
     await post(dm("42", "hi"), env());
     await settle();
     expect(f.mock.calls.some((c) => String(c[0]).includes("/rpc/"))).toBe(false);
+  });
+});
+
+describe("HubSpot sync of the X feed (MPC-7628)", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+  const e = (extra: object = {}) => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs-token", ...extra });
+  /** Fake X, Supabase and HubSpot. `existing` = the HubSpot contact id returned by search. */
+  function fake(opts: { existing?: string; propertyStatus?: number } = {}) {
+    const hs: { method: string; path: string; body: any; auth: string }[] = [];
+    const sbPatch: any[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: any) => {
+      const url = String(u);
+      if (url.startsWith("https://api.hubapi.com")) {
+        const path = url.replace("https://api.hubapi.com", "");
+        hs.push({ method: init.method, path, body: init.body ? JSON.parse(init.body) : undefined, auth: init.headers.Authorization });
+        if (path === "/crm/v3/properties/contacts") return new Response("{}", { status: opts.propertyStatus ?? 201 });
+        if (path === "/crm/v3/objects/contacts/search") return Response.json({ results: opts.existing ? [{ id: opts.existing }] : [] });
+        return new Response("{}", { status: init.method === "DELETE" ? 204 : 200 });
+      }
+      if (url.includes("/rest/v1/social_contacts") && init?.method === "PATCH") { sbPatch.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
+      if (url.includes("/rpc/")) return new Response("{}");
+      if (url.includes("connection_status")) return Response.json({ data: { connection_status: ["followed_by"] } });
+      if (url.includes("user.fields=username")) return Response.json({ data: { username: "alice_99" } });
+      return new Response("{}");
+    });
+    return { hs, sbPatch };
+  }
+  beforeEach(() => resetHubSpotCache());
+
+  it("creates the properties once, then creates the contact and marks it synced", async () => {
+    const x = fake();
+    await post(dm("42", "hello there"), e());
+    await settle();
+    expect(x.hs.filter((c) => c.path === "/crm/v3/properties/contacts").map((c) => c.body.name)).toEqual(["x_user_id", "x_handle", "x_last_event", "x_last_activity", "x_follows_us"]);
+    const create = x.hs.find((c) => c.method === "POST" && c.path === "/crm/v3/objects/contacts")!;
+    expect(create.body.properties).toMatchObject({ x_user_id: "42", x_handle: "alice_99", x_last_event: "dm", x_follows_us: "true", firstname: "@alice_99" });
+    expect(x.hs.every((c) => c.auth === "Bearer hs-token")).toBe(true);
+    expect(x.sbPatch).toHaveLength(1);
+    expect(typeof x.sbPatch[0].hubspot_synced_at).toBe("string");
+  });
+  it("never sends message text to HubSpot", async () => {
+    const x = fake();
+    await post(dm("42", "my private worry about a stalker"), e());
+    await settle();
+    expect(JSON.stringify(x.hs)).not.toMatch(/stalker|worry/);
+  });
+  it("updates an existing contact instead of creating another", async () => {
+    const x = fake({ existing: "901" });
+    await post(dm("42", "hi"), e());
+    await settle();
+    expect(x.hs.some((c) => c.method === "PATCH" && c.path === "/crm/v3/objects/contacts/901")).toBe(true);
+    expect(x.hs.some((c) => c.method === "POST" && c.path === "/crm/v3/objects/contacts")).toBe(false);
+  });
+  it("does nothing, and sends nothing to HubSpot, when the token is not set (or is a deploy placeholder)", async () => {
+    const x = fake();
+    await post(dm("42", "hi"), e({ HUBSPOT_SOCIAL_TOKEN: undefined }));
+    await post(dm("43", "hi"), e({ HUBSPOT_SOCIAL_TOKEN: "placeholder" }));
+    await settle();
+    expect(x.hs).toHaveLength(0);
+  });
+  it("stops quietly when the token cannot create properties (403) and still replies", async () => {
+    const x = fake({ propertyStatus: 403 });
+    await post(dm("42", "hi"), e());
+    await settle();
+    expect(x.hs.some((c) => c.path === "/crm/v3/objects/contacts")).toBe(false);
+  });
+  it("DELETE removes the person from HubSpot as well", async () => {
+    const x = fake({ existing: "901" });
+    await post(dm("42", "delete my data"), e());
+    await settle();
+    expect(x.hs.some((c) => c.method === "DELETE" && c.path === "/crm/v3/objects/contacts/901")).toBe(true);
   });
 });

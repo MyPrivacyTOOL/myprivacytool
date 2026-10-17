@@ -10,6 +10,8 @@ export interface Env {
   X_CLIENT_SECRET?: string;
   X_REFRESH_TOKEN?: string;
   /** OAuth 1.0a keys (API key, account access token + secret): sign the clip upload, which the OAuth 2.0 token cannot do. */
+  /** HubSpot private-app token limited to contacts (read/write) and contact properties (read/write): the X activity sync. */
+  HUBSPOT_SOCIAL_TOKEN?: string;
   X_CONSUMER_KEY?: string;
   X_ACCESS_TOKEN?: string;
   X_ACCESS_TOKEN_SECRET?: string;
