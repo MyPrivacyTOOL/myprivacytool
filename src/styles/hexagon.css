@@ -122,3 +122,20 @@
     animation: none;
   }
 }
+
+/* "Your browser says this": the tick comes out from behind the top edge of the tile like a curtain opening, then settles. Still for people who ask for less motion. */
+@keyframes tileCurtainTick {
+  0% { opacity: 0; transform: translateY(-16px) scale(0.5); }
+  55% { opacity: 1; transform: translateY(2px) scale(1.12); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tile-curtain-tick {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tileCurtainTick 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 0.45s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-curtain-tick {
+    animation: none;
+  }
+}

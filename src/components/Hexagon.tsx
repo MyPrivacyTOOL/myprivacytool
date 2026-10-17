@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HexagonData } from '@/lib/deviceDetection';
-import { HexagonTile, tileAriaLabel, tileIcon } from '@/lib/hexagonTile';
+import { HexagonTile, tileAriaLabel, tileIcon, TILE_BROWSER_SAYS } from '@/lib/hexagonTile';
 import { cn } from '@/lib/utils';
 
 interface HexagonProps {
@@ -251,6 +251,34 @@ export default function Hexagon({ data, onConfirm, onHover, isRevealing = false,
                 {data.confidence}%
               </text>
             )
+          )}
+
+          {/* "Your browser says this": a small outlined tick in neutral dark, never green (the solid green tick means Clear) that slides out from behind the top edge, with its caption. */}
+          {t?.browserSays && (
+            <g data-testid="browser-says" aria-hidden="true">
+              <text
+                x="50"
+                y="81"
+                textAnchor="middle"
+                fontSize="4.6"
+                style={{ fill: tileSolidColoured ? 'hsl(var(--brand-white))' : 'hsl(var(--muted-foreground))' }}
+                className="select-none"
+                data-testid="browser-says-caption"
+              >
+                {TILE_BROWSER_SAYS}
+              </text>
+              <g transform="translate(17, 8)" className="tile-curtain-tick">
+                <circle cx="9" cy="9" r="8" fill="none" strokeWidth="1.8" style={{ stroke: tileSolidColoured ? 'hsl(var(--brand-white))' : 'hsl(var(--foreground))' }} />
+                <path
+                  d="M5 9.3 L8 12.2 L13.2 6.2"
+                  fill="none"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ stroke: tileSolidColoured ? 'hsl(var(--brand-white))' : 'hsl(var(--foreground))' }}
+                />
+              </g>
+            </g>
           )}
 
           {/* Tile badge: a symbol, so colour is never the only clue. */}

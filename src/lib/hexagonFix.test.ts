@@ -7,7 +7,8 @@ describe('fix steps (MPC-7916 Phase 2, draft)', () => {
   it('every hexagon that can turn red has a step, and no other hexagon has one', () => {
     const canBeRed = (HEXAGONS as { id: string; truth: { level: string; sensitivity: string } }[])
       .filter((h) => h.truth.level === 'measured' && h.truth.sensitivity !== 'low')
-      .map((h) => h.id);
+      .map((h) => h.id)
+      .filter((id) => id !== 'timezone-locale'); // reported by every browser, so seen and never red
     for (const id of canBeRed) {
       expect(tileKind({ id, value: 'A real value' })).toBe('needs_fixing');
       expect(fixStepFor(id)).toBeDefined();
