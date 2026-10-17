@@ -2,18 +2,26 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
-import { InteractiveHexagonTile } from "@/components/InteractiveHexagonTile";
+import Hexagon from "@/components/Hexagon";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { canConfirm, canDispute } from "@/lib/identityConfirmation";
+import { findingHexagonData, findingTile, honeycomb } from "@/lib/deepDiveTiles";
 import { Button } from "@/components/ui/button";
 import { useHexagonState } from "@/hooks/useHexagonState";
 import { fetchDeepDiveScan, fetchFinalScore, finalizeDeepDive, isDeepDiveApiConfigured, type FinalScore } from "@/lib/hexagonInteractionApi";
-import type { Hexagon } from "@/types/hexagon";
+import type { Hexagon as Finding } from "@/types/hexagon";
 
 // The page behind the secure link sent in reply to RESULTS on WhatsApp: /scan/deep-dive?scan=<scan id>. The person answers "Is this you?" per finding;
 // each answer is sent to the API (best effort), and the score shown is the server's, counted from confirmed and checked findings only.
 
-function Findings({ scanId, initial, finalized }: { scanId: string; initial: Hexagon[]; finalized: boolean }) {
+function Findings({ scanId, initial, finalized }: { scanId: string; initial: Finding[]; finalized: boolean }) {
   const { scanResult, handleConfirm, handleDispute } = useHexagonState({ hexagons: initial }, undefined, scanId);
   const [score, setScore] = useState<FinalScore | null>(null);
+  // Which finding's prompt is open. Only the buttons inside a prompt record an answer; closing it (Esc, outside click, Keep it) records nothing.
+  const [asking, setAsking] = useState<{ id: string; kind: "confirm" | "dispute" } | null>(null);
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const grid = honeycomb(scanResult.hexagons.length, isMobile);
+  const open = scanResult.hexagons.find((h) => h.id === asking?.id);
   const [sent, setSent] = useState<"idle" | "sending" | "sent" | "failed">(finalized ? "sent" : "idle");
 
   const answered = scanResult.hexagons.map((h) => h.status).join();
@@ -31,11 +39,47 @@ function Findings({ scanId, initial, finalized }: { scanId: string; initial: Hex
 
   return (
     <>
-      <div className="flex flex-wrap gap-4 justify-center my-8">
-        {scanResult.hexagons.map((h) => (
-          <InteractiveHexagonTile key={h.id} hexagon={h} onConfirm={handleConfirm} onDispute={handleDispute} />
-        ))}
+      <div className="flex justify-center my-8" role="list" aria-label="Your findings">
+        <div className="relative" style={{ width: `${grid.width}px`, height: `${grid.height}px` }}>
+          {scanResult.hexagons.map((h, i) => (
+            <div key={h.id} className="absolute" style={{ left: `${grid.positions[i].x}px`, top: `${grid.positions[i].y}px` }} role="listitem">
+              <Hexagon
+                data={findingHexagonData(h)}
+                tile={findingTile(h)}
+                onConfirm={() => {}}
+                onHover={() => {}}
+                onSelect={() => setAsking(canConfirm(h) ? { id: h.id, kind: "confirm" } : canDispute(h) ? { id: h.id, kind: "dispute" } : null)}
+              />
+            </div>
+          ))}
+        </div>
       </div>
+      <AlertDialog open={asking?.kind === "confirm" && !!open} onOpenChange={(o) => !o && setAsking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Is this you?</AlertDialogTitle>
+            <AlertDialogDescription>We found <span className="font-medium">{open?.data ?? "this item"}</span> linked to you. {open?.label}.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => open && handleConfirm(open.id, false)}>No, not me</AlertDialogCancel>
+            <AlertDialogAction onClick={() => open && handleConfirm(open.id, true)}>Yes, it's me</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={asking?.kind === "dispute" && !!open} onOpenChange={(o) => !o && setAsking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Does this look wrong?</AlertDialogTitle>
+            <AlertDialogDescription>
+              We checked and found <span className="font-medium">{open?.data ?? "this item"}</span> linked to you. {open?.label}. If that is not right, tell us and we will leave it out of your score.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => open && handleDispute(open.id)}>This isn't right</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <p className="text-center text-sm text-muted-foreground" aria-live="polite">
         {score ? `${score.verified_exposure_count} confirmed exposure${score.verified_exposure_count === 1 ? "" : "s"} so far.` : "Answer the findings marked ? to build your verified score."}
       </p>
@@ -62,7 +106,7 @@ const FAILURE_COPY: Record<Failure, { title: string; body: string }> = {
 export default function DeepDive() {
   const [params] = useSearchParams();
   const scanId = params.get("scan") ?? "";
-  const [state, setState] = useState<{ status: "loading" } | { status: "failed"; why: Failure } | { status: "ready"; hexagons: Hexagon[]; finalized: boolean }>(
+  const [state, setState] = useState<{ status: "loading" } | { status: "failed"; why: Failure } | { status: "ready"; hexagons: Finding[]; finalized: boolean }>(
     !scanId ? { status: "failed", why: "no_link" } : !isDeepDiveApiConfigured() ? { status: "failed", why: "unavailable" } : { status: "loading" },
   );
 
