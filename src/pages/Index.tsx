@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { hexagonTilesEnabled } from '@/lib/hexagonTile';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
 import { HERO_TILES_LINE1, HERO_TILES_LINE2 } from '@/lib/scanCopy';
 import HexagonGrid from '@/components/HexagonGrid';
 import ShadowHands from '@/components/ShadowHands';
@@ -249,7 +249,7 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
-          {hexagonTilesEnabled() ? (
+          {hexTileV2Enabled() ? (
             <>
               <p className="text-sm sm:text-lg text-foreground">
                 <span className="text-brand font-semibold">MyPrivacyTOOL</span>: {HERO_TILES_LINE1}

@@ -14,7 +14,7 @@ import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
-import { summarize, type HexagonTile } from '@/lib/hexagonTile';
+import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
 import { SUMMARY_LABELS } from '@/lib/scanCopy';
 
 interface FinalSummaryPanelProps {
@@ -60,11 +60,11 @@ export default function FinalSummaryPanel({
   // Tile mode: a hexagon counts as "confirmed" only if a check verified it. A tap means "seen" and says nothing about the value, so
   // concerns, positives and category counts below no longer follow taps or the raw values of tiles that could not be checked.
   const hexagons = useMemo(
-    () => (tiles ? rawHexagons.map((h) => ({ ...h, confirmed: tiles.get(h.id)?.class === 'verified' })) : rawHexagons),
+    () => (tiles ? rawHexagons.map((h) => ({ ...h, confirmed: tiles.get(h.id)?.kind === 'clear' })) : rawHexagons),
     [rawHexagons, tiles]
   );
-  const board = useMemo(() => summarize(tiles ? [...tiles.values()] : []), [tiles]);
-  const confirmedCount = tilesOn ? board.verified : tappedCount;
+  const board = useMemo(() => riskProfile(tiles ? [...tiles.values()] : []), [tiles]);
+  const confirmedCount = tilesOn ? board.clear : tappedCount;
 
   // Calculate category stats for all 8 categories
   const categoryStats = useMemo((): CategoryStats[] => {
@@ -724,7 +724,7 @@ export default function FinalSummaryPanel({
     const report = {
       generatedAt: new Date().toISOString(),
       summary: tilesOn
-        ? { totalDataPoints: HEXAGON_COUNT, verified: board.verified, fixesYouToldUs: board.self_attested_fixes, notYetChecked: board.not_yet_checked }
+        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
         : {
         totalDataPoints: HEXAGON_COUNT,
         confirmedDataPoints: confirmedCount,
@@ -786,7 +786,7 @@ export default function FinalSummaryPanel({
     const shareText = tilesOn
       ? `🎯 My Digital Shadow
 
-🔍 ${board.verified} ${SUMMARY_LABELS.verified} · ${board.not_yet_checked} ${SUMMARY_LABELS.notYet}
+🔍 ${board.clear} ${SUMMARY_LABELS.clear} · ${board.needsFixing} ${SUMMARY_LABELS.fixing} · ${board.notChecked} ${SUMMARY_LABELS.notYet}
 ${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
 
 Test yours at: ${window.location.origin}`
@@ -839,18 +839,12 @@ Test yours at: ${window.location.origin}`;
       <CardContent className="space-y-6 pt-6">
         {tilesOn ? (
           <div className="grid grid-cols-3 gap-3" data-testid="final-board-summary">
-            <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-              <p className="text-2xl font-bold text-risk-low">{board.verified}</p>
-              <p className="text-xs text-muted-foreground">{SUMMARY_LABELS.verified}</p>
-            </div>
-            <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-              <p className="text-2xl font-bold text-foreground">{board.self_attested_fixes}</p>
-              <p className="text-xs text-muted-foreground">{SUMMARY_LABELS.fixes}</p>
-            </div>
-            <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-              <p className="text-2xl font-bold text-foreground">{board.not_yet_checked}</p>
-              <p className="text-xs text-muted-foreground">{SUMMARY_LABELS.notYet}</p>
-            </div>
+            {([['clear', board.clear], ['fixing', board.needsFixing], ['notYet', board.notChecked]] as const).map(([k, n]) => (
+              <div key={k} className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
+                <p className="text-2xl font-bold text-foreground">{n}</p>
+                <p className="text-xs text-muted-foreground">{SUMMARY_LABELS[k]}</p>
+              </div>
+            ))}
           </div>
         ) : (
           <>
@@ -923,7 +917,7 @@ Test yours at: ${window.location.origin}`;
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground">
-                          {tilesOn ? `${cat.confirmed} ${SUMMARY_LABELS.verified} · ${cat.total - cat.confirmed} ${SUMMARY_LABELS.notYet}` : `${cat.confirmed}/${cat.total}`}
+                          {tilesOn ? `${cat.confirmed} ${SUMMARY_LABELS.clear} · ${cat.total - cat.confirmed} ${SUMMARY_LABELS.notYet}` : `${cat.confirmed}/${cat.total}`}
                         </span>
                       </div>
                     </div>

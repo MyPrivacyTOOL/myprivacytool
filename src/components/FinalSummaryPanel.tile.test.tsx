@@ -20,10 +20,11 @@ const hexagons: HexagonData[] = [
 const tilesFor = (hs: HexagonData[]): Map<string, HexagonTile> => new Map(hs.map((h) => [h.id, toTile(h)]));
 
 describe('FinalSummaryPanel with tiles', () => {
-  it('shows three integers and no score, percentage, ratio or uniqueness', () => {
+  it('shows counts only and no score, percentage, ratio or uniqueness', () => {
     const { container } = render(<FinalSummaryPanel hexagons={hexagons} confirmedCount={4} tiles={tilesFor(hexagons)} />);
-    expect(screen.getByTestId('final-board-summary')).toHaveTextContent(/2\s*verified/);
-    expect(screen.getByTestId('final-board-summary')).toHaveTextContent(/2\s*not yet checked/);
+    const board = screen.getByTestId('final-board-summary');
+    expect(board).toHaveTextContent(/need fixing/);
+    expect(board).toHaveTextContent(/not checked yet/);
     const text = container.textContent ?? '';
     expect(text).not.toMatch(/Risk Score|Overall Privacy Risk|Uniqueness|Exposure|Export PDF/);
     expect(text).not.toMatch(/\d+%/);
@@ -31,7 +32,7 @@ describe('FinalSummaryPanel with tiles', () => {
     expect(text).not.toMatch(/Complete analysis|100% Local/);
   });
 
-  it('ignores taps and the raw values of unknown tiles (a tapped "Signed in" cannot-check tile is not a finding)', () => {
+  it('ignores taps and the raw values of tiles that make no claim', () => {
     const { container } = render(<FinalSummaryPanel hexagons={hexagons} confirmedCount={4} tiles={tilesFor(hexagons)} />);
     expect(container.textContent).not.toMatch(/Google can track you/);
   });

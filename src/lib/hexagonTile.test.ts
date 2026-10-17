@@ -1,86 +1,130 @@
 import { describe, it, expect } from 'vitest';
+import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, tileIcon, tileExplanation, type TileKind } from './hexagonTile';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
-import { toTile, summarize, cannotCheckLast, bandFor, GUESS_BELOW } from './hexagonTile';
+import { captureStatus } from '../../shared/hexagon-registry/status.js';
 
-const cannotIds = HEXAGONS.filter((h) => h.truth.level === 'cannot_be_checked').map((h) => h.id);
-
-describe('toTile', () => {
-  it('a measured value at 80+ is verified, below 80 is inferred (80 is not a guess)', () => {
-    expect(toTile({ id: 'device', value: 'Desktop (Windows 11)', confidence: 92 }).class).toBe('verified');
-    expect(toTile({ id: 'device', value: 'Desktop (Windows 11)', confidence: GUESS_BELOW }).class).toBe('verified');
-    const t = toTile({ id: 'device', value: 'Desktop (Windows 11)', confidence: 79 });
-    expect(t.class).toBe('inferred');
-    expect(t.action_key).toBe('confirm');
+// MPC-7916 Phase 1: one function decides what a tile says. These are the rows Chris agreed on MPC-7913.
+describe('toTile (MPC-7916)', () => {
+  const rows: [string, string, string, TileKind][] = [
+    ['webrtc-leak says No Leak Detected: the code cannot tell this from a blocked check', 'webrtc-leak', 'No Leak Detected', 'couldnt_check'],
+    ['webrtc-leak that is leaking needs fixing', 'webrtc-leak', 'Leaking: 203.0.113.9', 'needs_fixing'],
+    ['canvas fingerprint (medium risk) needs fixing', 'canvas-fingerprint', 'Vale Tulip', 'needs_fixing'],
+    ['dns-leak cannot be checked from a web page, whatever the detector said', 'dns-leak', 'No Leak Detected', 'cant_check_here'],
+    ['dns-leak that claims a leak still cannot be checked from a web page', 'dns-leak', 'Leaking: 10.0.0.1', 'cant_check_here'],
+    ['typing patterns with no input is not checked yet', 'typing-patterns', 'No input yet', 'not_checked'],
+    ['location is an estimate, so it is our guess', 'location', 'Springfield, England', 'our_guess'],
+    ['internet provider is an estimate, so it is our guess', 'isp', 'Example Broadband', 'our_guess'],
+    ['a placeholder location is not a guess, we could not tell', 'location', 'Location Detected', 'couldnt_check'],
+    ['primary language is measured and low risk', 'primary-language', 'English (UK)', 'seen_low_risk'],
+    ['cookies that are empty are the registry-allowed clear', 'cookies-status', 'Empty', 'clear'],
+    ['a failed read is could not check', 'battery', 'Check failed', 'couldnt_check'],
+    ['the TLS version is never measured, so it is not a guess or a fact', 'tls-config', 'TLS 1.3 (likely)', 'couldnt_check'],
+    ['an id that is not in the registry never claims anything', 'not-a-hexagon', 'anything', 'not_checked'],
+  ];
+  it.each(rows)('%s', (_name, id, value, kind) => {
+    expect(tileKind({ id, value })).toBe(kind);
   });
 
-  it('the 7 registry cannot-be-checked tiles are always unknown, whatever value or confidence they carry', () => {
-    expect(cannotIds).toHaveLength(7);
-    for (const id of cannotIds) {
-      const t = toTile({ id, value: 'Google: signed in', confidence: 100 });
-      expect(t.class).toBe('unknown');
-      expect(t.unknown_reason).toBe('cannot_check_from_web');
-      expect(t.bar).toBeNull();
-      expect(t.result).toBeUndefined();
+  it('copy: green is solid and only for clear; purple is faint and only for a guess; grey shows no value when no claim is made', () => {
+    for (const [kind, c] of Object.entries(TILE_COPY)) {
+      if (c.colour === 'green') expect(kind).toBe('clear');
+      if (c.colour === 'purple') {
+        expect(kind).toBe('our_guess');
+        expect(c.level).toBe('faint');
+      }
+      if (c.colour === 'red') expect(c.level).toBe('solid');
+    }
+    for (const k of ['not_checked', 'couldnt_check', 'cant_check_here'] as TileKind[]) {
+      expect(TILE_COPY[k].colour).toBe('grey');
+      expect(TILE_COPY[k].showValue).toBe(false);
     }
   });
 
-  it('a stored confidence on a not-checked value never makes a verified or inferred tile', () => {
-    for (const value of ['Check failed', 'Unknown', 'Checking...', 'No input yet', 'blocked']) {
-      const t = toTile({ id: 'typing-patterns', value, confidence: 100 });
-      expect(t.class).toBe('unknown');
-      expect(t.bar).toBeNull();
+  it('no tile line, glyph or aria label ever contains a percentage', () => {
+    for (const c of Object.values(TILE_COPY)) {
+      expect(c.line).not.toMatch(/%/);
+      expect(c.glyph).not.toMatch(/%/);
     }
-    expect(toTile({ id: 'typing-patterns', value: 'No input yet', confidence: 100 }).unknown_reason).toBe('not_yet_checked');
-    expect(toTile({ id: 'cookies-status', value: 'Check failed', confidence: 100 }).unknown_reason).toBe('check_unavailable');
+    const t = toTile({ id: 'location', value: 'Springfield' });
+    expect(tileAriaLabel('Location', 'Springfield', t)).not.toMatch(/%|confidence/i);
   });
 
-  it('"nothing seen" values the code cannot tell from a failed check stay unknown, not clean', () => {
-    expect(toTile({ id: 'webrtc-leak', value: 'No Leak Detected', confidence: 90 }).class).toBe('unknown');
-    expect(toTile({ id: 'extension-detection', value: 'None detected', confidence: 90 }).class).toBe('unknown');
+  it('honesty: for every registry hexagon, a placeholder or failed value never becomes clear or needs fixing', () => {
+    for (const h of HEXAGONS as { id: string }[]) {
+      for (const value of ['No input yet', 'Check failed', 'Unknown', 'Collecting...', '']) {
+        const k = tileKind({ id: h.id, value });
+        expect(['not_checked', 'couldnt_check', 'cant_check_here']).toContain(k);
+      }
+    }
   });
 
-  it('a clear result is verified only where the registry allows it', () => {
-    const t = toTile({ id: 'cookies-status', value: 'Empty', confidence: 90 });
-    expect(t.class).toBe('verified');
-    expect(t.result).toBe('clear');
+  it('honesty: clear only where captureStatus says clear, and the 7 cannot-be-checked tiles are always grey', () => {
+    for (const h of HEXAGONS as { id: string; truth: { level: string } }[]) {
+      for (const value of ['Empty', 'None', 'Secure (HTTPS)', 'No Leak Detected', 'Something real']) {
+        const k = tileKind({ id: h.id, value });
+        if (k === 'clear') expect(captureStatus(h.id, value, {})).toBe('clear');
+        if (h.truth.level === 'cannot_be_checked') expect(k).toBe('cant_check_here');
+      }
+    }
   });
 
-  it('estimates keep the estimate flag; an unassumed id is unknown', () => {
-    expect(toTile({ id: 'location', value: 'Springfield, Exampleshire', confidence: 95 }).is_estimate).toBe(true);
-    expect(toTile({ id: 'device', value: 'Desktop', confidence: 92 }).is_estimate).toBe(false);
-    expect(toTile({ id: 'revealing', value: 'Data Point Revealed', confidence: 0 }).class).toBe('unknown');
-  });
-
-  it('self_attested is never produced from scan data', () => {
-    for (const h of HEXAGONS) expect(toTile({ id: h.id, value: 'x', confidence: 99 }).class).not.toBe('self_attested');
-  });
-});
-
-describe('summarize', () => {
-  it('returns exactly three integers; inferred and unknown both count as not yet checked', () => {
-    const tiles = [
-      toTile({ id: 'device', value: 'Desktop', confidence: 92 }),
-      toTile({ id: 'device', value: 'Desktop', confidence: 50 }),
-      toTile({ id: 'dns-leak', value: 'Leak', confidence: 100 }),
-    ];
-    const s = summarize(tiles);
-    expect(Object.keys(s).sort()).toEqual(['board', 'not_yet_checked', 'self_attested_fixes', 'verified']);
-    expect(s).toMatchObject({ verified: 1, self_attested_fixes: 0, not_yet_checked: 2 });
+  it('the context is passed on: an assumed WiFi default is not checked', () => {
+    expect(tileKind({ id: 'connection', value: 'WiFi' }, { connectionIsMeasured: false })).not.toBe('our_guess');
   });
 });
 
-describe('cannotCheckLast', () => {
+describe('risk profile (MPC-7916)', () => {
+  it('counts the tiles in each group; unchecked kinds all count as not checked', () => {
+    const p = riskProfile([
+      { kind: 'clear' }, { kind: 'needs_fixing' }, { kind: 'needs_fixing' }, { kind: 'our_guess' },
+      { kind: 'seen_low_risk' }, { kind: 'not_checked' }, { kind: 'couldnt_check' }, { kind: 'cant_check_here' },
+    ]);
+    expect(p).toEqual({ clear: 1, needsFixing: 2, ourGuess: 1, seenLowRisk: 1, notChecked: 3 });
+  });
+
+  it('is plain counts: no percentage, no "of", no rating word', () => {
+    const text = riskProfileParts(riskProfile([{ kind: 'needs_fixing' }, { kind: 'not_checked' }])).map((p) => p.text).join(' · ');
+    expect(text).toBe('0 clear · 1 needs fixing · 0 our guess · 0 seen, low risk · 1 not checked yet');
+    expect(text).not.toMatch(/%| of |low risk rating|medium|high/i);
+  });
+
+  it('an empty scan is all zeros, never "clear"', () => {
+    expect(riskProfile([])).toEqual({ clear: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 });
+  });
+});
+
+describe('tile icon (MPC-7916)', () => {
+  it('a green-tick icon is kept only on a clear tile', () => {
+    expect(tileIcon('cookies-status', '✅', 'clear')).toBe('✅');
+    expect(tileIcon('dns-leak', '✅', 'cant_check_here')).toBe('🔓');
+    expect(tileIcon('webrtc-leak', '✅', 'couldnt_check')).toBe('🌐');
+  });
+  it('any other icon is left alone', () => {
+    expect(tileIcon('dns-leak', '🔓', 'cant_check_here')).toBe('🔓');
+    expect(tileIcon('canvas-fingerprint', '🎨', 'needs_fixing')).toBe('🎨');
+  });
+});
+
+describe('tile explanation (MPC-7916)', () => {
+  it('a grey tile never says "looks normal": the words follow the tile, not the detector', () => {
+    const tile = toTile({ id: 'dns-leak', value: 'No Leak Detected' });
+    const said = tileExplanation('DNS Leak', 'No Leak Detected', tile, 'Your lookups look normal', 'We did not see your lookups leaving through an unexpected route.');
+    expect(said.headline).toBe("DNS Leak: A web page can't check this");
+    expect(`${said.headline} ${said.text}`).not.toMatch(/look normal|did not see|no leak|safe/i);
+  });
+  it('a guess says it is a guess, and a found tile keeps the detector text', () => {
+    const guess = toTile({ id: 'location', value: 'Springfield' });
+    expect(tileExplanation('Location', 'Springfield', guess, 'h', 'You are near Springfield.').text).toMatch(/^This is our guess, not a measurement\. You are near Springfield\./);
+    const found = toTile({ id: 'canvas-fingerprint', value: 'Vale Tulip' });
+    expect(tileExplanation('Canvas', 'Vale Tulip', found, 'Your browser gives you away', 'Details.')).toEqual({ headline: 'Your browser gives you away', text: 'Details.' });
+  });
+});
+
+import { cannotCheckLast } from './hexagonTile';
+
+describe('cannotCheckLast (from the first tile PR)', () => {
   it('moves cannot-check ids to the end, keeping the rest in order', () => {
     const ids = ['dns-leak', 'canvas-fingerprint', 'social-platforms', 'device', 'webrtc-leak'].map((id) => ({ id }));
     expect(cannotCheckLast(ids).map((i) => i.id)).toEqual(['canvas-fingerprint', 'device', 'webrtc-leak', 'dns-leak', 'social-platforms']);
-  });
-});
-
-describe('bandFor', () => {
-  it('maps confidence to word and bar', () => {
-    expect(bandFor(97)).toMatchObject({ word: 'sure', bar: 5 });
-    expect(bandFor(80)).toMatchObject({ word: 'pretty sure', bar: 4 });
-    expect(bandFor(79)).toMatchObject({ word: 'probably', bar: 3 });
-    expect(bandFor(10)).toMatchObject({ word: 'just a guess', bar: 1 });
   });
 });
