@@ -10,6 +10,7 @@ import de from "../../../locales/de/main.json";
 import fr from "../../../locales/fr/main.json";
 import pt from "../../../locales/pt/main.json";
 import ar from "../../../locales/ar/main.json";
+import type { EventLog } from "./event-log";
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
 
@@ -61,7 +62,7 @@ export function replyTarget(update: unknown): number | string | null {
 }
 
 /** Reads core-brain's answer and, if it carries message keys, sends the reply. Never throws: a failed send is logged only. */
-export async function sendTelegramReply(env: Env, update: unknown, brain: Response, log: Logger): Promise<void> {
+export async function sendTelegramReply(env: Env, update: unknown, brain: Response, log: Logger, events?: EventLog | null): Promise<void> {
   try {
     const chatId = replyTarget(update);
     if (chatId === null) return;
@@ -72,14 +73,19 @@ export async function sendTelegramReply(env: Env, update: unknown, brain: Respon
     if (!env.TELEGRAM_BOT_TOKEN) return log.warn("bot_token_unset");
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), TELEGRAM_TIMEOUT_MS);
+    const request = { chat_id: chatId, text: escapeUrlUnderscores(reply), parse_mode: "Markdown" };
     try {
       const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: escapeUrlUnderscores(reply), parse_mode: "Markdown" }),
+        body: JSON.stringify(request),
         signal: ctl.signal,
       });
       if (!res.ok) log.error("telegram_send_rejected", { status: res.status });
+      if (events) events.out("sendMessage", request, { status: res.status, response: await res.json().catch(() => null) });
+    } catch (err) {
+      events?.out("sendMessage", request, { status: 0, response: { error: err instanceof Error ? err.name : "unknown" } });
+      throw err;
     } finally {
       clearTimeout(timer);
     }

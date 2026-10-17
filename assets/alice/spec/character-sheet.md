@@ -19,6 +19,8 @@ numbers from the final art.
 
 ## 2. Face (views needed)
 
+v1.0 requires front, three-quarter-left and profile-left only; the mirrored and remaining views follow in a minor version.
+
 | View | Use | Min size |
 |---|---|---|
 | Front | talking to camera, thumbnails | 2048 px tall head crop |
@@ -77,7 +79,7 @@ Poses are described, not yet rendered; see the artist brief (MPC-7401).
 
 ## 6. Expression sheet
 
-Head crops, three-quarter view, same lighting, one per pose mood: `curious`, `observant`,
+Optional for v1.0 (later minor version). Head crops, three-quarter view, same lighting, one per pose mood: `curious`, `observant`,
 `concerned`, `purposeful`, `inviting`, `anticipatory`. Mapping to motion is in
 `animation-production.md`.
 

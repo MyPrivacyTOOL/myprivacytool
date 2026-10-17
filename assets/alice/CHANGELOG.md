@@ -13,5 +13,16 @@
   curtain reveal 0.5-1.5 s, expressions per pose mood, 7-head proportion target (provisional).
 - Voice licence recorded from MPC-7438 (Apache 2.0, commercial use permitted); approved sample added as the voice reference.
 
-## 0.1.2-draft
-- Corrected code colour from `#00FF00` to Matrix Green `#27AE60` (locked brand palette, 2026-07-31). `#00FF00` was never approved as a hex; the approved reference clip measures about RGB 78/199/67, nearer `#27AE60`. Notion (Brand Guidelines Part 8A, MPC-7438) corrected the same day. The 0.1.1 entry above is left as written for audit.
+## 0.1.2-draft (MPC-7797)
+- v1.0 scope reduced (approved): six poses P1-P6, layered master, three head views (front, three-quarter-left, profile-left) and the voice reference. Remaining faces, the six expression crops and the curtain-reveal animation are optional, for later minor versions.
+
+## 0.1.3-draft (MPC-7797)
+- Code colour corrected from `#00FF00` to Matrix Green `#27AE60` (locked brand palette; `#00FF00` was never approved as a hex). Matches the corrected MPC-7438.
+
+## 0.1.4-draft (MPC-7797)
+- Added `reference/alice_ref_still03-text-free_v0.png`: text-free 820x959 crop of the locked "What your channel reveals" still (Drive). Reference and test renders only; the full-size layered master still needs the original file or an artist.
+
+## 0.1.5-draft (MPC-7797)
+- $0 route (no artist, no paid tools): interim layered split of the curtain-pull pose (`animations/alice_p6_layers_v0/`: Alice, curtain, code) made with `tools/alice-library/split_p6_layers.py`. Soft 820 px source, so reference-only.
+- Added `reference/alice_ref_still-remove-yourself_pose2_v0.png`, a second existing Alice pose from the published stills (reference-only).
+- Neither changes the lock status: v1.0 still needs full-resolution art.

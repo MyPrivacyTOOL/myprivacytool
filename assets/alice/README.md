@@ -25,6 +25,7 @@ assets/alice/
   expressions/           expression sheet
   animations/            layered source + approved motion loops
   voice/                 approved voice samples (reference renders)
+  reference/             interim crops of the locked stills (reference only)
   reference-clips/       the 15 legacy 560x560 clips (reference only, never published)
 ```
 
@@ -34,7 +35,7 @@ assets/alice/
    listed in `manifest.json` with `status: "locked"`.
 2. Never redraw, restyle or "improve" Alice. Never generate her from a text prompt alone: start
    from a locked reference image (image-to-video; see `docs/kling-ai-prompt-engineering-guidelines.md`).
-3. Colours: white paper and black ink only. The one colour is Matrix green (`#27AE60`) code behind the curtain, on black. No greys beyond engraving hatching, no colour fills.
+3. Colours: white paper and black ink only. The one colour is Matrix Green (`#27AE60`) code behind the curtain, on black. No greys beyond engraving hatching, no colour fills.
 4. The 560x560 legacy clips are reference only. Do not publish or upscale them.
 5. Use the voice exactly as in `spec/voice.md`. Do not swap voices or tune settings per video.
 6. Before shipping, complete `spec/validation-checklist.md` and file the result with the video.

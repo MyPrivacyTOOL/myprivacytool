@@ -5,9 +5,12 @@
 //   - oauth-poc is probed at /health and /oauth/google/start (a redirect; nothing is exchanged or stored).
 //   - core-brain is probed at /health (must report configured:true) and for auth: POST /webhook without the
 //     secret must be 401. No secret is needed and no message is classified, so nothing reaches Qwen or Supabase.
+//   - webhook-receiver is probed at /health, and for auth: an unsigned POST to /webhook/whatsapp must be 401, a GET without the
+//     verify token 403, and the deep-dive start route without its secret 401 (this also proves the TypeScript module loads).
+//     No message is processed and nothing is sent.
 //   - the site is probed for HTTP 200 + the SPA shell on the conversion routes.
 //
-//   node scripts/ci/smoke-test.mjs <site|mpt-leads|oauth-poc|core-brain> [--base-url URL] [--retries N] [--delay-ms MS] [--expect-sha SHA]
+//   node scripts/ci/smoke-test.mjs <site|mpt-leads|oauth-poc|core-brain|webhook-receiver> [--base-url URL] [--retries N] [--delay-ms MS] [--expect-sha SHA]
 // Retries cover Cloudflare propagation after a deploy. Exits 1 with ::error:: annotations on failure.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +20,7 @@ export const DEFAULTS = {
   "mpt-leads": "https://mpt-leads.myprivacytool.workers.dev",
   "oauth-poc": "https://myprivacytool-oauth-poc.myprivacytool.workers.dev",
   "core-brain": "https://brain.myprivacytool.io", // MPC-7260 production custom domain
+  "webhook-receiver": "https://myprivacytool-webhook-receiver.myprivacytool.workers.dev",
 };
 export const SITE_ROUTES = ["/", "/scan", "/start", "/contact", "/newsletter", "/pricing", "/privacy"];
 
@@ -87,6 +91,22 @@ targets["core-brain"] = async (base, f = fetch) => {
     check("/health -> {ok, worker:core-brain, configured:true}", health.status === 200 && hb.ok === true && hb.worker === "core-brain" && hb.configured === true, `status ${health.status} ${JSON.stringify(hb)}`),
     check("POST /webhook without the secret -> 401", anon.status === 401, `status ${anon.status}`),
     check("GET /webhook -> 405 (POST-only)", get.status === 405, `status ${get.status}`),
+    check("unknown path -> 404", nf.status === 404, `status ${nf.status}`),
+  ];
+};
+
+targets["webhook-receiver"] = async (base, f = fetch) => {
+  const health = await f(`${base}/health`);
+  const hb = await health.json().catch(() => ({}));
+  const unsigned = await f(`${base}/webhook/whatsapp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const verify = await f(`${base}/webhook/whatsapp`, { method: "GET" });
+  const dive = await f(`${base}/api/scan/start-deep-dive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const nf = await f(`${base}/nope`);
+  return [
+    check("/health -> {status:ok}", health.status === 200 && hb.status === "ok", `status ${health.status}`),
+    check("unsigned POST /webhook/whatsapp -> 401", unsigned.status === 401, `status ${unsigned.status}`),
+    check("GET /webhook/whatsapp without the verify token -> 403", verify.status === 403, `status ${verify.status}`),
+    check("POST /api/scan/start-deep-dive without the secret -> 401", dive.status === 401, `status ${dive.status}`),
     check("unknown path -> 404", nf.status === 404, `status ${nf.status}`),
   ];
 };

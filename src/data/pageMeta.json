@@ -101,5 +101,10 @@
     "title": "Invite Friends",
     "description": "Invite friends to check what their browser and email give away. Earn a free month of Pro for each friend who gets their report.",
     "noindex": true
+  },
+  "/scan/deep-dive": {
+    "title": "Your Deep Dive",
+    "description": "Confirm or dispute what we found for your number. Private link, expires after 24 hours.",
+    "noindex": true
   }
 }

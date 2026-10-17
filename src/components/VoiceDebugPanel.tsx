@@ -73,7 +73,8 @@ import {
 } from '@/components/ui/alert-dialog';
 
 interface VoiceDebugPanelProps {
-  currentRiskScore: number;
+  /** null with the honest tiles on: there is no tap-based score then. */
+  currentRiskScore: number | null;
   onSimulateComplete?: () => void;
 }
 
@@ -588,9 +589,10 @@ export default function VoiceDebugPanel({ currentRiskScore, onSimulateComplete }
                 <span className="text-muted-foreground">Current Risk Score:</span>
                 <span className={cn(
                   "font-mono font-bold",
+                  currentRiskScore === null ? "text-muted-foreground" :
                   currentRiskScore >= 70 ? "text-foreground" :
                   currentRiskScore >= 40 ? "text-risk-mid" : "text-risk-low"
-                )}>{currentRiskScore}</span>
+                )}>{currentRiskScore ?? 'n/a (honest tiles)'}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Best Risk Score:</span>
