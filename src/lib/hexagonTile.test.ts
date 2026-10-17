@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, tileIcon, type TileKind } from './hexagonTile';
+import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, tileIcon, tileExplanation, type TileKind } from './hexagonTile';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus } from '../../shared/hexagon-registry/status.js';
 
@@ -102,5 +102,20 @@ describe('tile icon (MPC-7916)', () => {
   it('any other icon is left alone', () => {
     expect(tileIcon('dns-leak', '🔓', 'cant_check_here')).toBe('🔓');
     expect(tileIcon('canvas-fingerprint', '🎨', 'needs_fixing')).toBe('🎨');
+  });
+});
+
+describe('tile explanation (MPC-7916)', () => {
+  it('a grey tile never says "looks normal": the words follow the tile, not the detector', () => {
+    const tile = toTile({ id: 'dns-leak', value: 'No Leak Detected' });
+    const said = tileExplanation('DNS Leak', 'No Leak Detected', tile, 'Your lookups look normal', 'We did not see your lookups leaving through an unexpected route.');
+    expect(said.headline).toBe("DNS Leak: A web page can't check this");
+    expect(`${said.headline} ${said.text}`).not.toMatch(/look normal|did not see|no leak|safe/i);
+  });
+  it('a guess says it is a guess, and a found tile keeps the detector text', () => {
+    const guess = toTile({ id: 'location', value: 'Springfield' });
+    expect(tileExplanation('Location', 'Springfield', guess, 'h', 'You are near Springfield.').text).toMatch(/^This is our guess, not a measurement\. You are near Springfield\./);
+    const found = toTile({ id: 'canvas-fingerprint', value: 'Vale Tulip' });
+    expect(tileExplanation('Canvas', 'Vale Tulip', found, 'Your browser gives you away', 'Details.')).toEqual({ headline: 'Your browser gives you away', text: 'Details.' });
   });
 });

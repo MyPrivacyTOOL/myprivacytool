@@ -121,3 +121,19 @@ describe('HexagonGrid with the flag off (MPC-7916)', () => {
     expect(screen.getAllByRole('button')[0].textContent).toMatch(/99%/);
   });
 });
+
+describe('HexagonGrid explanation box with the honest tiles on (MPC-7916)', () => {
+  beforeEach(() => { vi.stubEnv('VITE_HEX_TILE_V2', 'true'); Element.prototype.scrollIntoView = vi.fn(); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
+  it('tapping the grey DNS tile never says the lookups look normal', () => {
+    const hexes = makeHexagons().map((x) => (x.id === 'dns-leak'
+      ? { ...x, headline: 'Your lookups look normal', explanation: 'We did not see your lookups leaving through an unexpected route.' }
+      : x));
+    render(<HexagonGrid hexagons={hexes} />);
+    const dns = screen.getAllByRole('button').find((b) => /DNS Leak/.test(b.getAttribute('aria-label') ?? ''))!;
+    fireEvent.click(dns);
+    const box = screen.getByTestId('hexagon-explanation');
+    expect(box).toHaveTextContent("A web page can't check this");
+    expect(box.textContent).not.toMatch(/look normal|did not see/i);
+  });
+});

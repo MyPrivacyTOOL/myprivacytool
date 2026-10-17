@@ -681,7 +681,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       />
 
       {/* CK-7805: constant-height box above the grid: shows the tapped or hovered hexagon's meaning without shifting or covering the grid. */}
-      <HexagonExplanation hexagon={hoveredHexagon ?? selectedHexagon} />
+      <HexagonExplanation
+        hexagon={hoveredHexagon ?? selectedHexagon}
+        tile={v2 && (hoveredHexagon ?? selectedHexagon) ? tiles.get((hoveredHexagon ?? selectedHexagon)!.id) : undefined}
+      />
 
       {/* Honeycomb Hexagon Grid */}
       <div ref={gridRef} className="flex justify-center mb-8" role="list" aria-label="Detected data points">

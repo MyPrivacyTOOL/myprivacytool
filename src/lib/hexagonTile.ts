@@ -123,3 +123,26 @@ export function tileIcon(id: string, icon: string, kind: TileKind): string {
   if (kind === 'clear' || !STATUS_EMOJI.test(String(icon ?? '').trim())) return icon;
   return getHexagon(id)?.artwork.emoji || '•';
 }
+
+// What the explanation box says for a tile. The detector's own headline and text were written for the old screen: for a tile that
+// makes no claim they can say "looks normal" or "no leak detected", which contradicts the grey tile. So the words follow the tile.
+export const TILE_EXPLANATION: Partial<Record<TileKind, { headline: string; text: string }>> = {
+  not_checked: { headline: 'Not checked yet', text: "We haven't looked at this yet, so we make no claim about it." },
+  couldnt_check: {
+    headline: "We couldn't check this",
+    text: 'The check was blocked or did not finish. That is not the same as finding nothing, so we make no claim either way.',
+  },
+  cant_check_here: {
+    headline: "A web page can't check this",
+    text: 'This can only be checked another way, so we make no claim either way. A real check is offered separately.',
+  },
+};
+
+export function tileExplanation(label: string, value: string, tile: HexagonTile, fallbackHeadline?: string, fallbackText?: string): { headline: string; text: string } {
+  const own = TILE_EXPLANATION[tile.kind];
+  if (own) return { headline: `${label}: ${own.headline}`, text: own.text };
+  const headline = fallbackHeadline ?? `${label}: ${value}`;
+  const text = fallbackText ?? '';
+  if (tile.kind === 'our_guess') return { headline, text: `This is our guess, not a measurement. ${text}`.trim() };
+  return { headline, text };
+}
