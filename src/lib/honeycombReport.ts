@@ -2,16 +2,9 @@
 // Pure functions, so the content is unit-tested. Opens anywhere and prints cleanly to PDF.
 import type { Hexagon, ObservationStatus } from '@/types/hexagon';
 import { hiveLayout } from '@/lib/honeycomb';
+import { groupHexagons } from '@/lib/hexagonGroups';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
 
-const PILLARS: [string, string][] = [
-  ['identity', 'Core Identity'],
-  ['contact', 'Contact & Comms'],
-  ['social', 'Social'],
-  ['web', 'Web'],
-  ['security', 'Security'],
-  ['device', 'Device'],
-];
 const REPORT_WIDTH = 480;
 const POINTS = '50,2 98,28.7 98,86.8 50,113.5 2,86.8 2,28.7';
 const WAITING = new Set<ObservationStatus>(['not_checked', 'false_positive']);
@@ -80,13 +73,7 @@ export function buildReportHtml(
   const fixedIds = opts.fixedIds ?? new Set<string>();
   const total = opts.total ?? hexagons.length;
   const secured = countSecuredFor(hexagons, fixedIds);
-  const known = new Set(PILLARS.map(([id]) => id));
-  const groups = [
-    ...PILLARS.map(([id, t]) => [t, hexagons.filter((h) => h.pillar === id)] as const),
-    ...[...new Set(hexagons.filter((h) => !known.has(h.pillar)).map((h) => h.pillar))].map(
-      (id) => [id.charAt(0).toUpperCase() + id.slice(1), hexagons.filter((h) => h.pillar === id)] as const,
-    ),
-  ].filter(([, items]) => items.length > 0);
+  const groups = groupHexagons(hexagons);
   const todo = hexagons.filter((h) => isExposed(h, fixedIds));
   const next = todo.length
     ? `<section><h2>What to do next</h2><ul>${todo.map((h) => `<li><strong>${escapeHtml(h.label)}</strong>${h.remediation ? ` ${escapeHtml(h.remediation)}` : ''}</li>`).join('')}</ul></section>`
@@ -105,7 +92,7 @@ ul{padding-left:20px}section{break-inside:avoid}
 @media print{main{padding:0}@page{margin:14mm}}
 </style></head><body><main>
 <header><h1>${escapeHtml(opts.title)}</h1><span class="meta">${secured} of ${total} secured · ${escapeHtml(opts.date)}</span></header>
-<div class="grid">${groups.map(([t, items]) => `<section><h2>${escapeHtml(t)}</h2>${pillarSvg([...items], fixedIds)}</section>`).join('')}</div>
+<div class="grid">${groups.map((g) => `<section><h2>${escapeHtml(g.title)}</h2>${pillarSvg(g.items, fixedIds)}</section>`).join('')}</div>
 ${next}
 </main></body></html>`;
 }

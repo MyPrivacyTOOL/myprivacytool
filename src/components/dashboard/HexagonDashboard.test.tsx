@@ -16,7 +16,7 @@ const data: ScanResult = {
 describe('HexagonDashboard', () => {
   it('groups by pillar, keeping unknown pillars, with the ring at the checked ratio', () => {
     render(<HexagonDashboard initialData={data} />);
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Contact & Comms', 'Security', 'Weird']);
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Security', 'Contact & Comms', 'Weird']);
     expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '2'); // 1 of 54
   });
 
