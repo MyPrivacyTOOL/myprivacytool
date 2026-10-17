@@ -28,6 +28,7 @@ Saved from the working session that built [#375](https://github.com/MyPrivacyTOO
 | 12 | A person reviews the new page wording before any real link is sent. The feature stays off until `VITE_DEEP_DIVE_API_URL` is set. | Nothing is exposed in the meantime. Agreed 2026-10-16. |
 | 13 | Apply `20261015200000_whatsapp_notify_engagement_log.sql` together with the Worker deploy, after reading it. | It changes an existing table (`mpt_user_engagement.user_id` becomes nullable). Agreed 2026-10-16. |
 | 14 | `!` means risk only. Disputing is a labelled "This isn't right" button inside its own prompt ("Does this look wrong?", with "Keep it" to close), opened by tapping a checked finding above 0.8. The small `!` "Not me?" badge is gone from both tiles. | The same findings are both "needs fixing" (risk) and the only ones that can be disputed, so one `!` could not mean both. A dispute is rare and should be deliberate, not a stray tap. The `dispute` action, tables and score rules are unchanged. Agreed 2026-10-17. |
+| 15 | The `/scan/deep-dive` error states drop the "Is this you?" heading and intro, and say what is actually wrong: no `?scan=` ("needs the link from your WhatsApp message"), expired or unknown scan ("may have expired"), API address not set ("isn't available yet"). | One message used to blame the link for all three causes, under a heading that invited an action that was not possible. Found from a screenshot of the live page, 2026-10-17. |
 
 ## Open
 
