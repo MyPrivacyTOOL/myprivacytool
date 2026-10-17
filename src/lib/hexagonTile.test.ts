@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, tileIcon, tileExplanation, type TileKind } from './hexagonTile';
+import { toTile, tileKind, TILE_COPY, riskProfile, riskProfileParts, tileAriaLabel, tileIcon, tileExplanation, withUserStatement, type TileKind } from './hexagonTile';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus } from '../../shared/hexagon-registry/status.js';
 
@@ -27,7 +27,9 @@ describe('toTile (MPC-7916)', () => {
 
   it('copy: green is solid and only for clear; purple is faint and only for a guess; grey shows no value when no claim is made', () => {
     for (const [kind, c] of Object.entries(TILE_COPY)) {
-      if (c.colour === 'green') expect(kind).toBe('clear');
+      if (c.colour === 'green' && kind !== 'you_told_us') expect(kind).toBe('clear');
+      // Your word is never as strong as our check.
+      if (kind === 'you_told_us') expect(c.level).toBe('medium');
       if (c.colour === 'purple') {
         expect(kind).toBe('our_guess');
         expect(c.level).toBe('faint');
@@ -79,7 +81,7 @@ describe('risk profile (MPC-7916)', () => {
       { kind: 'clear' }, { kind: 'needs_fixing' }, { kind: 'needs_fixing' }, { kind: 'our_guess' },
       { kind: 'seen_low_risk' }, { kind: 'not_checked' }, { kind: 'couldnt_check' }, { kind: 'cant_check_here' },
     ]);
-    expect(p).toEqual({ clear: 1, needsFixing: 2, ourGuess: 1, seenLowRisk: 1, notChecked: 3 });
+    expect(p).toEqual({ clear: 1, youToldUs: 0, needsFixing: 2, ourGuess: 1, seenLowRisk: 1, notChecked: 3 });
   });
 
   it('is plain counts: no percentage, no "of", no rating word', () => {
@@ -89,7 +91,7 @@ describe('risk profile (MPC-7916)', () => {
   });
 
   it('an empty scan is all zeros, never "clear"', () => {
-    expect(riskProfile([])).toEqual({ clear: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 });
+    expect(riskProfile([])).toEqual({ clear: 0, youToldUs: 0, needsFixing: 0, ourGuess: 0, seenLowRisk: 0, notChecked: 0 });
   });
 });
 
@@ -117,6 +119,21 @@ describe('tile explanation (MPC-7916)', () => {
     expect(tileExplanation('Location', 'Springfield', guess, 'h', 'You are near Springfield.').text).toMatch(/^This is our guess, not a measurement\. You are near Springfield\./);
     const found = toTile({ id: 'canvas-fingerprint', value: 'Vale Tulip' });
     expect(tileExplanation('Canvas', 'Vale Tulip', found, 'Your browser gives you away', 'Details.')).toEqual({ headline: 'Your browser gives you away', text: 'Details.' });
+  });
+});
+
+describe('you told us (MPC-7916 Phase 2)', () => {
+  it('the visitor saying a tile is fixed makes it medium green, never solid, and counts as "you told us"', () => {
+    const red = toTile({ id: 'canvas-fingerprint', value: 'Vale Tulip' });
+    expect(red.kind).toBe('needs_fixing');
+    const told = withUserStatement(red);
+    expect(told).toMatchObject({ kind: 'you_told_us', colour: 'green', level: 'medium', line: 'You told us' });
+    const p = riskProfile([told, red]);
+    expect(p).toMatchObject({ youToldUs: 1, needsFixing: 1, clear: 0 });
+    expect(riskProfileParts(p).map((x) => x.text)).toContain('1 you told us');
+  });
+  it('the profile line gains "you told us" only when there is one', () => {
+    expect(riskProfileParts(riskProfile([])).map((x) => x.text).join(' ')).not.toMatch(/told us/);
   });
 });
 
