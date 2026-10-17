@@ -7,12 +7,19 @@ import {
   type LearningSignal,
   type TransitionResult,
 } from '@/lib/identityConfirmation';
+import { sendHexagonInteraction } from '@/lib/hexagonInteractionApi';
 
 /**
  * Holds the scan result and applies the user's confirm / dispute answers.
- * `onLearningSignal` receives one signal per accepted answer (no finding data), for the future backend call.
+ * `onLearningSignal` receives one signal per accepted answer (no finding data).
+ * With a `scanId` (the deep-dive scan the page was opened for) each accepted answer is also sent to the backend, best effort: the UI has
+ * already updated, and a network failure or a refusal changes nothing on screen.
  */
-export const useHexagonState = (initialData: ScanResult, onLearningSignal?: (s: LearningSignal) => void) => {
+export const useHexagonState = (
+  initialData: ScanResult,
+  onLearningSignal?: (s: LearningSignal) => void,
+  scanId?: string,
+) => {
   const [scanResult, setScanResult] = useState(initialData);
   // Mirror of the latest state, so two quick taps in one tick both see the first answer.
   const latest = useRef(initialData);
@@ -23,11 +30,11 @@ export const useHexagonState = (initialData: ScanResult, onLearningSignal?: (s: 
       if (!signal) return;
       latest.current = next;
       setScanResult(next);
-      // THE LEARNING LOOP: id and outcome only. TODO: POST to the backend to tune provider confidence by region.
-      console.info(`[LEARNING LOOP] ${signal.outcome.toUpperCase()} ${signal.hexagonId}`);
+      // THE LEARNING LOOP: the server stores the answer and, for a reject or dispute, tunes the provider. id and action only go out.
+      if (scanId) void sendHexagonInteraction(scanId, signal.hexagonId, signal.outcome);
       onLearningSignal?.(signal);
     },
-    [onLearningSignal],
+    [onLearningSignal, scanId],
   );
 
   const handleConfirm = useCallback(

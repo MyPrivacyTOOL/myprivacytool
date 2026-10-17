@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { hexTileV2Enabled } from '@/config/hexagonTile';
-import { toTile, riskProfile, riskProfileParts, HexagonTile } from '@/lib/hexagonTile';
+import { toTile, riskProfile, riskProfileParts, cannotCheckLast, HexagonTile } from '@/lib/hexagonTile';
 import { captureContext } from '@/lib/webScan';
 
 // MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
@@ -159,8 +159,9 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       return categoryOrder.indexOf(catA) - categoryOrder.indexOf(catB);
     });
 
-    return sorted;
-  }, [allHexagons]);
+    // With the honest tiles on, tiles that a web page cannot check go last, so a visitor is not met by a row of grey (kept from main).
+    return v2 ? cannotCheckLast(sorted) : sorted;
+  }, [allHexagons, v2]);
 
   // Confirmation is derived from React state, not stored on the hexagon objects,
   // so it survives the parent regenerating `allHexagons` (orientation/motion updates).
@@ -436,11 +437,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         isFirstConfirmation.current = false;
       }
       
-      // MPC-7916: with the honest tiles on a tap is "seen", so no confirmation event is sent for it.
-      if (!v2) {
-        trackHexagonConfirm(hex.id, hex.label, true);
-        trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
-      }
+      // With the honest tiles on a tap is "seen". The event is still sent (as on main) with the tile kind, so the funnel can tell a tap on
+      // a grey tile from a tap on a red one.
+      trackHexagonConfirm(hex.id, hex.label, true, v2 ? tiles.get(hex.id)?.kind : undefined);
+      trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
       
       setConfirmedCount(c => c + 1);
       setConfirmedHexagons(prev => new Set(prev).add(id));

@@ -56,7 +56,7 @@ describe("ci.yml (merge blocking)", () => {
 });
 
 describe("deploy workflows: pre-deploy checks, smoke test, rollback", () => {
-  const DEPLOYS = { "deploy-mpt-leads.yml": "mpt-leads", "deploy-oauth-poc.yml": "oauth-poc" };
+  const DEPLOYS = { "deploy-mpt-leads.yml": "mpt-leads", "deploy-oauth-poc.yml": "oauth-poc", "deploy-webhook-receiver.yml": "webhook-receiver" };
   for (const [file, worker] of Object.entries(DEPLOYS)) {
     describe(file, () => {
       const wf = load(file);
@@ -97,7 +97,7 @@ describe("rollback.yml", () => {
   const wf = load("rollback.yml");
   it("offers every Worker that has a deploy workflow", () => {
     const options = wf.on.workflow_dispatch.inputs.worker.options;
-    const deployed = readdirSync(wfDir).filter((f) => /^deploy-(mpt-leads|oauth-poc|scan-report)\.yml$/.test(f)).map((f) => f.replace(/^deploy-|\.yml$/g, ""));
+    const deployed = readdirSync(wfDir).filter((f) => /^deploy-(mpt-leads|oauth-poc|scan-report|webhook-receiver)\.yml$/.test(f)).map((f) => f.replace(/^deploy-|\.yml$/g, ""));
     deployed.push("core-brain"); // MPC-7260: deployed by deploy.yml (shared with social-listeners), not a deploy-<name>.yml
     expect(options.sort()).toEqual(deployed.sort());
     for (const w of options) expect(existsSync(path.join(repo, "workers", w, "wrangler.toml")), w).toBe(true);

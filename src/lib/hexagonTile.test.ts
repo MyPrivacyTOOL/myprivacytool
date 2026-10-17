@@ -119,3 +119,12 @@ describe('tile explanation (MPC-7916)', () => {
     expect(tileExplanation('Canvas', 'Vale Tulip', found, 'Your browser gives you away', 'Details.')).toEqual({ headline: 'Your browser gives you away', text: 'Details.' });
   });
 });
+
+import { cannotCheckLast } from './hexagonTile';
+
+describe('cannotCheckLast (from the first tile PR)', () => {
+  it('moves cannot-check ids to the end, keeping the rest in order', () => {
+    const ids = ['dns-leak', 'canvas-fingerprint', 'social-platforms', 'device', 'webrtc-leak'].map((id) => ({ id }));
+    expect(cannotCheckLast(ids).map((i) => i.id)).toEqual(['canvas-fingerprint', 'device', 'webrtc-leak', 'dns-leak', 'social-platforms']);
+  });
+});

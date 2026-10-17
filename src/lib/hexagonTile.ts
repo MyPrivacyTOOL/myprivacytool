@@ -146,3 +146,12 @@ export function tileExplanation(label: string, value: string, tile: HexagonTile,
   if (tile.kind === 'our_guess') return { headline, text: `This is our guess, not a measurement. ${text}`.trim() };
   return { headline, text };
 }
+
+/**
+ * Stable partition: registry "cannot be checked from a web page" ids go after all others. Static, so tiles never move when a value
+ * arrives. The CK-7799 interest list itself is not edited. (Kept from the first tile PR on main.)
+ */
+export function cannotCheckLast<T extends { id: string }>(items: readonly T[]): T[] {
+  const cannot = (id: string) => getHexagon(id)?.truth.level === 'cannot_be_checked';
+  return [...items.filter((i) => !cannot(i.id)), ...items.filter((i) => cannot(i.id))];
+}

@@ -14,5 +14,6 @@ export function hexTileV2Enabled(search?: string): boolean {
   } catch {
     /* no window or blocked: use the build setting */
   }
-  return parseHexTileV2(import.meta.env.VITE_HEX_TILE_V2);
+  // VITE_HEXAGON_TILES is the older name for the same switch (it was on main before this one); either turns the tiles on.
+  return parseHexTileV2(import.meta.env.VITE_HEX_TILE_V2) || parseHexTileV2(import.meta.env.VITE_HEXAGON_TILES);
 }
