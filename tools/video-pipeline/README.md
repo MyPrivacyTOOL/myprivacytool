@@ -66,3 +66,11 @@ the claims. Claims go through MPC-7402 before a script is written.
 ```bash
 cd tools/video-pipeline && python3 -m unittest -v test_build_short
 ```
+
+## Brand sting (optional)
+
+`--sting assets/branding/audio/mpt-sting_v1.0.wav` adds the approved sound logo: it plays at the start and
+again after the last word, ducked under any voice, and the first and last picture are held while it plays
+(`--intro-hold`, default 1.5 s, and `--outro-hold`, default 2.0 s; both default to 0 without `--sting`).
+Captions and timings shift with the holds. `--sting` and `--music` cannot be combined. Without either, the
+output is unchanged (0.2 s lead-in, 0.4 s tail).

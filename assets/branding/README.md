@@ -10,4 +10,5 @@ Placeholder for Chris to upload high-resolution photos and brand imagery.
 Do not commit anything private or unreleased. Until files are added, agents should treat this folder as empty and not invent imagery.
 
 ## Files
-- `logo/`: draft SVG logo vectors traced from the approved PNG (see `logo/README.md`). Brand asset, not a personal photo.
+- `logo/`: SVG logo vectors v1.0 (primary, reversed, icon, favicon), traced from the approved PNG; approved by Chris 2026-10-17 (see `logo/README.md`).
+- `audio/`: the brand sting v1.0, generated and approved 2026-10-17 (see `audio/README.md`).
