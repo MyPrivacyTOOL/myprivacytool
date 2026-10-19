@@ -1,0 +1,9 @@
+# Cloudflare Pages redirects (https://developers.cloudflare.com/pages/configuration/redirects/).
+#
+# /wa is the one stable WhatsApp entry point: the QR codes and the "WhatsApp" button on /start all point here, so the
+# business number lives in this single line. On a phone, wa.me opens the WhatsApp app (or a "Continue to chat" page).
+#
+# Until the number is linked this sends people to /start. To go live, replace the target with the chat link, digits only,
+# international format, e.g.:
+#   /wa  https://wa.me/85212345678?text=hi  302
+/wa  /start  302
