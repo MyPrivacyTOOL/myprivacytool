@@ -98,3 +98,7 @@ These decisions approve the plan, not the execution: gates G1 (Stage 1 closed, M
 ## 9. Related
 
 `docs/hk-spam-flags-mpc-7446.md`, `docs/hk-spam-day10-email-mpc-7448.md`, `docs/hk-dnc-ivr-procedure.md`, `docs/INFRASTRUCTURE.md` (deploy and rollback), `docs/SUPABASE-AUDIT.md` (migration drift), `workers/scan-report/README.md`.
+
+## 10. Reconciliation with docs/cutover/mpc-8299-hk-spam-stage2-go-live.md
+
+Another session merged #447 (5205ea3), which added that go-live plan and set `HK_SPAM_EMAILS_LIVE = "true"`. The deploy for it failed (the Worker test requires `false`), so it never reached production. On 2026-10-19 the owner decided to keep test mode: the flag is back to `"false"`, and this document (with the decisions in section 8) is the plan of record until MPC-7545 and MPC-7385 are done. Where the two plans differ, section 8 wins.
