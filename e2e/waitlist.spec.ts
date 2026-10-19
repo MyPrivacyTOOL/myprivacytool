@@ -8,7 +8,7 @@ test.describe("/start signup (First Hexagon report waitlist)", () => {
     await expect(page).toHaveTitle(/MyPrivacyTOOL/i);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Your data is everywhere");
 
-    await page.getByRole("button", { name: /yes, that's me/i }).click();
+    await page.getByRole("button", { name: /join the list/i }).click();
     await page.getByPlaceholder("your@email.com").fill("e2e-waitlist@example.com");
     const submit = page.getByRole("button", { name: /check my exposure/i });
     await page.getByRole("checkbox").check();
@@ -29,7 +29,7 @@ test.describe("/start signup (First Hexagon report waitlist)", () => {
 
   test("the browser blocks submission until consent is ticked", async ({ page, net }) => {
     await page.goto("/start");
-    await page.getByRole("button", { name: /yes, that's me/i }).click();
+    await page.getByRole("button", { name: /join the list/i }).click();
     await page.getByPlaceholder("your@email.com").fill("e2e@example.com");
     await expect(page.getByRole("checkbox")).not.toBeChecked();
     await page.getByRole("button", { name: /check my exposure/i }).click();
@@ -40,7 +40,7 @@ test.describe("/start signup (First Hexagon report waitlist)", () => {
   test("shows the error and keeps the form usable when HubSpot fails", async ({ page, net }) => {
     net.mocks.hubspotStatus = 429;
     await page.goto("/start");
-    await page.getByRole("button", { name: /yes, that's me/i }).click();
+    await page.getByRole("button", { name: /join the list/i }).click();
     await page.getByPlaceholder("your@email.com").fill("e2e@example.com");
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: /check my exposure/i }).click();
@@ -48,9 +48,9 @@ test.describe("/start signup (First Hexagon report waitlist)", () => {
     await expect(page.getByRole("button", { name: /check my exposure/i })).toBeEnabled();
   });
 
-  test('"Not me" sends the visitor to a fresh scan', async ({ page }) => {
+  test('"Not now" points the visitor to the scan', async ({ page }) => {
     await page.goto("/start");
-    await page.getByRole("button", { name: /not me/i }).click();
+    await page.getByRole("button", { name: /not now/i }).click();
     await page.getByRole("main").getByRole("link", { name: /check my exposure/i }).click();
     await expect(page).toHaveURL(/\/scan$/);
   });
