@@ -6,12 +6,12 @@ export const HELP_IS_DRAFT = true;
 
 export const HELP_FAQ: { q: string; a: string }[] = [
   { q: 'Why is a hexagon grey?', a: 'Grey means we have not been able to check it, or a web page cannot check it at all. Grey never means you are safe, and it never means you are in danger. It means we are not making a claim.' },
-  { q: 'What does "Can\'t check from here" mean?', a: 'Some things, like a DNS leak, cannot be seen from a web page. Instead of showing a false "all clear", we say so.' },
+  { q: 'What does "Can\'t check from here" mean?', a: 'Some things, like a DNS leak (when your website lookups bypass your VPN), cannot be seen from a web page. Instead of showing a false "all clear", we say so.' },
   { q: 'What is "Our guess"?', a: 'Some details, like your location or internet provider, come from your internet address or an estimate. They are often right, but not always. We show them as guesses.' },
   { q: 'What is the difference between "You told us" and "Clear"?', a: '"Clear" means we checked for ourselves. "You told us" means you said you fixed something. We show the two differently, and it only becomes clear when we check again.' },
   { q: 'What if I tap "Later"?', a: 'Nothing changes. We do not take silence as "no", and we do not take it as "yes".' },
-  { q: 'Why are some hexagons red and others grey with an "i"?', a: 'Red means a tracker can use it and it matters, so there is something to fix. Grey with an "i" means a tracker can see it but it does little harm.' },
-  { q: 'Do I get points for tapping hexagons?', a: 'No. Tapping does not unlock anything or raise any score. Hexagons change colour only when we really check something, or when you tell us something is fixed.' },
+  { q: 'Why are some hexagons red and others grey with an "i"?', a: 'Red means a tracker can use it and it matters, so there is something to fix. Grey with an "i" means a tracker can see it but it matters less.' },
+  { q: 'Do I get points for tapping hexagons?', a: 'No. Tapping does not unlock anything. Hexagons change colour only when we really check something, or when you tell us something is fixed.' },
   { q: 'Does my phone number\'s country show where I live?', a: 'No. It shows where the number was issued. People move, travel and keep numbers.' },
 ];
 
@@ -40,7 +40,7 @@ export default function HexagonHelp() {
           <li><strong>Needs fixing</strong> (red): we found something that matters.</li>
           <li><strong>Our guess</strong> (purple): we think this is you. It is a guess.</li>
           <li><strong>You told us</strong> (lighter green): your word, not our proof.</li>
-          <li><strong>Seen, low risk</strong> (grey, "i"): a tracker can see it, little harm.</li>
+          <li><strong>Seen, minor</strong> (grey, "i"): a tracker can see it, but it matters less.</li>
           <li><strong>Not checked</strong> (grey): we make no claim either way.</li>
         </ul>
         <div className="space-y-2">

@@ -1,7 +1,7 @@
 // MPC-7916 Phase 1: the ONE place that turns a hexagon's captured value into what its tile says.
 // Colour = what it means for the visitor. Transparency = how we know. Grey = we make no claim.
 //   green solid  : checked and clear           red solid    : found, medium or high risk
-//   purple faint : our guess                   grey + "i"   : found, low risk
+//   purple faint : our guess                   grey + "i"   : found, minor
 //   grey         : not checked / couldn't check / can't be checked from a web page
 // Rules (agreed by Chris on MPC-7913): a tile never shows a percentage; an unchecked tile never shows the detector's
 // placeholder value; a guess never looks safe and never looks like an alarm; nothing here counts a tap.
@@ -56,7 +56,7 @@ export const TILE_COPY: Record<TileKind, { line: string; glyph: string; colour: 
   clear: { line: 'Clear', glyph: '✓', colour: 'green', level: 'solid', showValue: true },
   needs_fixing: { line: 'Needs fixing', glyph: '!', colour: 'red', level: 'solid', showValue: true },
   our_guess: { line: 'Our guess', glyph: '?', colour: 'purple', level: 'faint', showValue: true },
-  seen_low_risk: { line: 'Seen · low risk', glyph: 'i', colour: 'grey', level: 'solid', showValue: true },
+  seen_low_risk: { line: 'Seen · minor', glyph: 'i', colour: 'grey', level: 'solid', showValue: true },
   // Phase 2: the visitor said they fixed it. Their word, not our proof: medium, never solid, and it only becomes clear when we re-check.
   you_told_us: { line: 'You told us', glyph: '✓', colour: 'green', level: 'medium', showValue: true },
   // Guess check (prototype): the visitor answered "Are you in X?". Their word is shown as theirs; only the device check is independent.
@@ -65,7 +65,7 @@ export const TILE_COPY: Record<TileKind, { line: string; glyph: string; colour: 
   // Our guess was wrong: the wrong value is not shown again.
   guess_wrong: { line: 'Our guess was wrong', glyph: '×', colour: 'grey', level: 'solid', showValue: false },
   not_checked: { line: 'Not checked yet', glyph: '–', colour: 'grey', level: 'solid', showValue: false },
-  couldnt_check: { line: "Couldn't check", glyph: '↻', colour: 'grey', level: 'solid', showValue: false },
+  couldnt_check: { line: "Check didn't finish", glyph: '↻', colour: 'grey', level: 'solid', showValue: false },
   cant_check_here: { line: "Can't check from here", glyph: '–', colour: 'grey', level: 'solid', showValue: false },
 };
 
@@ -155,7 +155,7 @@ export function riskProfileParts(p: RiskProfile): { key: keyof RiskProfile; text
     ...(p.confirmed > 0 ? [{ key: 'confirmed' as const, text: `${p.confirmed} confirmed` }] : []),
     { key: 'needsFixing', text: `${p.needsFixing} need${p.needsFixing === 1 ? 's' : ''} fixing` },
     { key: 'ourGuess', text: `${p.ourGuess} our guess` },
-    { key: 'seenLowRisk', text: `${p.seenLowRisk} seen, low risk` },
+    { key: 'seenLowRisk', text: `${p.seenLowRisk} seen, minor` },
     { key: 'notChecked', text: `${p.notChecked} not checked yet` },
   ];
 }
@@ -178,7 +178,7 @@ export function tileIcon(id: string, icon: string, kind: TileKind): string {
 export const TILE_EXPLANATION: Partial<Record<TileKind, { headline: string; text: string }>> = {
   not_checked: { headline: 'Not checked yet', text: "We haven't looked at this yet, so we make no claim about it." },
   couldnt_check: {
-    headline: "We couldn't check this",
+    headline: "The check didn't finish",
     text: 'The check was blocked or did not finish. That is not the same as finding nothing, so we make no claim either way.',
   },
   guess_wrong: {
