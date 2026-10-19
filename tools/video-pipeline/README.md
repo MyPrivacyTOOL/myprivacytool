@@ -19,6 +19,12 @@ mpt-yt-s010_singapore-dnc-registry_en.srt
 mpt-yt-s010_singapore-dnc-registry_thumb-a.jpg
 ```
 
+The build also writes `out/youtube-upload/<title>.mp4`, a copy named with the script's
+`title` (a colon becomes " -"). The Zapier Drive-to-YouTube Zap uses the Drive file name as the
+YouTube title, so a person who has approved the video drops this file in the Drive folder
+`MPT YouTube Uploads`. The Zap sets the description and keeps the video Private. The tool
+itself still never uploads anything.
+
 ## Setup
 
 - `ffmpeg` 6+ (with the `subtitles`, `zoompan`, `loudnorm` filters) and the Inter font
