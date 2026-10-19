@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MPT Digital Footprint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@500&display=swap">
+<!-- Live data adapter injected before main script -->
+<script src="footprint-live-adapter.js" defer></script>
+<style>
+/* [STYLES IDENTICAL TO PUBLIC/FOOTPRINT/INDEX.HTML — TRUNCATED FOR BREVITY] */
+/* Paste the entire <style> block from the original index.html here */
+/* This stub shows the critical difference: the script tag for footprint-live-adapter.js above */
+</style>
+
+<div class="wrap">
+  <!-- [MARKUP IDENTICAL TO PUBLIC/FOOTPRINT/INDEX.HTML — TRUNCATED FOR BREVITY] -->
+  <!-- Paste the entire body markup from the original index.html here -->
+</div>
+
+<script>
+// Initialize live data adapter (injected before this script runs)
+const FootprintLiveAdapter = window.FootprintLiveAdapter || {};
+
+// The main initialization function, modified to support live data
+(async function initializeFootprint() {
+  // Feature flag: enable live data mode
+  const USE_LIVE_DATA = new URLSearchParams(window.location.search).get('live') === 'true';
+
+  let registryItems = [];
+
+  if (USE_LIVE_DATA && FootprintLiveAdapter.initLiveFootprint) {
+    try {
+      console.log('[footprint] Attempting to load live scan data...');
+      const liveRegistry = await FootprintLiveAdapter.initLiveFootprint();
+
+      if (liveRegistry && liveRegistry.length > 0) {
+        console.log('[footprint] Loaded', liveRegistry.length, 'hexagons from live scan');
+        registryItems = liveRegistry;
+      } else {
+        console.log('[footprint] No live scan available, using example data');
+        registryItems = REG;  // Fall back to embedded example data
+      }
+    } catch (e) {
+      console.warn('[footprint] Live data adapter error, falling back to example:', e);
+      registryItems = REG;
+    }
+  } else {
+    console.log('[footprint] Using example data (live=true URL param to enable live mode)');
+    registryItems = REG;  // Default to example data for safety
+  }
+
+  // Call the main initialization with the resolved registry
+  build(registryItems, 'Web');
+  setScope(PRIM, false, false);
+})();
+
+// [PASTE THE ENTIRE ORIGINAL FOOTPRINT SCRIPT HERE, EXCEPT FOR THE build() AND setScope() INITIALIZATION AT THE END]
+// The key difference is above: we wrap everything in an async IIFE that loads live data if requested.
+</script>
+</body>
+</html>
