@@ -169,7 +169,7 @@ for (const flag of [undefined, '', 'false', 'TRUE', '1']) {
   await quiet(async () => { await worker.scheduled({ cron: '*/5 * * * *', scheduledTime: Date.UTC(2026, 9, 11, 2, 0) }, ON, ctx); await Promise.all(ran); });
   check(F.calls.length === 1 && F.calls[0].url.includes('hk_spam_due_reminders') && F.sends().length === 0, 'HK slot tick (02:00 UTC) => HK job only (test mode here), nothing mailed to registrants');
   const wrangler = (await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
-  check(/crons = \["\*\/5 \* \* \* \*"\]/.test(wrangler) && /HK_SPAM_EMAILS_LIVE = "false"/.test(wrangler) && !/HK_SPAM_TEST_INBOXES\s*=/.test(wrangler), 'wrangler.toml: only the 5-minute cron (Workers Free allows 5 crons per account), EMAILS_LIVE committed false, no test inbox address in the repo');
+  check(/crons = \["\*\/5 \* \* \* \*"\]/.test(wrangler) && /HK_SPAM_EMAILS_LIVE = "true"/.test(wrangler) && !/HK_SPAM_TEST_INBOXES\s*=/.test(wrangler), 'wrangler.toml: only the 5-minute cron (Workers Free allows 5 crons per account), EMAILS_LIVE committed true (Stage 2 go-live, #447), no test inbox address in the repo');
   check([[1, 0], [2, 0], [3, 0], [4, 0]].every(([h, m]) => isHkSpamSlot(Date.UTC(2026, 9, 11, h, m))) && ![[0, 0], [5, 0], [2, 5], [1, 5], [13, 0]].some(([h, m]) => isHkSpamSlot(Date.UTC(2026, 9, 11, h, m))), 'HK slots are exactly 01:00-04:00 UTC (09:00 HKT daily run + hourly retries)');
   const ran2 = []; const ctx2 = { waitUntil: (p) => ran2.push(p) };
   const G = fake({ regs: [reg('r1', 'a@example.com')] }); globalThis.fetch = G.f;
