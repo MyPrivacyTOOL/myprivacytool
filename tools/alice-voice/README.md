@@ -17,6 +17,21 @@ after `pip install sherpa-onnx soundfile numpy imageio-ffmpeg`. Models:
 
 The script sentence uses "My Privacy Tool" for pronunciation (MPC-7411).
 
+## Run it on a droplet (one command)
+
+On a fresh Ubuntu machine (for example the Singapore droplet; 2 vCPU / 8 GB is plenty, CPU only):
+
+```
+git clone https://github.com/MyPrivacyTOOL/myprivacytool && cd myprivacytool
+bash tools/alice-voice/run-on-droplet.sh        # optional argument: a work folder (default ~/alice-voice-job)
+```
+
+It checks free disk (3 GiB) and memory (1.5 GiB), installs `python3-venv ffmpeg curl bzip2` with apt, builds a
+venv, installs `sherpa-onnx==1.13.8`, downloads both Kokoro packages, records their SHA-256 (`out/SHA256SUMS.txt`),
+copies each package's `LICENSE` to `out/licences/`, and runs `generate_samples.py` at low priority. It writes only
+inside the work folder, needs no secrets and costs nothing. Then follow the three "Next" steps it prints: listen,
+read the v1.0 licence in full, and copy A, B and C off the machine (never publish them before the listener test).
+
 ## Status
 
 - Generated 2026-10-13 on the Mac used for MPC-7411 (sherpa-onnx 1.13.8, ffmpeg from
