@@ -5,21 +5,21 @@ import { test, expect } from "./fixtures";
 test("the home page shows the honeycomb dashboard by default, and ?view=grid shows the old grid", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  await expect(page.getByRole("progressbar", { name: "Secured" })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole("progressbar", { name: "Checked" })).toBeVisible({ timeout: 45_000 });
   await expect(page.locator('section[aria-labelledby^="pillar-"]')).toHaveCount(8);
   await expect(page.getByRole("button", { name: "Export report" })).toBeVisible();
   await expect(page.getByTestId("confirmation-counter")).toHaveCount(0);
 
   await page.goto("/?view=grid");
   await expect(page.getByTestId("confirmation-counter")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByRole("progressbar", { name: "Secured" })).toHaveCount(0);
+  await expect(page.getByRole("progressbar", { name: "Checked" })).toHaveCount(0);
 });
 
 test("answering the last Is this you? guess emits privacy_scan_completed once, and scan_started once", async ({ page, isMobile }) => {
   test.skip(isMobile, "slow full-scan flow; desktop project is enough");
   test.setTimeout(120_000);
   await page.goto("/");
-  await expect(page.getByRole("progressbar", { name: "Secured" })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole("progressbar", { name: "Checked" })).toBeVisible({ timeout: 45_000 });
 
   const guesses = page.locator('button[title="We think this is you. Tap to confirm."]');
   for (let i = 0; i < 60 && (await guesses.count()) > 0; i++) {

@@ -71,7 +71,6 @@ export function buildReportHtml(
   opts: { title: string; date: string; fixedIds?: ReadonlySet<string>; total?: number },
 ): string {
   const fixedIds = opts.fixedIds ?? new Set<string>();
-  const total = opts.total ?? hexagons.length;
   const secured = countSecuredFor(hexagons, fixedIds);
   const groups = groupHexagons(hexagons);
   const todo = hexagons.filter((h) => isExposed(h, fixedIds));
@@ -91,7 +90,7 @@ svg{display:block;margin:0 auto;max-width:100%;height:auto}
 ul{padding-left:20px}section{break-inside:avoid}
 @media print{main{padding:0}@page{margin:14mm}}
 </style></head><body><main>
-<header><h1>${escapeHtml(opts.title)}</h1><span class="meta">${secured} of ${total} secured · ${escapeHtml(opts.date)}</span></header>
+<header><h1>${escapeHtml(opts.title)}</h1><span class="meta">${secured} ${secured === 1 ? 'tile' : 'tiles'} checked · ${escapeHtml(opts.date)}</span></header>
 <div class="grid">${groups.map((g) => `<section><h2>${escapeHtml(g.title)}</h2>${pillarSvg(g.items, fixedIds)}</section>`).join('')}</div>
 ${next}
 </main></body></html>`;

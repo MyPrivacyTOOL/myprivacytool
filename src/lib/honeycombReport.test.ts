@@ -27,7 +27,7 @@ describe('buildReportHtml', () => {
     const list = [hex(), hex({ id: 'h2', status: 'checked', exposure: false })];
     expect(countSecuredFor(list, new Set())).toBe(1);
     expect(countSecuredFor(list, new Set(['h1']))).toBe(2);
-    expect(buildReportHtml(list, { ...opts, total: 54 })).toContain('1 of 54 secured');
+    expect(buildReportHtml(list, { ...opts, total: 54 })).toContain('1 tile checked');
   });
   it('escapes anything that came from scan data', () => {
     const html = buildReportHtml([hex({ label: '<img src=x onerror=alert(1)>', data: '"><script>', remediation: '<b>x</b>' })], { ...opts, title: '<script>' });
