@@ -87,6 +87,12 @@ describe("Pricing waitlist (MPC-7626)", () => {
     expect(screen.getByText("Can I cancel anytime?")).toBeInTheDocument();
     expect(screen.getByText("What data do you keep if I join the waitlist?")).toBeInTheDocument();
   });
+
+  it("explains what paid removal is planned to look like, without promising it is available", () => {
+    renderPage(<Pricing />);
+    expect(screen.getByText("What would paid removal look like?")).toBeInTheDocument();
+    expect(screen.getByText(/still only planned and not open/)).toBeInTheDocument();
+  });
 });
 
 describe("Pricing A/B tests (MPC-7638)", () => {
