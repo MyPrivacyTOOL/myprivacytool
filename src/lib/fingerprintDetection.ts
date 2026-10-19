@@ -1025,6 +1025,47 @@ export async function calculateProtectionScore(): Promise<ProtectionStatus> {
 // ============================================
 
 /**
+ * CK-8305: pull the connection address out of an ICE candidate line
+ * ("candidate:<foundation> <component> <protocol> <priority> <address> <port> typ ...").
+ * Returns null for mDNS hostnames (browser privacy placeholders), anything that is not a valid
+ * IPv4/IPv6 address, and the foundation id; related addresses (raddr) are not read.
+ */
+export function parseIceCandidateAddress(
+  candidate: string
+): { address: string; kind: 'local' | 'public' } | null {
+  const fields = candidate.trim().split(/\s+/);
+  const address = fields[4]?.replace(/^\[|\]$/g, '');
+  if (!address) return null;
+
+  const v4 = address.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if ([v4[1], v4[2], v4[3], v4[4]].some((n) => Number(n) > 255)) return null;
+    const local =
+      a === 0 || a === 10 || a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127);
+    return { address, kind: local ? 'local' : 'public' };
+  }
+
+  // IPv6: hex groups and colons only, at least two colons, at most one "::"
+  if (/^[0-9a-fA-F:]+$/.test(address) && (address.match(/:/g) || []).length >= 2 && address.split('::').length <= 2) {
+    const groups = address.split(':').filter((g) => g !== '');
+    if (groups.length > 8 || groups.some((g) => g.length > 4)) return null;
+    const lower = address.toLowerCase();
+    const local =
+      lower === '::' || lower === '::1' ||
+      /^fe[89ab]/.test(lower) || // fe80::/10 link-local
+      /^f[cd]/.test(lower); // fc00::/7 unique local
+    return { address, kind: local ? 'local' : 'public' };
+  }
+
+  return null; // mDNS "<uuid>.local" or any other hostname
+}
+
+/**
  * Detect WebRTC IP leaks that can expose real IP even behind VPN
  * ⚠️ PRIVACY WARNING: This API can reveal your real IP address
  */
@@ -1076,25 +1117,11 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
 
         const candidate = event.candidate.candidate;
         
-        // Extract IP addresses from ICE candidate
-        const ipRegex = /(\d{1,3}\.){3}\d{1,3}|([a-fA-F0-9:]+:+)+[a-fA-F0-9]+/g;
-        const matches = candidate.match(ipRegex);
-        
-        if (matches) {
-          matches.forEach((ip) => {
-            // Classify as local or public
-            if (ip.startsWith('192.168.') || 
-                ip.startsWith('10.') || 
-                ip.startsWith('172.') ||
-                ip.startsWith('169.254.') ||
-                ip === '0.0.0.0' ||
-                ip.startsWith('::') ||
-                ip.startsWith('fe80:')) {
-              if (!localIPs.includes(ip)) localIPs.push(ip);
-            } else {
-              if (!publicIPs.includes(ip)) publicIPs.push(ip);
-            }
-          });
+        // CK-8305: read the connection address field only; ignore mDNS names and foundation ids
+        const parsed = parseIceCandidateAddress(candidate);
+        if (parsed) {
+          const list = parsed.kind === 'public' ? publicIPs : localIPs;
+          if (!list.includes(parsed.address)) list.push(parsed.address);
         }
       };
     });
