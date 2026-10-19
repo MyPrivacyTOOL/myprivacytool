@@ -85,13 +85,15 @@ Rollback triggers (any one): 5xx or failed registration inserts above a handful,
 
 Deployed commit sha and Pages deployment id; `mpt-scan-report` version id; SQL results for 3.1/3.2; screenshots of the page at 360px in EN and zh; GA4 DebugView capture; the registration test row id; the `[TEST]` emails received (both languages); the `hk_spam_reminder_run` log lines; the preview kill-switch results; the unsubscribe round trip; the count of first organic rows; the list of test rows for Chris to delete.
 
-## 8. Open questions for Chris
+## 8. Decisions (Chris, 2026-10-19: all recommendations agreed and approved)
 
-1. `main` already has `indexable: true` and `IVR_VERIFIED = true` (launched 2026-10-14 per `docs/hk-spam-flags-mpc-7446.md`), and Stage 1 tested the live page. Does "pages go live" in Stage 2 therefore mean only confirming and announcing what is already deployed, or should the page be pulled back (`indexable: false`) until Stage 2 approval? This spec assumes it stays as is.
-2. Confirm the production database objects: the 2026-10-05 audit and MPC-7624 say they are missing; has anyone applied the four HK migrations since?
-3. Real day-10 sends: go on 2026-10-27, or hold until after MPC-7385 / MPC-7545?
-4. Is the "real responses to test submissions" reading in section 5 right?
-5. Who removes the Stage 1 and Stage 2 test rows from production?
+1. **Page stays live as deployed** (`indexable: true`, `IVR_VERIFIED = true`). Stage 2 confirms and evidences it, then enables what is not yet live. Exception: if pre-check 3.1 shows the HK tables are missing, pull the page back (`indexable: false`) until they are applied.
+2. **Pre-check 3.1 (database objects) runs first, read-only.** If anything is missing, Chris applies the four migrations (dry run of `deploy-supabase.yml` first; no `migration repair` without Chris).
+3. **Real day-10 emails are held** until MPC-7545 (wording sign-off) and MPC-7385 (scan go-live) are both done. Test-mode email runs on 2026-10-27 to prove the pipeline; `HK_SPAM_EMAILS_LIVE` flips to `"true"` later on Chris's word.
+4. **"Real responses to test submissions"** = a real email through the real pipeline to a test inbox. Real sends to registrants are a separate step after approval.
+5. **Test rows are removed by Chris** (or someone he explicitly delegates). The agent deletes nothing; the Result Summary lists every test row id and address.
+
+These decisions approve the plan, not the execution: gates G1 (Stage 1 closed, MPC-7539) and G2 (Chris's go to start executing) still apply, and each production change still needs the approval named in section 4.
 
 ## 9. Related
 
