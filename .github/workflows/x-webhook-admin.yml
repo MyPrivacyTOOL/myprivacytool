@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "list, validate (re-run the CRC check), delete or create"
+        description: "list, validate (re-run the CRC check), delete, create, subs (list DM subscriptions) or subscribe (create the dm.received subscription)"
         required: true
         default: list
         type: choice
-        options: [list, validate, delete, create]
+        options: [list, validate, delete, create, subs, subscribe]
       webhook_id:
         description: "Webhook id (validate and delete only)"
         required: false
@@ -48,6 +48,13 @@ jobs:
             delete)   [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
                       code=$(call -X DELETE "https://api.x.com/2/webhooks/${WEBHOOK_ID}") ;;
             create)   code=$(call -X POST -H 'Content-Type: application/json' -d "{\"url\":\"${WEBHOOK_URL}\"}" https://api.x.com/2/webhooks) ;;
+            subs)     code=$(call https://api.x.com/2/activity/subscriptions) ;;
+            subscribe) [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
+                      code=$(call https://api.x.com/2/users/by/username/myprivacytool)
+                      echo "user lookup HTTP ${code}"
+                      uid=$(sed -n 's/.*"id":"\([0-9]*\)".*/\1/p' /tmp/x.out | head -1)
+                      [ -n "$uid" ] || { head -c 1000 /tmp/x.out; echo; exit 1; }
+                      code=$(call -X POST -H 'Content-Type: application/json' -d "{\"event_type\":\"dm.received\",\"filter\":{\"user_id\":\"${uid}\"},\"webhook_id\":\"${WEBHOOK_ID}\"}" https://api.x.com/2/activity/subscriptions) ;;
             *)        echo "unknown action"; exit 1 ;;
           esac
           echo "HTTP ${code}"
