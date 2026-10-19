@@ -6,6 +6,9 @@ import { HexagonGrid } from '@/components/dashboard/HexagonGrid';
 import { ProgressRing } from '@/components/dashboard/ProgressRing';
 import { HitlConfirmModal } from '@/components/modals/HitlConfirmModal';
 import { countSecured } from '@/components/dashboard/countSecured';
+import { TileProfile } from '@/components/dashboard/TileProfile';
+import { effectiveTile } from '@/utils/hexagonStyles';
+import type { TileKind } from '@/lib/hexagonTile';
 import { buildReportHtml } from '@/lib/honeycombReport';
 import { RemediationPanel } from '@/components/modals/RemediationPanel';
 
@@ -74,6 +77,7 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
   };
 
   const secured = countSecured(scanResult.hexagons, fixedIds);
+  const kinds = scanResult.hexagons.map((h) => effectiveTile(h, fixedIds.has(h.id))).filter((k): k is TileKind => !!k);
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -85,6 +89,7 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
           <ProgressRing securedCount={secured} totalCount={TOTAL} />
         </div>
       </header>
+      <TileProfile kinds={kinds} />
       <HexagonGrid
         scanResult={scanResult}
         onConfirm={handleConfirm}
