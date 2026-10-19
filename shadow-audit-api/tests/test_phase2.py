@@ -1,0 +1,118 @@
+import io
+import json
+import unittest
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+from app.api import make_app
+from app.config import Settings
+from app.crypto import signing
+from app.integrations.outbound import NotionClient, SlackNotifier
+from app.integrations.sources import InMemorySource
+from app.services import detectors
+from app.services.audit import AuditService
+
+KEY = Ed25519PrivateKey.generate()
+PRIV = KEY.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
+PUB = KEY.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+SECRET = "sk_live_" + "a" * 24
+
+
+class Boom:
+    def fetch(self, *a):
+        raise RuntimeError("bq down")
+
+
+def svc(source, notion=None, slack=None, env="staging"):
+    return AuditService(Settings(environment=env), source, signing.PassportSigner(PRIV, "urn:t#1"), notion, slack)
+
+
+class DetectorTests(unittest.TestCase):
+    def test_57_detects_and_never_leaks_secret(self):
+        d = detectors.detect_57_api_keys([{"ts": "t1", "text": f"key={SECRET}"}])
+        self.assertEqual(d.frequency, 1)
+        self.assertNotIn("sk_live", json.dumps(d.evidence_excerpts))
+        self.assertIsNone(detectors.detect_57_api_keys([{"ts": "t", "text": "ok"}]))
+
+    def test_9_residual(self):
+        e = [{"ts": "1", "session": "a", "vault_end": list("abcdef"), "vault_start": []},
+             {"ts": "2", "session": "b", "vault_start": list("abcdef"), "vault_end": []}]
+        self.assertEqual(detectors.detect_9_uncleared_context(e).frequency, 1)
+
+    def test_41_and_51(self):
+        self.assertIsNotNone(detectors.detect_41_sql_injection([{"ts": "1", "text": "SELECT * FROM u WHERE id='" + " + uid"}]))
+        loop = [{"ts": f"{i:03d}", "tool": "search", "text": "x"} for i in range(25)]
+        self.assertIsNotNone(detectors.detect_51_tool_loops(loop))
+        self.assertIsNone(detectors.detect_51_tool_loops(loop[:5]))
+
+
+class AuditTests(unittest.TestCase):
+    def test_planted_risk_gives_signed_staging_passport(self):
+        r = svc(InMemorySource({"a1": [{"ts": "t", "text": SECRET}]})).run("a1")
+        self.assertEqual(r["status"], "completed")
+        self.assertEqual(r["detectedRisks"][0]["riskId"], 57)
+        self.assertTrue(signing.verify(r["passport"], PUB))
+        self.assertEqual(r["passport"]["credentialSubject"]["environment"], "staging")
+
+    def test_source_failure_is_incomplete_with_no_passport(self):
+        r = svc(Boom()).run("a1")
+        self.assertEqual((r["status"], r["riskLevel"], r["passportIssued"]), ("incomplete", "INCOMPLETE", False))
+
+    def test_notion_failure_keeps_result(self):
+        def bad(*a):
+            raise OSError("down")
+        r = svc(InMemorySource({}), NotionClient("t", "db", bad)).run("a1")
+        self.assertTrue(r["passportIssued"])
+        self.assertTrue(any(e.startswith("notion") for e in r["errors"]))
+
+    def test_notion_and_slack_payloads(self):
+        calls = []
+        t = lambda m, u, h, b: calls.append((u, b)) or {"url": "https://notion/x"}  # noqa: E731
+        r = svc(InMemorySource({}), NotionClient("t", "db1", t), SlackNotifier("https://hook", t)).run("a1")
+        notion = [c for c in calls if "notion" in c[0]][0][1]
+        self.assertEqual(notion["parent"]["database_id"], "db1")
+        self.assertEqual(notion["properties"]["Environment"]["select"]["name"], "staging")
+        self.assertEqual(r["passportUrl"], "https://notion/x")
+        self.assertTrue(any(c[0] == "https://hook" for c in calls))
+
+
+def call(app, method, path, body=None, token="tok"):
+    raw = json.dumps(body).encode() if body is not None else b""
+    env = {"REQUEST_METHOD": method, "PATH_INFO": path, "CONTENT_LENGTH": str(len(raw)),
+           "wsgi.input": io.BytesIO(raw)}
+    if token:
+        env["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+    out = {}
+    res = app(env, lambda code, h: out.setdefault("code", code))
+    return out["code"], json.loads(b"".join(res))
+
+
+class ApiTests(unittest.TestCase):
+    def setUp(self):
+        self.app = make_app(svc(InMemorySource({"a1": []})), "tok")
+
+    def test_health_open_others_need_auth(self):
+        self.assertEqual(call(self.app, "GET", "/health", token=None)[0], "200 OK")
+        self.assertEqual(call(self.app, "POST", "/audit/a1", token=None)[0], "401 Unauthorized")
+        self.assertEqual(call(self.app, "POST", "/audit/a1", token="wrong")[0], "401 Unauthorized")
+
+    def test_full_flow(self):
+        code, a = call(self.app, "POST", "/audit/a1", {"lookbackDays": 7})
+        self.assertEqual(code, "200 OK")
+        self.assertEqual(call(self.app, "GET", f"/audit/{a['auditId']}")[1]["agentId"], "a1")
+        self.assertEqual(len(call(self.app, "GET", "/agent/a1/audit-history")[1]["audits"]), 1)
+        self.assertEqual(call(self.app, "POST", f"/audit/{a['auditId']}/remediate",
+                              {"remediationId": "r", "status": "in_progress"})[0], "200 OK")
+        self.assertEqual(call(self.app, "POST", f"/audit/{a['auditId']}/remediate",
+                              {"remediationId": "r", "status": "bogus"})[0], "400 Bad Request")
+        self.assertEqual(call(self.app, "GET", "/audit/nope")[0], "404 Not Found")
+        self.assertEqual(call(self.app, "POST", "/audit/a1", {"lookbackDays": 999})[0], "400 Bad Request")
+
+    def test_no_token_configured_denies_all(self):
+        app = make_app(svc(InMemorySource({})), "")
+        self.assertEqual(call(app, "POST", "/audit/a1", token="")[0], "401 Unauthorized")
+
+
+if __name__ == "__main__":
+    unittest.main()
