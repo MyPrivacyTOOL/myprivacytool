@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   buildTeaser, TOP_SIX_EXPLAINERS, TOP_SIX_IDS, ALICE_QUIET_IDS, ALICE_INTRO, ALICE_WEBRTC_LEAK, aliceQuietLine,
 } from './exposureCopy';
@@ -38,5 +40,15 @@ describe('Alice script (CK-8313)', () => {
   it('does not say "hover" in the intro and mentions tapping', () => {
     expect(ALICE_INTRO).not.toMatch(/hover/i);
     expect(ALICE_INTRO).toMatch(/tap/i);
+  });
+});
+
+describe('Alice spoken copy has no invented statistics (CK-7799 cleanup)', () => {
+  // vitest runs from the repo root; import.meta.url is not a file: URL in this environment
+  const src = readFileSync(resolve(process.cwd(), 'src/components/VoiceAI.tsx'), 'utf8');
+  it('contains none of the removed unbacked percentage claims', () => {
+    for (const banned of ['97% unique', '99% trackable', '99% identifiable', 'approximately 90%', '${percentage}%', '${uniquenessPercentage}', 'approximately 80% of websites', 'about 30% of users']) {
+      expect(src).not.toContain(banned);
+    }
   });
 });
