@@ -33,11 +33,14 @@ MANIFEST = ALICE / "manifest.json"
 SCALE = 4  # trace a 4x Lanczos upscale so curves are smoother than the 820 px pixel grid
 # Luminance below this (0-255) counts as ink. The curtain is near-white with faint fold
 # lines, so it needs a higher cut than Alice.
-THRESHOLDS = {"alice": 170, "curtain": 215}
+THRESHOLDS = {"alice": 170, "curtain": 200}
 # Alice uses a local-contrast cut: a pixel is ink when it is darker than its surroundings by
 # CONTRAST (so hatching lines separate instead of fusing) and below the threshold, or when it is
-# dark outright (CORE). The curtain keeps a plain global cut.
-LOCAL = {"alice": dict(radius=8, contrast=22, core=80)}
+# dark outright (CORE). Both layers use it; the curtain's fold lines are fainter, so it is gentler.
+LOCAL = {
+    "alice": dict(radius=8, contrast=22, core=80),
+    "curtain": dict(radius=8, contrast=14, core=110),  # fold lines are fainter than Alice's ink
+}
 LAYERS = ("alice", "curtain")
 
 
@@ -116,7 +119,7 @@ All layers use the 820x959 canvas and stack with no offsets: code, curtain, Alic
 
 ## Method
 - Layer composited on white, converted to grey, Lanczos-upscaled 4x, thresholded to ink
-  (curtain below 215 of 255; Alice by local contrast: darker than its surroundings by 22 and below 170, or below 80), traced with `potrace -t 0 -a 1.0 -O 0.2`.
+  (local contrast: a pixel is ink when it is darker than its surroundings by 22 and below 170, or below 80 for Alice; 14, 200 and 110 for the curtain, whose folds are fainter), traced with `potrace -t 0 -a 1.0 -O 0.2`.
 - No speckle removal and only light curve smoothing, to keep the engraving hatching.
 - Nothing redrawn or restyled; the paths follow the existing pixels.
 
