@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[2]
 ALICE = ROOT / "assets" / "alice"
@@ -33,7 +33,11 @@ MANIFEST = ALICE / "manifest.json"
 SCALE = 4  # trace a 4x Lanczos upscale so curves are smoother than the 820 px pixel grid
 # Luminance below this (0-255) counts as ink. The curtain is near-white with faint fold
 # lines, so it needs a higher cut than Alice.
-THRESHOLDS = {"alice": 150, "curtain": 215}
+THRESHOLDS = {"alice": 175, "curtain": 215}
+# Alice uses a local-contrast cut: a pixel is ink when it is darker than its surroundings by
+# CONTRAST (so hatching lines separate instead of fusing) and below the threshold, or when it is
+# dark outright (CORE). The curtain keeps a plain global cut.
+LOCAL = {"alice": dict(radius=10, contrast=14, core=100)}
 LAYERS = ("alice", "curtain")
 
 
@@ -42,7 +46,13 @@ def to_pbm(layer: str, threshold: int, path: Path) -> tuple[int, int]:
     white = Image.new("RGBA", im.size, (255, 255, 255, 255))
     grey = Image.alpha_composite(white, im).convert("L")
     big = grey.resize((im.width * SCALE, im.height * SCALE), Image.LANCZOS)
-    ink = np.array(big) < threshold
+    a = np.array(big).astype(float)
+    local = LOCAL.get(layer)
+    if local:
+        mean = np.array(big.filter(ImageFilter.GaussianBlur(local["radius"])), dtype=float)
+        ink = ((a < mean - local["contrast"]) & (a < threshold)) | (a < local["core"])
+    else:
+        ink = a < threshold
     Image.fromarray(np.where(ink, 0, 255).astype(np.uint8)).convert("1").save(path)
     return im.size
 
@@ -106,7 +116,7 @@ All layers use the 820x959 canvas and stack with no offsets: code, curtain, Alic
 
 ## Method
 - Layer composited on white, converted to grey, Lanczos-upscaled 4x, thresholded to ink
-  (Alice below 150, curtain below 215 of 255), traced with `potrace -t 0 -a 1.0 -O 0.2`.
+  (curtain below 215 of 255; Alice by local contrast: darker than its surroundings by 14 and below 175, or below 100), traced with `potrace -t 0 -a 1.0 -O 0.2`.
 - No speckle removal and only light curve smoothing, to keep the engraving hatching.
 - Nothing redrawn or restyled; the paths follow the existing pixels.
 
