@@ -26,6 +26,8 @@ export interface Hexagon {
   /** 0.0 to 1.0 (e.g. 0.95 high, 0.60 guess). */
   confidence_score?: number;
   remediation: string | null;
+  /** Optional https link for the remediation step (e.g. a registry sign-up page). */
+  remediation_url?: string | null;
   /** True when the finding is something the user should act on (set by the OSINT orchestrator). Counts toward verified_exposure_count. */
   exposure?: boolean;
   interaction_state?: InteractionState;
