@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
 import { getConversationState, saveConversationState, purgeExpiredState, STATE_TTL_MS } from './state-store.js';
 
-const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc', GCP_PROJECT_ID: 'p', FIRESTORE_SA_TOKEN: 't' };
+const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc' };
 let reqs: { url: string; method: string; body: any; headers: any }[]; let status: number; let contentRange: string; let seed: Record<string, any>;
 
 beforeEach(() => {
@@ -19,16 +19,27 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('state store routing', () => {
-  it.each(['deepdive:abc', 'deepdive_latest:85212345678', 'whatsapp:85212345678'])('%s goes to Supabase, never Firestore', async (key) => {
+describe('state store', () => {
+  it.each(['deepdive:abc', 'deepdive_latest:85212345678', 'whatsapp:85212345678', 'telegram:1', 'messenger:2', 'sms:+44', 'email:a@b.c', 'lead:a@b.c'])('%s goes to Supabase, never Firestore', async (key) => {
     await saveConversationState(ENV, key, { a: 1 }); await getConversationState(ENV, key);
     expect(reqs).toHaveLength(2);
     expect(reqs.every((r) => r.url.includes('/rest/v1/mpt_conversation_state'))).toBe(true);
+    expect(reqs.some((r) => r.url.includes('firestore.googleapis.com'))).toBe(false);
   });
-  it.each(['telegram:1', 'messenger:2', 'sms:+44', 'email:a@b.c', 'lead:a@b.c'])('%s stays on Firestore', async (key) => {
-    await getConversationState(ENV, key);
-    expect(reqs).toHaveLength(1);
-    expect(reqs[0].url).toContain('firestore.googleapis.com');
+  it('a stored state is read back unchanged', async () => {
+    seed['telegram:1'] = { stage: 'awaiting_confirmation', platform: 'telegram' };
+    expect(await getConversationState(ENV, 'telegram:1')).toEqual({ stage: 'awaiting_confirmation', platform: 'telegram' });
+  });
+  it('the Telegram confirmation flow works on Supabase alone (no Firestore variables)', async () => {
+    const env = { SUPABASE_SERVICE_ROLE_KEY: 'svc', TELEGRAM_BOT_KEY: 'bot', TELEGRAM_WEBHOOK_SECRET: 'tws' };
+    const hit = () => worker.fetch(new Request('https://x/webhook/telegram', { method: 'POST', headers: { 'X-Telegram-Bot-Api-Secret-Token': 'tws' },
+      body: JSON.stringify({ message: { from: { id: 7 }, chat: { id: 7 }, text: 'hi' } }) }), env, { waitUntil() {} });
+    const r = await hit();
+    expect(r.status).toBe(200);
+    const saved = reqs.find((q) => q.method === 'POST' && q.url.includes('mpt_conversation_state'));
+    expect(saved?.body.key).toBe('telegram:7');
+    expect(saved?.body.state.stage).toBe('awaiting_confirmation');
+    expect(reqs.some((q) => q.url.includes('firestore.googleapis.com'))).toBe(false);
   });
 });
 
