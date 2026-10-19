@@ -27,6 +27,7 @@ const NOTHING_SEEN = {
   privacy: /^dnt enabled$/i,
   'webgl-fingerprint': /^detected$/i,
   'font-detection': /^0 fonts$/i,
+  'audio-fingerprint': /^0+(\.\.\.)?$/, // CK-8321: a silent or blocked audio read hashes to all zeros; never a finding
 };
 
 // The wording where the registry allows CHECKED AND CLEAR, and the positive "nothing found" value the detector gives.
