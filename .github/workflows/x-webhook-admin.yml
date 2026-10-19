@@ -55,7 +55,7 @@ jobs:
                       echo "user lookup HTTP ${code}"
                       uid=$(sed -n 's/.*"id":"\([0-9]*\)".*/\1/p' /tmp/x.out | head -1)
                       [ -n "$uid" ] || { head -c 1000 /tmp/x.out; echo; exit 1; }
-                      code=$(call -X POST -H 'Content-Type: application/json' -d "{\"event_type\":\"dm.received\",\"filter\":{\"user_id\":\"${uid}\"},\"webhook_id\":\"${WEBHOOK_ID}\"}" -H "Authorization: Bearer ${X_USER_ACCESS_TOKEN}" https://api.x.com/2/activity/subscriptions) ;;
+                      code=$(curl -sS -o /tmp/x.out -w '%{http_code}' -X POST -H "Authorization: Bearer ${X_USER_ACCESS_TOKEN}" -H 'Content-Type: application/json' -d "{\"event_type\":\"dm.received\",\"filter\":{\"user_id\":\"${uid}\"},\"webhook_id\":\"${WEBHOOK_ID}\"}" https://api.x.com/2/activity/subscriptions) ;;
             *)        echo "unknown action"; exit 1 ;;
           esac
           echo "HTTP ${code}"
