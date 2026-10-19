@@ -2,6 +2,8 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { hexTileV2Enabled } from '@/config/hexagonTile';
 import { HERO_TILES_LINE1, HERO_TILES_LINE2 } from '@/lib/scanCopy';
 import HexagonGrid from '@/components/HexagonGrid';
+import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
+import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
@@ -299,7 +301,12 @@ const Index = () => {
             </div>
           ) : (
             <>
-              <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+              {/* The scan is complete here (loading is over), which is when WebScanDashboard must mount: it keeps its own answers from then on. */}
+              {honeycombDashboardEnabled() ? (
+                <WebScanDashboard scanned={hexagons} title="Your Digital Footprint" />
+              ) : (
+                <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+              )}
               <ScanSavingNotice variant="scan" />
               <WelcomeBack hexagons={hexagons} />
               <ScanNumberNotice />
