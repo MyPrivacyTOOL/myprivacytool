@@ -55,7 +55,8 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
   const secured = !tile && !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
   const emoji = WAITING.has(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
   const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status) && (!tile || tile.showValue);
-  const tip = tile ? `${hexagon.label}: ${tile.line}.` : exposed ? EXPOSED_TOOLTIP : visuals.tooltip;
+  // A guess keeps its instruction ("Tap to confirm"): it is the one tile that asks the visitor to answer.
+  const tip = tile && hexagon.status !== 'guess' ? `${hexagon.label}: ${tile.line}.` : exposed ? EXPOSED_TOOLTIP : visuals.tooltip;
 
   return (
     <div className={cn('group/tile relative', className)} style={style}>
