@@ -418,6 +418,19 @@ const Privacy = () => {
                   Web Analytics, which counts page loads without cookies)
                 </li>
                 <li>
+                  <strong>AI Model Providers:</strong> When you send us a message
+                  through a messaging channel, we may send the text of that message
+                  to an AI language model run by a third-party provider, for
+                  example to work out what you are asking about. We remove email
+                  addresses and phone numbers from the text first, and we do not
+                  add your name, contact details or scan results to it. We choose
+                  AI providers and models, open-source or closed-source and from
+                  any country, to fit the business and technical need, and we change
+                  them over time. The providers in use are always named in the
+                  sub-processor list of our DPA. The free scan on our website and
+                  Alice's spoken guidance do not send anything to an AI provider
+                </li>
+                <li>
                   <strong>Email Checks for Your Report:</strong> To prepare your
                   report we send the domain part of your email address to
                   Cloudflare (a public DNS lookup), and a SHA-256 hash of your
