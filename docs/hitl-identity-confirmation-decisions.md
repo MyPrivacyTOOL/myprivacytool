@@ -36,6 +36,8 @@ Saved from the working session that built [#375](https://github.com/MyPrivacyTOO
 
 ## Production status (as of 2026-10-16 01:26 HKT)
 
+> **Superseded 2026-10-19 (MPC-8318).** The snapshot below is kept for history. Two lines in it are out of date: `20261015200000_whatsapp_notify_engagement_log.sql` was applied by hand on 2026-10-17 (its `whatsapp_notify_*` columns exist, empty and unused) and is no longer to be applied as a go-live step, because the pull model (MPC-8309, PR #389) replaced the template send. The webhook-receiver Worker has since been deployed. Ignore the "Not applied", "Not deployed" and "Go-live order" lines below.
+
 - **Applied:** the two tables from `20261016000000_hexagon_hitl_interactions.sql` exist on the live project `xmdmkumwxpgahmlweuug`, with forced RLS, no access for `anon` or `authenticated`, `service_role` only, the check constraints and indexes, and 0 rows. The migration tool and a combined script timed out, so it was run as the same statements in small steps. Supabase's migration history does not list it. The file is idempotent, so a later push of it is harmless.
 - **Not applied:** `20261015200000_whatsapp_notify_engagement_log.sql` (decision 13).
 - **Not deployed:** the webhook-receiver Worker on Cloudflare was last deployed on 14 Oct, before the deep-dive code.
