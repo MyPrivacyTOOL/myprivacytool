@@ -59,9 +59,9 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
   return (
     <div className="min-h-screen bg-white text-gray-900">
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-8">
-      <header className="flex items-center justify-between gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold sm:text-3xl">{title}</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:justify-end">
           <Button variant="outline" onClick={exportReport}>Export report</Button>
           <ProgressRing securedCount={secured} totalCount={TOTAL} />
         </div>
