@@ -108,4 +108,9 @@ describe('InteractiveHexagonTile honest look', () => {
     expect(screen.queryByText('Leaking: 1.2.3.4')).toBeNull();
     expect(screen.getByTestId('tile-line')).toHaveTextContent("Check didn't finish");
   });
+  it('a guess keeps its "Tap to confirm" tooltip, because it is the one tile that asks the visitor to answer', () => {
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTitle(/tap to confirm/i)).toBeTruthy();
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess');
+  });
 });
