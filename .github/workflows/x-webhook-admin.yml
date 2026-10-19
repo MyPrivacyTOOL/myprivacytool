@@ -62,7 +62,7 @@ jobs:
                       echo "token store check HTTP ${pc}"
                       [ "$pc" = 200 ] || { echo "token store not reachable; refresh token NOT spent"; exit 1; }
                       rc=$(curl -sS -o /tmp/tok.json -w '%{http_code}' -u "${X_CLIENT_ID}:${X_CLIENT_SECRET}" -d grant_type=refresh_token -d "refresh_token=${X_REFRESH_TOKEN}" -d "client_id=${X_CLIENT_ID}" https://api.x.com/2/oauth2/token)
-                      echo "token refresh HTTP ${rc}"
+                      echo "token refresh HTTP ${rc} (lengths: refresh_token=${#X_REFRESH_TOKEN} client_id=${#X_CLIENT_ID} client_secret=${#X_CLIENT_SECRET})"
                       [ "$rc" = 200 ] || { jq -r '.error // .detail // .title // "no detail"' /tmp/tok.json; exit 1; }
                       acc=$(jq -r .access_token /tmp/tok.json); ref=$(jq -r .refresh_token /tmp/tok.json); exp=$(jq -r '.expires_in // 7200' /tmp/tok.json)
                       echo "::add-mask::${acc}"; echo "::add-mask::${ref}"
