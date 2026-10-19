@@ -117,8 +117,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     const coreMatch = value.match(/(\d+)\s*cores/);
     const cores = coreMatch ? coreMatch[1] : 'multiple';
     const isHighEnd = value.toLowerCase().includes('high') || (parseInt(cores) >= 8);
-    const percentage = isHighEnd ? '15' : '35';
-    return `I detected your hardware configuration: ${cores} CPU cores with ${isHighEnd ? 'high-end' : 'standard'} specifications. Combined with your GPU from WebGL, this creates a unique hardware fingerprint. About ${percentage}% of users share your exact hardware profile. ${isHighEnd ? 'High-end hardware actually makes you MORE trackable because it\'s less common.' : ''}`;
+    return `I detected your hardware configuration: ${cores} CPU cores with ${isHighEnd ? 'high-end' : 'standard'} specifications. Combined with your GPU from WebGL, this creates a unique hardware fingerprint. ${isHighEnd ? 'High-end hardware actually makes you MORE trackable because it\'s less common.' : ''}`;
   }
   
   if (label.includes('display profile') || label.includes('screen fingerprint')) {
@@ -159,8 +158,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     const mics = micMatch ? micMatch[1] : '0';
     const speakers = spkMatch ? spkMatch[1] : '0';
     const totalDevices = parseInt(cameras) + parseInt(mics) + parseInt(speakers);
-    const percentage = totalDevices > 3 ? '65' : '28';
-    return `You have ${cameras} cameras, ${mics} microphones, and ${speakers} speakers connected. The specific combination of media devices is ${percentage}% unique. ${totalDevices > 3 ? 'Professional setups with multiple devices are especially identifying.' : ''} Even the order in which devices are enumerated creates a fingerprint.`;
+    return `You have ${cameras} cameras, ${mics} microphones, and ${speakers} speakers connected. The specific combination of media devices can help tell your device apart. ${totalDevices > 3 ? 'Professional setups with multiple devices are especially identifying.' : ''} Even the order in which devices are enumerated creates a fingerprint.`;
   }
   
   // CORE FINGERPRINTING HEXAGONS
@@ -180,7 +178,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   }
   if (label.includes('extensions') || label.includes('plugin')) {
     if (value.toLowerCase().includes('ad blocker: yes')) {
-      return "I can see you're using an ad blocker. While this protects your privacy from ads, it also makes you more unique—only about 30% of users have ad blockers. This paradoxically makes you more trackable through fingerprinting.";
+      return "I can see you're using an ad blocker. While this protects your privacy from ads, it can also make your browser easier to tell apart through fingerprinting.";
     }
     const pluginMatch = value.match(/(\d+)/);
     if (pluginMatch) {
@@ -262,7 +260,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     }
     const serviceMatch = value.match(/(\d+)\s*services?/i);
     const serviceCount = serviceMatch ? parseInt(serviceMatch[1]) : 1;
-    return `I detected you're logged into Google services. This is significant because Google can now track you across approximately 80% of websites through Google Analytics, even when you're not using Google products directly. Every YouTube video, every search, every Gmail you read—it's all connected to build your advertising profile. With ${serviceCount > 1 ? serviceCount + ' services' : 'your account'} active, Google has deep visibility into your online behavior.`;
+    return `I detected you're logged into Google services. This is significant because Google can now follow you across the many websites that use Google Analytics, even when you're not using Google products directly. Every YouTube video, every search, every Gmail you read—it's all connected to build your advertising profile. With ${serviceCount > 1 ? serviceCount + ' services' : 'your account'} active, Google has deep visibility into your online behavior.`;
   }
   
   if (label.includes('meta services') || label.includes('facebook')) {
@@ -476,9 +474,9 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     const patternMatch = value.toLowerCase().includes('human') ? 'human' : value.toLowerCase().includes('bot') ? 'bot' : 'unknown';
     
     if (value.toLowerCase().includes('collecting')) {
-      return "I'm currently tracking your mouse movements. Every cursor position, speed change, and acceleration pattern creates a behavioral signature that's 97% unique. Keep moving your mouse and watch the data accumulate.";
+      return "I'm currently tracking your mouse movements. Every cursor position, speed change, and acceleration pattern creates a behavioral signature that can help recognise you. Keep moving your mouse and watch the data accumulate.";
     }
-    return `I've been tracking your mouse movements. In just a few seconds, I recorded ${movements} movements averaging ${speed} pixels per second. Your pattern was classified as ${patternMatch}. The way you move your mouse—the speed, acceleration, and even micro-corrections—creates a behavioral signature that's 97% unique. This can identify you across different websites even without cookies.`;
+    return `I've been tracking your mouse movements. In just a few seconds, I recorded ${movements} movements averaging ${speed} pixels per second. Your pattern was classified as ${patternMatch}. The way you move your mouse—the speed, acceleration, and even micro-corrections—creates a behavioral signature that can help recognise you across different websites, even without cookies.`;
   }
   
   if (label.includes('keystroke') || label.includes('typing pattern')) {
@@ -754,9 +752,7 @@ const generateBehaviorAssessmentMessage = (
     timeOnSite > 0
   ].filter(Boolean).length;
   
-  const uniquenessPercentage = Math.min(95, 60 + (dataPoints * 7));
-  
-  return `Behavioral tracking is perhaps the most insidious form of surveillance because it works without cookies or storage, can't be blocked by privacy tools, continues even in incognito mode, is completely invisible to users, and is highly accurate for identification. Your combined behavioral signature—mouse, keyboard, clicks, scrolls, and timing—is approximately ${uniquenessPercentage}% unique. This means you can be tracked and identified across websites even if you use a VPN, block cookies, randomize your fingerprint, and browse in private mode. I need to be honest: protecting against behavioral tracking is nearly impossible. The only real defense is awareness. Know that every movement, every click, every scroll is being recorded, analyzed, and used to build a profile of you.`;
+  return `Behavioral tracking is perhaps the most insidious form of surveillance because it works without cookies or storage, can't be blocked by privacy tools, continues even in incognito mode, is completely invisible to users, and is highly accurate for identification. Your combined behavioral signature—mouse, keyboard, clicks, scrolls, and timing—can help recognise you based on the ${dataPoints} kinds of behaviour seen so far. This means you may be recognised across websites even if you use a VPN, block cookies, randomize your fingerprint, and browse in private mode. I need to be honest: protecting against behavioral tracking is nearly impossible. The only real defense is awareness. Know that every movement, every click, every scroll is being recorded, analyzed, and used to build a profile of you.`;
 };
 
 // Generate final comprehensive summary
@@ -1006,7 +1002,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
         } else if (label.includes('cpu') || label.includes('hardware')) {
           newMessage = `Hardware Profile: ${hexagonData.value}. Your CPU and RAM create a unique fingerprint. Click to confirm.`;
         } else if (label.includes('display') || label.includes('screen fingerprint')) {
-          newMessage = `Display Profile: ${hexagonData.value}. Your screen config is ${hexagonData.confidence}% identifiable. Click to confirm.`;
+          newMessage = `Display Profile: ${hexagonData.value}. Your screen config can help tell your device apart. Click to confirm.`;
         } else if (label.includes('timezone')) {
           const hasMismatch = hexagonData.risk?.toLowerCase().includes('mismatch');
           newMessage = hasMismatch 
@@ -1022,7 +1018,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
       // BEHAVIOR HEXAGONS - Unconfirmed messages
       } else if (category === 'behavior') {
         if (label.includes('mouse tracking') || label.includes('mouse movement')) {
-          newMessage = `🖱️ Mouse Tracking: ${hexagonData.value}. Your movement patterns are 97% unique. I'm recording speed, acceleration, and micro-corrections. Click to confirm.`;
+          newMessage = `🖱️ Mouse Tracking: ${hexagonData.value}. Your movement patterns can help recognise you. I'm recording speed, acceleration, and micro-corrections. Click to confirm.`;
         } else if (label.includes('keystroke') || label.includes('typing')) {
           newMessage = `⌨️ Keystroke Dynamics: ${hexagonData.value}. I'm capturing your typing rhythm—not content. This biometric can identify you. Click to confirm.`;
         } else if (label.includes('click')) {
@@ -1070,7 +1066,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
       newMessage = `🖱️ Behavioral tracking active! I'm now analyzing your mouse movements, typing patterns, clicks, and scrolls. This is the most insidious form of tracking—it cannot be blocked.`;
       trackVoiceAIMessage('behavior_wave');
     } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= 46) {
-      newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that's approximately 90% unique. This can identify you even in incognito mode.`;
+      newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that can help recognise you, even in private browsing.`;
     } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < 46) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow.`;
     } else if (confirmedCount === totalCount && totalCount >= 46) {
@@ -1127,7 +1123,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
       // BEHAVIOR HEXAGONS - Confirmed messages
       } else if (category === 'behavior') {
         if (label.includes('mouse tracking') || label.includes('mouse movement')) {
-          newMessage = `🖱️ Mouse tracking confirmed! Your movement patterns—speed, acceleration, micro-corrections—create a 97% unique behavioral signature. This can identify you across websites even without cookies.`;
+          newMessage = `🖱️ Mouse tracking confirmed! Your movement patterns—speed, acceleration, micro-corrections—create a behavioral signature that can help recognise you across websites, even without cookies.`;
         } else if (label.includes('keystroke') || label.includes('typing')) {
           newMessage = `⌨️ Keystroke dynamics confirmed! Your typing rhythm is like a fingerprint. Websites use this for biometric authentication and cross-site tracking.`;
         } else if (label.includes('click')) {
