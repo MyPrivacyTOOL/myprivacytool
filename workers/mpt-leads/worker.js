@@ -273,11 +273,7 @@ export default {
           `${hktTime.fullDate} > ${hktTime.time} HKT`,
           `Total Leads: ${totalLeads}`,
           ``,
-          `Name: ${slackEsc(name) || '(not given)'}`,
-          `Email: ${slackEsc(email)}`,
-          phone ? `Phone: ${slackEsc(phone)}` : null,
-          ``,
-          `Country: ${country || '—'}`,   // CK-7721 fix 4: no IP address or city in Slack (data minimisation); the full detail stays in the Notion lead row until it expires
+          `Country: ${country || '—'}`,   // CK-7721 fix 4: no name, email, phone, IP address or city in Slack (data minimisation); the contact details stay in the Notion lead row (24-month retention)
           `Browser: ${browser || '—'} | OS: ${os || '—'} | Device: ${device || '—'}`,
           ``,
           `Other Info: ${slackEsc(otherInfo)}`,
@@ -385,19 +381,23 @@ export default {
 // this is the in-Worker path that fires within seconds. Never throws.
 async function alertHighPriority(env, lead) {
   if (!(lead.score > HIGH_PRIORITY_THRESHOLD)) return;
+  const role = lead.props?.jobtitle ? `Role: ${slackEsc(lead.props.jobtitle)}${lead.props.company ? ' @ ' + slackEsc(lead.props.company) : ''}` : null;
+  const breakdown = `Breakdown: domain ${lead.parts.domain} / role ${lead.parts.role} / geo ${lead.parts.geo}`;
+  // CK-7721 fix 4: the Slack alert carries no name or email (the lead is in Notion and HubSpot); the alert EMAIL to ALERT_EMAIL keeps them.
+  const slackText = [`:fire: *High Priority lead* (score ${lead.score}/100)`, role, breakdown].filter(Boolean).join('\n');
   const text = [
     `:fire: *High Priority lead* (score ${lead.score}/100)`,
     `Name: ${slackEsc(lead.name) || '(not given)'}`,
     `Email: ${slackEsc(lead.email)}`,
-    lead.props?.jobtitle ? `Role: ${slackEsc(lead.props.jobtitle)}${lead.props.company ? ' @ ' + slackEsc(lead.props.company) : ''}` : null,
-    `Breakdown: domain ${lead.parts.domain} / role ${lead.parts.role} / geo ${lead.parts.geo}`,
+    role,
+    breakdown,
   ].filter(Boolean).join('\n');
   const sends = [];
   if (env.SLACK_BOT_TOKEN) {
     sends.push(fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text, unfurl_links: false }),
+      body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text: slackText, unfurl_links: false }),
     }));
   }
   if (env.RESEND_API_KEY && env.ALERT_EMAIL) {
