@@ -4,7 +4,7 @@ import { test, expect } from "./fixtures";
 // and the "what a stranger could guess" card must appear once 8 hexagons are confirmed.
 test("tap keeps an explanation visible and the stranger-guess card appears after 8 confirmations", async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto("/");
+  await page.goto("/?view=grid");
   const counter = page.getByTestId("confirmation-counter");
   await expect(counter).toBeVisible({ timeout: 30_000 });
 
