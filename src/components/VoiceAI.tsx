@@ -31,7 +31,7 @@ import AliceHDBadge from './AliceHDBadge';
 import AliceHDModal from './AliceHDModal';
 import FreeVoiceBadge from './FreeVoiceBadge';
 import { trackUpgradeModalOpened } from '@/lib/analytics';
-import { TOP_SIX_EXPLAINERS } from '@/lib/exposureCopy';
+import { TOP_SIX_EXPLAINERS, ALICE_QUIET_IDS, ALICE_INTRO, ALICE_WEBRTC_LEAK, aliceQuietLine } from '@/lib/exposureCopy';
 import { scanHint, aliceTileMessage } from '@/lib/scanCopy';
 import { hexTileV2Enabled } from '@/config/hexagonTile';
 import type { HexagonTile } from '@/lib/hexagonTile';
@@ -972,11 +972,14 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
     // Determine the message based on state
     if (v2) {
       newMessage = aliceTileMessage(hexagonData, tile, confirmedCount);
+    } else if (hexagonData && !hexagonData.confirmed && ALICE_QUIET_IDS.has(hexagonData.id)) {
+      // CK-8313: the bottom fifteen stay short
+      newMessage = aliceQuietLine(hexagonData.label, hexagonData.value);
     } else if (hexagonData && !hexagonData.confirmed) {
       // Special messages for fingerprint hexagons
       if (category === 'fingerprint') {
         if (label.includes('canvas')) {
-          newMessage = `Canvas Fingerprint detected: ${hexagonData.value}. This unique signature is created by how your browser renders graphics. You're 99% trackable with this alone. Click to confirm.`;
+          newMessage = `Canvas Fingerprint detected: ${hexagonData.value}. ${TOP_SIX_EXPLAINERS['canvas-fingerprint']} Click to confirm.`;
         } else if (label.includes('webgl')) {
           newMessage = `WebGL Signature found: ${hexagonData.value}. Your GPU creates one of the most powerful identifiers. Click to confirm if this is your graphics card.`;
         } else if (label.includes('audio')) {
@@ -996,7 +999,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
         } else if (label.includes('webrtc')) {
           const hasLeak = hexagonData.value?.toLowerCase().includes('leaking') || hexagonData.value?.toLowerCase().includes('leak');
           if (hasLeak) {
-            newMessage = `WebRTC is sharing your real IP: ${hexagonData.value}. This bypasses your VPN. Click to confirm and learn how to fix.`;
+            newMessage = `${ALICE_WEBRTC_LEAK} Click to confirm and learn more.`;
           } else {
             newMessage = `WebRTC Status: ${hexagonData.value}. Click to confirm your IP leak status.`;
           }
@@ -1037,7 +1040,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
         newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
       }
     } else if (confirmedCount === 0 && totalCount > 0) {
-      newMessage = `Hi, I'm Alice, your privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points without asking. Hover over any hexagon to see what I found, then click to confirm if it's correct.`;
+      newMessage = ALICE_INTRO;
     } else if (confirmedCount === 1) {
       newMessage = `Great! That boosted my confidence. I'm scanning deeper... ${totalCount - confirmedCount} more to go.`;
     } else if (confirmedCount === 2) {
@@ -1080,7 +1083,7 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
       // Special confirmed messages for fingerprint hexagons
       if (category === 'fingerprint') {
         if (label.includes('canvas')) {
-          newMessage = `Canvas fingerprint confirmed! This signature makes you 99% identifiable across websites, even in private browsing mode.`;
+          newMessage = `Canvas fingerprint confirmed. ${TOP_SIX_EXPLAINERS['canvas-fingerprint']}`;
         } else if (label.includes('webgl') && !label.includes('webrtc')) {
           newMessage = `WebGL signature confirmed! Your graphics card is now part of your verified digital shadow.`;
         } else if (label.includes('audio')) {
