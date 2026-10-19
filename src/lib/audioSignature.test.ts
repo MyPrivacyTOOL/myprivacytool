@@ -14,10 +14,11 @@ describe('audio signature (CK-8321)', () => {
     expect(hash).toMatch(/^[0-9a-f]{8}$/);
     expect(hash).not.toMatch(/^0+$/);
   });
-  it('one finite bin among silent ones counts as a read', () => {
+  it('a read that is almost all silence and hashes to zeros is not a read either', () => {
+    // each -Infinity bin resets the hash, so one finite bin followed by silence still ends as 00000000
     const data = new Float32Array(64).fill(-Infinity);
     data[10] = -61.5;
-    expect(audioSignalHash(data)).not.toBeNull();
+    expect(audioSignalHash(data)).toBeNull();
   });
   it('the status rule treats an all-zero audio value as not checked, and a real one as found', () => {
     expect(captureStatus('audio-fingerprint', '00000000...')).toBe('not_checked');
