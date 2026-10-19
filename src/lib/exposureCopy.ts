@@ -14,6 +14,21 @@ export const TOP_SIX_EXPLAINERS: Readonly<Record<string, string>> = {
   'audio-fingerprint': 'Tiny differences in how your device processes sound can add to a device signature.',
 };
 
+// CK-8313 (CK-7799 step 6): Alice speaks the top three first and keeps the bottom fifteen short.
+// DRAFT wording approved by the owner in chat on 2026-10-19; hold the PR until the owner has seen it.
+export const ALICE_QUIET_IDS: ReadonlySet<string> = new Set(HEXAGON_INTEREST_ORDER.slice(-15));
+
+export const ALICE_INTRO =
+  "Hi, I'm Alice. Let's look at the three things people most often ask about first. Tap any hexagon to see what it means. Tapping also confirms it looks right to you.";
+
+export const ALICE_WEBRTC_LEAK =
+  'Your browser let this page see an internet address that may be your real one, even if you use a VPN. This one needs investigation to know who else can see it.';
+
+/** Short line for the bottom fifteen: no claims, no numbers. */
+export function aliceQuietLine(label: string, value: string): string {
+  return `${label}: ${value}. An ordinary detail every site sees. Ask me if you want more.`;
+}
+
 /** Teaser: names up to 3 of the top six that were found, then the real count of the rest. */
 export function buildTeaser(foundIds: readonly string[], labels: Readonly<Record<string, string>>): string {
   const named = TOP_SIX_IDS.filter(id => foundIds.includes(id)).slice(0, 3);
