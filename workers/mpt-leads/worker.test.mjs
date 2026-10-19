@@ -59,10 +59,10 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
 // CK-7721 fix 4: Slack carries no IP address or city; the Notion lead page is archived after 24 months, once a day.
 {
   const slackCalls=()=>calls.filter(c=>c.url.includes('slack.com'));
-  calls=[]; const waits=[]; const sreq=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'203.0.113.7'},body:JSON.stringify({email:'s@t.co',name:'S T'})});
+  calls=[]; const waits=[]; const sreq=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'203.0.113.7'},body:JSON.stringify({email:'s@t.co',name:'S T',phone:'+85291234567'})});
   await worker.fetch(sreq,env,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
   const slackText=JSON.parse(slackCalls()[0].body).text;
-  check(!slackText.includes('203.0.113.7')&&!/\bIP:/.test(slackText)&&!/City/i.test(slackText)&&slackText.includes('Email: s@t.co'),'Slack lead post carries no IP address or city');
+  check(!slackText.includes('203.0.113.7')&&!/\bIP:/.test(slackText)&&!/City/i.test(slackText)&&!slackText.includes('s@t.co')&&!slackText.includes('S T')&&!slackText.includes('91234567')&&!/(Email|Name|Phone):/.test(slackText)&&slackText.includes('Total Leads')&&slackText.includes('Open Notion Leads DB'),'Slack lead post carries no name, email, phone, IP address or city, but keeps the count and the Notion link');
 }
 {
   const realFetch=globalThis.fetch; const seen=[];

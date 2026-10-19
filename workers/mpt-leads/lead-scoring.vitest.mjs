@@ -62,6 +62,8 @@ describe('worker integration', () => {
     expect(Number(props.mpt_lead_score)).toBeGreaterThan(80);
     expect(props).toMatchObject({ mpt_lead_tier: 'High', mpt_lead_segment: 'B2B', mpt_lead_enrich_status: 'scored', jobtitle: 'Chief Information Security Officer', company: 'Acme' });
     expect(to('slack.com').some((c) => JSON.parse(c.body).text.includes('High Priority'))).toBe(true);
+    // CK-7721 fix 4: no Slack message (the new-lead post or the High Priority alert) carries the lead's name or email.
+    for (const c of to('slack.com')) { const t = JSON.parse(c.body).text; expect(t).not.toContain('ciso@acme.com'); expect(t).not.toContain('C I'); }
   });
   it('Hunter outage still creates the contact (status pending) and sends no alert', async () => {
     handlers['hunter.io'] = () => res({}, 500);
