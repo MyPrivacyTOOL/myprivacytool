@@ -1,0 +1,55 @@
+name: X webhook admin
+
+# MPC-7628: manual only. Lists, re-validates, deletes or creates the X (Twitter) webhook for the Mirror bot through the X API with the app
+# bearer token (X_BEARER_TOKEN), for when the developer console cannot do it (its Delete button returns a 500). Prints X's JSON answer: webhook
+# ids, URLs and validity, never a secret. See docs/channels/x-mirror-bot.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "list, validate (re-run the CRC check), delete or create"
+        required: true
+        default: list
+        type: choice
+        options: [list, validate, delete, create]
+      webhook_id:
+        description: "Webhook id (validate and delete only)"
+        required: false
+        type: string
+      url:
+        description: "Webhook URL (create only)"
+        required: false
+        default: "https://social-listeners.myprivacytool.workers.dev/webhook/x?app=2"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  x-webhook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the X API
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          ACTION: ${{ inputs.action }}
+          WEBHOOK_ID: ${{ inputs.webhook_id }}
+          WEBHOOK_URL: ${{ inputs.url }}
+        run: |
+          set -u
+          if [ -z "${X_BEARER_TOKEN:-}" ]; then echo "X_BEARER_TOKEN is not set"; exit 1; fi
+          case "$WEBHOOK_ID" in ''|*[!0-9]*) id_ok=0 ;; *) id_ok=1 ;; esac
+          call() { curl -sS -o /tmp/x.out -w '%{http_code}' -H "Authorization: Bearer ${X_BEARER_TOKEN}" "$@"; }
+          case "$ACTION" in
+            list)     code=$(call https://api.x.com/2/webhooks) ;;
+            validate) [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
+                      code=$(call -X PUT "https://api.x.com/2/webhooks/${WEBHOOK_ID}") ;;
+            delete)   [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
+                      code=$(call -X DELETE "https://api.x.com/2/webhooks/${WEBHOOK_ID}") ;;
+            create)   code=$(call -X POST -H 'Content-Type: application/json' -d "{\"url\":\"${WEBHOOK_URL}\"}" https://api.x.com/2/webhooks) ;;
+            *)        echo "unknown action"; exit 1 ;;
+          esac
+          echo "HTTP ${code}"
+          head -c 4000 /tmp/x.out; echo
+          case "$code" in 2*) ;; *) exit 1 ;; esac
