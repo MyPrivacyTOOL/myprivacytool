@@ -47,4 +47,6 @@ export function scanHint(): string {
 // Hero copy (home page) with tiles on: no "found N data points without asking", no "click the ones that are correct".
 export const HERO_TILES_LINE1 = 'See what your browser tells every website, and how we know each thing.';
 export const HERO_TILES_LINE2 = 'Tap a hexagon to see what we found.';
+// DRAFT (needs Chris's review): on the honeycomb dashboard a tap only does something on a guess, so the line says that.
+export const HERO_DASHBOARD_LINE2 = 'Purple means our guess. Tap one to tell us if it is you.';
 export const SUMMARY_LABELS = { clear: 'clear', fixing: 'need fixing', toldUs: 'you told us', notYet: 'not checked yet' } as const;

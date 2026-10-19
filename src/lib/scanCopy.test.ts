@@ -19,3 +19,12 @@ describe('scan copy (CK-7805, owner-approved)', () => {
     for (const t of [HINT_TOUCH, HINT_POINTER, DNS_BANNER]) expect(t).not.toMatch(BAD);
   });
 });
+
+describe('hero copy with the honest tiles or the dashboard', () => {
+  it('makes no "found N data points without asking" claim and has no percentage', async () => {
+    const { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2 } = await import('./scanCopy');
+    for (const line of [HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2]) {
+      expect(line).not.toMatch(/data points|without asking|click the ones|\d+\s?%|\d\+/i);
+    }
+  });
+});
