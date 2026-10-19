@@ -14,10 +14,10 @@ const data: ScanResult = {
 };
 
 describe('HexagonDashboard', () => {
-  it('groups by pillar, keeping unknown pillars, with the ring at the checked ratio', () => {
+  it('groups by pillar, keeping unknown pillars, with the ring showing the count of checked tiles', () => {
     render(<HexagonDashboard initialData={data} />);
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Security', 'Contact & Comms', 'Weird']);
-    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '2'); // 1 of 54
+    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '1'); // one tile checked
   });
 
   it('guess -> question -> Yes opens the action plan; Mark as Fixed needs the checkbox; then the ring grows', () => {
@@ -30,11 +30,11 @@ describe('HexagonDashboard', () => {
     expect(within(panel).getByRole('link')).toHaveAttribute('href', 'https://example.org/dnc');
     const fixed = within(panel).getByRole('button', { name: /mark as fixed/i });
     expect(fixed).toBeDisabled();
-    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '2'); // exposure still open
+    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '1'); // exposure still open
     fireEvent.click(within(panel).getByRole('checkbox'));
     expect(fixed).toBeEnabled();
     fireEvent.click(fixed);
-    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '4'); // 2 of 54
+    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute('aria-valuenow', '2'); // two tiles checked or fixed
   });
 
   it('No closes the question and records a false positive', () => {
