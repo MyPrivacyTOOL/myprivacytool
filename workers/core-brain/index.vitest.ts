@@ -10,7 +10,9 @@ const env = {
   WEBHOOK_SECRET: "hook-secret",
 };
 
-type Stub = { qwen?: any; state?: any; qwenFail?: boolean; stateFail?: boolean; rpcFail?: "http" | "throw" };
+/** The response fields these tests read. */
+type Reply = { error?: { code?: string }; locale?: string; message_keys?: string[]; response_key?: string; state_source?: string };
+type Stub = { qwen?: unknown; state?: unknown; qwenFail?: boolean; stateFail?: boolean; rpcFail?: "http" | "throw" };
 let calls: { url: string; init?: RequestInit }[] = [];
 
 function stub({ qwen, state = [], qwenFail, stateFail, rpcFail }: Stub) {
@@ -31,12 +33,12 @@ function stub({ qwen, state = [], qwenFail, stateFail, rpcFail }: Stub) {
   });
 }
 
-async function post(body: unknown, headers: Record<string, string> = { "x-mpt-webhook-secret": env.WEBHOOK_SECRET }, e: any = env) {
+async function post(body: unknown, headers: Record<string, string> = { "x-mpt-webhook-secret": env.WEBHOOK_SECRET }, e: Record<string, unknown> = env) {
   const res = await worker.fetch(
     new Request("https://brain.test/webhook", { method: "POST", headers, body: typeof body === "string" ? body : JSON.stringify(body) }),
-    e,
+    e as unknown as typeof env,
   );
-  return { status: res.status, body: (await res.json()) as any };
+  return { status: res.status, body: (await res.json()) as Reply };
 }
 
 const msg = (text: string, extra = {}) => ({ platform: "telegram", sender_id: "42", message_text: text, ...extra });
@@ -49,7 +51,7 @@ describe("auth and validation", () => {
     stub({});
     const noSecret = await post(msg("hi"), {});
     expect(noSecret.status).toBe(401);
-    expect(noSecret.body.error.code).toBe("unauthorized");
+    expect(noSecret.body.error?.code).toBe("unauthorized");
     expect((await post(msg("hi"), { "x-mpt-webhook-secret": "nope" })).status).toBe(401);
     expect(calls).toHaveLength(0);
   });
@@ -58,7 +60,7 @@ describe("auth and validation", () => {
     stub({});
     const r = await post(msg("hi"), undefined, { ...env, WEBHOOK_SECRET: undefined });
     expect(r.status).toBe(503);
-    expect(r.body.error.code).toBe("not_configured");
+    expect(r.body.error?.code).toBe("not_configured");
   });
 
   it("400 on bad JSON or bad structure, 405 on GET", async () => {
@@ -74,9 +76,9 @@ describe("auth and validation", () => {
     const ok = await worker.fetch(new Request("https://brain.test/health"), env);
     expect(await ok.json()).toEqual({ ok: true, worker: "core-brain", configured: true, rate_limit: { sender: false, global: false } });
     const limited = { ...env, RATE_LIMITER: { limit: async () => ({ success: true }) } };
-    expect(((await (await worker.fetch(new Request("https://brain.test/health"), limited)).json()) as any).rate_limit).toEqual({ sender: true, global: false });
-    const bare = await worker.fetch(new Request("https://brain.test/health"), {} as any);
-    expect((await bare.json() as any).configured).toBe(false);
+    expect(((await (await worker.fetch(new Request("https://brain.test/health"), limited)).json()) as Record<string, unknown>).rate_limit).toEqual({ sender: true, global: false });
+    const bare = await worker.fetch(new Request("https://brain.test/health"), {} as typeof env);
+    expect(((await bare.json()) as Record<string, unknown>).configured).toBe(false);
     expect((await worker.fetch(new Request("https://brain.test/x"), env)).status).toBe(404);
   });
 });
@@ -104,7 +106,7 @@ describe("intent -> response key", () => {
     const q = new URL(sb.url).searchParams;
     expect(q.get("channel")).toBe("eq.telegram");
     expect(q.get("sender_id")).toBe("eq.42");
-    expect((sb.init!.headers as any).apikey).toBe(env.SUPABASE_KEY);
+    expect((sb.init!.headers as Record<string, string>).apikey).toBe(env.SUPABASE_KEY);
   });
 
   it("help and unknown return the welcome keys", async () => {
@@ -192,7 +194,7 @@ describe("degradation and privacy", () => {
     const q = calls.find((c) => c.url.includes("/chat/completions"))!;
     const sent = JSON.parse(q.init!.body as string).messages[1].content;
     expect(sent).toBe("scan [email] or [phone]");
-    expect((q.init!.headers as any).authorization).toBe("Bearer qwen-test-key");
+    expect((q.init!.headers as Record<string, string>).authorization).toBe("Bearer qwen-test-key");
     expect(q.url).toBe("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions");
   });
 
@@ -385,7 +387,7 @@ describe("POST /ingest/social (MPC-8301 hand-off)", () => {
       new Request("https://brain.test/ingest/social", { method: "POST", headers, body: JSON.stringify(body) }),
       env,
     );
-    return { status: res.status, body: (await res.json()) as any };
+    return { status: res.status, body: (await res.json()) as Reply };
   };
   const tg = (text: string) => ({ source: "telegram", receivedAt: "2026-10-07T00:00:00Z", payload: { message: { chat: { id: 5 }, text } } });
   const xdm = (sender: string, text: string, forUser = "999") => ({

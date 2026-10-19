@@ -28,8 +28,6 @@ interface Props {
   onSelect?: (hexagon: Hexagon) => void;
   /** The user finished the remediation step: a confirmed exposure shows green instead of red. */
   fixed?: boolean;
-  /** Touch screens have no hover, so a tap on a confident finding calls onSelect to offer the dispute. */
-  disputeOnTap?: boolean;
   /** Small tiles (a phone held upright) show the icon and name only. */
   compact?: boolean;
   /** Positions the tile; the hexagon fills it. */
@@ -37,15 +35,16 @@ interface Props {
   style?: CSSProperties;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, disputeOnTap = false, compact = false, className, style }: Props) => {
-  const [asking, setAsking] = useState(false);
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, compact = false, className, style }: Props) => {
+  // Which prompt is open. Only the buttons inside a prompt record an answer; closing it (Esc, outside click, Keep it) records nothing.
+  const [prompt, setPrompt] = useState<'confirm' | 'dispute' | null>(null);
   const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
   const visuals = getHexagonVisuals(hexagon.status);
   const paint = getHexPaint(hexagon.status, exposed);
   const requiresConfirmation = canConfirm(hexagon);
   const allowsDispute = canDispute(hexagon);
-  const disputable = allowsDispute && disputeOnTap && !!onSelect;
-  const actionable = requiresConfirmation || (exposed && !!onSelect) || disputable;
+  const reopensPlan = exposed && !!onSelect;
+  const interactive = requiresConfirmation || allowsDispute || reopensPlan;
   const secured = !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
   const emoji = WAITING.has(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
   const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status);
@@ -56,16 +55,19 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
         type="button"
         className={cn(
           'group absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-center focus-visible:outline-none',
-          actionable ? 'cursor-pointer' : 'cursor-default',
+          interactive ? 'cursor-pointer' : 'cursor-default',
           paint.ink,
           hexagon.status === 'guess' && 'animate-pulse motion-reduce:animate-none',
         )}
         onClick={() => {
-          // A guess opens the question; a confirmed, unfixed exposure reopens its action plan.
-          if (onSelect && actionable) onSelect(hexagon);
-          else if (requiresConfirmation) setAsking(true);
+          // A confirmed, unfixed exposure reopens its action plan; a guess asks "Is this you?"; a confident finding offers the dispute.
+          if (reopensPlan) onSelect(hexagon);
+          else if (requiresConfirmation && onSelect) onSelect(hexagon);
+          else if (requiresConfirmation) setPrompt('confirm');
+          else if (allowsDispute) setPrompt('dispute');
         }}
-        aria-disabled={!actionable}
+        aria-disabled={!interactive}
+        aria-haspopup={interactive ? 'dialog' : undefined}
         title={exposed ? EXPOSED_TOOLTIP : visuals.tooltip}
       >
         <svg viewBox="0 0 100 115.47" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
@@ -87,20 +89,8 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
         <span className="sr-only">{exposed ? EXPOSED_TOOLTIP : visuals.tooltip}</span>
       </button>
 
-      {allowsDispute && !disputeOnTap && (
-        <button
-          type="button"
-          onClick={() => onDispute(hexagon.id)}
-          className="absolute left-[12%] top-[12%] z-10 hidden h-5 w-5 items-center justify-center rounded-full border border-orange-600 bg-white text-xs text-orange-600 opacity-0 before:absolute before:-inset-3 before:content-[''] focus-visible:opacity-100 group-hover/tile:opacity-100 [@media(hover:hover)]:flex"
-          title="Not me?"
-          aria-label={`Not me: dispute ${hexagon.label}`}
-        >
-          !
-        </button>
-      )}
-
-      {/* Only the two buttons answer. Closing the dialog (Esc, outside click) records nothing. */}
-      <AlertDialog open={asking} onOpenChange={setAsking}>
+      {/* `!` is reserved for risk. Disputing is a labelled button inside its own prompt, so it is deliberate, never a stray tap. */}
+      <AlertDialog open={prompt === 'confirm'} onOpenChange={(open) => !open && setPrompt(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Is this you?</AlertDialogTitle>
@@ -111,6 +101,22 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => onConfirm(hexagon.id, false)}>No, not me</AlertDialogCancel>
             <AlertDialogAction onClick={() => onConfirm(hexagon.id, true)}>Yes, it's me</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={prompt === 'dispute'} onOpenChange={(open) => !open && setPrompt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Does this look wrong?</AlertDialogTitle>
+            <AlertDialogDescription>
+              We checked and found <span className="font-medium">{hexagon.data ?? 'this item'}</span> linked to you. {hexagon.label}. If that is
+              not right, tell us and we will leave it out of your score.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => onDispute(hexagon.id)}>This isn't right</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

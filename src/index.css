@@ -82,6 +82,12 @@
     --brand-ink: 145 63% 27%;
     --brand-soft: 145 45% 94%;                   /* Matrix Green at ~10% on white */
 
+    /* MPC-7916: honest hexagon tiles. Green = clear, red = needs fixing, purple = our guess, grey = no claim made. Only used when the tile flag is on. */
+    --tile-green: var(--brand-ink);
+    --tile-red: 8 62% 48%;
+    --tile-purple: 267 43% 52%;
+    --tile-grey: 150 5% 50%;
+
     --surface: var(--brand-white);
     --surface-alpha: 0.94;                       /* lets the rain read faintly through cards */
     --surface-border: var(--border);

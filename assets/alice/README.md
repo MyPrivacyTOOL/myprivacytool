@@ -25,7 +25,7 @@ assets/alice/
   expressions/           expression sheet
   animations/            layered source + approved motion loops
   voice/                 approved voice samples (reference renders)
-  reference/             interim text-free crops of the locked still (reference only)
+  reference/             interim crops of the locked stills (reference only)
   reference-clips/       the 15 legacy 560x560 clips (reference only, never published)
 ```
 

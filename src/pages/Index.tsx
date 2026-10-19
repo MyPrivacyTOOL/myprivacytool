@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2 } from '@/lib/scanCopy';
 import HexagonGrid from '@/components/HexagonGrid';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
@@ -247,12 +249,23 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
-          <p className="text-sm sm:text-lg text-foreground">
-            <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
-          </p>
-          <p className="text-sm sm:text-lg text-foreground">
-            Click the ones that are correct.
-          </p>
+          {hexTileV2Enabled() ? (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span>: {HERO_TILES_LINE1}
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">{HERO_TILES_LINE2}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">
+                Click the ones that are correct.
+              </p>
+            </>
+          )}
         </section>
 
         {/* Live Device Tracking Hero */}
@@ -296,6 +309,21 @@ const Index = () => {
 
         {/* MPC-7446: Hong Kong visitors only; hidden until the /HongKongSpam launch flag is on */}
         <HkStopSpamCard placement="home" />
+
+        {/* Footprint teaser: /footprint/ is a static page (public/footprint), so this is a plain link, not a router Link. */}
+        <section className="pb-12 px-4" aria-labelledby="footprint-teaser-heading">
+          <div className="max-w-2xl mx-auto text-center rounded-2xl border border-surface-border bg-brand-soft p-6 sm:p-8">
+            <h2 id="footprint-teaser-heading" className="text-xl sm:text-2xl font-bold text-foreground mb-2">
+              See your footprint as a beehive
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground mb-5">
+              Open the curtain and watch the 54 data points appear one by one.
+            </p>
+            <Button asChild>
+              <a href="/footprint/">Open the footprint</a>
+            </Button>
+          </div>
+        </section>
 
         {/* Journey teaser */}
         <section className="pb-12 px-4" aria-labelledby="journey-teaser-heading">

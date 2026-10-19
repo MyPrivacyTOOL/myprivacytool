@@ -13,6 +13,7 @@
  * Requires env vars: CORE_BRAIN_STAGING_URL, WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_KEY
  */
 
+import { createHmac } from 'node:crypto';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 const STAGING_URL = process.env.CORE_BRAIN_STAGING_URL || 'https://core-brain-staging.mpt.workers.dev';
@@ -504,9 +505,7 @@ describe('MPC-7257: Core Brain Staging Integration', () => {
  * Matches the signature generation in core-brain/index.ts
  */
 function generateWebhookSignature(payload: string, secret: string): string {
-  // Node.js crypto module
-  const crypto = require('crypto');
-  const hmac = crypto.createHmac('sha256', secret);
+  const hmac = createHmac('sha256', secret);
   hmac.update(payload);
   return hmac.digest('hex');
 }

@@ -184,8 +184,11 @@ export async function runOsintScan(
   return { hexagons, diagnostics: [m.diag, s.diag, b.diag] };
 }
 
-/** verified_exposure_count: findings that count toward the score (checked / given / confirmed, never false_positive, disputed or unanswered) AND are exposures. */
-export function verifiedExposureCount(hexagons: Hexagon[]): number {
+/** The ids that count toward the score: checked / given / confirmed exposures, never false_positive, disputed or unanswered. */
+export function verifiedExposureIds(hexagons: Hexagon[]): string[] {
   const scored = new Set<Hexagon['status']>(['checked', 'given', 'confirmed']);
-  return hexagons.filter((h) => scored.has(h.status) && h.exposure === true).length;
+  return hexagons.filter((h) => scored.has(h.status) && h.exposure === true).map((h) => h.id);
 }
+
+/** verified_exposure_count: how many findings verifiedExposureIds returns. */
+export const verifiedExposureCount = (hexagons: Hexagon[]): number => verifiedExposureIds(hexagons).length;

@@ -30,6 +30,10 @@ export interface HibpPaste {
   source: string;
 }
 
+/** HIBP's raw response shapes (only the fields read below). */
+interface HibpBreachRaw { Name: string; BreachDate: string; DataClasses?: string[]; PwnCount?: number; Description?: string }
+interface HibpPasteRaw { Id: string; Date: string; EmailCount?: number; Count: number; Source: string }
+
 export interface OsintLookupResult {
   inputValue: string;
   inputType: InputType;
@@ -137,7 +141,7 @@ class NotCheckedError extends Error {
 }
 
 /** One read-only HIBP GET. 404 means "nothing found". Anything else that is not 200 means "not checked". */
-async function hibpGet(path: string, email: string, apiKey: string, fetchImpl: typeof fetch): Promise<any[]> {
+async function hibpGet<T>(path: string, email: string, apiKey: string, fetchImpl: typeof fetch): Promise<T[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
@@ -150,7 +154,7 @@ async function hibpGet(path: string, email: string, apiKey: string, fetchImpl: t
     if (response.status === 429) throw new NotCheckedError('rate_limited');
     if (!response.ok) throw new NotCheckedError('upstream_error');
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data) ? (data as T[]) : [];
   } catch (err) {
     if (err instanceof NotCheckedError) throw err;
     if (err instanceof Error && err.name === 'AbortError') throw new NotCheckedError('timeout');
@@ -244,8 +248,8 @@ export async function osintLookup(
       breaches = await xonCheckEmail(inputValue, fetchImpl);
     } else {
       const [rawBreaches, rawPastes] = await Promise.all([
-        hibpGet('breachedaccount', inputValue, options.apiKey as string, fetchImpl),
-        hibpGet('pasteaccount', inputValue, options.apiKey as string, fetchImpl),
+        hibpGet<HibpBreachRaw>('breachedaccount', inputValue, options.apiKey as string, fetchImpl),
+        hibpGet<HibpPasteRaw>('pasteaccount', inputValue, options.apiKey as string, fetchImpl),
       ]);
       breaches = rawBreaches.map((b) => ({
         name: b.Name,

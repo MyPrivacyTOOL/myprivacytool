@@ -3,7 +3,7 @@
 // Retention: none. The consent step is stateless (the explicit "MIRROR YES" message is the consent), the scan result lives
 // only in memory for the length of one request, and logs carry event names only (no handles, ids or profile content).
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, pick } from "./shared";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
 import { classifyTheme, recordXDm } from "./funnel";
@@ -51,14 +51,15 @@ export interface MirrorDm {
 const MAX_DEPTH = 8;
 
 /** The id of the account the event was delivered for (our bot), from either event system. */
-export function selfId(p: any): string {
-  return String(p?.for_user_id ?? p?.data?.filter?.user_id ?? p?.filter?.user_id ?? p?.data?.payload?.filter?.user_id ?? "");
+export function selfId(p: unknown): string {
+  return String(pick(p, "for_user_id") ?? pick(p, "data", "filter", "user_id") ?? pick(p, "filter", "user_id") ?? pick(p, "data", "payload", "filter", "user_id") ?? "");
 }
 
 /** Sender id and text of one DM-shaped object, in the shapes X uses (legacy Account Activity and the newer dm.received event). */
-function dmFields(o: any): { sender: string; text: string } | null {
-  const sender = o.sender_id ?? o.sender?.id ?? o.from_user_id;
-  const text = o.text ?? o.message_data?.text ?? (typeof o.message === "string" ? o.message : o.message?.text) ?? o.dm_event?.text;
+function dmFields(o: unknown): { sender: string; text: string } | null {
+  const sender = pick(o, "sender_id") ?? pick(o, "sender", "id") ?? pick(o, "from_user_id");
+  const message = pick(o, "message");
+  const text = pick(o, "text") ?? pick(o, "message_data", "text") ?? (typeof message === "string" ? message : pick(o, "message", "text")) ?? pick(o, "dm_event", "text");
   if ((typeof sender !== "string" && typeof sender !== "number") || typeof text !== "string") return null;
   return { sender: String(sender), text };
 }
@@ -103,10 +104,10 @@ export function extractDms(payload: unknown): { senderId: string; text: string }
 
 /** Event type and top-level key names only (no ids, no text), so an unrecognised event shape can be diagnosed from logs. */
 export function describeShape(payload: unknown): { event_type?: string; keys: string[] } {
-  const p = payload as any;
-  const raw = p?.event_type ?? p?.data?.event_type ?? p?.payload?.event_type;
+  const p = payload;
+  const raw = pick(p, "event_type") ?? pick(p, "data", "event_type") ?? pick(p, "payload", "event_type");
   const event_type = typeof raw === "string" && /^[a-z0-9_.]{1,48}$/i.test(raw) ? raw : undefined;
-  const keys = p && typeof p === "object" ? Object.keys(p).filter((k) => /^[a-z0-9_]{1,40}$/i.test(k)).slice(0, 12) : [];
+  const keys = p && typeof p === "object" ? Object.keys(p as object).filter((k) => /^[a-z0-9_]{1,40}$/i.test(k)).slice(0, 12) : [];
   return event_type ? { event_type, keys } : { keys };
 }
 

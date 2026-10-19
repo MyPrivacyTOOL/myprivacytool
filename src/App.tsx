@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Index from "./pages/Index";
 const Scan = lazy(() => import("./pages/Scan"));
+const DeepDive = lazy(() => import("./pages/DeepDive"));
 const Report = lazy(() => import("./pages/Report"));
 const Business = lazy(() => import("./pages/Business"));
 const Enterprise = lazy(() => import("./pages/Enterprise"));
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             {/* Marketing landing pages */}
             <Route path="/scan" element={<Scan />} />
+            <Route path="/scan/deep-dive" element={<DeepDive />} />
             <Route path="/report" element={<Report />} />
             <Route path="/business" element={<Business />} />
             <Route path="/enterprise" element={<Enterprise />} />

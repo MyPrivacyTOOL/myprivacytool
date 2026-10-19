@@ -7,8 +7,6 @@ import { ProgressRing } from '@/components/dashboard/ProgressRing';
 import { HitlConfirmModal } from '@/components/modals/HitlConfirmModal';
 import { countSecured } from '@/components/dashboard/countSecured';
 import { buildReportHtml } from '@/lib/honeycombReport';
-import { DisputeModal } from '@/components/modals/DisputeModal';
-import { useCanHover } from '@/hooks/useCanHover';
 import { RemediationPanel } from '@/components/modals/RemediationPanel';
 
 const TOTAL = 54;
@@ -20,9 +18,8 @@ interface Props {
 
 export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint' }: Props) => {
   const { scanResult, handleConfirm, handleDispute } = useHexagonState(initialData);
-  const canHover = useCanHover();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [phase, setPhase] = useState<'confirm' | 'remediate' | 'dispute' | null>(null);
+  const [phase, setPhase] = useState<'confirm' | 'remediate' | null>(null);
   const [fixedIds, setFixedIds] = useState<ReadonlySet<string>>(new Set());
 
   const active = scanResult.hexagons.find((h) => h.id === activeId) ?? null;
@@ -30,7 +27,7 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
 
   const onSelect = (h: Hexagon) => {
     setActiveId(h.id);
-    setPhase(h.status === 'guess' ? 'confirm' : h.status === 'checked' ? 'dispute' : 'remediate');
+    setPhase(h.status === 'guess' ? 'confirm' : 'remediate');
   };
 
   const onAnswer = (isMatch: boolean) => {
@@ -75,12 +72,10 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
         onDispute={handleDispute}
         onSelect={onSelect}
         fixedIds={fixedIds}
-        disputeOnTap={!canHover}
       />
       {active && (
         <>
           <HitlConfirmModal hexagon={active} isOpen={phase === 'confirm'} onClose={close} onConfirm={onAnswer} />
-          <DisputeModal hexagon={active} isOpen={phase === 'dispute'} onClose={close} onDispute={() => { handleDispute(active.id); close(); }} />
           <RemediationPanel hexagon={active} isOpen={phase === 'remediate'} onClose={close} onMarkFixed={onMarkFixed} />
         </>
       )}

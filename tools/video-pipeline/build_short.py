@@ -39,6 +39,9 @@ VOICE_SPEED = 0.95
 LEAD_IN_S = 0.2
 PAUSE_S = 0.3
 TAIL_S = 0.4
+# Optional brand sting (approved 2026-10-17): the first and last picture are held while it plays.
+STING_INTRO_HOLD_S = 1.5
+STING_OUTRO_HOLD_S = 2.0
 PITCH_SEMITONES = -1
 
 INTER_DIR = Path("/usr/share/fonts/opentype/inter")
@@ -178,14 +181,16 @@ class Timeline:
     total: float
 
 
-def build_voice_track(script: Script, voice) -> tuple["object", Timeline]:
+def build_voice_track(script: Script, voice, hold_in: float = 0.0, hold_out: float = 0.0) -> tuple["object", Timeline]:
     """Each beat is generated separately (the approved sample was), joined with
-    0.3 s pauses, 0.2 s lead-in and 0.4 s tail."""
+    0.3 s pauses, 0.2 s lead-in and 0.4 s tail. `hold_in` and `hold_out` add silent seconds
+    before the first and after the last beat (the first and last picture stay on screen)."""
     import numpy as np
 
     sr = voice.sample_rate
-    pieces = [np.zeros(int(LEAD_IN_S * sr), dtype="float32")]
-    t = LEAD_IN_S
+    lead_in = LEAD_IN_S + hold_in
+    pieces = [np.zeros(int(lead_in * sr), dtype="float32")]
+    t = lead_in
     starts, ends = [], []
     for i, beat in enumerate(script.beats):
         clip = voice.synth(beat.narration)
@@ -193,7 +198,7 @@ def build_voice_track(script: Script, voice) -> tuple["object", Timeline]:
         t += len(clip) / sr
         ends.append(t)
         pieces.append(clip)
-        gap = PAUSE_S if i < len(script.beats) - 1 else TAIL_S
+        gap = PAUSE_S if i < len(script.beats) - 1 else TAIL_S + hold_out
         pieces.append(np.zeros(int(gap * sr), dtype="float32"))
         t += gap
     return np.concatenate(pieces), Timeline(starts, ends, t)
@@ -233,6 +238,15 @@ class Cue:
     text: str
 
 
+def _two_lines(words: list[str]) -> str:
+    """Break a caption of more than 4 words into two balanced lines at a word boundary, so the
+    renderer never has to wrap inside a hyphenated word such as Do-Not-Call."""
+    if len(words) <= 4:
+        return " ".join(words)
+    half = math.ceil(len(words) / 2)
+    return " ".join(words[:half]) + "\n" + " ".join(words[half:])
+
+
 def make_cues(script: Script, tl: Timeline, max_words: int = MAX_CAPTION_WORDS) -> list[Cue]:
     """Captions are the narration word for word. A beat is split into chunks of at
     most `max_words` words, each timed by its share of the beat's letters."""
@@ -241,7 +255,7 @@ def make_cues(script: Script, tl: Timeline, max_words: int = MAX_CAPTION_WORDS) 
         words = beat.narration.split()
         n_chunks = max(1, math.ceil(len(words) / max_words))
         per = math.ceil(len(words) / n_chunks)
-        chunks = [" ".join(words[i:i + per]) for i in range(0, len(words), per)]
+        chunks = [_two_lines(words[i:i + per]) for i in range(0, len(words), per)]
         weights = [max(1, len(c)) for c in chunks]
         total_w = sum(weights)
         t = start
@@ -300,7 +314,13 @@ def render_frame(beat: Beat, alice_path: Path | None, out_png: Path) -> None:
 
     img = Image.new("RGB", (W, H), WHITE)
     d = ImageDraw.Draw(img)
-    bold = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), 92)
+    # Shrink the headline until its longest word (e.g. a URL) fits inside the side margins.
+    headline_size = 92
+    bold = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), headline_size)
+    if beat.on_screen:
+        while headline_size > 48 and max(d.textlength(w, font=bold) for w in beat.on_screen.split()) > W - 140:
+            headline_size -= 4
+            bold = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), headline_size)
     small = ImageFont.truetype(str(find_font(FONT_BOLD_CANDIDATES)), 40)
     d.text((70, 80), "MyPrivacyTOOL", font=small, fill=BLACK)
 
@@ -399,14 +419,33 @@ def mix_music(voice_wav: Path, music: Path, out_wav: Path, seconds: float) -> No
          "-ar", str(SAMPLE_RATE_OUT), "-ac", "1", str(out_wav)])
 
 
+def mix_sting(voice_wav: Path, sting: Path, out_wav: Path, tl: Timeline, hold_in: float, hold_out: float) -> None:
+    """The brand sting plays once at the start and once after the last word, ducked under any voice."""
+    intro_len = LEAD_IN_S + hold_in + 1.0
+    outro_len = TAIL_S + hold_out
+    outro_ms = int(round(tl.ends[-1] * 1000))
+    fc = (
+        f"[1:a]atrim=0:{intro_len:.3f},afade=t=out:st={max(0.0, intro_len - 1.0):.3f}:d=1.0,volume=0.9[s1];"
+        f"[2:a]atrim=0:{outro_len:.3f},afade=t=out:st={max(0.0, outro_len - 1.2):.3f}:d=1.2,volume=0.9,"
+        f"adelay={outro_ms}|{outro_ms}[s2];"
+        "[s1][s2]amix=inputs=2:normalize=0:duration=longest[st];"
+        "[0:a]asplit=2[v][vsc];"
+        "[st][vsc]sidechaincompress=threshold=0.02:ratio=6:attack=20:release=400[duck];"
+        "[v][duck]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.89[out]"
+    )
+    run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(voice_wav), "-i", str(sting), "-i", str(sting),
+         "-filter_complex", fc, "-map", "[out]", "-t", f"{tl.total:.3f}",
+         "-ar", str(SAMPLE_RATE_OUT), "-ac", "1", str(out_wav)])
+
+
 def build(script: Script, voice, out_dir: Path, alice: Path | None, music: Path | None = None,
-          version: int = 1) -> dict[str, Path]:
+          version: int = 1, sting: Path | None = None, hold_in: float = 0.0, hold_out: float = 0.0) -> dict[str, Path]:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     names = output_names(script, version)
     with tempfile.TemporaryDirectory() as tmp_s:
         tmp = Path(tmp_s)
-        samples, tl = build_voice_track(script, voice)
+        samples, tl = build_voice_track(script, voice, hold_in, hold_out)
         raw_wav, voice_wav = tmp / "raw.wav", tmp / "voice.wav"
         write_wav(raw_wav, samples, voice.sample_rate)
         master_voice(raw_wav, voice.sample_rate, voice_wav)
@@ -415,6 +454,9 @@ def build(script: Script, voice, out_dir: Path, alice: Path | None, music: Path 
         if music:
             audio_wav = tmp / "mixed.wav"
             mix_music(voice_wav, music, audio_wav, tl.total)
+        elif sting:
+            audio_wav = tmp / "mixed.wav"
+            mix_sting(voice_wav, sting, audio_wav, tl, hold_in, hold_out)
 
         cues = make_cues(script, tl)
         srt_path = out_dir / names["srt"]
@@ -454,7 +496,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--alice", type=Path, help="Alice drawing (PNG); the approved text-free reference")
     ap.add_argument("--model-dir", type=Path, help="Kokoro v0.19 folder (model.onnx, voices.bin, tokens.txt, espeak-ng-data)")
     ap.add_argument("--silent", action="store_true", help="no voice: layout and caption check only, NOT for publishing")
-    ap.add_argument("--music", type=Path, help="optional music file from the approved free source")
+    grp = ap.add_mutually_exclusive_group()
+    grp.add_argument("--music", type=Path, help="optional music file from the approved free source (a quiet bed under the whole video)")
+    grp.add_argument("--sting", type=Path, help="brand sting (assets/branding/audio): played at the start and after the last word, with the first and last picture held")
+    ap.add_argument("--intro-hold", type=float, default=None, help=f"seconds to hold the first picture before the voice (default {STING_INTRO_HOLD_S} with --sting, else 0)")
+    ap.add_argument("--outro-hold", type=float, default=None, help=f"seconds to hold the last picture after the voice (default {STING_OUTRO_HOLD_S} with --sting, else 0)")
     ap.add_argument("--version", type=int, default=1)
     args = ap.parse_args(argv)
 
@@ -471,7 +517,12 @@ def main(argv: list[str] | None = None) -> int:
             print("error: give --model-dir (Kokoro v0.19 folder) or --silent", file=sys.stderr)
             return 2
         voice = KokoroVoice(args.model_dir)
-    paths = build(script, voice, args.out, args.alice, args.music, args.version)
+    hold_in = args.intro_hold if args.intro_hold is not None else (STING_INTRO_HOLD_S if args.sting else 0.0)
+    hold_out = args.outro_hold if args.outro_hold is not None else (STING_OUTRO_HOLD_S if args.sting else 0.0)
+    if min(hold_in, hold_out) < 0:
+        print("error: holds cannot be negative", file=sys.stderr)
+        return 2
+    paths = build(script, voice, args.out, args.alice, args.music, args.version, args.sting, hold_in, hold_out)
     for kind, p in paths.items():
         print(f"{kind}: {p}")
     return 0

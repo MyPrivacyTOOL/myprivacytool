@@ -1,4 +1,5 @@
 -- MPC-7251 follow-up (2026-10-12): wording rewritten to match what the free scan really does (DRAFT, needs Chris's approval; live rows are NOT updated by this file until it is applied).
+-- 2026-10-17: bot.first_hexagon.question and bot.contact_unsupported now match locales/en/main.json (what the bot sees and keeps; no "haven't saved" claim).
 -- MPT-1003: English seed for public.localization, generated from locales/en/main.json (source: workers/telegram-webhook).
 -- Idempotent. Other locales are not seeded: their values are empty placeholders until translated.
 -- Rollback: delete from public.localization where locale = 'en' and key like 'bot.%';
@@ -10,7 +11,7 @@ insert into public.localization (key, locale, value, description, status) values
   ('bot.first_hexagon.email', 'en', '• Breach history: not checked automatically yet, so your report gives you a link to check it yourself', 'Exposure line: email', 'draft'),
   ('bot.first_hexagon.social', 'en', '• People-search sites: your report has opt-out guides to follow step by step', 'Exposure line: social profiles', 'draft'),
   ('bot.first_hexagon.brokers', 'en', '• Data broker databases: not searched yet, and I''ll say so plainly in your report', 'Exposure line: data brokers', 'draft'),
-  ('bot.first_hexagon.question', 'en', 'I can''t see your Telegram profile, phone number or contacts, only what you type here. Want to run the scan now?', 'Confirmation question', 'draft'),
+  ('bot.first_hexagon.question', 'en', 'I can see the public details of your Telegram profile (such as your name, @handle, photo and bio, depending on your Telegram privacy settings), and what you type here. I don''t get your phone number or contacts. I save what you send and those public details for up to 90 days to run your scan. Want to run the scan now?', 'Confirmation question', 'draft'),
   ('bot.first_hexagon.reply_y', 'en', 'Reply *Y* and I''ll send you the link.', 'Prompt: confirm Y', 'draft'),
   ('bot.first_hexagon.reply_n', 'en', 'Reply *N* if you''d rather not for now.', 'Prompt: reject N', 'draft'),
   ('bot.confirmed_y.title', 'en', '✅ *Great.*', 'Y confirmation header', 'draft'),
@@ -24,6 +25,6 @@ insert into public.localization (key, locale, value, description, status) values
   ('bot.unknown.body', 'en', 'Say *"scan me"* and I''ll tell you what our free scan looks at and send you the link to run it.', 'Welcome body', 'draft'),
   ('bot.unknown.free', 'en', 'It''s free. You''ll be asked for your email so we can send your report.', 'Welcome footer', 'draft'),
   ('bot.confirm_prompt', 'en', 'Reply *Y* to get the link to the free scan, or *N* if you''d rather not.', 'Re-prompt on invalid reply', 'draft'),
-  ('bot.contact_unsupported', 'en', '📧 I can''t take an email address or phone number in this chat yet, and I haven''t saved what you sent. Say *"scan me"* and I''ll send you the link to the free scan instead.', 'Email or phone typed into the bot (not supported yet)', 'draft')
+  ('bot.contact_unsupported', 'en', '📧 I can''t take an email address or phone number in this chat yet, so please don''t send one here. Say *"scan me"* and I''ll send you the link to the free scan instead.', 'Email or phone typed into the bot (not supported yet)', 'draft')
 on conflict (key, locale) do update
   set value = excluded.value, description = excluded.description, updated_at = now();

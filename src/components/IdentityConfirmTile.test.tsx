@@ -23,16 +23,29 @@ describe('IdentityConfirmTile', () => {
     fireEvent.click(screen.getByText('No, not me'));
     expect(onConfirm).toHaveBeenLastCalledWith('e1', false);
   });
-  it('shows the dispute button only for checked > 0.8, and it does not open the question', () => {
+  it('has no `!` badge: a checked finding above 0.8 opens a labelled dispute prompt, and only its button disputes', () => {
     const onDispute = vi.fn();
-    const { rerender } = render(<IdentityConfirmTile finding={{ ...base, status: 'checked', confidence_score: 0.95 }} onConfirm={vi.fn()} onDispute={onDispute} />);
-    fireEvent.click(screen.getByLabelText(/Dispute/));
+    render(<IdentityConfirmTile finding={{ ...base, status: 'checked', confidence_score: 0.95 }} onConfirm={vi.fn()} onDispute={onDispute} />);
+    const tile = () => screen.getByTestId('identity-tile-e1').querySelector('button') as HTMLButtonElement;
+    expect(screen.queryByTitle('Not me?')).toBeNull();
+    fireEvent.click(tile());
+    expect(screen.getByRole('alertdialog')).toBeTruthy();
+    expect(onDispute).not.toHaveBeenCalled();           // opening the prompt records nothing
+    fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
+    expect(onDispute).not.toHaveBeenCalled();
+    fireEvent.click(tile());
+    fireEvent.click(screen.getByRole('button', { name: /this isn't right/i }));
     expect(onDispute).toHaveBeenCalledWith('e1');
-    expect(screen.queryByText('Is this you?')).toBeNull();
-    rerender(<IdentityConfirmTile finding={{ ...base, status: 'checked', confidence_score: 0.7 }} onConfirm={vi.fn()} onDispute={onDispute} />);
-    expect(screen.queryByLabelText(/Dispute/)).toBeNull();
+  });
+  it('opens no prompt for a checked finding at 0.8 or below, or one already disputed', () => {
+    const onDispute = vi.fn();
+    const { rerender } = render(<IdentityConfirmTile finding={{ ...base, status: 'checked', confidence_score: 0.7 }} onConfirm={vi.fn()} onDispute={onDispute} />);
+    fireEvent.click(screen.getByTestId('identity-tile-e1').querySelector('button') as HTMLButtonElement);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     rerender(<IdentityConfirmTile finding={{ ...base, status: 'disputed', confidence_score: 0.95 }} onConfirm={vi.fn()} onDispute={onDispute} />);
-    expect(screen.queryByLabelText(/Dispute/)).toBeNull();
+    fireEvent.click(screen.getByTestId('identity-tile-e1').querySelector('button') as HTMLButtonElement);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(onDispute).not.toHaveBeenCalled();
   });
 });
 

@@ -66,17 +66,13 @@ describe('HexagonDashboard', () => {
     click.mockRestore();
   });
 
-  it('on a touch screen, tapping a confident finding offers the dispute; Not me records it, closing records nothing', () => {
-    const original = window.matchMedia;
-    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+  it('tapping a confident finding asks "Does this look wrong?"; This isn\'t right records it, Keep it records nothing', () => {
     render(<HexagonDashboard initialData={data} />);
-    expect(screen.queryByTitle('Not me?')).toBeNull();
     fireEvent.click(screen.getByTitle('Checked.'));
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
     expect(screen.queryByTitle(/you disputed/i)).toBeNull();
     fireEvent.click(screen.getByTitle('Checked.'));
-    fireEvent.click(screen.getByRole('button', { name: /not me/i }));
+    fireEvent.click(screen.getByRole('button', { name: /this isn't right/i }));
     expect(screen.getByTitle(/you disputed/i)).toBeInTheDocument();
-    window.matchMedia = original;
   });
 });
