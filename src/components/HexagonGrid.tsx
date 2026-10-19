@@ -8,6 +8,7 @@ import StrangerGuessCard from './StrangerGuessCard';
 import { generateFindings } from '@/lib/strangerGuess';
 import { DNS_BANNER } from '@/lib/scanCopy';
 import { interestRank } from '@/lib/hexagonInterestOrder';
+import { buildTeaser } from '@/lib/exposureCopy';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { detectDNSLeak, DNSLeakResult } from '@/lib/securityDetection';
 import { startBehaviorTracking, stopBehaviorTracking, getAllBehaviorData } from '@/lib/behaviorDetection';
@@ -668,7 +669,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         <p className="text-sm sm:text-base text-muted-foreground">
           {v2
             ? `Showing ${visibleCount} hexagons. Grey means we could not check it.`
-            : `We found ${visibleCount} data points about you without asking.`}
+            : buildTeaser(orderedHexagons.map(h => h.id), Object.fromEntries(orderedHexagons.map(h => [h.id, h.label.toLowerCase()])))}
           {visibleCount < orderedHexagons.length && (
             <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
