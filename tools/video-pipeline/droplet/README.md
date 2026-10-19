@@ -22,4 +22,10 @@ sudo systemctl start alice-render.service        # run once now, then watch: jou
 ## Not in scope
 This is not a live voice service for the website. The site says Alice's voice is the visitor's own device and nothing is
 sent to us; serving Alice's voice from a server would change that and needs its own decision, privacy wording and legal review.
-The art is not stored in this repository, so the Alice picture must be put on the machine by a person.
+
+## Alice's picture
+By default it uses the text-free reference in the repo (`video-scripts/assets/alice.png`, 820 px wide, so slightly soft when
+enlarged). When a full-size text-free drawing exists (MPC-7401), install it as `/var/lib/alice-render/alice.png` and it takes priority:
+`install -o alice-render -g alice-render -m 0640 /path/to/alice.png /var/lib/alice-render/alice.png`.
+Scripts are re-rendered only when they change; to re-render everything after changing the picture: `rm /var/lib/alice-render/state/*`
+then `systemctl start alice-render.service`.

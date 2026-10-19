@@ -24,11 +24,17 @@ cd "$REPO"
 git fetch --quiet origin main
 git merge --quiet --ff-only origin/main   # fast-forward only: never merges, never rewrites
 
+# Alice's picture: a full-size file placed on the machine wins; otherwise use the text-free reference that is in the repo
+# (video-scripts/assets/alice.png, 820 px wide: it looks a little soft when enlarged until a full-size file exists).
+REPO_ALICE="$REPO/video-scripts/assets/alice.png"
 alice_arg=()
 if [ -f "$ALICE_PNG" ]; then
   alice_arg=(--alice "$ALICE_PNG")
+elif [ -f "$REPO_ALICE" ]; then
+  alice_arg=(--alice "$REPO_ALICE")
+  echo "note: using the repo reference $REPO_ALICE (no full-size $ALICE_PNG)"
 else
-  echo "WARNING: $ALICE_PNG is missing: the pictures will have NO Alice (layout check only)"
+  echo "WARNING: no Alice picture found ($ALICE_PNG or $REPO_ALICE): the pictures will have NO Alice (layout check only)"
 fi
 
 rendered=0; skipped=0; failed=0

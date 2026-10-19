@@ -57,7 +57,5 @@ Installed. The timer runs at about 00:15, 06:15, 12:15 and 18:15 (UTC) and rende
   Output:   $STATE/out        (nothing is uploaded; a person watches and publishes)
   Logs:     journalctl -u alice-render.service
   Test now: systemctl start alice-render.service
-  Next:     put Alice's approved drawing (text-free PNG, MPC-7401) at $STATE/alice.png, owned by alice-render:
-            install -o alice-render -g alice-render -m 0640 /path/to/alice.png $STATE/alice.png
-            Without it the videos render WITHOUT Alice's picture.
+  Picture:  uses video-scripts/assets/alice.png from the repo; a full-size file at $STATE/alice.png (owned by alice-render) takes priority.
 MSG
