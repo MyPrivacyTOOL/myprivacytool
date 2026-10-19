@@ -346,13 +346,8 @@ export default function FinalSummaryPanel({
     return () => window.clearTimeout(t);
   }, []);
 
-  // Calculate uniqueness estimate
-  const uniquenessEstimate = useMemo(() => {
-    const totalDataPoints = confirmedCount;
-    // Rough estimate: each confirmed data point increases uniqueness
-    const uniqueness = Math.min(Math.pow(2, totalDataPoints / 4), 1000000);
-    return Math.round(uniqueness);
-  }, [confirmedCount]);
+  // CK-7799: the "uniqueness 1 in N" figure that used to be here was 2^(confirmed / 4), an invented number, and the fingerprint's
+  // "1 in X" came from a hard-coded entropy table. Neither is shown or exported any more.
 
   const getRiskColor = (risk: number) => {
     if (risk >= 70) return 'text-foreground';
@@ -469,13 +464,13 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted);
       pdf.text('Risk Score', margin + colWidth * 1 + 10, statsY + 8);
       
-      // Uniqueness
+      // Categories (a true count; this slot used to show an invented "uniqueness" figure)
       pdf.setFontSize(14);
       pdf.setTextColor(...PDF.purple);
-      pdf.text(`1:${uniquenessEstimate.toLocaleString()}`, margin + colWidth * 2 + 10, statsY);
+      pdf.text(String(HEXAGON_GROUP_COUNT), margin + colWidth * 2 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
-      pdf.text('Uniqueness', margin + colWidth * 2 + 10, statsY + 8);
+      pdf.text('Categories', margin + colWidth * 2 + 10, statsY + 8);
       
       // Exposure
       pdf.setFontSize(18);
@@ -730,7 +725,6 @@ export default function FinalSummaryPanel({
         confirmedDataPoints: confirmedCount,
         overallPrivacyRisk: overallRisk,
         riskLevel: getRiskLabel(overallRisk),
-        uniqueness: `1 in ${uniquenessEstimate.toLocaleString()} browsers`,
         trackingExposure: `${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`,
       },
       categories: categoryStats.map((cat) => ({
@@ -757,7 +751,6 @@ export default function FinalSummaryPanel({
         : null,
       fingerprint: fingerprint
         ? {
-            uniqueness: fingerprint.uniqueness,
             riskLevel: fingerprint.totalRisk,
             compositeHash: fingerprint.compositeHash,
           }
@@ -787,7 +780,6 @@ export default function FinalSummaryPanel({
       ? `🎯 My Digital Shadow
 
 🔍 ${board.clear} ${SUMMARY_LABELS.clear} · ${board.needsFixing} ${SUMMARY_LABELS.fixing} · ${board.notChecked} ${SUMMARY_LABELS.notYet}
-${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
 
 Test yours at: ${window.location.origin}`
       : `🎯 My Complete Digital Shadow - Final Report
@@ -795,8 +787,7 @@ Test yours at: ${window.location.origin}`
 📊 ${HEXAGON_COUNT} data points analyzed
 🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%)
 Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
-🔍 Uniqueness: 1 in ${uniquenessEstimate.toLocaleString()} browsers
-${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
+🔍 ${HEXAGON_GROUP_COUNT} categories looked at
 
 Test yours at: ${window.location.origin}`;
 
@@ -858,8 +849,8 @@ Test yours at: ${window.location.origin}`;
             <p className="text-xs text-muted-foreground">Risk Score</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-lg font-bold text-foreground">1:{uniquenessEstimate.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">Uniqueness</p>
+            <p className="text-lg font-bold text-foreground">{HEXAGON_GROUP_COUNT}</p>
+            <p className="text-xs text-muted-foreground">Categories</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
             <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%</p>
