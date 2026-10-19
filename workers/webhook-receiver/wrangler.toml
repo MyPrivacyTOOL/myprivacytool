@@ -15,9 +15,8 @@ compatibility_flags = ["nodejs_compat"]
 # Never hardcode values in this file.
 
 # ─── SCHEDULE ────────────────────────────────────────────────────────────────
-# Hourly purge of expired scan / conversation state in Supabase (mpt_conversation_state, 24 h life). MPC-8320.
-[triggers]
-crons = ["17 * * * *"]
+# No Cron Trigger: the account is at the Workers Free limit of 5 (Cloudflare error 10072). Expired state in Supabase
+# (mpt_conversation_state, 24 h life) is purged after each successful start-deep-dive instead. See index.js. MPC-8320.
 
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]

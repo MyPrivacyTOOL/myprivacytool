@@ -61,6 +61,10 @@ const FAQS: { q: string; a: string }[] = [
     a: "Your email address, the plan you are interested in, and a record of the consent you gave (date and where you gave it). We use them to tell you when paid plans open. Our Privacy Policy describes how that information is processed and your rights.",
   },
   {
+    q: "What would paid removal look like?",
+    a: "Paid plans are still only planned and not open. We are designing them around three things: clear terms and an easy way to stop before any card details are taken, a way for you to check for yourself afterwards that your information is gone, and a list of the sites we would contact on your behalf. None of this is available yet, and no payment is taken now.",
+  },
+  {
     q: "Are the prices final?",
     a: "They are the planned monthly prices in US dollars. Scan allowances may change before paid plans open.",
   },

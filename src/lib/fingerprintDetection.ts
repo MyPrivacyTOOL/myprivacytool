@@ -168,7 +168,9 @@ function simpleHash(str: string): string {
 function hashNumberArray(arr: number[] | Uint8Array | Float32Array | Uint8ClampedArray): string {
   let hash = 0;
   for (let i = 0; i < arr.length; i++) {
-    hash = ((hash << 5) - hash) + (arr[i] || 0);
+    // CK-8321 follow-up: -Infinity or NaN (a silent bin) counts as 0. It used to reset the whole hash to 0 at that bin
+    // (ToInt32(-Infinity) is 0), which threw away every bin before it.
+    hash = ((hash << 5) - hash) + (Number.isFinite(arr[i]) ? arr[i] : 0);
     hash = hash & hash;
   }
   return Math.abs(hash).toString(16).padStart(8, '0');
@@ -343,6 +345,21 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
 // ============================================
 
 /**
+ * CK-8321: the hash of one frame of frequency data, or null when the read did not really happen.
+ * A silent, suspended or blocked audio context gives -Infinity (or NaN) in every bin. hashNumberArray turns that into "00000000",
+ * which the page then showed as a finding. No finite bin, or an all-zero hash, means the read failed: the hexagon is "not checked".
+ */
+export function audioSignalHash(frequencyData: Float32Array | number[]): string | null {
+  let finite = false;
+  for (let i = 0; i < frequencyData.length; i++) {
+    if (Number.isFinite(frequencyData[i])) { finite = true; break; }
+  }
+  if (!finite) return null;
+  const hash = hashNumberArray(frequencyData as Float32Array);
+  return /^0+$/.test(hash) ? null : hash;
+}
+
+/**
  * Detect audio fingerprinting by generating and analyzing audio
  */
 export async function detectAudioFingerprint(): Promise<AudioFingerprintResult | null> {
@@ -386,8 +403,8 @@ export async function detectAudioFingerprint(): Promise<AudioFingerprintResult |
         setTimeout(() => {
           analyser.getFloatFrequencyData(frequencyData);
           
-          // Generate hash from frequency data
-          const hash = hashNumberArray(frequencyData);
+          // Generate hash from frequency data (null when the context was silent or blocked: CK-8321)
+          const hash = audioSignalHash(frequencyData);
           
           // Cleanup
           oscillator.stop();
@@ -397,6 +414,10 @@ export async function detectAudioFingerprint(): Promise<AudioFingerprintResult |
           gain.disconnect();
           audioContext.close().catch(() => {});
           
+          if (hash === null) {
+            resolve(null);
+            return;
+          }
           resolve({
             hash,
             technique: 'Audio',

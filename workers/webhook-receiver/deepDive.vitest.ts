@@ -16,6 +16,7 @@ beforeEach(() => {
     const url = String(input); calls.push(url);
     if (url.includes('/rest/v1/mpt_conversation_state')) {   // scan / conversation state (Supabase)
       if (init.method === 'POST') { const row = JSON.parse(init.body); docs[row.key] = row.state; return new Response('', { status: 201 }); }
+      if (init.method === 'DELETE') return new Response('', { status: 200, headers: { 'Content-Range': '*/0' } });   // purge of expired rows
       const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(url)![1]);
       return new Response(JSON.stringify(docs[key] ? [{ state: docs[key] }] : []));
     }
