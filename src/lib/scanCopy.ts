@@ -47,4 +47,9 @@ export function scanHint(): string {
 // Hero copy (home page) with tiles on: no "found N data points without asking", no "click the ones that are correct".
 export const HERO_TILES_LINE1 = 'See what your browser tells every website, and how we know each thing.';
 export const HERO_TILES_LINE2 = 'Tap a hexagon to see what we found.';
+// CK-8323: hero copy for the default honeycomb dashboard (owner-approved wording, 2026-10-19). "up to N": the 54 registry hexagons are 41
+// always checked plus up to 13 that depend on the browser, so the claim is "up to". N comes from the registry, never typed by hand.
+// Line 1 follows the brand name, which the page sets in its own colour.
+export const heroDashboardLine1 = (n: number): string => ` looks at up to ${n} things your browser and connection already tell every website.`;
+export const HERO_DASHBOARD_LINE2 = 'Purple hexagons are our best guesses. Tap one to say if we got it right.';
 export const SUMMARY_LABELS = { clear: 'clear', fixing: 'need fixing', toldUs: 'you told us', notYet: 'not checked yet' } as const;

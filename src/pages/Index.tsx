@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { hexTileV2Enabled } from '@/config/hexagonTile';
-import { HERO_TILES_LINE1, HERO_TILES_LINE2 } from '@/lib/scanCopy';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1 } from '@/lib/scanCopy';
+import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
 import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
@@ -257,6 +258,13 @@ const Index = () => {
                 <span className="text-brand font-semibold">MyPrivacyTOOL</span>: {HERO_TILES_LINE1}
               </p>
               <p className="text-sm sm:text-lg text-foreground">{HERO_TILES_LINE2}</p>
+            </>
+          ) : honeycombDashboardEnabled() ? (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span>{heroDashboardLine1(HEXAGON_COUNT)}
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">{HERO_DASHBOARD_LINE2}</p>
             </>
           ) : (
             <>
