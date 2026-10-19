@@ -43,6 +43,14 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(n["thumb"], "mpt-yt-s010_singapore-dnc-registry_thumb-a.jpg")
 
 
+class UploadNameTests(unittest.TestCase):
+    def test_title_becomes_a_safe_file_name(self):
+        self.assertEqual(bs.upload_name("Singapore Do Not Call Registry: How to Sign Up"),
+                         "Singapore Do Not Call Registry - How to Sign Up.mp4")
+        self.assertEqual(bs.upload_name('A/B "test"?  now.'), "AB test now.mp4")
+        self.assertEqual(bs.upload_name("???"), "video.mp4")
+
+
 class TimingTests(unittest.TestCase):
     def setUp(self):
         self.script = bs.load_script(EXAMPLE)
@@ -103,6 +111,9 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual((st["width"], st["height"]), (1080, 1920))
             self.assertTrue(paths["srt"].read_text().strip())
             self.assertLess(paths["thumb"].stat().st_size, 2_000_000)
+            self.assertEqual(paths["upload_copy"].name, bs.upload_name(script.title))
+            self.assertEqual(paths["upload_copy"].parent.name, "youtube-upload")
+            self.assertEqual(paths["upload_copy"].read_bytes(), paths["video"].read_bytes())
 
     def test_sting_with_holds_adds_exactly_the_hold_seconds(self):
         sting = HERE.parent.parent / "assets" / "branding" / "audio" / "mpt-sting_v1.0.wav"

@@ -22,6 +22,7 @@ import argparse
 import json
 import math
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -120,6 +121,17 @@ def output_names(script: Script, version: int = 1) -> dict[str, str]:
         "srt": f"{base}_{script.language}.srt",
         "thumb": f"{base}_thumb-a.jpg",
     }
+
+
+def upload_name(title: str) -> str:
+    """File name for the Zapier Drive folder: the YouTube title, made safe for a file name.
+
+    The Zap uses the Drive file name as the video title, so this is the title people see.
+    A colon becomes " -"; characters Drive and most systems reject are dropped."""
+    t = title.replace(":", " -")
+    t = re.sub(r'[\\/?*"<>|\x00-\x1f]', "", t)
+    t = re.sub(r"\s+", " ", t).strip(" .")
+    return f"{t or 'video'}.mp4"
 
 
 # --------------------------------------------------------------------------- voice
@@ -486,7 +498,14 @@ def build(script: Script, voice, out_dir: Path, alice: Path | None, music: Path 
 
         thumb_path = out_dir / names["thumb"]
         render_thumbnail(script, alice, thumb_path)
-    return {"video": video_path, "srt": srt_path, "thumb": thumb_path}
+
+        # A copy named with the YouTube title, for the Zapier Drive folder. It sits in a
+        # sub-folder so the main outputs stay as they were. A person still approves first.
+        upload_dir = out_dir / "youtube-upload"
+        upload_dir.mkdir(exist_ok=True)
+        upload_path = upload_dir / upload_name(script.title)
+        shutil.copyfile(video_path, upload_path)
+    return {"video": video_path, "srt": srt_path, "thumb": thumb_path, "upload_copy": upload_path}
 
 
 def main(argv: list[str] | None = None) -> int:
