@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import type { Hexagon } from '@/types/hexagon';
-import { getHexagonVisuals, getHexPaint } from '@/utils/hexagonStyles';
+import { getHexagonVisuals, getHexPaint, effectiveTile } from '@/utils/hexagonStyles';
+import { TILE_COPY } from '@/lib/hexagonTile';
 import { canConfirm, canDispute } from '@/lib/identityConfirmation';
 import { cn } from '@/lib/utils';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
@@ -43,11 +44,18 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
   const paint = getHexPaint(hexagon.status, exposed);
   const requiresConfirmation = canConfirm(hexagon);
   const allowsDispute = canDispute(hexagon);
-  const reopensPlan = exposed && !!onSelect;
+  // The honest look (dashboard tiles from the web scan). Other hexagons keep the look above.
+  const kind = effectiveTile(hexagon, fixed);
+  const tile = kind ? TILE_COPY[kind] : null;
+  const solid = !!tile && tile.level === 'solid' && tile.colour !== 'grey';
+  const hue = tile ? `hsl(var(--tile-${tile.colour}))` : '';
+  const needsFix = kind === 'needs_fixing';
+  const reopensPlan = (exposed || needsFix) && !!onSelect;
   const interactive = requiresConfirmation || allowsDispute || reopensPlan;
-  const secured = !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
+  const secured = !tile && !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
   const emoji = WAITING.has(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
-  const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status);
+  const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status) && (!tile || tile.showValue);
+  const tip = tile ? `${hexagon.label}: ${tile.line}.` : exposed ? EXPOSED_TOOLTIP : visuals.tooltip;
 
   return (
     <div className={cn('group/tile relative', className)} style={style}>
@@ -56,7 +64,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
         className={cn(
           'group absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-center focus-visible:outline-none',
           interactive ? 'cursor-pointer' : 'cursor-default',
-          paint.ink,
+          tile ? (solid ? 'text-white' : tile.colour === 'grey' ? 'text-gray-500' : 'text-gray-800') : paint.ink,
           hexagon.status === 'guess' && 'animate-pulse motion-reduce:animate-none',
         )}
         onClick={() => {
@@ -68,14 +76,18 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
         }}
         aria-disabled={!interactive}
         aria-haspopup={interactive ? 'dialog' : undefined}
-        title={exposed ? EXPOSED_TOOLTIP : visuals.tooltip}
+        title={tip}
       >
         <svg viewBox="0 0 100 115.47" className="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
           <polygon
             points={POINTS}
             strokeWidth={3}
             strokeLinejoin="round"
-            className={cn(paint.polygon, paint.dashed && '[stroke-dasharray:7_5]', 'transition-colors group-focus-visible:stroke-blue-500')}
+            className={cn(!tile && paint.polygon, !tile && paint.dashed && '[stroke-dasharray:7_5]', 'transition-colors group-focus-visible:stroke-blue-500')}
+            style={tile ? {
+              stroke: tile.colour === 'grey' ? 'hsl(var(--tile-grey))' : hue,
+              fill: tile.colour === 'grey' ? 'transparent' : tile.level === 'solid' ? hue : `hsl(var(--tile-${tile.colour}) / ${tile.level === 'medium' ? 0.42 : 0.16})`,
+            } : undefined}
           />
         </svg>
         {secured && (
@@ -83,10 +95,21 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
             ✓
           </span>
         )}
+        {tile && (
+          <span
+            aria-hidden="true"
+            data-testid="tile-badge"
+            className="absolute right-[10%] top-[10%] flex h-[18px] w-[18px] items-center justify-center rounded-full text-[11px] font-bold leading-none"
+            style={{ background: solid ? '#fff' : tile.colour === 'grey' ? 'hsl(var(--tile-grey))' : hue, color: solid ? hue : '#fff' }}
+          >
+            {tile.glyph}
+          </span>
+        )}
         <span className="relative text-xl leading-none" aria-hidden="true">{emoji}</span>
         <span className="relative w-[68%] text-[9px] font-semibold uppercase leading-tight tracking-wide">{hexagon.label}</span>
-        {showValue && <span className="relative w-[68%] truncate text-[10px] text-gray-900">{hexagon.data}</span>}
-        <span className="sr-only">{exposed ? EXPOSED_TOOLTIP : visuals.tooltip}</span>
+        {showValue && <span className={cn('relative w-[68%] truncate text-[10px]', solid ? 'text-white' : 'text-gray-900')}>{hexagon.data}</span>}
+        {tile && !compact && <span className="relative w-[68%] truncate text-[8px] italic" data-testid="tile-line">{tile.line}</span>}
+        <span className="sr-only">{tip}</span>
       </button>
 
       {/* `!` is reserved for risk. Disputing is a labelled button inside its own prompt, so it is deliberate, never a stray tap. */}

@@ -38,3 +38,20 @@ describe('fromWebScan', () => {
     expect(h.remediation).toEqual(expect.any(String));
   });
 });
+
+describe('fromWebScan tile kinds (honest look)', () => {
+  const find = (pred: (h: (typeof HEXAGONS)[number]) => boolean) => HEXAGONS.find(pred)!.id;
+  it('every hexagon gets a kind, and an unscanned one is never "clear"', () => {
+    const list = fromWebScan([]);
+    expect(list.every((h) => !!h.tile && h.tile !== 'clear')).toBe(true);
+    expect(list.filter((h) => h.tile === 'cant_check_here').length).toBe(HEXAGONS.filter((h) => h.truth.level === 'cannot_be_checked').length);
+  });
+  it('a measured low-sensitivity finding is "seen", not clear; a guess is our guess; a medium measured finding needs fixing', () => {
+    const lowId = find((h) => h.truth.level === 'measured' && h.truth.sensitivity === 'low' && h.status.kind === 'informational' && h.id !== 'connection');
+    const medId = 'canvas-fingerprint';
+    const list = fromWebScan([scanned(lowId, 'Chrome 141'), scanned(estimateId, 'London (en-GB)', { confidence: 60 }), scanned(medId, 'Dune Pine')]);
+    expect(get(list, lowId).tile).toBe('seen_low_risk');
+    expect(get(list, estimateId).tile).toBe('our_guess');
+    expect(get(list, medId).tile).toBe('needs_fixing');
+  });
+});
