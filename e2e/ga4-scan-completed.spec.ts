@@ -6,7 +6,7 @@ import { test, expect } from "./fixtures";
 test("completing the scan emits privacy_scan_completed exactly once", async ({ page, isMobile }) => {
   test.skip(isMobile, "slow full-scan flow; desktop project is enough");
   test.setTimeout(120_000);
-  await page.goto("/");
+  await page.goto("/?view=grid");
   const counter = page.getByTestId("confirmation-counter");
   await expect(counter).toBeVisible({ timeout: 30_000 });
 

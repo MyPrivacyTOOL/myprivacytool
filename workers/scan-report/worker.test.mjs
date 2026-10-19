@@ -1,5 +1,6 @@
 // Stubbed-fetch tests: no network, no secrets. Run: node workers/scan-report/worker.test.mjs
 import worker, { handleScan, runReportJob, runFollowUpJob, recipientAllowed } from './index.js';
+import { emailHash } from './lib/suppression.js';
 import { computeScore, breachRisk } from './lib/score.js';
 import { checkBreaches } from './lib/hibp.js';
 import { pushScanActivity } from './lib/hubspot.js';
@@ -50,7 +51,7 @@ check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includ
 
 // ---- fake Supabase/Resend/HubSpot
 function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [] }; const calls = []; let n = 0;
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [] }; const calls = []; let n = 0;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -65,6 +66,7 @@ function fake(opts = {}) {
     }
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
+    if (o.method === 'DELETE' && q.get('email')) { const v = decodeURIComponent(q.get('email').replace(/^(eq|ilike)\./, '')).replace(/\\(.)/g, '$1').toLowerCase(); db[t] = db[t].filter((x) => String(x.email).toLowerCase() !== v); return res(204); }   // CK-7721 fix 3
     if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
       if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
@@ -86,7 +88,9 @@ function fake(opts = {}) {
     let rows = db[t]; const uid = q.get('id')?.replace('eq.', ''); if (uid) rows = rows.filter((x) => x.id === uid);
     if (t === 'scans' && q.get('report_status') === 'eq.sent') rows = rows.filter((x) => x.report_status === 'sent' && (x.followup_stage ?? 0) < 2 && x.report_sent_at && new Date(x.report_sent_at) < new Date(decodeURIComponent(q.get('report_sent_at').replace('lt.', ''))));
     const rc = q.get('referral_code'); if (rc?.startsWith('eq.')) rows = rows.filter((x) => x.referral_code === rc.slice(3));
-    const e = q.get('email')?.replace('eq.', ''); if (e) rows = rows.filter((x) => x.email === decodeURIComponent(e));
+    const e = q.get('email')?.replace('eq.', ''); if (e && !e.startsWith('ilike.')) rows = rows.filter((x) => x.email === decodeURIComponent(e));
+    if (q.get('email')?.startsWith('ilike.')) { const v = decodeURIComponent(q.get('email').slice(6)).replace(/\\(.)/g, '$1').toLowerCase(); rows = rows.filter((x) => String(x.email).toLowerCase() === v); }
+    const eh = q.get('email_hash'); if (eh?.startsWith('eq.')) rows = rows.filter((x) => x.email_hash === eh.slice(3));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
@@ -232,6 +236,7 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const peek = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`), OB, {});
   const peekHtml = await peek.text();
   check(peek.status === 200 && !F.db.users[0].email_opt_out_at && /<form method="POST"/.test(peekHtml) && /noindex/.test(peekHtml) && !peekHtml.includes(EMAIL), 'unsubscribe: GET (what a mail scanner does) only shows a confirm page, opts nobody out, does not print the address');
+  F.db.subscribers.push({ id: 's1', email: EMAIL.replace(/^./, (c) => c.toUpperCase()) }, { id: 's2', email: 'other@example.com' });   // CK-7721 fix 3: the newsletter row, stored with different case
   const sentBefore = resendCount(F);
   const good = await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
   check(good.status === 200 && F.db.users[0].email_opt_out_at && /You are unsubscribed/.test(await good.text()), 'unsubscribe: POST (button or one-click) opts the user out');
@@ -240,6 +245,8 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   const ucBody = uc[0] ? JSON.parse(uc[0].body) : {};
   check(uc.length === 1 && ucBody.subject === 'You are unsubscribed' && /no more scan report or follow-up emails/.test(ucBody.text) && /privacy@myprivacytool\.io/.test(ucBody.text), 'unsubscribe: sends one plain confirmation email');
   check(!/<img|<a |<button|utm_|http/i.test(ucBody.html + ucBody.text) && !ucBody.headers, 'unsubscribe confirmation email: no images, buttons, links, UTM tags or unsubscribe header');
+  check(F.db.subscribers.length === 1 && F.db.subscribers[0].email === 'other@example.com', 'unsubscribe: deletes that address from the newsletter list (any case) and leaves other subscribers');
+  check(/removed you from our newsletter list/.test(ucBody.text), 'unsubscribe confirmation email says the newsletter row was removed');
   check(F.db.email_suppressions.length === 1 && /^[0-9a-f]{64}$/.test(F.db.email_suppressions[0].email_hash) && !JSON.stringify(F.db.email_suppressions).includes(EMAIL), 'unsubscribe: also writes an email-hash suppression (no readable address)');
   await worker.fetch(new Request(`https://x/api/unsubscribe?${qs}`, { method: 'POST' }), OB, {});
   check(F.db.email_suppressions.length === 1 && resendCount(F) === sentBefore + 1, 'unsubscribe twice: suppression stays a single row and no second confirmation email');
@@ -369,6 +376,15 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   F.db.users[0].email_opt_out_at = new Date().toISOString();
   await reqUnsub(F, EMAIL);
   check(sentTo(F).length === before + 1, 'unsubscribe request: already-unsubscribed address gets no email');
+  // MPC-7789: a newsletter-only subscriber (no users row) gets the link too; an already-suppressed one does not
+  F.db.users.length = 0; F.db.subscribers.push({ id: 's9', email: EMAIL.replace(/^./, (c) => c.toUpperCase()) });
+  const b4 = sentTo(F).length;
+  await reqUnsub(F, EMAIL);
+  const newsMail = sentTo(F).slice(b4);
+  check(newsMail.length === 1 && newsMail[0].to[0] === EMAIL && /unsubscribe\?e=/.test(newsMail[0].text), 'unsubscribe request: newsletter-only subscriber (no users row) gets the confirmation email');
+  F.db.email_suppressions.push({ email_hash: await emailHash(EMAIL), source: 'unsubscribe' });
+  await reqUnsub(F, EMAIL);
+  check(sentTo(F).length === b4 + 1, 'unsubscribe request: already-suppressed subscriber gets no email');
   check((await reqUnsub(F, 'not-an-email')).status === 400, 'unsubscribe request: invalid email => 400');
   check((await reqUnsub(F, EMAIL, 'https://evil.example')).status === 403, 'unsubscribe request: foreign browser origin => 403');
   const limited = await worker.fetch(mk('/api/unsubscribe-request', { method: 'POST', headers: { 'content-type': 'application/json', Origin: origin }, body: JSON.stringify({ email: EMAIL }) }), { ...OB, RATE_LIMITER: { limit: async () => ({ success: false }) } }, {});

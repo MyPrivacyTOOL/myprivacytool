@@ -23,9 +23,9 @@ const withKillSwitch = (fn) => {
 const robots = readFileSync(path.join(ROOT, "public/robots.txt"), "utf8");
 
 describe("hkSpam launch flag", () => {
-  it("ships not indexable: the committed config is noindex", () => {
+  it("is launched: the committed config is indexable (approved by Chris 2026-10-14)", () => {
     const cfg = readHkSpamConfig(ROOT);
-    expect(cfg.indexable).toBe(false);
+    expect(cfg.indexable).toBe(true);
     expect(cfg.path).toBe("/HongKongSpam");
   });
 

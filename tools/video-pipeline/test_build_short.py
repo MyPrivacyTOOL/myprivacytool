@@ -55,6 +55,14 @@ class TimingTests(unittest.TestCase):
             self.assertAlmostEqual(tl.starts[i + 1] - tl.ends[i], bs.PAUSE_S, places=2)
         self.assertAlmostEqual(tl.total - tl.ends[-1], bs.TAIL_S, places=2)
 
+    def test_holds_lengthen_only_the_lead_in_and_tail(self):
+        _, held = bs.build_voice_track(self.script, bs.SilentVoice(), hold_in=1.5, hold_out=2.0)
+        self.assertAlmostEqual(held.starts[0], bs.LEAD_IN_S + 1.5, places=2)
+        self.assertAlmostEqual(held.total - held.ends[-1], bs.TAIL_S + 2.0, places=2)
+        self.assertAlmostEqual(held.total - self.tl.total, 3.5, places=2)
+        for i in range(len(held.starts) - 1):
+            self.assertAlmostEqual(held.starts[i + 1] - held.ends[i], bs.PAUSE_S, places=2)
+
     def test_audio_length_matches_timeline(self):
         self.assertAlmostEqual(len(self.samples) / 24000, self.tl.total, places=1)
 
@@ -68,6 +76,11 @@ class TimingTests(unittest.TestCase):
             self.assertGreater(c.end, c.start)
         for a, b in zip(cues, cues[1:]):
             self.assertLessEqual(a.end, b.start + 1e-6)
+
+    def test_long_captions_break_at_word_boundaries_in_two_lines(self):
+        text = bs._two_lines("There are three free Do-Not-Call registers, for".split())
+        self.assertEqual(text, "There are three free\nDo-Not-Call registers, for")
+        self.assertEqual(bs._two_lines("It is free".split()), "It is free")
 
     def test_srt_format(self):
         srt = bs.to_srt(bs.make_cues(self.script, self.tl))
@@ -90,6 +103,36 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual((st["width"], st["height"]), (1080, 1920))
             self.assertTrue(paths["srt"].read_text().strip())
             self.assertLess(paths["thumb"].stat().st_size, 2_000_000)
+
+    def test_sting_with_holds_adds_exactly_the_hold_seconds(self):
+        sting = HERE.parent.parent / "assets" / "branding" / "audio" / "mpt-sting_v1.0.wav"
+        self.assertTrue(sting.exists(), "the approved brand sting is missing")
+
+        def duration(path):
+            out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                                 capture_output=True, text=True, check=True)
+            return float(out.stdout)
+
+        with tempfile.TemporaryDirectory() as out:
+            script = bs.load_script(EXAMPLE)
+            script.beats = script.beats[:2]
+            plain = bs.build(script, bs.SilentVoice(), Path(out) / "a", alice=None)
+            held = bs.build(script, bs.SilentVoice(), Path(out) / "b", alice=None, sting=sting, hold_in=1.5, hold_out=2.0)
+            self.assertAlmostEqual(duration(held["video"]) - duration(plain["video"]), 3.5, delta=0.15)
+
+
+@unittest.skipUnless(bs.INTER_DIR.exists(), "needs the Inter font")
+class FrameLayoutTest(unittest.TestCase):
+    def test_long_url_headline_stays_inside_the_side_margins(self):
+        from PIL import Image
+
+        beat = bs.Beat(narration="Check your exposure.", on_screen="Check your exposure: myprivacytool.io/scan")
+        with tempfile.TemporaryDirectory() as out:
+            png = Path(out) / "f.png"
+            bs.render_frame(beat, None, png)
+            im = Image.open(png).convert("L").crop((0, 200, bs.W, 620))
+            xs = [x for x in range(im.width) for y in range(0, im.height, 2) if im.getpixel((x, y)) < 100]
+            self.assertLessEqual(max(xs), bs.W - 60)
 
 
 if __name__ == "__main__":

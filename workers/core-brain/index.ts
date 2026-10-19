@@ -107,18 +107,28 @@ function normalizeLocale(raw: unknown): string {
   return LOCALES.includes(base) ? base : DEFAULT_LOCALE;
 }
 
+/** Reads a nested key path from untyped JSON; undefined at the first non-object step (what `a?.b?.c` gave on a parsed payload). */
+function pick(value: unknown, ...path: string[]): unknown {
+  let cur = value;
+  for (const key of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
+}
+
 // Accepts the listener format or a raw Telegram update. Returns null when the structure is invalid.
-function parseInbound(body: any): Inbound | null {
+function parseInbound(body: unknown): Inbound | null {
   if (!body || typeof body !== "object") return null;
-  let platform = body.platform;
-  let senderId = body.sender_id;
-  let text = body.message_text;
-  let locale = body.locale;
-  if (body.message?.chat && platform === undefined) {
+  let platform = pick(body, "platform");
+  let senderId = pick(body, "sender_id");
+  let text = pick(body, "message_text");
+  let locale = pick(body, "locale");
+  if (pick(body, "message", "chat") && platform === undefined) {
     platform = "telegram";
-    senderId = body.message.chat.id;
-    text = body.message.text;
-    locale = locale ?? body.message.from?.language_code;
+    senderId = pick(body, "message", "chat", "id");
+    text = pick(body, "message", "text");
+    locale = locale ?? pick(body, "message", "from", "language_code");
   }
   if (typeof platform !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/i.test(platform)) return null;
   if (typeof senderId === "number") senderId = String(senderId);
@@ -176,8 +186,8 @@ async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent
       log.warn("qwen http error", { status: res.status });
       return null;
     }
-    const data: any = await res.json();
-    const raw = String(data?.choices?.[0]?.message?.content ?? "");
+    const data: unknown = await res.json();
+    const raw = String(pick(data, "choices", "0", "message", "content") ?? "");
     const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
     const intent = String(parsed.intent ?? "").toLowerCase() as Intent;
     const confidence = Number(parsed.confidence);
@@ -209,11 +219,11 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
       log.warn("supabase http error", { status: res.status });
       return { ...anonymous, source: "fallback" };
     }
-    const rows: any[] = await res.json();
+    const rows = (await res.json()) as unknown[];
     const row = rows[0];
     if (!row) return anonymous;
-    const trustLevel = Number(row.trust_level);
-    return { trustLevel: Number.isInteger(trustLevel) ? trustLevel : 0, state: String(row.state ?? "new"), source: "supabase" };
+    const trustLevel = Number(pick(row, "trust_level"));
+    return { trustLevel: Number.isInteger(trustLevel) ? trustLevel : 0, state: String(pick(row, "state") ?? "new"), source: "supabase" };
   } catch (err) {
     log.warn("supabase failed", { error: (err as Error).name });
     return { ...anonymous, source: "fallback" };
@@ -400,14 +410,15 @@ function bearerMatches(request: Request, secret: string): boolean {
 }
 
 // X Account Activity API: a DM arrives as direct_message_events[].message_create. Ignore our own echoes.
-function parseXEnvelope(payload: any): Inbound | null {
-  const events: any[] = Array.isArray(payload?.direct_message_events) ? payload.direct_message_events : [];
+function parseXEnvelope(payload: unknown): Inbound | null {
+  const dms = pick(payload, "direct_message_events");
+  const events: unknown[] = Array.isArray(dms) ? dms : [];
   for (const ev of events) {
-    const mc = ev?.type === "message_create" ? ev.message_create : null;
-    const sender = mc?.sender_id;
-    const text = mc?.message_data?.text;
+    const mc = pick(ev, "type") === "message_create" ? pick(ev, "message_create") : null;
+    const sender = pick(mc, "sender_id");
+    const text = pick(mc, "message_data", "text");
     if (typeof sender !== "string" || typeof text !== "string" || !text.trim()) continue;
-    if (sender === String(payload?.for_user_id ?? "")) continue;
+    if (sender === String(pick(payload, "for_user_id") ?? "")) continue;
     return parseInbound({ platform: "x", sender_id: sender, message_text: text });
   }
   return null;
@@ -416,27 +427,31 @@ function parseXEnvelope(payload: any): Inbound | null {
 // LinkedIn (MPC-7640). Messaging is partner-gated, so the delivered shape is an ASSUMPTION to confirm against the approved
 // product: { organization|for_user: "<urn>", events: [{ from|sender: "<urn>", message|text|message_text: "..." }] }.
 // A bare single event (no `events` array) is accepted too. Our own echoes (sender == organization) are ignored.
-function parseLinkedInEnvelope(payload: any): Inbound | null {
-  const events: any[] = Array.isArray(payload?.events) ? payload.events : payload && typeof payload === "object" ? [payload] : [];
-  const self = String(payload?.organization ?? payload?.for_user ?? "");
-  const pick = (v: any) => (typeof v === "string" ? v : typeof v?.text === "string" ? v.text : undefined);
+function parseLinkedInEnvelope(payload: unknown): Inbound | null {
+  const listed = pick(payload, "events");
+  const events: unknown[] = Array.isArray(listed) ? listed : payload && typeof payload === "object" ? [payload] : [];
+  const self = String(pick(payload, "organization") ?? pick(payload, "for_user") ?? "");
+  const textOf = (v: unknown): string | undefined => {
+    const inner = pick(v, "text");
+    return typeof v === "string" ? v : typeof inner === "string" ? inner : undefined;
+  };
   for (const ev of events) {
-    const sender = ev?.from ?? ev?.sender;
-    const text = pick(ev?.message) ?? pick(ev?.text) ?? pick(ev?.message_text);
+    const sender = pick(ev, "from") ?? pick(ev, "sender");
+    const text = textOf(pick(ev, "message")) ?? textOf(pick(ev, "text")) ?? textOf(pick(ev, "message_text"));
     if (typeof sender !== "string" || !text?.trim()) continue;
     if (self && sender === self) continue;
-    return parseInbound({ platform: "linkedin", sender_id: sender, message_text: text, locale: ev?.locale });
+    return parseInbound({ platform: "linkedin", sender_id: sender, message_text: text, locale: pick(ev, "locale") });
   }
   return null;
 }
 
 async function handleIngestSocial(request: Request, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
-  const body: any = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
+  const body = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
   if (body instanceof Response) return body;
-  const source = body?.source;
+  const source = pick(body, "source");
   if (source !== "x" && source !== "telegram" && source !== "linkedin") throw new MptError("bad_request", "Unknown source");
-  const msg = source === "telegram" ? parseInbound(body.payload)
-    : source === "linkedin" ? parseLinkedInEnvelope(body.payload) : parseXEnvelope(body.payload);
+  const msg = source === "telegram" ? parseInbound(pick(body, "payload"))
+    : source === "linkedin" ? parseLinkedInEnvelope(pick(body, "payload")) : parseXEnvelope(pick(body, "payload"));
   if (!msg) {
     // Verified but carries no user text (follows, likes, edits, our own messages). 200 so the platform does not retry.
     log.info("ignored", { source });

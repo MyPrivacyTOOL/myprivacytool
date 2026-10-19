@@ -10,6 +10,8 @@ export interface Env {
   X_CLIENT_SECRET?: string;
   X_REFRESH_TOKEN?: string;
   /** OAuth 1.0a keys (API key, account access token + secret): sign the clip upload, which the OAuth 2.0 token cannot do. */
+  /** HubSpot private-app token limited to contacts (read/write) and contact properties (read/write): the X activity sync. */
+  HUBSPOT_SOCIAL_TOKEN?: string;
   X_CONSUMER_KEY?: string;
   X_ACCESS_TOKEN?: string;
   X_ACCESS_TOKEN_SECRET?: string;
@@ -25,6 +27,18 @@ export interface Env {
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;
+  /** Channel probe reader: "on" = allow-listed test accounts only, "all" = every non-bot sender; anything else (default) is off. See docs/channel-probe.md. */
+  PROBE_MODE?: string;
+  /** Comma-separated numeric Telegram ids of our own test accounts; only these are ever captured by the probe reader. */
+  PROBE_TELEGRAM_IDS?: string;
+  /** Mode "all": skip the public lookups for a sender looked up within this many hours (default 24). */
+  PROBE_LOOKUP_HOURS?: string;
+  /** Mode "all": days until a row's expires_at (default 90, clamped 1-365). */
+  PROBE_RETENTION_DAYS?: string;
+  /** Full event log (mode "on" only): comma-separated numeric Telegram ids of people who opted in, logged in addition to PROBE_TELEGRAM_IDS. */
+  PROBE_LOG_OPTIN_IDS?: string;
+  /** Full event log: days until a row expires (default 90, clamped 1-365), or "forever" for no expiry. */
+  PROBE_LOG_RETENTION_DAYS?: string;
   /** Preferred: service binding to the core-brain Worker (MPC-8601). */
   CORE_BRAIN?: { fetch(request: Request): Promise<Response> };
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */
@@ -110,6 +124,16 @@ export async function forwardToCoreBrain(env: Env, envelope: ForwardEnvelope, lo
 }
 
 /** Parses JSON (already signature-verified). Null on malformed input. */
+/** Reads a nested key path from untyped JSON; undefined at the first non-object step (what `a?.b?.c` gave on a parsed payload). */
+export function pick(value: unknown, ...path: string[]): unknown {
+  let cur = value;
+  for (const key of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
+}
+
 export function parseJson(raw: string): unknown | null {
   try { return JSON.parse(raw); } catch { return null; }
 }

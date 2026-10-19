@@ -3,6 +3,10 @@ import Hexagon from './Hexagon';
 import VoiceAI from './VoiceAI';
 import RiskScore from './RiskScore';
 import { HexagonData, DeviceData, getLanguageName, determineUserProfile, generateHexagonsAsync } from '@/lib/deviceDetection';
+import HexagonExplanation from './HexagonExplanation';
+import StrangerGuessCard from './StrangerGuessCard';
+import { generateFindings } from '@/lib/strangerGuess';
+import { DNS_BANNER } from '@/lib/scanCopy';
 import { interestRank } from '@/lib/hexagonInterestOrder';
 import { buildTeaser } from '@/lib/exposureCopy';
 import { calculateFingerprintUniqueness, CompositeFingerprint } from '@/lib/fingerprintDetection';
@@ -31,6 +35,15 @@ import { AlertTriangle, X, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { hexTileV2Enabled, hexScreenV2Enabled } from '@/config/hexagonTile';
+import { toTile, riskProfile, riskProfileParts, withUserStatement, withGuessAnswer, cannotCheckLast, HexagonTile, type GuessOutcome } from '@/lib/hexagonTile';
+import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
+import GuessCheckCard from './hexagon/GuessCheckCard';
+import { fixStepFor } from '@/lib/hexagonFix';
+import NextStepCard from './hexagon/NextStepCard';
+import DetailLadder, { type DetailLevel } from './hexagon/DetailLadder';
+import HexagonHelp from './hexagon/HexagonHelp';
+import { captureContext } from '@/lib/webScan';
 
 // MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
 const StoragePanel = lazy(() => import('./StoragePanel'));
@@ -50,6 +63,13 @@ interface HexagonGridProps {
 // Define progressive reveal thresholds. The hexagon total shown to the user comes from the registry (HEXAGON_COUNT).
 // FINAL_SUMMARY_MIN_VISIBLE is the wave boundary after which the behavior wave has been revealed, not a count of hexagons.
 const FINAL_SUMMARY_MIN_VISIBLE = 46;
+// CK-7805: the 'what a stranger could guess' card appears with the language panel.
+const STRANGER_CARD_MIN_CONFIRMED = 8;
+// CK-7805 (owner suggestion): the fingerprint panel waits for 8 fingerprint confirmations, not 3.
+const FINGERPRINT_PANEL_MIN_CONFIRMED = 8;
+
+// Phase 2: the steps the "Show more hexagons" button moves through (the same wave boundaries the taps used to reach).
+const UNLOCK_STEPS = [5, 8, 12, 17, 23, 29, 34, 39, 45];
 
 const REVEAL_THRESHOLDS = {
   initial: 5,           // Location, Device, Browser, ISP, Time Pattern
@@ -65,8 +85,21 @@ const REVEAL_THRESHOLDS = {
 };
 
 export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
+  // MPC-7916: honest tiles (colour, transparency and words say how we know). Off unless the flag is on.
+  const v2 = useMemo(() => hexTileV2Enabled(), []);
+  // MPC-7916 Phase 2: one job per screen. Hexagons first; more hexagons on a button, not on taps; one next step at a time;
+  // everything else (panels, the stranger card, the score) out of the way. Built on the honest tiles.
+  const screenV2 = useMemo(() => v2 && hexScreenV2Enabled(), [v2]);
+  const [toldFixed, setToldFixed] = useState<Set<string>>(new Set());
+  // Guess check (prototype): the visitor's answer and/or their device's verdict, per guessed tile. Kept in this tab only, never sent or stored.
+  const [guessState, setGuessState] = useState<Record<string, { answer?: 'yes' | 'no'; device?: DeviceCheckResult }>>({});
+  const [laterIds, setLaterIds] = useState<Set<string>>(new Set());
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>(1);
+  const [unlockCount, setUnlockCount] = useState(0);
   const [visibleCount, setVisibleCount] = useState(5);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
+  // CK-7805: a tap selects a hexagon so its explanation stays visible on touch screens (no hover there).
+  const [selectedHexagonId, setSelectedHexagonId] = useState<string | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [confirmedHexagons, setConfirmedHexagons] = useState<Set<string>>(new Set());
   const [revealingHexagons, setRevealingHexagons] = useState<Set<string>>(new Set());
@@ -145,20 +178,57 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       return categoryOrder.indexOf(catA) - categoryOrder.indexOf(catB);
     });
 
-    return sorted;
-  }, [allHexagons]);
+    // With the honest tiles on, tiles that a web page cannot check go last, so a visitor is not met by a row of grey (kept from main).
+    return v2 ? cannotCheckLast(sorted) : sorted;
+  }, [allHexagons, v2]);
 
   // Confirmation is derived from React state, not stored on the hexagon objects,
   // so it survives the parent regenerating `allHexagons` (orientation/motion updates).
   const orderedHexagons = useMemo(
     () => getOrderedHexagons().map(h =>
       confirmedHexagons.has(h.id)
-        ? { ...h, confirmed: true, confidence: Math.min(h.confidence + 5, 99) }
+        // MPC-7916: a tap is "seen", not a confirmation, so with the honest tiles on it no longer adds to the confidence.
+        ? { ...h, confirmed: true, confidence: v2 ? h.confidence : Math.min(h.confidence + 5, 99) }
         : { ...h, confirmed: false }
     ),
-    [getOrderedHexagons, confirmedHexagons]
+    [getOrderedHexagons, confirmedHexagons, v2]
   );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
+
+  // MPC-7916: what each visible tile says, decided in one place from the captured value and the registry.
+  const tiles = useMemo(() => {
+    const map = new Map<string, HexagonTile>();
+    if (!v2) return map;
+    const ctx = captureContext(allHexagons);
+    for (const h of visibleHexagons) {
+      const t = toTile({ id: h.id, value: h.value }, ctx);
+      // The visitor said a red tile is fixed: their word, shown lighter than a check, until we check again.
+      const g = guessState[h.id];
+      // The device's verdict beats the visitor's word; a "near" verdict changes nothing.
+      const outcome: GuessOutcome | null = g?.device?.verdict === 'agrees' ? 'device_agrees' : g?.device?.verdict === 'far' ? 'device_far' : g?.answer ?? null;
+      map.set(h.id, t.kind === 'needs_fixing' && toldFixed.has(h.id) ? withUserStatement(t) : outcome ? withGuessAnswer(t, outcome) : t);
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v2, allHexagons, visibleCount, toldFixed, guessState]);
+  // Phase 2: the red tiles still waiting, in the order they appear. The first one is the next step.
+  const stepsLeft = useMemo(
+    () => (screenV2
+      ? visibleHexagons.filter((h) => tiles.get(h.id)?.kind === 'needs_fixing' && !laterIds.has(h.id))
+      : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [screenV2, tiles, laterIds, visibleCount]
+  );
+  const currentStep = stepsLeft[0];
+  const profileParts = useMemo(() => riskProfileParts(riskProfile([...tiles.values()])), [tiles]);
+  const selectedHexagon = selectedHexagonId ? visibleHexagons.find(h => h.id === selectedHexagonId) ?? null : null;
+  const strangerFindings = useMemo(
+    () => (confirmedCount >= STRANGER_CARD_MIN_CONFIRMED
+      ? generateFindings({ deviceData, hexagons: v2 ? visibleHexagons.filter((h) => !['not_checked', 'couldnt_check', 'cant_check_here'].includes(tiles.get(h.id)?.kind ?? '')) : visibleHexagons, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '' })
+      : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [confirmedCount >= STRANGER_CARD_MIN_CONFIRMED, deviceData]
+  );
 
   // Lazy load fingerprint data when about to be revealed
   const loadFingerprintData = useCallback(async () => {
@@ -176,13 +246,15 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   }, [fingerprintData, isFingerprintLoading]);
 
   // Track funnel milestones and trigger progressive reveals
+  // Phase 2: the waves follow the visitor's "Show more hexagons" button, never a count of taps.
+  const progressCount = screenV2 ? unlockCount : confirmedCount;
   useEffect(() => {
-    if (confirmedCount === 3) {
+    if (progressCount === 3) {
       trackFunnelStep('three_confirmed');
     }
     
     // Second wave: After 5 confirmations, reveal screen/privacy/connection
-    if (confirmedCount >= REVEAL_THRESHOLDS.initial && !revealWaves.second) {
+    if (progressCount >= REVEAL_THRESHOLDS.initial && !revealWaves.second) {
       trackDeepScanUnlocked(confirmedCount);
       trackFunnelStep('deep_scan_triggered');
       setRevealWaves(prev => ({ ...prev, second: true }));
@@ -190,7 +262,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Language wave: After 8 confirmations
-    if (confirmedCount >= REVEAL_THRESHOLDS.secondWave + 3 && !revealWaves.language) {
+    if (progressCount >= REVEAL_THRESHOLDS.secondWave + 3 && !revealWaves.language) {
       trackFunnelStep('language_scan_triggered');
       setRevealWaves(prev => ({ ...prev, language: true }));
       loadLanguagePrediction();
@@ -198,14 +270,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Orientation wave: After 12 confirmations
-    if (confirmedCount >= REVEAL_THRESHOLDS.languageWave + 4 && !revealWaves.orientation) {
+    if (progressCount >= REVEAL_THRESHOLDS.languageWave + 4 && !revealWaves.orientation) {
       trackFunnelStep('orientation_scan_triggered');
       setRevealWaves(prev => ({ ...prev, orientation: true }));
       revealNextWave(13, 18);
     }
     
     // Fingerprint wave: After 17 confirmations
-    if (confirmedCount >= REVEAL_THRESHOLDS.orientationWave + 5 && !revealWaves.fingerprint) {
+    if (progressCount >= REVEAL_THRESHOLDS.orientationWave + 5 && !revealWaves.fingerprint) {
       trackFunnelStep('fingerprint_scan_triggered');
       setRevealWaves(prev => ({ ...prev, fingerprint: true }));
       loadFingerprintData();
@@ -213,28 +285,28 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Advanced fingerprint wave: After 23 confirmations
-    if (confirmedCount >= REVEAL_THRESHOLDS.fingerprintWave + 6 && !revealWaves.advancedFingerprint) {
+    if (progressCount >= REVEAL_THRESHOLDS.fingerprintWave + 6 && !revealWaves.advancedFingerprint) {
       trackFunnelStep('advanced_fingerprint_scan_triggered');
       setRevealWaves(prev => ({ ...prev, advancedFingerprint: true }));
       revealNextWave(24, 30);
     }
     
     // Storage wave: After 29 confirmations
-    if (confirmedCount >= REVEAL_THRESHOLDS.advancedFingerprintWave + 6 && !revealWaves.storage) {
+    if (progressCount >= REVEAL_THRESHOLDS.advancedFingerprintWave + 6 && !revealWaves.storage) {
       trackFunnelStep('storage_scan_triggered');
       setRevealWaves(prev => ({ ...prev, storage: true }));
       revealNextWave(30, 35);
     }
     
     // Social wave: After 34 confirmations (storage complete)
-    if (confirmedCount >= REVEAL_THRESHOLDS.storageWave + 5 && !revealWaves.social) {
+    if (progressCount >= REVEAL_THRESHOLDS.storageWave + 5 && !revealWaves.social) {
       trackFunnelStep('social_scan_triggered');
       setRevealWaves(prev => ({ ...prev, social: true }));
       revealNextWave(35, 40);
     }
     
     // Security wave: After 39 confirmations (social complete)
-    if (confirmedCount >= REVEAL_THRESHOLDS.socialWave + 5 && !revealWaves.security) {
+    if (progressCount >= REVEAL_THRESHOLDS.socialWave + 5 && !revealWaves.security) {
       trackFunnelStep('security_scan_triggered');
       setRevealWaves(prev => ({ ...prev, security: true }));
       // Check for DNS leak and show critical alert if needed
@@ -243,7 +315,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
     
     // Behavior wave: After 45 confirmations (security complete)
-    if (confirmedCount >= REVEAL_THRESHOLDS.securityWave + 6 && !revealWaves.behavior) {
+    if (progressCount >= REVEAL_THRESHOLDS.securityWave + 6 && !revealWaves.behavior) {
       trackFunnelStep('behavior_scan_triggered');
       setRevealWaves(prev => ({ ...prev, behavior: true }));
       revealNextWave(46, Math.min(52, orderedHexagons.length));
@@ -259,10 +331,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackFunnelStep('all_hexagons_confirmed');
       trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
-      // Trigger celebration confetti
-      triggerCompletionCelebration();
+      // Trigger celebration confetti. MPC-7916: not with the honest tiles on: finishing the taps is not a result.
+      if (!v2) triggerCompletionCelebration();
     }
-  }, [confirmedCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData]);
+  }, [confirmedCount, progressCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData, v2]);
 
   // Start behavior tracking on mount
   useEffect(() => {
@@ -323,7 +395,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       if (dnsResult.isLeaking) {
         setCriticalSecurityAlert({
           type: 'dns',
-          message: `Your DNS requests are visible to your ISP. Location shown: ${dnsResult.actualLocation}`,
+          message: DNS_BANNER,
         });
         // Auto-show the fix guide after a short delay
         setTimeout(() => setShowDNSFixGuide(true), 2000);
@@ -402,7 +474,9 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         isFirstConfirmation.current = false;
       }
       
-      trackHexagonConfirm(hex.id, hex.label, true);
+      // With the honest tiles on a tap is "seen". The event is still sent (as on main) with the tile kind, so the funnel can tell a tap on
+      // a grey tile from a tap on a red one.
+      trackHexagonConfirm(hex.id, hex.label, true, v2 ? tiles.get(hex.id)?.kind : undefined);
       trackHexagonAccuracy(hex.id, hex.label, hex.confidence);
       
       setConfirmedCount(c => c + 1);
@@ -412,7 +486,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       if (hex.category === 'fingerprint') {
         setFingerprintConfirmedCount(c => {
           const newCount = c + 1;
-          if (newCount >= 3 && !showFingerprintPanel) {
+          if (newCount >= FINGERPRINT_PANEL_MIN_CONFIRMED && !showFingerprintPanel) {
             setShowFingerprintPanel(true);
           }
           return newCount;
@@ -454,7 +528,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           if (label.includes('dns') && value.includes('leak')) {
             setCriticalSecurityAlert({
               type: 'dns',
-              message: 'DNS leak detected. Your browsing history is visible to your ISP.',
+              message: DNS_BANNER,
             });
           }
           return newCount;
@@ -547,7 +621,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
       {/* Critical Security Alert Banner */}
-      {criticalSecurityAlert && (
+      {!screenV2 && criticalSecurityAlert && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-brand-near-black text-brand-white border-b border-brand-dark-border py-3 px-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-6 h-6" />
@@ -588,19 +662,31 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Title Section */}
-      <div className={`text-center mb-4 sm:mb-8 ${criticalSecurityAlert ? 'mt-14' : ''}`}>
+      <div className={`text-center mb-4 sm:mb-8 ${!screenV2 && criticalSecurityAlert ? 'mt-14' : ''}`}>
         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2">
           YOUR DIGITAL SHADOW
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">
-          {buildTeaser(orderedHexagons.map(h => h.id), Object.fromEntries(orderedHexagons.map(h => [h.id, h.label.toLowerCase()])))}
+          {v2
+            ? `Showing ${visibleCount} hexagons. Grey means we could not check it.`
+            : buildTeaser(orderedHexagons.map(h => h.id), Object.fromEntries(orderedHexagons.map(h => [h.id, h.label.toLowerCase()])))}
           {visibleCount < orderedHexagons.length && (
             <span className="text-brand ml-1">{getPhaseDescription()}</span>
           )}
         </p>
       </div>
 
-      {/* Confirmation progress */}
+      {/* MPC-7916: the risk profile. Counts, never a score: no percentage, no "N of M", no Low / Medium / High. */}
+      {v2 && !screenV2 ? (
+        <div className="max-w-xl mx-auto mb-4 px-4" data-testid="risk-profile">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1 text-center">Your risk profile</p>
+          <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm font-mono" aria-live="polite" aria-atomic="true">
+            {profileParts.map((p) => (
+              <span key={p.key} data-testid={`risk-profile-${p.key}`}>{p.text}</span>
+            ))}
+          </p>
+        </div>
+      ) : v2 ? null : (
       <div className="max-w-md mx-auto mb-4 px-4" data-testid="confirmation-progress">
         <div className="flex items-center justify-between text-sm mb-1">
           <span className="text-muted-foreground">Confirmed</span>
@@ -622,13 +708,53 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           />
         </div>
       </div>
+      )}
 
-      {/* Voice AI */}
+      {/* Voice AI. Phase 2: closed by default, so the hexagons come first. */}
+      {screenV2 ? (
+        <details className="max-w-md mx-auto mb-4 px-4" data-testid="voice-details">
+          <summary className="cursor-pointer text-sm text-muted-foreground text-center">Ask Alice, the voice guide</summary>
+      <VoiceAI 
+          hexagonData={hoveredHexagon} 
+          tile={v2 && hoveredHexagon ? tiles.get(hoveredHexagon.id) : undefined}
+          confirmedCount={confirmedCount} 
+          totalCount={Math.max(visibleCount, 8)} 
+        />
+        </details>
+      ) : (
       <VoiceAI 
         hexagonData={hoveredHexagon} 
+        tile={v2 && hoveredHexagon ? tiles.get(hoveredHexagon.id) : undefined}
         confirmedCount={confirmedCount} 
         totalCount={Math.max(visibleCount, 8)} 
       />
+      )}
+
+      {/* CK-7805: constant-height box above the grid: shows the tapped or hovered hexagon's meaning without shifting or covering the grid. */}
+      <HexagonExplanation
+        hexagon={hoveredHexagon ?? selectedHexagon}
+        tile={v2 && (hoveredHexagon ?? selectedHexagon) ? tiles.get((hoveredHexagon ?? selectedHexagon)!.id) : undefined}
+      />
+
+      {/* Guess check (prototype): a guess is only worth showing if it can be made true. Shown for the selected guessed tile that has a check. */}
+      {v2 && selectedHexagon && guessCheckFor(selectedHexagon.id) && ['our_guess', 'you_confirmed', 'device_agrees', 'guess_wrong'].includes(tiles.get(selectedHexagon.id)?.kind ?? '') && (() => {
+        const g = guessState[selectedHexagon.id];
+        const spec = guessCheckFor(selectedHexagon.id)!;
+        const answered = g?.device?.verdict === 'agrees' ? 'device_agrees' : g?.device?.verdict === 'far' ? 'device_far' : g?.answer ?? null;
+        const loc = deviceData?.location;
+        return (
+          <GuessCheckCard
+            key={selectedHexagon.id}
+            label={selectedHexagon.label}
+            value={selectedHexagon.displayValue ?? selectedHexagon.value}
+            spec={spec}
+            guess={loc && (loc.latitude || loc.longitude) ? { lat: loc.latitude, lon: loc.longitude } : undefined}
+            answered={answered}
+            onAnswer={(a) => setGuessState((prev) => ({ ...prev, [selectedHexagon.id]: { ...prev[selectedHexagon.id], answer: a } }))}
+            onDevice={(r) => setGuessState((prev) => ({ ...prev, [selectedHexagon.id]: { ...prev[selectedHexagon.id], device: r } }))}
+          />
+        );
+      })()}
 
       {/* Honeycomb Hexagon Grid */}
       <div ref={gridRef} className="flex justify-center mb-8" role="list" aria-label="Detected data points">
@@ -671,7 +797,9 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
                   data={displayData}
                   onConfirm={handleConfirm}
                   onHover={handleHover}
+                  onSelect={(d) => setSelectedHexagonId(d.id)}
                   isRevealing={isRevealing}
+                  tile={v2 ? tiles.get(hex.id) : undefined}
                 />
               </div>
             );
@@ -679,18 +807,96 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         </div>
       </div>
 
+      {screenV2 && (
+        <>
+          <div className="max-w-xl mx-auto mb-4 px-4" data-testid="risk-profile">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1 text-center">Your risk profile</p>
+            <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm font-mono" aria-live="polite" aria-atomic="true">
+              {profileParts.map((p) => (
+                <span key={p.key} data-testid={`risk-profile-${p.key}`}>{p.text}</span>
+              ))}
+            </p>
+          </div>
+
+          {visibleCount < orderedHexagons.length && (
+            <div className="text-center mb-6">
+              <button
+                type="button"
+                data-testid="show-more"
+                onClick={() => setUnlockCount((c) => UNLOCK_STEPS.find((t) => t > c) ?? c)}
+                className="rounded-lg border border-surface-border px-4 py-2 text-sm font-semibold hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+              >
+                Show more hexagons
+              </button>
+            </div>
+          )}
+
+          {criticalSecurityAlert && (
+            <div className="max-w-xl mx-auto mb-4 rounded-xl border border-dashed border-[hsl(var(--tile-purple))] bg-surface p-3 text-sm" data-testid="dns-note">
+              <p className="font-semibold text-foreground">About the DNS leak and WebRTC hexagons · our guess</p>
+              <p className="text-muted-foreground">{criticalSecurityAlert.message} This is a guess, not a check.</p>
+              <button
+                type="button"
+                onClick={() => setShowDNSFixGuide(true)}
+                className="mt-2 underline text-foreground focus-visible:outline focus-visible:outline-2"
+              >
+                See how to fix
+              </button>
+            </div>
+          )}
+
+          {currentStep ? (
+            <NextStepCard
+              key={currentStep.id}
+              label={currentStep.label}
+              step={fixStepFor(currentStep.id)}
+              position={1}
+              total={stepsLeft.length}
+              onDone={() => setToldFixed((prev) => new Set(prev).add(currentStep.id))}
+              onLater={() => setLaterIds((prev) => new Set(prev).add(currentStep.id))}
+            />
+          ) : (
+            laterIds.size > 0 && (
+              <div className="text-center mb-6">
+                <button
+                  type="button"
+                  onClick={() => setLaterIds(new Set())}
+                  className="underline text-sm text-muted-foreground focus-visible:outline focus-visible:outline-2"
+                  data-testid="show-skipped"
+                >
+                  Show the {laterIds.size} step{laterIds.size === 1 ? '' : 's'} I skipped
+                </button>
+              </div>
+            )
+          )}
+
+          <DetailLadder
+            rows={visibleHexagons.map((h) => ({ hexagon: h, tile: tiles.get(h.id)! })).filter((r) => r.tile)}
+            level={detailLevel}
+            onLevel={setDetailLevel}
+          />
+
+          <div className="text-center mb-8"><HexagonHelp /></div>
+        </>
+      )}
+
+      {!screenV2 && strangerFindings.length > 0 && <StrangerGuessCard findings={strangerFindings} />}
+
       {/* Risk Score - now with fingerprint data */}
-      <RiskScore 
-        confirmed={confirmedCount} 
-        total={visibleCount}
-        hexagons={visibleHexagons}
-        fingerprint={fingerprintData}
-      />
+      {/* MPC-7916: the percentage and "Medium Risk" card gives a rating from partly checked data, so it is replaced by the risk profile above. */}
+      {!v2 && (
+        <RiskScore 
+          confirmed={confirmedCount} 
+          total={visibleCount}
+          hexagons={visibleHexagons}
+          fingerprint={fingerprintData}
+        />
+      )}
 
       {/* Panel Display Order: Language -> Fingerprint -> Final Summary */}
       
       {/* Language Intelligence Panel - shown after 8 confirmations */}
-      {showLanguagePanel && (
+      {!screenV2 && showLanguagePanel && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <LanguageIntelligencePanel
@@ -703,7 +909,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Fingerprint Panel - shown after confirming 3+ fingerprint hexagons */}
-      {showFingerprintPanel && (
+      {!screenV2 && showFingerprintPanel && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <FingerprintPanel />
@@ -712,7 +918,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Storage Panel - shown after confirming 3+ storage hexagons */}
-      {showStoragePanel && (
+      {!screenV2 && showStoragePanel && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <StoragePanel />
@@ -721,7 +927,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Social Accounts Panel - shown after confirming 3+ social hexagons */}
-      {showSocialPanel && (
+      {!screenV2 && showSocialPanel && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <SocialAccountsPanel />
@@ -730,7 +936,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Security Panel - shown after confirming 3+ security hexagons */}
-      {showSecurityPanel && (
+      {!screenV2 && showSecurityPanel && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <SecurityPanel onClose={() => setShowSecurityPanel(false)} />
@@ -739,7 +945,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Behavior Panel - shown after confirming 3+ behavior hexagons */}
-      {showBehaviorPanel && (
+      {!screenV2 && showBehaviorPanel && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <BehaviorPanel onClose={() => setShowBehaviorPanel(false)} />
@@ -748,7 +954,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Completion Celebration Banner */}
-      {showCompletionCelebration && (
+      {!v2 && showCompletionCelebration && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-surface border border-surface-border shadow-card px-8 py-6 rounded-2xl animate-scale-in text-center pointer-events-auto">
             <div className="flex items-center justify-center gap-3 mb-2">
@@ -776,12 +982,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       )}
 
       {/* Final Summary Panel - shown after all hexagons confirmed */}
-      {showFinalSummary && (
+      {!v2 && showFinalSummary && (
         <div className="mt-8 animate-fade-in">
           <Suspense fallback={null}>
             <FinalSummaryPanel
               hexagons={visibleHexagons}
               confirmedCount={confirmedCount}
+              tiles={v2 ? tiles : undefined}
               fingerprint={fingerprintData}
               languagePrediction={languagePrediction}
               onStartOver={handleStartOver}

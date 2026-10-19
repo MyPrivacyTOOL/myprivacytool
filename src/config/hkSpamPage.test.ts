@@ -14,8 +14,8 @@ import { IVR_VERIFIED } from "./hkDnc";
 const base = { search: "", hostname: "www.myprivacytool.io", stored: null, dev: false };
 
 describe("launch flag", () => {
-  it("ships not indexable (the launch flag is separate from the verified keys)", () => {
-    expect(HK_SPAM_INDEXABLE).toBe(false);
+  it("is launched: indexable (approved by Chris 2026-10-14), with the keys verified", () => {
+    expect(HK_SPAM_INDEXABLE).toBe(true);
     expect(IVR_VERIFIED).toBe(true);
     expect(HK_SPAM_PATH).toBe("/HongKongSpam");
   });

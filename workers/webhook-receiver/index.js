@@ -43,6 +43,18 @@ export default {
     if (path === '/webhook/email')     return handleEmail(request, env);
     if (path === '/webhook/leads')     return handleLeads(request, env);
 
+    // WhatsApp deep dive (OSINT -> web confirm -> person replies RESULTS). Lazy import: it is TypeScript, and the Node security test never reaches it.
+    if (path.startsWith('/api/scan/')) {
+      try {
+        const { handleDeepDive } = await import('./deepDive.ts');
+        const res = await handleDeepDive(request, env);
+        if (res) return res;
+      } catch (err) {
+        console.error('Deep dive error:', err);
+        return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 };
@@ -165,6 +177,18 @@ async function handleWhatsApp(request, env) {
 
     const from  = msg.from;
     const text  = msg.text?.body || '';
+    // Proof of possession for the deep dive: Meta's contact record (name) and the time of the person's own message.
+    const profileName = clip(body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name, 64);
+    const inboundTs   = Number(msg.timestamp) || Math.floor(Date.now() / 1000);
+
+    // Pull model: the person asks for their deep-dive result. Plain text reply, never a Meta template.
+    const cmd = text.trim().toUpperCase();
+    if (cmd === 'RESULTS' || cmd === 'STATUS') {
+      const { resultsReply } = await import('./deepDive.ts');
+      await sendWhatsApp(env, from, await resultsReply(env, from));
+      return ok();
+    }
+
     const state = await getConversationState(env, `whatsapp:${from}`);
 
     if (!state || state.stage === 'new') {
@@ -172,11 +196,12 @@ async function handleWhatsApp(request, env) {
       await saveConversationState(env, `whatsapp:${from}`, {
         stage: 'awaiting_confirmation', platform: 'whatsapp',
         phone: from, hexagonSent: true, ts: Date.now(),
+        profileName, inbound_message_timestamp: inboundTs,
       });
       await createHubSpotContact(env, { source: 'whatsapp', phone: from });
       await sendWhatsApp(env, from, hexagon);
     } else if (state.stage === 'awaiting_confirmation') {
-      const reply = await handleConfirmation(text, state, env, `whatsapp:${from}`);
+      const reply = await handleConfirmation(text, { ...state, profileName: profileName || state.profileName, inbound_message_timestamp: inboundTs }, env, `whatsapp:${from}`);
       await sendWhatsApp(env, from, reply);
     }
     return ok();

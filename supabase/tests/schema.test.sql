@@ -698,5 +698,60 @@ select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 1, 'mpt_purge
 select pg_temp.assert((select count(*) from public.social_contacts) = 0, 'mpt_purge_expired_social_contacts: removes expired contacts');
 reset role;
 
+-- ===== MPC-7502: plans (pricing source of truth) =====
+select pg_temp.assert((select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.plans'::regclass), 'plans: RLS enabled and forced');
+select pg_temp.assert((select count(*) = 4 and string_agg(slug || ':' || monthly_price_cents, ',' order by sort_order) = 'free:0,basic:799,pro:1499,executive:4999' from public.plans), 'plans: seeded with the four approved tiers and prices');
+select pg_temp.assert(pg_temp.try_as('anon', $$select slug, name, monthly_price_cents, scans_label, sort_order from public.plans$$) = '', 'plans: anon can read the public columns');
+select pg_temp.assert(pg_temp.try_as('anon', $$select stripe_price_id from public.plans$$) = '42501', 'plans: anon cannot read stripe_price_id');
+select pg_temp.assert(pg_temp.try_as('anon', $$select * from public.plans$$) = '42501', 'plans: anon select * is denied (stripe_price_id is not granted)');
+select pg_temp.assert(pg_temp.try_as('anon', $$update public.plans set monthly_price_cents = 1$$) = '42501', 'plans: anon cannot update');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$insert into public.plans (slug, name, monthly_price_cents, scans_label, sort_order) values ('x','X',1,'x',99)$$) = '42501', 'plans: authenticated cannot insert');
+set local role service_role;
+update public.plans set active = false where slug = 'executive';
+reset role;
+set local role anon;
+select pg_temp.assert((select count(*) from public.plans) = 3, 'plans: anon sees active plans only');
+reset role;
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.plans (slug, name, monthly_price_cents, scans_label, sort_order) values ('Bad Slug','X',1,'x',98)$$) = '23514', 'plans: slug must be a lower-case slug');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.plans (slug, name, monthly_price_cents, scans_label, sort_order) values ('neg','X',-1,'x',97)$$) = '23514', 'plans: price cannot be negative');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.plans set stripe_price_id = 'price_abc123' where slug = 'free'$$) = '23514', 'plans: the free plan cannot have a Stripe price');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.plans set stripe_price_id = 'not-a-price' where slug = 'pro'$$) = '23514', 'plans: stripe_price_id must look like price_...');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.plans set stripe_price_id = 'price_1AbC' where slug = 'pro'$$) = '', 'plans: a paid plan can hold a Stripe price id');
+
+-- ===== Telegram event log (probe reader, mode "on" only) =====
+select pg_temp.assert((select relforcerowsecurity and relrowsecurity from pg_class where oid = 'public.telegram_event_log'::regclass), 'telegram_event_log: RLS enabled and forced');
+select pg_temp.assert(pg_temp.try_as('anon', $$select id from public.telegram_event_log$$) = '42501', 'telegram_event_log: anon cannot read');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select id from public.telegram_event_log$$) = '42501', 'telegram_event_log: authenticated cannot read');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.telegram_event_log (direction, kind, sender_id, chat_id, session_id, payload) values ('sideways','x','1','1','1:1:1','{}')$$) = '23514', 'telegram_event_log: direction must be in, out or brain');
+set local role service_role;
+-- The same (direction, update_id, kind) inserted twice with ON CONFLICT DO NOTHING (what the Worker sends) leaves one row.
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload) values ('in', 'message', '111', '111', 9001, '111:111:1', '{"n":1}') on conflict do nothing;
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload) values ('in', 'message', '111', '111', 9001, '111:111:1', '{"n":2}') on conflict do nothing;
+select pg_temp.assert((select count(*) from public.telegram_event_log where direction = 'in' and update_id = 9001 and kind = 'message') = 1, 'telegram_event_log: the same update_id inserted twice with ON CONFLICT DO NOTHING is stored once');
+select pg_temp.assert((select payload->>'n' from public.telegram_event_log where update_id = 9001) = '1', 'telegram_event_log: the first row wins');
+-- A different direction or kind for the same update_id is a different event (a failed decision does not block the retry's decision).
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload) values ('brain', 'decision_unavailable', '111', '111', 9001, '111:111:1', '{}') on conflict do nothing;
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload) values ('brain', 'core-brain', '111', '111', 9001, '111:111:1', '{}') on conflict do nothing;
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload) values ('out', 'sendMessage', '111', '111', 9001, '111:111:1', '{}') on conflict do nothing;
+select pg_temp.assert((select count(*) from public.telegram_event_log where update_id = 9001) = 4, 'telegram_event_log: different direction or kind for one update_id are separate rows');
+-- Rows with no update_id are never deduplicated.
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, session_id, payload) values ('out', 'sendMessage', '111', '111', '111:111:1', '{}') on conflict do nothing;
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, session_id, payload) values ('out', 'sendMessage', '111', '111', '111:111:1', '{}') on conflict do nothing;
+select pg_temp.assert((select count(*) from public.telegram_event_log where update_id is null) = 2, 'telegram_event_log: rows without an update_id are not deduplicated');
+-- Purge removes expired rows only; expires_at null means "forever".
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload, expires_at) values ('in', 'message', '111', '111', 9002, '111:111:1', '{}', now() - interval '1 day');
+insert into public.telegram_event_log (direction, kind, sender_id, chat_id, update_id, session_id, payload, expires_at) values ('in', 'message', '111', '111', 9003, '111:111:1', '{}', now() + interval '1 day');
+select pg_temp.assert(public.mpt_purge_expired_telegram_event_log() = 1, 'mpt_purge_expired_telegram_event_log: removes only the expired row');
+select pg_temp.assert((select count(*) from public.telegram_event_log where update_id in (9002, 9003)) = 1 and (select count(*) from public.telegram_event_log where update_id = 9001) = 4, 'mpt_purge_expired_telegram_event_log: keeps unexpired and never-expiring rows');
+reset role;
+
+-- ===== HITL interactions + tuning log =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.mpt_hexagon_interactions$$) = '42501', 'hitl: anon cannot read interactions');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.osint_engine_tuning_log$$) = '42501', 'hitl: authenticated cannot read the tuning log');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action) values ('s','h','maybe')$$) = '23514', 'hitl: user_action check constraint');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.osint_engine_tuning_log (hexagon_id, osint_source, action_type) values ('h','HIBP','other')$$) = '23514', 'hitl: action_type check constraint');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, original_confidence_score) values ('s','h','disputed',1.5)$$) = '23514', 'hitl: confidence must be 0..1');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, osint_source) values ('s','h','disputed','spam_registry')$$) = '', 'hitl: service_role can insert an interaction');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

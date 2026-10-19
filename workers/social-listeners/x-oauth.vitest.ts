@@ -10,7 +10,7 @@ const hours = (h: number) => new Date(Date.now() + h * 3600_000).toISOString();
 function world(row: null | { access_token: string; refresh_token: string; expires_at: string }, xStatus = 200) {
   const calls: { url: string; init?: RequestInit }[] = [];
   let stored = row;
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
     const url = String(u);
     calls.push({ url, init });
     if (url.startsWith("https://sb.test") && (!init || !init.method || init.method === "GET")) return Response.json(stored ? [stored] : []);
@@ -84,7 +84,7 @@ describe("getUserAccessToken", () => {
 
   it("does NOT refresh when the token store cannot be read (the refresh token would be burned), and uses the static token", async () => {
     const calls: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
       calls.push(String(u));
       if (String(u).startsWith("https://sb.test")) return new Response("relation does not exist", { status: 404 });
       return Response.json({ access_token: "new-access", refresh_token: "new-refresh", expires_in: 7200 });
@@ -101,7 +101,7 @@ describe("getUserAccessToken", () => {
 
   it("retries saving the new pair once, and still returns the new token if saving fails", async () => {
     let writes = 0;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
       if (url.startsWith("https://sb.test") && init?.method === "POST") { writes++; return new Response("no", { status: 500 }); }
       if (url.startsWith("https://sb.test")) return Response.json([]);
@@ -119,8 +119,8 @@ describe("getUserAccessToken", () => {
 
   it("falls back to the X_REFRESH_TOKEN secret when X refuses the stored refresh token (the owner generated a new token)", async () => {
     const bodies: string[] = [];
-    let stored: any = { access_token: "old", refresh_token: "revoked-refresh", expires_at: hours(-1) };
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+    let stored: Record<string, unknown> = { access_token: "old", refresh_token: "revoked-refresh", expires_at: hours(-1) };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
       if (url.startsWith("https://sb.test") && (!init || !init.method || init.method === "GET")) return Response.json([stored]);
       if (url.startsWith("https://sb.test")) { stored = JSON.parse(init!.body as string); return new Response(null, { status: 201 }); }
@@ -138,7 +138,7 @@ describe("getUserAccessToken", () => {
 
   it("does not retry with the bootstrap secret when it is the same token or a deploy placeholder", async () => {
     let n = 0;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: any, init?: RequestInit) => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
       if (url.startsWith("https://sb.test")) return Response.json([{ access_token: "old", refresh_token: "same", expires_at: hours(-1) }]);
       n++;

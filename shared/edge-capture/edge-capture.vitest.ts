@@ -3,7 +3,7 @@
 // The retention cut is tested against a real Postgres in supabase/tests/schema.test.sql. All rows here are made up.
 import { describe, expect, it, vi } from "vitest";
 import { classify, treatAsPerson } from "./classify";
-import { buildVisit, captureEnabled, captureVisit, cleanReferrer, recordVisit, type CaptureEnv } from "./capture";
+import { buildVisit, captureEnabled, captureVisit, cleanQuery, cleanReferrer, recordVisit, safeCf, type CaptureEnv } from "./capture";
 import { RULES, RULESET_VERSION, type RequestFacts } from "./ruleset";
 import { onRequest } from "../../functions/_middleware";
 import routes from "../../public/_routes.json";
@@ -74,7 +74,7 @@ const req = (url: string, headers: Record<string, string> = {}, cf: Record<strin
 };
 
 describe("raw visit row", () => {
-  it("keeps raw facts, the class, the rule and the version; drops query string, cookie and credentials", () => {
+  it("keeps raw facts, the class, the rule and the version; redacts credential-like query values; drops cookie and credentials", () => {
     const row = buildVisit(
       req("https://www.example.test/scan?email=a@b.test&utm=x", {
         "user-agent": "ExampleCrawler/1.0", cookie: "session=abc", authorization: "Bearer zzz", "cf-connecting-ip": "192.0.2.7",
@@ -87,8 +87,35 @@ describe("raw visit row", () => {
       country: "HK", asn: 64500, network: "Example Net", colo: "HKG", referrer: "https://ref.example.test/page",
       class: "bot", rule: "R4", ruleset_version: RULESET_VERSION,
     });
-    expect(JSON.stringify(row)).not.toMatch(/secret|a@b\.test|session=abc|Bearer|utm/);
+    expect(JSON.stringify(row)).not.toMatch(/secret|a@b\.test|session=abc|Bearer/);
+    expect(row.query).toBe("email=[redacted]&utm=x");
     expect(row.headers).toEqual({ "accept-language": "en" });
+  });
+  it("decision D-A: keeps everything Cloudflare attached, every non-credential header, the IP version", () => {
+    const cf = { country: "HK", city: "Example City", region: "Example Region", latitude: "22.30", longitude: "114.17", timezone: "Asia/Hong_Kong", tlsVersion: "TLSv1.3", tlsCipher: "AEAD-AES128-GCM-SHA256", clientTcpRtt: 12, httpProtocol: "HTTP/2" };
+    const row = buildVisit(
+      req("https://www.example.test/", { "user-agent": "Mozilla/5.0 Chrome/120", "cf-connecting-ip": "2001:db8::1", "x-custom": "yes", cookie: "a=b", authorization: "Bearer zzz", "x-session-id": "s1", "x-api-key": "k", "cf-access-jwt-assertion": "jwt" }, cf),
+      200,
+    );
+    expect(row.cf).toEqual(cf);
+    expect(row.ip_version).toBe(6);
+    expect(row.all_headers["x-custom"]).toBe("yes");
+    expect(row.all_headers["user-agent"]).toBe("Mozilla/5.0 Chrome/120");
+    for (const h of ["cookie", "authorization", "x-session-id", "x-api-key", "cf-access-jwt-assertion"]) expect(row.all_headers).not.toHaveProperty(h);
+    expect(buildVisit(req("https://x.test/", { "cf-connecting-ip": "192.0.2.9" }), 200).ip_version).toBe(4);
+    expect(buildVisit(req("https://x.test/"), 200).ip_version).toBeNull();
+  });
+  it("decision D-A: oversized cf keeps only top-level plain values; non-objects give an empty object", () => {
+    const big = { country: "HK", nested: { blob: "x".repeat(9000) } };
+    expect(safeCf(big)).toEqual({ _truncated: true, country: "HK" });
+    expect(safeCf(undefined)).toEqual({});
+    expect(safeCf("nope")).toEqual({});
+  });
+  it("decision D-A: query keeps plain keys and redacts credential-like ones", () => {
+    expect(cleanQuery("?utm_source=x&utm_campaign=y")).toBe("utm_source=x&utm_campaign=y");
+    expect(cleanQuery("?token=abc&Code=1&session_id=2&x=ok&user_email=a@b.test")).toBe("token=[redacted]&Code=[redacted]&session_id=[redacted]&x=ok&user_email=[redacted]");
+    expect(cleanQuery("")).toBeNull();
+    expect(cleanQuery("?")).toBeNull();
   });
   it("cleans referrers and bad country codes", () => {
     expect(cleanReferrer("not a url")).toBeNull();

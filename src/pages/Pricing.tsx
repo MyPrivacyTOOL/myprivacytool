@@ -11,6 +11,7 @@ import { useLeadSubmit } from "@/hooks/useLeadSubmit";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import { suggestEmail, validateEmail } from "@/lib/formFeedback";
 import { cn } from "@/lib/utils";
+import { PLAN_ROWS, formatMonthlyPrice } from "@/lib/plans";
 import {
   trackExperimentCta,
   trackExperimentExposure,
@@ -43,7 +44,8 @@ interface Plan {
 }
 
 const WAITLIST_CTA = { label: "Join the waitlist", to: `#${WAITLIST_ID}` };
-const PAID_PLANS = ["Basic", "Pro", "Executive"];
+// MPC-7502: names and prices come from public.plans (src/data/plans.generated.json); paid = any plan that costs money.
+const PAID_PLANS = PLAN_ROWS.filter((p) => p.monthly_price_cents > 0).map((p) => p.name);
 
 const FAQS: { q: string; a: string }[] = [
   {
@@ -64,18 +66,19 @@ const FAQS: { q: string; a: string }[] = [
   },
 ];
 
-const PLANS: Plan[] = [
-  { name: "Free", scans: "1 scan per month", note: "No credit card required", monthly: "$0", cta: { label: "Check my exposure", to: "/scan" } },
-  { name: "Basic", scans: "5 scans per month", monthly: "$7.99", cta: WAITLIST_CTA },
-  { name: "Pro", scans: "25 scans per month", monthly: "$14.99", cta: WAITLIST_CTA },
-  { name: "Executive", scans: "Unlimited scans", monthly: "$49.99", cta: WAITLIST_CTA },
-];
+const PLANS: Plan[] = PLAN_ROWS.map((p) => ({
+  name: p.name,
+  scans: p.scans_label,
+  note: p.note ?? undefined,
+  monthly: formatMonthlyPrice(p.monthly_price_cents),
+  cta: p.monthly_price_cents === 0 ? { label: "Check my exposure", to: "/scan" } : WAITLIST_CTA,
+}));
 
 // MPC-7638: A/B tests (docs/ab-testing.md). Every variant string below is truthful for a page with no
 // checkout yet; the trust line makes no claim beyond what the Free plan already states.
 const HEADLINE = {
-  control: { h1: "Pricing", sub: "The scan is free. Paid plans remove your data from brokers and keep it off." },
-  free_first: { h1: "Know your exposure for free. Pay to remove it.", sub: "Paid plans remove your data from brokers and keep it off." },
+  control: { h1: "Pricing", sub: "The scan is free. Paid plans are planned to remove your data from brokers and keep it off; they are not open yet." },
+  free_first: { h1: "Know your exposure for free. Removal is planned.", sub: "Paid plans are planned to remove your data from brokers and keep it off; they are not open yet." },
 } as const;
 const TRUST_LINE = "The scan is free and needs no credit card.";
 const PRICING_TESTS = ["pricing_headline", "pricing_cta", "pricing_tiers", "pricing_social_proof"] as const;

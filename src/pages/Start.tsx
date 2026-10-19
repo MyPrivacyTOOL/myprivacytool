@@ -39,7 +39,7 @@ const CTA_LABEL: Record<string, string> = {
 };
 
 const channels = [
-  { name: "WhatsApp", Icon: MessageCircle, url: "https://wa.me/YOUR_WHATSAPP_NUMBER?text=scan+me" },
+  { name: "WhatsApp", Icon: MessageCircle, url: "/wa" },
   { name: "Telegram", Icon: Send, url: "https://t.me/MyPrivacyToolBot?start=scan" },
   { name: "Messenger", Icon: MessageSquare, url: "https://m.me/myprivacytool" },
   { name: "Instagram", Icon: Instagram, url: "https://ig.me/m/myprivacytool" },

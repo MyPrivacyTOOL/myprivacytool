@@ -1,0 +1,288 @@
+{
+  "library": "alice",
+  "version": "0.1.5-draft",
+  "locked": false,
+  "fps": 30,
+  "canvas": {
+    "vertical": [
+      1080,
+      1920
+    ],
+    "horizontal": [
+      1920,
+      1080
+    ],
+    "thumbnail": [
+      1280,
+      720
+    ]
+  },
+  "voice": {
+    "engine": "kokoro-en-v0_19 via sherpa-onnx",
+    "voice": "bf_isabella",
+    "speaker_id": 8,
+    "speed": 0.95,
+    "pitch_semitones": -1,
+    "loudness_lufs": -18
+  },
+  "proportions": {
+    "status": "provisional",
+    "head_units_full_height": 7.0,
+    "tolerance_pct": 3,
+    "source": "MPC-7438 example (head = 1/7 of body)"
+  },
+  "palette": {
+    "code_green": "#27AE60",
+    "note": "only colour; behind the curtain on black. Brand Matrix Green; measured ~RGB 78/199/67 in the approved clip, a lighter glow tint is fine where it spills out of the curtain"
+  },
+  "legacy_clips": {
+    "count": 15,
+    "size_px": [
+      560,
+      560
+    ],
+    "policy": "reference only; stored outside git until a person uploads them to reference-clips/"
+  },
+  "open_decisions": [
+    "Produce or commission the high-resolution master art (faces, poses, expressions, layered source). Not possible in-repo.",
+    "Measure the final art and replace provisional proportions (status -> measured).",
+    "Record provenance/licence of the master artwork (field `provenance`) before lock.",
+    "Upload the 15 legacy 560 px clips to reference-clips/ if they should be archived here."
+  ],
+  "provenance": null,
+  "assets": [
+    {
+      "id": "face-front",
+      "path": "faces/alice_face_front_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-three-quarter-left",
+      "path": "faces/alice_face_three-quarter-left_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-three-quarter-right",
+      "path": "faces/alice_face_three-quarter-right_v1.0.png",
+      "kind": "face",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 2048,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "face-profile-left",
+      "path": "faces/alice_face_profile-left_v1.0.png",
+      "kind": "face",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 2048
+    },
+    {
+      "id": "face-profile-right",
+      "path": "faces/alice_face_profile-right_v1.0.png",
+      "kind": "face",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 2048,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "pose-p1-curious-ready",
+      "path": "poses/alice_pose_p1-curious-ready_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-p2-observant",
+      "path": "poses/alice_pose_p2-observant_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-p3-concerned",
+      "path": "poses/alice_pose_p3-concerned_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-p4-purposeful",
+      "path": "poses/alice_pose_p4-purposeful_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-p5-inviting",
+      "path": "poses/alice_pose_p5-inviting_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "pose-p6-behind-curtain",
+      "path": "poses/alice_pose_p6-behind-curtain_v1.0.png",
+      "kind": "pose",
+      "required": true,
+      "status": "missing",
+      "min_long_edge_px": 3000
+    },
+    {
+      "id": "expr-curious",
+      "path": "expressions/alice_expr_curious_v1.0.png",
+      "kind": "expression",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "expr-observant",
+      "path": "expressions/alice_expr_observant_v1.0.png",
+      "kind": "expression",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "expr-concerned",
+      "path": "expressions/alice_expr_concerned_v1.0.png",
+      "kind": "expression",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "expr-purposeful",
+      "path": "expressions/alice_expr_purposeful_v1.0.png",
+      "kind": "expression",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "expr-inviting",
+      "path": "expressions/alice_expr_inviting_v1.0.png",
+      "kind": "expression",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "expr-anticipatory",
+      "path": "expressions/alice_expr_anticipatory_v1.0.png",
+      "kind": "expression",
+      "required": false,
+      "status": "missing",
+      "min_long_edge_px": 1024,
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "voice-ref-approved-sample",
+      "path": "voice/alice_voice_ref-approved-sample_v1.0.mp3",
+      "kind": "voice",
+      "required": true,
+      "status": "missing",
+      "note": "Copy of A_note-spec_v019.mp3 from Drive: MPT YouTube / 03-brand-assets / Voice"
+    },
+    {
+      "id": "anim-layered-master",
+      "path": "animations/alice_anim_layered-master_v1.0.psd",
+      "kind": "animation-source",
+      "required": true,
+      "status": "missing",
+      "note": "Interim split of the curtain-pull drawing exists (animations/alice_p6_layers_v0/) but its source is the soft 820 px raster; a master needs a full-resolution source."
+    },
+    {
+      "id": "anim-curtain-reveal",
+      "path": "animations/alice_anim_curtain-reveal_v1.0.mp4",
+      "kind": "animation",
+      "required": false,
+      "status": "missing",
+      "note": "Deferred to a later minor version (not needed for v1.0)."
+    },
+    {
+      "id": "interim-reference",
+      "path": "../../video-scripts/assets/alice.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x736 curtain-pull drawing with curtain/code. Soft when enlarged. Replace with the locked curtain-pull pose."
+    },
+    {
+      "id": "interim-reference-still03",
+      "path": "reference/alice_ref_still03-text-free_v0.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959 text-free crop of the locked still 'What your channel reveals' (Drive 1haDIyC-5safbe87C6GxKmMK4jOJiToWV, 1920x1080). About 1.4x taller than video-scripts/assets/alice.png but still a raster of the same drawing, curtain cut at the right edge. Reference and test renders only; not the locked master."
+    },
+    {
+      "id": "interim-reference-still03-2560h",
+      "path": "reference/alice_ref_still03-text-free_2560h_interim.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "2189x2560 Lanczos upscale of interim-reference-still03 with light sharpening (2026-10-17, approved by Chris for the channel honeycomb visuals). No new drawing: same pixels, enlarged, so it is softer than a true master. Not the locked master; replace it with art generated from the locked still."
+    },
+    {
+      "id": "interim-p6-layer-alice",
+      "path": "animations/alice_p6_layers_v0/alice.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959, hand-masked from interim-reference-still03 (soft source). Alice only (figure, hand), transparent elsewhere. Same canvas as the curtain and code layers."
+    },
+    {
+      "id": "interim-p6-layer-curtain",
+      "path": "animations/alice_p6_layers_v0/curtain.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959, hand-masked from interim-reference-still03 (soft source). Curtain fabric in front of the code, opaque white with ink folds."
+    },
+    {
+      "id": "interim-p6-layer-code",
+      "path": "animations/alice_p6_layers_v0/code.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "820x959, hand-masked from interim-reference-still03 (soft source). Matrix code backdrop, extended column by column behind the curtain so the curtain can move. Extension is synthetic, not drawn."
+    },
+    {
+      "id": "interim-pose2-still",
+      "path": "reference/alice_ref_still-remove-yourself_pose2_v0.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "1807x1791 crop of Alice from the 'REMOVE YOURSELF' still (Drive PDF, 3840x2160 page), background cleaned to white. Leaning, pointing pose (nearest to P2 Observant). Right hand is cut off by the original canvas edge. Reference only; origin of the underlying drawing not recorded."
+    }
+  ],
+  "approved_decisions": [
+    "Proposed framing pixel rules (full/medium/close) and the 1920x1080 horizontal canvas are approved as the v1 working values.",
+    "Proposed blink, head, gesture and pause timings are approved as the v1 working values.",
+    "Voice stays Kokoro v0.19 bf_isabella as shipped; no paid TTS or custom recording for v1.",
+    "Proportions: MPC-7438 example (head = 1/7 of body) adopted as the provisional target; must be measured from the final art before lock.",
+    "v1.0 scope reduced to six poses, layered master, three head views and the voice reference (2026-10-14)."
+  ],
+  "authority": "Notion MPC-7438 Alice Character Sheet, approved by Chris 2026-10-12",
+  "v1_scope": "Six poses P1-P6, layered master (Alice/curtain/code), three head views (front, three-quarter, profile), approved voice reference. Other faces, expressions and the curtain-reveal animation ship as later minor versions."
+}

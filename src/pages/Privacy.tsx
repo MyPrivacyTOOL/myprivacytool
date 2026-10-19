@@ -138,7 +138,25 @@ const Privacy = () => {
                   <strong>Messaging Channel Data:</strong> If you contact us through
                   a messaging channel (currently Telegram and the web start page),
                   we store your channel ID, display name, your replies, and your
-                  conversation stage so we can continue the conversation
+                  conversation stage so we can continue the conversation. When you
+                  message our Telegram bot we receive what you send (including
+                  message text), your Telegram user id, and the public details of
+                  your profile that Telegram makes available to bots, such as your
+                  name, @handle, profile photo details, bio and, where public, a
+                  linked personal channel. We do not receive your phone number or
+                  contacts unless you share them. We use this to run your privacy
+                  scan and to measure what a messaging channel makes visible about
+                  a person. We keep it for up to 90 days, then it is deleted
+                  automatically. Our team can see it on a restricted basis; it is
+                  not shared publicly. You can ask us to delete everything linked
+                  to your Telegram id at any time by writing to{" "}
+                  <a
+                    href="mailto:privacy@myprivacytool.io"
+                    className="text-brand underline hover:text-foreground"
+                  >
+                    privacy@myprivacytool.io
+                  </a>
+                  .
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
@@ -398,6 +416,19 @@ const Privacy = () => {
                   notification tools (Notion, Slack), consent management
                   (Consentmanager), and analytics (Google Analytics 4, and Cloudflare
                   Web Analytics, which counts page loads without cookies)
+                </li>
+                <li>
+                  <strong>AI Model Providers:</strong> When you send us a message
+                  through a messaging channel, we may send the text of that message
+                  to an AI language model run by a third-party provider, for
+                  example to work out what you are asking about. We remove email
+                  addresses and phone numbers from the text first, and we do not
+                  add your name, contact details or scan results to it. We choose
+                  AI providers and models, open-source or closed-source and from
+                  any country, to fit the business and technical need, and we change
+                  them over time. The providers in use are always named in the
+                  sub-processor list of our DPA. The free scan on our website and
+                  Alice's spoken guidance do not send anything to an AI provider
                 </li>
                 <li>
                   <strong>Email Checks for Your Report:</strong> To prepare your
