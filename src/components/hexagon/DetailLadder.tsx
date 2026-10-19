@@ -17,7 +17,7 @@ const REASON: Record<TileKind, string> = {
   clear: 'We checked and found nothing.',
   needs_fixing: 'A tracker can read this and it matters.',
   our_guess: 'Comes from your internet address or an estimate. It is our guess.',
-  seen_low_risk: 'A tracker can read this, but it does little harm.',
+  seen_low_risk: 'A tracker can read this, but it matters less.',
   you_told_us: 'You said you fixed it. We have not checked again.',
   you_confirmed: 'You said our guess is right. That is your word, not our proof.',
   device_agrees: "Your device's own location agrees with our guess.",

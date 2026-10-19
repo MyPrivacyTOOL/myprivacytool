@@ -26,7 +26,7 @@ describe('aliceTileMessage', () => {
     expect(aliceTileMessage(c, tileOf(c), 3)).toMatch(/^Canvas Fingerprint: a long technical code\. /);
     expect(aliceTileMessage(c, tileOf(c), 3)).not.toMatch(/a3f9|\.{2,}|…/);
     const d = hex();
-    expect(aliceTileMessage(d, tileOf(d), 3)).toMatch(/Seen, low risk\./);
+    expect(aliceTileMessage(d, tileOf(d), 3)).toMatch(/Seen, minor\./);
     expect(aliceTileMessage(d, tileOf(d), 3)).not.toMatch(/·/);
   });
 
@@ -47,7 +47,7 @@ describe('aliceTileMessage', () => {
 
   it('says "Your browser says this" for a tile that carries the tick, and not otherwise', () => {
     const tz = hex({ id: 'timezone-locale', label: 'Timezone/Locale', value: 'London (en-GB)' });
-    expect(aliceTileMessage(tz, tileOf(tz), 3)).toMatch(/Seen, low risk\. Your browser says this\./);
+    expect(aliceTileMessage(tz, tileOf(tz), 3)).toMatch(/Seen, minor\. Your browser says this\./);
     const d = hex();
     expect(aliceTileMessage(d, tileOf(d), 3)).not.toMatch(/Your browser says this/);
   });

@@ -101,7 +101,7 @@ describe('HexagonGrid with the honest tiles on (MPC-7916)', () => {
     const profile = screen.getByTestId('risk-profile');
     expect(profile).toHaveTextContent('1 clear');
     expect(profile).toHaveTextContent('1 our guess');
-    expect(profile).toHaveTextContent('1 seen, low risk');
+    expect(profile).toHaveTextContent('1 seen, minor');
   });
 
   it('no confetti and no final summary, even when every hexagon has been tapped', async () => {
