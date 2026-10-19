@@ -1,3 +1,5 @@
+import type { TileKind } from '@/lib/hexagonTile';
+
 // Human-in-the-loop identity confirmation: the status model for findings the user can confirm or dispute.
 // Separate from the web-scan registry statuses (found / clear / not_checked in shared/hexagon-registry).
 
@@ -31,6 +33,8 @@ export interface Hexagon {
   /** True when the finding is something the user should act on (set by the OSINT orchestrator). Counts toward verified_exposure_count. */
   exposure?: boolean;
   interaction_state?: InteractionState;
+  /** How the dashboard paints this tile (the same decision the honest-tile grid makes). Absent for hexagons that do not come from the web scan. */
+  tile?: TileKind;
 }
 
 export interface ScanResult {

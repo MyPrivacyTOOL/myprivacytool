@@ -168,7 +168,9 @@ function simpleHash(str: string): string {
 function hashNumberArray(arr: number[] | Uint8Array | Float32Array | Uint8ClampedArray): string {
   let hash = 0;
   for (let i = 0; i < arr.length; i++) {
-    hash = ((hash << 5) - hash) + (arr[i] || 0);
+    // CK-8321 follow-up: -Infinity or NaN (a silent bin) counts as 0. It used to reset the whole hash to 0 at that bin
+    // (ToInt32(-Infinity) is 0), which threw away every bin before it.
+    hash = ((hash << 5) - hash) + (Number.isFinite(arr[i]) ? arr[i] : 0);
     hash = hash & hash;
   }
   return Math.abs(hash).toString(16).padStart(8, '0');

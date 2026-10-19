@@ -26,7 +26,7 @@ const META_QUERY = {
 
 export default {
   // Cron Trigger handler. NOT scheduled in wrangler.toml: the Cloudflare account is at the Workers Free limit of 5 cron triggers (error 10072),
-  // so the purge also runs after every successful start-deep-dive (below). Add `[triggers] crons = [...]` if the account is upgraded. MPC-8320.
+  // so the purge runs hourly from Supabase pg_cron (job mpt-purge-conversation-state, migration 20261019160000) and also after every successful start-deep-dive (below). Add `[triggers] crons = [...]` if the account is upgraded. MPC-8320.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(purgeExpiredState(env).then((n) => console.log('state purge removed', n)));
   },

@@ -760,10 +760,11 @@ const generateFinalSummary = (
   confirmedCount: number,
   totalCount: number,
   riskScore: number,
-  fingerprintUniqueness?: number
+  _fingerprintUniqueness?: number
 ): string => {
   const riskLevel = riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low';
-  const uniquenessText = fingerprintUniqueness ? `${fingerprintUniqueness}% unique` : 'highly trackable';
+  // CK-7799: no invented uniqueness percentage here (the old calculation was a hard-coded entropy table, not a measurement).
+  const uniquenessText = 'something sites can read';
   
   let summary = `I've now analyzed all ${confirmedCount} aspects of your digital shadow across 7 categories: your device and network, your language and location, your physical device orientation, your browser fingerprint which is ${uniquenessText}, your stored data, your connected accounts, your security checks, and your behavioral patterns. `;
   
