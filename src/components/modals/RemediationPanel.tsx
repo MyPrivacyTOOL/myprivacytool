@@ -34,7 +34,9 @@ export const RemediationPanel = ({ hexagon, isOpen, onClose, onMarkFixed }: Prop
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto max-sm:bottom-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-t-2xl">
         <DialogHeader>
-          <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">Exposure Confirmed</span>
+          <span className="w-fit rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white">
+            {hexagon.tile === 'needs_fixing' && hexagon.status !== 'confirmed' ? 'Needs fixing' : 'Exposure Confirmed'}
+          </span>
           <DialogTitle>{hexagon.label}</DialogTitle>
           <DialogDescription className="text-base text-gray-700">
             {hexagon.remediation ?? 'Review this item and take the recommended step.'}
@@ -54,6 +56,7 @@ export const RemediationPanel = ({ hexagon, isOpen, onClose, onMarkFixed }: Prop
         <Button disabled={!done} className="bg-green-600 text-white hover:bg-green-700" onClick={onMarkFixed}>
           Mark as Fixed
         </Button>
+        <p className="text-xs text-gray-500">Recorded as what you told us. It turns solid green only when we check again.</p>
       </DialogContent>
     </Dialog>
   );

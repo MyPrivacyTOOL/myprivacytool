@@ -6,6 +6,7 @@
 import type { HexagonData } from '@/lib/deviceDetection';
 import type { Hexagon } from '@/types/hexagon';
 import { captureContext } from '@/lib/webScan';
+import { tileKind } from '@/lib/hexagonTile';
 import { remediationFor } from '@/utils/remediationMapper';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus, isEstimate } from '../../shared/hexagon-registry/status.js';
@@ -26,11 +27,14 @@ export function fromWebScan(scanned: HexagonData[]): Hexagon[] {
       data: null,
       source: 'web-scan',
       remediation: remediationFor(reg.id),
+      // Never scanned: a web page cannot check some hexagons at all; the rest simply have not been checked.
+      tile: reg.truth.level === 'cannot_be_checked' ? 'cant_check_here' : 'not_checked',
     };
     const seen = byId.get(reg.id);
     if (!seen) return base;
     const captured = captureStatus(reg.id, seen.value, ctx);
-    if (captured === 'not_checked') return base;
+    const tile = tileKind({ id: reg.id, value: seen.value }, ctx);
+    if (captured === 'not_checked') return { ...base, tile };
     const estimatedFinding = captured === 'found' && isEstimate(reg.id);
     return {
       ...base,
@@ -38,6 +42,7 @@ export function fromWebScan(scanned: HexagonData[]): Hexagon[] {
       data: captured === 'clear' ? 'Nothing found' : (seen.displayValue ?? seen.value).replace(CONTROL, ' ').trim().slice(0, MAX_DATA),
       confidence_score: Math.min(1, Math.max(0, seen.confidence / 100)),
       exposure: estimatedFinding,
+      tile,
     };
   });
 }

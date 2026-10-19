@@ -1,27 +1,27 @@
 /**
  * MyPrivacyTOOL — conversation / scan state store (MPC-8320)
  *
- * Same two functions as firestore-client.js, so callers only change their import. Keys for the WhatsApp RESULTS pull model live in
- * Supabase (table mpt_conversation_state); every other key (telegram, messenger, sms, email, lead) still goes to Firestore, untouched.
+ * Same two functions as firestore-client.js, so callers only change their import. ALL keys live in Supabase (table
+ * mpt_conversation_state). firestore-client.js is kept in the repo but nothing imports it any more, so GCP_PROJECT_ID and
+ * FIRESTORE_SA_TOKEN are no longer read.
  *
  *   deepdive:<scan_id>        a deep-dive scan (hexagons + owner + finalized flag)
  *   deepdive_latest:<wa_id>   pointer to that person's newest scan
  *   whatsapp:<wa_id>          WhatsApp conversation state (read by start-deep-dive for proof of possession)
+ *   telegram:<id> messenger:<id> sms:<phone> email:<addr>   confirmation-flow state (stage awaiting_confirmation / confirmed / denied)
+ *   lead:<email>              web lead capture (written only; HubSpot is the record)
  *
- * Every row has a hard life of 24 h (expires_at). An expired row is never returned, and purgeExpiredState() deletes expired rows
+ * Every row has a hard life of 24 h (expires_at). A flow left idle for more than 24 h starts again from "new". An expired row is never returned, and purgeExpiredState() deletes expired rows
  * (called from the Worker's Cron Trigger; the SQL function purge_expired_conversation_state() does the same by hand or via pg_cron).
  *
  * Writes need the service_role key (RLS is forced, no anon access): SUPABASE_SERVICE_ROLE_KEY, a Worker secret. Fail-soft like
  * supabase-client.js: a missing key or a database error is logged and never throws into a webhook reply.
  */
-import { saveConversationState as saveFirestore, getConversationState as getFirestore } from './firestore-client.js';
 import { SUPABASE_DEFAULT_URL } from './supabase-client.js';
 
 export const STATE_TTL_MS = 24 * 3600 * 1000;
 const TABLE = 'mpt_conversation_state';
-const SUPABASE_PREFIXES = ['deepdive:', 'deepdive_latest:', 'whatsapp:'];
 
-const inSupabase = (key) => SUPABASE_PREFIXES.some((p) => key.startsWith(p));
 const base = (env) => `${env.SUPABASE_URL || SUPABASE_DEFAULT_URL}/rest/v1/${TABLE}`;
 const headers = (env, extra = {}) => ({
   apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -29,7 +29,7 @@ const headers = (env, extra = {}) => ({
   ...extra,
 });
 
-/** True when the Supabase-backed keys can be read and written. */
+/** True when state can be read and written. */
 export const stateStored = (env) => !!env.SUPABASE_SERVICE_ROLE_KEY;
 
 /**
@@ -37,7 +37,6 @@ export const stateStored = (env) => !!env.SUPABASE_SERVICE_ROLE_KEY;
  * @returns {Promise<void>}
  */
 export async function saveConversationState(env, key, state) {
-  if (!inSupabase(key)) return saveFirestore(env, key, state);
   if (!stateStored(env)) {
     console.warn('Supabase not configured — skipping state save');
     return;
@@ -61,7 +60,6 @@ export async function saveConversationState(env, key, state) {
  * @returns {Promise<Object|null>} the state, or null if missing, expired or unreadable
  */
 export async function getConversationState(env, key) {
-  if (!inSupabase(key)) return getFirestore(env, key);
   if (!stateStored(env)) return null;
   try {
     const q = `key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=state&limit=1`;

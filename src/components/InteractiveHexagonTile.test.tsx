@@ -81,3 +81,36 @@ describe('useHexagonState', () => {
     expect(onSignal.mock.calls.map(([s]) => s.outcome)).toEqual(['rejected', 'disputed']);
   });
 });
+
+describe('InteractiveHexagonTile honest look', () => {
+  it('a finding gets its own kind and no all-clear tick; a clear one gets the tick', () => {
+    const { unmount } = render(<InteractiveHexagonTile hexagon={hex({ status: 'checked', tile: 'seen_low_risk', confidence_score: 0.5 })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTestId('tile-badge')).toHaveTextContent('i');
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Seen · minor');
+    expect(screen.getByTitle('Leaked email: Seen · minor.')).toBeTruthy();
+    unmount();
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'checked', tile: 'clear', confidence_score: 0.5 })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTestId('tile-badge')).toHaveTextContent('✓');
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Clear');
+  });
+  it('a tile that needs fixing opens the next step, and once fixed it reads "you told us", not clear', () => {
+    const onSelect = vi.fn();
+    const h = hex({ status: 'checked', tile: 'needs_fixing', confidence_score: 0.5 });
+    const { rerender } = render(<InteractiveHexagonTile hexagon={h} onConfirm={vi.fn()} onDispute={vi.fn()} onSelect={onSelect} />);
+    expect(screen.getByTestId('tile-badge')).toHaveTextContent('!');
+    fireEvent.click(screen.getByTitle('Leaked email: Needs fixing.'));
+    expect(onSelect).toHaveBeenCalledWith(h);
+    rerender(<InteractiveHexagonTile hexagon={h} onConfirm={vi.fn()} onDispute={vi.fn()} onSelect={onSelect} fixed />);
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('You told us');
+  });
+  it('a grey no-claim tile does not show the detector value', () => {
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'not_checked', data: 'Leaking: 1.2.3.4', tile: 'couldnt_check' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.queryByText('Leaking: 1.2.3.4')).toBeNull();
+    expect(screen.getByTestId('tile-line')).toHaveTextContent("Check didn't finish");
+  });
+  it('a guess keeps its "Tap to confirm" tooltip, because it is the one tile that asks the visitor to answer', () => {
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTitle(/tap to confirm/i)).toBeTruthy();
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess');
+  });
+});
