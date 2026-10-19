@@ -274,6 +274,30 @@
       "required": false,
       "status": "reference-only",
       "note": "1807x1791 crop of Alice from the 'REMOVE YOURSELF' still (Drive PDF, 3840x2160 page), background cleaned to white. Leaning, pointing pose (nearest to P2 Observant). Right hand is cut off by the original canvas edge. Reference only; origin of the underlying drawing not recorded."
+    },
+    {
+      "id": "interim-p6-vector-alice",
+      "path": "animations/alice_p6_vector_v0/alice.svg",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "Potrace trace of interim-p6-layer-alice (MPC-7797-A4). Reference only; follows the soft 820 px source."
+    },
+    {
+      "id": "interim-p6-vector-curtain",
+      "path": "animations/alice_p6_vector_v0/curtain.svg",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "Potrace trace of interim-p6-layer-curtain (MPC-7797-A4). Reference only; follows the soft 820 px source."
+    },
+    {
+      "id": "interim-p6-vector-code",
+      "path": "animations/alice_p6_vector_v0/code.png",
+      "kind": "interim-reference",
+      "required": false,
+      "status": "reference-only",
+      "note": "Unchanged raster copy of the code layer, kept beside the traced layers (MPC-7797-A4)."
     }
   ],
   "approved_decisions": [
