@@ -52,3 +52,14 @@ describe('Alice spoken copy has no invented statistics (CK-7799 cleanup)', () =>
     }
   });
 });
+
+describe('final summary has no invented uniqueness figure (CK-7799)', () => {
+  it('FinalSummaryPanel no longer computes or exports a "1 in N" uniqueness', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/components/FinalSummaryPanel.tsx'), 'utf8');
+    for (const banned of ['uniquenessEstimate', 'fingerprint.uniqueness', 'Uniqueness']) expect(src).not.toContain(banned);
+  });
+  it('the unused VoiceAI final-summary builder does not print a uniqueness percentage', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/components/VoiceAI.tsx'), 'utf8');
+    expect(src).not.toContain('% unique`');
+  });
+});

@@ -37,3 +37,21 @@ describe('buildReportHtml', () => {
     expect(escapeHtml(`&<>"'`)).toBe('&amp;&lt;&gt;&quot;&#39;');
   });
 });
+
+describe('buildReportHtml honest look', () => {
+  it('a finding that needs fixing is listed under next steps and carries its words; a clear tile is not listed', () => {
+    const html = buildReportHtml([
+      hex({ id: 'canvas-fingerprint', label: 'Canvas', status: 'checked', exposure: false, tile: 'needs_fixing' }),
+      hex({ id: 'https-status', label: 'HTTPS', status: 'checked', exposure: false, tile: 'clear', remediation: 'Nothing.' }),
+    ], opts);
+    expect(html).toContain('Needs fixing');
+    expect(html).toContain('>Clear<');
+    expect(html).toMatch(/What to do next[\s\S]*Canvas/);
+    expect(html).not.toMatch(/What to do next[\s\S]*HTTPS<\/strong>/);
+  });
+  it('after the visitor says it is fixed the tile reads "You told us", not clear', () => {
+    const html = buildReportHtml([hex({ id: 'canvas-fingerprint', label: 'Canvas', status: 'checked', exposure: false, tile: 'needs_fixing' })], { ...opts, fixedIds: new Set(['canvas-fingerprint']) });
+    expect(html).toContain('You told us');
+    expect(html).not.toContain('>Clear<');
+  });
+});

@@ -1,4 +1,5 @@
-import type { ObservationStatus } from '@/types/hexagon';
+import type { Hexagon, ObservationStatus } from '@/types/hexagon';
+import type { TileKind } from '@/lib/hexagonTile';
 
 export interface HexagonVisuals {
   className: string;
@@ -66,4 +67,18 @@ export function getHexPaint(status: ObservationStatus, exposed = false): HexPain
     default:
       return { polygon: 'fill-gray-50 stroke-gray-200', ink: 'text-gray-400', dashed: false };
   }
+}
+
+/**
+ * The honest look for a dashboard tile (colour = what it means, transparency = how we know, grey = no claim): the same kinds the
+ * tile grid uses. A finding or a guess never gets the all-clear look, and a fix the visitor says they did is "you told us"
+ * (medium green) until we check again. Disputed and rejected tiles keep their own look (undefined).
+ */
+export function effectiveTile(h: Hexagon, fixed = false): TileKind | undefined {
+  if (!h.tile) return undefined;
+  if (h.status === 'given') return 'you_told_us';
+  if (h.status === 'confirmed') return h.exposure && !fixed ? 'needs_fixing' : 'you_told_us';
+  if (h.status === 'guess') return 'our_guess';
+  if (h.status === 'checked' || h.status === 'not_checked') return fixed && h.tile === 'needs_fixing' ? 'you_told_us' : h.tile;
+  return undefined;
 }

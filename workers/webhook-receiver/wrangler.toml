@@ -16,7 +16,8 @@ compatibility_flags = ["nodejs_compat"]
 
 # ─── SCHEDULE ────────────────────────────────────────────────────────────────
 # No Cron Trigger: the account is at the Workers Free limit of 5 (Cloudflare error 10072). Expired state in Supabase
-# (mpt_conversation_state, 24 h life) is purged after each successful start-deep-dive instead. See index.js. MPC-8320.
+# (mpt_conversation_state, 24 h life) is purged hourly by Supabase pg_cron (migration 20261019160000) and after each successful
+# start-deep-dive instead. See index.js. MPC-8320.
 
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
