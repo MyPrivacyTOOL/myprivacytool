@@ -3,7 +3,7 @@ import type { Hexagon, ScanResult } from '@/types/hexagon';
 import { InteractiveHexagonTile } from '@/components/InteractiveHexagonTile';
 import { useElementWidth } from '@/hooks/useElementWidth';
 import { HEX_RATIO, hiveLayout } from '@/lib/honeycomb';
-import { groupHexagons } from '@/lib/hexagonGroups';
+import { groupHexagonsByInterest } from '@/lib/hexagonGroups';
 
 interface Props {
   scanResult: ScanResult;
@@ -41,7 +41,7 @@ const Hive = ({ items, fixedIds, onConfirm, onDispute, onSelect }: Omit<Props, '
 /** One column on a phone or iPad held upright, two pillars side by side once there is room (desktop, landscape). */
 export const HexagonGrid = ({ scanResult, ...handlers }: Props) => (
   <div className="grid gap-x-6 gap-y-8 [grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))]">
-    {groupHexagons(scanResult.hexagons).map((group) => (
+    {groupHexagonsByInterest(scanResult.hexagons).map((group) => (
       <section key={group.id} aria-labelledby={`pillar-${group.id.replace(/\W+/g, '-')}`}>
         <h2 id={`pillar-${group.id.replace(/\W+/g, '-')}`} className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
           {group.title}

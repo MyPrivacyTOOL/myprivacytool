@@ -9,7 +9,9 @@ vi.mock('@/lib/analytics', () => ({ trackScanCompleted, trackScanStarted }));
 describe('WebScanDashboard', () => {
   it('renders one section per registry group for a scan, with the ring at zero before anything is found', () => {
     render(<WebScanDashboard scanned={[]} title="Your scan" />);
-    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(HEXAGON_GROUPS);
+    // CK-7799: the sections are shown most interesting first, so compare as a set; the order itself is tested in hexagonGroups.test.ts.
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect([...headings].sort()).toEqual([...HEXAGON_GROUPS].sort());
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
   });
   it('sends the canonical privacy_scan_completed once, with all 54 hexagons, when no guess is left; scan_started waits for an answer', () => {
