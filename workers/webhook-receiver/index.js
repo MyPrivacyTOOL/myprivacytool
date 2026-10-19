@@ -9,7 +9,7 @@
  */
 
 import { generateFirstHexagon } from './first-hexagon.js';
-import { saveConversationState, getConversationState } from './firestore-client.js';
+import { saveConversationState, getConversationState, purgeExpiredState } from './state-store.js';
 import { createHubSpotContact } from './hubspot-client.js';
 import { recordEngagement } from './supabase-client.js';
 import {
@@ -25,6 +25,11 @@ const META_QUERY = {
 };
 
 export default {
+  // Cron Trigger (wrangler.toml): hourly purge of expired scan / conversation rows in Supabase (MPC-8320).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeExpiredState(env).then((n) => console.log('state purge removed', n)));
+  },
+
   async fetch(request, env, ctx) {
     const url  = new URL(request.url);
     const path = url.pathname;

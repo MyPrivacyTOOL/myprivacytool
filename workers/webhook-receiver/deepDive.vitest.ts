@@ -5,21 +5,19 @@ import worker from './index.js';
 
 const SECRET = 'dd-secret';
 const WA = '85212345678';
-const ENV = { DEEP_DIVE_SECRET: SECRET, GCP_PROJECT_ID: 'p', FIRESTORE_SA_TOKEN: 't', SUPABASE_SERVICE_ROLE_KEY: 'svc', META_APP_SECRET: 'app-secret',
+const ENV = { DEEP_DIVE_SECRET: SECRET, SUPABASE_SERVICE_ROLE_KEY: 'svc', META_APP_SECRET: 'app-secret',
   WHATSAPP_PHONE_NUMBER_ID: '999', META_WHATSAPP_KEY: 'tok', RAPIDAPI_KEY: 'rk', RAPIDAPI_WHATSAPP_HOST: 'wa.example', SPAM_API_URL: 'https://spam.example/v1', SPAM_API_KEY: 'sk' };
 
 let metaBodies: any[]; let docs: Record<string, any>; let calls: string[]; let metaStatus: number; let spamMode: 'ok' | 'hang'; let engagement: any[]; let interactions: any[]; let tuning: any[];
-const enc = (o: any) => { const f: any = {}; for (const [k, v] of Object.entries(o)) f[k] = typeof v === 'string' ? { stringValue: v } : typeof v === 'number' ? { integerValue: String(v) } : { booleanValue: v }; return f; };
-const dec = (f: any) => Object.fromEntries(Object.entries<any>(f).map(([k, v]) => [k, v.stringValue ?? (v.integerValue !== undefined ? Number(v.integerValue) : v.booleanValue)]));
 
 beforeEach(() => {
   docs = { [`whatsapp:${WA}`]: { profileName: 'Alex', inbound_message_timestamp: 1760000000 } }; calls = []; metaBodies = []; metaStatus = 200; spamMode = 'ok'; engagement = []; interactions = []; tuning = [];
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     const url = String(input); calls.push(url);
-    if (url.includes('firestore.googleapis.com')) {
-      const key = decodeURIComponent(url.split('/conversations/')[1]);
-      if (init.method === 'PATCH') { docs[key] = dec(JSON.parse(init.body).fields); return new Response('{}'); }
-      return docs[key] ? new Response(JSON.stringify({ fields: enc(docs[key]) })) : new Response('', { status: 404 });
+    if (url.includes('/rest/v1/mpt_conversation_state')) {   // scan / conversation state (Supabase)
+      if (init.method === 'POST') { const row = JSON.parse(init.body); docs[row.key] = row.state; return new Response('', { status: 201 }); }
+      const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(url)![1]);
+      return new Response(JSON.stringify(docs[key] ? [{ state: docs[key] }] : []));
     }
     if (url.startsWith('https://wa.example')) return new Response(JSON.stringify({ profile_pic_url: 'https://pic', is_business: false }));
     if (url.startsWith('https://spam.example')) { if (spamMode === 'hang') return new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(new Error('aborted')))); return new Response(JSON.stringify({ flags: 0 })); }

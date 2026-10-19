@@ -11,7 +11,8 @@
  * missing secret can never break a webhook reply.
  */
 
-const DEFAULT_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+export const SUPABASE_DEFAULT_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+const DEFAULT_URL = SUPABASE_DEFAULT_URL;
 
 // Allowlist — the caller can never name another table.
 const TABLES = new Set([

@@ -9,7 +9,7 @@
  *   resultsReply(env, wa_id)             called by the WhatsApp webhook when the person texts RESULTS or STATUS
  * Imported lazily from index.js so the Node-run security test never loads TypeScript.
  */
-import { getConversationState, saveConversationState } from './firestore-client.js';
+import { getConversationState, saveConversationState, stateStored } from './state-store.js';
 import { insertMptRow } from './supabase-client.js';
 import { corsFor, clip, timingSafeEqual, unauthorized } from './security.js';
 import { runOsintScan, verifiedExposureCount, verifiedExposureIds, ProofOfPossessionError, type OsintProviders, type ProviderCall } from '../../src/services/osintOrchestrator';
@@ -55,7 +55,7 @@ export function providersFromEnv(env: Env): OsintProviders {
 }
 
 // ── helpers
-const stored = (env: Env) => !!env.GCP_PROJECT_ID && !!env.FIRESTORE_SA_TOKEN;
+const stored = (env: Env) => stateStored(env);
 const jsonRes = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extra } });
 const serverAuth = (req: Request, env: Env) => !!env.DEEP_DIVE_SECRET && timingSafeEqual(req.headers.get('X-Webhook-Secret'), env.DEEP_DIVE_SECRET);
@@ -63,7 +63,7 @@ const serverAuth = (req: Request, env: Env) => !!env.DEEP_DIVE_SECRET && timingS
 async function loadScan(env: Env, scanId: unknown) {
   if (typeof scanId !== 'string' || !UUID_RE.test(scanId)) return null;
   const s: any = await getConversationState(env, `deepdive:${scanId}`);
-  if (!s || typeof s.expires_at !== 'number' || s.expires_at < Date.now()) return null;   // expired = gone, whatever Firestore still holds
+  if (!s || typeof s.expires_at !== 'number' || s.expires_at < Date.now()) return null;   // expired = gone, whatever the store still holds
   return { scanId, state: s, hexagons: JSON.parse(s.hexagons) as Hexagon[] };
 }
 const saveScan = (env: Env, scanId: string, state: any, hexagons: Hexagon[]) =>

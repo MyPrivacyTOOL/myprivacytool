@@ -14,6 +14,11 @@ compatibility_flags = ["nodejs_compat"]
 # See DEPLOYMENT.md for the full list and descriptions.
 # Never hardcode values in this file.
 
+# ─── SCHEDULE ────────────────────────────────────────────────────────────────
+# Hourly purge of expired scan / conversation state in Supabase (mpt_conversation_state, 24 h life). MPC-8320.
+[triggers]
+crons = ["17 * * * *"]
+
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
 enabled = true
