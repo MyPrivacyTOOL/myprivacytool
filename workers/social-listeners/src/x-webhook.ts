@@ -12,6 +12,8 @@ const log = createLogger("social-listeners:x");
 async function handleCrc(request: Request, env: Env): Promise<Response> {
   const crc = new URL(request.url).searchParams.get("crc_token");
   if (!env.X_CONSUMER_SECRET || !crc) return new Response("Bad Request", { status: 400 });
+  // Length only (never the value): a Consumer Key (25) pasted where the Consumer Secret (50) belongs is the usual reason X reports "Invalid response_token".
+  log.info("x_crc_challenge", { secret_length: env.X_CONSUMER_SECRET.length });
   const token = "sha256=" + base64(await hmacSha256(env.X_CONSUMER_SECRET, crc));
   return Response.json({ response_token: token });
 }
