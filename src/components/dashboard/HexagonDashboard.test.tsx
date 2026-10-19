@@ -10,7 +10,7 @@ const hex = (o: Partial<Hexagon> = {}): Hexagon => ({
   exposure: true, ...o,
 });
 const data: ScanResult = {
-  hexagons: [hex(), hex({ id: 'h2', pillar: 'contact', label: 'Phone', status: 'checked', exposure: false }), hex({ id: 'h3', pillar: 'weird', status: 'not_checked' })],
+  hexagons: [hex(), hex({ id: 'h2', pillar: 'contact', label: 'Phone', status: 'checked', exposure: false, confidence_score: 0.95 }), hex({ id: 'h3', pillar: 'weird', status: 'not_checked' })],
 };
 
 describe('HexagonDashboard', () => {
@@ -64,5 +64,19 @@ describe('HexagonDashboard', () => {
     expect(click).toHaveBeenCalledOnce();
     expect(await created[0].text()).toContain('<title>Sarah</title>');
     click.mockRestore();
+  });
+
+  it('on a touch screen, tapping a confident finding offers the dispute; Not me records it, closing records nothing', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+    render(<HexagonDashboard initialData={data} />);
+    expect(screen.queryByTitle('Not me?')).toBeNull();
+    fireEvent.click(screen.getByTitle('Checked.'));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(screen.queryByTitle(/you disputed/i)).toBeNull();
+    fireEvent.click(screen.getByTitle('Checked.'));
+    fireEvent.click(screen.getByRole('button', { name: /not me/i }));
+    expect(screen.getByTitle(/you disputed/i)).toBeInTheDocument();
+    window.matchMedia = original;
   });
 });

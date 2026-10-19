@@ -28,6 +28,8 @@ interface Props {
   onSelect?: (hexagon: Hexagon) => void;
   /** The user finished the remediation step: a confirmed exposure shows green instead of red. */
   fixed?: boolean;
+  /** Touch screens have no hover, so a tap on a confident finding calls onSelect to offer the dispute. */
+  disputeOnTap?: boolean;
   /** Small tiles (a phone held upright) show the icon and name only. */
   compact?: boolean;
   /** Positions the tile; the hexagon fills it. */
@@ -35,14 +37,15 @@ interface Props {
   style?: CSSProperties;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, compact = false, className, style }: Props) => {
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, disputeOnTap = false, compact = false, className, style }: Props) => {
   const [asking, setAsking] = useState(false);
   const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
   const visuals = getHexagonVisuals(hexagon.status);
   const paint = getHexPaint(hexagon.status, exposed);
   const requiresConfirmation = canConfirm(hexagon);
   const allowsDispute = canDispute(hexagon);
-  const actionable = requiresConfirmation || (exposed && !!onSelect);
+  const disputable = allowsDispute && disputeOnTap && !!onSelect;
+  const actionable = requiresConfirmation || (exposed && !!onSelect) || disputable;
   const secured = !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
   const emoji = WAITING.has(hexagon.status) ? '🔍' : getHexagon(hexagon.id)?.artwork.emoji ?? visuals.icon;
   const showValue = !compact && !!hexagon.data && !WAITING.has(hexagon.status);
@@ -84,7 +87,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
         <span className="sr-only">{exposed ? EXPOSED_TOOLTIP : visuals.tooltip}</span>
       </button>
 
-      {allowsDispute && (
+      {allowsDispute && !disputeOnTap && (
         <button
           type="button"
           onClick={() => onDispute(hexagon.id)}

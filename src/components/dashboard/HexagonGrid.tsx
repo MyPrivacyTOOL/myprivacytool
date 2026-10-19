@@ -12,9 +12,11 @@ interface Props {
   onSelect: (hexagon: Hexagon) => void;
   /** Ids of confirmed exposures the user has fixed. */
   fixedIds?: ReadonlySet<string>;
+  /** Touch screens: tapping a confident finding offers the dispute. */
+  disputeOnTap?: boolean;
 }
 
-const Hive = ({ items, fixedIds, onConfirm, onDispute, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
+const Hive = ({ items, fixedIds, disputeOnTap, onConfirm, onDispute, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
   const ref = useRef<HTMLDivElement>(null);
   const layout = hiveLayout(items.length, useElementWidth(ref));
   return (
@@ -28,6 +30,7 @@ const Hive = ({ items, fixedIds, onConfirm, onDispute, onSelect }: Omit<Props, '
             onDispute={onDispute}
             onSelect={onSelect}
             fixed={fixedIds?.has(h.id)}
+            disputeOnTap={disputeOnTap}
             compact={layout.compact}
             className="absolute"
             style={{ left: layout.positions[i].left, top: layout.positions[i].top, width: layout.hw, height: layout.hw * HEX_RATIO }}
