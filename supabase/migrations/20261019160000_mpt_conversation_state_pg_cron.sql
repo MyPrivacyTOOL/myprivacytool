@@ -7,10 +7,11 @@
 -- Idempotent: it replaces only its own job, by name. Rollback: select cron.unschedule('mpt-purge-conversation-state');
 -- Applied to production by hand on 2026-10-19 (job id 9); this file records it.
 
+-- Skipped where pg_cron is not installed (local test databases), like the other mpt-purge-* schedules.
 do $$
 begin
-  if exists (select 1 from cron.job where jobname = 'mpt-purge-conversation-state') then
-    perform cron.unschedule('mpt-purge-conversation-state');
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'mpt-purge-conversation-state';
+    perform cron.schedule('mpt-purge-conversation-state', '17 * * * *', 'select public.purge_expired_conversation_state();');
   end if;
-  perform cron.schedule('mpt-purge-conversation-state', '17 * * * *', 'select public.purge_expired_conversation_state();');
 end $$;
