@@ -75,4 +75,29 @@ describe('HexagonDashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: /this isn't right/i }));
     expect(screen.getByTitle(/you disputed/i)).toBeInTheDocument();
   });
+
+  it('onStarted fires once at the first answer; onAllAnswered fires once when no guess is left', () => {
+    const onStarted = vi.fn();
+    const onAllAnswered = vi.fn();
+    render(<HexagonDashboard initialData={data} onStarted={onStarted} onAllAnswered={onAllAnswered} />);
+    expect(onStarted).not.toHaveBeenCalled();
+    expect(onAllAnswered).not.toHaveBeenCalled(); // a guess is still waiting
+    fireEvent.click(screen.getByTitle(/tap to confirm/i));
+    fireEvent.click(screen.getByRole('button', { name: /no, not me/i }));
+    expect(onStarted).toHaveBeenCalledTimes(1);
+    expect(onAllAnswered).toHaveBeenCalledTimes(1);
+    expect(onAllAnswered).toHaveBeenCalledWith(3);
+    fireEvent.click(screen.getByTitle('Checked.'));
+    fireEvent.click(screen.getByRole('button', { name: /this isn't right/i }));
+    expect(onStarted).toHaveBeenCalledTimes(1);
+    expect(onAllAnswered).toHaveBeenCalledTimes(1);
+  });
+
+  it('with no guess to answer, onAllAnswered fires once on arrival and onStarted does not fire', () => {
+    const onStarted = vi.fn();
+    const onAllAnswered = vi.fn();
+    render(<HexagonDashboard initialData={{ hexagons: [hex({ status: 'checked', exposure: false })] }} onStarted={onStarted} onAllAnswered={onAllAnswered} />);
+    expect(onAllAnswered).toHaveBeenCalledTimes(1);
+    expect(onStarted).not.toHaveBeenCalled();
+  });
 });

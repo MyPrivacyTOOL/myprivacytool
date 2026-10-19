@@ -24,7 +24,7 @@ const spoken = (page: Page) => page.evaluate(() => (window as unknown as { __spo
 
 test("honest tiles: no percentage or score, a tap means seen, the hint says it confirms nothing", async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto("/?hex_v2=1");
+  await page.goto("/?hex_v2=1&view=grid");
   await expect(page.getByTestId("risk-profile")).toBeVisible({ timeout: 30_000 });
   // the old confirmation bar, counter and risk card are gone
   await expect(page.getByTestId("confirmation-progress")).toHaveCount(0);
@@ -56,7 +56,7 @@ test("honest tiles: no percentage or score, a tap means seen, the hint says it c
 test("honest tiles: Alice says what the tile says, with no score or 'click to confirm'", async ({ page }) => {
   test.setTimeout(120_000);
   await captureSpeech(page);
-  await page.goto("/?hex_v2=1");
+  await page.goto("/?hex_v2=1&view=grid");
   await expect(page.getByTestId("risk-profile")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: /voice ai/i }).click();
   const lines = await spoken(page);
@@ -70,7 +70,7 @@ test("honest tiles: Alice says what the tile says, with no score or 'click to co
 test("honest tiles, one job per screen: Alice (inside the closed 'Ask Alice' box) keeps to the same words", async ({ page }) => {
   test.setTimeout(120_000);
   await captureSpeech(page);
-  await page.goto("/?hex_v2=2");
+  await page.goto("/?hex_v2=2&view=grid");
   const details = page.getByTestId("voice-details");
   await expect(details).toBeVisible({ timeout: 30_000 });
   await details.locator("summary").click();
@@ -82,7 +82,7 @@ test("honest tiles, one job per screen: Alice (inside the closed 'Ask Alice' box
 });
 
 test("with the flag off the old screen is unchanged", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?view=grid");
   await expect(page.getByTestId("confirmation-counter")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("risk-profile")).toHaveCount(0);
 });

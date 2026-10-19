@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Hexagon, ScanResult } from '@/types/hexagon';
 import { Button } from '@/components/ui/button';
 import { useHexagonState } from '@/hooks/useHexagonState';
@@ -14,13 +14,31 @@ const TOTAL = 54;
 interface Props {
   initialData: ScanResult;
   title?: string;
+  /** The visitor's first answer (confirm, reject or dispute). Fires once. */
+  onStarted?: () => void;
+  /** No "Is this you?" guess is left (or there were none). Fires once, with the number of hexagons on the page. */
+  onAllAnswered?: (hexagonCount: number) => void;
 }
 
-export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint' }: Props) => {
+export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint', onStarted, onAllAnswered }: Props) => {
   const { scanResult, handleConfirm, handleDispute } = useHexagonState(initialData);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [phase, setPhase] = useState<'confirm' | 'remediate' | null>(null);
   const [fixedIds, setFixedIds] = useState<ReadonlySet<string>>(new Set());
+
+  const started = useRef(false);
+  const completed = useRef(false);
+  const markStarted = () => {
+    if (started.current) return;
+    started.current = true;
+    onStarted?.();
+  };
+  const guessesLeft = scanResult.hexagons.filter((h) => h.status === 'guess').length;
+  useEffect(() => {
+    if (guessesLeft > 0 || completed.current) return;
+    completed.current = true;
+    onAllAnswered?.(scanResult.hexagons.length);
+  }, [guessesLeft, onAllAnswered, scanResult.hexagons.length]);
 
   const active = scanResult.hexagons.find((h) => h.id === activeId) ?? null;
   const close = () => setPhase(null);
@@ -32,6 +50,7 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
 
   const onAnswer = (isMatch: boolean) => {
     if (!active) return;
+    markStarted();
     handleConfirm(active.id, isMatch);
     // No: fade out (the false_positive is logged by the state hook). Yes: move to the action plan.
     setPhase(isMatch && (active.exposure || active.remediation) ? 'remediate' : null);
@@ -69,7 +88,10 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
       <HexagonGrid
         scanResult={scanResult}
         onConfirm={handleConfirm}
-        onDispute={handleDispute}
+        onDispute={(id) => {
+          markStarted();
+          handleDispute(id);
+        }}
         onSelect={onSelect}
         fixedIds={fixedIds}
       />
