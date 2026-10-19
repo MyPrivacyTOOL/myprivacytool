@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Free vector clean-up of the interim curtain-pull layers (MPC-7797-A4).
+
+Traces animations/alice_p6_layers_v0/{alice,curtain}.png to SVG with Potrace
+(`brew install potrace`), copies code.png as the raster code layer, and writes a
+README plus compare.html (source PNG vs trace side by side, 300% zoom) into
+animations/alice_p6_vector_v0/.
+
+    python3 tools/alice-library/trace_p6_vector.py            # trace + README + compare.html
+    python3 tools/alice-library/trace_p6_vector.py --register # after sign-off: add manifest entries
+
+Does not redraw or restyle: it only thresholds the existing pixels. Ink is kept at
+full detail (no speckle removal, light curve smoothing) so engraving hatching survives.
+"""
+import argparse
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+ROOT = Path(__file__).resolve().parents[2]
+ALICE = ROOT / "assets" / "alice"
+SRC = ALICE / "animations" / "alice_p6_layers_v0"
+OUT = ALICE / "animations" / "alice_p6_vector_v0"
+MANIFEST = ALICE / "manifest.json"
+
+SCALE = 4  # trace a 4x Lanczos upscale so curves are smoother than the 820 px pixel grid
+# Luminance below this (0-255) counts as ink. The curtain is near-white with faint fold
+# lines, so it needs a higher cut than Alice.
+THRESHOLDS = {"alice": 150, "curtain": 215}
+LAYERS = ("alice", "curtain")
+
+
+def to_pbm(layer: str, threshold: int, path: Path) -> tuple[int, int]:
+    im = Image.open(SRC / f"{layer}.png").convert("RGBA")
+    white = Image.new("RGBA", im.size, (255, 255, 255, 255))
+    grey = Image.alpha_composite(white, im).convert("L")
+    big = grey.resize((im.width * SCALE, im.height * SCALE), Image.LANCZOS)
+    ink = np.array(big) < threshold
+    Image.fromarray(np.where(ink, 0, 255).astype(np.uint8)).convert("1").save(path)
+    return im.size
+
+
+def trace(layer: str, threshold: int) -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        pbm = Path(tmp) / f"{layer}.pbm"
+        w, h = to_pbm(layer, threshold, pbm)
+        svg = OUT / f"{layer}.svg"
+        # -t 0: keep every speck (hatching); -a 1.0: light corner smoothing; -O 0.2: fine curve fit
+        subprocess.run(
+            ["potrace", "-s", "-t", "0", "-a", "1.0", "-O", "0.2", "-o", str(svg), str(pbm)],
+            check=True,
+        )
+    text = svg.read_text()
+    # Potrace sizes in pt of the upscaled bitmap; pin the SVG to the 820x959 layer canvas.
+    text = re.sub(r'width="[^"]*"', f'width="{w}"', text, count=1)
+    text = re.sub(r'height="[^"]*"', f'height="{h}"', text, count=1)
+    svg.write_text(text)
+    print(f"{layer}.svg  threshold {threshold}  {w}x{h}")
+
+
+def write_compare() -> None:
+    rows = "".join(
+        f"<h2>{n}</h2><div class=r><div><p>source PNG</p><img src='../alice_p6_layers_v0/{n}.png'></div>"
+        f"<div><p>traced SVG</p><img src='{n}.svg'></div></div>"
+        for n in LAYERS
+    )
+    (OUT / "compare.html").write_text(
+        "<!doctype html><meta charset=utf-8><title>p6 trace vs source (300%)</title>"
+        "<style>body{font:14px sans-serif;background:#fff}.r{display:flex;gap:16px}"
+        "img{width:2460px;image-rendering:pixelated;border:1px solid #ccc}"
+        ".r>div{overflow:auto;max-width:48vw;max-height:80vh}</style>"
+        "<h1>Trace vs source at 300%</h1>" + rows
+    )
+
+
+def write_readme() -> None:
+    (OUT / "README.md").write_text(
+        """# Vector clean-up of the curtain-pull layers (v0)
+
+Free trace (MPC-7797-A4) of `../alice_p6_layers_v0/` with Potrace, run by
+`tools/alice-library/trace_p6_vector.py`. Reference only. Not the locked master, and it does not
+lock v1.0.
+
+| File | What it is |
+|---|---|
+| `alice.svg` | Alice only, ink as vector paths on transparent |
+| `curtain.svg` | curtain fold lines and edges, ink as vector paths on transparent |
+| `code.png` | Matrix Green code backdrop, unchanged raster copy |
+| `compare.html` | source PNG next to each trace at 300% zoom, for the line-quality check |
+
+All layers use the 820x959 canvas and stack with no offsets: code, curtain, Alice.
+
+## Method
+- Layer composited on white, converted to grey, Lanczos-upscaled 4x, thresholded to ink
+  (Alice below 150, curtain below 215 of 255), traced with `potrace -t 0 -a 1.0 -O 0.2`.
+- No speckle removal and only light curve smoothing, to keep the engraving hatching.
+- Nothing redrawn or restyled; the paths follow the existing pixels.
+
+## Known limits
+- The source is a soft 820 px raster, so edges follow its softness. Vector makes it scale
+  cleanly; it does not add detail that is not in the source.
+- Single-threshold trace: tonal shading is reduced to ink or no ink.
+- Line quality has to be accepted by the account holder before this is relied on.
+"""
+    )
+
+
+def register() -> None:
+    m = json.loads(MANIFEST.read_text())
+    ids = {a["id"] for a in m["assets"]}
+    new = [
+        (f"interim-p6-vector-{n}", f"animations/alice_p6_vector_v0/{n}.svg",
+         f"Potrace trace of interim-p6-layer-{n} (MPC-7797-A4). Reference only; follows the soft 820 px source.")
+        for n in LAYERS
+    ] + [
+        ("interim-p6-vector-code", "animations/alice_p6_vector_v0/code.png",
+         "Unchanged raster copy of the code layer, kept beside the traced layers (MPC-7797-A4).")
+    ]
+    for aid, path, note in new:
+        if aid not in ids:
+            m["assets"].append({"id": aid, "path": path, "kind": "interim-reference",
+                                "required": False, "status": "reference-only", "note": note})
+    MANIFEST.write_text(json.dumps(m, indent=2, ensure_ascii=False) + "\n")
+    print("manifest.json updated (reference-only)")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--register", action="store_true", help="add manifest entries (after sign-off)")
+    ap.add_argument("--alice-threshold", type=int, default=THRESHOLDS["alice"])
+    ap.add_argument("--curtain-threshold", type=int, default=THRESHOLDS["curtain"])
+    args = ap.parse_args()
+    if args.register:
+        register()
+        return 0
+    if shutil.which("potrace") is None:
+        sys.exit("potrace not found: brew install potrace")
+    OUT.mkdir(parents=True, exist_ok=True)
+    trace("alice", args.alice_threshold)
+    trace("curtain", args.curtain_threshold)
+    shutil.copy2(SRC / "code.png", OUT / "code.png")
+    write_readme()
+    write_compare()
+    print(f"done: open {OUT / 'compare.html'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
