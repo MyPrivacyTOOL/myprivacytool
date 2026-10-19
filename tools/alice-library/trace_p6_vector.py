@@ -33,11 +33,11 @@ MANIFEST = ALICE / "manifest.json"
 SCALE = 4  # trace a 4x Lanczos upscale so curves are smoother than the 820 px pixel grid
 # Luminance below this (0-255) counts as ink. The curtain is near-white with faint fold
 # lines, so it needs a higher cut than Alice.
-THRESHOLDS = {"alice": 175, "curtain": 215}
+THRESHOLDS = {"alice": 170, "curtain": 215}
 # Alice uses a local-contrast cut: a pixel is ink when it is darker than its surroundings by
 # CONTRAST (so hatching lines separate instead of fusing) and below the threshold, or when it is
 # dark outright (CORE). The curtain keeps a plain global cut.
-LOCAL = {"alice": dict(radius=10, contrast=14, core=100)}
+LOCAL = {"alice": dict(radius=8, contrast=22, core=80)}
 LAYERS = ("alice", "curtain")
 
 
@@ -116,7 +116,7 @@ All layers use the 820x959 canvas and stack with no offsets: code, curtain, Alic
 
 ## Method
 - Layer composited on white, converted to grey, Lanczos-upscaled 4x, thresholded to ink
-  (curtain below 215 of 255; Alice by local contrast: darker than its surroundings by 14 and below 175, or below 100), traced with `potrace -t 0 -a 1.0 -O 0.2`.
+  (curtain below 215 of 255; Alice by local contrast: darker than its surroundings by 22 and below 170, or below 80), traced with `potrace -t 0 -a 1.0 -O 0.2`.
 - No speckle removal and only light curve smoothing, to keep the engraving hatching.
 - Nothing redrawn or restyled; the paths follow the existing pixels.
 
@@ -153,7 +153,13 @@ def main() -> int:
     ap.add_argument("--register", action="store_true", help="add manifest entries (after sign-off)")
     ap.add_argument("--alice-threshold", type=int, default=THRESHOLDS["alice"])
     ap.add_argument("--curtain-threshold", type=int, default=THRESHOLDS["curtain"])
+    ap.add_argument("--radius", type=int, help="Alice local-contrast blur radius (default 8; smaller = finer)")
+    ap.add_argument("--contrast", type=int, help="Alice: how much darker than surroundings counts as ink (default 22; higher = thinner lines)")
+    ap.add_argument("--core", type=int, help="Alice: pixels darker than this are always ink (default 80)")
     args = ap.parse_args()
+    for k in ("radius", "contrast", "core"):
+        if getattr(args, k) is not None:
+            LOCAL["alice"][k] = getattr(args, k)
     if args.register:
         register()
         return 0
