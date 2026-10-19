@@ -67,16 +67,23 @@ def trace(layer: str, threshold: int) -> None:
 
 def write_compare() -> None:
     rows = "".join(
-        f"<h2>{n}</h2><div class=r><div><p>source PNG</p><img src='../alice_p6_layers_v0/{n}.png'></div>"
-        f"<div><p>traced SVG</p><img src='{n}.svg'></div></div>"
+        f"<h2>{n}</h2><div class=r><div class=p><img src='../alice_p6_layers_v0/{n}.png'></div>"
+        f"<div class=p><img src='{n}.svg'></div></div>"
         for n in LAYERS
     )
     (OUT / "compare.html").write_text(
         "<!doctype html><meta charset=utf-8><title>p6 trace vs source (300%)</title>"
         "<style>body{font:14px sans-serif;background:#fff}.r{display:flex;gap:16px}"
-        "img{width:2460px;image-rendering:pixelated;border:1px solid #ccc}"
-        ".r>div{overflow:auto;max-width:48vw;max-height:80vh}</style>"
-        "<h1>Trace vs source at 300%</h1>" + rows
+        ".p{flex:1;overflow:auto;height:80vh;border:1px solid #888;"
+        "background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/20px 20px}"
+        "img{width:2460px;display:block}</style>"
+        "<h1>Trace vs source at 300%: left source PNG, right traced SVG (scroll together)</h1>"
+        + rows
+        + "<script>document.querySelectorAll('.r').forEach(r=>{const[a,b]=r.children;"
+        "let l=0;const s=(x,y)=>()=>{if(l)return;l=1;y.scrollLeft=x.scrollLeft;y.scrollTop=x.scrollTop;l=0};"
+        "a.onscroll=s(a,b);b.onscroll=s(b,a);"
+        "addEventListener('load',()=>{a.scrollLeft=(a.scrollWidth-a.clientWidth)/2;"
+        "a.scrollTop=(a.scrollHeight-a.clientHeight)/2})})</script>"
     )
 
 
