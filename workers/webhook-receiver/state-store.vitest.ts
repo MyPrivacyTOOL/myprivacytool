@@ -5,14 +5,16 @@ import worker from './index.js';
 import { getConversationState, saveConversationState, purgeExpiredState, STATE_TTL_MS } from './state-store.js';
 
 const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc', GCP_PROJECT_ID: 'p', FIRESTORE_SA_TOKEN: 't' };
-let reqs: { url: string; method: string; body: any; headers: any }[]; let status: number; let contentRange: string;
+let reqs: { url: string; method: string; body: any; headers: any }[]; let status: number; let contentRange: string; let seed: Record<string, any>;
 
 beforeEach(() => {
-  reqs = []; status = 200; contentRange = '*/0';
+  reqs = []; status = 200; contentRange = '*/0'; seed = {};
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     reqs.push({ url: String(input), method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : undefined, headers: init.headers });
     if (String(input).includes('firestore.googleapis.com')) return new Response('', { status: 404 });
-    return new Response(init.method === 'DELETE' ? '' : '[]', { status, headers: { 'Content-Range': contentRange } });
+    const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(String(input))?.[1] ?? '');
+    const body = init.method === 'DELETE' ? '' : seed[key] ? JSON.stringify([{ state: seed[key] }]) : '[]';
+    return new Response(body, { status, headers: { 'Content-Range': contentRange } });
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -68,7 +70,21 @@ describe('purge', () => {
     status = 500;
     expect(await purgeExpiredState(ENV)).toBe(-1);
   });
-  it('the Worker Cron Trigger runs it', async () => {
+  it('a successful start-deep-dive purges expired rows off the response path; a refused one does not', async () => {
+    const waits: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => waits.push(p) };
+    const env = { ...ENV, DEEP_DIVE_SECRET: 's' };
+    const start = (headers: Record<string, string>) => worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: '{}', headers }), env, ctx);
+    expect((await start({})).status).toBe(401);
+    await Promise.all(waits);
+    expect(reqs.some((r) => r.method === 'DELETE')).toBe(false);
+    seed['whatsapp:85212345678'] = { profileName: 'Alex', inbound_message_timestamp: 1760000000 };
+    const ok = await worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: JSON.stringify({ wa_id: '85212345678' }), headers: { 'X-Webhook-Secret': 's' } }), env, ctx);
+    expect(ok.status).toBe(200);
+    await Promise.all(waits);
+    expect(reqs.filter((r) => r.method === 'DELETE')).toHaveLength(1);
+  });
+  it('the scheduled handler still runs it (for when the account has a free cron slot)', async () => {
     const waits: Promise<unknown>[] = [];
     await (worker as any).scheduled({}, ENV, { waitUntil: (p: Promise<unknown>) => waits.push(p) });
     await Promise.all(waits);

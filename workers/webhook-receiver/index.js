@@ -25,7 +25,8 @@ const META_QUERY = {
 };
 
 export default {
-  // Cron Trigger (wrangler.toml): hourly purge of expired scan / conversation rows in Supabase (MPC-8320).
+  // Cron Trigger handler. NOT scheduled in wrangler.toml: the Cloudflare account is at the Workers Free limit of 5 cron triggers (error 10072),
+  // so the purge also runs after every successful start-deep-dive (below). Add `[triggers] crons = [...]` if the account is upgraded. MPC-8320.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(purgeExpiredState(env).then((n) => console.log('state purge removed', n)));
   },
@@ -53,6 +54,8 @@ export default {
       try {
         const { handleDeepDive } = await import('./deepDive.ts');
         const res = await handleDeepDive(request, env);
+        // Purge expired scan / conversation rows (24 h life) after each authenticated scan start, off the response path.
+        if (res && res.status === 200 && path === '/api/scan/start-deep-dive') ctx?.waitUntil?.(purgeExpiredState(env));
         if (res) return res;
       } catch (err) {
         console.error('Deep dive error:', err);
