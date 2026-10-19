@@ -12,6 +12,7 @@ class Settings:
     signing_key_hex: str = ""             # 32-byte seed, loaded from Secret Manager at runtime
     verification_method: str = "urn:shadow-audit:key:staging#1"
     lookback_days: int = 7
+    allowed_regions: tuple = ("eu",)      # Risk #119: regions data may be sent to
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -22,4 +23,5 @@ class Settings:
         return cls(env, g("API_TOKEN", ""), g("NOTION_TOKEN", ""), g("NOTION_DB_ID", ""),
                    g("SLACK_WEBHOOK_URL", ""), g("SIGNING_KEY_HEX", ""),
                    g("VERIFICATION_METHOD", f"urn:shadow-audit:key:{env}#1"),
-                   int(g("LOOKBACK_DAYS", "7")))
+                   int(g("LOOKBACK_DAYS", "7")),
+                   tuple(r.strip().lower() for r in g("ALLOWED_REGIONS", "eu").split(",") if r.strip()))

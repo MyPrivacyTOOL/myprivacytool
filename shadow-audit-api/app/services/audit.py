@@ -25,7 +25,7 @@ class AuditService:
         errors: List[str] = []
         try:
             entries = self.source.fetch(agent_id, days)
-            outcome = risk_detector.run_audit([(n, (lambda f=f: f(entries))) for n, f in detectors.ALL])
+            outcome = risk_detector.run_audit([(n, (lambda f=f: f(entries))) for n, f in detectors.build(self.s)])
         except Exception as exc:  # noqa: BLE001 - log source failure => incomplete audit
             log.exception("log source failed for %s", agent_id)
             outcome = risk_detector.AuditOutcome([], [risk_detector.DetectorError("log_source", str(exc))])
