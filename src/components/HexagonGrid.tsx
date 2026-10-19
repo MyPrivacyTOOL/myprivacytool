@@ -681,8 +681,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         <div className="max-w-xl mx-auto mb-4 px-4" data-testid="risk-profile">
           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1 text-center">Your risk profile</p>
           <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm font-mono" aria-live="polite" aria-atomic="true">
-            {profileParts.map((p) => (
-              <span key={p.key} data-testid={`risk-profile-${p.key}`}>{p.text}</span>
+            {profileParts.map((p, i) => (
+              <span key={p.key} data-testid={`risk-profile-${p.key}`}>
+                {i > 0 && <span aria-hidden="true" className="mr-4">·</span>}{p.text}
+              </span>
             ))}
           </p>
         </div>
@@ -812,8 +814,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           <div className="max-w-xl mx-auto mb-4 px-4" data-testid="risk-profile">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1 text-center">Your risk profile</p>
             <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm font-mono" aria-live="polite" aria-atomic="true">
-              {profileParts.map((p) => (
-                <span key={p.key} data-testid={`risk-profile-${p.key}`}>{p.text}</span>
+              {profileParts.map((p, i) => (
+                <span key={p.key} data-testid={`risk-profile-${p.key}`}>
+                  {i > 0 && <span aria-hidden="true" className="mr-4">·</span>}{p.text}
+                </span>
               ))}
             </p>
           </div>

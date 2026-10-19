@@ -26,7 +26,7 @@ describe('Hexagon tile (MPC-7916)', () => {
     expect(b.textContent).not.toMatch(/%/);
     expect(b.textContent).not.toMatch(/No Leak Detected/);
     expect(b.getAttribute('aria-label')).not.toMatch(/%|Confidence|Confirmed|No Leak Detected/);
-    expect(screen.getByTestId('tile-line')).toHaveTextContent("Couldn't check");
+    expect(screen.getByTestId('tile-line')).toHaveTextContent("Check didn't finish");
     expect(b.getAttribute('aria-pressed')).toBeNull();
     expect(container.querySelector('[data-tile-kind="couldnt_check"]')).not.toBeNull();
   });
@@ -80,7 +80,7 @@ describe('Hexagon "your browser says this" tick', () => {
     expect(screen.getByTestId('browser-says')).toBeInTheDocument();
     expect(screen.getByTestId('browser-says-caption')).toHaveTextContent('Your browser says this');
     expect(screen.getByRole('button').getAttribute('aria-label')).toMatch(/Your browser says this\.$/);
-    expect(screen.getByTestId('tile-line')).toHaveTextContent('Seen · low risk');
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Seen · minor');
   });
 
   it('no tick on a tile with a lower held confidence, and none without a tile', () => {

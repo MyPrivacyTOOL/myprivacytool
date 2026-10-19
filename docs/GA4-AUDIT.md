@@ -33,11 +33,12 @@ The same ID is quoted in `docs/` (seo-url-registry, form-wiring-playbook, ai-acc
 
 All are sent through `trackEvent(name, params)` in `src/lib/analytics.ts:28`, which calls `window.gtag('event', ...)` and silently no-ops if `window.gtag` is absent. HK funnel events go through `src/lib/hkSpamTrack.ts`, which wraps `trackEvent`.
 
-### Scan funnel and engagement (`analytics.ts`, called from `Index.tsx`, `HexagonGrid.tsx`)
+### Scan funnel and engagement (`analytics.ts`, called from `Index.tsx`, `HexagonGrid.tsx`, `WebScanDashboard.tsx`)
 | Event | Trigger |
 |---|---|
 | `funnel_step` (`step_name`, `step_number`) | `page_load`, `hexagons_visible`, `first_hexagon_confirmed`, `three_confirmed`, `deep_scan_triggered`, `language_/orientation_/fingerprint_/advanced_fingerprint_/storage_/social_/security_/behavior_scan_triggered`, `all_hexagons_confirmed`, `scroll_to_footer` |
-| `privacy_scan_completed` | Once per page session when all hexagons confirmed. Carries first-touch `utm_*`. Canonical O3 KPI event (MPC-7170). |
+| `privacy_scan_completed` | Once per page session. **Meaning depends on the view (changed 2026-10-19, site build 65902cb).** Old grid (`?view=grid`, `HexagonGrid.tsx`): when all hexagons are confirmed one by one. Home-page dashboard (the default since 2026-10-19, `WebScanDashboard.tsx`): when no purple "Is this you?" tile is left, or on arrival if the scan had none; `hexagon_count` is then the number of hexagons on the page (54). Carries first-touch `utm_*`. Canonical O3 KPI event (MPC-7170). Treat 2026-10-19 as a break in the series. |
+| `scan_started` | Once per page session. Old grid: first hexagon interaction. Dashboard (default since 2026-10-19): the visitor's first answer (confirm, reject or dispute). See `privacy_scan_completed` above for the break in the series. |
 | `device_profile`, `hexagon_confirm`, `hexagon_accuracy`, `time_to_first_confirmation`, `session_duration`, `deep_scan_unlocked` | Home-page scan |
 | `error` | Device detection failure (`Index.tsx`) |
 | `social_click` (`platform`, `url`) | Footer social icons |

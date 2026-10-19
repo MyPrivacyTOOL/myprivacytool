@@ -86,7 +86,7 @@ describe('risk profile (MPC-7916)', () => {
 
   it('is plain counts: no percentage, no "of", no rating word', () => {
     const text = riskProfileParts(riskProfile([{ kind: 'needs_fixing' }, { kind: 'not_checked' }])).map((p) => p.text).join(' · ');
-    expect(text).toBe('0 clear · 1 needs fixing · 0 our guess · 0 seen, low risk · 1 not checked yet');
+    expect(text).toBe('0 clear · 1 needs fixing · 0 our guess · 0 seen, minor · 1 not checked yet');
     expect(text).not.toMatch(/%| of |low risk rating|medium|high/i);
   });
 

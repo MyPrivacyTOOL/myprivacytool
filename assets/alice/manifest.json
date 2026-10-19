@@ -200,7 +200,7 @@
       "path": "voice/alice_voice_ref-approved-sample_v1.0.mp3",
       "kind": "voice",
       "required": true,
-      "status": "missing",
+      "status": "present",
       "note": "Copy of A_note-spec_v019.mp3 from Drive: MPT YouTube / 03-brand-assets / Voice"
     },
     {

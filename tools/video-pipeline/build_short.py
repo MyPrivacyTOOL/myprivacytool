@@ -48,7 +48,7 @@ INTER_DIR = Path("/usr/share/fonts/opentype/inter")
 FONT_BOLD_CANDIDATES = [INTER_DIR / "Inter-Bold.otf", INTER_DIR / "Inter-ExtraBold.otf"]
 FONT_REGULAR_CANDIDATES = [INTER_DIR / "Inter-Regular.otf", INTER_DIR / "Inter-Medium.otf"]
 
-GREEN = (46, 160, 90)
+GREEN = (39, 174, 96)  # Matrix Green #27AE60 (locked brand palette)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 

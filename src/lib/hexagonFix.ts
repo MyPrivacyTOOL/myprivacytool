@@ -14,26 +14,26 @@ const FIX_STEPS: Record<string, FixStep> = {
   'webrtc-leak': {
     why: 'Your browser can reveal your real network address to a website, even when you use a VPN.',
     steps: [
-      'Turn off WebRTC address sharing in your browser settings, or add a WebRTC-blocking extension.',
+      'Turn off WebRTC address sharing (a browser feature used for video calls) in your browser settings, or add a WebRTC-blocking extension.',
       'Reload this page and look at this hexagon again.',
     ],
   },
   'canvas-fingerprint': {
-    why: 'Your browser draws an image in a way that is nearly unique to your device, so sites can recognise you without cookies.',
+    why: 'Your browser can draw an image in a way that can be nearly unique to your device, so sites can recognise you without cookies.',
     steps: [
-      'Use a browser, or a browser setting, that blocks or randomises canvas fingerprinting.',
+      'Use a browser, or a browser setting, that blocks or randomises canvas fingerprinting (the hidden image test sites use to recognise you).',
       'Reload this page and look at this hexagon again.',
     ],
   },
   'webgl-fingerprint': {
-    why: 'Your graphics hardware gives a signature that helps sites recognise your device.',
+    why: 'Your graphics hardware can give a signature that helps sites recognise your device.',
     steps: [
       'Use a browser, or a browser setting, that hides or randomises graphics details.',
       'Reload this page and look at this hexagon again.',
     ],
   },
   'audio-fingerprint': {
-    why: 'Your device handles sound in a slightly unique way that sites can use to recognise it.',
+    why: 'Your device can handle sound in a slightly unique way that sites can use to recognise it.',
     steps: [
       'Use a browser, or a browser setting, that protects against audio fingerprinting.',
       'Reload this page and look at this hexagon again.',
