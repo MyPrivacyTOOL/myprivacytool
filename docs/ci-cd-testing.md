@@ -62,7 +62,7 @@ typecheck. Clear the backlog, then drop `continue-on-error`.
 |---|---|---|
 | Pre-deploy | `scripts/ci/check-env.mjs`, first step of `deploy-mpt-leads`, `deploy-oauth-poc`, `deploy-scan-report`, `deploy-webhook-receiver` | Fails before anything ships when `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are missing or blank (names only, never values), `wrangler.toml` has `REPLACE_*` placeholders, no `name`/`main`, or `EXPECTED_SECRETS.txt` contains anything but secret **names**. |
 | Secrets survive | existing steps in each deploy workflow | Secret names before vs. after the deploy must match (unchanged). |
-| Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads`, `deploy-oauth-poc` and `deploy-webhook-receiver` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. webhook-receiver: `/health`, unsigned WhatsApp POST 401, verify GET 403, deep-dive start without secret 401, 404. |
+| Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads`, `deploy-oauth-poc` and `deploy-webhook-receiver` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. webhook-receiver: `/health`, unsigned WhatsApp POST 401, verify GET 403, deep-dive start without secret 401, deep-dive Firestore lookup, 404. |
 | Auto-rollback | same workflows | If the smoke step fails, `wrangler rollback` restores the previous version and the smoke test re-runs. The job stays red either way. |
 | Site smoke | `.github/workflows/smoke-site.yml` | After each push to `main` (waits up to ~10 min for Cloudflare Pages), every 6 h, and on demand: 7 conversion routes return 200 with the SPA shell, sitemap is served, plus both public Workers. |
 
@@ -89,9 +89,9 @@ not per version, so they are kept; the workflow verifies the names to be sure.
   deliberately side-effect free (no real signup is created).
 * **Scan engine** (`src/lib/*Detection*`, TensorFlow models, hexagon logic) has only the pre-existing `HexagonGrid` test.
   Not part of the critical-path coverage gate.
-* **Workers without unit tests in Vitest:** `webhook-receiver`, `telegram-webhook` (no deploy workflow either; its
+* **Workers without unit tests in Vitest:** `telegram-webhook` (no deploy workflow either; its
   `wrangler.toml` still has a `REPLACE_WITH_KV_NAMESPACE_ID` placeholder). `scan-report` and `github-channel` keep their
-  existing node:test suites, run in CI but not in the coverage gate.
+  existing node:test suites, run in CI but not in the coverage gate. `webhook-receiver` has Vitest tests (`workers/webhook-receiver/deepDive.vitest.ts`).
 * **Real rollback of a live Worker is not exercised automatically** (only the dry-run drill and the post-failure
   rollback). Do a supervised real rollback once and record it here.
 * `wrangler rollback` flags were written against wrangler 3.x as shipped by `cloudflare/wrangler-action@v3`; the first
