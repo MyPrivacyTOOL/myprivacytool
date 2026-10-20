@@ -12,7 +12,7 @@ on:
         required: true
         default: list
         type: choice
-        options: [list, validate, delete, create, subs, subscribe]
+        options: [list, validate, delete, create, subs, subscribe, mediainit]
       webhook_id:
         description: "Webhook id (validate and delete only)"
         required: false
@@ -37,6 +37,10 @@ jobs:
           X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
           X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
           X_USER_ACCESS_TOKEN: ${{ secrets.X_USER_ACCESS_TOKEN }}
+          X_CONSUMER_KEY: ${{ secrets.X_CONSUMER_KEY }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}
           ACTION: ${{ inputs.action }}
@@ -82,6 +86,24 @@ jobs:
                       uid=$(sed -n 's/.*"id":"\([0-9]*\)".*/\1/p' /tmp/x.out | head -1)
                       [ -n "$uid" ] || { head -c 1000 /tmp/x.out; echo; exit 1; }
                       code=$(curl -sS -o /tmp/x.out -w '%{http_code}' -X POST -H "Authorization: Bearer ${acc}" -H 'Content-Type: application/json' -d "{\"event_type\":\"dm.received\",\"filter\":{\"user_id\":\"${uid}\"},\"webhook_id\":\"${WEBHOOK_ID}\"}" https://api.x.com/2/activity/subscriptions) ;;
+            mediainit) # Try the video upload INIT step on both X endpoints, signed with OAuth 1.0a, and print X's answers (no secrets).
+                      enc() { jq -rn --arg s "$1" '$s|@uri'; }
+                      oauth() { # $1 = url
+                        local n t params base key sig
+                        n=$(openssl rand -hex 16); t=$(date +%s)
+                        params="oauth_consumer_key=$(enc "$X_CONSUMER_KEY")&oauth_nonce=${n}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=${t}&oauth_token=$(enc "$X_ACCESS_TOKEN")&oauth_version=1.0"
+                        base="POST&$(enc "$1")&$(enc "$params")"
+                        key="$(enc "$X_CONSUMER_SECRET")&$(enc "$X_ACCESS_TOKEN_SECRET")"
+                        sig=$(printf %s "$base" | openssl dgst -sha1 -hmac "$key" -binary | base64)
+                        echo "OAuth oauth_consumer_key=\"$(enc "$X_CONSUMER_KEY")\", oauth_nonce=\"${n}\", oauth_signature=\"$(enc "$sig")\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"${t}\", oauth_token=\"$(enc "$X_ACCESS_TOKEN")\", oauth_version=\"1.0\""
+                      }
+                      u1="https://api.x.com/2/media/upload"
+                      c=$(curl -sS -o /tmp/a.out -w '%{http_code}' -X POST -H "Authorization: $(oauth "$u1")" -F command=INIT -F media_type=video/mp4 -F total_bytes=1000000 -F media_category=dm_video "$u1")
+                      echo "A (combined endpoint, form) HTTP ${c}: $(head -c 600 /tmp/a.out)"
+                      u2="https://api.x.com/2/media/upload/initialize"
+                      c=$(curl -sS -o /tmp/b.out -w '%{http_code}' -X POST -H "Authorization: $(oauth "$u2")" -H 'Content-Type: application/json' -d '{"media_type":"video/mp4","total_bytes":1000000,"media_category":"dm_video"}' "$u2")
+                      echo "B (initialize endpoint, JSON) HTTP ${c}: $(head -c 600 /tmp/b.out)"
+                      exit 0 ;;
             *)        echo "unknown action"; exit 1 ;;
           esac
           echo "HTTP ${code}"
