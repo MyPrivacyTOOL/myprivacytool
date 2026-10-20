@@ -39,8 +39,7 @@ done
 
 # 4. Build + deploy to staging (runs the tests first)
 gcloud builds submit . --config cloudbuild.yaml --substitutions=_REGION=$REGION
-gcloud run services update shadow-audit-api-staging --region=$REGION --service-account=$SA \
-  --update-env-vars=LOG_TABLE=<project.dataset.agent_logs>
+# LOG_TABLE defaults to <project>.agent_logs.logs (set in cloudbuild.yaml); the deploy uses --update-env-vars so it never wipes env vars.
 # (--no-allow-unauthenticated is set: callers need a Google identity token AND the X-Api-Token header)
 
 # 5. Smoke test (replace AGENT_ID with a non-prod agent)
