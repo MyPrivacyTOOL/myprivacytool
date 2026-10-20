@@ -1,6 +1,6 @@
 """Scoring engine. Fixes MPC-7877 issue 1: the old `int(raw*100) % 100` wrapped
 around and never reproduced the design example (Risk #57 -> ~26)."""
-from typing import Dict, List, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 from app.models import HEXAGON_RISKS, PILLARS, PillarScore, RiskDetection, Severity
 
@@ -44,15 +44,23 @@ def pillar_score(pillar: str, detections: List[RiskDetection], incomplete: bool 
     return PillarScore(pillar, score, level, len(items), incomplete)
 
 
-def overall(pillars: Dict[str, PillarScore], audit_complete: bool) -> Tuple[int, str]:
-    """Incomplete audits (a detector errored) can never be APPROVED."""
+QUARANTINE_SEVERITIES = {"CRITICAL", "HIGH"}
+
+
+def overall(pillars: Dict[str, PillarScore], audit_complete: bool,
+            detections: Sequence[RiskDetection] = ()) -> Tuple[int, str]:
+    """Incomplete audits (a detector errored) can never be APPROVED. Any HIGH or
+    CRITICAL detection forces QUARANTINE whatever the averaged score is (owner
+    decision, MPC-7877): an averaged score must not hide a serious finding."""
     score = round(sum(p.score for p in pillars.values()) / len(pillars)) if pillars else 0
     if not audit_complete:
         return score, "INCOMPLETE"
+    if any(d.severity.value in QUARANTINE_SEVERITIES for d in detections):
+        return score, "QUARANTINE"
     return score, "APPROVED_FOR_P1_DATA" if score >= 50 else "QUARANTINE"
 
 
 def score_all(detections: List[RiskDetection], audit_complete: bool) -> Tuple[Dict[str, PillarScore], int, str]:
     pillars = {p: pillar_score(p, detections, not audit_complete) for p in PILLARS}
-    total, status = overall(pillars, audit_complete)
+    total, status = overall(pillars, audit_complete, detections)
     return pillars, total, status

@@ -4,12 +4,12 @@ steps:
     entrypoint: sh
     args: ["-c", "pip install -r requirements.txt && python -m unittest discover -s tests"]
   - name: gcr.io/cloud-builders/docker
-    args: ["build", "-t", "$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$SHORT_SHA", "."]
+    args: ["build", "-t", "$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$BUILD_ID", "."]
   - name: gcr.io/cloud-builders/docker
-    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$SHORT_SHA"]
+    args: ["push", "$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$BUILD_ID"]
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
-    args: ["run", "deploy", "shadow-audit-api-staging", "--image=$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$SHORT_SHA",
+    args: ["run", "deploy", "shadow-audit-api-staging", "--image=$_REGION-docker.pkg.dev/$PROJECT_ID/shadow-audit/api:$BUILD_ID",
            "--region=$_REGION", "--no-allow-unauthenticated", "--set-env-vars=SHADOW_AUDIT_ENV=staging,NOTION_DB_ID=e86ff98ace7946dcb11e45bc2908f2a3",
            "--set-secrets=SIGNING_KEY_HEX=shadow-audit-ed25519-key-staging:latest,API_TOKEN=shadow-audit-api-token-staging:latest,NOTION_TOKEN=shadow-audit-notion-token:latest,SLACK_WEBHOOK_URL=shadow-audit-slack-webhook:latest"]
 substitutions:

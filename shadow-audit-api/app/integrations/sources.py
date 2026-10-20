@@ -15,6 +15,11 @@ class InMemorySource:
         return list(self.data.get(agent_id, []))
 
 
+# nonce / sender / dest_region feed detectors #65 (replay) and #119 (cross-border transfer).
+# They must exist as (nullable) columns on the log table.
+QUERY_COLUMNS = "ts, text, tool, session, vault_start, vault_end, nonce, sender, dest_region"
+
+
 class BigQuerySource:  # untested adapter; requires google-cloud-bigquery and credentials
     def __init__(self, table: str):
         self.table = table
@@ -23,7 +28,7 @@ class BigQuerySource:  # untested adapter; requires google-cloud-bigquery and cr
         from google.cloud import bigquery  # lazy import
         client = bigquery.Client()
         job = client.query(
-            f"SELECT ts, text, tool, session, vault_start, vault_end FROM `{self.table}` "
+            f"SELECT {QUERY_COLUMNS} FROM `{self.table}` "
             "WHERE agent_id=@a AND ts >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @d DAY)",
             job_config=bigquery.QueryJobConfig(query_parameters=[
                 bigquery.ScalarQueryParameter("a", "STRING", agent_id),
