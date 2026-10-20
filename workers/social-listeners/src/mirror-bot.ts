@@ -10,7 +10,8 @@ import { classifyTheme, recordXDm } from "./funnel";
 import { eraseContact, touchContact } from "./social";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
-const SCAN_URL = "https://myprivacytool.io/scan?utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply";
+// Short link (public/x.html): clean in the DM, shows a preview card, then forwards to /scan with the same utm tracking.
+const SCAN_URL = "https://myprivacytool.io/x";
 const X_API = "https://api.x.com/2";
 const X_TIMEOUT_MS = 5000;
 
@@ -138,7 +139,7 @@ const CONSENT_MARKER = CONSENT_MESSAGE.split("\n")[0];
 const CONSENT_WINDOW_MS = 15 * 60_000;
 
 /** One-tap follow (X's own follow intent page). A reply cannot make someone follow us, so we link it. */
-export const FOLLOW_LINE = "👉 Follow @MyPrivacyTOOL for privacy alerts: https://x.com/intent/follow?screen_name=MyPrivacyTOOL";
+export const FOLLOW_LINE = "👉 Follow @MyPrivacyTOOL for privacy alerts: https://myprivacytool.io/follow"; // /follow redirects to X's follow intent (public/_redirects)
 
 /** Every message we send opens with who we are (so it is easy to find in the inbox and remembered as the brand) and ends with the same signature. */
 export const SIGNATURE = "— @MyPrivacyTOOL · myprivacytool.io";
@@ -156,13 +157,13 @@ const MIRROR_OFFER =
 export const WELCOME_BODY =
   "We show you what the internet can learn about you, and how to take control of it. I'm an automated assistant.\n\n" +
   "What brought you here? Reply 1, 2 or 3, or tell us in your own words:\n" +
-  "1. I'm curious what's out there about me\n" +
-  "2. I'm worried about something specific\n" +
-  "3. I'm just exploring\n\n" +
+  "1️⃣ I'm curious what's out there about me\n" +
+  "2️⃣ I'm worried about something specific\n" +
+  "3️⃣ I'm just exploring\n\n" +
   `${MIRROR_OFFER}\n\n` +
   `🔎 Or run the free privacy scan: ${SCAN_URL}\n\n` +
   `${FOLLOW_LINE}\n\n` +
-  "Privacy: I only note that you got in touch (your @handle, never what you write). Send DELETE and I'll remove it.\n\n" +
+  "🔒 I only note that you got in touch (your @handle, never what you write). Send DELETE and I'll remove it.\n\n" +
   "Thank you for getting in touch.";
 export const WELCOME_MESSAGE = branded(undefined, WELCOME_BODY);
 
