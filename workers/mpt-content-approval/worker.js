@@ -5,9 +5,9 @@
 //   reject      -> log to D1, reply in the Slack thread
 //   approve_all -> POST each draft to the Make.com webhook, log to D1 (agent_execution_logs 'published' + social_metrics), reply in thread
 
-const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', reddit: 'Reddit' };
+const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', reddit: 'Reddit', facebook: 'Facebook', pinterest: 'Pinterest', youtube: 'YouTube' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
-const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', reddit: '19:00' };
+const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', reddit: '19:00', facebook: '13:00', pinterest: '20:00', youtube: '17:00' };
 const CAMPAIGN = 'mpc-7033-daily';
 const SITE = 'https://myprivacytool.io';
 const encoder = new TextEncoder();
@@ -71,6 +71,7 @@ export function handoffPayload(draft, { date, approvedBy, approvalTimestamp, def
     ...(draft.platform === 'linkedin' ? { linkedin_text: copy } : {}),
     ...(draft.platform === 'reddit' ? { subreddit: draft.subreddit || 'r/privacy' } : {}),
     ...(draft.slides ? { slides: draft.slides } : {}),
+    ...(draft.script ? { script: draft.script } : {}),
   };
 }
 
