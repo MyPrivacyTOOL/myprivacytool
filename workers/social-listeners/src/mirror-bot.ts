@@ -159,7 +159,7 @@ export const WELCOME_BODY =
   "1. I'm curious what's out there about me\n" +
   "2. I'm worried about something specific\n" +
   "3. I'm just exploring\n\n" +
-  `${MIRROR_OFFER}\n` +
+  `${MIRROR_OFFER}\n\n` +
   `🔎 Or run the free privacy scan: ${SCAN_URL}\n\n` +
   `${FOLLOW_LINE}\n\n` +
   "Privacy: I only note that you got in touch (your @handle, never what you write). Send DELETE and I'll remove it.\n\n" +
@@ -170,16 +170,17 @@ export const WELCOME_MESSAGE = branded(undefined, WELCOME_BODY);
 export const INTENT_REPLIES: Record<string, string> = {
   "1":
     "Thank you, that's exactly what we're here for.\n\n" +
-    `${MIRROR_OFFER}\n` +
+    `${MIRROR_OFFER}\n\n` +
     `🔎 Or run the free scan to see what your browser, device and email reveal: ${SCAN_URL}`,
   "2":
     "Thank you for telling me, and I'm sorry you're dealing with that. If you feel unsafe, please contact your local authorities first.\n\n" +
-    `🔎 To see what about you is exposed and get step-by-step fixes, run the free scan: ${SCAN_URL}\n` +
+    `🔎 To see what about you is exposed and get step-by-step fixes, run the free scan: ${SCAN_URL}\n\n` +
     MIRROR_OFFER,
   "3":
     "Welcome! MyPrivacyTOOL shows you what's visible about you online, explains why it matters in plain language, and walks you through taking it back.\n\n" +
-    `${MIRROR_OFFER}\n` +
-    `🔎 Or start with the free scan: ${SCAN_URL}`,
+    `${MIRROR_OFFER}\n\n` +
+    `🔎 Or start with the free scan: ${SCAN_URL}\n\n` +
+    "Thank you for stopping by.",
 };
 
 export const DECLINE_MESSAGE = "No problem. Nothing was scanned and nothing was stored. Send MIRROR any time to try again.";
@@ -291,11 +292,13 @@ export async function sendXDm(env: Env, recipientId: string, text: string, log?:
   const quiet: Logger = log ?? { info() {}, warn() {}, error() {} };
   const path = `/dm_conversations/with/${recipientId}/messages`;
   if (opts.video) {
-    const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init));
-    if (mediaId) {
+    // An animated GIF autoplays and loops in the DM; if X refuses it, the same clip goes as a normal video, then as text alone.
+    for (const category of ["dm_gif", "dm_video"] as const) {
+      const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init), category);
+      if (!mediaId) continue;
       const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) });
       if (withVideo?.ok) return true;
-      quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0 });
+      quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0, category });
     }
   }
   const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) });
@@ -385,7 +388,7 @@ export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: 
   // Funnel row: the number they chose, or the theme of what they typed. Never the text, never who sent it.
   await recordXDm(env, "help", reply ? `x.intent.${choice}` : `x.welcome.${classifyTheme(dm.text ?? "")}`, log);
   const username = await fetchUsername(env, dm.senderId);
-  const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply + "\n\nThank you!") : branded(username, WELCOME_BODY), log, { video: true });
+  const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply) : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
   await noteContact(env, dm.senderId, username, "dm", log);
 }
