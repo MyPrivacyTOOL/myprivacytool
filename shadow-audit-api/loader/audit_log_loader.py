@@ -1,0 +1,165 @@
+"""Turn the OpenClaw router's audit trail (/opt/openclaw/audit/audit-*.jsonl) into rows for the
+Shadow Audit API log table (BigQuery agent_logs.logs). MPC-8364.
+
+Runs on the droplet with the standard library only. It does NOT upload: it writes newline-delimited
+JSON that `bq load --source_format=NEWLINE_DELIMITED_JSON` accepts, so the transport stays a separate
+decision. Everything that leaves this module is masked first (see `mask`).
+
+What the source gives us, and does not (found by read-only discovery, 2026-10-20):
+  tool name, timing, outcome and the NAMES of parameters, never argument values; no vault snapshots;
+  no nonce/sender/destination region. Those columns are written empty and the matching detectors
+  simply have no data. `details._raw` can hold raw tool output and is NEVER read.
+"""
+import argparse
+import glob
+import json
+import re
+import sys
+from collections import Counter
+from typing import Dict, Iterable, Iterator, List, Optional, Tuple
+
+MAX_TEXT = 500
+
+# --- masking -----------------------------------------------------------------------------------
+# Format-preserving: real values are replaced but the *shape* the detectors look for is kept
+# (prefix, character class, length), so credentials in logs are still detected without the secret
+# ever reaching BigQuery. Keep these four in step with CRED_RE in app/services/detectors.py.
+_SHAPED = [
+    (re.compile(r"\b(sk_live_|pk_live_)[A-Za-z0-9]+"), lambda m: m.group(1) + "X" * (len(m.group(0)) - len(m.group(1)))),
+    (re.compile(r"\bAKIA[0-9A-Z]{12,}"), lambda m: "AKIA" + "X" * (len(m.group(0)) - 4)),
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9_\-]{40,}"), lambda m: m.group(1) + "X" * (len(m.group(0)) - len(m.group(1)))),
+    (re.compile(r"(password\s*[:=]\s*)\S+", re.I), lambda m: m.group(1) + "********"),
+]
+# Other secret shapes the detectors do not look for are removed outright.
+_OTHER = [
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(-----END [A-Z ]*PRIVATE KEY-----|$)", re.S), "[REDACTED:private-key]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{5,}"), "[REDACTED:jwt]"),
+    (re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}"), "[REDACTED:github-token]"),
+    (re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}"), "[REDACTED:slack-token]"),
+    (re.compile(r"\b(?:sk-ant-|sk-)[A-Za-z0-9_\-]{20,}"), "[REDACTED:api-key]"),
+    (re.compile(r"\bAIza[0-9A-Za-z_\-]{30,}"), "[REDACTED:google-key]"),
+    (re.compile(r"\b(?:ntn_|secret_)[A-Za-z0-9]{20,}"), "[REDACTED:notion-token]"),
+    (re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"), "[EMAIL]"),
+]
+
+
+def mask(text) -> str:
+    s = "" if text is None else str(text)
+    for rx, repl in _OTHER:          # first, so e.g. a key inside a longer token is not half-masked
+        s = rx.sub(repl, s)
+    for rx, repl in _SHAPED:
+        s = rx.sub(repl, s)
+    return s[:MAX_TEXT]
+
+
+# --- mapping ----------------------------------------------------------------------------------
+TOOL_EVENTS = {"tool_execution_started", "tool_execution_completed", "tool_execution_failed", "tool_execution_denied"}
+SENSITIVE_EVENT = "sensitive_data_accessed"
+COLUMNS = ("ts", "text", "tool", "session", "vault_start", "vault_end", "agent_id", "nonce", "sender", "dest_region")
+
+
+def _text(event: str, tool: str, d: Dict) -> str:
+    det = d.get("details") or {}
+    if event == "tool_execution_started":
+        keys = det.get("param_keys")
+        keys = ",".join(str(k) for k in keys) if isinstance(keys, list) else str(keys or "")
+        return f"tool {tool} started; params: {keys}"          # stable text so repeated calls look identical (#51)
+    if event == "tool_execution_completed":
+        return f"tool {tool} completed: {det.get('outcome_summary') or ''}"   # duration left out on purpose
+    if event == "tool_execution_failed":
+        return f"tool {tool} failed: {det.get('error') or ''}"
+    if event == "tool_execution_denied":
+        return f"tool {tool} denied: {det.get('reason') or ''}"
+    cats = det.get("sensitivity_categories")
+    cats = ",".join(str(c) for c in cats) if isinstance(cats, list) else str(cats or "")
+    return f"sensitive data accessed ({d.get('sensitivity_level')}): {cats}"
+
+
+def to_row(d: Dict) -> Optional[Dict]:
+    """One audit record -> one log-table row, or None if it is not an agent action."""
+    event = d.get("event_type")
+    if event not in TOOL_EVENTS and event != SENSITIVE_EVENT:
+        return None
+    if d.get("actor_type") != "agent" or not d.get("actor_id") or not d.get("timestamp"):
+        return None
+    det = d.get("details") or {}
+    tool = str(d.get("target_id") or "") if d.get("target_type") == "tool" else None
+    return {
+        "ts": str(d["timestamp"]),
+        "text": mask(_text(event, tool or "-", d)),
+        "tool": tool,
+        "session": str(d.get("correlation_id") or det.get("task_id") or "") or None,   # VERIFY: correlation_id is the session
+        "vault_start": [],
+        "vault_end": [],
+        "agent_id": str(d["actor_id"]),
+        "nonce": None,
+        "sender": None,
+        "dest_region": None,
+    }
+
+
+def read_records(paths: Iterable[str]) -> Iterator[Tuple[Optional[Dict], bool]]:
+    """Yield (record, ok). Unparseable lines come back as (None, False) so they can be counted."""
+    for p in paths:
+        with open(p, errors="replace") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    d = json.loads(line)
+                    yield (d, True) if isinstance(d, dict) else (None, False)
+                except ValueError:
+                    yield None, False
+
+
+def build_rows(paths: Iterable[str], agent: str, since: Optional[str] = None) -> Tuple[List[Dict], Dict]:
+    rows, stats = [], Counter()
+    for d, ok in read_records(paths):
+        if not ok:
+            stats["unparseable"] += 1
+            continue
+        stats["records"] += 1
+        row = to_row(d)
+        if row is None:
+            stats["skipped_not_agent_action"] += 1
+        elif row["agent_id"] != agent:
+            stats["skipped_other_agent"] += 1
+        elif since and row["ts"] <= since:
+            stats["skipped_before_since"] += 1
+        else:
+            rows.append(row)
+            stats["loaded:" + str(d["event_type"])] += 1
+    rows.sort(key=lambda r: r["ts"])
+    return rows, dict(stats)
+
+
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--agent", required=True, help="agent id, e.g. testingnt69 (non-prod only)")
+    ap.add_argument("--audit-dir", default="/opt/openclaw/audit")
+    ap.add_argument("--since", help="only rows with ts strictly after this ISO timestamp (printed by the previous run)")
+    ap.add_argument("--out", help="write NDJSON here (omit with --dry-run)")
+    ap.add_argument("--dry-run", action="store_true", help="print counts only; no rows are written or shown")
+    a = ap.parse_args(argv)
+    if not a.dry_run and not a.out:
+        ap.error("give --out FILE, or --dry-run")
+    paths = sorted(glob.glob(a.audit_dir.rstrip("/") + "/audit-*.jsonl"))
+    if not paths:
+        print(f"no audit files under {a.audit_dir}", file=sys.stderr)
+        return 2
+    rows, stats = build_rows(paths, a.agent, a.since)
+    print(f"files: {len(paths)}  agent: {a.agent}  rows: {len(rows)}")
+    for k in sorted(stats):
+        print(f"  {k}: {stats[k]}")
+    if rows:
+        print(f"  ts range: {rows[0]['ts']} .. {rows[-1]['ts']}   (next run: --since {rows[-1]['ts']})")
+    if not a.dry_run:
+        with open(a.out, "w") as f:
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"wrote {len(rows)} rows to {a.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
