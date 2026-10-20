@@ -28,6 +28,7 @@ export default defineConfig({
       include: [
         "workers/mpt-leads/worker.js",
         "workers/oauth-poc/*.js",
+        "workers/mpt-content-approval/*.js",
         "src/lib/hubspot.ts",
         "src/pages/Contact.tsx",
         "src/pages/Start.tsx",
