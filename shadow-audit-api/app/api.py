@@ -1,4 +1,4 @@
-"""WSGI app (stdlib only). Bearer auth on everything except /health."""
+"""WSGI app (stdlib only). Bearer auth on everything except /health and the public key file."""
 import hmac
 import json
 import re
@@ -8,6 +8,7 @@ from app.services.audit import AuditService
 
 ROUTES = [
     ("GET", re.compile(r"^/health$"), "health"),
+    ("GET", re.compile(r"^/\.well-known/shadow-audit-keys\.json$"), "keys"),
     ("POST", re.compile(r"^/audit/([^/]+)$"), "trigger"),
     ("GET", re.compile(r"^/audit/([^/]+)$"), "get_audit"),
     ("GET", re.compile(r"^/agent/([^/]+)/audit-history$"), "history"),
@@ -27,7 +28,7 @@ def make_app(svc: AuditService, api_token: str) -> Callable:
             mt = rx.match(path)
             if m != method or not mt:
                 continue
-            if name != "health":
+            if name not in ("health", "keys"):
                 # X-Api-Token first: behind Cloud Run IAM the Authorization header carries Google's OIDC token.
                 supplied = environ.get("HTTP_X_API_TOKEN") or environ.get("HTTP_AUTHORIZATION", "").removeprefix("Bearer ")
                 if not api_token or not hmac.compare_digest(supplied, api_token):
@@ -39,6 +40,10 @@ def make_app(svc: AuditService, api_token: str) -> Callable:
                 return respond(start, "400 Bad Request", {"error": "invalid json"})
             if name == "health":
                 return respond(start, "200 OK", {"status": "healthy", "environment": svc.s.environment})
+            if name == "keys":
+                if not svc.signer:
+                    return respond(start, "404 Not Found", {"error": "no signing key configured"})
+                return respond(start, "200 OK", svc.signer.jwks())
             if name == "trigger":
                 days = body.get("lookbackDays")
                 if days is not None and not (isinstance(days, int) and 1 <= days <= 30):
