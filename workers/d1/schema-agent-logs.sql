@@ -1,3 +1,5 @@
+-- DEPRECATED (MPC-8371): not valid SQLite (inline INDEX clauses) and never applied. The live schema is
+-- workers/mpt-content-consumer/migrations/0001_init.sql + 0002_spec_columns.sql. Kept only for history.
 -- mpt-agent-logs D1 database schema
 -- Tracks all agent execution events and social metrics across the MPT fleet
 

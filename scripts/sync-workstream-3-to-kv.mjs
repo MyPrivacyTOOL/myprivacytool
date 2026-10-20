@@ -1,130 +1,64 @@
 #!/usr/bin/env node
-/**
- * sync-workstream-3-to-kv.mjs
- * 
- * Reads MyPrivacyTOOL's Notion WORKSTREAM 3 database and syncs daily topic
- * assignments to Cloudflare KV namespace mpt-brand-topics.
- * 
- * Runs daily at 22:00 HKT (via Cloudflare scheduled trigger or manual invocation).
- * Idempotent: overwrites keys for dates already present.
- * 
- * Usage:
- *   npm run sync:workstream-3-to-kv
- * 
- * Environment:
- *   NOTION_TOKEN: Notion integration token (required)
- *   CLOUDFLARE_API_TOKEN: Cloudflare API token with KV:write (required)
- *   CF_ACCOUNT_ID: Cloudflare account ID (default: 35cb17172c65a20f5cf1baf131485382)
- *   KV_NAMESPACE_ID: KV namespace ID for mpt-brand-topics (default: from wrangler.toml)
- */
+// Sync the Notion "WORKSTREAM 3: Content Distribution Schedule" page into the Workers KV namespace mpt-brand-topics
+// (MPC-8371) so the autonomous content pipeline reads each day's topics from KV instead of hitting Notion.
+// Notion stays the source of truth; KV is a read-only cache. WORKSTREAM 3 is a Notion page (not a database), so it is
+// parsed with the same parser as sync-content-cache-to-kv.mjs.
+//
+// Idempotent: keys are deterministic (topic:<date>) and per-day values carry no timestamp, so re-running against an
+// unchanged page rewrites identical values. Only topic:index records synced_at. Refuses to write if nothing parses.
+//
+// Required env (names only, never commit values):
+//   NOTION_TOKEN            internal integration with the WORKSTREAM 3 page shared to it
+//   CLOUDFLARE_API_TOKEN    token with Account > Workers KV Storage > Edit
+//   CLOUDFLARE_ACCOUNT_ID   35cb17172c65a20f5cf1baf131485382
+// Optional env:
+//   KV_NAMESPACE_ID         default: 187c9af3fc3a44bea3b1eb80298ab0ce (mpt-brand-topics)
+//   SCHEDULE_PAGE_ID        default: 3f128547-eaa7-81ed-8e81-e74b87da1efc
+//   CONTENT_YEAR            default: 2026 (the schedule lists "Oct 9", no year)
+//
+// Usage: node scripts/sync-workstream-3-to-kv.mjs [--dry-run]
+//
+// KV layout:
+//   topic:<YYYY-MM-DD> -> {date, items:{pillar|blog|x|reddit|linkedin:[{text,qualifier}]}}
+//   topic:index        -> {synced_at, count, dates:[...]}
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { pathToFileURL } from 'node:url';
+import { fetchBlocks, parseSchedule } from './sync-content-cache-to-kv.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const NOTION_TOKEN = process.env.NOTION_TOKEN || '';
-const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN || '';
-const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || '35cb17172c65a20f5cf1baf131485382';
-const KV_NAMESPACE_ID = process.env.KV_NAMESPACE_ID || '85e2c0b18f4d4e1e892a37c8d6f5a1b9'; // TBD: fetch from wrangler.toml
+export function buildTopicPairs({ scheduleBlocks, year, now = new Date() }) {
+  const days = parseSchedule(scheduleBlocks, year);
+  const dates = Object.keys(days).sort();
+  if (!dates.length) throw new Error('No dated items parsed from the WORKSTREAM 3 page; refusing to overwrite KV.');
+  return [
+    ...dates.map((d) => ({ key: `topic:${d}`, value: JSON.stringify(days[d]) })),
+    { key: 'topic:index', value: JSON.stringify({ synced_at: now.toISOString(), count: dates.length, dates }) },
+  ];
+}
 
-// === NOTION FETCH ===
-async function fetchWorkstream3(notionToken) {
-  const databaseId = 'WORKSTREAM_3_DATABASE_ID'; // TBD: Chris provides Notion database ID
-  if (!notionToken) throw new Error('NOTION_TOKEN not set');
+export async function main(env = process.env, argv = process.argv) {
+  const dryRun = argv.includes('--dry-run');
+  const need = (k) => { if (!env[k]) throw new Error(`Missing env ${k}`); return env[k]; };
+  const notionToken = need('NOTION_TOKEN');
+  const cfToken = dryRun ? env.CLOUDFLARE_API_TOKEN : need('CLOUDFLARE_API_TOKEN');
+  const accountId = dryRun ? env.CLOUDFLARE_ACCOUNT_ID : need('CLOUDFLARE_ACCOUNT_ID');
+  const nsId = env.KV_NAMESPACE_ID || '187c9af3fc3a44bea3b1eb80298ab0ce';
 
-  const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${notionToken}`,
-      'Notion-Version': '2022-06-28',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      filter: {
-        and: [
-          { property: 'Status', select: { equals: 'Ready' } },
-          { property: 'Date', date: { on_or_after: new Date().toISOString().slice(0, 10) } },
-        ],
-      },
-      sorts: [{ property: 'Date', direction: 'ascending' }],
-      page_size: 100,
-    }),
+  const scheduleBlocks = await fetchBlocks(env.SCHEDULE_PAGE_ID || '3f128547-eaa7-81ed-8e81-e74b87da1efc', notionToken);
+  const pairs = buildTopicPairs({ scheduleBlocks, year: Number(env.CONTENT_YEAR) || 2026 });
+  console.log(`${pairs.length} KV keys -> ${nsId} (mpt-brand-topics)`);
+  if (dryRun) { console.log('dry run: nothing written'); return pairs; }
+
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${nsId}/bulk`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${cfToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(pairs),
   });
-
-  if (!response.ok) {
-    throw new Error(`Notion API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.results.map((result) => {
-    const props = result.properties;
-    return {
-      date: props.Date?.date?.start || '',
-      topic: props.Topic?.title?.[0]?.plain_text || '',
-      pillar: props.Pillar?.select?.name || 'awareness', // default
-      format_type: props.Format?.select?.name || 'mixed', // default
-      asset_tags: props.Tags?.multi_select?.map((t) => t.name) || [],
-      notionPageId: result.id,
-    };
-  });
+  const out = await res.json();
+  if (!res.ok || !out.success) throw new Error(`KV bulk write failed ${JSON.stringify(out.errors)}`);
+  console.log('KV sync complete');
+  return pairs;
 }
 
-// === KV WRITE ===
-async function writeToKV(topics, cfToken, accountId, kvId) {
-  if (!cfToken) throw new Error('CLOUDFLARE_API_TOKEN not set');
-  const baseUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${kvId}/values`;
-
-  for (const topic of topics) {
-    const key = topic.date; // e.g., "2026-10-20"
-    const value = JSON.stringify({
-      date: topic.date,
-      topic: topic.topic,
-      pillar: topic.pillar,
-      format_type: topic.format_type,
-      asset_tags: topic.asset_tags,
-      notionPageId: topic.notionPageId,
-      syncedAt: new Date().toISOString(),
-    });
-
-    const response = await fetch(`${baseUrl}/${encodeURIComponent(key)}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${cfToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: value,
-    });
-
-    if (!response.ok) {
-      console.error(`Failed to write key ${key}:`, response.status, await response.text());
-      throw new Error(`KV write failed for ${key}`);
-    }
-    console.log(`✓ Synced ${key}: "${topic.topic}"`);
-  }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => { console.error(e.message); process.exit(1); });
 }
-
-// === MAIN ===
-async function main() {
-  try {
-    console.log('📡 Fetching WORKSTREAM 3 from Notion...');
-    const topics = await fetchWorkstream3(NOTION_TOKEN);
-    console.log(`✓ Found ${topics.length} topics`);
-
-    if (topics.length === 0) {
-      console.log('No ready topics to sync. Exiting.');
-      process.exit(0);
-    }
-
-    console.log('📝 Writing to Cloudflare KV (mpt-brand-topics)...');
-    await writeToKV(topics, CLOUDFLARE_API_TOKEN, CF_ACCOUNT_ID, KV_NAMESPACE_ID);
-
-    console.log(`✅ Sync complete: ${topics.length} topics written to KV`);
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Sync failed:', err.message);
-    process.exit(1);
-  }
-}
-
-main();

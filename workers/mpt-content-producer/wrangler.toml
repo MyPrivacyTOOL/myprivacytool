@@ -18,6 +18,10 @@ crons = ["0 22 * * *"]
 queue = "mpt-content-generation-queue"
 binding = "CONTENT_QUEUE"
 
+[[kv_namespaces]]
+binding = "BRAND_TOPICS"
+id = "187c9af3fc3a44bea3b1eb80298ab0ce"  # mpt-brand-topics (MPC-8371; seeded by scripts/sync-workstream-3-to-kv.mjs)
+
 [[d1_databases]]
 binding = "AGENT_LOGS"
 database_name = "mpt-agent-logs"
