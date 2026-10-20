@@ -12,7 +12,7 @@ interface EmailCaptureModalProps {
   onSubmit: (email: string) => void;
 }
 
-const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://mpt-leads.myprivacytool.workers.dev';
+const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://api.myprivacytool.io';
 
 interface Baseline {
   overall_score: number;
