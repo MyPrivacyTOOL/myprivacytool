@@ -36,7 +36,7 @@ export interface Endpoint {
 }
 
 export const BASES = {
-  leads: "https://mpt-leads.myprivacytool.workers.dev",
+  leads: "https://api.myprivacytool.io",
   scan: "https://mpt-scan-report.myprivacytool.workers.dev",
   github: "https://channels.myprivacytool.io",
   oauthPoc: "https://myprivacytool-oauth-poc.myprivacytool.workers.dev",

@@ -22,15 +22,18 @@ describe("developer docs match the Workers", () => {
     }
   });
 
-  it("uses the workers.dev hosts declared in each wrangler.toml", () => {
+  it("uses the hosts declared in each wrangler.toml (workers.dev, or a custom domain)", () => {
     expect(read("workers/mpt-leads/wrangler.toml")).toContain('name = "mpt-leads"');
     expect(read("workers/scan-report/wrangler.toml")).toContain('name = "mpt-scan-report"');
     expect(read("workers/github-channel/wrangler.toml")).toContain('name = "myprivacytool-github-channel"');
     expect(read("workers/oauth-poc/wrangler.toml")).toContain('name = "myprivacytool-oauth-poc"');
     // The GitHub channel is served from a subdomain of the site (same-site cookies); the others stay on workers.dev.
     expect(read("workers/github-channel/wrangler.toml")).toContain('pattern = "channels.myprivacytool.io"');
+    // mpt-leads is served from api.myprivacytool.io (custom domain, MPC-8368); workers.dev still answers but is not the documented host.
+    expect(read("workers/mpt-leads/wrangler.toml")).toContain('pattern = "api.myprivacytool.io"');
     for (const [name, base] of Object.entries(BASES)) {
       if (name === "github") expect(base).toBe("https://channels.myprivacytool.io");
+      else if (name === "leads") expect(base).toBe("https://api.myprivacytool.io");
       else expect(base).toMatch(/^https:\/\/[a-z-]+\.myprivacytool\.workers\.dev$/);
     }
   });
