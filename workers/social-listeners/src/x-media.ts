@@ -7,7 +7,8 @@
 import type { Logger } from "./logger";
 import { type Env, pick } from "./shared";
 
-export const VIDEO_URL = "https://myprivacytool.io/media/alice-curtain.mp4";
+// Silent copy of the clip: X plays an animated GIF (dm_gif) automatically and loops it, but only without a sound track.
+export const VIDEO_URL = "https://myprivacytool.io/media/alice-curtain-silent.mp4";
 const UPLOAD = "/media/upload";
 const CHUNK = 1024 * 1024;
 const TIMEOUT_MS = 8000;
@@ -60,7 +61,7 @@ const fail = (log: Logger, event: string, extra?: Record<string, unknown>): null
 };
 
 /** Uploads the clip and returns its media id, or null when anything goes wrong. */
-export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall): Promise<string | null> {
+export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall, category: "dm_gif" | "dm_video" = "dm_video"): Promise<string | null> {
   const call: XUserCall = hasOAuth1(env)
     ? async (path, init) => {
         const url = `https://api.x.com/2${path}`;
@@ -78,7 +79,7 @@ export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall
     const init = await call(`${UPLOAD}/initialize`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ media_type: "video/mp4", total_bytes: video.length, media_category: "dm_video" }),
+      body: JSON.stringify({ media_type: "video/mp4", total_bytes: video.length, media_category: category }),
     });
     if (!init?.ok) return fail(log, "x_media_init_rejected", { status: init?.status ?? 0 });
     const id = idOf(await init.json());

@@ -292,11 +292,13 @@ export async function sendXDm(env: Env, recipientId: string, text: string, log?:
   const quiet: Logger = log ?? { info() {}, warn() {}, error() {} };
   const path = `/dm_conversations/with/${recipientId}/messages`;
   if (opts.video) {
-    const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init));
-    if (mediaId) {
+    // An animated GIF autoplays and loops in the DM; if X refuses it, the same clip goes as a normal video, then as text alone.
+    for (const category of ["dm_gif", "dm_video"] as const) {
+      const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init), category);
+      if (!mediaId) continue;
       const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) });
       if (withVideo?.ok) return true;
-      quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0 });
+      quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0, category });
     }
   }
   const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) });

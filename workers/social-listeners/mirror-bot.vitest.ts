@@ -275,13 +275,15 @@ describe("Alice clip on DMs (MPC-7628)", () => {
   function fake(upload: "ok" | "forbidden" = "ok", dmWithVideoOk = true) {
     const sent: Record<string, unknown>[] = [];
     const steps: string[] = [];
+    const categories: string[] = [];
     const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(2_500_000));
+      if (url.endsWith("/media/alice-curtain-silent.mp4")) return new Response(new Uint8Array(2_500_000));
       if (url.includes("/media/upload")) {
         if (init?.method === "GET") return Response.json({ data: { processing_info: { state: "succeeded" } } });
         const cmd = url.endsWith("/initialize") ? "INIT" : url.endsWith("/append") ? "APPEND" : url.endsWith("/finalize") ? "FINALIZE" : "?";
         steps.push(cmd);
+        if (cmd === "INIT") categories.push(JSON.parse(init!.body as string).media_category);
         if (upload === "forbidden") return new Response("{}", { status: 403 });
         if (cmd === "INIT") return Response.json({ data: { id: "777" } });
         if (cmd === "FINALIZE") return Response.json({ data: { id: "777" } });
@@ -294,7 +296,7 @@ describe("Alice clip on DMs (MPC-7628)", () => {
       }
       return new Response("{}");
     });
-    return { f, sent, steps };
+    return { f, sent, steps, categories };
   }
   const e = () => ({ ...env(), MEDIA_VIDEO_URL: undefined });
 
@@ -303,6 +305,7 @@ describe("Alice clip on DMs (MPC-7628)", () => {
     await post(dm("42", "hello"), e());
     await settle();
     expect(x.steps).toEqual(["INIT", "APPEND", "APPEND", "APPEND", "FINALIZE"]);
+    expect(x.categories).toEqual(["dm_gif"]); // an animated GIF autoplays and loops in the DM
     expect(x.sent).toHaveLength(1);
     expect(x.sent[0]).toEqual({ text: WELCOME_MESSAGE, attachments: [{ media_id: "777" }] });
   });
@@ -316,7 +319,13 @@ describe("Alice clip on DMs (MPC-7628)", () => {
     const x = fake("ok", false);
     await post(dm("42", "hello"), e());
     await settle();
-    expect(x.sent).toEqual([{ text: WELCOME_MESSAGE, attachments: [{ media_id: "777" }] }, { text: WELCOME_MESSAGE }]);
+    // first as an animated GIF, then as a normal video, then as text alone
+    expect(x.sent).toEqual([
+      { text: WELCOME_MESSAGE, attachments: [{ media_id: "777" }] },
+      { text: WELCOME_MESSAGE, attachments: [{ media_id: "777" }] },
+      { text: WELCOME_MESSAGE },
+    ]);
+    expect(x.categories).toEqual(["dm_gif", "dm_video"]);
   });
   it("MEDIA_VIDEO_URL=off means text only and no upload", async () => {
     const x = fake();
@@ -482,7 +491,7 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
     const seen: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
-      if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(10));
+      if (url.endsWith("/media/alice-curtain-silent.mp4")) return new Response(new Uint8Array(10));
       if (url.includes("/media/upload")) {
         seen.push((init!.headers as Record<string, string>).Authorization);
         return Response.json({ data: { id: "9" } });
