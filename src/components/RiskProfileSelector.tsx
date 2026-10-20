@@ -82,7 +82,7 @@ export default function RiskProfileSelector({
 
     try {
       // Call the Worker to save the risk profile to Supabase
-      const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://mpt-leads.myprivacytool.workers.dev';
+      const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://api.myprivacytool.io';
       
       const res = await fetch(WORKER_ENDPOINT, {
         method: 'POST',

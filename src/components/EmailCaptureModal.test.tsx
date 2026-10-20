@@ -48,7 +48,7 @@ describe("EmailCaptureModal", () => {
     expect(screen.getByText(/Baseline saved: 55\/100/)).toBeInTheDocument();
     expect(onSubmit).toHaveBeenCalledWith("ok@example.com");
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain("mpt-leads");
+    expect(url).toContain("api.myprivacytool.io");
     expect(JSON.parse(init.body as string)).toMatchObject({
       email: "ok@example.com", riskScore: 55, confirmedCount: 23, consent: true, consent_source: "web_scan_summary", categoryScores: { fingerprint: 50 },
     });

@@ -102,6 +102,17 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
   r=await ts('bad',enf); check(r.status===403&&r.json.error==='Verification failed'&&r.supa.length===0,'enforce: invalid token => 403 and nothing written');
   r=await ts(undefined,enf); check(r.status===403&&r.supa.length===0,'enforce: missing token => 403 and nothing written');
   r=await ts('wronghost',enf); check(r.status===403,'enforce: token issued for another hostname => 403');
+  {
+    const lines=[]; const rw=console.warn; console.warn=(...a)=>{ lines.push(a.join(' ')); };
+    calls=[]; const w=[]; const b403=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'198.51.100.9'},body:JSON.stringify({email:'secret@leak.co',riskScore:5,'cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w.push(p)}); await Promise.all(w);
+    console.warn=rw;
+    const tl=lines.find(l=>l.startsWith('TURNSTILE_FAILED ')); const j=tl&&JSON.parse(tl.slice('TURNSTILE_FAILED '.length));
+    check(b403.status===403&&j&&j.ip==='198.51.100.9'&&/^\d{4}-\d\d-\d\dT/.test(j.ts)&&j.action==='blocked_403'&&j.reason.startsWith('rejected:')&&j.origin==='https://myprivacytool.io','enforce: a 403 logs one TURNSTILE_FAILED line with ip, ISO timestamp, reason, origin and action');
+    check(tl&&!tl.includes('secret@leak.co')&&!tl.includes('"bad"'),'the TURNSTILE_FAILED log line carries no email and no token');
+    const l2=[]; console.warn=(...a)=>{ l2.push(a.join(' ')); }; await ts(undefined,enf); await ts('bad',tsEnv); console.warn=rw;
+    const miss=l2.find(l=>l.includes('missing_token')); check(miss&&JSON.parse(miss.slice('TURNSTILE_FAILED '.length)).action==='blocked_403','missing token logs reason missing_token');
+    check(l2.some(l=>l.includes('"action":"allowed_report_only"')),'report-only failures are logged too, marked allowed_report_only');
+  }
   r=await ts('good',enf); check(r.status===200&&r.json.success,'enforce: valid token => 200');
   r=await ts('throw',enf); check(r.status===200,'enforce: siteverify unreachable fails open (a Cloudflare outage never drops a lead)');
   r=await ts('down',enf); check(r.status===200,'enforce: siteverify HTTP 500 fails open');
