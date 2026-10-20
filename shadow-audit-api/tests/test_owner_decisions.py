@@ -49,7 +49,7 @@ class QuarantineRuleTests(unittest.TestCase):
 
 class PublicKeyTests(unittest.TestCase):
     def test_published_key_verifies_a_passport_and_rejects_tampering(self):
-        s = svc(InMemorySource({"a1": []}))
+        s = svc(InMemorySource({"a1": [{"ts": "2026-10-20T00:00:00Z", "text": "ok"}]}))
         app = make_app(s, "tok")
         code, jwks = call(app, "GET", "/.well-known/shadow-audit-keys.json", token=None)   # no API token needed
         self.assertEqual(code, "200 OK")
