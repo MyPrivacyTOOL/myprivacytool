@@ -28,6 +28,8 @@ export default defineConfig({
       include: [
         "workers/mpt-leads/worker.js",
         "workers/oauth-poc/*.js",
+        "workers/mpt-content-producer/worker.js",
+        "workers/mpt-content-consumer/worker.js",
         "src/lib/hubspot.ts",
         "src/pages/Contact.tsx",
         "src/pages/Start.tsx",
@@ -36,7 +38,11 @@ export default defineConfig({
         "src/components/ConsentCheckbox.tsx",
         "scripts/ci/*.mjs",
       ],
-      thresholds: { lines: 80, statements: 80, functions: 80, branches: 70 },
+      thresholds: {
+        lines: 80, statements: 80, functions: 80, branches: 70,
+        // MPC-8370: the content pipeline Workers are held to 90%.
+        "workers/mpt-content-{producer,consumer}/worker.js": { lines: 90, statements: 90, functions: 90, branches: 90 },
+      },
     },
   },
 });

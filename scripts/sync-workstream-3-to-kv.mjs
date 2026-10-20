@@ -26,7 +26,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NOTION_TOKEN = process.env.NOTION_TOKEN || '';
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN || '';
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID || '35cb17172c65a20f5cf1baf131485382';
-const KV_NAMESPACE_ID = process.env.KV_NAMESPACE_ID || '85e2c0b18f4d4e1e892a37c8d6f5a1b9'; // TBD: fetch from wrangler.toml
+const KV_NAMESPACE_ID = process.env.KV_NAMESPACE_ID || '187c9af3fc3a44bea3b1eb80298ab0ce'; // mpt-brand-topics (same id as workers/mpt-content-producer/wrangler.toml)
 
 // === NOTION FETCH ===
 async function fetchWorkstream3(notionToken) {
