@@ -26,6 +26,11 @@ head_sampling_rate = 1
 [vars]
 CONFIRMATION_OWNER = "scan-report"
 
+# MPC-8368: Turnstile on the scan email form. TURNSTILE_SECRET_KEY is a Worker secret (set already, see EXPECTED_SECRETS.txt).
+# "false" = verify and log only; set "true" to reject failed/missing tokens once the site that sends them is live and
+# the logs show tokens passing. Declared here because `wrangler deploy` replaces dashboard-set plain vars.
+TURNSTILE_ENFORCE = "false"
+
 # MPC-7350: per-IP rate limit on the public POST endpoint (10 requests / 60s). The code fails open if
 # this binding is missing, so deploying the code before the binding is safe.
 # Syntax note: the deploy action installs wrangler 3.90.0, which ignores the newer [[ratelimits]] table (it only warns
