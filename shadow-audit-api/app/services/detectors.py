@@ -150,6 +150,32 @@ def make_119(allowed_regions):
     return detect
 
 
+def _has(entries: Entries, pred) -> bool:
+    return any(pred(e) for e in entries)
+
+
+# A detector "had data" only if the log holds input it can actually judge. This is a floor, not a
+# guarantee: e.g. #1 counts as covered when text exists, though prompts may not be logged at all.
+APPLIES = {
+    "risk1": lambda es: _has(es, lambda e: bool(e.get("text"))),
+    "risk9": lambda es: _has(es, lambda e: bool(e.get("vault_start")) or bool(e.get("vault_end"))),
+    "risk41": lambda es: _has(es, lambda e: bool(SQL_WORD_RE.search(e.get("text", "")))),
+    "risk42": lambda es: _has(es, lambda e: e.get("tool") in SHELL_TOOLS),
+    "risk51": lambda es: _has(es, lambda e: bool(e.get("tool"))),
+    "risk57": lambda es: _has(es, lambda e: bool(e.get("text"))),
+    "risk58": lambda es: _has(es, lambda e: bool(e.get("text"))),
+    "risk65": lambda es: _has(es, lambda e: bool(e.get("nonce"))),
+    "risk99": lambda es: _has(es, lambda e: bool(INSTALL_WORD_RE.search(e.get("text", "")))),
+    "risk119": lambda es: _has(es, lambda e: bool(e.get("dest_region"))),
+}
+SQL_WORD_RE = re.compile(r"(?i)\b(select|insert|update|delete)\b")
+INSTALL_WORD_RE = re.compile(r"(?i)\b(pip3?|npm)\s+(install|i)\b")
+
+
+def coverage(entries: Entries) -> Dict[str, bool]:
+    return {name: bool(fn(entries)) for name, fn in APPLIES.items()}
+
+
 def build(settings) -> list:
     """All detectors as (name, fn(entries))."""
     return [("risk1", detect_1_prompt_injection), ("risk9", detect_9_uncleared_context),
