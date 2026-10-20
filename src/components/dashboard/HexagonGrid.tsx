@@ -9,12 +9,13 @@ interface Props {
   scanResult: ScanResult;
   onConfirm: (id: string, isMatch: boolean) => void;
   onDispute: (id: string) => void;
+  onKeep?: (id: string) => void;
   onSelect: (hexagon: Hexagon) => void;
   /** Ids of confirmed exposures the user has fixed. */
   fixedIds?: ReadonlySet<string>;
 }
 
-const Hive = ({ items, fixedIds, onConfirm, onDispute, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
+const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
   const ref = useRef<HTMLDivElement>(null);
   const layout = hiveLayout(items.length, useElementWidth(ref));
   return (
@@ -26,6 +27,7 @@ const Hive = ({ items, fixedIds, onConfirm, onDispute, onSelect }: Omit<Props, '
             hexagon={h}
             onConfirm={onConfirm}
             onDispute={onDispute}
+            onKeep={onKeep}
             onSelect={onSelect}
             fixed={fixedIds?.has(h.id)}
             compact={layout.compact}

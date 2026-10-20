@@ -7,6 +7,8 @@ import { ProgressRing } from '@/components/dashboard/ProgressRing';
 import { HitlConfirmModal } from '@/components/modals/HitlConfirmModal';
 import { countSecured } from '@/components/dashboard/countSecured';
 import { TileProfile } from '@/components/dashboard/TileProfile';
+import { canDispute } from '@/lib/identityConfirmation';
+import { recordAnswer, recordShown, type TileInfo } from '@/lib/learning/events';
 import { effectiveTile } from '@/utils/hexagonStyles';
 import type { TileKind } from '@/lib/hexagonTile';
 import { buildReportHtml } from '@/lib/honeycombReport';
@@ -43,6 +45,21 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
     onAllAnswered?.(scanResult.hexagons.length);
   }, [guessesLeft, onAllAnswered, scanResult.hexagons.length]);
 
+  // MPC-7915: tell the learning loop what was shown and answered. Off unless the build and the Worker both switch it on, and only with consent;
+  // see lib/learning/events. Only web-scan tiles, never a finding's value, and a plain tap or a closed prompt is never sent.
+  const tileInfo = (h: Hexagon): TileInfo => ({
+    hexagonId: h.id, tileKind: effectiveTile(h, fixedIds.has(h.id)) ?? null, confidence: h.confidence_score ?? null, source: 'web-scan',
+  });
+  const offersAnswer = (h: Hexagon) => h.source === 'web-scan' && (h.status === 'guess' || canDispute(h));
+  useEffect(() => {
+    for (const h of scanResult.hexagons) if (offersAnswer(h)) void recordShown(tileInfo(h));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanResult.hexagons]);
+  const reportAnswer = (id: string, answer: 'yes_me' | 'not_me' | 'disputed' | 'kept') => {
+    const h = scanResult.hexagons.find((x) => x.id === id);
+    if (h && offersAnswer(h)) void recordAnswer(tileInfo(h), answer);
+  };
+
   const active = scanResult.hexagons.find((h) => h.id === activeId) ?? null;
   const close = () => setPhase(null);
 
@@ -54,6 +71,7 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
   const onAnswer = (isMatch: boolean) => {
     if (!active) return;
     markStarted();
+    reportAnswer(active.id, isMatch ? 'yes_me' : 'not_me');
     handleConfirm(active.id, isMatch);
     // No: fade out (the false_positive is logged by the state hook). Yes: move to the action plan.
     setPhase(isMatch && (active.exposure || active.remediation) ? 'remediate' : null);
@@ -95,8 +113,10 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
         onConfirm={handleConfirm}
         onDispute={(id) => {
           markStarted();
+          reportAnswer(id, 'disputed');
           handleDispute(id);
         }}
+        onKeep={(id) => reportAnswer(id, 'kept')}
         onSelect={onSelect}
         fixedIds={fixedIds}
       />

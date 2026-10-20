@@ -25,6 +25,8 @@ interface Props {
   hexagon: Hexagon;
   onConfirm: (id: string, isMatch: boolean) => void;
   onDispute: (id: string) => void;
+  /** The visitor pressed the labelled "Keep it" button on the dispute prompt (closing the prompt is not an answer). */
+  onKeep?: (id: string) => void;
   /** When set, a tap on a guess calls this instead of opening the built-in prompt (the dashboard shows its own modal). */
   onSelect?: (hexagon: Hexagon) => void;
   /** The user finished the remediation step: a confirmed exposure shows green instead of red. */
@@ -36,7 +38,7 @@ interface Props {
   style?: CSSProperties;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, compact = false, className, style }: Props) => {
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, onSelect, fixed = false, compact = false, className, style }: Props) => {
   // Which prompt is open. Only the buttons inside a prompt record an answer; closing it (Esc, outside click, Keep it) records nothing.
   const [prompt, setPrompt] = useState<'confirm' | 'dispute' | null>(null);
   const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
@@ -139,7 +141,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => onKeep?.(hexagon.id)}>Keep it</AlertDialogCancel>
             <AlertDialogAction onClick={() => onDispute(hexagon.id)}>This isn't right</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
