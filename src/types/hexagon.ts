@@ -1,4 +1,5 @@
 import type { TileKind } from '@/lib/hexagonTile';
+import type { GuessBand } from '@/lib/guessBands';
 
 // Human-in-the-loop identity confirmation: the status model for findings the user can confirm or dispute.
 // Separate from the web-scan registry statuses (found / clear / not_checked in shared/hexagon-registry).
@@ -35,6 +36,8 @@ export interface Hexagon {
   interaction_state?: InteractionState;
   /** How the dashboard paints this tile (the same decision the honest-tile grid makes). Absent for hexagons that do not come from the web scan. */
   tile?: TileKind;
+  /** For a guess from the web scan: how sure we are, in words (never a number). */
+  band?: GuessBand;
 }
 
 export interface ScanResult {

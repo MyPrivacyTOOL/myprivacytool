@@ -7,6 +7,7 @@ import type { HexagonData } from '@/lib/deviceDetection';
 import type { Hexagon } from '@/types/hexagon';
 import { captureContext } from '@/lib/webScan';
 import { tileKind } from '@/lib/hexagonTile';
+import { guessBandFor } from '@/lib/guessBands';
 import { remediationFor } from '@/utils/remediationMapper';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { captureStatus, isEstimate } from '../../shared/hexagon-registry/status.js';
@@ -43,6 +44,7 @@ export function fromWebScan(scanned: HexagonData[]): Hexagon[] {
       confidence_score: Math.min(1, Math.max(0, seen.confidence / 100)),
       exposure: estimatedFinding,
       tile,
+      ...(estimatedFinding ? { band: guessBandFor(reg.id, ctx) ?? undefined } : {}),
     };
   });
 }

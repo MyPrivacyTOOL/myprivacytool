@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import type { Hexagon } from '@/types/hexagon';
 import { getHexagonVisuals, getHexPaint, effectiveTile } from '@/utils/hexagonStyles';
 import { TILE_COPY } from '@/lib/hexagonTile';
+import { BAND_FILL_OPACITY, BAND_WORD } from '@/lib/guessBands';
 import { canConfirm, canDispute } from '@/lib/identityConfirmation';
 import { cn } from '@/lib/utils';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
@@ -52,6 +53,9 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, 
   const solid = !!tile && tile.level === 'solid' && tile.colour !== 'grey';
   const hue = tile ? `hsl(var(--tile-${tile.colour}))` : '';
   const needsFix = kind === 'needs_fixing';
+  // A guess shows how sure we are in words and a slightly different purple (Chris approved the bands, 2026-10-20). Never a number.
+  const band = kind === 'our_guess' ? hexagon.band : undefined;
+  const lineText = tile ? (band ? `${tile.line} · ${BAND_WORD[band]}` : tile.line) : '';
   const reopensPlan = (exposed || needsFix) && !!onSelect;
   const interactive = requiresConfirmation || allowsDispute || reopensPlan;
   const secured = !tile && !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
@@ -89,7 +93,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, 
             className={cn(!tile && paint.polygon, !tile && paint.dashed && '[stroke-dasharray:7_5]', 'transition-colors group-focus-visible:stroke-blue-500')}
             style={tile ? {
               stroke: tile.colour === 'grey' ? 'hsl(var(--tile-grey))' : hue,
-              fill: tile.colour === 'grey' ? 'transparent' : tile.level === 'solid' ? hue : `hsl(var(--tile-${tile.colour}) / ${tile.level === 'medium' ? 0.42 : 0.16})`,
+              fill: tile.colour === 'grey' ? 'transparent' : tile.level === 'solid' ? hue : `hsl(var(--tile-${tile.colour}) / ${band ? BAND_FILL_OPACITY[band] : tile.level === 'medium' ? 0.42 : 0.16})`,
             } : undefined}
           />
         </svg>
@@ -111,7 +115,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, 
         <span className="relative text-xl leading-none" aria-hidden="true">{emoji}</span>
         <span className="relative w-[68%] text-[9px] font-semibold uppercase leading-tight tracking-wide">{hexagon.label}</span>
         {showValue && <span className={cn('relative w-[68%] truncate text-[10px]', solid ? 'text-white' : 'text-gray-900')}>{hexagon.data}</span>}
-        {tile && !compact && <span className="relative w-[68%] truncate text-[8px] italic" data-testid="tile-line">{tile.line}</span>}
+        {tile && !compact && <span className="relative w-[68%] truncate text-[8px] italic" data-testid="tile-line">{lineText}</span>}
         <span className="sr-only">{tip}</span>
       </button>
 
