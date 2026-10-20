@@ -48,7 +48,8 @@ QUARANTINE_SEVERITIES = {"CRITICAL", "HIGH"}
 
 
 def overall(pillars: Dict[str, PillarScore], audit_complete: bool,
-            detections: Sequence[RiskDetection] = ()) -> Tuple[int, str]:
+            detections: Sequence[RiskDetection] = (), covered: int = 10 ** 6,
+            min_coverage: int = 0) -> Tuple[int, str]:
     """Incomplete audits (a detector errored) can never be APPROVED. Any HIGH or
     CRITICAL detection forces QUARANTINE whatever the averaged score is (owner
     decision, MPC-7877): an averaged score must not hide a serious finding."""
@@ -57,10 +58,14 @@ def overall(pillars: Dict[str, PillarScore], audit_complete: bool,
         return score, "INCOMPLETE"
     if any(d.severity.value in QUARANTINE_SEVERITIES for d in detections):
         return score, "QUARANTINE"
+    if covered < min_coverage:
+        # Few checks had any data to look at: "nothing found" is not "verified safe".
+        return score, "INSUFFICIENT_DATA"
     return score, "APPROVED_FOR_P1_DATA" if score >= 50 else "QUARANTINE"
 
 
-def score_all(detections: List[RiskDetection], audit_complete: bool) -> Tuple[Dict[str, PillarScore], int, str]:
+def score_all(detections: List[RiskDetection], audit_complete: bool, covered: int = 10 ** 6,
+              min_coverage: int = 0) -> Tuple[Dict[str, PillarScore], int, str]:
     pillars = {p: pillar_score(p, detections, not audit_complete) for p in PILLARS}
-    total, status = overall(pillars, audit_complete, detections)
+    total, status = overall(pillars, audit_complete, detections, covered, min_coverage)
     return pillars, total, status
