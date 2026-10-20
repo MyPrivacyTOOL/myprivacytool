@@ -3,7 +3,7 @@
 //   { "action": "approve_all" | "reject" | "edit_resubmit", "drafted_content_id": "daily-posts-YYYY-MM-DD", "timestamp": "..." }
 //   (JSON requires `Authorization: Bearer <APPROVAL_API_TOKEN>`).
 //   reject      -> log to D1, reply in the Slack thread
-//   approve_all -> POST each draft to the Make.com webhook, log to D1 (agent_execution_logs 'published' + social_metrics), reply in thread
+//   approve_all -> validate each draft against Make.com schema, POST each to the Make.com webhook, log to D1 (agent_execution_logs 'published' + social_metrics), reply in thread
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
@@ -44,6 +44,38 @@ async function rows(env, taskId, status) {
 export function scheduledTime(date, platform, now = new Date()) {
   const t = new Date(`${date}T${PUBLISH_HKT[platform]}:00+08:00`);
   return iso(t > now ? t : now);
+}
+
+/**
+ * Validate draft content against Make.com schema.
+ * Required fields: platform, copy, cta
+ * Platform-specific: title for LinkedIn, subreddit for Reddit
+ * Returns { valid: boolean, errors: string[] }
+ */
+export function validateMakeSchema(draft) {
+  const errors = [];
+  if (!draft.platform || !['x', 'linkedin', 'instagram', 'reddit'].includes(draft.platform)) {
+    errors.push('platform must be one of: x, linkedin, instagram, reddit');
+  }
+  if (!draft.copy || typeof draft.copy !== 'string' || draft.copy.trim().length === 0) {
+    errors.push('copy is required and must be a non-empty string');
+  }
+  if (!draft.cta || typeof draft.cta !== 'string' || draft.cta.trim().length === 0) {
+    errors.push('cta (call-to-action) is required and must be a non-empty string');
+  }
+  if (draft.platform === 'linkedin' && (!draft.title || typeof draft.title !== 'string' || draft.title.trim().length === 0)) {
+    errors.push('LinkedIn posts require a title field');
+  }
+  if (draft.platform === 'reddit' && (!draft.subreddit || typeof draft.subreddit !== 'string' || !draft.subreddit.startsWith('r/'))) {
+    errors.push('Reddit posts require a subreddit field (format: r/privacy)');
+  }
+  if (draft.asset_url && typeof draft.asset_url !== 'string') {
+    errors.push('asset_url must be a string if provided');
+  }
+  if (draft.asset_tags && !Array.isArray(draft.asset_tags)) {
+    errors.push('asset_tags must be an array if provided');
+  }
+  return { valid: errors.length === 0, errors };
 }
 
 /**
@@ -104,6 +136,16 @@ export async function process(env, { action, taskId, timestamp, approver, target
     return { status: 200, message: 'edit requested' };
   }
   if (action !== 'approve_all') return { status: 400, message: `unknown action ${action}` };
+
+  // Validate all drafts against Make.com schema before proceeding
+  const validationResults = drafts.map((d) => ({ draft: d, validation: validateMakeSchema(d) }));
+  const invalid = validationResults.filter((r) => !r.validation.valid);
+  if (invalid.length) {
+    const errorSummary = invalid.map((r) => `${r.draft.platform}: ${r.validation.errors.join(', ')}`).join('\n');
+    await log(env, taskId, 'validation_failed', { error: errorSummary });
+    await reply(env, target, `❌ Schema validation failed:\n${errorSummary}\n\nFix the drafts and resubmit.`);
+    return { status: 400, message: `validation failed: ${errorSummary}` };
+  }
 
   const date = taskId.replace('daily-posts-', '');
   const approvedAt = timestamp && !Number.isNaN(Date.parse(timestamp)) ? iso(new Date(timestamp)) : iso();
