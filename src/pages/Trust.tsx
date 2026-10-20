@@ -72,8 +72,7 @@ const Trust = () => {
           </div>
 
           <p className="mt-12 text-sm text-muted-foreground">
-            MyPrivacyTOOL Ltd, 12E, Block 5, 8 Pak Lai Road, Park Island, Ma Wan, Tsuen Wan
-            District, New Territories, Hong Kong. Questions:{" "}
+            MyPrivacyTOOL Ltd, Hong Kong. Questions:{" "}
             <a
               href="mailto:privacy@myprivacytool.io"
               className="text-brand underline hover:text-foreground"
