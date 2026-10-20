@@ -6,6 +6,7 @@ import { groupHexagons } from '@/lib/hexagonGroups';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
 import { TILE_COPY } from '@/lib/hexagonTile';
 import { effectiveTile } from '@/utils/hexagonStyles';
+import { BAND_FILL_OPACITY, BAND_WORD } from '@/lib/guessBands';
 
 const REPORT_WIDTH = 480;
 const POINTS = '50,2 98,28.7 98,86.8 50,113.5 2,86.8 2,28.7';
@@ -54,7 +55,9 @@ const honestTileSvg = (h: Hexagon, kind: keyof typeof TILE_COPY, left: number, t
   const solid = t.level === 'solid' && t.colour !== 'grey';
   const grey = t.colour === 'grey';
   const fill = grey ? 'none' : col;
-  const op = solid || grey ? 1 : t.level === 'medium' ? 0.42 : 0.16;
+  const band = kind === 'our_guess' ? h.band : undefined;
+  const op = solid || grey ? 1 : band ? BAND_FILL_OPACITY[band] : t.level === 'medium' ? 0.42 : 0.16;
+  const lineText = band ? `${t.line} · ${BAND_WORD[band]}` : t.line;
   const ink = solid ? '#fff' : grey ? '#6b7280' : '#1f2937';
   const emoji = getHexagon(h.id)?.artwork.emoji ?? '•';
   const label = wrap(h.label.toUpperCase(), 14);
@@ -65,7 +68,7 @@ const honestTileSvg = (h: Hexagon, kind: keyof typeof TILE_COPY, left: number, t
   return `<g transform="translate(${left} ${top}) scale(${hw / 100})">
 <polygon points="${POINTS}" fill="${fill}" fill-opacity="${op}" stroke="${col}" stroke-width="3" stroke-linejoin="round"/>
 <text x="50" y="52" font-size="18">${emoji}</text>${lines.join('')}${value ? `<text x="50" y="${vy}" font-size="7" fill="${solid ? '#fff' : '#111827'}">${escapeHtml(value)}</text>` : ''}
-<text x="50" y="${ly}" font-size="5.5" font-style="italic" fill="${ink}">${escapeHtml(t.line)}</text>
+<text x="50" y="${ly}" font-size="5.5" font-style="italic" fill="${ink}">${escapeHtml(lineText)}</text>
 <circle cx="80" cy="26" r="9" fill="${solid ? '#fff' : col}"/><text x="80" y="30" font-size="11" font-weight="700" fill="${solid ? col : '#fff'}">${escapeHtml(t.glyph)}</text></g>`;
 };
 

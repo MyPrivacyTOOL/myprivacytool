@@ -113,4 +113,25 @@ describe('InteractiveHexagonTile honest look', () => {
     expect(screen.getByTitle(/tap to confirm/i)).toBeTruthy();
     expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess');
   });
+  it('a guess shows how sure we are in words and a darker or paler purple, and never a number', () => {
+    const fill = (c: HTMLElement) => (c.querySelector('polygon') as SVGPolygonElement).style.fill;
+    const { container, unmount } = render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess', band: 'likely' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess · likely');
+    const likely = fill(container);
+    unmount();
+    const m = render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess', band: 'maybe' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess · maybe');
+    const maybe = fill(m.container);
+    m.unmount();
+    const w = render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess', band: 'weak' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess · weak guess');
+    const weak = fill(w.container);
+    expect(new Set([likely, maybe, weak]).size).toBe(3);
+    expect(likely).toContain('0.28'); expect(maybe).toContain('0.16'); expect(weak).toContain('0.08');
+    expect(screen.getByTestId('tile-line').textContent).not.toMatch(/\d|%/);
+  });
+  it('a guess with no band keeps the plain faint look and line', () => {
+    render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
+    expect(screen.getByTestId('tile-line')).toHaveTextContent(/^Our guess$/);
+  });
 });
