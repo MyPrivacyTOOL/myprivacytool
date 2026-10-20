@@ -11,7 +11,12 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Any) 
                                  data=json.dumps(body).encode() if body is not None else None)
     with urllib.request.urlopen(req, timeout=15) as r:  # noqa: S310 - fixed https endpoints
         raw = r.read()
-    return json.loads(raw) if raw else {}
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return {"raw": raw.decode("utf-8", "replace")}  # Slack webhooks answer plain "ok"
 
 
 class NotionClient:

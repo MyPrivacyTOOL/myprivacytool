@@ -53,6 +53,7 @@ class AuditTests(unittest.TestCase):
         r = svc(InMemorySource({})).run("ghost")
         self.assertEqual((r["status"], r["riskLevel"], r["passportIssued"]), ("incomplete", "INCOMPLETE", False))
         self.assertIn("no log entries", r["errors"][0])
+        self.assertIsNone(r["overallScore"])
 
     def test_planted_risk_gives_signed_staging_passport(self):
         r = svc(InMemorySource({"a1": [{"ts": "t", "text": SECRET}]})).run("a1")
@@ -175,3 +176,24 @@ class NewDetectorTests(unittest.TestCase):
         self.assertEqual(len(detectors.build(Settings())), 10)
         from app.models import HEXAGON_RISKS, PILLARS
         self.assertEqual({r["pillar"] for r in HEXAGON_RISKS.values()}, set(PILLARS))
+
+
+class TransportTests(unittest.TestCase):
+    def _call(self, body: bytes):
+        import urllib.request
+        from unittest import mock
+        from app.integrations.outbound import urllib_transport
+
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return body
+        with mock.patch.object(urllib.request, "urlopen", return_value=Resp()):
+            return urllib_transport("POST", "https://hooks.example/x", {}, {"text": "hi"})
+
+    def test_slack_plain_ok_is_not_an_error(self):
+        self.assertEqual(self._call(b"ok"), {"raw": "ok"})
+
+    def test_json_and_empty_still_work(self):
+        self.assertEqual(self._call(b'{"url": "u"}'), {"url": "u"})
+        self.assertEqual(self._call(b""), {})
