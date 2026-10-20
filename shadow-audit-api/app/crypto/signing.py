@@ -13,6 +13,7 @@ from typing import Any, Dict
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 PASSPORT_CONTEXT = {
     "VerifiableCredential": "https://www.w3.org/2018/credentials#VerifiableCredential",
@@ -39,6 +40,17 @@ class PassportSigner:
     def __init__(self, private_key_bytes: bytes, verification_method: str):
         self._key = Ed25519PrivateKey.from_private_bytes(private_key_bytes)
         self.verification_method = verification_method
+
+    @property
+    def public_key_bytes(self) -> bytes:
+        return self._key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+
+    def jwks(self) -> Dict[str, Any]:
+        """Public half only, so third parties can check a passport's proof. `kid` is the
+        proof's verificationMethod."""
+        x = base64.urlsafe_b64encode(self.public_key_bytes).rstrip(b"=").decode()
+        return {"keys": [{"kty": "OKP", "crv": "Ed25519", "x": x, "use": "sig",
+                          "alg": "EdDSA", "kid": self.verification_method}]}
 
     def sign(self, doc: Dict[str, Any], created: str) -> Dict[str, Any]:
         opts = {"type": "Ed25519Signature2020", "created": created,
