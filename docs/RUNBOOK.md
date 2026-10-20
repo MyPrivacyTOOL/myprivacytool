@@ -29,7 +29,7 @@ Supabase `xmdmkumwxpgahmlweuug`: RLS forced, service_role writes only; pg_cron p
 | `mpt-scan-report` | `workers/scan-report` | `deploy-scan-report.yml` on merge; cron `*/5 * * * *` | `https://mpt-scan-report.myprivacytool.workers.dev` |
 | `myprivacytool-github-channel` | `workers/github-channel` | `deploy-github-channel.yml`: tests on PR/push, deploy on `workflow_dispatch` | `https://channels.myprivacytool.io` (custom domain; `*.workers.dev` retired) |
 | `myprivacytool-oauth-poc` | `workers/oauth-poc` | `deploy-oauth-poc.yml` on merge | `https://myprivacytool-oauth-poc.myprivacytool.workers.dev` |
-| `telegram-webhook`, `webhook-receiver` | `workers/*` | not deployed (the second never was) | — |
+| `webhook-receiver` | `workers/*` | deployed by `deploy-webhook-receiver.yml`; Telegram moved to `social-listeners` (MPC-8375 removed `telegram-webhook`) | — |
 | Database | `supabase/migrations`, `supabase/sql` | applied by a human or connector; **a merge does not apply them** | project `xmdmkumwxpgahmlweuug` |
 
 Live check on 2026-10-06 (Cloudflare connector, read-only): the MPT account lists exactly four Workers — `mpt-leads`, `mpt-scan-report`, `myprivacytool-oauth-poc`, `myprivacytool-github-channel`. Re-run `workers_list` to confirm before relying on this.

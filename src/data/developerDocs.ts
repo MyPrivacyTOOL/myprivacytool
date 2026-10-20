@@ -556,7 +556,6 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
 }`;
 
 export const INTERNAL_SERVICES = [
-  { name: "telegram-webhook", note: "Telegram bot webhook (First Hexagon). Called by Telegram only; not deployed from CI." },
   { name: "webhook-receiver", note: "Multi-channel inbound webhooks. Source only; not deployed on either Cloudflare account." },
 ];
 
