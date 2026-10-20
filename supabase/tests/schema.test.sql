@@ -753,5 +753,36 @@ select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.osint_
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, original_confidence_score) values ('s','h','disputed',1.5)$$) = '23514', 'hitl: confidence must be 0..1');
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_interactions (scan_session_id, hexagon_id, user_action, osint_source) values ('s','h','disputed','spam_registry')$$) = '', 'hitl: service_role can insert an interaction');
 
+-- ===== MPC-7915 learning events, config, proposals =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.mpt_hexagon_events$$) = '42501', 'learning: anon cannot read events');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.confidence_proposals$$) = '42501', 'learning: authenticated cannot read proposals');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.rollup_and_purge_hexagon_events()$$) = '42501', 'learning: anon cannot run the purge');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id) values ('shown', 'abcdefghijklmnop', 'w1', 'location')$$) = '', 'learning: service_role can insert a shown event');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id) values ('shown', 'abcdefghijklmnop', 'w1', 'location')$$) = '23505', 'learning: a repeat shown for the same person, tile and window is ignored (unique)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id) values ('answer', 'abcdefghijklmnop', 'w1', 'location')$$) = '23514', 'learning: an answer event needs an answer');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id, answer) values ('shown', 'qrstuvwxyz012345', 'w1', 'location', 'yes_me')$$) = '23514', 'learning: a shown event cannot carry an answer');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id, answer) values ('answer', 'abcdefghijklmnop', 'w1', 'location', 'maybe')$$) = '23514', 'learning: answer must be one of the four');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id) values ('shown', 'short', 'w1', 'location')$$) = '23514', 'learning: person_key must look like a random id');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id, answer) values ('answer', 'abcdefghijklmnop', 'w1', 'location', 'not_me')$$) = '', 'learning: service_role can insert an answer');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id, confidence_at_display) values ('shown', 'zyxwvutsrqponmlk', 'w1', 'location', 1.5)$$) = '23514', 'learning: confidence at display must be 0..1');
+select pg_temp.assert((select count(*) from public.confidence_config where active) = 1 and (select version from public.confidence_config where active) = 0, 'learning: exactly one active config and it is version 0 (the registry numbers)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.confidence_config (version, active, created_by) values (1, true, 'chris')$$) = '23505', 'learning: a second active config is refused');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.confidence_proposals (hexagon_id, source, basis, current_value, proposed_value, interval_low, interval_high, responders, response_rate, config_version) values ('location','web-scan','accuracy',0.95,0.5,0.4,0.6,29,0.3,0)$$) = '23514', 'learning: a proposal needs at least 30 responders');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.confidence_proposals (hexagon_id, source, basis, current_value, proposed_value, interval_low, interval_high, responders, response_rate, config_version) values ('location','web-scan','accuracy',0.95,0.5,0.4,0.6,40,0.3,0)$$) = '', 'learning: service_role can insert a proposal (status proposed)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.confidence_proposals set status = 'approved'$$) = '23514', 'learning: approving needs a named decider');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.confidence_proposals set status = 'approved', decided_by = 'chris', decided_at = now()$$) = '', 'learning: a named human can approve');
+-- rollup: three people shown, two answered (one changed their answer), one old row set; nothing newer is touched
+insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id, created_at) values
+  ('shown','oldpersonaaaaaaaa','w9','isp', now() - interval '100 days'), ('shown','oldpersonbbbbbbbb','w9','isp', now() - interval '100 days'), ('shown','oldpersonccccccccc','w9','isp', now() - interval '100 days'),
+  ('shown','newpersonaaaaaaaa','w9','isp', now());
+insert into public.mpt_hexagon_events (event_type, person_key, scan_window, hexagon_id, answer, created_at) values
+  ('answer','oldpersonaaaaaaaa','w9','isp','not_me', now() - interval '100 days'),
+  ('answer','oldpersonaaaaaaaa','w9','isp','yes_me', now() - interval '99 days'),
+  ('answer','oldpersonbbbbbbbb','w9','isp','yes_me', now() - interval '100 days');
+select pg_temp.assert(public.rollup_and_purge_hexagon_events() = 6, 'learning: the purge deletes only the old raw rows (3 shown + 3 answers)');
+select pg_temp.assert((select count(*) from public.mpt_hexagon_events where hexagon_id = 'isp') = 1, 'learning: a recent row survives the purge');
+select pg_temp.assert((select shown_people from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 3 and (select not_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1 and (select yes_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1, 'learning: the rollup counts 3 shown and each person''s first answer once (a change of mind is not double counted)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.rollup_and_purge_hexagon_events(interval '1 hour')$$) = 'P0001', 'learning: retention under one day is refused');
+
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

@@ -55,3 +55,13 @@ describe('fromWebScan tile kinds (honest look)', () => {
     expect(get(list, medId).tile).toBe('needs_fixing');
   });
 });
+
+describe('fromWebScan guess bands', () => {
+  it('a guess gets its approved band; a measured finding and an unscanned hexagon get none', () => {
+    const list = fromWebScan([scanned('demographic', 'Young Adult', { confidence: 60 }), scanned('location', 'London (en-GB)', { confidence: 95 }), scanned('cookies-status', '3 cookies')]);
+    expect(get(list, 'demographic')).toMatchObject({ tile: 'our_guess', band: 'weak' });
+    expect(get(list, 'location')).toMatchObject({ tile: 'our_guess', band: 'maybe' });
+    expect(get(list, 'cookies-status').band).toBeUndefined();
+    expect(get(list, 'tls-config').band).toBeUndefined();
+  });
+});

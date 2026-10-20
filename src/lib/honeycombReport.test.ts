@@ -55,3 +55,16 @@ describe('buildReportHtml honest look', () => {
     expect(html).not.toContain('>Clear<');
   });
 });
+
+describe('buildReportHtml guess bands', () => {
+  it('a guess carries its band in words and a matching fill strength', () => {
+    const html = buildReportHtml([
+      hex({ id: 'location', label: 'Location', status: 'guess', exposure: true, tile: 'our_guess', band: 'maybe' }),
+      hex({ id: 'demographic', label: 'Estimated Profile', status: 'guess', exposure: true, tile: 'our_guess', band: 'weak' }),
+    ], opts);
+    expect(html).toContain('Our guess · maybe');
+    expect(html).toContain('Our guess · weak guess');
+    expect(html).toContain('fill-opacity="0.16"');
+    expect(html).toContain('fill-opacity="0.08"');
+  });
+});

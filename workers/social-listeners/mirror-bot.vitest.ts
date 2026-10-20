@@ -126,7 +126,7 @@ describe("MIRROR flow over the X webhook", () => {
   });
   it("the welcome offers the Mirror and a tagged scan link", () => {
     expect(WELCOME_MESSAGE).toContain("Mirror");
-    expect(WELCOME_MESSAGE).toContain("utm_source=x&utm_medium=channel_osint");
+    expect(WELCOME_MESSAGE).toContain("https://myprivacytool.io/x"); // short link; /x forwards to /scan with the utm tracking
   });
 });
 
@@ -186,7 +186,7 @@ describe("rate limit, retry and tagging (MPC-7628)", () => {
     expect((dms[1][1]!.headers as Record<string, string>).Authorization).toBe("Bearer fresh");
   });
   it("tags the scan link for channel analytics", () => {
-    expect(buildMirrorMessage({ protected: false })).toContain("utm_source=x&utm_medium=channel_osint&utm_campaign=bot_reply");
+    expect(buildMirrorMessage({ protected: false })).toContain("https://myprivacytool.io/x");
   });
 });
 
@@ -470,7 +470,7 @@ describe("Channel OSINT funnel counting (MPC-7628)", () => {
 describe("follow link (MPC-7628)", () => {
   it("the welcome offers a one-tap follow", () => {
     expect(WELCOME_BODY).toContain(FOLLOW_LINE);
-    expect(FOLLOW_LINE).toContain("https://x.com/intent/follow?screen_name=MyPrivacyTOOL");
+    expect(FOLLOW_LINE).toContain("https://myprivacytool.io/follow");
   });
 });
 

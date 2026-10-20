@@ -17,6 +17,7 @@ KEY = Ed25519PrivateKey.generate()
 PRIV = KEY.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption())
 PUB = KEY.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 SECRET = "sk_live_" + "a" * 24
+CLEAN = [{"ts": "2026-10-20T00:00:00Z", "text": "ok"}]
 
 
 class Boom:
@@ -48,6 +49,12 @@ class DetectorTests(unittest.TestCase):
 
 
 class AuditTests(unittest.TestCase):
+    def test_no_log_entries_is_incomplete_never_approved(self):
+        r = svc(InMemorySource({})).run("ghost")
+        self.assertEqual((r["status"], r["riskLevel"], r["passportIssued"]), ("incomplete", "INCOMPLETE", False))
+        self.assertIn("no log entries", r["errors"][0])
+        self.assertIsNone(r["overallScore"])
+
     def test_planted_risk_gives_signed_staging_passport(self):
         r = svc(InMemorySource({"a1": [{"ts": "t", "text": SECRET}]})).run("a1")
         self.assertEqual(r["status"], "completed")
@@ -62,14 +69,14 @@ class AuditTests(unittest.TestCase):
     def test_notion_failure_keeps_result(self):
         def bad(*a):
             raise OSError("down")
-        r = svc(InMemorySource({}), NotionClient("t", "db", bad)).run("a1")
+        r = svc(InMemorySource({"a1": CLEAN}), NotionClient("t", "db", bad)).run("a1")
         self.assertTrue(r["passportIssued"])
         self.assertTrue(any(e.startswith("notion") for e in r["errors"]))
 
     def test_notion_and_slack_payloads(self):
         calls = []
         t = lambda m, u, h, b: calls.append((u, b)) or {"url": "https://notion/x"}  # noqa: E731
-        r = svc(InMemorySource({}), NotionClient("t", "db1", t), SlackNotifier("https://hook", t)).run("a1")
+        r = svc(InMemorySource({"a1": CLEAN}), NotionClient("t", "db1", t), SlackNotifier("https://hook", t)).run("a1")
         notion = [c for c in calls if "notion" in c[0]][0][1]
         self.assertEqual(notion["parent"]["database_id"], "db1")
         self.assertEqual(notion["properties"]["Environment"]["select"]["name"], "staging")
@@ -90,7 +97,7 @@ def call(app, method, path, body=None, token="tok"):
 
 class ApiTests(unittest.TestCase):
     def setUp(self):
-        self.app = make_app(svc(InMemorySource({"a1": []})), "tok")
+        self.app = make_app(svc(InMemorySource({"a1": CLEAN})), "tok")
 
     def test_health_open_others_need_auth(self):
         self.assertEqual(call(self.app, "GET", "/health", token=None)[0], "200 OK")
@@ -169,3 +176,24 @@ class NewDetectorTests(unittest.TestCase):
         self.assertEqual(len(detectors.build(Settings())), 10)
         from app.models import HEXAGON_RISKS, PILLARS
         self.assertEqual({r["pillar"] for r in HEXAGON_RISKS.values()}, set(PILLARS))
+
+
+class TransportTests(unittest.TestCase):
+    def _call(self, body: bytes):
+        import urllib.request
+        from unittest import mock
+        from app.integrations.outbound import urllib_transport
+
+        class Resp:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self): return body
+        with mock.patch.object(urllib.request, "urlopen", return_value=Resp()):
+            return urllib_transport("POST", "https://hooks.example/x", {}, {"text": "hi"})
+
+    def test_slack_plain_ok_is_not_an_error(self):
+        self.assertEqual(self._call(b"ok"), {"raw": "ok"})
+
+    def test_json_and_empty_still_work(self):
+        self.assertEqual(self._call(b'{"url": "u"}'), {"url": "u"})
+        self.assertEqual(self._call(b""), {})

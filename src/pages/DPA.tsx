@@ -180,8 +180,7 @@ const DPA = () => {
                   </a>
                 </p>
                 <p>
-                  <strong>Company:</strong> MyPrivacyTOOL Ltd, 12E, Block 5, 8 Pak Lai
-                  Road, Park Island, Ma Wan, Tsuen Wan District, New Territories, Hong Kong
+                  <strong>Company:</strong> MyPrivacyTOOL Ltd, Hong Kong
                 </p>
               </div>
             </section>

@@ -25,6 +25,9 @@ class AuditService:
         errors: List[str] = []
         try:
             entries = self.source.fetch(agent_id, days)
+            if not entries:
+                # No evidence is not evidence of safety: unknown agent, wrong id or empty window.
+                raise LookupError(f"no log entries for agent '{agent_id}' in the last {days} days")
             outcome = risk_detector.run_audit([(n, (lambda f=f: f(entries))) for n, f in detectors.build(self.s)])
         except Exception as exc:  # noqa: BLE001 - log source failure => incomplete audit
             log.exception("log source failed for %s", agent_id)
@@ -40,7 +43,9 @@ class AuditService:
             passport = self.signer.sign(doc, iso)
         result = {
             "auditId": audit_id, "agentId": agent_id, "auditDate": iso, "environment": self.s.environment,
-            "status": "completed" if outcome.complete else "incomplete", "overallScore": total,
+            "status": "completed" if outcome.complete else "incomplete",
+            # An incomplete audit has no trustworthy score; never show 90 for "we could not look".
+            "overallScore": total if outcome.complete else None,
             "riskLevel": status, "errors": errors,
             "pillars": {k: {"score": v.score, "riskLevel": v.risk_level.value} for k, v in pillars.items()},
             "detectedRisks": [{"riskId": d.risk_id, "riskName": d.risk_name, "severity": d.severity.value,
@@ -70,7 +75,7 @@ class AuditService:
         if self.slack:
             try:
                 self.slack.notify(f"[{r['environment']}] Shadow audit {r['auditId']} for {r['agentId']}: "
-                                  f"{r['riskLevel']} ({r['overallScore']}), {len(r['detectedRisks'])} risks")
+                                  f"{r['riskLevel']} ({r['overallScore'] if r['overallScore'] is not None else 'no score'}), {len(r['detectedRisks'])} risks")
             except Exception as exc:  # noqa: BLE001
                 log.exception("slack notify failed")
                 r["errors"].append(f"slack: {exc}")
