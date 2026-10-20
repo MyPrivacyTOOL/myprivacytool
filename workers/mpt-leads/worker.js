@@ -22,6 +22,34 @@ async function rateLimitState(env, request) {
 }
 const rateLimited = async (env, request) => (await rateLimitState(env, request)) === 'limited';
 
+// MPC-8368: Cloudflare Turnstile (privacy-preserving, no cookies, no puzzle). The widget on the scan form sends a token as
+// `cf-turnstile-response`; it is verified against TURNSTILE_SECRET_KEY. Returns 'absent' (secret not set: feature off),
+// 'ok', 'failed' (missing, invalid, reused or wrong-hostname token) or 'error' (siteverify unreachable: fails open, like the
+// rate limiter, so a Cloudflare hiccup never drops a real lead). Blocking is opt-in via TURNSTILE_ENFORCE = "true"; until then
+// a 'failed' result is only logged so the Worker can ship before the site that sends tokens.
+const TURNSTILE_HOSTS = ['myprivacytool.io', 'www.myprivacytool.io', 'wwwmyprivacytool.pages.dev'];
+async function turnstileState(env, request, token, info = {}) {
+  if (!env.TURNSTILE_SECRET_KEY) return 'absent';
+  if (typeof token !== 'string' || !token) { info.reason = 'missing_token'; return 'failed'; }
+  if (token.length > 2048) { info.reason = 'token_too_long'; return 'failed'; }
+  try {
+    const fd = new FormData();
+    fd.append('secret', env.TURNSTILE_SECRET_KEY);
+    fd.append('response', token);
+    const ip = request.headers.get('CF-Connecting-IP');
+    if (ip) fd.append('remoteip', ip);
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: fd });
+    if (!res.ok) { console.warn('turnstile siteverify http', res.status); return 'error'; }
+    const out = await res.json();
+    if (!out.success) { info.reason = 'rejected:' + (out['error-codes'] || []).join(',').slice(0, 100); console.warn('turnstile rejected:', (out['error-codes'] || []).join(',').slice(0, 200)); return 'failed'; }
+    if (out.hostname && !TURNSTILE_HOSTS.includes(out.hostname)) { info.reason = 'hostname_mismatch:' + clip(out.hostname, 100); console.warn('turnstile hostname mismatch:', clip(out.hostname, 100)); return 'failed'; }
+    return 'ok';
+  } catch (e) {
+    console.warn('turnstile error:', String(e && e.message || e).slice(0, 200));
+    return 'error';
+  }
+}
+
 function whoami(request, cors, rlState) {
   const cf = request.cf || {};
   let country = cf.country || '';
@@ -115,6 +143,7 @@ export default {
       let categoryScores = null; // MPC-7173: per-category risk scores for the baseline snapshot
       let riskScore = null; // MPC-6956: only the post-scan email modal sends this
       let consentRaw = null, consentSourceRaw = '', sourceRaw = ''; // MPC-6971: explicit consent only
+      let turnstileToken = ''; // MPC-8368: Turnstile response from the scan form
       const ct = request.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const b = await request.json();
@@ -125,6 +154,7 @@ export default {
         utm_campaign = b.utm_campaign || ''; utm_content = b.utm_content || '';
         referrer = b.referrer || '';
         consentRaw = b.consent ?? null; consentSourceRaw = b.consent_source || ''; sourceRaw = b.source || '';
+        turnstileToken = b['cf-turnstile-response'] || '';
       } else {
         const fd = await request.formData();
         riskScore = fd.get('riskScore') || null;
@@ -133,6 +163,7 @@ export default {
         utm_campaign = fd.get('utm_campaign') || ''; utm_content = fd.get('utm_content') || '';
         referrer = fd.get('referrer') || '';
         consentRaw = fd.get('consent'); consentSourceRaw = fd.get('consent_source') || ''; sourceRaw = fd.get('source') || '';
+        turnstileToken = fd.get('cf-turnstile-response') || '';
       }
       // MPC-7350: strings only, bounded lengths (Notion/HubSpot/Slack get nothing unbounded).
       email = String(email).trim(); name = clip(name, 100).trim(); phone = clip(phone, 32).trim();
@@ -154,6 +185,24 @@ export default {
         return new Response(JSON.stringify({ success: true, note: 'healthcheck' }), {
           status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
         });
+      }
+
+      // MPC-8368: bot check. Runs after the watchdog health check (which has no browser and no token) and before any write.
+      const tsInfo = {};
+      const ts = await turnstileState(env, request, turnstileToken, tsInfo);
+      if (ts === 'failed') {
+        // MPC-8368: one structured line per failure (search the Worker logs for TURNSTILE_FAILED) so false positives can be
+        // reviewed during the enforcement trial. Carries the IP, timestamp, reason, country and Origin; never the email or token.
+        const enforce = String(env.TURNSTILE_ENFORCE).toLowerCase() === 'true';
+        console.warn('TURNSTILE_FAILED ' + JSON.stringify({
+          ts: new Date().toISOString(),
+          ip: request.headers.get('CF-Connecting-IP') || '',
+          country: request.cf?.country || '',
+          origin: origin || '',
+          reason: tsInfo.reason || 'unknown',
+          action: enforce ? 'blocked_403' : 'allowed_report_only',
+        }));
+        if (enforce) return reject(403, 'Verification failed');
       }
 
       // Capture technical metadata from the request
