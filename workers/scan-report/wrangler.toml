@@ -26,8 +26,8 @@ ALLOW_PARTIAL_REPORT = "true"
 # Real sending is switched on at Chris's sign-off (MPC-7545), after the scan go-live (MPC-7385). See docs/hk-spam-day10-email-mpc-7448.md.
 # It runs on the */5 trigger at 01:00-04:00 UTC (09:00 HKT first run, hourly retries), see isHkSpamSlot in lib/hkSpam.js; no separate cron (Workers Free allows 5 per account).
 HK_SPAM_ENABLED = "true"
-# MPC-8299: LIVE since 2026-10-19 on the owner's instruction. Rollback: set back to "false" (test mode) and merge.
-HK_SPAM_EMAILS_LIVE = "true"
+# MPC-8299: back to test mode (owner decision 2026-10-19): real sends wait for MPC-7545 (wording sign-off) and MPC-7385 (scan go-live).
+HK_SPAM_EMAILS_LIVE = "false"
 
 # MPC-7465/7470: save the visitor's scan with the email request (POST /api/scan with scan + save_consent:true, the separate tick box at the contact step).
 # ON since 2026-10-12 (MPC-7470: wording approved by Chris, decision D12, production migrations applied). Anything but "true" saves nothing, so "false" is the rollback.
