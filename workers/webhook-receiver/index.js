@@ -63,6 +63,17 @@ export default {
       }
     }
 
+    // MPC-7915: visitors' answers about a tile. OFF unless LEARNING_EVENTS_ENABLED is "true" (404 otherwise). Lazy import like the deep dive.
+    if (path === '/api/learning/event') {
+      try {
+        const { handleLearningEvent } = await import('./learningEvents.ts');
+        return await handleLearningEvent(request, env);
+      } catch (err) {
+        console.error('Learning event error:', err);
+        return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 };

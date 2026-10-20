@@ -465,9 +465,7 @@ const Terms = () => {
                   <br />
                   MyPrivacyTOOL Ltd
                   <br />
-                  12E, Block 5, 8 Pak Lai Road, Park Island, Ma Wan,
-                  <br />
-                  Tsuen Wan District, New Territories, Hong Kong, HK99
+                  Hong Kong
                 </p>
               </div>
             </section>

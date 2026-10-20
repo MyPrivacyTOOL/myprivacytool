@@ -2,11 +2,13 @@
 // X's console does not offer media.write on the OAuth 2.0 user token (upload answers 403), so the upload is signed with OAuth 1.0a
 // (the app's API key + the account's access token and secret), which X accepts on the same endpoint. If those secrets are not set the
 // caller's OAuth 2.0 call is tried instead. Every failure returns null: the caller then sends the text alone.
-// Chunked v2 flow: INIT -> APPEND (1 MB chunks) -> FINALIZE (-> STATUS while X processes the video).
+// Chunked v2 flow: POST /media/upload/initialize (JSON) -> POST /media/upload/:id/append (1 MB chunks) -> POST /media/upload/:id/finalize
+// (-> GET /media/upload?command=STATUS while X processes the video). The old POST /media/upload with command=INIT answers 400 "Missing media field".
 import type { Logger } from "./logger";
 import { type Env, pick } from "./shared";
 
-export const VIDEO_URL = "https://myprivacytool.io/media/alice-curtain.mp4";
+// Silent copy of the clip: X plays an animated GIF (dm_gif) automatically and loops it, but only without a sound track.
+export const VIDEO_URL = "https://myprivacytool.io/media/alice-curtain-silent.mp4";
 const UPLOAD = "/media/upload";
 const CHUNK = 1024 * 1024;
 const TIMEOUT_MS = 8000;
@@ -59,12 +61,12 @@ const fail = (log: Logger, event: string, extra?: Record<string, unknown>): null
 };
 
 /** Uploads the clip and returns its media id, or null when anything goes wrong. */
-export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall): Promise<string | null> {
+export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall, category: "dm_gif" | "dm_video" = "dm_video"): Promise<string | null> {
   const call: XUserCall = hasOAuth1(env)
     ? async (path, init) => {
         const url = `https://api.x.com/2${path}`;
         try {
-          return await fetch(url, { ...init, headers: { Authorization: await oauth1Header(env, init.method ?? "GET", url) }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+          return await fetch(url, { ...init, headers: { ...(init.headers as Record<string, string> | undefined), Authorization: await oauth1Header(env, init.method ?? "GET", url) }, signal: AbortSignal.timeout(TIMEOUT_MS) });
         } catch {
           return null;
         }
@@ -74,13 +76,11 @@ export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall
   try {
     const video = await loadVideo(env);
     if (!video?.length) return fail(log, "x_media_video_unavailable");
-    const api = (extra: Record<string, string>, body?: FormData) => {
-      const form = body ?? new FormData();
-      for (const [k, v] of Object.entries(extra)) form.append(k, v);
-      return call(UPLOAD, { method: "POST", body: form });
-    };
-
-    const init = await api({ command: "INIT", media_type: "video/mp4", total_bytes: String(video.length), media_category: "dm_video" });
+    const init = await call(`${UPLOAD}/initialize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ media_type: "video/mp4", total_bytes: video.length, media_category: category }),
+    });
     if (!init?.ok) return fail(log, "x_media_init_rejected", { status: init?.status ?? 0 });
     const id = idOf(await init.json());
     if (!id) return fail(log, "x_media_init_malformed");
@@ -88,11 +88,12 @@ export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall
     for (let i = 0, seg = 0; i < video.length; i += CHUNK, seg++) {
       const form = new FormData();
       form.append("media", new Blob([video.slice(i, i + CHUNK)], { type: "application/octet-stream" }), "chunk");
-      const res = await api({ command: "APPEND", media_id: id, segment_index: String(seg) }, form);
+      form.append("segment_index", String(seg));
+      const res = await call(`${UPLOAD}/${id}/append`, { method: "POST", body: form });
       if (!res?.ok) return fail(log, "x_media_append_rejected", { status: res?.status ?? 0 });
     }
 
-    const fin = await api({ command: "FINALIZE", media_id: id });
+    const fin = await call(`${UPLOAD}/${id}/finalize`, { method: "POST" });
     if (!fin?.ok) return fail(log, "x_media_finalize_rejected", { status: fin?.status ?? 0 });
     let info = (pick(await fin.json(), "data", "processing_info") ?? null) as ProcessingInfo | null;
     for (let n = 0; info && n < POLLS; n++) {

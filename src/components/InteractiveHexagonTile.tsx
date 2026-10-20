@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import type { Hexagon } from '@/types/hexagon';
 import { getHexagonVisuals, getHexPaint, effectiveTile } from '@/utils/hexagonStyles';
 import { TILE_COPY } from '@/lib/hexagonTile';
+import { BAND_FILL_OPACITY, BAND_WORD } from '@/lib/guessBands';
 import { canConfirm, canDispute } from '@/lib/identityConfirmation';
 import { cn } from '@/lib/utils';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
@@ -25,6 +26,8 @@ interface Props {
   hexagon: Hexagon;
   onConfirm: (id: string, isMatch: boolean) => void;
   onDispute: (id: string) => void;
+  /** The visitor pressed the labelled "Keep it" button on the dispute prompt (closing the prompt is not an answer). */
+  onKeep?: (id: string) => void;
   /** When set, a tap on a guess calls this instead of opening the built-in prompt (the dashboard shows its own modal). */
   onSelect?: (hexagon: Hexagon) => void;
   /** The user finished the remediation step: a confirmed exposure shows green instead of red. */
@@ -36,7 +39,7 @@ interface Props {
   style?: CSSProperties;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect, fixed = false, compact = false, className, style }: Props) => {
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, onSelect, fixed = false, compact = false, className, style }: Props) => {
   // Which prompt is open. Only the buttons inside a prompt record an answer; closing it (Esc, outside click, Keep it) records nothing.
   const [prompt, setPrompt] = useState<'confirm' | 'dispute' | null>(null);
   const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
@@ -50,6 +53,9 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
   const solid = !!tile && tile.level === 'solid' && tile.colour !== 'grey';
   const hue = tile ? `hsl(var(--tile-${tile.colour}))` : '';
   const needsFix = kind === 'needs_fixing';
+  // A guess shows how sure we are in words and a slightly different purple (Chris approved the bands, 2026-10-20). Never a number.
+  const band = kind === 'our_guess' ? hexagon.band : undefined;
+  const lineText = tile ? (band ? `${tile.line} · ${BAND_WORD[band]}` : tile.line) : '';
   const reopensPlan = (exposed || needsFix) && !!onSelect;
   const interactive = requiresConfirmation || allowsDispute || reopensPlan;
   const secured = !tile && !exposed && (hexagon.status === 'checked' || hexagon.status === 'confirmed');
@@ -87,7 +93,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
             className={cn(!tile && paint.polygon, !tile && paint.dashed && '[stroke-dasharray:7_5]', 'transition-colors group-focus-visible:stroke-blue-500')}
             style={tile ? {
               stroke: tile.colour === 'grey' ? 'hsl(var(--tile-grey))' : hue,
-              fill: tile.colour === 'grey' ? 'transparent' : tile.level === 'solid' ? hue : `hsl(var(--tile-${tile.colour}) / ${tile.level === 'medium' ? 0.42 : 0.16})`,
+              fill: tile.colour === 'grey' ? 'transparent' : tile.level === 'solid' ? hue : `hsl(var(--tile-${tile.colour}) / ${band ? BAND_FILL_OPACITY[band] : tile.level === 'medium' ? 0.42 : 0.16})`,
             } : undefined}
           />
         </svg>
@@ -109,7 +115,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
         <span className="relative text-xl leading-none" aria-hidden="true">{emoji}</span>
         <span className="relative w-[68%] text-[9px] font-semibold uppercase leading-tight tracking-wide">{hexagon.label}</span>
         {showValue && <span className={cn('relative w-[68%] truncate text-[10px]', solid ? 'text-white' : 'text-gray-900')}>{hexagon.data}</span>}
-        {tile && !compact && <span className="relative w-[68%] truncate text-[8px] italic" data-testid="tile-line">{tile.line}</span>}
+        {tile && !compact && <span className="relative w-[68%] truncate text-[8px] italic" data-testid="tile-line">{lineText}</span>}
         <span className="sr-only">{tip}</span>
       </button>
 
@@ -139,7 +145,7 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onSelect
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => onKeep?.(hexagon.id)}>Keep it</AlertDialogCancel>
             <AlertDialogAction onClick={() => onDispute(hexagon.id)}>This isn't right</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

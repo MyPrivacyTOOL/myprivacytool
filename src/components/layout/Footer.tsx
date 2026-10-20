@@ -123,7 +123,7 @@ const Footer = () => {
             <img src={logoFooter} alt="MyPrivacyTOOL" width={300} height={169} decoding="async" className="h-14 w-auto min-w-24 -my-3 mx-2 object-contain" loading="lazy" />
           </Link>
           <p className="text-xs text-muted-foreground text-center">
-            © {year} MyPrivacyTOOL Ltd, 12E, Block 5, 8 Pak Lai Road, Park Island, Ma Wan, Tsuen Wan District, New Territories, Hong Kong, HK99
+            © {year} MyPrivacyTOOL Ltd, Hong Kong
           </p>
           <p className="text-xs text-muted-foreground">We never sell your data.</p>
         </div>
