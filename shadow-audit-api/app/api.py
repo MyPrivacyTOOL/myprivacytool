@@ -28,7 +28,8 @@ def make_app(svc: AuditService, api_token: str) -> Callable:
             if m != method or not mt:
                 continue
             if name != "health":
-                supplied = environ.get("HTTP_AUTHORIZATION", "").removeprefix("Bearer ")
+                # X-Api-Token first: behind Cloud Run IAM the Authorization header carries Google's OIDC token.
+                supplied = environ.get("HTTP_X_API_TOKEN") or environ.get("HTTP_AUTHORIZATION", "").removeprefix("Bearer ")
                 if not api_token or not hmac.compare_digest(supplied, api_token):
                     return respond(start, "401 Unauthorized", {"error": "unauthorized"})
             try:

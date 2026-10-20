@@ -5,7 +5,7 @@ Standalone Python service (separate from the TS/Cloudflare stack). Stdlib WSGI a
 Phase 1: scorer fix, detector errors => INCOMPLETE, canonical Ed25519 signing.
 Phases 2-5: 10 detectors (#1, #9, #41, #42, #51, #57, #58, #65, #99, #119), audit orchestration, API routes, Notion/Slack clients, Dockerfile, staging-only cloudbuild.yaml.
 
-Endpoints (Bearer auth except /health): POST /audit/{agent_id}, GET /audit/{id}, GET /agent/{id}/audit-history, POST /audit/{id}/remediate.
+Endpoints (X-Api-Token header, or Bearer, except /health): POST /audit/{agent_id}, GET /audit/{id}, GET /agent/{id}/audit-history, POST /audit/{id}/remediate.
 Staging by default (`SHADOW_AUDIT_ENV`); the environment is inside the signed passport. Incomplete audits get no passport.
 
 Tests: `python3 -m unittest discover -s tests -v` (20 pass; needs `cryptography`).

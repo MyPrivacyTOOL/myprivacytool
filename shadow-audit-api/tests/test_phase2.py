@@ -109,6 +109,14 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(call(self.app, "GET", "/audit/nope")[0], "404 Not Found")
         self.assertEqual(call(self.app, "POST", "/audit/a1", {"lookbackDays": 999})[0], "400 Bad Request")
 
+    def test_x_api_token_header_works_alongside_google_authorization(self):
+        raw = b""
+        env = {"REQUEST_METHOD": "POST", "PATH_INFO": "/audit/a1", "CONTENT_LENGTH": "0", "wsgi.input": io.BytesIO(raw),
+               "HTTP_AUTHORIZATION": "Bearer google-oidc-token", "HTTP_X_API_TOKEN": "tok"}
+        out = {}
+        self.app(env, lambda code, h: out.setdefault("code", code))
+        self.assertEqual(out["code"], "200 OK")
+
     def test_no_token_configured_denies_all(self):
         app = make_app(svc(InMemorySource({})), "")
         self.assertEqual(call(app, "POST", "/audit/a1", token="")[0], "401 Unauthorized")
