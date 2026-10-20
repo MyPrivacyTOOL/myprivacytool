@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Shield, Lock, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { loadTurnstile, TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 
 interface EmailCaptureModalProps {
   riskScore: number;
@@ -32,6 +33,31 @@ export default function EmailCaptureModal({
   const [errorMsg, setErrorMsg] = useState('');
   const [consent, setConsent] = useState(false);
   const [baseline, setBaseline] = useState<Baseline | null>(null);
+  // MPC-8368: Turnstile token. If the script is blocked or offline the form still submits (the Worker decides what to do).
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileBox = useRef<HTMLDivElement>(null);
+  const turnstileApi = useRef<TurnstileApi>();
+  const turnstileWidget = useRef<string>();
+
+  useEffect(() => {
+    let cancelled = false;
+    loadTurnstile().then((ts) => {
+      if (cancelled || !ts || !turnstileBox.current) return;
+      turnstileApi.current = ts;
+      turnstileWidget.current = ts.render(turnstileBox.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        appearance: 'interaction-only',
+        callback: (token: string) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(''),
+        'error-callback': () => setTurnstileToken(''),
+      });
+    });
+    return () => {
+      cancelled = true;
+      if (turnstileWidget.current) turnstileApi.current?.remove(turnstileWidget.current);
+      turnstileWidget.current = undefined;
+    };
+  }, []);
 
   const getRiskLabel = (risk: number) => {
     if (risk >= 70) return { label: 'High Risk', color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
@@ -54,6 +80,13 @@ export default function EmailCaptureModal({
       return;
     }
 
+    // The widget is rendered but has not produced a token yet (normally under a second): ask the visitor to retry rather than
+    // sending a request the Worker may reject. No widget at all (blocked script, offline) falls through and submits.
+    if (turnstileWidget.current && !turnstileToken) {
+      setErrorMsg('Verifying you are human. Please try again in a moment.');
+      return;
+    }
+
     setStatus('loading');
     setErrorMsg('');
 
@@ -69,10 +102,16 @@ export default function EmailCaptureModal({
           source: 'web_scan_summary',
           consent: true,
           consent_source: 'web_scan_summary',
+          'cf-turnstile-response': turnstileToken || undefined,
           ts: Date.now(),
         }),
       });
 
+      if (res.status === 403) {
+        // MPC-8368: a Turnstile token is single use, so a rejected submit needs a fresh one.
+        if (turnstileWidget.current) turnstileApi.current?.reset(turnstileWidget.current);
+        setTurnstileToken('');
+      }
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json().catch(() => null);
       if (data?.baseline) setBaseline(data.baseline);
@@ -186,6 +225,9 @@ export default function EmailCaptureModal({
                   <p role="alert" className="mt-1.5 text-xs text-foreground border-l-2 border-destructive pl-2">{errorMsg}</p>
                 )}
               </div>
+
+              {/* MPC-8368: Turnstile mounts here; renders nothing unless Cloudflare needs an interaction. */}
+              <div ref={turnstileBox} data-testid="turnstile-box" />
 
               <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
                 <input

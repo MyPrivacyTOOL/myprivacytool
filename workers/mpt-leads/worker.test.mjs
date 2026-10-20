@@ -2,6 +2,13 @@ import worker from './worker.js';
 let calls=[]; let supa='ok'; let notionFail=false; let baselineRow=null;
 globalThis.fetch = async (url, opts) => {
   calls.push({url:String(url), body: opts?.body});
+  if (String(url).includes('challenges.cloudflare.com/turnstile/v0/siteverify')) {
+    const tok=opts.body.get('response');
+    if (tok==='throw') throw new Error('network down');
+    if (tok==='down') return {ok:false,status:500,json:async()=>({}),text:async()=>''};
+    if (tok==='wronghost') return {ok:true,status:200,json:async()=>({success:true,hostname:'evil.example'}),text:async()=>''};
+    return {ok:true,status:200,json:async()=>tok==='good'?{success:true,hostname:'myprivacytool.io'}:{success:false,'error-codes':['invalid-input-response']},text:async()=>''};
+  }
   if (String(url).includes('mpt_score_baselines')) {
     if (opts?.method==='POST') { if (baselineRow) return {ok:true,status:201,text:async()=>'',json:async()=>[]};
       const b=JSON.parse(opts.body); baselineRow={overall_score:b.overall_score,created_at:'2026-10-05T00:00:00Z'}; return {ok:true,status:201,text:async()=>'',json:async()=>[baselineRow]}; }
@@ -79,6 +86,30 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
   globalThis.fetch=async (url)=>({ok:false,status:500,json:async()=>({}),text:async()=>'x'});
   let threw=false; try { await tick('2026-10-14T19:00:00Z'); } catch { threw=true; } check(!threw,'a Notion failure during the purge never breaks the scheduled run');
   globalThis.fetch=realFetch;
+}
+
+// MPC-8368: Turnstile verification on the scan email form
+{
+  const ts=(tok,e)=>run({email:'t@t.co',riskScore:5,...(tok===undefined?{}:{'cf-turnstile-response':tok})},e);
+  const sv=()=>calls.filter(c=>c.url.includes('siteverify'));
+  const tsEnv={...env,TURNSTILE_SECRET_KEY:'sek'};
+  let r=await ts(undefined,env); check(r.status===200&&sv().length===0,'no TURNSTILE_SECRET_KEY => feature off, no siteverify call, lead accepted');
+  r=await ts('good',tsEnv); check(r.status===200&&sv().length===1,'valid token => siteverify called, lead accepted');
+  const fdv=sv()[0].body; check(fdv.get('secret')==='sek'&&fdv.get('response')==='good','siteverify receives the secret and the token');
+  r=await ts('bad',tsEnv); check(r.status===200,'report-only (TURNSTILE_ENFORCE unset): invalid token is logged, lead still accepted');
+  r=await ts(undefined,tsEnv); check(r.status===200&&sv().length===0,'report-only: missing token is accepted without calling siteverify');
+  const enf={...tsEnv,TURNSTILE_ENFORCE:'true'};
+  r=await ts('bad',enf); check(r.status===403&&r.json.error==='Verification failed'&&r.supa.length===0,'enforce: invalid token => 403 and nothing written');
+  r=await ts(undefined,enf); check(r.status===403&&r.supa.length===0,'enforce: missing token => 403 and nothing written');
+  r=await ts('wronghost',enf); check(r.status===403,'enforce: token issued for another hostname => 403');
+  r=await ts('good',enf); check(r.status===200&&r.json.success,'enforce: valid token => 200');
+  r=await ts('throw',enf); check(r.status===200,'enforce: siteverify unreachable fails open (a Cloudflare outage never drops a lead)');
+  r=await ts('down',enf); check(r.status===200,'enforce: siteverify HTTP 500 fails open');
+  r=await run({email:'x@healthcheck.io'},enf); check(r.json.note==='healthcheck'&&sv().length===0,'enforce: watchdog health check needs no token');
+  // form-encoded submits carry the token too
+  calls=[]; const waits=[]; const fd=new FormData(); fd.set('email','f@f.co'); fd.set('cf-turnstile-response','good');
+  const fr=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{Origin:'https://myprivacytool.io'},body:fd}),enf,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
+  check(fr.status===200&&sv().length===1,'form-encoded submit: token read from cf-turnstile-response');
 }
 
 process.exit(ok?0:1);
