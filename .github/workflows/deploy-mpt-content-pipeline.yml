@@ -1,0 +1,76 @@
+name: Deploy mpt-content producer + consumer Workers
+
+# Autonomous content generation: cron producer -> Queue mpt-content-generation-queue -> consumer (KV + LLM + D1 + Slack)
+# -> approval Worker (Slack buttons / POST /approve -> Make.com).
+# Repo secrets (already used by deploy-mpt-leads.yml): CLOUDFLARE_API_TOKEN (Workers Scripts, Queues, D1 Edit), CLOUDFLARE_ACCOUNT_ID.
+# Consumer Worker secrets are set in Cloudflare, never here; the workflow fails if a name in EXPECTED_SECRETS.txt is missing.
+# The consumer deploys first so the queue has a consumer before the producer's first cron.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/mpt-content-producer/**'
+      - 'workers/mpt-content-consumer/**'
+      - 'workers/mpt-content-approval/**'
+      - '.github/workflows/deploy-mpt-content-pipeline.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mpt-content-pipeline
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pre-deployment checks
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-content-consumer
+          node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-content-producer
+          node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-content-approval
+      - name: Test Workers (stubbed KV / D1 / fetch)
+        run: node workers/mpt-content-consumer/worker.test.mjs
+      - name: Deploy consumer
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-content-consumer
+          command: deploy
+      - name: Deploy approval
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-content-approval
+          command: deploy
+      - name: Deploy producer
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-content-producer
+          command: deploy
+      - name: Verify expected secret names are present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for w in consumer approval; do
+            curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-content-$w/secrets" \
+              | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
+            sort workers/mpt-content-$w/EXPECTED_SECRETS.txt > /tmp/secrets.expected
+            missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
+            [ -z "$missing" ] || { echo "::error::mpt-content-$w secrets missing: $missing"; exit 1; }
+          done
+          echo "OK: all expected secrets present"

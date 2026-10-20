@@ -1,0 +1,24 @@
+# mpt-content-approval: POST /approve. Handles the Slack buttons (Approve All / Reject / Edit & Resubmit) and the JSON form
+# { action, drafted_content_id, timestamp }. On approve it hands the drafts to the Make.com webhook.
+# MyPrivacyTOOL Cloudflare account 35cb17172c65a20f5cf1baf131485382.
+# URL: https://mpt-content-approval.myprivacytool.workers.dev/approve  (use this as the Slack app's Interactivity Request URL).
+# No zone route: api.myprivacytool.io is a custom domain owned by mpt-leads, and a Worker can't also route a path on it without
+# replacing that custom domain with routes (see the Cloudflare audit page, section 6).
+name = "mpt-content-approval"
+main = "worker.js"
+workers_dev = true
+compatibility_date = "2024-09-23"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "AGENT_LOGS"
+database_name = "mpt-agent-logs"
+database_id = "b9dc1a03-74be-45a0-85db-fb61d80825ac"
+
+# Secrets are NOT declared here. Expected names: EXPECTED_SECRETS.txt
+[vars]
+SLACK_APPROVER = "chris"
+# Optional default asset (e.g. a Supabase mpt-brand-assets URL) until the per-post asset pipeline (MPC-8366) exists.
+DEFAULT_ASSET_URL = ""
