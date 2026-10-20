@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import consumer, { parseDraft, buildPrompt, guardrails, topicFor, slackBlocks } from './worker.js';
 import producer, { hktDate, buildMessage } from '../mpt-content-producer/worker.js';
-import approval, { handoffPayload, scheduledTime, verifySlack } from '../mpt-content-approval/worker.js';
+import approval, { scheduledTime } from '../mpt-content-approval/worker.js';
 import { parseSchedule, toSections } from '../../scripts/sync-content-cache-to-kv.mjs';
 
 let passed = 0;
@@ -105,7 +105,7 @@ check(slackPosts.length === 1, 'duplicate delivery is a no-op');
 // ---- approval worker ----
 const taskId = 'daily-posts-2026-10-20';
 const makeCalls = [];
-const aenv = { AGENT_LOGS: env.AGENT_LOGS, MAKE_WEBHOOK_URL: 'https://hook.example/x', APPROVAL_API_TOKEN: 'tok', SLACK_SIGNING_SECRET: 'sign', SLACK_BOT_TOKEN: 'xoxb', SLACK_APPROVER: 'chris', DEFAULT_ASSET_URL: '' };
+const aenv = { AGENT_LOGS: env.AGENT_LOGS, MAKE_WEBHOOK_URL: 'https://hook.example/x', APPROVAL_API_TOKEN: 'tok', SLACK_SIGNING_SECRET: 'sign', SLACK_BOT_TOKEN: 'xoxb', SLACK_APPROVER: 'chris', DEFAULT_ASSET_URL: 'https://cdn.example.com/default.png' };
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
   if (String(url).startsWith('https://hook.example')) { makeCalls.push(JSON.parse(init.body)); return new Response('Accepted'); }
@@ -117,12 +117,11 @@ check((await approval.fetch(new Request('https://a.example/approve'), aenv, ctx)
 check((await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId }), aenv, ctx)).status === 401, 'JSON without token rejected');
 slackPosts.length = 0;
 const res = await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId, timestamp: '2026-10-20T22:15:00Z' }, { authorization: 'Bearer tok' }), aenv, ctx);
-check(res.status === 200 && makeCalls.length === 4, 'approve_all posts 4 payloads to Make');
-const li = makeCalls.find((c) => c.platform === 'linkedin');
-check(li.linkedin_text === 'linkedin copy' && li.title && li.excerpt && li.url && li.campaign && li.approved_by === 'chris' && li.approval_timestamp === '2026-10-20T22:15:00.000Z' && Array.isArray(li.asset_tags) && li.cta, 'linkedin payload has OpenClaw + live-Make fields');
-check(!('linkedin_text' in makeCalls.find((c) => c.platform === 'x')), 'only linkedin carries linkedin_text');
+check(res.status === 200 && makeCalls.length === 1 && makeCalls[0].posts.length === 4, 'approve_all posts one envelope with 4 posts to Make');
+const li = makeCalls[0].posts.find((c) => c.platform === 'linkedin');
+check(li.body === 'linkedin copy' && li.title && li.link_url && li.asset_url && li.cta && li.publish_timestamp.endsWith('+08:00') && makeCalls[0].approved_by === 'chris' && makeCalls[0].approval_timestamp === '2026-10-21T06:15:00+08:00', 'envelope carries approver, HKT timestamps and per-post fields');
 check(env.AGENT_LOGS.metrics.length === 4 && env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'social_metrics + published logged');
-check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /LinkedIn/.test(slackPosts[0].text) && /HKT/.test(slackPosts[0].text), 'thread reply names platforms and HKT time');
+check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /^✅ Posted to X, LinkedIn, IG, Reddit$/.test(slackPosts[0].text), 'thread reply names platforms');
 makeCalls.length = 0;
 await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId }, { authorization: 'Bearer tok' }), aenv, ctx);
 check(makeCalls.length === 0, 'second approval is a no-op');
@@ -142,6 +141,6 @@ const pending = [];
 check((await approval.fetch(slackReq(sig), env3, { waitUntil: (p) => pending.push(p) })).status === 200, 'Slack click acked immediately');
 await Promise.all(pending);
 check(env3.AGENT_LOGS.logs.some((r) => r.status === 'rejected') && slackPosts[0]?.text === 'Rejected. Awaiting next cycle.' && slackPosts[0].thread_ts === '2.2', 'reject logged + thread reply');
-check(scheduledTime('2026-10-21', 'linkedin', new Date('2026-10-20T22:00:00Z')) === '2026-10-21T00:30:00.000Z', 'linkedin 08:30 HKT = 00:30Z');
+check(scheduledTime('2026-10-21', 'linkedin', new Date('2026-10-20T22:00:00Z')) === '2026-10-21T08:30:00+08:00', 'linkedin 08:30 HKT');
 
 console.log(`mpt-content pipeline: ${passed} checks passed`);
