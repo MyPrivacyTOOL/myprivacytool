@@ -25,6 +25,9 @@ class AuditService:
         errors: List[str] = []
         try:
             entries = self.source.fetch(agent_id, days)
+            if not entries:
+                # No evidence is not evidence of safety: unknown agent, wrong id or empty window.
+                raise LookupError(f"no log entries for agent '{agent_id}' in the last {days} days")
             outcome = risk_detector.run_audit([(n, (lambda f=f: f(entries))) for n, f in detectors.build(self.s)])
         except Exception as exc:  # noqa: BLE001 - log source failure => incomplete audit
             log.exception("log source failed for %s", agent_id)
