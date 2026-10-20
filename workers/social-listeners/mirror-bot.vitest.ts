@@ -280,7 +280,7 @@ describe("Alice clip on DMs (MPC-7628)", () => {
       if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(2_500_000));
       if (url.includes("/media/upload")) {
         if (init?.method === "GET") return Response.json({ data: { processing_info: { state: "succeeded" } } });
-        const cmd = (init!.body as FormData).get("command") as string;
+        const cmd = url.endsWith("/initialize") ? "INIT" : url.endsWith("/append") ? "APPEND" : url.endsWith("/finalize") ? "FINALIZE" : "?";
         steps.push(cmd);
         if (upload === "forbidden") return new Response("{}", { status: 403 });
         if (cmd === "INIT") return Response.json({ data: { id: "777" } });
@@ -485,8 +485,7 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
       if (url.endsWith("/media/alice-curtain.mp4")) return new Response(new Uint8Array(10));
       if (url.includes("/media/upload")) {
         seen.push((init!.headers as Record<string, string>).Authorization);
-        const cmd = (init!.body as FormData).get("command");
-        return cmd === "INIT" ? Response.json({ data: { id: "9" } }) : Response.json({ data: { id: "9" } });
+        return Response.json({ data: { id: "9" } });
       }
       return new Response("{}");
     });
