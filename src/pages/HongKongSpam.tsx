@@ -319,13 +319,19 @@ const HongKongSpamPage = () => {
                   <h3 className="font-semibold">{s.title}</h3>
                   <p className="text-sm text-muted-foreground">{s.body}</p>
                   {i === 2 && !view.keysHidden && (
-                    <ul className="mt-3 flex flex-wrap gap-3" aria-label={copy.keysFallback} data-testid="hk-keys">
+                    <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label={copy.keysFallback} data-testid="hk-keys">
                       {view.keys.map((k, n) => (
                         <li
                           key={`${k.purpose}-${n}`}
-                          className={`rounded-lg border border-border bg-background px-3 py-2 text-center ${view.largeKeys ? "min-w-[5.5rem]" : ""}`}
+                          className="relative flex min-w-0 flex-col items-center justify-center rounded-lg border border-border bg-background px-3 py-3 pt-6 text-center"
                         >
-                          <span className="block text-xs text-muted-foreground">
+                          <span
+                            aria-hidden="true"
+                            className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+                          >
+                            {n + 1}
+                          </span>
+                          <span className="flex min-h-[2.25rem] items-center justify-center text-xs text-muted-foreground">
                             {copy.press} ({copy.keyPurpose[k.purpose]})
                           </span>
                           <span className={`block font-mono font-bold ${view.largeKeys ? "text-5xl" : "text-2xl"}`}>{k.key}</span>
