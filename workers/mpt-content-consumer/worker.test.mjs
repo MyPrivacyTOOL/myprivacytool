@@ -35,7 +35,7 @@ check(hktDate(new Date('2026-10-19T22:00:00Z')) === '2026-10-20', '22:00 UTC is 
 check(JSON.stringify(buildMessage(new Date('2026-10-19T22:00:00Z'))) === '{"date":"2026-10-20","action":"generate_daily_posts"}', 'producer payload');
 const sent = []; const pdb = makeDb();
 const pending0 = [];
-await producer.scheduled({ scheduledTime: Date.parse('2026-10-19T22:00:00Z') }, { AGENT_LOGS: pdb, BRAND_TOPICS: { get: async (k) => (k === '2026-10-20' ? { topic: 'Exposure score', pillar: 'awareness' } : null) }, CONTENT_QUEUE: { send: async (m) => sent.push(m) } }, { waitUntil: (p) => pending0.push(p) });
+await producer.scheduled({ scheduledTime: Date.parse('2026-10-19T22:00:00Z') }, { AGENT_LOGS: pdb, BRAND_TOPICS: { get: async (k) => (k === 'topic:2026-10-20' ? { topic: 'Exposure score', pillar: 'awareness' } : null) }, CONTENT_QUEUE: { send: async (m) => sent.push(m) } }, { waitUntil: (p) => pending0.push(p) });
 await Promise.all(pending0);
 check(sent.length === 1 && sent[0].date === '2026-10-20' && sent[0].topic === 'Exposure score' && sent[0].pillar === 'awareness' && pdb.logs[0].status === 'queued' && pdb.logs[0].id.length > 20, 'producer enqueues + logs');
 
