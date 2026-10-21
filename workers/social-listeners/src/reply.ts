@@ -22,7 +22,7 @@ const TELEGRAM_TIMEOUT_MS = 5000;
 // MPC-7641: Telegram's legacy Markdown reads "_" as italics, which would break the UTM-tagged links. Escape them inside URLs only.
 export const escapeUrlUnderscores = (text: string): string => text.replace(/https?:\/\/\S+/g, (u) => u.replace(/_/g, "\\_"));
 
-/** Text that follows a key before the next key (default: a line break). Mirrors workers/telegram-webhook/messages.js. */
+/** Text that follows a key before the next key (default: a line break). */
 const AFTER: Record<string, string> = {
   "bot.first_hexagon.title": "\n\n",
   "bot.first_hexagon.brokers": "\n\n---\n",

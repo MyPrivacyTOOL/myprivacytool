@@ -87,7 +87,6 @@ itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 | mpt-metrics-collector | `SUPABASE_SERVICE_ROLE_KEY`, `COLLECTOR_TRIGGER_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`, `YOUTUBE_API_KEY`, `GA4_SERVICE_ACCOUNT_JSON`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN` (MPC-7383 Monday digest, `chat:write` only), `HUBSPOT_READONLY_TOKEN` (read-only HubSpot private-app token for portal 246502821; deliberately not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY`) (non-secret config: `SUPABASE_URL`, `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` (set as a secret so `wrangler deploy` does not replace it)) |
 | oauth-poc | `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `SUPABASE_SERVICE_ROLE_KEY` † |
 | scan-report | `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`, `UNSUBSCRIBE_SECRET` † |
-| telegram-webhook | `TELEGRAM_BOT_TOKEN`, `HUBSPOT_API_KEY`, `WEBHOOK_SECRET` |
 | webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` |
 
 GitHub Actions also holds: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_PROJECT_ID`,
@@ -99,7 +98,7 @@ GitHub Actions also holds: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUP
 Revoke and reissue at the provider, then update **both** the Worker (`wrangler secret put`) and the GitHub Actions secret.
 
 - [ ] **Shared values: change everywhere in the same window**
-  - `WEBHOOK_SECRET` (core-brain, telegram-webhook) and `CORE_BRAIN_TOKEN` (social-listeners) must stay equal.
+  - `WEBHOOK_SECRET` (core-brain) and `CORE_BRAIN_TOKEN` (social-listeners) must stay equal.
   - `SUPABASE_SERVICE_ROLE_KEY` is used by github-channel, mpt-leads, mpt-metrics-collector, oauth-poc, scan-report
     and webhook-receiver. Only scan-report is synced by CI (`SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`); set the rest
     by hand with `wrangler secret put`.
