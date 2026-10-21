@@ -1,7 +1,7 @@
 // @vitest-environment node
 // MPC-8370: unit + integration tests for mpt-content-producer (KV / D1 / Queue stubbed; no network).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import producer, { hktDate, buildMessage, enqueue } from './worker.js';
+import producer, { hktDate, buildMessage, enqueue, topicRecord } from './worker.js';
 
 const CRON = Date.parse('2026-10-19T22:00:00Z'); // 06:00 HKT on 2026-10-20
 
@@ -41,16 +41,33 @@ describe('buildMessage', () => {
   it('omits optional fields that are absent', () => expect(buildMessage(new Date(CRON), { topic: 'T' })).toEqual({ date: '2026-10-20', action: 'generate_daily_posts', topic: 'T' }));
 });
 
+describe('topicRecord', () => {
+  it('derives the topic from the sync shape: x, then pillar, then blog', () => {
+    expect(topicRecord({ date: 'd', items: { x: [{ text: 'X topic' }], pillar: [{ text: 'P' }] } }).topic).toBe('X topic');
+    expect(topicRecord({ items: { pillar: [{ text: ' P ' }], blog: [{ text: 'B' }] } }).topic).toBe('P');
+    expect(topicRecord({ items: { blog: [{ text: 'B' }] } }).topic).toBe('B');
+  });
+  it('keeps a record that already has a topic', () => expect(topicRecord({ topic: 'T', pillar: 'p' })).toEqual({ topic: 'T', pillar: 'p' }));
+  it('returns null for nothing usable', () => {
+    for (const r of [null, undefined, 'str', {}, { items: {} }, { items: { reddit: [{ text: 'R' }] } }]) expect(topicRecord(r)).toBeNull();
+  });
+});
+
 describe('enqueue', () => {
-  it('reads the HKT-date key as JSON from mpt-brand-topics and enqueues the payload as JSON', async () => {
+  it('reads the topic:<HKT date> key as JSON from mpt-brand-topics and enqueues the payload as JSON', async () => {
     const env = makeEnv();
     const msg = await enqueue(env, new Date(CRON));
-    expect(env.gets).toEqual([['2026-10-20', 'json']]);
+    expect(env.gets).toEqual([['topic:2026-10-20', 'json']]);
     expect(env.sent).toEqual([[msg, { contentType: 'json' }]]);
     expect(msg).toMatchObject({ date: '2026-10-20', action: 'generate_daily_posts', topic: 'Your exposure score', pillar: 'awareness', asset_tags: ['score'] });
     expect(env.logs).toHaveLength(1);
     expect(env.logs[0]).toMatchObject({ task_id: 'daily-posts-2026-10-20', status: 'queued', error_message: null });
     expect(env.logs[0].id).toHaveLength(36);
+  });
+
+  it('enqueues a topic derived from a record written by sync-workstream-3-to-kv', async () => {
+    const env = makeEnv({ topic: { date: '2026-10-20', items: { x: [{ text: 'Thread: exposure', qualifier: null }] } } });
+    expect((await enqueue(env, new Date(CRON))).topic).toBe('Thread: exposure');
   });
 
   it('still enqueues (and notes it) when there is no topic yet', async () => {
