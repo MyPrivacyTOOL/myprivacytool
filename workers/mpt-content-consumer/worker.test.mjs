@@ -34,8 +34,10 @@ const makeDb = () => {
 check(hktDate(new Date('2026-10-19T22:00:00Z')) === '2026-10-20', '22:00 UTC is 06:00 HKT next day');
 check(JSON.stringify(buildMessage(new Date('2026-10-19T22:00:00Z'))) === '{"date":"2026-10-20","action":"generate_daily_posts"}', 'producer payload');
 const sent = []; const pdb = makeDb();
-await producer.scheduled({ scheduledTime: Date.parse('2026-10-19T22:00:00Z') }, { AGENT_LOGS: pdb, CONTENT_QUEUE: { send: async (m) => sent.push(m) } }, { waitUntil: (p) => p });
-check(sent.length === 1 && sent[0].date === '2026-10-20' && pdb.logs[0].status === 'queued' && pdb.logs[0].id.length > 20, 'producer enqueues + logs');
+const pending0 = [];
+await producer.scheduled({ scheduledTime: Date.parse('2026-10-19T22:00:00Z') }, { AGENT_LOGS: pdb, BRAND_TOPICS: { get: async (k) => (k === '2026-10-20' ? { topic: 'Exposure score', pillar: 'awareness' } : null) }, CONTENT_QUEUE: { send: async (m) => sent.push(m) } }, { waitUntil: (p) => pending0.push(p) });
+await Promise.all(pending0);
+check(sent.length === 1 && sent[0].date === '2026-10-20' && sent[0].topic === 'Exposure score' && sent[0].pillar === 'awareness' && pdb.logs[0].status === 'queued' && pdb.logs[0].id.length > 20, 'producer enqueues + logs');
 
 // ---- KV sync parsing ----
 const days = parseSchedule([
@@ -59,27 +61,27 @@ const brand = { sections: [{ heading: 'Voice & tone', text: 'calm' }, { heading:
 check(guardrails(brand) === '## Voice & tone\ncalm', 'guardrails pick voice sections');
 const schedule = { date: '2026-10-20', items: { x: [{ text: 'Thread: exposure', qualifier: null }] } };
 check(topicFor(schedule, 'instagram') === 'Thread: exposure' && topicFor(schedule, 'x') === 'Thread: exposure', 'instagram falls back to x topic');
-const pr = buildPrompt('reddit', 'T', '2026-10-20', 'GUARD');
-check(pr.system.includes('GUARD') && pr.user.includes('Platform: Reddit') && pr.user.includes("Today's topic: T"), 'system has guardrails, user has platform + topic');
+const pr = buildPrompt('pinterest', 'T', '2026-10-20', 'GUARD');
+check(pr.system.includes('GUARD') && pr.user.includes('Platform: Pinterest') && pr.user.includes("Today's topic: T"), 'system has guardrails, user has platform + topic');
 assert.throws(() => parseDraft('x', JSON.stringify({ copy: 'a'.repeat(300) })), /280/); passed++;
-assert.throws(() => parseDraft('reddit', JSON.stringify({ copy: 'b' })), /title/); passed++;
+assert.throws(() => parseDraft('pinterest', JSON.stringify({ copy: 'b' })), /title/); passed++;
 check(parseDraft('linkedin', `ok\n${JSON.stringify({ copy: 'hello' })}`).cta === 'Check your exposure', 'parseDraft tolerates prose, adds CTA');
 
 // ---- consumer end to end ----
-const goodFor = (platform) => (platform === 'reddit' ? { copy: 'body', title: 'T', subreddit: 'r/privacy' } : platform === 'instagram' ? { copy: 'cap', slides: ['s1'] } : { copy: `${platform} copy` });
+const goodFor = (platform) => (platform === 'pinterest' ? { copy: 'body', title: 'T' } : platform === 'youtube' ? { copy: 'desc', title: 'T', script: 'spoken' } : platform === 'instagram' ? { copy: 'cap', slides: ['s1'] } : { copy: `${platform} copy` });
 const env = {
   AGENT_LOGS: makeDb(),
   CONTENT_CACHE: { get: async (k) => (k === 'schedule:2026-10-20' ? schedule : brand) },
   ANTHROPIC_API_KEY: 'k', SLACK_BOT_TOKEN: 'xoxb', SLACK_CHANNEL: '#mpt-content-approval', LLM_MODEL: 'm',
 };
-let inflight = 0; let maxInflight = 0; let failReddit = true; const slackPosts = [];
+let inflight = 0; let maxInflight = 0; let failPinterest = true; const slackPosts = [];
 globalThis.fetch = async (url, init) => {
   if (String(url).includes('anthropic')) {
     inflight++; maxInflight = Math.max(maxInflight, inflight);
     await new Promise((r) => setTimeout(r, 15));
     inflight--;
     const platform = /Platform: (\w+)/.exec(JSON.parse(init.body).messages[0].content)[1].toLowerCase();
-    if (platform === 'reddit' && failReddit) return new Response('overloaded', { status: 529 });
+    if (platform === 'pinterest' && failPinterest) return new Response('overloaded', { status: 529 });
     return Response.json({ content: [{ type: 'text', text: JSON.stringify(goodFor(platform)) }] });
   }
   if (String(url).includes('chat.postMessage')) { slackPosts.push(JSON.parse(init.body)); return Response.json({ ok: true, channel: 'C99', ts: '1.1' }); }
@@ -88,16 +90,16 @@ globalThis.fetch = async (url, init) => {
 const acks = [];
 const msg = { body: { date: '2026-10-20', action: 'generate_daily_posts' }, attempts: 1, ack: () => acks.push('ack'), retry: () => acks.push('retry') };
 await consumer.queue({ messages: [msg] }, env);
-check(maxInflight === 4, 'four LLM calls ran concurrently');
-check(acks[0] === 'retry' && env.AGENT_LOGS.logs.filter((r) => r.status === 'drafted').length === 3 && env.AGENT_LOGS.logs.some((r) => r.status === 'failed' && /reddit/.test(r.error_message)), 'one failed platform: others saved, failure logged, retried');
-failReddit = false; maxInflight = 0;
+check(maxInflight === 6, 'six LLM calls ran concurrently');
+check(acks[0] === 'retry' && env.AGENT_LOGS.logs.filter((r) => r.status === 'drafted').length === 5 && env.AGENT_LOGS.logs.some((r) => r.status === 'failed' && /pinterest/.test(r.error_message)), 'one failed platform: others saved, failure logged, retried');
+failPinterest = false; maxInflight = 0;
 await consumer.queue({ messages: [{ ...msg, attempts: 2 }] }, env);
 check(maxInflight === 1, 'retry regenerates only the missing platform');
-check(env.AGENT_LOGS.logs.filter((r) => r.status === 'drafted').length === 4 && acks[1] === 'ack', '4 drafts saved, acked');
+check(env.AGENT_LOGS.logs.filter((r) => r.status === 'drafted').length === 6 && acks[1] === 'ack', '4 drafts saved, acked');
 const blocks = slackPosts[0].blocks;
 check(slackPosts.length === 1 && slackPosts[0].channel === '#mpt-content-approval', 'one Slack post to the approval channel');
 check(blocks.at(-1).elements.map((e) => e.action_id).join() === 'approve_all,reject,edit_resubmit' && blocks.at(-1).elements.every((e) => e.value === 'daily-posts-2026-10-20'), '3 buttons');
-check(blocks.filter((b) => b.type === 'section' && /\*(X|LinkedIn|Instagram|Reddit)\*/.test(b.text.text)).length === 4, 'all 4 drafts in the message');
+check(blocks.filter((b) => b.type === 'section' && /\*(X|LinkedIn|Instagram|Facebook|Pinterest|YouTube)\*/.test(b.text.text)).length === 6, 'all 6 drafts in the message');
 check(JSON.parse(env.AGENT_LOGS.logs.find((r) => r.status === 'notified').draft_content).ts === '1.1', 'slack ts stored');
 await consumer.queue({ messages: [{ ...msg, attempts: 3 }] }, env);
 check(slackPosts.length === 1, 'duplicate delivery is a no-op');
@@ -117,11 +119,12 @@ check((await approval.fetch(new Request('https://a.example/approve'), aenv, ctx)
 check((await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId }), aenv, ctx)).status === 401, 'JSON without token rejected');
 slackPosts.length = 0;
 const res = await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId, timestamp: '2026-10-20T22:15:00Z' }, { authorization: 'Bearer tok' }), aenv, ctx);
-check(res.status === 200 && makeCalls.length === 1 && makeCalls[0].posts.length === 4, 'approve_all posts one envelope with 4 posts to Make');
+check(res.status === 200 && makeCalls.length === 1 && makeCalls[0].posts.length === 6, 'approve_all posts one envelope with 6 posts to Make');
 const li = makeCalls[0].posts.find((c) => c.platform === 'linkedin');
 check(li.body === 'linkedin copy' && li.title && li.link_url && li.asset_url && li.cta && li.publish_timestamp.endsWith('+08:00') && makeCalls[0].approved_by === 'chris' && makeCalls[0].approval_timestamp === '2026-10-21T06:15:00+08:00', 'envelope carries approver, HKT timestamps and per-post fields');
-check(env.AGENT_LOGS.metrics.length === 4 && env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'social_metrics + published logged');
-check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /^✅ Posted to X, LinkedIn, IG, Reddit$/.test(slackPosts[0].text), 'thread reply names platforms');
+check(makeCalls[0].posts.find((c) => c.platform === 'youtube').script === 'spoken', 'youtube script passes through');
+check(env.AGENT_LOGS.metrics.length === 6 && env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'social_metrics + published logged');
+check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /^✅ Posted to X, LinkedIn, IG, FB, Pinterest, YouTube$/.test(slackPosts[0].text), 'thread reply names platforms');
 makeCalls.length = 0;
 await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId }, { authorization: 'Bearer tok' }), aenv, ctx);
 check(makeCalls.length === 0, 'second approval is a no-op');

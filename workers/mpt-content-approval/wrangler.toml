@@ -12,6 +12,10 @@ compatibility_date = "2024-09-23"
 [observability]
 enabled = true
 
+[[kv_namespaces]]
+binding = "PUBLISHED_POSTS"
+id = "2c58243307124e74b9bee12093d4c081"  # mpt-published-posts (MPC-8371)
+
 [[d1_databases]]
 binding = "AGENT_LOGS"
 database_name = "mpt-agent-logs"
@@ -19,7 +23,7 @@ database_id = "b9dc1a03-74be-45a0-85db-fb61d80825ac"
 
 # Secrets are NOT declared here. Expected names: EXPECTED_SECRETS.txt
 # MAKE_WEBHOOK_URL is the full Make.com hook URL (its token is the credential; never commit it). Optional: MAKE_API_KEY, sent as x-make-apikey.
-# Every Make POST is logged to D1 make_webhook_log (apply workers/mpt-content-consumer/migrations/0002_make_webhook_log.sql first).
+# Every Make POST is logged to D1 make_webhook_log (apply workers/mpt-content-consumer/migrations/0003_make_webhook_log.sql first).
 [vars]
 SLACK_APPROVER = "chris"
 # Optional default asset (e.g. a Supabase mpt-brand-assets URL) until the per-post asset pipeline (MPC-8366) exists.

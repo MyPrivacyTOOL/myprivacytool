@@ -36,7 +36,7 @@ export interface Endpoint {
 }
 
 export const BASES = {
-  leads: "https://mpt-leads.myprivacytool.workers.dev",
+  leads: "https://api.myprivacytool.io",
   scan: "https://mpt-scan-report.myprivacytool.workers.dev",
   github: "https://channels.myprivacytool.io",
   oauthPoc: "https://myprivacytool-oauth-poc.myprivacytool.workers.dev",
@@ -556,7 +556,6 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
 }`;
 
 export const INTERNAL_SERVICES = [
-  { name: "telegram-webhook", note: "Telegram bot webhook (First Hexagon). Called by Telegram only; not deployed from CI." },
   { name: "webhook-receiver", note: "Multi-channel inbound webhooks. Source only; not deployed on either Cloudflare account." },
 ];
 

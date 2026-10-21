@@ -10,7 +10,7 @@ import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
-const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', facebook: '19:00', pinterest: '20:00', youtube: '18:00', reddit: '19:00' };
+const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', facebook: '13:00', pinterest: '20:00', youtube: '17:00', reddit: '19:00' };
 const CAMPAIGN = 'mpc-7033-daily';
 const SITE = 'https://myprivacytool.io';
 const MAKE_TIMEOUT_MS = 10_000;
@@ -82,6 +82,8 @@ export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp
         publish_timestamp: scheduledTime(date, d.platform, new Date(approvalTimestamp)),
         ...(d.platform === 'reddit' ? { subreddit: d.subreddit || 'r/privacy' } : {}),
         ...(d.slides ? { slides: d.slides } : {}),
+        ...(d.script ? { script: d.script } : {}),
+        ...(Array.isArray(d.asset_tags) && d.asset_tags.length ? { asset_tags: d.asset_tags } : {}),
       };
     });
   return {

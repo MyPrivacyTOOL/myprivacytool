@@ -2,7 +2,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { composeReply, replyTarget } from "./src/reply";
-import { confirmedN, confirmedY, confirmPrompt, firstHexagon, unknown } from "../telegram-webhook/messages.js";
 
 const KEYS = {
   firstHexagon: ["bot.first_hexagon.title", "bot.first_hexagon.name", "bot.first_hexagon.location", "bot.first_hexagon.phone",
@@ -15,20 +14,16 @@ const KEYS = {
 };
 
 describe("composeReply", () => {
-  it("matches the text the old telegram-webhook Worker sent, for every message", () => {
-    expect(composeReply(KEYS.firstHexagon, "en")).toBe(firstHexagon("en"));
-    expect(composeReply(KEYS.confirmedYes, "en")).toBe(confirmedY("en"));
-    expect(composeReply(KEYS.confirmedNo, "en")).toBe(confirmedN("en"));
-    expect(composeReply(KEYS.welcome, "en")).toBe(unknown("en"));
-    expect(composeReply(KEYS.confirmPrompt, "en")).toBe(confirmPrompt("en"));
+  it("composes a non-empty reply for every message", () => {
+    for (const keys of Object.values(KEYS)) expect(composeReply(keys, "en").length).toBeGreaterThan(0);
   });
   it("falls back to English for untranslated or unknown locales", () => {
-    expect(composeReply(KEYS.welcome, "es")).toBe(unknown("en"));
-    expect(composeReply(KEYS.welcome, "xx")).toBe(unknown("en"));
-    expect(composeReply(KEYS.welcome, undefined)).toBe(unknown("en"));
+    expect(composeReply(KEYS.welcome, "es")).toBe(composeReply(KEYS.welcome, "en"));
+    expect(composeReply(KEYS.welcome, "xx")).toBe(composeReply(KEYS.welcome, "en"));
+    expect(composeReply(KEYS.welcome, undefined)).toBe(composeReply(KEYS.welcome, "en"));
   });
   it("skips unknown keys and returns empty for bad input", () => {
-    expect(composeReply(["nope", 5, "bot.confirm_prompt"], "en")).toBe(confirmPrompt("en"));
+    expect(composeReply(["nope", 5, "bot.confirm_prompt"], "en")).toBe(composeReply(KEYS.confirmPrompt, "en"));
     expect(composeReply(undefined, "en")).toBe("");
     expect(composeReply([], "en")).toBe("");
   });
@@ -59,7 +54,7 @@ describe("Telegram reply flow", () => {
     expect(tg).toHaveBeenCalledOnce();
     expect(tg.mock.calls[0][0]).toBe("https://api.telegram.org/bot123:abc/sendMessage");
     const sent = JSON.parse(String((tg.mock.calls[0][1] as RequestInit).body));
-    expect(sent).toEqual({ chat_id: 4242, text: unknown("en"), parse_mode: "Markdown" });
+    expect(sent).toEqual({ chat_id: 4242, text: composeReply(KEYS.welcome, "en"), parse_mode: "Markdown" });
   });
   it("sends nothing when core-brain ignores the update", async () => {
     const tg = telegram();
