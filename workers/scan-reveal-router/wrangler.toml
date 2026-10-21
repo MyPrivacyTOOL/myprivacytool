@@ -1,0 +1,32 @@
+name = "scan-reveal-router"
+main = "worker.js"
+compatibility_date = "2024-11-13"
+
+# Route configuration
+# This worker intercepts /api/scan* on myprivacytool.io to assign A/B variants
+routes = [
+  { pattern = "myprivacytool.io/api/scan*", zone_name = "myprivacytool.io" }
+]
+
+# Environment variables
+vars = { 
+  GA4_PROPERTY_ID = "G-1BWMDBJSPL"
+}
+
+# Secrets (must be set via wrangler secret put)
+# AB_TEST_SALT = "..." (secret, use for deterministic hashing)
+# DB = "..." (D1 database binding for kill switch)
+
+[env.production]
+route = "myprivacytool.io/api/scan*"
+
+# D1 Database binding for kill switch config
+[[d1_databases]]
+binding = "DB"
+database_name = "myprivacytool-prod"
+database_id = "YOUR_D1_DATABASE_ID"
+
+# Cloudflare KV binding for caching kill switch (optional, for performance)
+[[kv_namespaces]]
+binding = "KV_CONFIG"
+id = "YOUR_KV_NAMESPACE_ID"

@@ -1,12 +1,40 @@
-// mpt-content-producer: cron -> Queue only. All slow work (KV read, LLM call, Slack) happens in mpt-content-consumer.
+// mpt-content-producer: cron -> reads today's topic from KV mpt-brand-topics (key = topic:<HKT date>, written by scripts/sync-workstream-3-to-kv.mjs)
+// -> Queue. All slow work (LLM calls, Slack) happens in mpt-content-consumer.
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 export function hktDate(now = new Date()) {
   return new Date(now.getTime() + HKT_OFFSET_MS).toISOString().slice(0, 10);
 }
 
-export function buildMessage(now = new Date()) {
-  return { date: hktDate(now), action: 'generate_daily_posts' };
+export function buildMessage(now = new Date(), topic = null) {
+  const msg = { date: hktDate(now), action: 'generate_daily_posts' };
+  if (topic?.topic) {
+    msg.topic = topic.topic;
+    for (const k of ['pillar', 'format_type', 'asset_tags']) if (topic[k] !== undefined) msg[k] = topic[k];
+  }
+  return msg;
+}
+
+/**
+ * The sync writes {date, items:{x|pillar|blog|linkedin|reddit:[{text}]}}. The queue message carries one topic, so take the
+ * first X thread, else pillar post, else blog (the same order the consumer uses for platforms with no topic of their own).
+ * A record that already has a `topic` string (hand-written or older shape) is used as is.
+ */
+export function topicRecord(rec) {
+  if (!rec || typeof rec !== 'object') return null;
+  if (typeof rec.topic === 'string' && rec.topic.trim()) return rec;
+  const text = ['x', 'pillar', 'blog'].map((k) => rec.items?.[k]?.[0]?.text).find((t) => typeof t === 'string' && t.trim());
+  return text ? { ...rec, topic: text.trim() } : null;
+}
+
+/** Today's topic record, or null when the sync has not written one (the consumer then falls back to schedule:<date>). */
+async function readTopic(env, date) {
+  try {
+    return topicRecord(await env.BRAND_TOPICS.get(`topic:${date}`, 'json'));
+  } catch (e) {
+    console.error('topic read failed', e?.message);
+    return null;
+  }
 }
 
 async function log(env, taskId, status, error) {
@@ -19,15 +47,15 @@ async function log(env, taskId, status, error) {
 }
 
 export async function enqueue(env, now = new Date()) {
-  const msg = buildMessage(now);
-  const taskId = `daily-posts-${msg.date}`;
+  const taskId = `daily-posts-${hktDate(now)}`;
+  const msg = buildMessage(now, await readTopic(env, hktDate(now)));
   try {
     await env.CONTENT_QUEUE.send(msg, { contentType: 'json' });
   } catch (e) {
     await log(env, taskId, 'failed', `enqueue failed: ${e?.message}`);
     throw e;
   }
-  await log(env, taskId, 'queued');
+  await log(env, taskId, 'queued', msg.topic ? undefined : 'no topic in mpt-brand-topics; consumer will use the schedule fallback');
   return msg;
 }
 

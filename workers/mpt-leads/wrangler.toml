@@ -3,6 +3,13 @@ name = "mpt-leads"
 main = "worker.js"
 workers_dev = true
 
+# MPC-8368: production hostname. A custom domain on the myprivacytool.io zone (same pattern as core-brain and github-channel):
+# `wrangler deploy` keeps the DNS record and certificate for it, no manual DNS. The site posts here (Pages variable
+# VITE_WORKER_ENDPOINT). workers_dev stays true: the deploy smoke test and any old client still use the workers.dev address.
+# Rollback: delete this line and remove the domain from the Worker (Workers & Pages > mpt-leads > Domains), then point
+# VITE_WORKER_ENDPOINT back at https://mpt-leads.myprivacytool.workers.dev.
+routes = [{ pattern = "api.myprivacytool.io", custom_domain = true }]
+
 # DECISION: the LIVE worker has an EMPTY compatibility_date (oldest runtime behaviour). wrangler
 # requires one, so the first Action deploy changes it. The code is plain fetch/formData/crypto and is
 # covered by worker.test.mjs, but verify once with a real submission after the first Action deploy.

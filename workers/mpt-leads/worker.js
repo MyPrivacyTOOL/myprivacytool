@@ -27,6 +27,19 @@ const rateLimited = async (env, request) => (await rateLimitState(env, request))
 // 'ok', 'failed' (missing, invalid, reused or wrong-hostname token) or 'error' (siteverify unreachable: fails open, like the
 // rate limiter, so a Cloudflare hiccup never drops a real lead). Blocking is opt-in via TURNSTILE_ENFORCE = "true"; until then
 // a 'failed' result is only logged so the Worker can ship before the site that sends tokens.
+// Privacy: the TURNSTILE_FAILED log keeps a coarse network prefix (IPv4 /24, IPv6 /48), never the visitor's full address.
+// It still groups repeat offenders and shows which network a false positive came from. Workers Logs retention is fixed by
+// plan (3 days Free, 7 days Paid) and cannot be set per log line, so the address is cut before it is written.
+function maskIp(ip) {
+  const s = String(ip || '');
+  const v4 = s.match(/(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/); // also IPv4-mapped IPv6 (::ffff:1.2.3.4)
+  if (v4) return v4[1] + '.0/24';
+  if (s.includes(':')) {
+    const g = s.split(':');
+    return g[0] && g[1] && g[2] ? `${g[0]}:${g[1]}:${g[2]}::/48` : 'ipv6';
+  }
+  return '';
+}
 const TURNSTILE_HOSTS = ['myprivacytool.io', 'www.myprivacytool.io', 'wwwmyprivacytool.pages.dev'];
 async function turnstileState(env, request, token, info = {}) {
   if (!env.TURNSTILE_SECRET_KEY) return 'absent';
@@ -192,11 +205,11 @@ export default {
       const ts = await turnstileState(env, request, turnstileToken, tsInfo);
       if (ts === 'failed') {
         // MPC-8368: one structured line per failure (search the Worker logs for TURNSTILE_FAILED) so false positives can be
-        // reviewed during the enforcement trial. Carries the IP, timestamp, reason, country and Origin; never the email or token.
+        // reviewed during the enforcement trial. Carries a truncated IP, timestamp, reason, country and Origin; never the email or token.
         const enforce = String(env.TURNSTILE_ENFORCE).toLowerCase() === 'true';
         console.warn('TURNSTILE_FAILED ' + JSON.stringify({
           ts: new Date().toISOString(),
-          ip: request.headers.get('CF-Connecting-IP') || '',
+          ip: maskIp(request.headers.get('CF-Connecting-IP')),
           country: request.cf?.country || '',
           origin: origin || '',
           reason: tsInfo.reason || 'unknown',
