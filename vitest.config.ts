@@ -30,6 +30,7 @@ export default defineConfig({
         "workers/oauth-poc/*.js",
         "workers/mpt-content-producer/worker.js",
         "workers/mpt-content-consumer/worker.js",
+        "workers/mpt-content-approval/*.js",
         "src/lib/hubspot.ts",
         "src/pages/Contact.tsx",
         "src/pages/Start.tsx",
