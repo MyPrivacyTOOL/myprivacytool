@@ -43,7 +43,7 @@ Set in *Settings → Secrets and variables → Actions*.
 
 | GitHub secret | Workflows | Passed to |
 |---|---|---|
-| `CLOUDFLARE_API_TOKEN` | deploy, deploy-scan-report, deploy-mpt-leads, deploy-mpt-metrics-collector, deploy-github-channel, deploy-oauth-poc, deploy-telegram-webhook, rollback | wrangler-action `apiToken` (deploy only; scope it to *Workers Scripts: Edit* on the account, not "all permissions") |
+| `CLOUDFLARE_API_TOKEN` | deploy, deploy-scan-report, deploy-mpt-leads, deploy-mpt-metrics-collector, deploy-github-channel, deploy-oauth-poc, rollback | wrangler-action `apiToken` (deploy only; scope it to *Workers Scripts: Edit* on the account, not "all permissions") |
 | `CLOUDFLARE_ACCOUNT_ID` | same as above | wrangler-action `accountId` (identifier, not a secret, but kept alongside) |
 | `SUPABASE_URL` | deploy | core-brain, social-listeners Worker secret |
 | `SUPABASE_KEY` | deploy | core-brain, social-listeners Worker secret |
@@ -93,7 +93,6 @@ human has to set it.
 | github-channel | `REDDIT_CLIENT_SECRET` | `workers/github-channel/lib/reddit-routes.js` (optional Reddit OAuth) | ❌ | optional, omitted on purpose |
 | oauth-poc | `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY` | `workers/oauth-poc/` | ❌ | ✅ |
 | oauth-poc | `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_URL`) | `workers/oauth-poc/supabase.js` (optional account linking) | ❌ | optional, omitted on purpose |
-| telegram-webhook | `TELEGRAM_BOT_TOKEN`, `HUBSPOT_API_KEY`, `WEBHOOK_SECRET` | `workers/telegram-webhook/` | ❌ | ✅ |
 | webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` | `workers/webhook-receiver/` | ✅ `deploy-webhook-receiver.yml` | ✅ (names verified unchanged across each deploy) |
 | mirror-risk | none | — | — | ✅ (empty) |
 
@@ -107,7 +106,7 @@ human has to set it.
 | Supabase `SUPABASE_KEY` (core-brain / social-listeners) | Supabase dashboard → API Keys | GitHub secret `SUPABASE_KEY` (deploy.yml syncs both Workers) |
 | Supabase anon / publishable key | Supabase dashboard → API Keys | mpt-leads Worker secret |
 | Supabase access token / DB password | Supabase account → Access Tokens; project → Database settings | GitHub `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` |
-| HubSpot private-app tokens | HubSpot → Settings → Private Apps | `SCAN_REPORT_HUBSPOT_TOKEN`; Worker secrets on mpt-leads, telegram-webhook, webhook-receiver, mpt-metrics-collector (read-only token) |
+| HubSpot private-app tokens | HubSpot → Settings → Private Apps | `SCAN_REPORT_HUBSPOT_TOKEN`; Worker secrets on mpt-leads, webhook-receiver, mpt-metrics-collector (read-only token) |
 | Resend, HIBP, Hunter, Notion, Slack, Qwen, Twilio, Meta, X, Telegram, Google/GitHub/Reddit OAuth, YouTube, GA4 | Each vendor's console | The Workers listed in section 3 |
 | `WEBHOOK_SECRET` / `CORE_BRAIN_TOKEN`, `STATE_SIGNING_KEY`, `ENCRYPTION_KEY`, `UNSUBSCRIBE_SECRET`, `COLLECTOR_TRIGGER_TOKEN` | Self-generated (`openssl rand -hex 32`) | GitHub secrets and/or Worker secrets as in sections 2–3. `CORE_BRAIN_TOKEN` must equal core-brain `WEBHOOK_SECRET` |
 

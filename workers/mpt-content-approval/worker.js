@@ -3,13 +3,19 @@
 //   { "action": "approve_all" | "reject" | "edit_resubmit", "drafted_content_id": "daily-posts-YYYY-MM-DD", "timestamp": "..." }
 //   (JSON requires `Authorization: Bearer <APPROVAL_API_TOKEN>`).
 //   reject      -> log to D1, reply in the Slack thread
-//   approve_all -> POST each draft to the Make.com webhook, log to D1 (agent_execution_logs 'published' + social_metrics), reply in thread
+//   approve_all -> build the 6-platform payload, validate it (schema.js), POST it once to the Make.com webhook,
+//                  log every attempt to D1 (make_webhook_log + agent_execution_logs 'published'/'failed' + social_metrics), reply in thread
 
-const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', reddit: 'Reddit' };
+import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
+
+const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
-const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', reddit: '19:00' };
+const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', facebook: '13:00', pinterest: '20:00', youtube: '17:00', reddit: '19:00' };
 const CAMPAIGN = 'mpc-7033-daily';
 const SITE = 'https://myprivacytool.io';
+const MAKE_TIMEOUT_MS = 10_000;
+const REQUEST_LOG_CHARS = 2000;
+const RESPONSE_LOG_CHARS = 500;
 const encoder = new TextEncoder();
 const iso = (d = new Date()) => d.toISOString();
 
@@ -41,37 +47,97 @@ async function rows(env, taskId, status) {
   return (results ?? []).map((r) => (r.draft_content ? JSON.parse(r.draft_content) : null)).filter(Boolean);
 }
 
+const HKT_OFFSET_MS = 8 * 3600e3;
+/** Date -> "YYYY-MM-DDTHH:MM:SS+08:00". */
+export const toHktIso = (d) => `${new Date(d.getTime() + HKT_OFFSET_MS).toISOString().slice(0, 19)}+08:00`;
+
+/** Publish time for a platform on `date` (YYYY-MM-DD, HKT); a window already in the past becomes "now". */
 export function scheduledTime(date, platform, now = new Date()) {
   const t = new Date(`${date}T${PUBLISH_HKT[platform]}:00+08:00`);
-  return iso(t > now ? t : now);
+  return toHktIso(t > now ? t : now);
 }
 
+const contentTypeOf = (url) => (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(url ?? '') ? 'video' : 'image');
+
 /**
- * Make.com handoff. Contains the OpenClaw fields AND the fields the live Make scenario (MPC-6952, hook 3856260) reads
- * (title, excerpt, url, campaign, linkedin_text). `linkedin_text` is only set for LinkedIn: that scenario's only action is
- * "LinkedIn page share, when linkedin_text exists", so the other platforms are accepted but not published until Make is extended.
+ * The Make.com hand-off: one envelope carrying a post per platform (X, LinkedIn, IG, FB, Pinterest, YouTube; Reddit while
+ * the consumer still drafts it). Must pass validateMakePayload() before it is sent.
  */
-export function handoffPayload(draft, { date, approvedBy, approvalTimestamp, defaultAssetUrl = '' }) {
-  const copy = draft.copy;
-  const cta = draft.cta || 'Check your exposure';
+export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp, defaultAssetUrl = '' }) {
+  const date = taskId.replace('daily-posts-', '');
+  const order = [...PLATFORMS, ...LEGACY_PLATFORMS];
+  const posts = [...drafts]
+    .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
+    .map((d) => {
+      const assetUrl = d.asset_url || defaultAssetUrl || null;
+      return {
+        platform: d.platform,
+        title: d.title || d.topic || 'MyPrivacyTOOL',
+        body: d.copy,
+        hashtags: d.hashtags ?? '',
+        cta: d.cta || 'Check your exposure',
+        content_type: d.content_type || contentTypeOf(assetUrl),
+        asset_url: assetUrl,
+        link_url: `${SITE}?utm_source=${d.platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
+        publish_timestamp: scheduledTime(date, d.platform, new Date(approvalTimestamp)),
+        ...(d.platform === 'reddit' ? { subreddit: d.subreddit || 'r/privacy' } : {}),
+        ...(d.slides ? { slides: d.slides } : {}),
+        ...(d.script ? { script: d.script } : {}),
+        ...(Array.isArray(d.asset_tags) && d.asset_tags.length ? { asset_tags: d.asset_tags } : {}),
+      };
+    });
   return {
-    platform: draft.platform,
-    copy,
-    asset_url: draft.asset_url || defaultAssetUrl || null,
-    asset_tags: draft.asset_tags ?? [],
-    cta,
-    scheduled_time: scheduledTime(date, draft.platform, new Date(approvalTimestamp)),
-    approved_by: approvedBy,
-    approval_timestamp: approvalTimestamp,
-    // fields below exist for the live Make scenario / Reddit
-    title: draft.title || draft.topic || 'MyPrivacyTOOL',
-    excerpt: copy.slice(0, 200),
-    url: SITE,
+    schema_version: SCHEMA_VERSION,
     campaign: CAMPAIGN,
-    ...(draft.platform === 'linkedin' ? { linkedin_text: copy } : {}),
-    ...(draft.platform === 'reddit' ? { subreddit: draft.subreddit || 'r/privacy' } : {}),
-    ...(draft.slides ? { slides: draft.slides } : {}),
+    drafted_content_id: taskId,
+    approved_by: approvedBy,
+    approval_timestamp: toHktIso(new Date(approvalTimestamp)),
+    posts,
   };
+}
+
+/** The webhook URL carries its secret token in the path, so only its origin and last 4 characters are logged. */
+export function maskUrl(url) {
+  try {
+    const u = new URL(url);
+    return `${u.origin}/…${u.pathname.slice(-4)}`;
+  } catch {
+    return 'invalid-url';
+  }
+}
+
+const clip = (s, n) => (s.length > n ? `${s.slice(0, n)}…[truncated ${s.length - n}]` : s);
+
+async function logMake(env, taskId, { statusCode = null, request = '', response = '', error = null }) {
+  try {
+    await env.AGENT_LOGS.prepare('INSERT INTO make_webhook_log (id, timestamp, task_id, webhook_url, status_code, request_body, response_body, error_message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), iso(), taskId, maskUrl(env.MAKE_WEBHOOK_URL), statusCode, clip(request, REQUEST_LOG_CHARS), clip(response, RESPONSE_LOG_CHARS), error).run();
+  } catch (e) {
+    console.error('make_webhook_log insert failed', e?.message); // never let logging mask the real outcome
+  }
+}
+
+/** POST the validated payload once. Resolves { ok, statusCode, error } and always writes a make_webhook_log row. */
+export async function postToMake(env, taskId, payload) {
+  const body = JSON.stringify(payload);
+  if (!env.MAKE_WEBHOOK_URL) {
+    const error = 'MAKE_WEBHOOK_URL is not configured';
+    await logMake(env, taskId, { request: body, error });
+    return { ok: false, statusCode: null, error };
+  }
+  const headers = { 'content-type': 'application/json' };
+  if (env.MAKE_API_KEY) headers['x-make-apikey'] = env.MAKE_API_KEY; // only when the Make hook has an API-key check
+  try {
+    const res = await fetch(env.MAKE_WEBHOOK_URL, { method: 'POST', headers, body, signal: AbortSignal.timeout(MAKE_TIMEOUT_MS) });
+    const text = await res.text().catch(() => '');
+    const error = res.ok ? null : `Make webhook ${res.status}`;
+    await logMake(env, taskId, { statusCode: res.status, request: body, response: text, error });
+    return { ok: res.ok, statusCode: res.status, error };
+  } catch (e) {
+    const error = `Make webhook request failed: ${e?.message ?? e}`;
+    await logMake(env, taskId, { request: body, error });
+    return { ok: false, statusCode: null, error };
+  }
 }
 
 async function reply(env, target, text) {
@@ -83,14 +149,13 @@ async function reply(env, target, text) {
   }).catch((e) => console.error('slack reply failed', e?.message));
 }
 
-const hktClock = (d) => new Date(d.getTime() + 8 * 3600e3).toISOString().slice(11, 16);
-
 export async function process(env, { action, taskId, timestamp, approver, target }) {
   const drafts = await rows(env, taskId, 'drafted');
   if (!drafts.length) return { status: 404, message: `no drafts for ${taskId}` };
   target ??= (await rows(env, taskId, 'notified'))[0];
 
-  const done = (await rows(env, taskId, 'approved')).length + (await rows(env, taskId, 'rejected')).length;
+  // Only a published or rejected cycle is final: a failed hand-off stays re-approvable ("Logged for retry").
+  const done = (await rows(env, taskId, 'published')).length + (await rows(env, taskId, 'rejected')).length;
   if (done) { await reply(env, target, 'Already decided for this cycle; ignoring.'); return { status: 200, message: 'already decided' }; }
 
   if (action === 'reject') {
@@ -105,33 +170,32 @@ export async function process(env, { action, taskId, timestamp, approver, target
   }
   if (action !== 'approve_all') return { status: 400, message: `unknown action ${action}` };
 
-  const date = taskId.replace('daily-posts-', '');
-  const approvedAt = timestamp && !Number.isNaN(Date.parse(timestamp)) ? iso(new Date(timestamp)) : iso();
+  const approvedAt = timestamp && !Number.isNaN(Date.parse(timestamp)) ? new Date(timestamp) : new Date();
   await log(env, taskId, 'approved', { draft: { by: approver } });
 
-  const results = await Promise.allSettled(drafts.map(async (d) => {
-    const res = await fetch(env.MAKE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(handoffPayload(d, { date, approvedBy: approver, approvalTimestamp: approvedAt, defaultAssetUrl: env.DEFAULT_ASSET_URL })),
-    });
-    if (!res.ok) throw new Error(`${d.platform}: Make webhook ${res.status}`);
-    return d;
-  }));
-  const ok = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
-  const failed = results.filter((r) => r.status === 'rejected').map((r) => r.reason?.message);
-
-  for (const d of ok) {
-    await env.AGENT_LOGS.prepare('INSERT INTO social_metrics (id, timestamp, platform, topic, impressions, engagement, url) VALUES (?, ?, ?, ?, 0, 0, NULL)')
-      .bind(crypto.randomUUID(), iso(), d.platform, d.topic ?? null).run();
+  const payload = buildMakePayload(drafts, { taskId, approvedBy: approver, approvalTimestamp: approvedAt.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL });
+  const check = validateMakePayload(payload);
+  if (!check.ok) {
+    const error = `schema validation failed: ${check.errors.join('; ')}`;
+    await log(env, taskId, 'failed', { error: clip(error, 1000) });
+    await reply(env, target, `Failed to post drafts. Schema validation failed, nothing was sent to Make.com: ${clip(check.errors.slice(0, 5).join('; '), 600)}`);
+    return { status: 422, message: error };
   }
-  if (ok.length) await log(env, taskId, 'published', { draft: { platforms: ok.map((d) => d.platform), approved_by: approver } });
-  if (failed.length) await log(env, taskId, 'failed', { error: failed.join('; ') });
 
-  const names = ok.map((d) => PLATFORM_NAMES[d.platform]).join(', ') || 'none';
-  const live = ok.some((d) => d.platform === 'linkedin') ? ' Live publishing today: LinkedIn only (the Make scenario has no X/IG/Reddit modules yet).' : '';
-  await reply(env, target, `✅ Handed to Make.com: ${names} at ${hktClock(new Date())} HKT.${live}${failed.length ? ` ⚠️ Failed: ${failed.join('; ')}` : ''}`);
-  return { status: failed.length ? 502 : 200, message: failed.length ? failed.join('; ') : 'approved' };
+  const sent = await postToMake(env, taskId, payload);
+  if (!sent.ok) {
+    await log(env, taskId, 'failed', { error: sent.error });
+    await reply(env, target, 'Failed to post drafts. Logged for retry.');
+    return { status: 502, message: sent.error };
+  }
+
+  for (const p of payload.posts) {
+    await env.AGENT_LOGS.prepare('INSERT INTO social_metrics (id, timestamp, platform, topic, impressions, engagement, url) VALUES (?, ?, ?, ?, 0, 0, NULL)')
+      .bind(crypto.randomUUID(), iso(), p.platform, drafts.find((d) => d.platform === p.platform)?.topic ?? null).run();
+  }
+  await log(env, taskId, 'published', { draft: { platforms: payload.posts.map((p) => p.platform), approved_by: approver } });
+  await reply(env, target, `✅ Posted to ${payload.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ')}`);
+  return { status: 200, message: 'approved' };
 }
 
 export default {

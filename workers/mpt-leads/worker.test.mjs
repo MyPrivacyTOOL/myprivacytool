@@ -107,8 +107,16 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
     calls=[]; const w=[]; const b403=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'198.51.100.9'},body:JSON.stringify({email:'secret@leak.co',riskScore:5,'cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w.push(p)}); await Promise.all(w);
     console.warn=rw;
     const tl=lines.find(l=>l.startsWith('TURNSTILE_FAILED ')); const j=tl&&JSON.parse(tl.slice('TURNSTILE_FAILED '.length));
-    check(b403.status===403&&j&&j.ip==='198.51.100.9'&&/^\d{4}-\d\d-\d\dT/.test(j.ts)&&j.action==='blocked_403'&&j.reason.startsWith('rejected:')&&j.origin==='https://myprivacytool.io','enforce: a 403 logs one TURNSTILE_FAILED line with ip, ISO timestamp, reason, origin and action');
+    check(b403.status===403&&j&&j.ip==='198.51.100.0/24'&&/^\d{4}-\d\d-\d\dT/.test(j.ts)&&j.action==='blocked_403'&&j.reason.startsWith('rejected:')&&j.origin==='https://myprivacytool.io','enforce: a 403 logs one TURNSTILE_FAILED line with ip, ISO timestamp, reason, origin and action');
     check(tl&&!tl.includes('secret@leak.co')&&!tl.includes('"bad"'),'the TURNSTILE_FAILED log line carries no email and no token');
+    check(tl&&!tl.includes('198.51.100.9'),'the TURNSTILE_FAILED log line never carries the full IPv4 address');
+    const ipOf=async(ipHeader)=>{ const L=[]; const keep=console.warn; console.warn=(...a)=>{ L.push(a.join(' ')); }; const w2=[];
+      await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io',...(ipHeader?{'CF-Connecting-IP':ipHeader}:{})},body:JSON.stringify({email:'m@m.co','cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w2.push(p)}); await Promise.all(w2); console.warn=keep;
+      const line=L.find(l=>l.startsWith('TURNSTILE_FAILED ')); return line&&JSON.parse(line.slice('TURNSTILE_FAILED '.length)).ip; };
+    check(await ipOf('2001:db8:85a3:8a2e:370:7334:1234:5678')==='2001:db8:85a3::/48','IPv6 is cut to its /48 prefix');
+    check(await ipOf('::ffff:203.0.113.77')==='203.0.113.0/24','IPv4-mapped IPv6 is cut to the IPv4 /24');
+    check(await ipOf('::1')==='ipv6','a short or loopback IPv6 is logged as the bare word ipv6');
+    check(await ipOf(null)==='','a missing IP is logged as empty');
     const l2=[]; console.warn=(...a)=>{ l2.push(a.join(' ')); }; await ts(undefined,enf); await ts('bad',tsEnv); console.warn=rw;
     const miss=l2.find(l=>l.includes('missing_token')); check(miss&&JSON.parse(miss.slice('TURNSTILE_FAILED '.length)).action==='blocked_403','missing token logs reason missing_token');
     check(l2.some(l=>l.includes('"action":"allowed_report_only"')),'report-only failures are logged too, marked allowed_report_only');
