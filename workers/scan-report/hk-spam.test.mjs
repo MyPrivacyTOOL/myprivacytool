@@ -70,6 +70,9 @@ for (const flag of [undefined, '', 'false', 'TRUE', '1']) {
   check(o.test_mode === true && o.live === false && o.due === 3 && o.sent === 0 && o.test_sent === 4 && to.length === 4
     && to.every((m) => ['qa@example.org', 'qa2@example.org'].includes(m.to[0]) && /^\[TEST\]|^【測試】/.test(m.subject))
     && new Set(to.map((m) => m.subject)).size === 2, `EMAILS_LIVE=${JSON.stringify(flag)}: one [TEST] sample per language to each valid test inbox only (4 mails), nobody else`);
+  const keys = F.sends().map((c) => c.headers['Idempotency-Key']);
+  check(keys.length === 4 && keys.every((k) => typeof k === 'string' && k.startsWith('hk-spam-test-')) && new Set(keys).size === 4,
+    `EMAILS_LIVE=${JSON.stringify(flag)}: every test sample has its own Resend idempotency key (never "undefined", so the second language is not rejected with 409)`);
   check(F.db.regs.every((r) => !r.reminder_sent_at) && F.calls.every((c) => c.method === 'GET' || c.url.includes('resend'))
     && F.calls.filter((c) => c.url.includes('hk_spam_due_reminders')).every((c) => !/email/.test(c.url.replace('hk_spam_due_reminders', '')))
     && !out.join().includes('@'), `EMAILS_LIVE=${JSON.stringify(flag)}: no row claimed, no registrant address read, none logged`);

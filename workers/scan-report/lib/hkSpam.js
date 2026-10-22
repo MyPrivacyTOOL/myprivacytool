@@ -79,7 +79,9 @@ async function runTestMode(env, sb, fetchImpl, when, done) {
   for (const to of inboxes) for (const language of langs) {
     try {
       const links = { page: await unsubscribePageUrl(env, to), oneClick: await unsubscribeUrl(env, to) };
-      const r = await sendEmail(env, { to, ...buildHkSpamEmail({ language, unsubscribeLink: links.page, test: true }),
+      // A key per run + language + inbox: without one Resend got the literal key "undefined" and rejected every sample after the
+      // first within 24 h with HTTP 409 (the second language, or any re-run).
+      const r = await sendEmail(env, { to, ...buildHkSpamEmail({ language, unsubscribeLink: links.page, test: true }), idempotencyKey: `hk-spam-test-${when}-${language}-${to}`,
         headers: { 'List-Unsubscribe': `<${links.oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }, fetchImpl);
       if (!r.sent) throw new Error(`email not sent: ${r.reason}`);
       out.test_sent++;
