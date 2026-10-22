@@ -23,29 +23,36 @@ class AuditService:
         now = datetime.now(timezone.utc)
         days = lookback_days or self.s.lookback_days
         errors: List[str] = []
+        cov: Dict[str, bool] = {}
         try:
             entries = self.source.fetch(agent_id, days)
             if not entries:
                 # No evidence is not evidence of safety: unknown agent, wrong id or empty window.
                 raise LookupError(f"no log entries for agent '{agent_id}' in the last {days} days")
+            cov = detectors.coverage(entries)
             outcome = risk_detector.run_audit([(n, (lambda f=f: f(entries))) for n, f in detectors.build(self.s)])
         except Exception as exc:  # noqa: BLE001 - log source failure => incomplete audit
             log.exception("log source failed for %s", agent_id)
             outcome = risk_detector.AuditOutcome([], [risk_detector.DetectorError("log_source", str(exc))])
         errors = [f"{e.detector}: {e.error}" for e in outcome.errors]
-        pillars, total, status = scorer.score_all(outcome.detections, outcome.complete)
+        covered = sum(cov.values())
+        pillars, total, status = scorer.score_all(outcome.detections, outcome.complete, covered, self.s.min_coverage)
+        no_score = status in ("INCOMPLETE", "INSUFFICIENT_DATA")
         iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         exp = (now + timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
         audit_id = f"audit-{now:%Y-%m-%d}-{next(_seq):05d}"
         passport = None
-        if self.signer and status != "INCOMPLETE":   # no passport for an incomplete audit
-            doc = signing.build_passport(agent_id, total, status, iso, exp, self.s.environment)
+        if self.signer and not no_score:   # no passport when we could not look, or barely could
+            doc = signing.build_passport(agent_id, total, status, iso, exp, self.s.environment,
+                                         {"checked": covered, "of": len(cov)})
             passport = self.signer.sign(doc, iso)
         result = {
             "auditId": audit_id, "agentId": agent_id, "auditDate": iso, "environment": self.s.environment,
             "status": "completed" if outcome.complete else "incomplete",
             # An incomplete audit has no trustworthy score; never show 90 for "we could not look".
-            "overallScore": total if outcome.complete else None,
+            "overallScore": None if no_score else total,
+            "coverage": {"checked": covered, "of": len(cov), "minimum": self.s.min_coverage,
+                         "detectors": cov},
             "riskLevel": status, "errors": errors,
             "pillars": {k: {"score": v.score, "riskLevel": v.risk_level.value} for k, v in pillars.items()},
             "detectedRisks": [{"riskId": d.risk_id, "riskName": d.risk_name, "severity": d.severity.value,

@@ -18,3 +18,10 @@ Known gaps (see also DEPLOY_COMMANDS.md, SIGNING_KEY_PLAN.md):
 
 Log entry fields the detectors read: ts, text, tool, session, vault_start, vault_end, sender, nonce, dest_region.
 A pillar with no findings scores 90 ("nothing found"), not "verified safe"; entries missing a field are simply not matched by that detector. Risk #119 allows regions from ALLOWED_REGIONS (default "eu").
+
+## Coverage rule (approval needs enough data)
+Each audit reports `coverage`: which of the 10 detectors had log input they can judge (e.g. #65 needs `nonce`, #119 needs
+`dest_region`, #9 needs vault snapshots, #42 needs shell-tool calls). An audit can only be `APPROVED_FOR_P1_DATA` if at least
+`MIN_COVERAGE` detectors (default 5) had data; otherwise it is `INSUFFICIENT_DATA` with no score and no passport. A HIGH or
+CRITICAL finding still QUARANTINEs whatever the coverage. Issued passports carry `coverage` in the signed subject.
+Coverage is a floor, not a guarantee (e.g. #1 counts as covered if any text exists, even if prompts are not logged).

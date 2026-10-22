@@ -41,6 +41,10 @@ jobs:
         run: node workers/mpt-content-consumer/worker.test.mjs
       - name: Deploy consumer
         uses: cloudflare/wrangler-action@v3
+        # wrangler-action runs `npm i wrangler@3.90.0` inside the repo's npm workspace; core-brain's wrangler 4 / workers-types
+        # peer conflict makes that fail with ERESOLVE. Same workaround as deploy-mpt-leads.yml.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -48,6 +52,10 @@ jobs:
           command: deploy
       - name: Deploy approval
         uses: cloudflare/wrangler-action@v3
+        # wrangler-action runs `npm i wrangler@3.90.0` inside the repo's npm workspace; core-brain's wrangler 4 / workers-types
+        # peer conflict makes that fail with ERESOLVE. Same workaround as deploy-mpt-leads.yml.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -55,6 +63,10 @@ jobs:
           command: deploy
       - name: Deploy producer
         uses: cloudflare/wrangler-action@v3
+        # wrangler-action runs `npm i wrangler@3.90.0` inside the repo's npm workspace; core-brain's wrangler 4 / workers-types
+        # peer conflict makes that fail with ERESOLVE. Same workaround as deploy-mpt-leads.yml.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

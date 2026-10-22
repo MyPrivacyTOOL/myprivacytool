@@ -1,20 +1,24 @@
-// mpt-content-consumer: handles { date, action: "generate_daily_posts" } messages from mpt-content-generation-queue.
-//   1. read today's topic + brand guardrails from KV mpt-content-cache
-//   2. four CONCURRENT Anthropic calls (X, LinkedIn, Instagram, Reddit)
-//   3. save the 4 drafts to D1 agent_execution_logs (one row per platform)
+// mpt-content-consumer: handles { date, action: "generate_daily_posts", topic?, pillar?, format_type?, asset_tags? } messages
+// from mpt-content-generation-queue (topic comes from the producer's mpt-brand-topics read).
+//   1. read brand/tone guardrails from KV mpt-content-cache (topic falls back to schedule:<date> there if the message has none)
+//   2. six CONCURRENT Anthropic calls (X, LinkedIn, Instagram, Facebook, Pinterest, YouTube)
+//   3. save the 6 drafts to D1 agent_execution_logs (one row per platform)
 //   4. post to Slack #mpt-content-approval with Approve All / Reject / Edit & Resubmit buttons (handled by mpt-content-approval)
 
-export const PLATFORMS = ['x', 'linkedin', 'instagram', 'reddit'];
-const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', reddit: 'Reddit' };
+export const PLATFORMS = ['x', 'linkedin', 'instagram', 'facebook', 'pinterest', 'youtube'];
+const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', pinterest: 'Pinterest', youtube: 'YouTube' };
 const PLATFORM_RULES = {
   x: 'A thread of 3-5 posts. Each post at most 280 characters. Separate posts with a line containing only ---.',
   linkedin: 'Professional thought-leadership post, 2-3 short paragraphs, at most 3000 characters.',
   instagram: 'Caption of at most 2200 characters, 3-5 sentences, light emoji, 5-8 hashtags. Start with a 9-slide carousel outline in "slides" (one short line per slide).',
-  reddit: 'Value-first post for r/privacy or r/cybersecurity. Genuinely useful, no sales pitch; mention MyPrivacyTOOL only if directly relevant. Needs a "title" (max 300 chars) and a body.',
+  facebook: 'Conversational page post, 2-4 short sentences, at most 500 characters, at most 2 hashtags.',
+  pinterest: 'Pin with a keyword-rich "title" (max 100 chars) and a description in "copy" (at most 500 characters).',
+  youtube: 'Short-form video: a "title" (max 100 chars), a 30-45 second spoken script in "script", and a description in "copy" (at most 5000 characters).',
 };
 const BRAND_KEYWORDS = /voice|tone|messag|language|social|do'?s|don'?t|never|always|guardrail/i;
 const BRAND_CHAR_CAP = 6000;
 const CTA = 'Check your exposure';
+const TITLED = ['pinterest', 'youtube'];
 
 export const taskIdFor = (date) => `daily-posts-${date}`;
 const now = () => new Date().toISOString();
@@ -36,14 +40,17 @@ export function guardrails(brand) {
   return (picked || sections.map(fmt).join('\n\n')).slice(0, BRAND_CHAR_CAP);
 }
 
-/** Topic for one platform from schedule:<date>; Instagram has no schedule so it borrows the X/pillar topic. */
+/** Topic for one platform from schedule:<date>; platforms without a schedule borrow the X/pillar topic. */
 export function topicFor(schedule, platform) {
   const items = schedule?.items ?? {};
   const first = (k) => items[k]?.[0]?.text;
   return first(platform) ?? first('x') ?? first('pillar') ?? first('blog') ?? null;
 }
 
-export function buildPrompt(platform, topic, date, guardrailText) {
+/** The queue message's topic (from mpt-brand-topics) wins; otherwise the per-platform schedule topic. */
+export const resolveTopic = (hint, schedule, platform) => (typeof hint?.topic === 'string' && hint.topic.trim() ? hint.topic.trim() : topicFor(schedule, platform));
+
+export function buildPrompt(platform, topic, date, guardrailText, hint = {}) {
   return {
     system: [
       'You are the social copywriter for MyPrivacyTOOL. Follow these brand guardrails exactly. Tone: Empowering Detective: confident, clear, helpful, never alarmist. No fabricated statistics, no personal data.',
@@ -56,9 +63,11 @@ export function buildPrompt(platform, topic, date, guardrailText) {
       `Platform: ${PLATFORM_NAMES[platform]}`,
       `Date (HKT): ${date}`,
       `Today's topic: ${topic}`,
+      ...(hint.pillar ? [`Content pillar: ${hint.pillar}`] : []),
+      ...(hint.format_type ? [`Format: ${hint.format_type}`] : []),
       `Rules: ${PLATFORM_RULES[platform]}`,
       `End with the CTA "${CTA}" linking to https://myprivacytool.io?utm_source=${platform}&utm_medium=social&utm_campaign=oct-sprint`,
-      'Return JSON: {"copy": string' + (platform === 'reddit' ? ', "title": string, "subreddit": string' : '') + (platform === 'instagram' ? ', "slides": string[]' : '') + '}',
+      'Return JSON: {"copy": string' + (TITLED.includes(platform) ? ', "title": string' : '') + (platform === 'youtube' ? ', "script": string' : '') + (platform === 'instagram' ? ', "slides": string[]' : '') + '}',
     ].join('\n'),
   };
 }
@@ -72,7 +81,12 @@ export function parseDraft(platform, text) {
   if (platform === 'x' && d.copy.split(/\n\s*---\s*\n/).some((t) => t.trim().length > 280)) throw new Error('x: a post exceeds 280 characters');
   if (platform === 'linkedin' && d.copy.length > 3000) throw new Error('linkedin: over 3000 characters');
   if (platform === 'instagram' && d.copy.length > 2200) throw new Error('instagram: over 2200 characters');
-  if (platform === 'reddit' && (typeof d.title !== 'string' || !d.title.trim())) throw new Error('reddit: missing title');
+  if (platform === 'facebook' && d.copy.length > 500) throw new Error('facebook: over 500 characters');
+  if (platform === 'pinterest' && d.copy.length > 500) throw new Error('pinterest: over 500 characters');
+  if (platform === 'youtube' && d.copy.length > 5000) throw new Error('youtube: over 5000 characters');
+  if (TITLED.includes(platform) && (typeof d.title !== 'string' || !d.title.trim())) throw new Error(`${platform}: missing title`);
+  if (TITLED.includes(platform) && d.title.length > 100) throw new Error(`${platform}: title over 100 characters`);
+  if (platform === 'youtube' && (typeof d.script !== 'string' || !d.script.trim())) throw new Error('youtube: missing script');
   return { platform, ...d, cta: CTA };
 }
 
@@ -89,7 +103,7 @@ async function callLlm(env, prompt) {
 
 export function slackBlocks(taskId, topic, drafts) {
   const clip = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-  const body = (d) => (d.platform === 'reddit' ? `*${d.title}*\n${d.copy}` : d.copy);
+  const body = (d) => (d.title ? `*${d.title}*\n${d.copy}` : d.copy);
   const button = (text, action_id, style) => ({ type: 'button', text: { type: 'plain_text', text }, action_id, value: taskId, ...(style ? { style } : {}) });
   return [
     { type: 'header', text: { type: 'plain_text', text: `MPT daily drafts: ${taskId.replace('daily-posts-', '')}` } },
@@ -113,7 +127,7 @@ async function postSlack(env, topic, taskId, drafts) {
   return { channel: body.channel, ts: body.ts };
 }
 
-export async function generateDailyPosts(env, date) {
+export async function generateDailyPosts(env, date, hint = {}) {
   const taskId = taskIdFor(date);
   if ((await rows(env, taskId, 'notified')).length) return 'skipped'; // retry / duplicate delivery
 
@@ -121,19 +135,19 @@ export async function generateDailyPosts(env, date) {
     env.CONTENT_CACHE.get(`schedule:${date}`, 'json'),
     env.CONTENT_CACHE.get('brand:guidelines', 'json'),
   ]);
-  if (!schedule) throw new Error(`no schedule:${date} in mpt-content-cache (run the KV sync)`);
+  if (!schedule && !hint?.topic) throw new Error(`no topic in the queue message and no schedule:${date} in mpt-content-cache (run the KV sync)`);
   const guard = guardrails(brand);
 
   const have = new Map((await rows(env, taskId, 'drafted')).map((d) => [d.platform, d]));
   const missing = PLATFORMS.filter((p) => !have.has(p));
   if (missing.length) await log(env, taskId, 'running');
 
-  // 4 concurrent calls; each draft is saved as soon as it succeeds so a retry only redoes the failed platforms.
+  // 6 concurrent calls; each draft is saved as soon as it succeeds so a retry only redoes the failed platforms.
   const results = await Promise.allSettled(missing.map(async (platform) => {
-    const topic = topicFor(schedule, platform);
+    const topic = resolveTopic(hint, schedule, platform);
     if (!topic) throw new Error(`${platform}: no topic for ${date}`);
     try {
-      const draft = { ...parseDraft(platform, await callLlm(env, buildPrompt(platform, topic, date, guard))), topic };
+      const draft = { ...parseDraft(platform, await callLlm(env, buildPrompt(platform, topic, date, guard, hint))), topic, ...(Array.isArray(hint?.asset_tags) && hint.asset_tags.length ? { asset_tags: hint.asset_tags } : {}) };
       await log(env, taskId, 'drafted', { draft });
       have.set(platform, draft);
     } catch (e) {
@@ -144,7 +158,7 @@ export async function generateDailyPosts(env, date) {
   if (failed.length) throw new Error(failed.join('; '));
 
   const drafts = PLATFORMS.map((p) => have.get(p));
-  const slack = await postSlack(env, topicFor(schedule, 'x') ?? drafts[0].topic, taskId, drafts);
+  const slack = await postSlack(env, resolveTopic(hint, schedule, 'x') ?? drafts[0].topic, taskId, drafts);
   await log(env, taskId, 'notified', { draft: slack });
   return 'notified';
 }
@@ -152,10 +166,10 @@ export async function generateDailyPosts(env, date) {
 export default {
   async queue(batch, env) {
     for (const msg of batch.messages) {
-      const { date, action } = msg.body ?? {};
+      const { date, action, topic, pillar, format_type, asset_tags } = msg.body ?? {};
       if (action !== 'generate_daily_posts' || !/^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) { console.error('bad message', JSON.stringify(msg.body)); msg.ack(); continue; }
       try {
-        await generateDailyPosts(env, date);
+        await generateDailyPosts(env, date, { topic, pillar, format_type, asset_tags });
         msg.ack();
       } catch (e) {
         await log(env, taskIdFor(date), 'failed', { error: `attempt ${msg.attempts}: ${e?.message}` }).catch(() => {});
