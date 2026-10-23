@@ -4,12 +4,12 @@
 --  * user_id references public.users (auth.users is empty), nullable, ON DELETE CASCADE so deletion-on-request removes everything.
 --  * id patterns loosened: the spec's own example ids did not match its regexes.
 --  * timestamptz instead of timestamp; FORCE RLS; anon/authenticated grants revoked; authenticated gets SELECT on own rows only.
---  * 72h retention (Cairn strategy page) enforced by retain_until + hourly pg_cron purge.
+--  * 72h retention (Cairn strategy page) enforced by retain_until + an hourly purge (scheduled in 20261023120100).
 --
 -- Rollback:
 --   drop table public.cairn_intents, public.cairn_facts, public.cairn_sessions cascade;
 --   drop function public.mpt_purge_expired_cairn_sessions();
---   select cron.unschedule('mpt-purge-expired-cairn-sessions');
+--   (and the cron job, see 20261023120100_mpc_8413_cairn_purge_pg_cron.sql)
 
 create table public.cairn_sessions (
   id bigserial primary key,
@@ -138,8 +138,6 @@ end;
 $$;
 revoke execute on function public.mpt_purge_expired_cairn_sessions() from public, anon, authenticated;
 grant execute on function public.mpt_purge_expired_cairn_sessions() to service_role;
-
-select cron.schedule('mpt-purge-expired-cairn-sessions', '45 * * * *', $cron$select public.mpt_purge_expired_cairn_sessions();$cron$);
 
 comment on table public.cairn_sessions is 'MPC-8413 / spec MPC-8401. One row per Cairn OSINT deep-scan run. Holds the seed email, so it is personal data. 72h retention (retain_until; purge job mpt-purge-expired-cairn-sessions); facts and intents cascade. Deletion on request removes the row. Writes via service_role only; authenticated may read own rows.';
 comment on table public.cairn_facts is 'MPC-8413 / spec MPC-8401. Facts Cairn discovered about the seed. Sensitive types (phone, etc.) must arrive hashed (is_hashed + hash_algorithm); never dehash. Cascades with the session. Writes via service_role only.';
