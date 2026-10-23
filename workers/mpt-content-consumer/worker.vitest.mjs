@@ -99,6 +99,8 @@ describe('buildPrompt', () => {
     expect(pr.system).toContain('GUARD');
     expect(pr.system).toContain('Empowering Detective');
     expect(pr.user).toContain(`utm_source=${p}`);
+    expect(pr.user).toContain(`utm_source=${p}&utm_medium=social&utm_campaign=mpc-7033-daily&utm_content=${DATE}`);
+    expect(pr.user).not.toContain('oct-sprint');
     expect(pr.user).toContain("Today's topic: T");
     expect(pr.user).toContain('Check your exposure');
   });
