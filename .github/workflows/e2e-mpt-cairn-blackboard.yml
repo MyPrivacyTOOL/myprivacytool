@@ -1,19 +1,27 @@
 name: E2E mpt-cairn-blackboard (configure, test, clean up)
 
 # MPC-8413 step 5. MANUAL ONLY (workflow_dispatch). Does four things, never printing a secret:
-#   1. Copies two EXISTING repo secrets onto the Worker, so nobody has to paste a key anywhere:
+#   1. Copies two repo secrets onto the Worker, so nobody has to paste a key anywhere:
 #        NEW_SUPABASE_SECRET_KEY (or SUPABASE_KEY)  ->  SUPABASE_SERVICE_ROLE_KEY
-#        NOTION_TOKEN                               ->  NOTION_TOKEN
+#        NOTION_CAIRN_TOKEN                         ->  NOTION_TOKEN
+#      NOTION_CAIRN_TOKEN must belong to a DEDICATED Notion integration that can see only the three Cairn databases. The existing
+#      NOTION_TOKEN repo secret (the MPT Leads integration) is deliberately NOT used: it can reach the leads database.
 #   2. Issues a ONE-TIME bridge token (random, masked, known only to this job) and sets it as CAIRN_BRIDGE_TOKEN.
 #   3. Runs workers/mpt-cairn-blackboard/e2e.mjs: a clearly marked test session through the real Worker, Supabase and Notion, checking the
 #      phone hash, the masked seed email and the mirror, then deleting everything it created.
 #   4. Deletes the one-time token again, so the Worker goes back to refusing every write until a real token is set.
 #
-# If the Notion step fails with HTTP 404, the integration behind the NOTION_TOKEN repo secret cannot see the three Cairn databases: the log
-# names the integration; share the databases with it in Notion (database -> ... -> Connections) and re-run. Needs Worker secrets
-# SUPABASE_URL and CAIRN_HASH_PEPPER to be set already (they are; this workflow does not touch them).
+# One-time setup for NOTION_CAIRN_TOKEN (about two minutes, in the Notion and GitHub web UIs):
+#   a. Notion -> Settings -> Connections -> Develop or manage integrations -> New integration. Name: mpt-cairn-sync. Internal.
+#      Capabilities: read, update and insert content. No user information. Copy the integration token.
+#   b. For each of the three databases under "14 - Data & Knowledge" (Cairn Live Investigations, Cairn Facts, Cairn Intent Queue):
+#      ... menu -> Connections -> add mpt-cairn-sync.
+#   c. GitHub -> Settings -> Secrets and variables -> Actions -> New repository secret NOTION_CAIRN_TOKEN = the token. Never paste it in chat.
+#   d. Run this workflow.
+# If the Notion step still fails with HTTP 404, one of the three databases was not shared with the integration named in the log.
+# Needs Worker secrets SUPABASE_URL and CAIRN_HASH_PEPPER to be set already (they are; this workflow does not touch them).
 #
-# Repo secrets used (already present for other workflows): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, NEW_SUPABASE_SECRET_KEY or SUPABASE_KEY, NOTION_TOKEN.
+# Repo secrets used: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, NEW_SUPABASE_SECRET_KEY or SUPABASE_KEY (all already present), NOTION_CAIRN_TOKEN (new).
 
 on:
   workflow_dispatch:
@@ -52,14 +60,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_CAIRN_TOKEN: ${{ secrets.NOTION_CAIRN_TOKEN }}
         run: |
           missing=""
           [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
           [ -n "$SUPABASE_KEY" ] || missing="$missing NEW_SUPABASE_SECRET_KEY/SUPABASE_KEY"
-          [ -n "$NOTION_TOKEN" ] || missing="$missing NOTION_TOKEN"
           if [ -n "$missing" ]; then echo "::error::missing repo secrets:$missing"; exit 1; fi
+          if [ -z "$NOTION_CAIRN_TOKEN" ]; then
+            echo "::error::the repo secret NOTION_CAIRN_TOKEN is not set. Create a Notion internal integration named mpt-cairn-sync, share the three Cairn databases with it (database menu -> Connections), and add its token as the repo secret NOTION_CAIRN_TOKEN. See the comment at the top of this workflow file."
+            exit 1
+          fi
           echo "all required repo secrets are present"
 
       - name: Canary - the Supabase key must read the database (apikey header only, as the Worker sends it)
@@ -69,6 +80,20 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -H "apikey: $SUPABASE_KEY" "$SUPABASE_URL/rest/v1/scans?select=id&limit=1")
           echo "canary HTTP $code"
           if [ "$code" != "200" ]; then echo "::error::the Supabase key did not read scans (HTTP $code); no Worker secret was changed"; exit 1; fi
+
+      - name: Canary - the Notion token must open all three Cairn databases (before any Worker secret is changed)
+        env:
+          NOTION_CAIRN_TOKEN: ${{ secrets.NOTION_CAIRN_TOKEN }}
+        run: |
+          who=$(curl -s -H "Authorization: Bearer $NOTION_CAIRN_TOKEN" -H 'Notion-Version: 2022-06-28' https://api.notion.com/v1/users/me | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d.get("name") or d.get("message") or "unknown")')
+          echo "Notion integration: $who"
+          bad=0
+          for db in "$NOTION_CAIRN_SESSIONS_DB" "$NOTION_CAIRN_FACTS_DB" "$NOTION_CAIRN_INTENTS_DB"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $NOTION_CAIRN_TOKEN" -H 'Notion-Version: 2022-06-28' "https://api.notion.com/v1/databases/$db")
+            echo "database ${db:0:8}... HTTP $code"
+            [ "$code" = "200" ] || bad=1
+          done
+          if [ "$bad" != "0" ]; then echo "::error::the Notion integration \"$who\" cannot open all three Cairn databases; share each of them with it (database menu -> Connections). No Worker secret was changed."; exit 1; fi
 
       - name: Look at the Worker's current secrets (names only)
         env:
@@ -92,7 +117,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_API: https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/scripts/mpt-cairn-blackboard/secrets
           SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_CAIRN_TOKEN: ${{ secrets.NOTION_CAIRN_TOKEN }}
         run: |
           put() {
             jq -n --arg n "$1" --arg t "$2" '{name:$n,text:$t,type:"secret_text"}' \
@@ -100,7 +125,7 @@ jobs:
               && echo "set $1" || { echo "::error::could not set $1"; exit 1; }
           }
           put SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_KEY"
-          put NOTION_TOKEN "$NOTION_TOKEN"
+          put NOTION_TOKEN "$NOTION_CAIRN_TOKEN"
 
       - name: Issue a one-time bridge token
         id: token
@@ -120,7 +145,7 @@ jobs:
       - name: Run the end-to-end test
         env:
           SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_TOKEN: ${{ secrets.NOTION_CAIRN_TOKEN }}
         run: node workers/mpt-cairn-blackboard/e2e.mjs
 
       - name: Remove the one-time bridge token
