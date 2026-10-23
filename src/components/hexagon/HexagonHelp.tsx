@@ -38,7 +38,7 @@ export default function HexagonHelp() {
         <ul className="space-y-1 text-sm">
           <li><strong>Clear</strong> (green): we checked and found nothing.</li>
           <li><strong>Needs fixing</strong> (red): we found something that matters.</li>
-          <li><strong>Our guess</strong> (purple): we think this is you. It is a guess.</li>
+          <li><strong>Our guess</strong> (purple): we think this is you. It is a guess. A darker purple means we are more sure; a paler one means we are less sure. We never show this as a number.</li>
           <li><strong>You told us</strong> (lighter green): your word, not our proof.</li>
           <li><strong>Seen, minor</strong> (grey, "i"): a tracker can see it, but it matters less.</li>
           <li><strong>Not checked</strong> (grey): we make no claim either way.</li>

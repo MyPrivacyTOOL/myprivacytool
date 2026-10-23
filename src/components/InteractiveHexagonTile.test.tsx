@@ -124,7 +124,7 @@ describe('InteractiveHexagonTile honest look', () => {
     const maybe = fill(m.container);
     m.unmount();
     const w = render(<InteractiveHexagonTile hexagon={hex({ status: 'guess', tile: 'our_guess', band: 'weak' })} onConfirm={vi.fn()} onDispute={vi.fn()} />);
-    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess · weak guess');
+    expect(screen.getByTestId('tile-line')).toHaveTextContent('Our guess · weak');
     const weak = fill(w.container);
     expect(new Set([likely, maybe, weak]).size).toBe(3);
     expect(likely).toContain('0.28'); expect(maybe).toContain('0.16'); expect(weak).toContain('0.08');

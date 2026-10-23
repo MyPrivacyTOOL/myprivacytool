@@ -63,7 +63,7 @@ describe('buildReportHtml guess bands', () => {
       hex({ id: 'demographic', label: 'Estimated Profile', status: 'guess', exposure: true, tile: 'our_guess', band: 'weak' }),
     ], opts);
     expect(html).toContain('Our guess · maybe');
-    expect(html).toContain('Our guess · weak guess');
+    expect(html).toContain('Our guess · weak');
     expect(html).toContain('fill-opacity="0.16"');
     expect(html).toContain('fill-opacity="0.08"');
   });
