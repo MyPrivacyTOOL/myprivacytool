@@ -2,7 +2,10 @@
 // into Supabase without knowing Supabase internals. One endpoint: POST /api/cairn/blackboard/commit, bearer-token protected.
 // Writes go through PostgREST with the service key (tables are service_role only). No secret, seed email or fact value is ever logged.
 // Sensitive fact types (default: phone) are hashed with HMAC-SHA256 + a server-side pepper before they reach the database.
-export const BRIDGE_VERSION = '1.0.0';
+// After each successful write the session is mirrored to Notion (notion-sync.js) in the background; a Notion problem never changes the response.
+import { notionConfigured, syncSession, reconcile } from './notion-sync.js';
+
+export const BRIDGE_VERSION = '1.1.0';
 
 const SESSION_ID_RE = /^mpt-cairn-[0-9]{10,}$/;
 const FACT_ID_RE = /^cairn-fact-[A-Za-z0-9_-]{3,64}$/;
@@ -272,9 +275,44 @@ async function updateSessionState(env, sessionId, session, p) {
   return json({ success: true, session_id: sessionId, status: patch.status ?? session.status, timestamp: new Date().toISOString() });
 }
 
-export async function commit(request, env) {
+// Mirrors the session to Notion after the response is sent. start_session also sweeps rows of purged sessions. Never throws, never logs values.
+function scheduleSync(env, ctx, sessionId, { sweep = false } = {}) {
+  if (!notionConfigured(env) || typeof ctx?.waitUntil !== 'function') return;
+  ctx.waitUntil((async () => {
+    try {
+      if (sweep) await reconcile(env, sb);
+      await syncSession(env, sb, sessionId);
+    } catch (e) {
+      console.error(JSON.stringify({ worker: 'mpt-cairn-blackboard', notion_sync: 'failed', session_id: sessionId, error: String(e?.message ?? e).slice(0, 200) }));
+    }
+  })());
+}
+
+async function authorize(request, env) {
   if (!configured(env)) return fail(500, 'not_configured', 'bridge secrets are not set');
   if (!(await tokenOk(request.headers.get('authorization'), env.CAIRN_BRIDGE_TOKEN))) return fail(401, 'unauthorized', 'missing or wrong bearer token');
+  return null;
+}
+
+// POST /api/cairn/notion/sync {"session_id": "..."} re-mirrors one session; POST /api/cairn/notion/reconcile archives rows of purged sessions.
+async function notionAdmin(request, env, kind) {
+  const denied = await authorize(request, env);
+  if (denied) return denied;
+  if (!notionConfigured(env)) return fail(500, 'notion_not_configured', 'NOTION_TOKEN and the three NOTION_CAIRN_*_DB variables are required');
+  try {
+    if (kind === 'reconcile') return json({ success: true, ...(await reconcile(env, sb)) });
+    const body = plainObject(await request.json().catch(() => null));
+    if (!body || typeof body.session_id !== 'string' || !SESSION_ID_RE.test(body.session_id)) return fail(400, 'invalid_session_id', 'body must be {"session_id": "mpt-cairn-<digits>"}');
+    return json({ success: true, ...(await syncSession(env, sb, body.session_id)) });
+  } catch (e) {
+    console.error(JSON.stringify({ worker: 'mpt-cairn-blackboard', notion_admin: kind, error: String(e?.message ?? e).slice(0, 200) }));
+    return fail(502, 'sync_failed', 'the Notion or database call failed; it is safe to retry');
+  }
+}
+
+export async function commit(request, env, ctx) {
+  const denied = await authorize(request, env);
+  if (denied) return denied;
   const text = await request.text();
   if (text.length > MAX_BODY_BYTES) return fail(413, 'payload_too_large', `body is limited to ${MAX_BODY_BYTES} bytes`);
   let body;
@@ -287,11 +325,17 @@ export async function commit(request, env) {
   const actions = { start_session: null, write_facts: writeFacts, write_intents: writeIntents, update_session_state: updateSessionState };
   if (!(b.action in actions)) return fail(400, 'invalid_action', `action must be one of ${Object.keys(actions).join(', ')}`);
   try {
-    if (b.action === 'start_session') return await startSession(env, b.session_id, p);
+    if (b.action === 'start_session') {
+      const res = await startSession(env, b.session_id, p);
+      if (res.ok) scheduleSync(env, ctx, b.session_id, { sweep: true });
+      return res;
+    }
     const session = await loadSession(env, b.session_id);
     if (!session) return fail(404, 'session_not_found', 'start the session first with action start_session');
     if (b.action !== 'update_session_state' && session.status !== 'active') return fail(409, 'session_not_active', `session is ${session.status}`);
-    return await actions[b.action](env, b.session_id, session, p);
+    const res = await actions[b.action](env, b.session_id, session, p);
+    if (res.ok) scheduleSync(env, ctx, b.session_id);
+    return res;
   } catch (e) {
     // Status code only: the Supabase response body can echo row values.
     console.error(JSON.stringify({ worker: 'mpt-cairn-blackboard', action: b.action, session_id: b.session_id, error: String(e?.message ?? e).slice(0, 200) }));
@@ -300,12 +344,13 @@ export async function commit(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (url.pathname === '/health' && request.method === 'GET') return json({ ok: true, worker: 'mpt-cairn-blackboard', version: BRIDGE_VERSION, configured: configured(env) });
-    if (url.pathname === '/api/cairn/blackboard/commit') {
+    if (url.pathname === '/health' && request.method === 'GET') return json({ ok: true, worker: 'mpt-cairn-blackboard', version: BRIDGE_VERSION, configured: configured(env), notion_sync: notionConfigured(env) });
+    const route = { '/api/cairn/blackboard/commit': 'commit', '/api/cairn/notion/sync': 'sync', '/api/cairn/notion/reconcile': 'reconcile' }[url.pathname];
+    if (route) {
       if (request.method !== 'POST') return fail(405, 'method_not_allowed', 'use POST', {}, { allow: 'POST' });
-      return commit(request, env);
+      return route === 'commit' ? commit(request, env, ctx) : notionAdmin(request, env, route);
     }
     return fail(404, 'not_found', 'unknown path');
   },

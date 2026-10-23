@@ -1,6 +1,6 @@
 name: Deploy mpt-cairn-blackboard Worker
 
-# MPC-8413 step 2: API bridge for the Cairn OSINT blackboard. Modelled on deploy-mpt-metrics-collector.yml.
+# MPC-8413 steps 2 and 3: API bridge for the Cairn OSINT blackboard and its Supabase -> Notion mirror. Modelled on deploy-mpt-metrics-collector.yml.
 #
 # MANUAL ONLY (workflow_dispatch): merging the Worker code must not publish the endpoint. MPC-8413 lists the API bridge deployment as a
 # separate approval. Run it from the Actions tab when that approval is given.
@@ -11,7 +11,7 @@ name: Deploy mpt-cairn-blackboard Worker
 #
 # Safety: runs the pre-deploy config checks and the Worker tests first; after deploy it lists the Worker's secret NAMES via the API and
 # FAILS if any name in workers/mpt-cairn-blackboard/EXPECTED_SECRETS.txt is missing. Secret values never appear here, in the repo or in logs.
-# On the very first deploy that check is expected to go red until a human has set the four secrets in Cloudflare; re-run afterwards.
+# On the very first deploy that check is expected to go red until a human has set the five secrets in Cloudflare; re-run afterwards.
 
 on:
   workflow_dispatch:
@@ -37,8 +37,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-cairn-blackboard
 
-      - name: Test Worker (stubbed Supabase)
-        run: node workers/mpt-cairn-blackboard/worker.test.mjs
+      - name: Test Worker (stubbed Supabase and Notion)
+        run: node workers/mpt-cairn-blackboard/worker.test.mjs && node workers/mpt-cairn-blackboard/notion-sync.test.mjs
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
