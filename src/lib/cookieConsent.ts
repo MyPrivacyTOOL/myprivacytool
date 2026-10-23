@@ -1,54 +1,57 @@
-declare global {
-  interface Window {
-    __cmp?: (command: string, parameter?: unknown, callback?: unknown) => void;
+// MPC-8450: our own cookie choice (replaces the consentmanager.net layer). One optional category: analytics (Google Analytics 4 and the
+// HubSpot forms script). The choice lives only in this browser (localStorage), with the date; it is never sent to us.
+// index.html reads the same key for the Google Analytics gate, so keep KEY and the shape in step with it.
+export const CONSENT_KEY = "mpt_cookie_consent";
+const CHANGED = "mpt:consent";
+const OPEN = "mpt:consent-open";
+
+export type ConsentChoice = { v: 1; analytics: boolean; at: string };
+
+/** The stored choice, or null when the visitor has not chosen (or storage is unavailable or the value is not ours). */
+export function getChoice(): ConsentChoice | null {
+  try {
+    const raw = typeof window === "undefined" ? null : window.localStorage.getItem(CONSENT_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as Partial<ConsentChoice> | null;
+    return c && c.v === 1 && typeof c.analytics === "boolean" && typeof c.at === "string" ? (c as ConsentChoice) : null;
+  } catch {
+    return null;
   }
 }
 
-/**
- * Reopens the consentmanager.net CMP preferences layer that's already loaded
- * in index.html. Guarded because the CMP script loads async and may not be
- * ready yet on first paint.
- */
-export function openCookiePreferences() {
-  if (typeof window !== "undefined" && typeof window.__cmp === "function") {
-    window.__cmp("showConsentLayer");
+/** Saves the visitor's choice and tells listeners (the banner closes, analytics scripts load or stop). */
+export function setChoice(analytics: boolean): void {
+  try {
+    window.localStorage.setItem(CONSENT_KEY, JSON.stringify({ v: 1, analytics, at: new Date().toISOString() } satisfies ConsentChoice));
+  } catch {
+    /* storage blocked: the choice cannot be kept, so nothing optional will load next visit either */
   }
+  window.dispatchEvent(new Event(CHANGED));
 }
 
-type CmpData = { userChoiceExists?: boolean; purposeConsents?: Record<string, boolean> };
-
 /**
- * True once the visitor has made a choice in the consentmanager.net layer and
- * granted at least one purpose. Defaults to false (no consent) whenever the CMP
- * is missing, still loading or errors, so third-party scripts stay off.
+ * True only after the visitor chose "Accept analytics". Defaults to false (no consent) whenever there is no choice,
+ * storage is blocked or the value is damaged, so optional scripts stay off.
  */
 export function hasConsent(): boolean {
-  try {
-    if (typeof window === "undefined" || typeof window.__cmp !== "function") return false;
-    const data = (window.__cmp as unknown as (c: string) => CmpData | undefined)("getCMPData");
-    const purposes = data?.purposeConsents;
-    return !!data?.userChoiceExists && !!purposes && Object.values(purposes).some(Boolean);
-  } catch {
-    return false;
-  }
+  return getChoice()?.analytics === true;
 }
 
-/**
- * Calls `cb` whenever the visitor saves a consent choice. Returns an
- * unsubscribe function. A no-op if the CMP has not loaded.
- */
+/** Calls `cb` whenever the visitor saves a choice. Returns an unsubscribe function. */
 export function onConsentChange(cb: () => void): () => void {
-  if (typeof window === "undefined" || typeof window.__cmp !== "function") return () => {};
-  try {
-    window.__cmp("addEventListener", ["consent", cb, false], null);
-  } catch {
-    return () => {};
-  }
-  return () => {
-    try {
-      window.__cmp?.("removeEventListener", ["consent", cb, false], null);
-    } catch {
-      /* ignore */
-    }
-  };
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(CHANGED, cb);
+  return () => window.removeEventListener(CHANGED, cb);
+}
+
+/** Footer "Manage cookies": asks the banner to open again so the visitor can change their choice. */
+export function openCookiePreferences(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(OPEN));
+}
+
+/** For the banner: calls `cb` when "Manage cookies" is pressed. */
+export function onOpenPreferences(cb: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(OPEN, cb);
+  return () => window.removeEventListener(OPEN, cb);
 }

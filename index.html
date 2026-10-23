@@ -53,17 +53,12 @@
     <!-- MPC-7200: ipify/ipapi preconnects removed (the scan now asks our own Worker, /whoami); they were unused and
          opened connections to third parties before any consent choice. Preconnect only what the home page really uses. -->
     <link rel="preconnect" href="https://api.myprivacytool.io" crossorigin />
-    <link rel="preconnect" href="https://c.delivery.consentmanager.net" crossorigin />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-    <link rel="dns-prefetch" href="https://cdn.consentmanager.net" />
-
-    <!-- Consent Manager -->
-    <script type="text/javascript" data-cmp-ab="1" src="https://cdn.consentmanager.net/delivery/autoblocking/e71fec59020f9.js" data-cmp-host="c.delivery.consentmanager.net" data-cmp-cdn="cdn.consentmanager.net" data-cmp-codesrc="16"></script>
 
     <!-- Google tag (gtag.js) — Property: 515216281 | Measurement ID: G-1BWMDBJSPL
          Loaded only after consent: no request to googletagmanager.com / google-analytics.com
-         before the visitor accepts in the consentmanager.net layer. Withdrawing consent sets the
-         ga-disable flag so no further hits are sent. -->
+         before the visitor chooses "Accept analytics" in our own cookie banner (src/components/CookieBanner.tsx, choice kept in
+         localStorage under mpt_cookie_consent, MPC-8450). Withdrawing consent sets the ga-disable flag so no further hits are sent. -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -77,9 +72,8 @@
         function allowed() {
           if (!isProd) return false;
           try {
-            var d = window.__cmp && window.__cmp('getCMPData');
-            var p = d && d.purposeConsents;
-            return !!(d && d.userChoiceExists && p && Object.keys(p).some(function (k) { return p[k]; }));
+            var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
+            return !!(c && c.v === 1 && c.analytics === true);
           } catch (e) { return false; }
         }
         function sync() {
@@ -94,9 +88,7 @@
           gtag('js', new Date());
           gtag('config', GA_ID);
         }
-        if (typeof window.__cmp === 'function') {
-          try { window.__cmp('addEventListener', ['consent', sync, false], null); } catch (e) {}
-        }
+        window.addEventListener('mpt:consent', sync);
         sync();
       })();
     </script>
