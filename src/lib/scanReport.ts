@@ -19,7 +19,7 @@ export const REPORT_FAILED_MESSAGE =
   "We could not request your report just now, so nothing has been sent yet. Your email is still filled in: please press the button to try again.";
 export const REPORT_WAIT_MESSAGE = "You have tried a few times in a row. Please wait a minute, then press the button again.";
 
-export async function requestScanReport(email: string, saveScan: boolean, recognise: boolean): Promise<void> {
+export async function requestScanReport(email: string, saveScan: boolean, recognise: boolean, turnstileToken = ""): Promise<void> {
   const base = resolveScanApiUrl();
   if (!base) return; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
   const q = new URLSearchParams(window.location.search);
@@ -33,6 +33,7 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
         email,
         consent: true, // only called after the consent checkbox is ticked
         consent_source: "scan_page",
+        ...(turnstileToken ? { "cf-turnstile-response": turnstileToken } : {}), // MPC-8430
         ...(saveScan ? scanSaveFields({ recognise }) : {}),
         ...(ref ? { ref } : {}),
         utm_source: q.get("utm_source") ?? "",
