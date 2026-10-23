@@ -15,6 +15,9 @@ export const EMAIL_HEXAGONS = {
   'email-name': { label: 'Name in your address', source: 'Analysed inside our Worker (nothing sent out)', services: [] },
   'email-provider': { label: 'Mail provider and domain', source: 'Cloudflare public DNS (1.1.1.1 over HTTPS)', services: ['Cloudflare DNS-over-HTTPS (receives the domain only, the part after the @)'] },
   'email-profile': { label: 'Public profile or avatar', source: 'Gravatar', services: ['Gravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
+  // MPC-8452 (OSINT list, batch 1): both send a hash or the domain only, never the address.
+  'email-libravatar': { label: 'Second public avatar service', source: 'Libravatar', services: ['Libravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
+  'email-domain-record': { label: 'Public domain registration', source: 'RDAP (public domain registration data)', services: ['rdap.org and the domain registry it redirects to (receive the domain only, the part after the @)'] },
 };
 
 const result = (id, status, extra = {}) => ({ id, label: EMAIL_HEXAGONS[id].label, status, source: EMAIL_HEXAGONS[id].source, services: EMAIL_HEXAGONS[id].services, ...extra });
@@ -144,6 +147,63 @@ export async function checkPublicProfile(email, fetchImpl = fetch, { timeoutMs =
   }
 }
 
+// ------------------------------------------------------------------ 5. second avatar service (Libravatar, hash only) - MPC-8452
+const LIBRAVATAR_AVATAR = 'https://seccdn.libravatar.org/avatar';
+export async function checkLibravatar(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+  const id = 'email-libravatar';
+  const parts = splitEmail(email);
+  if (!parts) return notChecked(id, 'not a valid email address');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const hash = await sha256Hex(`${parts.local}@${parts.domain}`);
+    const res = await fetchImpl(`${LIBRAVATAR_AVATAR}/${hash}?d=404&s=1`, { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal });
+    if (res.status === 200) return result(id, 'found', { value: 'A public Libravatar avatar is linked to this address. Anyone who knows the address can see it.' });
+    if (res.status === 404) return result(id, 'clear');
+    return notChecked(id, `Libravatar HTTP ${res.status}`);      // rate limited or erroring: not "clear"
+  } catch (e) {
+    return notChecked(id, ctl.signal.aborted ? 'Libravatar lookup timed out' : `Libravatar lookup failed: ${String(e).slice(0, 100)}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ------------------------------------------------------------------ 6. public domain registration record (RDAP, domain only) - MPC-8452
+// Only for a domain that is not a shared webmail domain: the question is what the public registration record of YOUR domain tells strangers.
+const RDAP = 'https://rdap.org/domain';
+// What registrars print where the owner's details are hidden (GDPR redaction, privacy services). Anything else counts as visible.
+const REDACTED = /redacted|privacy|withheld|not disclosed|data protected|please query|rdds|registrar of record|contact the registrant|not applicable|^n\/a$|^none$|^-$/i;
+const vcardText = (entity) => {
+  const rows = Array.isArray(entity?.vcardArray) ? entity.vcardArray[1] || [] : [];
+  return rows.filter((r) => ['fn', 'org', 'email', 'adr', 'tel'].includes(r[0])).map((r) => (Array.isArray(r[3]) ? r[3].join(' ') : String(r[3] || '')).trim()).filter(Boolean);
+};
+export async function checkDomainRecord(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+  const id = 'email-domain-record';
+  const parts = splitEmail(email);
+  if (!parts || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(parts.domain)) return notChecked(id, 'not a valid email address');
+  if (PERSONAL_DOMAINS.has(parts.domain)) return result(id, 'clear');      // a shared webmail domain: there is no registration of yours to expose
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(`${RDAP}/${encodeURIComponent(parts.domain)}`, { headers: { accept: 'application/rdap+json', 'user-agent': 'MyPrivacyTOOL-scan-report' }, redirect: 'follow', signal: ctl.signal });
+    if (res.status === 404) return notChecked(id, 'no public registration record was available for this domain');   // unsupported registry or unknown domain: not "clear"
+    if (!res.ok) return notChecked(id, `RDAP HTTP ${res.status}`);
+    const j = await res.json();
+    const reg = (j.events || []).find((e) => e.eventAction === 'registration')?.eventDate;
+    const year = reg && /^\d{4}/.test(reg) ? Number(reg.slice(0, 4)) : null;
+    const registrar = vcardText((j.entities || []).find((e) => (e.roles || []).includes('registrar')))[0] || '';
+    const exposed = (j.entities || []).filter((e) => (e.roles || []).includes('registrant')).flatMap(vcardText).filter((t) => !REDACTED.test(t));
+    if (exposed.length) {
+      return result(id, 'found', { value: `The public registration record for ${parts.domain}${year ? ` (registered in ${year})` : ''}${registrar ? `, through ${registrar},` : ''} shows contact details for the owner. Anyone can look this up.` });
+    }
+    return result(id, 'clear');      // answered, and the owner's details are hidden or redacted
+  } catch (e) {
+    return notChecked(id, ctl.signal.aborted ? 'registration lookup timed out' : `registration lookup failed: ${String(e).slice(0, 100)}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ------------------------------------------------------------------ run all (never throws, never exceeds the budget)
 export async function runEmailHexagons(email, env = {}, fetchImpl = fetch) {
   const budget = Number(env.EMAIL_HEXAGON_TIMEOUT_MS) || CHECK_TIMEOUT_MS;
@@ -155,6 +215,8 @@ export async function runEmailHexagons(email, env = {}, fetchImpl = fetch) {
     guard('email-name', checkNameInAddress(email)),
     guard('email-provider', checkProviderAndDomain(email, fetchImpl, { timeoutMs: budget })),
     guard('email-profile', checkPublicProfile(email, fetchImpl, { timeoutMs: budget })),
+    guard('email-libravatar', checkLibravatar(email, fetchImpl, { timeoutMs: budget })),
+    guard('email-domain-record', checkDomainRecord(email, fetchImpl, { timeoutMs: budget })),
   ]);
 }
 

@@ -59,6 +59,8 @@ function fake(opts = {}) {
     if (url.includes('api.hubapi.com')) return res(200, url.includes('/contacts/search') && opts.hsContact !== false ? { results: [{ id: '42' }] } : {});
     if (url.includes('cloudflare-dns.com')) return res(200, { Status: 0, Answer: [] });   // MPC-7467 email hexagons
     if (url.includes('gravatar.com')) return res(404);
+    if (url.includes('libravatar.org')) return res(404);   // MPC-8452 email hexagons
+    if (url.includes('rdap.org')) return res(404);
     if (url.includes('haveibeenpwned.com')) return opts.hibp ? opts.hibp() : res(404);
     if (url.includes('/rpc/mpt_complete_referral')) {   // MPC-7645: same rules as the SQL function
       const id = JSON.parse(o.body).p_referee_user_id; const r = db.referrals.find((x) => x.referee_user_id === id && x.status === 'signed_up'); if (!r) return res(200, []);
@@ -172,10 +174,10 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const rs = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), lenv, { waitUntil: (p) => w.push(p) });
   await Promise.all(w); const body = await rs.json();
   check(rs.status === 200 && typeof body.live_token === 'string' && !('scan_number' in body), 'submit returns a live_token (and it is not the scan number)');
-  check(L.db.signals.filter((x) => x.signal_type.startsWith('email-')).length === 3, 'the three fast email checks were written right after the submit');
+  check(L.db.signals.filter((x) => x.signal_type.startsWith('email-')).length === 5, 'the five fast email checks were written right after the submit');
   const lr = await worker.fetch(new Request('https://x/api/scan/live?t=' + encodeURIComponent(body.live_token), { headers: { Origin: 'https://myprivacytool.io' } }), lenv, { waitUntil: () => {} });
   const lb = await lr.json();
-  check(lr.status === 200 && lb.items.length === 3 && lb.items.every((i) => !('details' in i) && !('value' in i)), 'GET /api/scan/live with the token returns three redacted items');
+  check(lr.status === 200 && lb.items.length === 5 && lb.items.every((i) => !('details' in i) && !('value' in i)), 'GET /api/scan/live with the token returns five redacted items');
   const nr = await worker.fetch(new Request('https://x/api/scan/live?t=nope', { headers: { Origin: 'https://myprivacytool.io' } }), lenv, { waitUntil: () => {} });
   check(nr.status === 401, 'GET /api/scan/live with a bad token => 401');
   const dup = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), lenv, { waitUntil: (p) => w.push(p) });
