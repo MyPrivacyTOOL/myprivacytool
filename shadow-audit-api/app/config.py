@@ -15,6 +15,12 @@ class Settings:
     allowed_regions: tuple = ("eu",)      # Risk #119: regions data may be sent to
     min_coverage: int = 5                 # detectors that must have had data before an audit can be APPROVED
 
+    @property
+    def slack_enabled(self) -> bool:
+        """True only for a real Slack incoming-webhook URL. A placeholder secret (e.g. before the owner
+        creates the webhook) must not cause a failing call and an error line on every audit."""
+        return self.slack_webhook_url.startswith("https://hooks.slack.com/")
+
     @classmethod
     def from_env(cls) -> "Settings":
         g = os.environ.get
