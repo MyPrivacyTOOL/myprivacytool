@@ -3,7 +3,8 @@ name: Sync content cache (Notion -> KV mpt-content-cache)
 # Daily refresh of the Workstream 3 schedule + Brand Guidelines into Workers KV mpt-content-cache (script: scripts/sync-content-cache-to-kv.mjs),
 # then the same page's per-day topics into mpt-brand-topics (script: scripts/sync-workstream-3-to-kv.mjs), which mpt-content-producer reads.
 # 21:00 UTC = 05:00 HKT, one hour before the 06:00 HKT producer cron. Make.com can also trigger this via workflow_dispatch.
-# Repo secrets: NOTION_TOKEN, CLOUDFLARE_API_TOKEN (needs Workers KV Storage > Edit), CLOUDFLARE_ACCOUNT_ID.
+# Repo secrets: NOTION_TOKEN, CLOUDFLARE_ACCOUNT_ID, and a Cloudflare token with Account > Workers KV Storage > Edit: CLOUDFLARE_KV_TOKEN
+# (preferred, KV-only) or, if absent, CLOUDFLARE_API_TOKEN. The deploy token has no KV permission, so it fails with 'Authentication error' (10000).
 
 on:
   schedule:
@@ -26,18 +27,18 @@ jobs:
       - name: Pre-deployment checks (secrets present)
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KV_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/ci/check-env.mjs --require NOTION_TOKEN,CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID
       - name: Sync content cache (schedule + brand guidelines)
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KV_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/sync-content-cache-to-kv.mjs
       - name: Sync brand topics (mpt-brand-topics)
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KV_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/sync-workstream-3-to-kv.mjs
