@@ -9,6 +9,7 @@ import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression, emailHash } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
+import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
@@ -29,6 +30,12 @@ async function rateLimited(env, request, prefix = '') {
   try { return !(await env.RATE_LIMITER.limit({ key: prefix + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
 }
 
+// MPC-8452: the live view is polled every few seconds, so it has its own, wider limit (wrangler.toml LIVE_LIMITER); fails open like the others.
+async function liveLimited(env, request) {
+  if (!env.LIVE_LIMITER) return false;
+  try { return !(await env.LIVE_LIMITER.limit({ key: 'live:' + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
+}
+
 // gmail "+tag" and dots are ignored when matching the allowlist.
 const norm = (e) => { const [l, d] = String(e).toLowerCase().split('@'); return d === 'gmail.com' ? `${l.split('+')[0].replace(/\./g, '')}@${d}` : `${l}@${d}`; };
 export function recipientAllowed(env, email) {
@@ -41,7 +48,7 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const cors = {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-      'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', Vary: 'Origin',
     };
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
@@ -55,6 +62,8 @@ export default {
     // MPC-7645: referral programme. Both answer 404 unless REFERRALS_ENABLED is "true". Authorised by the signed manage link in the referrer's report email.
     if (request.method === 'POST' && url.pathname === '/api/referral/status') return handleReferralStatus(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/referral/invite') return handleReferralInvite(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
+    // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
+    if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -86,7 +95,14 @@ export default {
       const saved = save.hexagons && !result.duplicate && result.scanId
         ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
         : { saved: false };
-      return json({ success: true, duplicate: result.duplicate, scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}) });
+      // MPC-8452: start the live view. The fast email checks run now (off the response path) and the page polls for them with this token.
+      // A repeat request within 24h gets no live view (nothing new is checked).
+      let live = null;
+      if (!result.duplicate && result.scanId && env.SUPABASE_SERVICE_ROLE_KEY) {
+        live = await makeLiveToken(env, result.scanId);
+        if (live) { const p = runLiveChecks(env, db(env), result.scanId, email); if (ctx?.waitUntil) ctx.waitUntil(p); }
+      }
+      return json({ success: true, duplicate: result.duplicate, scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}), ...(live ? { live_token: live } : {}) });
     } catch (e) {
       console.error('scan submit failed:', String(e));
       return json({ error: 'Could not record your scan request' }, 500);
@@ -173,7 +189,7 @@ const unsubHeaders = (links) => (links ? { 'List-Unsubscribe': `<${links.oneClic
 async function confirm(env, sb, scanId, email, fetchImpl) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
   const links = await unsubLinks(env, email);
-  const m = buildConfirmationEmail({ unsubscribeLink: links?.page });
+  const m = buildConfirmationEmail({ unsubscribeLink: links?.page, liveLink: await makeLiveLink(env, scanId) });   // MPC-8452: opening it proves the reader owns the inbox
   const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(links) }, fetchImpl);
   if (r.sent) await sb.patch(`scans?id=eq.${scanId}`, { confirmation_sent_at: new Date().toISOString() });
   else console.error('confirmation not sent:', r.reason);
@@ -283,7 +299,7 @@ async function processScan(env, sb, job, fetchImpl) {
   const links = await unsubLinks(env, email);
   const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
   const referral = await referralFor(env, sb, job.user_id, email);
-  const mail = buildReportEmail({ scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {

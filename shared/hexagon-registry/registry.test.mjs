@@ -28,8 +28,8 @@ test('trust score is empty everywhere; unclear hexagons default to NOT_CHECKED a
 import { EMAIL_HEXAGONS } from './registry.js';
 import { captureStatus } from './status.js';
 
-test('four email hexagons are in the shared registry, outside the 54 web hexagons', () => {
-  assert.deepEqual(EMAIL_HEXAGONS.map((h) => h.id), ['email-breaches', 'email-name', 'email-provider', 'email-profile']);
+test('six email hexagons are in the shared registry, outside the 54 web hexagons', () => {
+  assert.deepEqual(EMAIL_HEXAGONS.map((h) => h.id), ['email-breaches', 'email-name', 'email-provider', 'email-profile', 'email-libravatar', 'email-domain-record']);
   assert.ok(EMAIL_HEXAGONS.every((h) => h.trust_score === null && !isKnownHexagonId(h.id)));
 });
 

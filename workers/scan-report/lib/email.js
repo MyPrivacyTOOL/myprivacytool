@@ -78,7 +78,7 @@ const CONFIRMATION_PARTS = [
   { key: 'device', label: 'Your browser findings' },
   { key: 'email', label: 'What your email address reveals' },
 ];
-export function buildConfirmationEmail({ unsubscribeLink } = {}) {
+export function buildConfirmationEmail({ unsubscribeLink, liveLink } = {}) {
   const subject = 'Your privacy scan is starting';
   const text = [
     ALICE_TAGLINE,
@@ -93,6 +93,7 @@ export function buildConfirmationEmail({ unsubscribeLink } = {}) {
     '',
     'My job is to show you what you look like from the outside: what’s exposed, what it means for you, and what to change first.',
     '',
+    ...(liveLink ? ['Watch it live: open your results page and I’ll show each result as I find it. Only you can open this link, because it came to your inbox:', liveLink, ''] : []),
     'Here’s what happens next.',
     '',
     'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
@@ -121,6 +122,7 @@ ${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m y
 ${para('You asked us to look at your privacy exposure, so we&rsquo;re starting right now.')}
 ${para('MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We&rsquo;re starting with two things: your browser and your email address. More channels will follow over time.')}
 ${para('My job is to show you what you look like from the outside: what&rsquo;s exposed, what it means for you, and what to change first.')}
+${liveLink ? para('<strong>Watch it live.</strong> Open your results page and I&rsquo;ll show each result as I find it. Only you can open this link, because it came to your inbox.') + button(liveLink, 'Watch my results live') : ''}
 ${h2('Here&rsquo;s what happens next.')}
 ${para('Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
 <ol style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
@@ -181,7 +183,7 @@ const MAX_BREACH_ROWS = 10;
 const brokersRelevant = (emailHexes, breaches) => emailHexes.some((h) => h.id === 'email-name' && h.status === 'found')
   || breaches.some((b) => (b.DataClasses || []).some((c) => /^(names|phone numbers|physical addresses)$/i.test(String(c))));
 
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null }) {
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -212,6 +214,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
       : [`US people-search removal guides (we have not searched these sites for you): ${SITE}/opt-out`, '']),
     `More removal guides: ${SITE}/opt-out`, '',
     'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
+    ...(liveLink ? ['', `Keep an eye on your results: open this page and new findings appear as we find them. Only you can open it, because it came to your inbox: ${liveLink}`] : []),
     ...(referral ? ['', referral.text] : []),
     ...(unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
   ].join('\n');
@@ -235,6 +238,7 @@ ${showBrokers ? `${h2('People-search sites')}${para('A finding above makes these
     : para(`US people-search removal guides: <a href="${SITE}/opt-out" style="color:${BRAND}">see them on the site</a>. We have not searched these sites for you.`)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
+${liveLink ? para('<strong>Keep an eye on your results.</strong> Open your results page and new findings appear as we find them. Only you can open it, because it came to your inbox.') + button(liveLink, 'Watch my results live') : ''}
 ${referral ? referral.html : ''}
 ${unsubscribeLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Then you do not need to hear from us again. <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">Unsubscribe</a> and we will send you no more follow-up or marketing emails.</td></tr></table>` : ''}`, unsubscribeLink);
   return { ...tagged('scan-report', { subject, text, html }), report };

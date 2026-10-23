@@ -1,6 +1,6 @@
 // MPC-7467 email hexagons. Stubbed fetch, no network. Run: node workers/scan-report/email-hexagons.test.mjs
 // '+' test addresses only (testingnt69+...@gmail.com style); no real person's address appears here.
-import { checkNameInAddress, checkProviderAndDomain, checkPublicProfile, runEmailHexagons, emailHexagonSignalRows, EMAIL_HEXAGONS } from './lib/emailHexagons.js';
+import { checkDomainRecord, checkLibravatar, checkNameInAddress, checkProviderAndDomain, checkPublicProfile, runEmailHexagons, emailHexagonSignalRows, EMAIL_HEXAGONS } from './lib/emailHexagons.js';
 import { runReportJob } from './index.js';
 
 let ok = true; let count = 0;
@@ -73,13 +73,47 @@ await checkPublicProfile('testingnt69+hash@gmail.com', async (u) => { seen.push(
 check(seen[0].includes(h1), 'profile: hash is case-insensitive');
 
 // ---- run all: never throws, never slow
-const all = await runEmailHexagons('testingnt69+a@gmail.com', {}, async (u) => (String(u).includes('gravatar') ? res(404) : res(200, { Status: 0, Answer: [] })));
-check(all.length === 3 && all.map((h) => h.id).join() === Object.keys(EMAIL_HEXAGONS).join(), 'run: three hexagons returned in registry order');
+const all = await runEmailHexagons('testingnt69+a@gmail.com', {}, async (u) => (/gravatar|libravatar|rdap\.org/.test(String(u)) ? res(404) : res(200, { Status: 0, Answer: [] })));
+check(all.length === 5 && all.map((h) => h.id).join() === Object.keys(EMAIL_HEXAGONS).join(), 'run: five hexagons returned in registry order');
 const t0 = Date.now();
 const slow = await runEmailHexagons('testingnt69+a@gmail.com', { EMAIL_HEXAGON_TIMEOUT_MS: '50' }, () => new Promise(() => {}));
-check(Date.now() - t0 < 1500 && slow.filter((h) => h.id !== 'email-name').every((h) => h.status === 'not_checked'), 'run: hung outside services => not_checked within the budget, pure check unaffected');
+check(Date.now() - t0 < 1500 && slow.filter((h) => !['email-name', 'email-domain-record'].includes(h.id)).every((h) => h.status === 'not_checked') && slow.find((h) => h.id === 'email-domain-record').status === 'clear', 'run: hung outside services => not_checked within the budget, pure check unaffected');
 const rows = emailHexagonSignalRows('scan1', all);
-check(rows.length === 3 && rows.every((x) => x.category === 'email' && ['found', 'clear', 'not_checked'].includes(x.check_status) && x.signal_type.startsWith('email-')), 'rows: stored as email-category signals with valid status values');
+check(rows.length === 5 && rows.every((x) => x.category === 'email' && ['found', 'clear', 'not_checked'].includes(x.check_status) && x.signal_type.startsWith('email-')), 'rows: stored as email-category signals with valid status values');
+
+// ---- MPC-8452 batch 1: Libravatar (hash only) and the public domain registration record (RDAP, domain only)
+{
+  const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body ?? '') });
+  const seen = [];
+  const spy = (status, body) => async (u) => { seen.push(String(u)); return resp(status, body); };
+  let x = await checkLibravatar('Jane.Smith+tag@example.com', spy(200));
+  check(x.status === 'found' && /Libravatar/.test(x.value), 'libravatar: 200 => found');
+  check(seen[0].startsWith('https://seccdn.libravatar.org/avatar/') && /\/[0-9a-f]{64}\?d=404/.test(seen[0]) && !seen.join().includes('jane') && !seen.join().includes('example.com'), 'libravatar: only a SHA-256 hash is sent, never the address or domain');
+  check((await checkLibravatar('a@example.com', spy(404))).status === 'clear', 'libravatar: 404 => clear');
+  check((await checkLibravatar('a@example.com', spy(429))).status === 'not_checked' && (await checkLibravatar('a@example.com', spy(500))).status === 'not_checked', 'libravatar: rate limited or erroring => not_checked, never clear');
+  check((await checkLibravatar('a@example.com', async () => { throw new Error('down'); })).status === 'not_checked' && (await checkLibravatar('nope')).status === 'not_checked', 'libravatar: network error or invalid address => not_checked');
+
+  const rdap = (over = {}) => ({ events: [{ eventAction: 'registration', eventDate: '2012-03-04T00:00:00Z' }], entities: [
+    { roles: ['registrar'], vcardArray: ['vcard', [['fn', {}, 'text', 'Example Registrar Inc']]] },
+    { roles: ['registrant'], vcardArray: ['vcard', [['fn', {}, 'text', 'Jane Smith'], ['org', {}, 'text', 'Smith Consulting']]] }], ...over });
+  seen.length = 0;
+  x = await checkDomainRecord('jane@smith-consulting.example', spy(200, rdap()));
+  check(x.status === 'found' && /registered in 2012/.test(x.value) && /Example Registrar Inc/.test(x.value) && !/Jane|Smith Consulting/.test(x.value.replace(/smith-consulting/g, '')), 'rdap: visible owner details => found (year and registrar, never the owner\'s name)');
+  check(seen.length === 1 && seen[0] === 'https://rdap.org/domain/smith-consulting.example' && !seen[0].includes('jane'), 'rdap: only the domain is sent');
+  x = await checkDomainRecord('jane@smith-consulting.example', spy(200, rdap({ entities: [{ roles: ['registrant'], vcardArray: ['vcard', [['fn', {}, 'text', 'REDACTED FOR PRIVACY'], ['org', {}, 'text', 'Data Protected'], ['email', {}, 'text', 'Please query the RDDS service of the Registrar of Record']]] }] })));
+  check(x.status === 'found' || x.status === 'clear', 'rdap: runs on redacted data');
+  check(x.status === 'clear', 'rdap: owner details redacted => clear');
+  check((await checkDomainRecord('jane@smith-consulting.example', spy(200, rdap({ entities: [] })))).status === 'clear', 'rdap: no registrant entity at all => clear (nothing exposed)');
+  seen.length = 0;
+  x = await checkDomainRecord('someone@gmail.com', spy(200, rdap()));
+  check(x.status === 'clear' && seen.length === 0, 'rdap: a shared webmail domain is skipped (clear, nothing sent)');
+  check((await checkDomainRecord('a@own-domain.example', spy(404))).status === 'not_checked', 'rdap: no record (unsupported registry) => not_checked, never clear');
+  check((await checkDomainRecord('a@own-domain.example', spy(429))).status === 'not_checked' && (await checkDomainRecord('a@own-domain.example', spy(500))).status === 'not_checked', 'rdap: rate limited or erroring => not_checked');
+  check((await checkDomainRecord('a@own-domain.example', async () => { throw new Error('down'); })).status === 'not_checked' && (await checkDomainRecord('bad')).status === 'not_checked', 'rdap: network error or invalid address => not_checked');
+  // a hung lookup: like a real fetch, the stub rejects when the check's AbortSignal fires
+  const hung = await checkDomainRecord('a@own-domain.example', (u, o) => new Promise((_, reject) => o.signal.addEventListener('abort', () => reject(new Error('aborted')))), { timeoutMs: 40 });
+  check(hung.status === 'not_checked' && /timed out/.test(hung.reason), 'rdap: a hung lookup is cut off by the timeout');
+}
 
 // ---- report job: hexagons stored, report not blocked by failures
 function fakeJob(dnsFails) {
@@ -103,7 +137,7 @@ for (const dnsFails of [false, true]) {
   const out = await runReportJob({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', ALLOW_PARTIAL_REPORT: 'true' }, F.f);
   const hex = F.db.signals.filter((s) => s.signal_type.startsWith('email-'));
   check(out.sent === 1 && F.db.scans[0].report_status === 'sent', `job (dns ${dnsFails ? 'down' : 'up'}): report still sent`);
-  check(hex.length === 3, `job (dns ${dnsFails ? 'down' : 'up'}): 3 email hexagon rows stored with the scan`);
+  check(hex.length === 5, `job (dns ${dnsFails ? 'down' : 'up'}): 5 email hexagon rows stored with the scan`);
   const byType = Object.fromEntries(hex.map((s) => [s.signal_type, s.check_status]));
   check(byType['email-profile'] === 'found' && byType['email-provider'] === (dnsFails ? 'not_checked' : 'found'), `job (dns ${dnsFails ? 'down' : 'up'}): provider ${dnsFails ? 'not_checked' : 'found'}, profile found`);
 }

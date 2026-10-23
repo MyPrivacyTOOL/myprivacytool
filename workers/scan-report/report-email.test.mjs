@@ -28,12 +28,12 @@ const real = buildReportEmail({ scan, breaches: manyBreaches.slice(0, 3), breach
 const none = buildReportEmail({ scan: { ...computeScore([], new Set()), id: 'scan-9' }, breaches: [], breachStatus: 'not_checked', brokers: BROKERS, webScan: null, unsubscribeLink: UNSUB });
 
 console.log(`sizes: worst ${bytes(worst.html)} B, realistic ${bytes(real.html)} B, no-web-scan ${bytes(none.html)} B (limit ${HARD_LIMIT}, target ${TARGET})`);
-check(WEB_HEXAGONS.length === 54 && EMAIL_HEXAGONS.length === 4, 'registry: 54 web hexagons and 4 email hexagons');
+check(WEB_HEXAGONS.length === 54 && EMAIL_HEXAGONS.length === 6, 'registry: 54 web hexagons and 6 email hexagons');
 check(bytes(worst.html) < HARD_LIMIT, `HARD LIMIT: worst-case HTML (all 54 web + all email hexagons found, hostile values) is under ${HARD_LIMIT} bytes`);
 check(bytes(real.html) < TARGET, 'realistic report is under the 80 KB target');
 for (const [k, m] of [['worst', worst], ['realistic', real]]) {
   const hexCount = (m.html.match(/FOUND|CHECKED AND CLEAR|NOT CHECKED/g) || []).length;
-  check(hexCount >= 58, `${k}: all 54 web + 4 email hexagons are present (${hexCount} status tags)`);
+  check(hexCount >= 60, `${k}: all 54 web + 6 email hexagons are present (${hexCount} status tags)`);
 }
 
 // honest status
@@ -44,7 +44,7 @@ const byId = Object.fromEntries(gap.report.web_scan.hexagons.map((h) => [h.id, h
 check(byId.location.status === 'found' && byId.location.value === 'Springfield', 'FOUND shows the real value');
 check(byId.screen.status === 'not_checked', 'a "clear" on an informational hexagon is NOT CHECKED (nothing to be clear of)');
 check(byId.browser.status === 'not_checked' && gap.report.web_scan.hexagons.length === 54 && !byId.nonsense, 'hexagons missing from the saved scan are NOT CHECKED, never clear; unknown ids are ignored');
-check(gap.report.email.hexagons.find((h) => h.id === 'email-breaches').status === 'clear' && gap.report.email.hexagons.filter((h) => h.status === 'not_checked').length === 3, 'email: breaches clear when checked and none; the three MPC-7467 checks are NOT CHECKED until they exist');
+check(gap.report.email.hexagons.find((h) => h.id === 'email-breaches').status === 'clear' && gap.report.email.hexagons.filter((h) => h.status === 'not_checked').length === 5, 'email: breaches clear when checked and none; the five other email checks are NOT CHECKED when no result is passed in');
 check(/ESTIMATE/.test(buildReportEmail({ scan, breaches: [], breachStatus: 'checked', webScan: { hexagons: [{ id: 'demographic', status: 'found', value: '25-34' }] } }).html), 'estimates are labelled ESTIMATE');
 
 // escaping
@@ -79,13 +79,13 @@ check(/Alice/.test(real.html) && real.html.includes('/email/alice/alice-peek.gif
 
 // text in step with HTML
 const tagsText = cnt(/\[(FOUND|CHECKED AND CLEAR|NOT CHECKED)/g, real.text), tagsHtml = cnt(/>(FOUND|CHECKED AND CLEAR|NOT CHECKED)/g, real.html);
-check(tagsText === tagsHtml && tagsText === 58, `plain text lists the same ${tagsText} hexagons as the HTML`);
+check(tagsText === tagsHtml && tagsText === 60, `plain text lists the same ${tagsText} hexagons as the HTML`);
 check(cnt(/utm_content=/g, real.text) === guide.length, 'plain text carries the same tagged guide links');
 
 // JSON attachment
 const att = reportAttachment(real.report);
 const parsed = JSON.parse(Buffer.from(att.content, 'base64').toString('utf8'));
-check(/^my-privacy-scan-[a-z0-9-]+\.json$/.test(att.filename) && parsed.schema_version === 1 && parsed.web_scan.hexagons.length === 54 && parsed.email.hexagons.length === 4 && parsed.web_scan.hexagons.find((h) => h.status === 'found').detail !== undefined, 'JSON attachment decodes and carries all hexagons with detail');
+check(/^my-privacy-scan-[a-z0-9-]+\.json$/.test(att.filename) && parsed.schema_version === 1 && parsed.web_scan.hexagons.length === 54 && parsed.email.hexagons.length === 6 && parsed.web_scan.hexagons.find((h) => h.status === 'found').detail !== undefined, 'JSON attachment decodes and carries all hexagons with detail');
 check(!JSON.stringify(parsed).includes('@'), 'JSON attachment holds no email address');
 check(Object.keys(parsed).sort().join() === 'email,generated_at,report_id,schema_version,score,web_scan', 'JSON top-level keys match docs/report-json-shape.md');
 

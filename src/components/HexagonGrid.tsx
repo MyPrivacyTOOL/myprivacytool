@@ -43,7 +43,9 @@ import { fixStepFor } from '@/lib/hexagonFix';
 import NextStepCard from './hexagon/NextStepCard';
 import DetailLadder, { type DetailLevel } from './hexagon/DetailLadder';
 import HexagonHelp from './hexagon/HexagonHelp';
-import { captureContext } from '@/lib/webScan';
+import { captureContext, forgetPendingHexagon } from '@/lib/webScan';
+import { footprintsCueEnabled } from '@/config/footprints';
+import FootprintsCue from './FootprintsCue';
 
 // MPC-7200: below-the-fold panels (recharts / PDF export) load on demand, not with the home page.
 const StoragePanel = lazy(() => import('./StoragePanel'));
@@ -90,6 +92,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   // MPC-7916 Phase 2: one job per screen. Hexagons first; more hexagons on a button, not on taps; one next step at a time;
   // everything else (panels, the stranger card, the score) out of the way. Built on the honest tiles.
   const screenV2 = useMemo(() => v2 && hexScreenV2Enabled(), [v2]);
+  // The footprints cue (the Path): off unless the switch is on. Not shown on the one-job-per-screen layout.
+  const footprintsCue = useMemo(() => footprintsCueEnabled() && !screenV2, [screenV2]);
   const [toldFixed, setToldFixed] = useState<Set<string>>(new Set());
   // Guess check (prototype): the visitor's answer and/or their device's verdict, per guessed tile. Kept in this tab only, never sent or stored.
   const [guessState, setGuessState] = useState<Record<string, { answer?: 'yes' | 'no'; device?: DeviceCheckResult }>>({});
@@ -458,6 +462,27 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     }
   };
 
+  // Footprints cue: remove one footprint. The step is forgotten, not just hidden: the hexagon goes back to unconfirmed (tap to take the step
+  // again), its progress and any answer given to it are undone, and it is taken out of the scan held in this browser so it cannot be saved.
+  const handleRemoveFootprint = (id: string) => {
+    if (!confirmedHexagons.has(id)) return;
+    const hex = orderedHexagons.find(h => h.id === id);
+    confirmedIdsRef.current.delete(id);
+    setConfirmedHexagons(prev => { const next = new Set(prev); next.delete(id); return next; });
+    setConfirmedCount(c => Math.max(0, c - 1));
+    setGuessState(prev => { if (!(id in prev)) return prev; const next = { ...prev }; delete next[id]; return next; });
+    setToldFixed(prev => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next; });
+    setLaterIds(prev => { if (!prev.has(id)) return prev; const next = new Set(prev); next.delete(id); return next; });
+    const down = (c: number) => Math.max(0, c - 1);
+    if (hex?.category === 'fingerprint') setFingerprintConfirmedCount(down);
+    if (hex?.category === 'storage') setStorageConfirmedCount(down);
+    if (hex?.category === 'social') setSocialConfirmedCount(down);
+    if (hex?.category === 'security') setSecurityConfirmedCount(down);
+    if (hex?.category === 'behavior') setBehaviorConfirmedCount(down);
+    forgetPendingHexagon(id);
+    if (hex) trackHexagonConfirm(hex.id, hex.label, false, v2 ? tiles.get(hex.id)?.kind : undefined);
+  };
+
   const handleConfirm = (id: string) => {
     if (revealingHexagons.has(id)) return;
     if (confirmedIdsRef.current.has(id)) return;
@@ -808,6 +833,18 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
           })}
         </div>
       </div>
+
+
+      {footprintsCue && (
+        <FootprintsCue
+          footprints={[...confirmedHexagons].flatMap((id) => {
+            const h = orderedHexagons.find((o) => o.id === id);
+            return h ? [{ id: h.id, label: h.label }] : [];
+          })}
+          onRemove={handleRemoveFootprint}
+          className="mb-8"
+        />
+      )}
 
       {screenV2 && (
         <>
