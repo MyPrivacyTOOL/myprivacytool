@@ -111,3 +111,9 @@ The Scan page shows a Cloudflare Turnstile widget (`interaction-only`, cookieles
 - The key is not the scan number (that is the visitor's deletion handle). No `UNSUBSCRIBE_SECRET` = no key = no live view.
 - Memory only on the page: a refresh forgets everything and the view starts again.
 - Rollback: remove `UNSUBSCRIBE_SECRET`'s use here by reverting the PR; the report pipeline is unchanged either way.
+
+### Increment 2: the email link proves inbox ownership and unlocks the detail
+
+The confirmation email (and the report email) carry a button to `https://www.myprivacytool.io/scan/live#v=<token>`. The token (`scanId.expiry.HMAC`, message `verify:<scanId>:<expiry>`, 7 days, same `UNSUBSCRIBE_SECRET`) is in the URL **fragment**, which browsers never send to a server; the page reads it into memory, removes it from the address bar, and sends it to `GET /api/scan/live` as `Authorization: Bearer <token>` (never in a URL, so never in a request log). Only someone who can read the inbox has the link, so this is the proof of ownership: a verified request also reads `details`, and a found check carries its `value`. A stream token (`?t=`) can never unlock the detail, and the database `details` column is not even selected for it.
+
+The `/scan/live` page keeps watching after the first results (every 30 seconds, up to an hour) so new or changed findings appear. `noindex` and `Disallow: /scan/live` in robots.txt. A refresh forgets the key: press the button in the email again.

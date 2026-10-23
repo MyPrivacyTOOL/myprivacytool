@@ -9,7 +9,7 @@ import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression, emailHash } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
-import { handleLive, makeLiveToken, runLiveChecks } from './lib/live.js';
+import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
@@ -48,7 +48,7 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const cors = {
       'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', Vary: 'Origin',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', Vary: 'Origin',
     };
     const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
     const url = new URL(request.url);
@@ -189,7 +189,7 @@ const unsubHeaders = (links) => (links ? { 'List-Unsubscribe': `<${links.oneClic
 async function confirm(env, sb, scanId, email, fetchImpl) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
   const links = await unsubLinks(env, email);
-  const m = buildConfirmationEmail({ unsubscribeLink: links?.page });
+  const m = buildConfirmationEmail({ unsubscribeLink: links?.page, liveLink: await makeLiveLink(env, scanId) });   // MPC-8452: opening it proves the reader owns the inbox
   const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(links) }, fetchImpl);
   if (r.sent) await sb.patch(`scans?id=eq.${scanId}`, { confirmation_sent_at: new Date().toISOString() });
   else console.error('confirmation not sent:', r.reason);
@@ -299,7 +299,7 @@ async function processScan(env, sb, job, fetchImpl) {
   const links = await unsubLinks(env, email);
   const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
   const referral = await referralFor(env, sb, job.user_id, email);
-  const mail = buildReportEmail({ scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {

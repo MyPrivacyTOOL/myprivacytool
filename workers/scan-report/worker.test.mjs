@@ -180,6 +180,8 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   check(nr.status === 401, 'GET /api/scan/live with a bad token => 401');
   const dup = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), lenv, { waitUntil: (p) => w.push(p) });
   check(!('live_token' in await dup.json()), 'a repeat request within 24h gets no live view');
+  const confirmMail = L.calls.filter((c) => c.url.includes('api.resend.com')).map((c) => JSON.parse(c.body)).find((x) => /scan is starting/i.test(x.subject));
+  check(confirmMail && /scan\/live\?utm_source=email[^\s"]*#v=[0-9a-f-]{36}\./.test(confirmMail.text), 'the confirmation email carries the signed live link (token in the fragment)');
   const off = fake(); globalThis.fetch = off.f; const r0 = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), env, { waitUntil: () => {} });
   check(!('live_token' in await r0.json()), 'without UNSUBSCRIBE_SECRET there is no live view (feature off)');
 }
