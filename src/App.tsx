@@ -38,6 +38,7 @@ const Journey = lazy(() => import("./pages/Journey"));
 const AmIExposed = lazy(() => import("./pages/AmIExposed"));
 const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
+const ScanResults = lazy(() => import("./pages/ScanResults"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -68,6 +69,8 @@ const App = () => (
             <Route path="/thank-you" element={<ThankYou />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/invite" element={<Invite />} />
+            {/* MPC-8454 + MPC-8455: Scan results reveal flow */}
+            <Route path="/scan-results" element={<ScanResults />} />
             {/* Blog section */}
             <Route path="/blog" element={<Blog />} />
             <Route path="/blog/:slug" element={<BlogPost />} />
