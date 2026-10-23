@@ -69,7 +69,7 @@ function fake(opts = {}) {
     if (o.method === 'DELETE' && q.get('email')) { const v = decodeURIComponent(q.get('email').replace(/^(eq|ilike)\./, '')).replace(/\\(.)/g, '$1').toLowerCase(); db[t] = db[t].filter((x) => String(x.email).toLowerCase() !== v); return res(204); }   // CK-7721 fix 3
     if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
-      if (t === 'web_scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });
+      if (t === 'web_scans' || t === 'scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });   // production ids are uuids (MPC-8452 checks the shape)
       if (t === 'web_scan_contacts') { if (opts.linkFail) return res(500, 'x'); const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
@@ -167,6 +167,22 @@ const call = async (body, e = env) => { const F2 = fake(); globalThis.fetch = F2
 check((await call({ email: 'bad' })).status === 400, 'invalid email => 400');
 check((await call({ email: EMAIL })).status === 400, 'missing consent => 400 (never defaulted)');
 check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submit => 200');
+// MPC-8452: live view through the real entry point: the submit returns a stream token, the fast checks are written, the token reads them back redacted.
+{ const L = fake(); globalThis.fetch = L.f; const w = []; const lenv = { ...env, UNSUBSCRIBE_SECRET: 'live-test-secret' };
+  const rs = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), lenv, { waitUntil: (p) => w.push(p) });
+  await Promise.all(w); const body = await rs.json();
+  check(rs.status === 200 && typeof body.live_token === 'string' && !('scan_number' in body), 'submit returns a live_token (and it is not the scan number)');
+  check(L.db.signals.filter((x) => x.signal_type.startsWith('email-')).length === 3, 'the three fast email checks were written right after the submit');
+  const lr = await worker.fetch(new Request('https://x/api/scan/live?t=' + encodeURIComponent(body.live_token), { headers: { Origin: 'https://myprivacytool.io' } }), lenv, { waitUntil: () => {} });
+  const lb = await lr.json();
+  check(lr.status === 200 && lb.items.length === 3 && lb.items.every((i) => !('details' in i) && !('value' in i)), 'GET /api/scan/live with the token returns three redacted items');
+  const nr = await worker.fetch(new Request('https://x/api/scan/live?t=nope', { headers: { Origin: 'https://myprivacytool.io' } }), lenv, { waitUntil: () => {} });
+  check(nr.status === 401, 'GET /api/scan/live with a bad token => 401');
+  const dup = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), lenv, { waitUntil: (p) => w.push(p) });
+  check(!('live_token' in await dup.json()), 'a repeat request within 24h gets no live view');
+  const off = fake(); globalThis.fetch = off.f; const r0 = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email: EMAIL, consent: true }) }), env, { waitUntil: () => {} });
+  check(!('live_token' in await r0.json()), 'without UNSUBSCRIBE_SECRET there is no live view (feature off)');
+}
 // MPC-7350: hardening
 { const mk=(o,body,h={})=>new Request('https://x/api/scan',{method:'POST',headers:{'content-type':'application/json',...(o?{Origin:o}:{}),...h},body});
   const w=()=>({waitUntil:()=>{}});

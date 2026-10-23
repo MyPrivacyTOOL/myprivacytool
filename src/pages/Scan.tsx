@@ -11,6 +11,7 @@ import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
 import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
+import LiveScanPanel from "@/components/LiveScanPanel";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
@@ -46,6 +47,8 @@ const Scan = () => {
   const tsWidgets = useRef(0);
   // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
   const [waitingForToken, setWaitingForToken] = useState(false);
+  // MPC-8452: key for the live results shown under the thank-you (memory only: a refresh starts again)
+  const [liveToken, setLiveToken] = useState("");
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -79,8 +82,9 @@ const Scan = () => {
         });
         hubspotSent.current = true; // the lead is kept whatever happens to the report request
       }
+      let sent: { liveToken?: string } = {};
       try {
-        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
+        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
       } catch (reportErr) {
         const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
@@ -91,6 +95,7 @@ const Scan = () => {
         setTsReset((n) => n + 1);
         return;
       }
+      if (sent.liveToken) setLiveToken(sent.liveToken);
       trackReportRequested("scan_page", offerSave && saveConsent);
       trackStartSignup({ source: "scan_page" });
       setSubmitted(true);
@@ -155,6 +160,7 @@ const Scan = () => {
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
       <ScanNumberNotice />
+      {liveToken && <LiveScanPanel token={liveToken} />}
     </div>
   );
 

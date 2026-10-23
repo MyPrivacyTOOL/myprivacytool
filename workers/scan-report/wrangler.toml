@@ -72,3 +72,10 @@ name = "RATE_LIMITER"
 type = "ratelimit"
 namespace_id = "7351"
 simple = { limit = 5, period = 60 }
+
+# MPC-8452: per-IP limit on the live view (GET /api/scan/live, polled every few seconds): 40 requests / 60s. Fails open if the binding is missing.
+[[unsafe.bindings]]
+name = "LIVE_LIMITER"
+type = "ratelimit"
+namespace_id = "7352"
+simple = { limit = 40, period = 60 }
