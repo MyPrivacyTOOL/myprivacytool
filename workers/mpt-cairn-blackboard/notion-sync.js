@@ -195,7 +195,12 @@ export async function syncSession(env, sb, sessionId, now = new Date()) {
 }
 
 // Archives the Notion rows (session, facts, intents) of every session that no longer exists in Supabase.
-export async function reconcile(env, sb) {
+// A big session is archived in chunks over several calls: its facts and intents go first, and the session row only once nothing is left under
+// it, so the session row doubles as the "still to do" marker and an interrupted run simply continues next time. The defaults suit the Worker
+// (a small budget, because a Worker invocation allows 50 subrequests); the scheduled job passes bigger numbers.
+const RECONCILE_WRITES = 12;
+const RECONCILE_SESSIONS = 3;
+export async function reconcile(env, sb, { maxWrites = RECONCILE_WRITES, maxSessions = RECONCILE_SESSIONS } = {}) {
   const pages = await queryAll(env, env.NOTION_CAIRN_SESSIONS_DB, { property: 'Session ID', title: { is_not_empty: true } }, 3);
   // Only rows whose title is a real session id are ever archived: a note someone typed into the database is left alone.
   const bySession = new Map(pages.map((p) => [titleOf(p, 'Session ID'), p.id]).filter(([id]) => /^mpt-cairn-[0-9]{10,}$/.test(id)));
@@ -205,15 +210,22 @@ export async function reconcile(env, sb) {
   const live = await (await sb(env, `cairn_sessions?select=session_id&session_id=in.(${ids.join(',')})`)).json();
   const liveIds = new Set(live.map((r) => r.session_id));
   let writes = 0;
+  let sessions = 0;
   for (const [sessionId, pageId] of bySession) {
     if (liveIds.has(sessionId)) continue;
-    if (writes >= MAX_WRITES - 5) { out.remaining++; continue; }
+    if (writes >= maxWrites || sessions >= maxSessions) { out.remaining++; continue; }
+    sessions++;
     const children = [
       ...(await queryAll(env, env.NOTION_CAIRN_FACTS_DB, { property: 'Session', relation: { contains: pageId } })),
       ...(await queryAll(env, env.NOTION_CAIRN_INTENTS_DB, { property: 'Session', relation: { contains: pageId } })),
     ];
-    if (writes + children.length + 1 > MAX_WRITES) { out.remaining++; continue; } // finish this one next call, never leave a session half archived
-    for (const c of children) { await notion(env, `pages/${c.id}`, 'PATCH', { archived: true }); writes++; out.rows_archived++; }
+    let archivedHere = 0;
+    for (const c of children) {
+      if (writes >= maxWrites) break;
+      await notion(env, `pages/${c.id}`, 'PATCH', { archived: true });
+      writes++; archivedHere++; out.rows_archived++;
+    }
+    if (archivedHere < children.length || writes >= maxWrites) { out.remaining++; continue; } // not finished: the session row stays until next time
     await notion(env, `pages/${pageId}`, 'PATCH', { archived: true });
     writes++; out.sessions_archived++;
   }
