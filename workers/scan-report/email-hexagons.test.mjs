@@ -110,8 +110,9 @@ check(rows.length === 5 && rows.every((x) => x.category === 'email' && ['found',
   check((await checkDomainRecord('a@own-domain.example', spy(404))).status === 'not_checked', 'rdap: no record (unsupported registry) => not_checked, never clear');
   check((await checkDomainRecord('a@own-domain.example', spy(429))).status === 'not_checked' && (await checkDomainRecord('a@own-domain.example', spy(500))).status === 'not_checked', 'rdap: rate limited or erroring => not_checked');
   check((await checkDomainRecord('a@own-domain.example', async () => { throw new Error('down'); })).status === 'not_checked' && (await checkDomainRecord('bad')).status === 'not_checked', 'rdap: network error or invalid address => not_checked');
-  const hung = await checkDomainRecord('a@own-domain.example', () => new Promise(() => {}), { timeoutMs: 40 }).catch(() => null);
-  check(hung === null || hung.status === 'not_checked', 'rdap: a hung lookup is cut off by the timeout');
+  // a hung lookup: like a real fetch, the stub rejects when the check's AbortSignal fires
+  const hung = await checkDomainRecord('a@own-domain.example', (u, o) => new Promise((_, reject) => o.signal.addEventListener('abort', () => reject(new Error('aborted')))), { timeoutMs: 40 });
+  check(hung.status === 'not_checked' && /timed out/.test(hung.reason), 'rdap: a hung lookup is cut off by the timeout');
 }
 
 // ---- report job: hexagons stored, report not blocked by failures
