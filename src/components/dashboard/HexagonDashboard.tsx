@@ -13,7 +13,6 @@ import { effectiveTile } from '@/utils/hexagonStyles';
 import type { TileKind } from '@/lib/hexagonTile';
 import { buildReportHtml } from '@/lib/honeycombReport';
 import { RemediationPanel } from '@/components/modals/RemediationPanel';
-import { footprintsCueEnabled } from '@/config/footprints';
 
 const TOTAL = 54;
 
@@ -31,10 +30,6 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
   const [activeId, setActiveId] = useState<string | null>(null);
   const [phase, setPhase] = useState<'confirm' | 'remediate' | null>(null);
   const [fixedIds, setFixedIds] = useState<ReadonlySet<string>>(new Set());
-  // The footprints path: the hexagons you have answered, in order. Held in this page only; it is gone when the page is.
-  const [pathSteps, setPathSteps] = useState<string[]>([]);
-  const pathOn = footprintsCueEnabled();
-  const stepOn = (id: string) => setPathSteps((prev) => (prev.includes(id) ? prev : [...prev, id]));
 
   const started = useRef(false);
   const completed = useRef(false);
@@ -77,7 +72,6 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
     if (!active) return;
     markStarted();
     reportAnswer(active.id, isMatch ? 'yes_me' : 'not_me');
-    stepOn(active.id);
     handleConfirm(active.id, isMatch);
     // No: fade out (the false_positive is logged by the state hook). Yes: move to the action plan.
     setPhase(isMatch && (active.exposure || active.remediation) ? 'remediate' : null);
@@ -120,13 +114,11 @@ export const HexagonDashboard = ({ initialData, title = 'Your Digital Footprint'
         onDispute={(id) => {
           markStarted();
           reportAnswer(id, 'disputed');
-          stepOn(id);
           handleDispute(id);
         }}
         onKeep={(id) => reportAnswer(id, 'kept')}
         onSelect={onSelect}
         fixedIds={fixedIds}
-        path={pathOn ? { steps: pathSteps, nextId: scanResult.hexagons.find((h) => h.status === 'guess' && !pathSteps.includes(h.id))?.id ?? null } : undefined}
       />
       {active && (
         <>

@@ -12,10 +12,10 @@ function Foot({ x, y, rotate }: { x: number; y: number; rotate: number }) {
   );
 }
 
-export default function FootprintsIcon({ className = "", feetOnly = false }: { className?: string; feetOnly?: boolean }) {
+export default function FootprintsIcon({ className = "" }: { className?: string }) {
   return (
-    <svg viewBox={feetOnly ? "13 16 20 16" : "0 0 32 32"} className={className} aria-hidden="true" focusable="false">
-      {!feetOnly && <polygon points="9,4 23,4 30,14 23,24 9,24 2,14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />}
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true" focusable="false">
+      <polygon points="9,4 23,4 30,14 23,24 9,24 2,14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <Foot x={19} y={25} rotate={-8} />
       <Foot x={26} y={23} rotate={8} />
     </svg>
