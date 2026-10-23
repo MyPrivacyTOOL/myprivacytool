@@ -14,6 +14,9 @@ class Settings:
     lookback_days: int = 7
     allowed_regions: tuple = ("eu",)      # Risk #119: regions data may be sent to
     min_coverage: int = 5                 # detectors that must have had data before an audit can be APPROVED
+    service_mode: str = "audit"           # "audit" (default) or "ingest": the ingest service only accepts log rows
+    ingest_token: str = ""                # bearer token for POST /ingest/{agent}; separate from api_token
+    ingest_agents: tuple = ()             # agent ids allowed to be ingested; empty means none
 
     @property
     def slack_enabled(self) -> bool:
@@ -27,9 +30,15 @@ class Settings:
         env = g("SHADOW_AUDIT_ENV", "staging")
         if env not in ("staging", "production"):
             raise ValueError("SHADOW_AUDIT_ENV must be staging or production")
-        return cls(env, g("API_TOKEN", ""), g("NOTION_TOKEN", ""), g("NOTION_DB_ID", ""),
-                   g("SLACK_WEBHOOK_URL", ""), g("SIGNING_KEY_HEX", ""),
-                   g("VERIFICATION_METHOD", f"urn:shadow-audit:key:{env}#1"),
-                   int(g("LOOKBACK_DAYS", "7")),
-                   tuple(r.strip().lower() for r in g("ALLOWED_REGIONS", "eu").split(",") if r.strip()),
-                   int(g("MIN_COVERAGE", "5")))
+        mode = g("SERVICE_MODE", "audit")
+        if mode not in ("audit", "ingest"):
+            raise ValueError("SERVICE_MODE must be audit or ingest")
+        return cls(environment=env, api_token=g("API_TOKEN", ""), notion_token=g("NOTION_TOKEN", ""),
+                   notion_db_id=g("NOTION_DB_ID", ""), slack_webhook_url=g("SLACK_WEBHOOK_URL", ""),
+                   signing_key_hex=g("SIGNING_KEY_HEX", ""),
+                   verification_method=g("VERIFICATION_METHOD", f"urn:shadow-audit:key:{env}#1"),
+                   lookback_days=int(g("LOOKBACK_DAYS", "7")),
+                   allowed_regions=tuple(r.strip().lower() for r in g("ALLOWED_REGIONS", "eu").split(",") if r.strip()),
+                   min_coverage=int(g("MIN_COVERAGE", "5")),
+                   service_mode=mode, ingest_token=g("INGEST_TOKEN", ""),
+                   ingest_agents=tuple(a.strip() for a in g("INGEST_AGENTS", "").split(",") if a.strip()))
