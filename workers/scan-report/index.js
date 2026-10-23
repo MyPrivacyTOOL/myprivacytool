@@ -8,6 +8,7 @@ import { buildConfirmationEmail, buildReportEmail, buildUnsubscribedEmail, build
 import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression, emailHash } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
+import { turnstileBlocks } from './lib/turnstile.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
@@ -67,6 +68,8 @@ export default {
       const email = clip(b.email, 255).trim().toLowerCase();
       if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
+      // MPC-8430: bot check before anything is stored or sent (no-op until TURNSTILE_SECRET_KEY is set; blocks only when TURNSTILE_ENFORCE = "true").
+      if (await turnstileBlocks(env, request, b['cf-turnstile-response'], origin)) return json({ error: 'Verification failed' }, 403);
       // MPC-7470 (D12): saving the scan needs its own consent (save_consent === true), given at this contact step. Checked before anything is stored or sent.
       // Switch off: the save fields are ignored, the email request is handled as before.
       const save = webScanEnabled(env) ? parseSaveRequest(b) : { none: true };

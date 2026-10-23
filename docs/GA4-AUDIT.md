@@ -5,7 +5,7 @@ Audit of the repo at `main` (`639bf7f`, 2026-10-11). Code review only: no tracki
 ## Summary
 
 - GA4 **is** installed: property `515216281`, measurement ID **`G-1BWMDBJSPL`**, loaded with **gtag.js directly**. There is no Google Tag Manager in the repo.
-- The tag is consent-gated through consentmanager.net and is not loaded until the visitor opts in.
+- The tag is consent-gated through our own cookie banner (src/components/CookieBanner.tsx, choice in localStorage `mpt_cookie_consent`, MPC-8450; it replaced consentmanager.net) and is not loaded until the visitor chooses "Accept analytics".
 - About 70 custom events are implemented behind one helper, `trackEvent()`. There is **no ecommerce tracking** and no `purchase`/`begin_checkout`-style events.
 - Main gaps: no SPA `page_view` on route change (relies on a GA4 setting we cannot see from the repo), no `/pricing` tracking, no generic CTA click tracking, no scan-start event, and no dev/staging separation.
 

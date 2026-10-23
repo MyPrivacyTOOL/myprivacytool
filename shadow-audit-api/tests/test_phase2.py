@@ -26,7 +26,7 @@ class Boom:
 
 
 def svc(source, notion=None, slack=None, env="staging"):
-    return AuditService(Settings(environment=env), source, signing.PassportSigner(PRIV, "urn:t#1"), notion, slack)
+    return AuditService(Settings(environment=env, min_coverage=0), source, signing.PassportSigner(PRIV, "urn:t#1"), notion, slack)
 
 
 class DetectorTests(unittest.TestCase):
@@ -81,7 +81,8 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(notion["parent"]["database_id"], "db1")
         self.assertEqual(notion["properties"]["Environment"]["select"]["name"], "staging")
         self.assertEqual(r["passportUrl"], "https://notion/x")
-        self.assertTrue(any(c[0] == "https://hook" for c in calls))
+        self.assertEqual(r["riskLevel"], "APPROVED_FOR_P1_DATA")
+        self.assertFalse(any(c[0] == "https://hook" for c in calls))   # clean audits do not alert (see test_slack_alerts)
 
 
 def call(app, method, path, body=None, token="tok"):
@@ -197,3 +198,44 @@ class TransportTests(unittest.TestCase):
     def test_json_and_empty_still_work(self):
         self.assertEqual(self._call(b'{"url": "u"}'), {"url": "u"})
         self.assertEqual(self._call(b""), {})
+
+
+class CoverageRuleTests(unittest.TestCase):
+    """Approval needs enough detectors to have had data (default minimum 5 of 10)."""
+
+    def _svc(self, entries, minimum=5):
+        return AuditService(Settings(min_coverage=minimum), InMemorySource({"a": entries}),
+                            signing.PassportSigner(PRIV, "urn:t#1"))
+
+    THIN = [{"ts": "2026-10-20T00:00:00Z", "text": "tool x completed: ok"}]
+    RICH = [
+        {"ts": "2026-10-20T00:00:01Z", "text": "select 1", "tool": "db", "session": "s1",
+         "vault_start": ["k"], "vault_end": ["k"], "nonce": "n1", "sender": "a", "dest_region": "eu"},
+        {"ts": "2026-10-20T00:00:02Z", "text": "pip install x==1", "tool": "bash"},
+    ]
+
+    def test_thin_data_is_not_approved_and_has_no_passport_or_score(self):
+        r = self._svc(self.THIN).run("a")
+        self.assertEqual(r["riskLevel"], "INSUFFICIENT_DATA")
+        self.assertEqual((r["status"], r["passportIssued"], r["overallScore"]), ("completed", False, None))
+        self.assertLess(r["coverage"]["checked"], 5)
+        self.assertEqual(r["coverage"]["of"], 10)
+
+    def test_rich_data_is_approved_and_passport_records_coverage(self):
+        r = self._svc(self.RICH).run("a")
+        self.assertEqual(r["riskLevel"], "APPROVED_FOR_P1_DATA")
+        self.assertEqual(r["coverage"]["checked"], 10)
+        self.assertEqual(r["passport"]["credentialSubject"]["coverage"], {"checked": 10, "of": 10})
+        # coverage is signed: stripping or editing it breaks the proof
+        p = r["passport"]
+        p["credentialSubject"]["coverage"] = {"checked": 10, "of": 3}
+        self.assertFalse(signing.verify(p, PUB))
+
+    def test_a_serious_finding_still_quarantines_with_thin_data(self):
+        r = self._svc([{"ts": "2026-10-20T00:00:00Z", "text": f"key={SECRET}"}]).run("a")
+        self.assertEqual(r["riskLevel"], "QUARANTINE")
+        self.assertTrue(r["passportIssued"])
+
+    def test_minimum_is_configurable(self):
+        self.assertEqual(self._svc(self.THIN, minimum=0).run("a")["riskLevel"], "APPROVED_FOR_P1_DATA")
+        self.assertEqual(self._svc(self.RICH, minimum=11).run("a")["riskLevel"], "INSUFFICIENT_DATA")

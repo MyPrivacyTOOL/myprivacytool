@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildTopicPairs, main as syncTopics } from './sync-workstream-3-to-kv.mjs';
 import { buildBrandPairs, main as syncBrand } from './sync-mpt-cache-to-kv.mjs';
+import { normalizeBlocks, parseSchedule, toSections } from './sync-content-cache-to-kv.mjs';
 
 const para = (type, text) => ({ object: 'block', id: `${type}-${text}`, type, has_children: false, [type]: { rich_text: [{ plain_text: text }] } });
 const PAGES = {
@@ -82,4 +83,45 @@ test('brand: seeds brand:guidelines in mpt-content-cache and is idempotent', asy
 test('missing credentials fail fast', async () => {
   mockFetch();
   await assert.rejects(syncTopics({ NOTION_TOKEN: 't' }, ['node', 'x']), /Missing env CLOUDFLARE_API_TOKEN/);
+});
+
+// A page pasted in as plain text keeps its markdown literally: paragraph blocks reading "## ..." (MPC-8371 live run).
+const PASTED = [
+  '# Content Distribution Schedule for MyPrivacyTOOL Sprint',
+  '## PILLAR POST PUBLICATION CALENDAR',
+  '**- Oct 9 (Wed): Publish Pillar Post #1: "The Hidden Cost of Free Privacy Tools"**',
+  '## SOCIAL MEDIA: Twitter/X THREADS (1 per day)',
+  '- Oct 9: Thread: "3 data brokers" (urgency)',
+  '## REDDIT CONTRIBUTIONS (2 per week)',
+  '- Oct 10 (r/privacy): "ELI5: Why are data brokers legal?" — explainer',
+  '---',
+];
+const real = [
+  { type: 'heading_2', text: 'PILLAR POST PUBLICATION CALENDAR' }, { type: 'paragraph', text: PASTED[2] },
+  { type: 'heading_2', text: 'SOCIAL MEDIA: Twitter/X THREADS (1 per day)' }, { type: 'bulleted_list_item', text: PASTED[4] },
+  { type: 'heading_2', text: 'REDDIT CONTRIBUTIONS (2 per week)' }, { type: 'bulleted_list_item', text: PASTED[6] },
+];
+
+test('pasted-markdown page (one block per line) parses like real headings', () => {
+  const blocks = PASTED.map((text) => ({ type: 'paragraph', text }));
+  assert.deepEqual(parseSchedule(blocks, 2026), parseSchedule(real, 2026));
+  assert.deepEqual(Object.keys(parseSchedule(blocks, 2026)), ['2026-10-09', '2026-10-10']);
+});
+
+test('pasted-markdown page (everything in one multi-line block) parses too', () => {
+  const blocks = [{ type: 'paragraph', text: PASTED.join('\n') }];
+  assert.deepEqual(parseSchedule(blocks, 2026), parseSchedule(real, 2026));
+});
+
+test('normalizeBlocks is idempotent and leaves real headings and hex colours alone', () => {
+  const blocks = [{ type: 'heading_1', text: 'Voice' }, { type: 'paragraph', text: 'Matrix Green #27AE60 on #000000' }, { type: 'paragraph', text: '#27AE60 first' }];
+  assert.deepEqual(normalizeBlocks(normalizeBlocks(blocks)), normalizeBlocks(blocks));
+  assert.deepEqual(normalizeBlocks(blocks), blocks);
+  assert.equal(toSections(blocks)[0].heading, 'Voice');
+});
+
+test('brand page pasted as markdown paragraphs gets real sections', () => {
+  const sections = toSections([{ type: 'paragraph', text: '## Voice\nPlain, calm.\n## Colours\nMatrix Green.' }]);
+  assert.deepEqual(sections.map((x) => x.heading), ['Voice', 'Colours']);
+  assert.equal(sections[0].text, 'Plain, calm.');
 });

@@ -1,4 +1,4 @@
-// mpt-content-producer: cron -> reads today's topic from KV mpt-brand-topics (key = HKT date, written by scripts/sync-workstream-3-to-kv.mjs)
+// mpt-content-producer: cron -> reads today's topic from KV mpt-brand-topics (key = topic:<HKT date>, written by scripts/sync-workstream-3-to-kv.mjs)
 // -> Queue. All slow work (LLM calls, Slack) happens in mpt-content-consumer.
 const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
 
@@ -15,10 +15,22 @@ export function buildMessage(now = new Date(), topic = null) {
   return msg;
 }
 
+/**
+ * The sync writes {date, items:{x|pillar|blog|linkedin|reddit:[{text}]}}. The queue message carries one topic, so take the
+ * first X thread, else pillar post, else blog (the same order the consumer uses for platforms with no topic of their own).
+ * A record that already has a `topic` string (hand-written or older shape) is used as is.
+ */
+export function topicRecord(rec) {
+  if (!rec || typeof rec !== 'object') return null;
+  if (typeof rec.topic === 'string' && rec.topic.trim()) return rec;
+  const text = ['x', 'pillar', 'blog'].map((k) => rec.items?.[k]?.[0]?.text).find((t) => typeof t === 'string' && t.trim());
+  return text ? { ...rec, topic: text.trim() } : null;
+}
+
 /** Today's topic record, or null when the sync has not written one (the consumer then falls back to schedule:<date>). */
 async function readTopic(env, date) {
   try {
-    return await env.BRAND_TOPICS.get(date, 'json');
+    return topicRecord(await env.BRAND_TOPICS.get(`topic:${date}`, 'json'));
   } catch (e) {
     console.error('topic read failed', e?.message);
     return null;

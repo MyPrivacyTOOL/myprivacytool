@@ -27,6 +27,19 @@ const rateLimited = async (env, request) => (await rateLimitState(env, request))
 // 'ok', 'failed' (missing, invalid, reused or wrong-hostname token) or 'error' (siteverify unreachable: fails open, like the
 // rate limiter, so a Cloudflare hiccup never drops a real lead). Blocking is opt-in via TURNSTILE_ENFORCE = "true"; until then
 // a 'failed' result is only logged so the Worker can ship before the site that sends tokens.
+// Privacy: the TURNSTILE_FAILED log keeps a coarse network prefix (IPv4 /24, IPv6 /48), never the visitor's full address.
+// It still groups repeat offenders and shows which network a false positive came from. Workers Logs retention is fixed by
+// plan (3 days Free, 7 days Paid) and cannot be set per log line, so the address is cut before it is written.
+function maskIp(ip) {
+  const s = String(ip || '');
+  const v4 = s.match(/(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/); // also IPv4-mapped IPv6 (::ffff:1.2.3.4)
+  if (v4) return v4[1] + '.0/24';
+  if (s.includes(':')) {
+    const g = s.split(':');
+    return g[0] && g[1] && g[2] ? `${g[0]}:${g[1]}:${g[2]}::/48` : 'ipv6';
+  }
+  return '';
+}
 const TURNSTILE_HOSTS = ['myprivacytool.io', 'www.myprivacytool.io', 'wwwmyprivacytool.pages.dev'];
 async function turnstileState(env, request, token, info = {}) {
   if (!env.TURNSTILE_SECRET_KEY) return 'absent';
@@ -192,11 +205,11 @@ export default {
       const ts = await turnstileState(env, request, turnstileToken, tsInfo);
       if (ts === 'failed') {
         // MPC-8368: one structured line per failure (search the Worker logs for TURNSTILE_FAILED) so false positives can be
-        // reviewed during the enforcement trial. Carries the IP, timestamp, reason, country and Origin; never the email or token.
+        // reviewed during the enforcement trial. Carries a truncated IP, timestamp, reason, country and Origin; never the email or token.
         const enforce = String(env.TURNSTILE_ENFORCE).toLowerCase() === 'true';
         console.warn('TURNSTILE_FAILED ' + JSON.stringify({
           ts: new Date().toISOString(),
-          ip: request.headers.get('CF-Connecting-IP') || '',
+          ip: maskIp(request.headers.get('CF-Connecting-IP')),
           country: request.cf?.country || '',
           origin: origin || '',
           reason: tsInfo.reason || 'unknown',
@@ -217,8 +230,8 @@ export default {
       // MPC-7120: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement)
       // BEFORE the Notion write and independent of it: a Notion failure must never block the engagement row.
       // Fail-soft and off the response path; stores no PII (random session id + funnel booleans).
-      const engagement = recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
-      ctx.waitUntil(engagement);
+      // MPC-7616: awaited (not just waitUntil) so the answer can say whether the row really landed. Still fail-soft: it never throws.
+      const engagementRecorded = await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
@@ -411,7 +424,9 @@ export default {
 
       ctx.waitUntil(Promise.all(side));
 
-      return new Response(JSON.stringify({ success: true, ...(baseline ? { baseline } : {}) }), {
+      // MPC-7616: `engagement_recorded` is false when the Supabase write was skipped or failed (the error is in the Worker log with the target host),
+      // so a lead that reached Notion but not the database is visible to a caller instead of looking like a full success.
+      return new Response(JSON.stringify({ success: true, engagement_recorded: engagementRecorded, ...(baseline ? { baseline } : {}) }), {
         status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
       });
 
@@ -516,6 +531,8 @@ async function sweepPending(env) {
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
 const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+// MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
+const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
 async function recordEngagement(env, sessionId, flags) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('Supabase not configured - skipping engagement write');
@@ -533,12 +550,12 @@ async function recordEngagement(env, sessionId, flags) {
       body: JSON.stringify({ session_id: sessionId, ...flags }),
     });
     if (!res.ok) {
-      console.error('Supabase mpt_user_engagement insert failed:', res.status, (await res.text()).slice(0, 200));
+      console.error('Supabase mpt_user_engagement insert failed:', res.status, supabaseHost(env), (await res.text()).slice(0, 200));
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Supabase mpt_user_engagement insert error:', String(err));
+    console.error('Supabase mpt_user_engagement insert error:', supabaseHost(env), String(err));
     return false;
   }
 }

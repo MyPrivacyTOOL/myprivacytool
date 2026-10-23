@@ -84,3 +84,21 @@ Name in address, mail provider and domain, public profile (Gravatar) run per sca
 
 ## Status per hexagon, decided at scan time (MPC-7487)
 The site sets each hexagon's `status` (`found` | `clear` | `not_checked`, plus `estimate: true` for registry estimates) when it captures the value, with `captureStatus` in `shared/hexagon-registry/status.js`, and saves it with the scan (`web_scans.results`, no schema change). The report uses it: a real value shows FOUND; placeholders and failures (`Location detected`, `Unknown ISP`, an assumed `WiFi`, `Checking...`, `N/A`, `No input yet`, blocked) are NOT CHECKED; the 7 hexagons the registry marks `cannot_be_checked` are always NOT CHECKED; CHECKED AND CLEAR only where the registry allows it. The Worker re-checks the saved status against the registry (the browser is untrusted), and a scan saved before this change (no `status`) falls back to the strict behaviour above (the 29 `cannot tell` hexagons NOT CHECKED).
+
+## Monitoring (MPC-8406)
+
+A report is normally sent about 4 minutes after the request (confirmation within seconds, report on the next 5-minute tick). Three checks watch for a regression:
+- **Fast alert (10 to 25 minutes):** pg_cron job `mpt-scan-report-alert` runs `public.mpt_scan_report_alert()` every 10 minutes and posts to Telegram (Vault secrets `telegram_alert_token`, `telegram_alert_chat_id`) when a scan is still pending or processing after 15 minutes, a scan failed in the last 24 hours (unsubscribe cancellations do not count), or a scan has no confirmation after 5 minutes. One alert, repeated at most hourly, plus one recovery message; counts only, no email addresses. Source and rollback: `supabase/sql/mpt-scan-report-alert.sql`.
+- **Daily gap check:** `workers/mpt-metrics-collector/collectors/scan-gap.js` compares `/scan` form submissions with accepted report requests (the MPC-7535 symptom) and alerts on Slack.
+- **48 hour deadline:** `ALERT: N report(s) past their 48h deadline` in the Worker log.
+
+Known root cause of the original MPC-7535 / MPC-7616 failure: an empty `VITE_SCAN_API_URL` Pages variable overrode the default Worker URL, so the page thanked the visitor and sent nothing. `src/lib/webScan.ts` now treats a blank value as "use the default", and `/scan` shows an honest error when the request fails.
+
+## Turnstile on POST /api/scan (MPC-8430)
+
+The Scan page shows a Cloudflare Turnstile widget (`interaction-only`, cookieless; it shows nothing unless Cloudflare needs the visitor) and sends the token as `cf-turnstile-response`. The Worker verifies it against `TURNSTILE_SECRET_KEY` after the Origin, rate-limit and consent checks and before anything is stored or sent (`lib/turnstile.js`).
+
+- No `TURNSTILE_SECRET_KEY` = feature off. Siteverify unreachable = fails open (a Cloudflare hiccup never drops a real request).
+- `TURNSTILE_ENFORCE = "false"` (wrangler.toml) = report-only: every failed check logs one `TURNSTILE_FAILED` line (truncated IP, country, origin, reason, action) and the request goes through. `"true"` = answer 403 `Verification failed`, nothing stored or sent. Rollback: set back to `"false"` and merge.
+- Separate widget from the mpt-leads one (`mpt-scan-report (MPC-8430)`; site key is public in `src/lib/turnstile.ts`, override `VITE_SCAN_API_URL`-style with `VITE_SCAN_TURNSTILE_SITE_KEY`). Hostnames: myprivacytool.io, www, wwwmyprivacytool.pages.dev.
+- Enforcing since 2026-10-23 (report-only ran about 5 hours with no real traffic; enforced on the owner's instruction). Watch the stuck-scan alert (above) and the `TURNSTILE_FAILED` lines. A visitor whose browser blocks the Turnstile script sends no token and gets the generic "could not request your report" message; rollback is `TURNSTILE_ENFORCE = "false"`.

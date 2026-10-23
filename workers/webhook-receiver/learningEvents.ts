@@ -6,14 +6,17 @@
  * (The site has its own switch, VITE_LEARNING_EVENTS; both must be on before anything is collected.)
  * Browser-origin only (CORS), a tiny body, strict validation, and the row holds NO finding value, account, phone or email:
  * person_key is a random id the browser makes. Writing is best effort: the visitor always gets 202 and a storage failure is logged, never shown.
- * NOT done here, and required before this is switched on in production: a rate limit (nothing in this Worker rate-limits browser routes today),
- * the Privacy Policy wording, and applying the migration (supabase/migrations/20261019180000_hexagon_learning_events.sql).
+ * Rate limited per client address with the Cloudflare RATE_LIMITER binding (30 a minute; see wrangler.toml). Like the other Workers it fails open
+ * if the binding is absent or errors, so tests/local runs work; the wrangler.toml syntax is pinned by workers/ratelimit-config.vitest.mjs.
+ * NOT done here, and required before this is switched on in production: the Privacy Policy wording, and applying the migration
+ * (supabase/migrations/20261019180000_hexagon_learning_events.sql).
  */
 import { insertMptRow } from './supabase-client.js';
 import { corsFor } from './security.js';
 import { isKnownHexagonId } from '../../shared/hexagon-registry/registry.js';
 
-type Env = Record<string, string | undefined>;
+type RateLimiter = { limit(opts: { key: string }): Promise<{ success: boolean }> };
+type Env = Record<string, string | undefined> & { RATE_LIMITER?: RateLimiter };
 
 const MAX_BODY_BYTES = 2048;
 const PERSON_KEY_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -58,6 +61,11 @@ export function validateLearningEvent(input: unknown): LearningRow | null {
   return { event_type: b.event_type as LearningRow['event_type'], person_key: b.person_key, scan_window: b.scan_window, hexagon_id: b.hexagon_id, source, tile_kind: tile, confidence_at_display: conf, config_version: version, answer: answer as string | null };
 }
 
+async function limited(env: Env, request: Request): Promise<boolean> {
+  if (!env.RATE_LIMITER) return false;
+  try { return !(await env.RATE_LIMITER.limit({ key: 'learning:' + (request.headers.get('CF-Connecting-IP') || 'unknown') })).success; } catch { return false; }
+}
+
 export async function handleLearningEvent(request: Request, env: Env): Promise<Response> {
   if (env.LEARNING_EVENTS_ENABLED !== 'true') return new Response('Not Found', { status: 404 });
   const cors = corsFor(request);
@@ -66,6 +74,7 @@ export async function handleLearningEvent(request: Request, env: Env): Promise<R
   if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
   // Browser-origin only: a request with no Origin (a script) is refused, unlike the generic gate which lets it through.
   if (!cors.allowed || !request.headers.get('Origin')) return new Response(JSON.stringify({ error: 'Forbidden origin' }), { status: 403, headers });
+  if (await limited(env, request)) return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: { ...headers, 'Retry-After': '60' } });
   const text = await request.text();
   if (text.length > MAX_BODY_BYTES) return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers });
   let body: unknown = null;

@@ -21,6 +21,7 @@ PASSPORT_CONTEXT = {
     "overallScore": "urn:shadow-audit:overallScore",
     "riskLevel": "urn:shadow-audit:riskLevel",
     "environment": "urn:shadow-audit:environment",
+    "coverage": "urn:shadow-audit:coverage",
 }
 
 
@@ -75,14 +76,17 @@ def verify(doc: Dict[str, Any], public_key_bytes: bytes) -> bool:
 
 
 def build_passport(agent_id: str, overall_score: int, risk_level: str, issued: str,
-                   expires: str, environment: str) -> Dict[str, Any]:
+                   expires: str, environment: str, coverage: Any = None) -> Dict[str, Any]:
     """environment='staging' passports are tests and must not be trusted by production."""
+    subject = {"id": agent_id, "overallScore": overall_score,
+               "riskLevel": risk_level, "environment": environment}
+    if coverage is not None:
+        subject["coverage"] = coverage       # {"checked": n, "of": m}: signed, so it cannot be stripped
     return {
         "@context": ["https://www.w3.org/2018/credentials/v1", PASSPORT_CONTEXT],
         "type": ["VerifiableCredential", "AgentAuditPassport"],
         "issuer": "urn:shadow-audit-gatekeeper",
         "issuanceDate": issued,
         "expirationDate": expires,
-        "credentialSubject": {"id": agent_id, "overallScore": overall_score,
-                              "riskLevel": risk_level, "environment": environment},
+        "credentialSubject": subject,
     }

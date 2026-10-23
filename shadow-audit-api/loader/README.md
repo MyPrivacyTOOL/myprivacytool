@@ -38,5 +38,8 @@ copying the file there):
 ```bash
 bq load --source_format=NEWLINE_DELIMITED_JSON mpt-digital-shadow---deepseek:agent_logs.logs rows.ndjson
 ```
-Re-loading the same window creates duplicates; use `--since`. The audit log is hash-chained
+Re-loading the same window with `bq load` creates duplicates; use `--since`. The audit log is hash-chained
 (`previous_hash`/`entry_hash`); this loader does **not** verify the chain.
+
+## Sending rows without copying files (`--push`)
+`--push https://<ingest-service>` posts the masked rows in batches to the ingest endpoint (see `../INGEST.md`). The token comes from `--token-file` (or the `SHADOW_INGEST_TOKEN` environment variable), never from the command line. `--state-file` remembers where the last successful push ended (minus 5 seconds of overlap; the endpoint drops duplicates), so scheduled runs send only what is new. A failed push exits non-zero and does not move the state forward. `http://` URLs are refused.

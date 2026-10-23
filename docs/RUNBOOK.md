@@ -25,11 +25,11 @@ Supabase `xmdmkumwxpgahmlweuug`: RLS forced, service_role writes only; pg_cron p
 | Component | Source | Deploys via | URL / id |
 |---|---|---|---|
 | Site | repo root (Vite) | Cloudflare Pages auto-build on push to `main`; `postbuild` writes per-route HTML and `sitemap.xml` | `https://www.myprivacytool.io` |
-| `mpt-leads` | `workers/mpt-leads` | `deploy-mpt-leads.yml` on merge | `https://mpt-leads.myprivacytool.workers.dev` |
+| `mpt-leads` | `workers/mpt-leads` | `deploy-mpt-leads.yml` on merge | `https://api.myprivacytool.io` (custom domain; `https://mpt-leads.myprivacytool.workers.dev` still answers and is used by the deploy smoke test) |
 | `mpt-scan-report` | `workers/scan-report` | `deploy-scan-report.yml` on merge; cron `*/5 * * * *` | `https://mpt-scan-report.myprivacytool.workers.dev` |
 | `myprivacytool-github-channel` | `workers/github-channel` | `deploy-github-channel.yml`: tests on PR/push, deploy on `workflow_dispatch` | `https://channels.myprivacytool.io` (custom domain; `*.workers.dev` retired) |
 | `myprivacytool-oauth-poc` | `workers/oauth-poc` | `deploy-oauth-poc.yml` on merge | `https://myprivacytool-oauth-poc.myprivacytool.workers.dev` |
-| `telegram-webhook`, `webhook-receiver` | `workers/*` | not deployed (the second never was) | — |
+| `webhook-receiver` | `workers/*` | deployed by `deploy-webhook-receiver.yml`; Telegram moved to `social-listeners` (MPC-8375 removed `telegram-webhook`) | — |
 | Database | `supabase/migrations`, `supabase/sql` | applied by a human or connector; **a merge does not apply them** | project `xmdmkumwxpgahmlweuug` |
 
 Live check on 2026-10-06 (Cloudflare connector, read-only): the MPT account lists exactly four Workers — `mpt-leads`, `mpt-scan-report`, `myprivacytool-oauth-poc`, `myprivacytool-github-channel`. Re-run `workers_list` to confirm before relying on this.
@@ -44,7 +44,12 @@ Secret names per Worker are in `workers/<name>/EXPECTED_SECRETS.txt`. Non-secret
 | Cloudflare | Dashboard login for the MPT account (not the personal cransford account). Claude's Cloudflare connector is read-only. |
 | Supabase | Dashboard, or the Supabase connector (`execute_sql`, `apply_migration`, `query_logs`, advisors). |
 | Repo Actions secrets | `CLOUDFLARE_API_TOKEN` (MPT account only, Workers Scripts: Edit), `CLOUDFLARE_ACCOUNT_ID`. scan-report optionally syncs `SCAN_REPORT_RESEND_API_KEY`, `SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`, `SCAN_REPORT_HUBSPOT_TOKEN`, `SCAN_REPORT_HIBP_API_KEY`. |
-| Network note | Claude sandboxes block `api.cloudflare.com`, `*.workers.dev` and `myprivacytool.io`. Ask a human to run the `curl`, then verify the result in Supabase. |
+| Network note | Claude sandboxes block `api.cloudflare.com`, `*.workers.dev`, `myprivacytool.io` and `api.myprivacytool.io`. Ask a human to run the `curl`, then verify the result in Supabase. |
+| Brand assets | Public Supabase Storage bucket `mpt-brand-assets` (R2 could not be enabled via API). See `docs/brand-assets-storage.md`. |
+| Risk registry cache | Workers KV `MPT_AGENT_RISK_REGISTRY`, filled from the Notion Hexagon Risk Registry by `scripts/sync-risk-registry-to-kv.mjs`. See `docs/risk-registry-kv-sync.md`. |
+| Scan report alert | `pg_cron` job `mpt-scan-report-alert` (every 10 minutes) -> Telegram, same Vault channel as the purge alert. Alerts when a `/scan` request is still pending after 15 minutes, a report failed in the last 24 hours, or no confirmation went out after 5 minutes. Counts only, never an email. Source `supabase/sql/mpt-scan-report-alert.sql`; test with `select public.mpt_scan_report_alert(true);`. Rollback: `select cron.unschedule('mpt-scan-report-alert');`. |
+| Turnstile | Enforcing on the scan email form (`TURNSTILE_ENFORCE`, `workers/mpt-leads/README.md`). Rollback: set it to `"false"` and merge. |
+| Turnstile on `/scan` (MPC-8430) | Widget for `mpt-scan-report` (`POST /api/scan`), secret `TURNSTILE_SECRET_KEY` on that Worker. `TURNSTILE_ENFORCE` in `workers/scan-report/wrangler.toml`: `"true"` = 403 on a failed check (enforcing since 2026-10-23), `"false"` = log only (search Workers Logs for `TURNSTILE_FAILED`). Rollback: set `"false"` and merge. The stuck-scan alert will message Telegram if enforcement breaks real submissions. |
 
 ## 3. Deployment procedures
 
@@ -153,7 +158,7 @@ Daily 2-minute check: Actions (red runs), Worker Observability (exceptions), `mp
 | Workflow stops at "repo secrets are not set" | Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in Settings → Secrets and variables → Actions. |
 | Cloudflare 403 on the snapshot step | Token scope or account mismatch: token must be MPT-account, Workers Scripts: Edit. |
 | Push 403 / repo not found in a Claude session | Session attached to the other GitHub owner; attach `MyPrivacyTOOL`. |
-| `CONNECT tunnel failed, 403` to workers.dev | Sandbox allowlist; ask a human to curl. |
+| `CONNECT tunnel failed, 403` to workers.dev or api.myprivacytool.io | Sandbox allowlist; ask a human to curl. |
 | Deploy workflow did not run | Path filters: only changes under `workers/<name>/**`, the workflow file, and (scan-report) `src/data/optOutGuides.json` trigger it; use `workflow_dispatch`. |
 
 ## 7. Incident checklist

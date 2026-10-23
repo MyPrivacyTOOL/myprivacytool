@@ -2,7 +2,7 @@
   "_meta": {
     "task": "MPT-1003",
     "spec": "FLEET-TASK-V4.2",
-    "source": "workers/telegram-webhook/index.js",
+    "source": "workers/social-listeners (was workers/telegram-webhook, removed MPC-8375)",
     "default_locale": "en",
     "locales": [
       "en",

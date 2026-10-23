@@ -56,6 +56,11 @@ REFERRALS_ENABLED = "true"
 REFERRAL_AB_REPORT_BLOCK = "false"
 REFERRAL_AB_INVITE_SUBJECT = "false"
 
+# MPC-8430: Cloudflare Turnstile on POST /api/scan. Needs the Worker secret TURNSTILE_SECRET_KEY (the widget created for this Worker; no secret = off).
+# TURNSTILE_ENFORCE "false" = report-only: a missing/invalid token is logged (TURNSTILE_FAILED, truncated IP) but the request goes through.
+# "true" = a failed check answers 403 and nothing is stored or sent. Rollback: set back to "false" and redeploy.
+TURNSTILE_ENFORCE = "true"
+
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
 enabled = true
