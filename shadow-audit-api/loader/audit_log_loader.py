@@ -13,10 +13,14 @@ What the source gives us, and does not (found by read-only discovery, 2026-10-20
 import argparse
 import glob
 import json
+import os
 import re
 import sys
+import urllib.error
+import urllib.request
 from collections import Counter
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 MAX_TEXT = 500
 
@@ -133,31 +137,112 @@ def build_rows(paths: Iterable[str], agent: str, since: Optional[str] = None) ->
     return rows, dict(stats)
 
 
+# --- push to the ingest endpoint -----------------------------------------------------------------
+BATCH_SIZE = 500
+
+
+def _http_post(url: str, token: str, payload: Dict, timeout: int = 60) -> Dict:
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "X-Api-Token": token})
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - https enforced by push_rows
+        return json.loads(r.read() or b"{}")
+
+
+def push_rows(base_url: str, agent: str, rows: List[Dict], token: str, batch_size: int = BATCH_SIZE,
+              post: Optional[Callable[[str, str, Dict], Dict]] = None) -> Dict:
+    """Send rows to POST {base_url}/ingest/{agent} in batches. Stops at the first failure and raises, so the
+    caller never records progress for rows that were not accepted. https only: the token must not travel in clear."""
+    post = post or _http_post
+    if not base_url.startswith("https://"):
+        raise ValueError("--push needs an https:// URL (the token must not be sent in clear)")
+    if not token:
+        raise ValueError("no ingest token: use --token-file or the SHADOW_INGEST_TOKEN environment variable")
+    url = base_url.rstrip("/") + "/ingest/" + agent
+    total = Counter()
+    for i in range(0, len(rows), batch_size):
+        res = post(url, token, {"rows": rows[i:i + batch_size]})
+        for k in ("received", "inserted", "duplicates"):
+            total[k] += int(res.get(k, 0))
+    return dict(total)
+
+
+def read_token(token_file: Optional[str]) -> str:
+    if token_file:
+        with open(token_file) as f:
+            return f.read().strip()
+    return os.environ.get("SHADOW_INGEST_TOKEN", "").strip()
+
+
+def read_state(path: Optional[str]) -> Optional[str]:
+    if path and os.path.exists(path):
+        with open(path) as f:
+            return json.load(f).get("since")
+    return None
+
+
+OVERLAP_SECONDS = 5
+
+
+def overlap_start(ts: str) -> str:
+    """Timestamp OVERLAP_SECONDS before ts, same ISO format. The next run re-sends a few seconds of rows
+    (the ingest endpoint drops duplicates), so an event logged in the same instant as the last one is never lost."""
+    dt = datetime.fromisoformat(ts.replace("Z", "+00:00")) - timedelta(seconds=OVERLAP_SECONDS)
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+
+
+def write_state(path: str, since: str) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump({"since": since}, f)
+    os.replace(tmp, path)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--agent", required=True, help="agent id, e.g. testingnt69 (non-prod only)")
     ap.add_argument("--audit-dir", default="/opt/openclaw/audit")
     ap.add_argument("--since", help="only rows with ts strictly after this ISO timestamp (printed by the previous run)")
     ap.add_argument("--out", help="write NDJSON here (omit with --dry-run)")
-    ap.add_argument("--dry-run", action="store_true", help="print counts only; no rows are written or shown")
+    ap.add_argument("--dry-run", action="store_true", help="print counts only; no rows are written, shown or sent")
+    ap.add_argument("--push", metavar="URL", help="send rows to this https ingest service instead of (or as well as) --out")
+    ap.add_argument("--token-file", help="file holding the ingest token (default: env SHADOW_INGEST_TOKEN)")
+    ap.add_argument("--state-file", help="remember the newest pushed timestamp here; later runs start after it")
+    ap.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     a = ap.parse_args(argv)
-    if not a.dry_run and not a.out:
-        ap.error("give --out FILE, or --dry-run")
+    if not a.dry_run and not a.out and not a.push:
+        ap.error("give --out FILE, --push URL, or --dry-run")
+    if a.state_file and not a.push:
+        ap.error("--state-file only makes sense with --push")
     paths = sorted(glob.glob(a.audit_dir.rstrip("/") + "/audit-*.jsonl"))
     if not paths:
         print(f"no audit files under {a.audit_dir}", file=sys.stderr)
         return 2
-    rows, stats = build_rows(paths, a.agent, a.since)
+    since = a.since or read_state(a.state_file)
+    rows, stats = build_rows(paths, a.agent, since)
     print(f"files: {len(paths)}  agent: {a.agent}  rows: {len(rows)}")
     for k in sorted(stats):
         print(f"  {k}: {stats[k]}")
     if rows:
-        print(f"  ts range: {rows[0]['ts']} .. {rows[-1]['ts']}   (next run: --since {rows[-1]['ts']})")
+        print(f"  ts range: {rows[0]['ts']} .. {rows[-1]['ts']}")
     if not a.dry_run:
-        with open(a.out, "w") as f:
-            for r in rows:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        print(f"wrote {len(rows)} rows to {a.out}")
+        if a.out:
+            with open(a.out, "w") as f:
+                for r in rows:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            print(f"wrote {len(rows)} rows to {a.out}")
+        if a.push and rows:
+            try:
+                sent = push_rows(a.push, a.agent, rows, read_token(a.token_file), a.batch_size)
+            except (ValueError, urllib.error.URLError, OSError) as e:
+                print(f"push FAILED: {type(e).__name__}: {e}", file=sys.stderr)
+                return 1
+            print(f"pushed: received {sent.get('received', 0)}, inserted {sent.get('inserted', 0)}, duplicates {sent.get('duplicates', 0)}")
+            if a.state_file:
+                resume = overlap_start(rows[-1]["ts"])
+                write_state(a.state_file, resume)
+                print(f"state saved: next run starts after {resume}")
+        elif a.push:
+            print("nothing new to push")
     return 0
 
 

@@ -277,7 +277,7 @@ async function getBatteryInfo(): Promise<{ level: number; charging: boolean } | 
 }
 
 // Estimate demographic based on various signals
-function estimateDemographic(data: DeviceData): string {
+export function estimateDemographic(data: DeviceData): string {
   const hour = new Date().getHours();
   const os = data.device.os.toLowerCase();
   const browser = data.device.browser.toLowerCase();
@@ -286,7 +286,7 @@ function estimateDemographic(data: DeviceData): string {
   if (os.includes('ios') && browser.includes('safari')) {
     return 'Adult (25-45)';
   }
-  if (os.includes('android') && hour >= 22 || hour <= 6) {
+  if (os.includes('android') && (hour >= 22 || hour <= 6)) {
     return 'Young Adult (18-30)';
   }
   if (data.device.type === 'Desktop' && os.includes('windows')) {

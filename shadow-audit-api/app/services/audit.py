@@ -79,7 +79,8 @@ class AuditService:
             except Exception as exc:  # noqa: BLE001
                 log.exception("notion write failed")
                 r["errors"].append(f"notion: {exc}")
-        if self.slack:
+        # Alert only on results that need a human (QUARANTINE, INCOMPLETE), not on every clean audit.
+        if self.slack and r["riskLevel"] != "APPROVED_FOR_P1_DATA":
             try:
                 self.slack.notify(f"[{r['environment']}] Shadow audit {r['auditId']} for {r['agentId']}: "
                                   f"{r['riskLevel']} ({r['overallScore'] if r['overallScore'] is not None else 'no score'}), {len(r['detectedRisks'])} risks")
