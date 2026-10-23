@@ -763,7 +763,7 @@ export default function FinalSummaryPanel({
         confirmed: hex.confirmed,
         category: hex.category,
       })),
-      privacyNote: 'This report was generated locally in your browser. No data was sent to any server.',
+      privacyNote: 'This report was generated locally in your browser. We store your scan result only if you tick the save box with your email.',
     };
 
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
@@ -1038,9 +1038,9 @@ Test yours at: ${window.location.origin}`;
           <span className="text-xl">🔒</span>
           <p className="text-xs text-risk-low">
             {tilesOn ? (
-              <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.</>
+              <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
             ) : (
-              <><strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.</>
+              <><strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
             )}
           </p>
         </div>
