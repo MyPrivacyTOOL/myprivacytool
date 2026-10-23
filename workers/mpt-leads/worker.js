@@ -230,8 +230,8 @@ export default {
       // MPC-7120: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement)
       // BEFORE the Notion write and independent of it: a Notion failure must never block the engagement row.
       // Fail-soft and off the response path; stores no PII (random session id + funnel booleans).
-      const engagement = recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
-      ctx.waitUntil(engagement);
+      // MPC-7616: awaited (not just waitUntil) so the answer can say whether the row really landed. Still fail-soft: it never throws.
+      const engagementRecorded = await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
@@ -424,7 +424,9 @@ export default {
 
       ctx.waitUntil(Promise.all(side));
 
-      return new Response(JSON.stringify({ success: true, ...(baseline ? { baseline } : {}) }), {
+      // MPC-7616: `engagement_recorded` is false when the Supabase write was skipped or failed (the error is in the Worker log with the target host),
+      // so a lead that reached Notion but not the database is visible to a caller instead of looking like a full success.
+      return new Response(JSON.stringify({ success: true, engagement_recorded: engagementRecorded, ...(baseline ? { baseline } : {}) }), {
         status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
       });
 
@@ -529,6 +531,8 @@ async function sweepPending(env) {
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
 const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+// MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
+const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
 async function recordEngagement(env, sessionId, flags) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('Supabase not configured - skipping engagement write');
@@ -546,12 +550,12 @@ async function recordEngagement(env, sessionId, flags) {
       body: JSON.stringify({ session_id: sessionId, ...flags }),
     });
     if (!res.ok) {
-      console.error('Supabase mpt_user_engagement insert failed:', res.status, (await res.text()).slice(0, 200));
+      console.error('Supabase mpt_user_engagement insert failed:', res.status, supabaseHost(env), (await res.text()).slice(0, 200));
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Supabase mpt_user_engagement insert error:', String(err));
+    console.error('Supabase mpt_user_engagement insert error:', supabaseHost(env), String(err));
     return false;
   }
 }
