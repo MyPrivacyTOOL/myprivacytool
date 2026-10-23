@@ -81,7 +81,8 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(notion["parent"]["database_id"], "db1")
         self.assertEqual(notion["properties"]["Environment"]["select"]["name"], "staging")
         self.assertEqual(r["passportUrl"], "https://notion/x")
-        self.assertTrue(any(c[0] == "https://hook" for c in calls))
+        self.assertEqual(r["riskLevel"], "APPROVED_FOR_P1_DATA")
+        self.assertFalse(any(c[0] == "https://hook" for c in calls))   # clean audits do not alert (see test_slack_alerts)
 
 
 def call(app, method, path, body=None, token="tok"):
