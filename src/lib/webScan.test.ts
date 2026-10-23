@@ -1,7 +1,7 @@
 // MPC-7470 (D12): the site side of "save the scan only at the contact step, with its own tick box".
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  rememberCompletedScan, pendingScan, canOfferScanSave, scanSaveFields, noteSaveResult,
+  rememberCompletedScan, pendingScan, canOfferScanSave, scanSaveFields, noteSaveResult, forgetPendingHexagon,
   getScanNumber, visitScanNumber, toPayload, SCAN_NUMBER_EVENT, markScanStarted, reportStep, trackResults,
 } from "./webScan";
 import { SAVE_CONSENT_LABEL, SAVE_CONSENT_VERSION } from "./saveConsent";
@@ -56,6 +56,43 @@ describe("the finished scan stays in the browser until the contact step", () => 
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
     expect(() => rememberCompletedScan(hex())).not.toThrow();
     vi.restoreAllMocks();
+  });
+});
+
+describe("forgetPendingHexagon (a removed footprint is not saved)", () => {
+  it("takes one hexagon out of the scan held in the browser and leaves the rest", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    rememberCompletedScan(hex(3));
+    expect(forgetPendingHexagon("hx-1")).toBe(true);
+    expect((pendingScan() ?? []).map((h) => h.id)).toEqual(["hx-0", "hx-2"]);
+    expect(canOfferScanSave()).toBe(true);
+  });
+
+  it("drops the held scan when the last hexagon goes, so there is nothing left to save", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    rememberCompletedScan(hex(1));
+    expect(forgetPendingHexagon("hx-0")).toBe(true);
+    expect(pendingScan()).toBeNull();
+    expect(canOfferScanSave()).toBe(false);
+    expect(scanSaveFields()).toEqual({});
+  });
+
+  it("does nothing for an unknown id, with no scan held, or with broken storage", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    expect(forgetPendingHexagon("hx-0")).toBe(false);
+    rememberCompletedScan(hex(2));
+    expect(forgetPendingHexagon("nope")).toBe(false);
+    expect(pendingScan()).toHaveLength(2);
+    sessionStorage.setItem("mpt_pending_scan", "{not json");
+    expect(forgetPendingHexagon("hx-0")).toBe(false);
+  });
+
+  it("sends nothing", () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    const f = vi.fn(); vi.stubGlobal("fetch", f);
+    rememberCompletedScan(hex(2));
+    forgetPendingHexagon("hx-0");
+    expect(f).not.toHaveBeenCalled();
   });
 });
 
