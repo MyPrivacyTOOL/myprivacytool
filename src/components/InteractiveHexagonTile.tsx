@@ -5,6 +5,7 @@ import { TILE_COPY } from '@/lib/hexagonTile';
 import { BAND_FILL_OPACITY, BAND_WORD } from '@/lib/guessBands';
 import { canConfirm, canDispute } from '@/lib/identityConfirmation';
 import { cn } from '@/lib/utils';
+import FootprintsIcon from '@/components/FootprintsIcon';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
 import {
   AlertDialog,
@@ -22,8 +23,15 @@ const EXPOSED_TOOLTIP = 'Exposure confirmed. Open to see the next step.';
 const POINTS = '50,2 98,28.7 98,86.8 50,113.5 2,86.8 2,28.7';
 const WAITING = new Set<Hexagon['status']>(['not_checked', 'false_positive']);
 
+/** The footprints path (Chris, 2026-10-23): the steps you took are lit and numbered, the one you are on carries the footprints, the next is dashed, the rest is a faint hint. */
+export interface PathMark {
+  state: 'on' | 'here' | 'next' | 'faint';
+  step?: number;
+}
+
 interface Props {
   hexagon: Hexagon;
+  path?: PathMark;
   onConfirm: (id: string, isMatch: boolean) => void;
   onDispute: (id: string) => void;
   /** The visitor pressed the labelled "Keep it" button on the dispute prompt (closing the prompt is not an answer). */
@@ -39,7 +47,7 @@ interface Props {
   style?: CSSProperties;
 }
 
-export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, onSelect, fixed = false, compact = false, className, style }: Props) => {
+export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, onSelect, fixed = false, compact = false, path, className, style }: Props) => {
   // Which prompt is open. Only the buttons inside a prompt record an answer; closing it (Esc, outside click, Keep it) records nothing.
   const [prompt, setPrompt] = useState<'confirm' | 'dispute' | null>(null);
   const exposed = hexagon.status === 'confirmed' && hexagon.exposure === true && !fixed;
@@ -64,8 +72,15 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, 
   // A guess keeps its instruction ("Tap to confirm"): it is the one tile that asks the visitor to answer.
   const tip = tile && hexagon.status !== 'guess' ? `${hexagon.label}: ${tile.line}.` : exposed ? EXPOSED_TOOLTIP : visuals.tooltip;
 
+  const lit = path?.state === 'on' || path?.state === 'here';
+  // A faint tile stays readable, and one that needs fixing stays nearly full so the path never hides a risk.
+  const pathStyle: CSSProperties | undefined = !path ? undefined
+    : path.state === 'faint' ? { opacity: needsFix ? 0.75 : 0.35 }
+    : lit ? { filter: 'drop-shadow(0 0 6px hsl(var(--tile-green) / 0.55))' }
+    : undefined;
+
   return (
-    <div className={cn('group/tile relative', className)} style={style}>
+    <div className={cn('group/tile relative', className)} style={{ ...style, ...pathStyle }} data-path={path?.state}>
       <button
         type="button"
         className={cn(
@@ -118,6 +133,23 @@ export const InteractiveHexagonTile = ({ hexagon, onConfirm, onDispute, onKeep, 
         {tile && !compact && <span className="relative w-[68%] truncate text-[8px] italic" data-testid="tile-line">{lineText}</span>}
         <span className="sr-only">{tip}</span>
       </button>
+
+      {path?.state === 'next' && (
+        <svg viewBox="0 0 100 115.47" className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" aria-hidden="true" data-testid="path-next">
+          <polygon points={POINTS} fill="none" strokeWidth={3} strokeLinejoin="round" strokeDasharray="7 5" style={{ stroke: 'hsl(var(--tile-green))' }} />
+        </svg>
+      )}
+      {lit && path?.step !== undefined && (
+        <span aria-hidden="true" data-testid={`path-step-${path.step}`} className="pointer-events-none absolute left-[12%] top-[12%] flex h-[18px] w-[18px] items-center justify-center rounded-full bg-green-700 text-[10px] font-bold text-white">
+          {path.step}
+        </span>
+      )}
+      {path?.state === 'here' && (
+        <span className="pointer-events-none absolute bottom-[4%] right-[2%] text-green-950" data-testid="path-here">
+          <FootprintsIcon feetOnly className="h-9 w-11 drop-shadow-[0_0_2px_#fff]" />
+          <span className="sr-only">You are here</span>
+        </span>
+      )}
 
       {/* `!` is reserved for risk. Disputing is a labelled button inside its own prompt, so it is deliberate, never a stray tap. */}
       <AlertDialog open={prompt === 'confirm'} onOpenChange={(open) => !open && setPrompt(null)}>

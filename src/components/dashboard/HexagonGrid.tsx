@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { Hexagon, ScanResult } from '@/types/hexagon';
 import { InteractiveHexagonTile } from '@/components/InteractiveHexagonTile';
+import { pathMark, type PathInput } from '@/lib/footprintsPath';
 import { useElementWidth } from '@/hooks/useElementWidth';
 import { HEX_RATIO, hiveLayout } from '@/lib/honeycomb';
 import { groupHexagonsByInterest } from '@/lib/hexagonGroups';
@@ -13,9 +14,12 @@ interface Props {
   onSelect: (hexagon: Hexagon) => void;
   /** Ids of confirmed exposures the user has fixed. */
   fixedIds?: ReadonlySet<string>;
+  /** The footprints path, when switched on: the ids answered so far, in order, and the next one to answer. */
+  path?: PathInput;
 }
 
-const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
+
+const Hive = ({ items, fixedIds, path, onConfirm, onDispute, onKeep, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
   const ref = useRef<HTMLDivElement>(null);
   const layout = hiveLayout(items.length, useElementWidth(ref));
   return (
@@ -30,6 +34,7 @@ const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect }: Omit<
             onKeep={onKeep}
             onSelect={onSelect}
             fixed={fixedIds?.has(h.id)}
+            path={pathMark(path, h.id)}
             compact={layout.compact}
             className="absolute"
             style={{ left: layout.positions[i].left, top: layout.positions[i].top, width: layout.hw, height: layout.hw * HEX_RATIO }}
