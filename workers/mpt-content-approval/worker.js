@@ -149,6 +149,19 @@ async function reply(env, target, text) {
   }).catch((e) => console.error('slack reply failed', e?.message));
 }
 
+const hktClock = (d) => new Date(d.getTime() + 8 * 3600e3).toISOString().slice(11, 16);
+
+/** Replace the button row on the original message with a status banner, so a decided message can't be clicked again. */
+export async function markDecided(env, target, text) {
+  if (!target?.channel || !target?.ts || !env.SLACK_BOT_TOKEN || !Array.isArray(target.blocks)) return;
+  const blocks = [...target.blocks.filter((b) => b.type !== 'actions'), { type: 'section', text: { type: 'mrkdwn', text } }];
+  await fetch('https://slack.com/api/chat.update', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ channel: target.channel, ts: target.ts, text, blocks }),
+  }).catch((e) => console.error('slack update failed', e?.message));
+}
+
 export async function process(env, { action, taskId, timestamp, approver, target }) {
   const drafts = await rows(env, taskId, 'drafted');
   if (!drafts.length) return { status: 404, message: `no drafts for ${taskId}` };
@@ -161,6 +174,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
   if (action === 'reject') {
     await log(env, taskId, 'rejected', { draft: { by: approver } });
     await reply(env, target, 'Rejected. Awaiting next cycle.');
+    await markDecided(env, target, `❌ *REJECTED* by ${approver}. Nothing was sent. Awaiting next cycle.`);
     return { status: 200, message: 'rejected' };
   }
   if (action === 'edit_resubmit') {
@@ -171,6 +185,23 @@ export async function process(env, { action, taskId, timestamp, approver, target
   if (action !== 'approve_all') return { status: 400, message: `unknown action ${action}` };
 
   const approvedAt = timestamp && !Number.isNaN(Date.parse(timestamp)) ? new Date(timestamp) : new Date();
+  // The fixed primary key makes the second of two near-simultaneous clicks fail here instead of posting to Make twice.
+  const claimId = `${taskId}:claim`;
+  try {
+    await env.AGENT_LOGS.prepare('INSERT INTO agent_execution_logs (id, timestamp, task_id, status) VALUES (?, ?, ?, ?)').bind(claimId, iso(), taskId, 'processing').run();
+  } catch {
+    await reply(env, target, 'Already being processed; ignoring.');
+    return { status: 200, message: 'in progress' };
+  }
+  let succeeded = false;
+  try {
+    return await approve();
+  } finally {
+    // Keep the claim after success; release it after any failure so the cycle stays re-approvable ("Logged for retry").
+    if (!succeeded) await env.AGENT_LOGS.prepare('DELETE FROM agent_execution_logs WHERE id = ?').bind(claimId).run().catch(() => {});
+  }
+
+  async function approve() {
   await log(env, taskId, 'approved', { draft: { by: approver } });
 
   const payload = buildMakePayload(drafts, { taskId, approvedBy: approver, approvalTimestamp: approvedAt.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL });
@@ -194,8 +225,13 @@ export async function process(env, { action, taskId, timestamp, approver, target
       .bind(crypto.randomUUID(), iso(), p.platform, drafts.find((d) => d.platform === p.platform)?.topic ?? null).run();
   }
   await log(env, taskId, 'published', { draft: { platforms: payload.posts.map((p) => p.platform), approved_by: approver } });
-  await reply(env, target, `✅ Posted to ${payload.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ')}`);
+  const names = payload.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ');
+  const done = `✅ *COMPLETED*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${payload.posts.length} posts: ${names}. Publishing is done by the Make.com scenario.`;
+  await reply(env, target, done);
+  await markDecided(env, target, done);
+  succeeded = true;
   return { status: 200, message: 'approved' };
+  }
 }
 
 export default {
@@ -211,7 +247,7 @@ export default {
       const p = JSON.parse(new URLSearchParams(raw).get('payload') ?? '{}');
       const a = p.actions?.[0];
       if (!a) return new Response('', { status: 200 });
-      job = { action: a.action_id, taskId: a.value, timestamp: iso(), approver: p.user?.username || env.SLACK_APPROVER || 'chris', target: { channel: p.channel?.id, ts: p.message?.ts } };
+      job = { action: a.action_id, taskId: a.value, timestamp: iso(), approver: p.user?.username || env.SLACK_APPROVER || 'chris', target: { channel: p.channel?.id, ts: p.message?.ts, blocks: p.message?.blocks } };
     } else {
       const auth = request.headers.get('authorization') ?? '';
       if (!env.APPROVAL_API_TOKEN || !safeEqual(auth, `Bearer ${env.APPROVAL_API_TOKEN}`)) return new Response('Unauthorized', { status: 401 });

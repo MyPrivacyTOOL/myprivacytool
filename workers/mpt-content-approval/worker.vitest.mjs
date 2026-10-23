@@ -19,8 +19,10 @@ function fakeD1({ failMakeLog = false } = {}) {
   const prepare = (sql) => ({
     bind: (...args) => ({
       run: async () => {
+        if (sql.startsWith('DELETE FROM agent_execution_logs')) { tables.agent_execution_logs = tables.agent_execution_logs.filter((r) => r[0] !== args[0]); return {}; }
         const table = /INSERT INTO (\w+)/.exec(sql)[1];
         if (table === 'make_webhook_log' && failMakeLog) throw new Error('D1 down');
+        if (table === 'agent_execution_logs' && tables.agent_execution_logs.some((r) => r[0] === args[0])) throw new Error('UNIQUE constraint failed: agent_execution_logs.id');
         tables[table].push(args);
         return {};
       },
@@ -213,7 +215,7 @@ describe('postToMake', () => {
 });
 
 describe('process (approval flow)', () => {
-  it('approve_all success: validates, POSTs one payload, logs, replies "Posted to ..."', async () => {
+  it('approve_all success: validates, POSTs one payload, logs, replies COMPLETED', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
     const out = await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target });
     expect(out).toEqual({ status: 200, message: 'approved' });
@@ -225,7 +227,47 @@ describe('process (approval flow)', () => {
     expect(statuses(db)).not.toContain('failed');
     expect(db.tables.social_metrics).toHaveLength(6);
     expect(db.tables.make_webhook_log).toHaveLength(1);
-    expect(slackTexts()).toEqual(['✅ Posted to X, LinkedIn, IG, FB, Pinterest, YouTube']);
+    expect(slackTexts()).toEqual(['✅ *COMPLETED*: approved by chris at 07:00 HKT. Make.com accepted the hand-off (HTTP 200) for 6 posts: X, LinkedIn, IG, FB, Pinterest, YouTube. Publishing is done by the Make.com scenario.']);
+  });
+  it('does not claim the posts are live: the completion text says handed off / accepted', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target });
+    expect(slackTexts()[0]).not.toMatch(/Posted to/);
+    expect(slackTexts()[0]).toMatch(/accepted the hand-off/);
+  });
+  it('replaces the buttons on the original message with the COMPLETED banner', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    const blocks = [{ type: 'header' }, { type: 'section' }, { type: 'actions', elements: [] }];
+    await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target: { ...target, blocks } });
+    const [, init] = fetchMock.mock.calls.find(([u]) => u === 'https://slack.com/api/chat.update');
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({ channel: 'C1', ts: '111.222' });
+    expect(body.blocks.map((b) => b.type)).toEqual(['header', 'section', 'section']);
+    expect(body.blocks.at(-1).text.text).toMatch(/^✅ \*COMPLETED\*/);
+  });
+  it('skips the message update when there are no original blocks or no token', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target });
+    expect(fetchMock.mock.calls.some(([u]) => u === 'https://slack.com/api/chat.update')).toBe(false);
+  });
+  it('a second click while the first is in flight does not hand off twice', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    const env = mkEnv(db);
+    const job = { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target };
+    const [a, b] = await Promise.all([processApproval(env, job), processApproval(env, job)]);
+    expect([a.message, b.message].sort()).toEqual(['approved', 'in progress']);
+    expect(makeCalls()).toHaveLength(1);
+    expect(slackTexts().some((t) => t === 'Already being processed; ignoring.')).toBe(true);
+  });
+  it('a failed hand-off releases the claim so the cycle can be approved again', async () => {
+    let ok = false;
+    mockMake(async () => new Response(ok ? 'Accepted' : 'nope', { status: ok ? 200 : 500 }));
+    const db = fakeD1(); seed(db, sixDrafts());
+    const env = mkEnv(db);
+    const job = { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target };
+    expect((await processApproval(env, job)).status).toBe(502);
+    ok = true;
+    expect(await processApproval(env, job)).toEqual({ status: 200, message: 'approved' });
   });
   it('defaults the approval time to now when the timestamp is missing or invalid', async () => {
     for (const timestamp of [undefined, 'garbage']) {
@@ -267,6 +309,12 @@ describe('process (approval flow)', () => {
     expect(statuses(db)).toContain('rejected');
     expect(makeCalls()).toHaveLength(0);
     expect(slackTexts()).toEqual(['Rejected. Awaiting next cycle.']);
+  });
+  it('reject also replaces the buttons with a REJECTED banner', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    await processApproval(mkEnv(db), { action: 'reject', taskId: TASK, approver: 'chris', target: { ...target, blocks: [{ type: 'actions' }] } });
+    const [, init] = fetchMock.mock.calls.find(([u]) => u === 'https://slack.com/api/chat.update');
+    expect(JSON.parse(init.body).blocks[0].text.text).toMatch(/^❌ \*REJECTED\* by chris/);
   });
   it('edit_resubmit is acknowledged but not automated', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
@@ -384,7 +432,7 @@ describe('fetch handler (POST /approve)', () => {
       expect(res.status).toBe(200);
       await Promise.all(c.pending);
       expect(makeCalls()).toHaveLength(1);
-      expect(slackTexts()).toEqual(['✅ Posted to X, LinkedIn, IG, FB, Pinterest, YouTube']);
+      expect(slackTexts()[0]).toMatch(/^✅ \*COMPLETED\*: approved by ck at \d\d:\d\d HKT\. Make\.com accepted the hand-off \(HTTP 200\) for 6 posts/);
       expect(JSON.parse(makeCalls()[0][1].body).approved_by).toBe('ck');
     });
     it('falls back to the configured approver when Slack omits the user', async () => {
