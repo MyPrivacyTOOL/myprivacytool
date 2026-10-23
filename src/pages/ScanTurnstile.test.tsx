@@ -29,12 +29,17 @@ const submit = async () => {
 describe("Scan page Turnstile", () => {
   beforeEach(() => { requestScanReport.mockClear(); render_.mockClear(); window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; sessionStorage.clear(); localStorage.clear(); });
 
-  it("does not request the report before a token exists", async () => {
+  it("waits for the token, then sends the request by itself (no try-again error)", async () => {
     mount();
     await waitFor(() => expect(render_).toHaveBeenCalled());
     await submit();
-    expect(await screen.findByText(/Verifying you are human/)).toBeTruthy();
+    expect(await screen.findByText(/Verifying you are human, this takes a moment/)).toBeTruthy();
+    expect(screen.queryByText(/Please try again in a moment/)).toBeNull();
     expect(requestScanReport).not.toHaveBeenCalled();
+    act(() => onToken("late-token"));
+    await waitFor(() => expect(requestScanReport).toHaveBeenCalledTimes(1));
+    expect(requestScanReport.mock.calls[0][3]).toBe("late-token");
+    expect(screen.queryByText(/Verifying you are human, this takes a moment/)).toBeNull();
   });
 
   it("sends the token with the report request", async () => {

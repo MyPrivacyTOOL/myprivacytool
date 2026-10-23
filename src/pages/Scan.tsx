@@ -44,6 +44,8 @@ const Scan = () => {
   const [tsToken, setTsToken] = useState("");
   const [tsReset, setTsReset] = useState(0);
   const tsWidgets = useRef(0);
+  // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
+  const [waitingForToken, setWaitingForToken] = useState(false);
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -53,14 +55,19 @@ const Scan = () => {
     if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // The save box is optional: unticked = the report is still requested, the scan is just not saved.
-    if (!email.trim() || !consent || submitting) return;
+    if (!email.trim() || !consent || submitting || waitingForToken) return;
     if (tsWidgets.current > 0 && !tsToken) {
-      setErrorMsg("Verifying you are human. Please try again in a moment.");
+      setErrorMsg("");
+      setWaitingForToken(true);
       return;
     }
+    void sendReport(tsToken);
+  };
+
+  const sendReport = async (token: string) => {
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -73,7 +80,7 @@ const Scan = () => {
         hubspotSent.current = true; // the lead is kept whatever happens to the report request
       }
       try {
-        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, tsToken);
+        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
       } catch (reportErr) {
         const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
@@ -94,6 +101,14 @@ const Scan = () => {
     }
   };
 
+  useEffect(() => {
+    if (waitingForToken && tsToken) {
+      setWaitingForToken(false);
+      void sendReport(tsToken);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForToken, tsToken]);
+
   const renderForm = (idSuffix: string) => (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:flex-wrap gap-3 max-w-md mx-auto">
       <Input
@@ -108,10 +123,10 @@ const Scan = () => {
       />
       <Button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || waitingForToken}
         className="font-bold h-12 px-8 text-base whitespace-nowrap"
       >
-        {submitting ? "Sending…" : "Check My Exposure →"}
+        {submitting ? "Sending…" : waitingForToken ? "Verifying…" : "Check My Exposure →"}
       </Button>
       <TurnstileBox
         sitekey={SCAN_TURNSTILE_SITE_KEY}
@@ -165,6 +180,7 @@ const Scan = () => {
         </p>
 
         {!submitted ? renderForm("top") : thanks}
+        {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 
         <p className="text-muted-foreground text-xs mt-4">
