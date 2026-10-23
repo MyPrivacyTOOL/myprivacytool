@@ -217,6 +217,13 @@ describe('Supabase engagement + baseline', () => {
     await post({ email: 'a@b.co', riskScore: 10 }, { e: { ...env, SUPABASE_URL: 'https://custom.supabase.co' } });
     expect(to('custom.supabase.co/rest/v1/mpt_user_engagement')).toHaveLength(1);
   });
+  it('reports engagement_recorded so a lead that missed the database is visible (MPC-7616)', async () => {
+    expect((await (await post({ email: 'a@b.co', riskScore: 10 })).json()).engagement_recorded).toBe(true);
+    handlers['mpt_user_engagement'] = () => ({ ok: false, status: 401, text: async () => 'bad key' });
+    const json = await (await post({ email: 'a@b.co', riskScore: 10 })).json();
+    expect(json).toMatchObject({ success: true, engagement_recorded: false });
+    expect((await (await post({ email: 'a@b.co' }, { e: { ...env, SUPABASE_SERVICE_ROLE_KEY: undefined } })).json()).engagement_recorded).toBe(false);
+  });
   it('survives a thrown Supabase error', async () => {
     handlers['mpt_user_engagement'] = () => { throw new Error('dns'); };
     expect((await post({ email: 'a@b.co' })).status).toBe(200);
