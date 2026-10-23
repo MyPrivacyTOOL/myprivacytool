@@ -37,6 +37,16 @@ describe('FinalSummaryPanel with tiles', () => {
     expect(container.textContent).not.toMatch(/Google can track you/);
   });
 
+  it('the local-only notice says when a scan is stored, with and without tiles', () => {
+    for (const props of [{ tiles: tilesFor(hexagons) }, {}]) {
+      const { container, unmount } = render(<FinalSummaryPanel hexagons={hexagons} confirmedCount={4} {...props} />);
+      const text = container.textContent ?? '';
+      expect(text).toMatch(/or save your scan with your email/);
+      expect(text).toMatch(/We store your scan result only if you tick the save box with your email\./);
+      unmount();
+    }
+  });
+
   it('without tiles the old score, percentages and PDF button are unchanged', () => {
     const { container } = render(<FinalSummaryPanel hexagons={hexagons} confirmedCount={4} />);
     expect(container.textContent).toMatch(/Risk Score/);
