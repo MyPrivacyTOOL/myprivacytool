@@ -139,3 +139,28 @@
     animation: none;
   }
 }
+
+/* MPC-8452: live thank-you. Curtain slides off, then Alice fades in. Both are still for people who ask for less motion. */
+@keyframes ltyFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ltyCurtain {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+.lty-fade {
+  animation: ltyFade 4s ease-out both;
+}
+.lty-curtain {
+  animation: ltyCurtain 1.3s ease-in-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lty-fade,
+  .lty-curtain {
+    animation: none;
+  }
+  .lty-curtain {
+    display: none;
+  }
+}

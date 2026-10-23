@@ -13,7 +13,10 @@ import TurnstileBox from "@/components/TurnstileBox";
 import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
-import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
+import { canOfferScanSave, pendingScan, recognitionEnabled, reportStep } from "@/lib/webScan";
+import LiveThankYou from "@/components/LiveThankYou";
+import { liveThankYouEnabled } from "@/config/liveThankYou";
+import { liveCells } from "@/lib/liveThankYou";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
 import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 
@@ -165,6 +168,8 @@ const Scan = () => {
         </p>
 
         {!submitted ? renderForm("top") : thanks}
+        {/* MPC-8452: OFF by default. Replays the scan already held in this browser; the report email is unaffected. */}
+        {submitted && liveThankYouEnabled() && <LiveThankYou cells={liveCells(pendingScan())} />}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 
         <p className="text-muted-foreground text-xs mt-4">

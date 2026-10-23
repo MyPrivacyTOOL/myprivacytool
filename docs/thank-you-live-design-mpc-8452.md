@@ -1,6 +1,6 @@
 # MPC-8452 design note: live thank-you page
 
-**Status: DRAFT for owner approval. Nothing is built.** All visitor-facing copy below is a proposal and needs Chris's sign-off before it ships (swarm run and real-people check, per the ticket). Lines marked **[approved]** already exist in the codebase; everything else is **[proposed]**.
+**Status: option A approved by the owner (2026-10-23). Build step 1 is in this PR behind a flag that is OFF by default (`VITE_LIVE_THANKYOU`, or `?live_ty=1` in one tab). Still open: storage decision, Alice image, Chris's sign-off on the copy.** All visitor-facing copy below is a proposal and needs Chris's sign-off before it ships (swarm run and real-people check, per the ticket). Lines marked **[approved]** already exist in the codebase; everything else is **[proposed]**.
 
 Notion ticket: https://app.notion.com/p/40228547eaa781c4874ed5b7c0e4f2df
 
@@ -104,3 +104,12 @@ Reuse existing events through `src/lib/analytics.ts`: add only counts (reveal se
 2. Wire to the chosen data source behind a feature flag, default off.
 3. Playwright e2e at 375 px and with `reducedMotion: 'reduce'`.
 4. Owner and Chris review on a preview deploy, then flag on.
+
+## 11. Build log
+
+- **Decision (owner, 2026-10-23): option A.** Replay the scan already in this browser.
+- **Built, flag off by default:** `src/config/liveThankYou.ts` (flag), `src/lib/liveThankYou.ts` (reads the status decided at capture; unknown means "not checked"; no value, score or percentage is carried), `src/components/LiveThankYou.tsx` (curtain, waiting then resolved hexagons, one polite live region, reduced-motion and hidden-tab jump to the end state), wired under the existing thank-you box in `src/pages/Scan.tsx`. The existing thank-you box and the report request are untouched.
+- **Draft copy** lives in `LIVE_COPY` (`src/lib/liveThankYou.ts`) and must not ship until Chris signs it off.
+- **Image:** the existing `/footprint/alice-curtain.jpg` is used as a placeholder (prop `imageSrc`); swap once an image is chosen.
+- **Still open:** the page reads the scan through `pendingScan()`, which holds a scan only when `VITE_SAVE_WEB_SCANS` is on. With it off, every visitor sees the "no scan" state. Owner to choose: turn it on, or add a narrow hand-off cleared on use (section 6).
+- **Not done:** Playwright e2e at 375 px and with reduced motion (step 3), and the phone view decision (section 9, item 4).
