@@ -1205,9 +1205,9 @@ export const HEXAGONS = [
     "example_value": "None Detected",
     "truth": {
       "confidence": {
-        "number": 100,
+        "number": 60,
         "how": "fixed",
-        "note": null
+        "note": "Lowered from 100: the extension check only sees a short list of known add-ons, so 'None Detected' is a guess, not proof."
       },
       "risk": {
         "how": "text built from the detected values",
@@ -2244,9 +2244,9 @@ export const HEXAGONS = [
     "example_value": "TLS 1.3 (likely)",
     "truth": {
       "confidence": {
-        "number": 100,
+        "number": 60,
         "how": "fixed",
-        "note": null
+        "note": "Lowered from 100: the TLS version cannot be read by a browser, so it is guessed from the browser version."
       },
       "risk": {
         "how": "text built from the detected values",

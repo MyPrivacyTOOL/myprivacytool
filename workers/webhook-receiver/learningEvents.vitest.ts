@@ -49,6 +49,18 @@ describe('POST /api/learning/event', () => {
     ]) expect((await call(bad)).status).toBe(400);
     expect(stored).toEqual([]);
   });
+  it('is rate limited per address: 429 with Retry-After and nothing stored; no binding, or one that errors, fails open', async () => {
+    const seen: string[] = [];
+    const limiter = (success: boolean) => ({ limit: async ({ key }: { key: string }) => { seen.push(key); return { success }; } });
+    const r = await call(good, { ...web, 'CF-Connecting-IP': '203.0.113.9' }, { ...ON, RATE_LIMITER: limiter(false) });
+    expect(r.status).toBe(429);
+    expect(r.headers.get('Retry-After')).toBe('60');
+    expect(stored).toEqual([]);
+    expect(seen).toEqual(['learning:203.0.113.9']);
+    expect((await call(good, web, { ...ON, RATE_LIMITER: limiter(true) })).status).toBe(202);
+    expect((await call(good, web, { ...ON, RATE_LIMITER: { limit: async () => { throw new Error('down'); } } })).status).toBe(202);
+    expect((await call(good, web, ON)).status).toBe(202);
+  });
   it('a shown event needs no answer; a storage failure is logged but the visitor still gets 202', async () => {
     status = 500;
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
