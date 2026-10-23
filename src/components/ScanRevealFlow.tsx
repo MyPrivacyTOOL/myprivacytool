@@ -85,7 +85,7 @@ const ExposureScoreSummary: React.FC<{
       <div className="flex items-start gap-6">
         {/* Alice character badge */}
         <div className="flex-shrink-0">
-          <AliceHDBadge expression="greeting" />
+          <AliceHDBadge />
         </div>
 
         {/* Score summary */}
