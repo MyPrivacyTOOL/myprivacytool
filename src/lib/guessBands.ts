@@ -7,7 +7,7 @@
 //   weak   : invented, or inferred from something that cannot be read
 export type GuessBand = 'likely' | 'maybe' | 'weak';
 
-export const BAND_WORD: Record<GuessBand, string> = { likely: 'likely', maybe: 'maybe', weak: 'weak guess' };
+export const BAND_WORD: Record<GuessBand, string> = { likely: 'likely', maybe: 'maybe', weak: 'weak' };
 
 /** Fill strength of the purple guess tile. "Maybe" is the faint purple we already use; "likely" is a little darker, "weak" paler. */
 export const BAND_FILL_OPACITY: Record<GuessBand, number> = { likely: 0.28, maybe: 0.16, weak: 0.08 };
