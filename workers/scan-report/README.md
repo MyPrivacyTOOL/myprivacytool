@@ -93,3 +93,12 @@ A report is normally sent about 4 minutes after the request (confirmation within
 - **48 hour deadline:** `ALERT: N report(s) past their 48h deadline` in the Worker log.
 
 Known root cause of the original MPC-7535 / MPC-7616 failure: an empty `VITE_SCAN_API_URL` Pages variable overrode the default Worker URL, so the page thanked the visitor and sent nothing. `src/lib/webScan.ts` now treats a blank value as "use the default", and `/scan` shows an honest error when the request fails.
+
+## Turnstile on POST /api/scan (MPC-8430)
+
+The Scan page shows a Cloudflare Turnstile widget (`interaction-only`, cookieless; it shows nothing unless Cloudflare needs the visitor) and sends the token as `cf-turnstile-response`. The Worker verifies it against `TURNSTILE_SECRET_KEY` after the Origin, rate-limit and consent checks and before anything is stored or sent (`lib/turnstile.js`).
+
+- No `TURNSTILE_SECRET_KEY` = feature off. Siteverify unreachable = fails open (a Cloudflare hiccup never drops a real request).
+- `TURNSTILE_ENFORCE = "false"` (wrangler.toml) = report-only: every failed check logs one `TURNSTILE_FAILED` line (truncated IP, country, origin, reason, action) and the request goes through. `"true"` = answer 403 `Verification failed`, nothing stored or sent. Rollback: set back to `"false"` and merge.
+- Separate widget from the mpt-leads one (`mpt-scan-report (MPC-8430)`; site key is public in `src/lib/turnstile.ts`, override `VITE_SCAN_API_URL`-style with `VITE_SCAN_TURNSTILE_SITE_KEY`). Hostnames: myprivacytool.io, www, wwwmyprivacytool.pages.dev.
+- Watch the stuck-scan alert (above) and the `TURNSTILE_FAILED` lines for a day or two in report-only before enforcing.

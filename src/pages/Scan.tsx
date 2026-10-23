@@ -9,6 +9,8 @@ import ConsentCheckbox from "@/components/ConsentCheckbox";
 import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
+import TurnstileBox from "@/components/TurnstileBox";
+import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
@@ -38,6 +40,10 @@ const Scan = () => {
   const [errorMsg, setErrorMsg] = useState("");
   // MPC-7535: on a retry after a failed report request the HubSpot lead is not sent a second time.
   const hubspotSent = useRef(false);
+  // MPC-8430: Turnstile token for the report request. A blocked script means no widget, and the form still submits (the Worker decides).
+  const [tsToken, setTsToken] = useState("");
+  const [tsReset, setTsReset] = useState(0);
+  const tsWidgets = useRef(0);
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -51,6 +57,10 @@ const Scan = () => {
     e.preventDefault();
     // The save box is optional: unticked = the report is still requested, the scan is just not saved.
     if (!email.trim() || !consent || submitting) return;
+    if (tsWidgets.current > 0 && !tsToken) {
+      setErrorMsg("Verifying you are human. Please try again in a moment.");
+      return;
+    }
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -63,13 +73,15 @@ const Scan = () => {
         hubspotSent.current = true; // the lead is kept whatever happens to the report request
       }
       try {
-        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent);
+        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, tsToken);
       } catch (reportErr) {
         const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
         console.error("Scan report request failed", kind, status);
         trackReportFailed("scan_page", kind, status);
         setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        setTsToken(""); // a Turnstile token is single use: get a fresh one for the retry
+        setTsReset((n) => n + 1);
         return;
       }
       trackReportRequested("scan_page", offerSave && saveConsent);
@@ -101,6 +113,12 @@ const Scan = () => {
       >
         {submitting ? "Sending…" : "Check My Exposure →"}
       </Button>
+      <TurnstileBox
+        sitekey={SCAN_TURNSTILE_SITE_KEY}
+        onToken={setTsToken}
+        onRendered={(on) => { tsWidgets.current += on ? 1 : -1; }}
+        resetSignal={tsReset}
+      />
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
       {offerSave && (
         <>

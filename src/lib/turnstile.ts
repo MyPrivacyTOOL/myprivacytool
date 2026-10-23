@@ -4,6 +4,10 @@
 export const TURNSTILE_SITE_KEY =
   (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) || '0x4AAAAAAFdzq221ll_j9riV';
 
+// MPC-8430: the /scan page has its own widget (and secret, on the mpt-scan-report Worker), separate from the one above.
+export const SCAN_TURNSTILE_SITE_KEY =
+  (import.meta.env.VITE_SCAN_TURNSTILE_SITE_KEY as string | undefined) || '0x4AAAAAAFiCB-c5gCsrkmEZ';
+
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
 export interface TurnstileApi {

@@ -49,6 +49,7 @@ Secret names per Worker are in `workers/<name>/EXPECTED_SECRETS.txt`. Non-secret
 | Risk registry cache | Workers KV `MPT_AGENT_RISK_REGISTRY`, filled from the Notion Hexagon Risk Registry by `scripts/sync-risk-registry-to-kv.mjs`. See `docs/risk-registry-kv-sync.md`. |
 | Scan report alert | `pg_cron` job `mpt-scan-report-alert` (every 10 minutes) -> Telegram, same Vault channel as the purge alert. Alerts when a `/scan` request is still pending after 15 minutes, a report failed in the last 24 hours, or no confirmation went out after 5 minutes. Counts only, never an email. Source `supabase/sql/mpt-scan-report-alert.sql`; test with `select public.mpt_scan_report_alert(true);`. Rollback: `select cron.unschedule('mpt-scan-report-alert');`. |
 | Turnstile | Enforcing on the scan email form (`TURNSTILE_ENFORCE`, `workers/mpt-leads/README.md`). Rollback: set it to `"false"` and merge. |
+| Turnstile on `/scan` (MPC-8430) | Widget for `mpt-scan-report` (`POST /api/scan`), secret `TURNSTILE_SECRET_KEY` on that Worker. `TURNSTILE_ENFORCE` in `workers/scan-report/wrangler.toml`: `"false"` = log only (search Workers Logs for `TURNSTILE_FAILED`), `"true"` = 403. Rollback: set `"false"` and merge. The stuck-scan alert will message Telegram if enforcement breaks real submissions. |
 
 ## 3. Deployment procedures
 
