@@ -155,11 +155,14 @@ const hktClock = (d) => new Date(d.getTime() + 8 * 3600e3).toISOString().slice(1
 export async function markDecided(env, target, text) {
   if (!target?.channel || !target?.ts || !env.SLACK_BOT_TOKEN || !Array.isArray(target.blocks)) return;
   const blocks = [...target.blocks.filter((b) => b.type !== 'actions'), { type: 'section', text: { type: 'mrkdwn', text } }];
-  await fetch('https://slack.com/api/chat.update', {
+  const res = await fetch('https://slack.com/api/chat.update', {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify({ channel: target.channel, ts: target.ts, text, blocks }),
   }).catch((e) => console.error('slack update failed', e?.message));
+  // Slack answers 200 with { ok: false, error } when it refuses an edit; surface that instead of failing silently.
+  const out = await res?.json?.().catch(() => null);
+  if (out && out.ok === false) console.error('slack update refused', out.error);
 }
 
 export async function process(env, { action, taskId, timestamp, approver, target }) {
@@ -169,7 +172,13 @@ export async function process(env, { action, taskId, timestamp, approver, target
 
   // Only a published or rejected cycle is final: a failed hand-off stays re-approvable ("Logged for retry").
   const done = (await rows(env, taskId, 'published')).length + (await rows(env, taskId, 'rejected')).length;
-  if (done) { await reply(env, target, 'Already decided for this cycle; ignoring.'); return { status: 200, message: 'already decided' }; }
+  if (done) {
+    await reply(env, target, 'Already decided for this cycle; ignoring.');
+    // Turn the still-clickable buttons into a banner so nobody keeps pressing a dead button.
+    const approved = (await rows(env, taskId, 'published')).length > 0;
+    await markDecided(env, target, approved ? '✅ *COMPLETED*: already approved and handed to Make.com. Further clicks are ignored.' : '❌ *REJECTED*: already rejected. Further clicks are ignored.');
+    return { status: 200, message: 'already decided' };
+  }
 
   if (action === 'reject') {
     await log(env, taskId, 'rejected', { draft: { by: approver } });
