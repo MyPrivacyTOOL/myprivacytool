@@ -35,11 +35,29 @@ const SECTIONS = [
   [/LINKEDIN/i, 'linkedin'],
 ];
 
+/**
+ * Pages pasted in as plain text carry their markdown literally: a paragraph block whose text reads "## PILLAR POST ..."
+ * (often several lines in one block) instead of a real heading block. Split such blocks per line and turn "#"/"##"/"###"
+ * lines into heading blocks, so real and pasted headings parse the same. Idempotent; real heading blocks pass through.
+ */
+export function normalizeBlocks(blocks) {
+  const out = [];
+  for (const b of blocks) {
+    if (/^heading_[123]$/.test(b.type) || typeof b.text !== 'string' || !b.text.includes('\n') && !/^\s*#{1,3}\s/.test(b.text)) { out.push(b); continue; }
+    for (const line of b.text.split('\n')) {
+      const h = /^\s*(#{1,3})\s+(.*)$/.exec(line);
+      if (h) out.push({ type: `heading_${h[1].length}`, text: h[2].replace(/\*\*/g, '').trim() });
+      else out.push({ ...b, text: line });
+    }
+  }
+  return out;
+}
+
 /** blocks: [{type, text, level?}] flattened in page order. Returns {'YYYY-MM-DD': {date, items}}. */
 export function parseSchedule(blocks, year = 2026) {
   const out = {};
   let section = null;
-  for (const b of blocks) {
+  for (const b of normalizeBlocks(blocks)) {
     if (b.type === 'heading_1' || b.type === 'heading_2') {
       section = SECTIONS.find(([re]) => re.test(b.text))?.[1] ?? null;
       continue;
@@ -59,7 +77,7 @@ export function parseSchedule(blocks, year = 2026) {
 /** Splits flattened blocks into [{heading, text}] on h1/h2/h3 so consumers can pick sections by heading. */
 export function toSections(blocks) {
   const sections = [{ heading: 'Overview', text: '' }];
-  for (const b of blocks) {
+  for (const b of normalizeBlocks(blocks)) {
     if (/^heading_[123]$/.test(b.type)) sections.push({ heading: b.text, text: '' });
     else if (b.text) { const s = sections.at(-1); s.text += (s.text ? '\n' : '') + b.text; }
   }
