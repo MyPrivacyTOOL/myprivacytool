@@ -27,9 +27,11 @@ const rows = [
   { signal_type: 'email-provider', check_status: 'weird' },
   { signal_type: 'breach:Adobe', check_status: 'found', details: 'password breach' },
   { signal_type: 'email-name', check_status: 'found', details: 'jane' },
+  { signal_type: 'email-libravatar', check_status: 'clear' },
+  { signal_type: 'email-domain-record', check_status: 'found', details: 'registered in 2012, owner visible' },
 ];
 const items = liveItems(rows);
-check(items.map((i) => i.id).join() === 'email-name,email-provider,email-profile', 'known checks only, in a fixed order, duplicates collapsed');
+check(items.map((i) => i.id).join() === 'email-name,email-provider,email-profile,email-libravatar,email-domain-record', 'known checks only, in a fixed order, duplicates collapsed');
 check(items.find((i) => i.id === 'email-name').status === 'found', 'the last copy of a rewritten row wins');
 check(items.find((i) => i.id === 'email-provider').status === 'not_checked', 'unknown status shown as not_checked, never guessed');
 check(items.every((i) => Object.keys(i).sort().join() === 'id,label,status') && !JSON.stringify(items).includes('gravatar') && !JSON.stringify(items).includes('jane'), 'no value, detail or source ever leaves');
@@ -43,7 +45,7 @@ const run = (req, over = {}) => handleLive(over.env || env, req, req.headers.get
 const fresh = await makeLiveToken(env, ID);
 let r = await run(get(fresh));
 let b = await r.json();
-check(r.status === 200 && b.items.length === 3 && b.done === true && b.report_sent === false, 'valid token: three redacted items, done');
+check(r.status === 200 && b.items.length === 5 && b.done === true && b.report_sent === false, 'valid token: five redacted items, done');
 r = await run(get(fresh), { sb: sbWith([rows[1]], [{ report_status: 'sent' }]) }); b = await r.json();
 check(b.items.length === 1 && b.done === false && b.report_sent === true, 'partial results: not done yet; report_sent reflects the scan');
 check((await run(get(fresh, 'https://evil.example'))).status === 403, 'foreign browser origin => 403');
@@ -60,10 +62,10 @@ const written = [];
 const sb = { select: async () => [], insertMany: async (table, rs) => { written.push(...rs.map((x) => ({ table, ...x }))); return rs; } };
 const stub = async (url) => { calls.push(String(url)); return { ok: false, status: 404, json: async () => ({}), text: async () => '' }; };
 let out = await runLiveChecks(env, sb, ID, 'jane.smith@example.com', stub);
-check(out.wrote === 3 && written.length === 3 && written.every((x) => x.table === 'signals' && x.scan_id === ID && /^email-/.test(x.signal_type)), 'writes the three email check rows for this scan');
+check(out.wrote === 5 && written.length === 5 && written.every((x) => x.table === 'signals' && x.scan_id === ID && /^email-/.test(x.signal_type)), 'writes the five email check rows for this scan');
 check(new Set(written.map((x) => Object.keys(x).join())).size === 1, 'all rows have the same columns (PostgREST bulk insert)');
 out = await runLiveChecks(env, { ...sb, select: async () => [{ id: 1 }] }, ID, 'a@b.co', stub);
-check(out.skipped && written.length === 3, 'a scan that already has rows is left alone');
+check(out.skipped && written.length === 5, 'a scan that already has rows is left alone');
 console.error = () => {};
 out = await runLiveChecks(env, { select: async () => { throw new Error('boom a@b.co'); } }, ID, 'a@b.co', stub);
 console.error = warn;
@@ -79,9 +81,10 @@ check(await readLiveToken(env, vtok, NOW + 1000) === null && await readVerifyTok
 check(await readVerifyToken(env, vtok.replace(/.$/, vtok.endsWith('A') ? 'B' : 'A'), NOW + 1000) === null, 'a tampered verify token is refused');
 check(await makeLiveLink({}, ID, NOW) === null, 'no UNSUBSCRIBE_SECRET => no link');
 const vitems = liveItems(rows, { verified: true });
-check(vitems.find((i) => i.id === 'email-profile').value === 'https://gravatar.com/secret-person' && vitems.find((i) => i.id === 'email-name').value === 'jane', 'verified view: a found check carries its value');
+check(vitems.find((i) => i.id === 'email-profile').value === 'https://gravatar.com/secret-person' && vitems.find((i) => i.id === 'email-name').value === 'jane' && vitems.find((i) => i.id === 'email-domain-record').value.includes('2012'), 'verified view: a found check carries its value');
 check(!('value' in vitems.find((i) => i.id === 'email-provider')), 'verified view: clear / not_checked checks carry no value');
 check(liveItems(rows).every((i) => !('value' in i)), 'unverified view: still no values');
+check(!JSON.stringify(liveItems(rows)).includes('2012'), 'unverified view: the domain record detail never leaves');
 const getV = (token) => new Request('https://x/api/scan/live', { headers: { Origin: 'https://myprivacytool.io', Authorization: `Bearer ${token}` } });
 const seen = [];
 const spySb = { select: async (p) => { seen.push(p); return p.startsWith('signals?') ? rows : [{ report_status: 'sent' }]; } };

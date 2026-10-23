@@ -432,8 +432,10 @@ const Privacy = () => {
                 <li>
                   <strong>Email Checks for Your Report:</strong> To prepare your
                   report we send the domain part of your email address to
-                  Cloudflare (a public DNS lookup), and a SHA-256 hash of your
-                  email address to Gravatar to see whether a public profile
+                  Cloudflare (a public DNS lookup) and to rdap.org and the
+                  domain registry it points to (the public domain-registration
+                  record), and a SHA-256 hash of your email address to Gravatar
+                  and to Libravatar to see whether a public profile or avatar
                   exists. Where we check whether your address appears in a data
                   breach, we name that provider here when the check is switched on
                 </li>
