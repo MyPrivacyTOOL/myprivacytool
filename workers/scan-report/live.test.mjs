@@ -1,5 +1,6 @@
 // MPC-8452: live view tokens, redaction and endpoint. Stubbed, no network. Run: node workers/scan-report/live.test.mjs
-import { LIVE_TTL_MS, handleLive, liveItems, makeLiveToken, readLiveToken, runLiveChecks } from './lib/live.js';
+import { LIVE_TTL_MS, VERIFY_TTL_MS, handleLive, liveItems, makeLiveLink, makeLiveToken, readLiveToken, readVerifyToken, runLiveChecks } from './lib/live.js';
+import { buildConfirmationEmail, buildReportEmail } from './lib/email.js';
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const ID = '0eb12fbe-bf51-4186-9c12-0449fa526322';
@@ -67,5 +68,39 @@ console.error = () => {};
 out = await runLiveChecks(env, { select: async () => { throw new Error('boom a@b.co'); } }, ID, 'a@b.co', stub);
 console.error = warn;
 check(out.failed === true, 'never throws, even when the database fails');
+
+// ---- MPC-8452 increment 2: the email link proves inbox ownership and unlocks the detail
+const link = await makeLiveLink(env, ID, NOW);
+check(link.startsWith('https://www.myprivacytool.io/scan/live#v=' + ID + '.'), 'email link carries the token in the URL fragment (never sent to a server)');
+const vtok = link.split('#v=')[1];
+check(await readVerifyToken(env, vtok, NOW + 1000) === ID, 'verify token grants the scan');
+check(await readVerifyToken(env, vtok, NOW + VERIFY_TTL_MS + 1) === null, 'verify token expires after 7 days');
+check(await readLiveToken(env, vtok, NOW + 1000) === null && await readVerifyToken(env, t, NOW + 1000) === null, 'a stream token is not a verify token and the other way round');
+check(await readVerifyToken(env, vtok.replace(/.$/, vtok.endsWith('A') ? 'B' : 'A'), NOW + 1000) === null, 'a tampered verify token is refused');
+check(await makeLiveLink({}, ID, NOW) === null, 'no UNSUBSCRIBE_SECRET => no link');
+const vitems = liveItems(rows, { verified: true });
+check(vitems.find((i) => i.id === 'email-profile').value === 'https://gravatar.com/secret-person' && vitems.find((i) => i.id === 'email-name').value === 'jane', 'verified view: a found check carries its value');
+check(!('value' in vitems.find((i) => i.id === 'email-provider')), 'verified view: clear / not_checked checks carry no value');
+check(liveItems(rows).every((i) => !('value' in i)), 'unverified view: still no values');
+const getV = (token) => new Request('https://x/api/scan/live', { headers: { Origin: 'https://myprivacytool.io', Authorization: `Bearer ${token}` } });
+const seen = [];
+const spySb = { select: async (p) => { seen.push(p); return p.startsWith('signals?') ? rows : [{ report_status: 'sent' }]; } };
+r = await run(getV(vtok), { sb: spySb }); b = await r.json();
+check(r.status === 200 && b.verified === true && b.items.find((i) => i.id === 'email-profile').value, 'Bearer verify token: 200, verified, values returned');
+check(seen.some((p) => p.startsWith('signals?') && p.includes('details')), 'details are only read from the database for a verified request');
+seen.length = 0;
+r = await run(get(fresh), { sb: spySb }); b = await r.json();
+check(b.verified === false && !seen.some((p) => p.includes('details')), 'stream token: not verified, details never read from the database');
+check((await run(getV('forged.1800000000000.sig'))).status === 401 && (await run(getV(fresh))).status === 401, 'forged verify token, or a stream token sent as Bearer => 401');
+r = await run(getV(fresh.replace(/\./g, '.')), { sb: spySb });
+check(r.status === 401, 'a stream token never unlocks the detail through the Bearer path');
+
+// ---- the emails carry the link only when there is one
+const conf = buildConfirmationEmail({ liveLink: link });
+check(conf.text.includes('/scan/live?utm_source=email') && conf.text.includes('#v=' + vtok) && conf.html.includes('Watch my results live') && conf.html.includes('#v=' + vtok), 'confirmation email: link in text and a button in html, token still in the fragment after the utm tags');
+check(!buildConfirmationEmail({}).text.includes('/scan/live') && !buildConfirmationEmail({}).html.includes('/scan/live'), 'confirmation email without a link is unchanged');
+const rep = buildReportEmail({ scan: { id: ID, score: null, risk_level: null, partial: true, categories_checked: [], categories_unchecked: [] }, breachStatus: 'not_checked', liveLink: link });
+check(rep.text.includes('#v=' + vtok) && rep.html.includes('Watch my results live') && rep.html.includes('#v=' + vtok), 'report email: link in text and html');
+check(!buildReportEmail({ scan: { id: ID, score: null, risk_level: null, partial: true, categories_checked: [], categories_unchecked: [] }, breachStatus: 'not_checked' }).html.includes('/scan/live'), 'report email without a link is unchanged');
 
 console.log(ok ? 'ALL PASS' : 'FAILURES'); process.exit(ok ? 0 : 1);
