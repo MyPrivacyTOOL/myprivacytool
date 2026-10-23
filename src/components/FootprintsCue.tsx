@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import FootprintsIcon from "./FootprintsIcon";
 
 // The Path (Chris, 2026-10-23): hexagons are ahead of you, footsteps are where you are, footprints are the trail behind you.
 // This is the always-visible cue: what is behind you, the promise, and a remove button on each footprint.
@@ -27,7 +28,8 @@ export default function FootprintsCue({ footprints, onRemove, className = "" }: 
       aria-labelledby="footprints-heading"
       data-testid="footprints-cue"
     >
-      <h3 id="footprints-heading" className="mb-1 text-sm font-semibold uppercase tracking-wider text-foreground">
+      <h3 id="footprints-heading" className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-foreground">
+        <FootprintsIcon className="h-7 w-7 shrink-0 text-primary" />
         Your footprints
       </h3>
       <p className="text-sm text-foreground" data-testid="footprints-promise">{FOOTPRINTS_PROMISE}</p>
