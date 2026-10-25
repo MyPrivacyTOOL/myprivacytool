@@ -39,3 +39,4 @@ test-results
 .wrangler
 supabase/.env
 e2e-screenshots
+playwright-report-live/
