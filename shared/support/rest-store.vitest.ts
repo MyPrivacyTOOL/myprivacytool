@@ -31,6 +31,14 @@ describe("RestCaseStore", () => {
     expect(h.apikey).toBe("k-test"); expect(h.Authorization).toBe("Bearer k-test");
     expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ p_channel: "web", p_event_id: "e1", p_sender: "v1" });
   });
+  it("uses the Supabase /rest/v1 prefix by default and honours restPrefix", async () => {
+    const urls: string[] = [];
+    const fetchImpl = (async (u: string) => { urls.push(u); return new Response("[]", { status: 200 }); }) as unknown as typeof fetch;
+    await new RestCaseStore({ baseUrl: "https://test.invalid", serviceKey: "k", fetchImpl }).getCase("c1");
+    await new RestCaseStore({ baseUrl: "https://test.invalid", serviceKey: "k", fetchImpl, restPrefix: "" }).getCase("c1");
+    expect(urls[0]).toBe("https://test.invalid/rest/v1/support_cases?id=eq.c1&limit=1");
+    expect(urls[1]).toBe("https://test.invalid/support_cases?id=eq.c1&limit=1");
+  });
   it("URL-encodes filter values so a hostile thread key cannot add filters", async () => {
     const { store, calls } = fake(() => ({ body: [] }));
     await store.findCaseByThread("email", "x&state=eq.closed");

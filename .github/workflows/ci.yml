@@ -146,6 +146,9 @@ jobs:
         env:
           SUPPORT_REST_URL: http://localhost:3000
         run: npx vitest run shared/support/rest-store.integration.vitest.ts
+      - name: PostgREST logs (on failure)
+        if: failure()
+        run: docker logs postgrest 2>&1 | tail -60
 
   build:
     name: Production build

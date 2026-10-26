@@ -2,7 +2,7 @@
 // MPC-8528: RestCaseStore and the service over a REAL PostgREST on a throwaway Postgres (CI job `support-rest`).
 // Skips itself unless SUPPORT_REST_URL is set. Never point it at a Supabase project: it writes synthetic rows.
 // Every assertion reads state back from the database through the API; nothing is satisfied by a canned response.
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import { createHmac, randomUUID } from "node:crypto";
 import { RestCaseStore, handleInbound, buildTools, newCaseRef, type InboundEvent, type Notifier, type Model, type SupportDeps } from "./index";
 
@@ -15,12 +15,20 @@ const jwt = (role: string) => {
   const head = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role, exp: Math.floor(Date.now() / 1000) + 600 })}`;
   return `${head}.${createHmac("sha256", SECRET).update(head).digest("base64url")}`;
 };
-const store = (role = "service_role") => new RestCaseStore({ baseUrl: URL_ ?? "http://localhost:0", serviceKey: jwt(role) });
+const store = (role = "service_role") => new RestCaseStore({ baseUrl: URL_ ?? "http://localhost:0", serviceKey: jwt(role), restPrefix: "" });
 const now = new Date().toISOString();
 const ev = (o: Partial<InboundEvent> = {}): InboundEvent => ({ channel: "web", providerEventId: `it-${randomUUID()}`, text: "I can't find my report", senderHandle: "visitor-1", receivedAt: now, ...o });
 const init = () => ({ ref: newCaseRef(), policyVersion: "it-test", now });
 
 run("RestCaseStore against PostgREST + Postgres", () => {
+  beforeAll(async () => {
+    // Fail fast and clearly if PostgREST cannot see the schema (an empty schema cache otherwise shows up as 404 everywhere).
+    const r = await fetch(`${URL_}/`, { headers: { Authorization: `Bearer ${jwt("service_role")}` } });
+    const spec = (await r.json()) as { paths?: Record<string, unknown> };
+    const paths = Object.keys(spec.paths ?? {});
+    for (const need of ["/support_cases", "/support_messages", "/support_action_receipts", "/support_usage", "/rpc/support_create_case_from_event", "/rpc/support_append_inbound"])
+      expect(paths, `PostgREST does not expose ${need}; exposed: ${paths.join(", ")}`).toContain(need);
+  });
   it("creates a case, and a repeated provider event returns the same case without a second one", async () => {
     const s = store(); const e = ev();
     const a = await s.createCaseFromEvent(e, init());
@@ -91,7 +99,7 @@ run("RestCaseStore against PostgREST + Postgres", () => {
     const m = await s.addOutbound(c.id, "hello", "ai", now);
     expect(m.delivery).toBe("queued");
     await s.setDelivery(m.id, "failed");
-    const r = await fetch(`${URL_}/rest/v1/support_messages?id=eq.${m.id}&select=delivery`, { headers: { Authorization: `Bearer ${jwt("service_role")}` } });
+    const r = await fetch(`${URL_}/support_messages?id=eq.${m.id}&select=delivery`, { headers: { Authorization: `Bearer ${jwt("service_role")}` } });
     expect((await r.json())[0].delivery).toBe("failed");
   });
   it("usage accounting sums calls and cost inside the window", async () => {
@@ -101,13 +109,15 @@ run("RestCaseStore against PostgREST + Postgres", () => {
     expect(await s.usageSince(key, new Date(Date.now() + 60_000).toISOString())).toEqual({ calls: 0, costUnits: 0 });
   });
   it("anon and authenticated roles cannot read or call anything over HTTP", async () => {
-    for (const role of ["anon", "authenticated"]) {
-      const h = { Authorization: `Bearer ${jwt(role)}`, "Content-Type": "application/json" };
-      expect((await fetch(`${URL_}/rest/v1/support_cases?select=id`, { headers: h })).ok, `${role} read`).toBe(false);
-      const rpc = await fetch(`${URL_}/rest/v1/rpc/support_create_case_from_event`, { method: "POST", headers: h, body: JSON.stringify({ p_channel: "web", p_event_id: "x", p_thread_key: null, p_sender: null, p_text: "x", p_ref: "SUP-ABCDEFGH", p_policy: "p" }) });
-      expect(rpc.ok, `${role} rpc`).toBe(false);
+    const body = JSON.stringify({ p_channel: "web", p_event_id: `deny-${randomUUID()}`, p_thread_key: null, p_sender: null, p_text: "x", p_ref: newCaseRef(), p_policy: "p" });
+    const read = (role?: string) => fetch(`${URL_}/support_cases?select=id&limit=1`, { headers: role ? { Authorization: `Bearer ${jwt(role)}` } : {} });
+    const call = (role?: string) => fetch(`${URL_}/rpc/support_create_case_from_event`, { method: "POST", headers: { "Content-Type": "application/json", ...(role ? { Authorization: `Bearer ${jwt(role)}` } : {}) }, body });
+    // positive control: the same requests succeed for service_role, so a denial below means a permission refusal, not a missing route
+    expect((await read("service_role")).status).toBe(200);
+    expect((await call("service_role")).status).toBe(200);
+    for (const role of ["anon", "authenticated", undefined]) {
+      for (const res of [await read(role), await call(role)]) expect([401, 403], `${role ?? "no token"}`).toContain(res.status);
     }
-    expect((await fetch(`${URL_}/rest/v1/support_cases?select=id`)).ok).toBe(false); // no token at all
   });
   it("handleInbound end to end: the persisted case, messages and receipt match what the customer was told", async () => {
     const s = store(); const sent: string[] = [];
@@ -124,7 +134,7 @@ run("RestCaseStore against PostgREST + Postgres", () => {
     const stored = await s.getCaseByRef(r1.caseRef!);
     expect(stored?.state).toBe("waiting_customer");
     expect(sent[0]).toContain(r1.caseRef!); expect(sent[0]).toMatch(/state=/);
-    const rr = await fetch(`${URL_}/rest/v1/support_action_receipts?case_id=eq.${stored!.id}&select=tool,outcome,policy_version`, { headers: { Authorization: `Bearer ${jwt("service_role")}` } });
+    const rr = await fetch(`${URL_}/support_action_receipts?case_id=eq.${stored!.id}&select=tool,outcome,policy_version`, { headers: { Authorization: `Bearer ${jwt("service_role")}` } });
     expect(await rr.json()).toEqual([{ tool: "get_case_status", outcome: "success", policy_version: "it-policy" }]);
     const r2 = await handleInbound(deps, e); // a repeated provider event
     expect(r2.duplicate).toBe(true); expect(sent).toHaveLength(1); expect(model.complete).toHaveBeenCalledTimes(1);
