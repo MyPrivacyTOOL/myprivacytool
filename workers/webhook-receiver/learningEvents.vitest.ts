@@ -49,6 +49,18 @@ describe('POST /api/learning/event', () => {
     ]) expect((await call(bad)).status).toBe(400);
     expect(stored).toEqual([]);
   });
+  it('counts the body in bytes, not characters, and refuses a declared oversize before reading it', async () => {
+    expect((await call({ ...good, pad: 'é'.repeat(1500) })).status).toBe(413);   // about 1530 characters, over 3000 bytes
+    expect((await call(good, { ...web, 'Content-Length': '999999' })).status).toBe(413);
+    expect(stored).toEqual([]);
+  });
+  it('logs a failed write without the database error text, which can quote the row', async () => {
+    status = 409;
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect((await call({ ...good, event_type: 'shown', answer: undefined })).status).toBe(202);
+    expect(err.mock.calls.flat().join(' ')).toMatch(/insert failed: 409$/);
+  });
   it('is rate limited per address: 429 with Retry-After and nothing stored; no binding, or one that errors, fails open', async () => {
     const seen: string[] = [];
     const limiter = (success: boolean) => ({ limit: async ({ key }: { key: string }) => { seen.push(key); return { success }; } });
