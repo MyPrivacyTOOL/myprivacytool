@@ -1,17 +1,17 @@
 # MPC-8529 — Support follow-up watchdog, outage fallback and journey tests (PREPARATORY DESIGN)
 
 **Status: prepared design only.** Nothing here is implemented, installed, scheduled or verified.
-MPC-8529 is **not claimed**. Its prerequisites have no delivered outputs as of 2026-10-26 (see §1), so
+MPC-8529 is **not claimed**. Two of its three prerequisites have no delivered outputs as of 2026-10-26 (see §1), so
 acceptance stays open. This file is a separately bounded, docs-only preparation: no code, no migrations,
 no schedules, no live messages, no new infrastructure, no spend.
 
-## 1. Prerequisite evidence (checked 2026-10-26)
+## 1. Prerequisite evidence (checked 2026-10-26; MPC-8527 row re-checked after main moved)
 
 | Prerequisite | Needed output | Found |
 |---|---|---|
 | MPC-8530 policy pack | Evidence matrix, runbooks, action/cost/retry policy, approvals | None (Result Summary empty, Not started) |
 | MPC-8528 AI backend | Durable case model, delivery receipts, tool gateway PR | None (no PR, no code, Needs_Info) |
-| MPC-8527 HELP shell | Shared HELP component and route tests PR | None (no PR, no component) |
+| MPC-8527 HELP shell | Shared HELP component and route tests PR | **Delivered to main** as #533 (`HelpButton.tsx`, `HelpButton.test.tsx`; source + isolated tests only, `AI_SUPPORT_AVAILABLE = false`, deployed behaviour not verified, task not Done) |
 
 Everything below that depends on those outputs is marked **[BLOCKED-ON]** and must be re-validated against
 the real contracts before any implementation.
