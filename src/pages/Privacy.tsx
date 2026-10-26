@@ -4,6 +4,7 @@ import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from 
 import pageMeta from "@/data/pageMeta.json";
 import { referralsEnabled } from "@/lib/referral";
 import { recognitionFlagOn } from "@/lib/webScan";
+import { learningEventsEnabled } from "@/lib/learning/events";
 
 // MPC-7538: one language of the HK Stop Spam section. Wording lives in src/data/hkSpamCopy.ts (MPC-7542 reviews the Chinese).
 const HkPolicyBlocks = ({ copy, id }: { copy: HkPolicyCopy; id: string }) => (
@@ -276,6 +277,52 @@ const Privacy = () => {
                 </a>{" "}
                 with your scan number or the email address you used.
               </p>
+
+              {learningEventsEnabled() && (
+                <>
+                  <h3 className="mt-6 text-xl font-semibold text-foreground">
+                    2.4A Your Answers About a Hexagon
+                  </h3>
+                  <p className="text-muted-foreground">
+                    If you accepted analytics in the cookie banner, and you press
+                    an answer button on a hexagon in your scan (for example
+                    &ldquo;Yes, that&rsquo;s me&rdquo; or &ldquo;Not me&rdquo;), we
+                    record your answer, which hexagon it was about, which look the
+                    hexagon had, and how sure we said we were. We also record that
+                    the hexagon was shown to you. Closing a prompt, or tapping a
+                    hexagon without answering, records nothing. If you did not
+                    accept analytics, nothing is sent.
+                  </p>
+                  <p className="mt-4 text-muted-foreground">
+                    We do not record what we found (for example your city or your
+                    internet provider), your IP address, your email address or
+                    anything that names you. So that one visitor is not counted
+                    twice, your browser makes a random code and keeps it in its own
+                    storage. The code is not linked to your email address, your
+                    scan number or any account.
+                  </p>
+                  <p className="mt-4 text-muted-foreground">
+                    We use the answers only as counts, to see how often our guesses
+                    are right. A person may change how sure we say we are about a
+                    hexagon, and only after at least 30 people have answered about
+                    it. We do not make decisions about you from your answers. We
+                    keep each answer for about 90 days. After that it is turned
+                    into a daily count that no longer contains the random code.
+                  </p>
+                  <p className="mt-4 text-muted-foreground">
+                    To stop, withdraw your consent in the cookie settings, or clear
+                    this site&rsquo;s data in your browser. To ask us to delete the
+                    answers linked to your random code, write to{" "}
+                    <a
+                      href="mailto:privacy@myprivacytool.io"
+                      className="text-brand underline hover:text-foreground"
+                    >
+                      privacy@myprivacytool.io
+                    </a>{" "}
+                    and we will tell you how to find it.
+                  </p>
+                </>
+              )}
 
               {recognitionFlagOn() && (
                 <>
