@@ -4,9 +4,11 @@
 //   (JSON requires `Authorization: Bearer <APPROVAL_API_TOKEN>`).
 //   reject      -> log to D1, reply in the Slack thread
 //   approve_all -> build the 6-platform payload, validate it (schema.js), POST it once to the Make.com webhook,
-//                  log every attempt to D1 (make_webhook_log + agent_execution_logs 'published'/'failed' + social_metrics), reply in thread
+//                  log every attempt to D1 (make_webhook_log + agent_execution_logs 'handed_off'/'failed' + publication_receipts), reply in thread.
+//                  A Make 2xx is HANDED OFF only. POST /receipt (HMAC-signed) is the only path to verified_published. GET /status reports stages.
 
 import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
+import { recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
@@ -118,10 +120,11 @@ async function logMake(env, taskId, { statusCode = null, request = '', response 
 }
 
 /** POST the validated payload once. Resolves { ok, statusCode, error } and always writes a make_webhook_log row. */
-export async function postToMake(env, taskId, payload) {
+export async function postToMake(env, taskId, payload, meta = {}) {
   const body = JSON.stringify(payload);
   if (!env.MAKE_WEBHOOK_URL) {
     const error = 'MAKE_WEBHOOK_URL is not configured';
+    meta.notSent = true; // definitely not delivered, so not an ambiguous outcome
     await logMake(env, taskId, { request: body, error });
     return { ok: false, statusCode: null, error };
   }
@@ -131,6 +134,7 @@ export async function postToMake(env, taskId, payload) {
     const res = await fetch(env.MAKE_WEBHOOK_URL, { method: 'POST', headers, body, signal: AbortSignal.timeout(MAKE_TIMEOUT_MS) });
     const text = await res.text().catch(() => '');
     const error = res.ok ? null : `Make webhook ${res.status}`;
+    meta.retryAfterS = parseRetryAfter(res.headers?.get?.('retry-after'));
     await logMake(env, taskId, { statusCode: res.status, request: body, response: text, error });
     return { ok: res.ok, statusCode: res.status, error };
   } catch (e) {
@@ -171,12 +175,14 @@ export async function process(env, { action, taskId, timestamp, approver, target
   target ??= (await rows(env, taskId, 'notified'))[0];
 
   // Only a published or rejected cycle is final: a failed hand-off stays re-approvable ("Logged for retry").
-  const done = (await rows(env, taskId, 'published')).length + (await rows(env, taskId, 'rejected')).length;
+  // CK-8482: 'handed_off' is the truthful status for a Make 2xx; 'published' rows are legacy cycles written before it.
+  const handedOff = (await rows(env, taskId, 'handed_off')).length + (await rows(env, taskId, 'published')).length;
+  const done = handedOff + (await rows(env, taskId, 'rejected')).length;
   if (done) {
     await reply(env, target, 'Already decided for this cycle; ignoring.');
     // Turn the still-clickable buttons into a banner so nobody keeps pressing a dead button.
-    const approved = (await rows(env, taskId, 'published')).length > 0;
-    await markDecided(env, target, approved ? '✅ *COMPLETED*: already approved and handed to Make.com. Further clicks are ignored.' : '❌ *REJECTED*: already rejected. Further clicks are ignored.');
+    const approved = handedOff > 0;
+    await markDecided(env, target, approved ? '✅ *HANDED OFF*: already approved and handed to Make.com. Further clicks are ignored.' : '❌ *REJECTED*: already rejected. Further clicks are ignored.');
     return { status: 200, message: 'already decided' };
   }
 
@@ -222,20 +228,44 @@ export async function process(env, { action, taskId, timestamp, approver, target
     return { status: 422, message: error };
   }
 
-  const sent = await postToMake(env, taskId, payload);
+  // CK-8482: per-platform state. Tracking must never mask the real outcome, so a D1 failure here degrades to the legacy flow.
+  const platforms = payload.posts.map((p) => p.platform);
+  let toSend = platforms;
+  try {
+    await recordDrafted(env.AGENT_LOGS, taskId, platforms, approvedAt);
+    await recordApproved(env.AGENT_LOGS, taskId, platforms, approvedAt);
+    toSend = sendable(await rowsFor(env.AGENT_LOGS, taskId), platforms, approvedAt);
+  } catch (e) {
+    console.error('publication_receipts tracking unavailable', e?.message);
+  }
+  if (!toSend.length) {
+    // Everything already handed off (or awaiting reconciliation of an ambiguous timeout): never re-send.
+    await reply(env, target, 'Nothing to send: every platform is already handed off, verified, or awaiting reconciliation of an unknown outcome.');
+    succeeded = true;
+    return { status: 200, message: 'nothing to send' };
+  }
+  const outbound = toSend.length === platforms.length ? payload : { ...payload, posts: payload.posts.filter((p) => toSend.includes(p.platform)) };
+
+  const meta = {};
+  const sent = await postToMake(env, taskId, outbound, meta);
   if (!sent.ok) {
+    const ambiguous = sent.statusCode === null && !meta.notSent; // timeout / network error: Make may have received it
+    let outcome = null;
+    try { outcome = await recordHandoffFailure(env.AGENT_LOGS, taskId, toSend, { error: sent.error, ambiguous, retryAfterS: meta.retryAfterS, now: new Date() }); } catch (e) { console.error('publication_receipts tracking unavailable', e?.message); }
     await log(env, taskId, 'failed', { error: sent.error });
-    await reply(env, target, 'Failed to post drafts. Logged for retry.');
+    if (ambiguous) {
+      await reply(env, target, 'Make.com did not confirm the hand-off (timeout/network error). Outcome UNKNOWN: nothing will be re-sent until it has been reconciled.');
+      succeeded = true; // keep the claim: a second click must not re-send an unreconciled hand-off
+      return { status: 502, message: sent.error };
+    }
+    await reply(env, target, outcome?.deadLettered?.length ? `Failed to post drafts. Retries exhausted for ${outcome.deadLettered.join(', ')}; needs a human.` : 'Failed to post drafts. Logged for retry.');
     return { status: 502, message: sent.error };
   }
 
-  for (const p of payload.posts) {
-    await env.AGENT_LOGS.prepare('INSERT INTO social_metrics (id, timestamp, platform, topic, impressions, engagement, url) VALUES (?, ?, ?, ?, 0, 0, NULL)')
-      .bind(crypto.randomUUID(), iso(), p.platform, drafts.find((d) => d.platform === p.platform)?.topic ?? null).run();
-  }
-  await log(env, taskId, 'published', { draft: { platforms: payload.posts.map((p) => p.platform), approved_by: approver } });
-  const names = payload.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ');
-  const done = `✅ *COMPLETED*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${payload.posts.length} posts: ${names}. Publishing is done by the Make.com scenario.`;
+  try { await recordHandedOff(env.AGENT_LOGS, taskId, toSend, { now: new Date() }); } catch (e) { console.error('publication_receipts tracking unavailable', e?.message); }
+  await log(env, taskId, 'handed_off', { draft: { platforms: toSend, approved_by: approver } });
+  const names = outbound.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ');
+  const done = `✅ *HANDED OFF*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${outbound.posts.length} posts: ${names}. Not yet verified as published: platform receipts will confirm each post.`;
   await reply(env, target, done);
   await markDecided(env, target, done);
   succeeded = true;
@@ -243,9 +273,68 @@ export async function process(env, { action, taskId, timestamp, approver, target
   }
 }
 
+/**
+ * CK-8482 bounded recovery. Re-sends ONLY platforms that definitely failed and are due (backoff elapsed, not dead-lettered,
+ * approval intact); ambiguous timeouts are reconciled first and never re-sent on `unknown`.
+ * reconcile(contentId, platform) -> 'received' | 'not_received' | 'unknown'  (optional; without it unknown stays pending)
+ * Not scheduled by default: wiring a cron needs account-level authority (see the CK-8482 runbook).
+ */
+export async function recover(env, { now = new Date(), reconcile = null, contentIds = null } = {}) {
+  const report = { resent: [], reconciled: [], deadLettered: [], skipped: [] };
+  const { results } = await env.AGENT_LOGS.prepare("SELECT DISTINCT content_id FROM publication_receipts WHERE (state = 'failed' AND dead_letter = 0) OR outcome_unknown = 1").bind().all();
+  for (const { content_id: id } of results ?? []) {
+    if (contentIds && !contentIds.includes(id)) continue;
+    // Publication approval stays intact: no approval row, or a rejection, means nothing is re-sent.
+    if (!(await rows(env, id, 'approved')).length || (await rows(env, id, 'rejected')).length) { report.skipped.push({ id, reason: 'not_approved' }); continue; }
+    const target = (await rows(env, id, 'notified'))[0];
+    let current = await rowsFor(env.AGENT_LOGS, id);
+    for (const r of current.filter((x) => x.outcome_unknown)) {
+      const verdict = reconcile ? await reconcile(id, r.platform).catch(() => 'unknown') : 'unknown';
+      await applyReconciliation(env.AGENT_LOGS, id, r.platform, verdict, { source: 'recover', now });
+      report.reconciled.push({ id, platform: r.platform, verdict });
+    }
+    current = await rowsFor(env.AGENT_LOGS, id);
+    const due = sendable(current, current.filter((x) => x.state === 'failed').map((x) => x.platform), now);
+    if (!due.length) continue;
+    const drafts = (await rows(env, id, 'drafted')).filter((d) => due.includes(d.platform));
+    const payload = buildMakePayload(drafts, { taskId: id, approvedBy: env.SLACK_APPROVER || 'chris', approvalTimestamp: now.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL });
+    const check = validateMakePayload(payload);
+    if (!check.ok) { report.skipped.push({ id, reason: 'schema_invalid' }); continue; }
+    const meta = {};
+    const sent = await postToMake(env, id, payload, meta);
+    if (sent.ok) {
+      await recordHandedOff(env.AGENT_LOGS, id, due, { now });
+      await log(env, id, 'handed_off', { draft: { platforms: due, recovery: true } });
+      report.resent.push({ id, platforms: due });
+      continue;
+    }
+    const out = await recordHandoffFailure(env.AGENT_LOGS, id, due, { error: sent.error, ambiguous: sent.statusCode === null && !meta.notSent, retryAfterS: meta.retryAfterS, now });
+    if (out.deadLettered.length) {
+      report.deadLettered.push({ id, platforms: out.deadLettered });
+      await reply(env, target, `ALERT: retries exhausted for ${out.deadLettered.join(', ')} (${id}). Last error: ${sent.error}. Needs a human; nothing further will be sent automatically.`);
+    }
+  }
+  return report;
+}
+
 export default {
+  // Only runs when a cron trigger is configured for this Worker; none is (CK-8482 does not activate schedules).
+  async scheduled(_event, env, ctx) { ctx.waitUntil(recover(env).catch((e) => console.error('recover failed', e?.message))); },
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
+    if (pathname === '/receipt') {
+      if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
+      const out = await handleReceipt(env, await request.text(), request.headers);
+      return Response.json({ ok: out.status < 400, message: out.message, state: out.state }, { status: out.status });
+    }
+    if (pathname === '/status') {
+      const auth = request.headers.get('authorization') ?? '';
+      if (!env.APPROVAL_API_TOKEN || !safeEqualReceipt(auth, `Bearer ${env.APPROVAL_API_TOKEN}`)) return new Response('Unauthorized', { status: 401 });
+      const id = new URL(request.url).searchParams.get('drafted_content_id') ?? '';
+      if (!/^daily-posts-\d{4}-\d{2}-\d{2}$/.test(id)) return new Response('Bad drafted_content_id', { status: 400 });
+      const found = await rowsFor(env.AGENT_LOGS, id);
+      return Response.json({ drafted_content_id: id, platforms: found.map(({ platform, state, attempts, post_id, post_url, make_run_id, provenance, outcome_unknown, dead_letter }) => ({ platform, state, attempts, post_id, post_url, make_run_id, provenance, outcome_unknown, dead_letter })), ...classifyCycle(found) });
+    }
     if (pathname !== '/approve') return Response.json({ ok: true, worker: 'mpt-content-approval' });
     if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
 
