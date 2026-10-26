@@ -1,6 +1,6 @@
 # DRAFT, NOT APPROVED: "How we calculate your score"
 
-**Status: proposed wording for Chris to approve (or change) before merge. It is not routed, linked from the popup or the report, or published anywhere. Words in [square brackets] depend on open decisions O-1 to O-6 in `docs/exposure-score-spec.md`.**
+**Status: APPROVED by Chris on 2026-10-26 (reply "approved" to the wording, the O-1 finding and the baseline migration) and published as `src/pages/ScoreMethod.tsx` at `/how-we-calculate-your-score`. The page generates its weights and bands from `shared/hexagon-registry/score.js`; this file is the approved text, kept for reference. Any change to the wording needs Chris again.**
 
 ---
 

@@ -1,6 +1,6 @@
 # Exposure score, bands and coverage: specification `exposure-v1` (MPC-7471-F4)
 
-Status: **DRAFT PR, not merged, not deployed.** Chris approved four concepts (D-a to D-d, 2026-10-13, recorded in the task's Approval_Notes). He has **not** approved the weights, the severity map, the registry mapping or the public wording. Those are listed under "Decision register" and are marked PROPOSED in the code.
+Status: see the PR. Chris approved four concepts (D-a to D-d, 2026-10-13, recorded in the task's Approval_Notes) and, on 2026-10-26, replied "approved" to the wording, the O-1 finding and the baseline migration. The weights, severity map and registry mapping were proposed unchanged and went through that same reply; they stay marked PROPOSED in code comments until the Notion record says otherwise.
 
 Code: `shared/hexagon-registry/score.js` (types `score.d.ts`, tests `score.test.mjs`). The page reaches it through `src/lib/exposureScore.ts`. Nothing in this change alters what the scan detects.
 
@@ -76,7 +76,8 @@ Structure of the registry today (54 hexagons, 41 always present and 13 condition
 * **O-7. Z for conditional hexagons** belongs to MPC-7471-F2. This contract takes Z as a parameter (default: the registry's 54). If F2 decides Z excludes hexagons that do not apply to a device, pass it as `{ total }`; nothing else changes.
 * **O-8. Two score families.** The score above is the **browser web-scan** score. A different score exists for **email-footprint scans** (see section 6). They measure different things and must not share a name. Decide whether the email one is renamed, kept, or later unified. Not touched here.
 * **O-9. Server-side recomputation of the baseline.** The baseline Worker receives the score from the browser and can only range-check it. Recomputing needs the per-hexagon statuses sent to `mpt-leads`, a new data flow that needs a privacy decision. Not done. (If MPC-7471-F3 option A moves the popup onto the report pipeline, the saved scan already holds the statuses and the Worker can recompute from it.)
-* **O-10. Wording.** Band labels ("Low/Medium/High exposure"), "Exposure score", "Coverage" and "Not enough checked to score" are drafts in code. The explainer (`docs/exposure-score-explainer-draft.md`) is a draft and is **not routed or linked** until Chris approves it.
+* **O-10. Wording. Approved by Chris, 2026-10-26** (reply "approved"): band labels ("Low/Medium/High exposure"), "Exposure score", "Coverage", "Not enough checked to score" and the explainer. The page is `/how-we-calculate-your-score`, linked from the scan-complete dialog, the PDF and the report JSON (`web_scan.exposure.method_url`). It is **deliberately not linked from the report email body**: the email's headline score is the email-footprint score (O-8), a different measure, so the link would point at the wrong method.
+* **O-1 accepted** by the same reply: complete scans reading High is accepted for now; revisit with real data.
 
 ## 5. Mathematical requirements and where they are tested
 

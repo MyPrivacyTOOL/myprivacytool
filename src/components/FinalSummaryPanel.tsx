@@ -453,6 +453,9 @@ export default function FinalSummaryPanel({
       pdf.setFontSize(9);
       pdf.setTextColor(...byBand(band, PDF.riskHigh, PDF.riskMid, PDF.brand, PDF.muted));
       pdf.text(`${getRiskLabel()} · ${SCORE_VERSION}`, margin + 5, yPos + 7);
+      pdf.setFontSize(7);
+      pdf.setTextColor(...PDF.muted);
+      pdf.text('How we calculate your score: https://myprivacytool.io/how-we-calculate-your-score', margin + 65, yPos + 7);
       
       yPos += 20;
 

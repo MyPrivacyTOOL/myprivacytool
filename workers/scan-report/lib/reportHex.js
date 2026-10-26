@@ -149,7 +149,8 @@ export function hexText(hexes) {
 const outHex = (h) => ({ id: h.id, label: h.label, category: h.category, status: h.status, value: h.status === 'found' ? clean(h.value, 1000) : null, reported_value: h.status !== 'found' ? (h.reported ?? null) : null, estimate: h.estimate, detail: h.detail });
 // MPC-7471-F4: the web scan's exposure score, band and coverage (score_version in the object), from the statuses the report already shows.
 // A saved scan is final. `report.score` below is a different measure (the email-footprint privacy health score) and is left as it was.
-export const webExposure = (web) => computeExposure(web.map((h) => ({ id: h.id, status: h.status })), { final: true });
+export const EXPOSURE_METHOD_URL = 'https://myprivacytool.io/how-we-calculate-your-score';
+export const webExposure = (web) => ({ ...computeExposure(web.map((h) => ({ id: h.id, status: h.status })), { final: true }), method_url: EXPOSURE_METHOD_URL });
 export function buildReportJson({ scanId, webScan, web, emailHexes, score, generatedAt = new Date().toISOString() }) {
   return {
     schema_version: REPORT_JSON_VERSION,

@@ -106,6 +106,7 @@ describe('exposure-v1 replay across every consumer', () => {
     expect(pdfTexts).toContain('Exposure score');
     expect(pdfTexts).toContain('Coverage');
     expect(pdfTexts.some((t) => t.includes('Medium exposure') && t.includes(SCORE_VERSION))).toBe(true);
+    expect(pdfTexts.some((t) => t.includes('/how-we-calculate-your-score'))).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: /export json/i }));
     const json = JSON.parse(blobs.at(-1)!);
@@ -152,6 +153,7 @@ describe('exposure-v1 replay across every consumer', () => {
     const ex = report.web_scan.exposure;
     expect(ex).toMatchObject({ score_version: SCORE_VERSION, score: EXPECTED.score, band: EXPECTED.band, provisional: false });
     expect(ex.coverage).toEqual({ checked: EXPECTED.checked, total: 54, percent: EXPECTED.coverage });
+    expect(ex.method_url).toBe('https://myprivacytool.io/how-we-calculate-your-score');
     expect(report.web_scan.summary).toMatchObject({ found: EXPECTED.found, clear: EXPECTED.clear });
     // the page and the saved scan agree because both use the same status rules
     const page = exposureForPage(SCAN, true);

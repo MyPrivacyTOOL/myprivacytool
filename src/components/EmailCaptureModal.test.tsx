@@ -27,6 +27,14 @@ describe("EmailCaptureModal", () => {
     expect(screen.getByText(new RegExp(`${percentHalfUp(23, HEXAGON_COUNT)}% coverage`))).toBeInTheDocument();
   });
 
+  it("links to how the score is calculated", () => {
+    setup(55);
+    const a = screen.getByTestId("score-method-link");
+    expect(a).toHaveAttribute("href", "/how-we-calculate-your-score");
+    expect(a).toHaveAttribute("target", "_blank");
+    expect(a.getAttribute("rel")).toContain("noopener");
+  });
+
   it("with nothing checked there is no score and no band, never a Low label", () => {
     setup(null);
     expect(screen.getByText("Not enough checked to score")).toBeInTheDocument();

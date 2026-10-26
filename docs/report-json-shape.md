@@ -18,7 +18,8 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
       "coverage": { "checked": 9, "total": 54, "percent": 17 },
       "counts": { "found": 5, "clear": 4, "not_checked": 3, "checked": 9 },
       "categories": { /* per weight category: weight, found, clear, checked, exposure (null when nothing checked) */ },
-      "excluded_categories": [], "rejected": [], "warnings": []
+      "excluded_categories": [], "rejected": [], "warnings": [],
+      "method_url": "https://myprivacytool.io/how-we-calculate-your-score"
     },
     "hexagons": [
       {

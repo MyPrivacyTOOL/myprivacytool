@@ -199,6 +199,9 @@ export default function EmailCaptureModal({
               <span className="text-muted-foreground"> — {riskScore === null ? 'no score yet' : `${riskScore}/100 exposure score`} · {coveragePct}% coverage</span>
             </div>
           </div>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            <a href="/how-we-calculate-your-score" target="_blank" rel="noopener" className="underline" data-testid="score-method-link">How we calculate your score</a>
+          </p>
 
           <div>
             <h3 className="text-base font-semibold text-foreground leading-tight">Get your full privacy fix guide</h3>

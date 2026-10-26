@@ -4,7 +4,7 @@ import { test, expect, consoleErrors } from "./fixtures";
 const ROUTES: [string, RegExp][] = [
   ["/", /MyPrivacyTOOL/i], ["/scan", /scan/i], ["/start", /MyPrivacyTOOL/i], ["/contact", /contact/i],
   ["/newsletter", /MyPrivacyTOOL|privacy check/i], ["/pricing", /pricing/i], ["/privacy", /privacy/i],
-  ["/terms", /terms/i], ["/faq", /faq/i],
+  ["/terms", /terms/i], ["/faq", /faq/i], ["/how-we-calculate-your-score", /how we calculate your score/i],
 ];
 
 for (const [route, title] of ROUTES) {
