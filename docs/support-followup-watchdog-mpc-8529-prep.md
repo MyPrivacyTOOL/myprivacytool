@@ -135,6 +135,9 @@ when MPC-8528 lands a real case schema, and replace the proposed backoff and bou
 | Follow-up engine (tables, lease claim, idempotent attempts, bounded backoff, exhaustion, verify, reopen, sweep, metrics view) | `supabase/sql/mpc-8529-support-followup.sql` | Tested on a throwaway Postgres 16. **Not applied to production.** Deliberately not in `supabase/migrations/`, which auto-deploys. |
 | Sweep schedule (`mpt-support-followup-sweep`, every 5 min) | same file, commented out | **Not scheduled.** Needs approval. |
 | Honest outage wording and bound helpers | `src/lib/supportFollowup.ts` (+ test) | Unit-tested; **not wired into any UI or worker yet**. |
+| Sanitised defect-handoff builder (redacts email, token, URL query, phone, IP, cookie; routes only to `engineering_review`; `autoFixAllowed: false`) | `src/lib/supportDefectHandoff.ts` (+ test) | Unit-tested. **Builds a payload only; nothing sends it.** |
+| Versioned test receipts (expected vs actual, evidence class, refuses PII/tokens; `isLiveVerified` needs a passing real-channel check) | `src/lib/supportReceipts.ts` (+ test) | Unit-tested; not yet emitted by CI. |
+| Full follow-up lifecycle journey (intake, promised update, failed send, retry, receipt, 60 days of silence, failed then passed verification, reopen, exhaustion on a dead transport) | `supabase/tests/support-followup.test.sql` | Passes on throwaway Postgres 16 (provisional schema). |
 | HELP-under-outage browser checks (11 routes incl. 404, desktop + mobile, keyboard, focus return, no token/email in requests) | `e2e/support-degraded.spec.ts` | Run on a production build with all non-local traffic blocked. |
 
 Run command: `npm run test:support` (needs `DATABASE_URL` of a disposable Postgres and a built `dist/`; see `docs/ci-cd-testing.md`).
@@ -149,7 +152,7 @@ Receipts (run 2026-10-26 on this branch; expected = pass):
 | eslint (changed files), `tsc --noEmit -p tsconfig.app.json` | clean | clean |
 | Playwright `support-degraded.spec.ts` | pass | 24 / 24 |
 
-Evidence class: **mocked / isolated integration only.** No real channel, no production database, no live message.
+Receipts are structured by `src/lib/supportReceipts.ts` (versioned, timestamped, expected vs actual). Evidence class: **mocked / isolated integration only.** No real channel, no production database, no live message.
 
 ### Acceptance criteria against this build
 
@@ -157,11 +160,11 @@ Evidence class: **mocked / isolated integration only.** No real channel, no prod
 |---|---|
 | Persistent next-action / next-update scheduling, bounded retries, backoff, idempotency, lease against duplicate workers | Met in isolated DB tests (provisional schema) |
 | Orphan and stalled-lease detection; explicit waiting / unresolved / exhausted states; no close-on-silence; verification; reopen | Met in isolated DB tests |
-| Sanitised defect handoff to the engineering workflow | **Unmet.** Only the `engineering_handoff` state exists; no sender. |
+| Sanitised defect handoff to the engineering workflow | **Partly met.** Sanitising builder is built and tested; **no sender** into the authorised engineering workflow (needs that workflow's intake and approval). |
 | Failed acknowledgement / reply detection from a real transport | **Unmet.** Needs MPC-8528 delivery receipts and a worker. |
 | Independently reachable help/status/intake fallback | **Unmet.** Needs an approved host other than Cloudflare Pages. `describeAvailability` only labels shared-host fallbacks as not independent. |
 | HELP across routes, desktop/mobile, keyboard, honest copy | Met for the current HELP (11 routes in browser, all route patterns in HELP's own unit test) |
-| Full main journey (diagnosis, action, case reference, delivered follow-up, verified outcome, reopen) | **Unmet.** Needs MPC-8528 backend; only the follow-up state transitions are tested. |
+| Full main journey (diagnosis, action, case reference, delivered follow-up, verified outcome, reopen) | **Partly met.** The follow-up half (promise, delivery, verification, reopen, exhaustion) is tested end to end in SQL. The front half (AI diagnosis, permitted action, case reference) needs MPC-8528. |
 | Wrong-user access, broken login, disputed finding, billing boundary, malicious prompts, cost exhaustion | **Unmet.** Belong to the MPC-8528 gateway and MPC-8530 policy. |
 | Production schedule, live tests, load test | **Not done; approval required.** |
 

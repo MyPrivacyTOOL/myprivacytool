@@ -109,6 +109,35 @@ select pg_temp.assert(pg_temp.st('C-4') = 'reopened' and (select reopened_count 
 select pg_temp.assert(public.support_followup_customer_reply('C-1') = 'reopened', 'reply also reopens an exhausted case');
 select pg_temp.assert((select attempt_count from public.support_followup where case_ref = 'C-1') = 0, 'reopen resets the attempt bound');
 
+
+-- ===== full lifecycle journey (provisional): intake -> promised update -> failed send -> retry delivered -> silence -> proposal ->
+--       failed verification -> re-proposal -> verified -> customer reply reopens -> exhaustion on a dead transport =====
+select public.support_followup_open('J-1');
+select pg_temp.assert(pg_temp.st('J-1') = 'open', 'journey: intake creates an open case');
+select public.support_followup_schedule_update('J-1', now() + interval '1 hour') as jdue \gset
+select pg_temp.assert(:'jdue'::timestamptz > now(), 'journey: update promise is committed before it is told to the customer');
+update public.support_followup set next_action_at = now() where case_ref = 'J-1';
+select pg_temp.assert((select count(*) from public.support_followup_claim_due('journey-worker', 100, 300) where case_ref = 'J-1') = 1, 'journey: due update is claimed');
+select pg_temp.assert(public.support_followup_record_attempt('J-1', 'j-a1', 'update', 'failed') = 'recorded', 'journey: first send fails');
+select pg_temp.assert(pg_temp.st('J-1') = 'delivery_failed', 'journey: failed send is visible, not hidden');
+select pg_temp.assert(public.support_followup_record_attempt('J-1', 'j-a2', 'update', 'attempted') = 'recorded', 'journey: retry sent, no receipt yet');
+select pg_temp.assert(pg_temp.st('J-1') <> 'waiting_customer', 'journey: attempted is still not delivered');
+select pg_temp.assert(public.support_followup_mark_delivered('j-a2', 'receipt-j2'), 'journey: receipt arrives');
+select pg_temp.assert(pg_temp.st('J-1') = 'waiting_customer', 'journey: delivered, now waiting for the customer');
+update public.support_followup set updated_at = now() - interval '60 days', last_attempt_at = now() - interval '60 days' where case_ref = 'J-1';
+select * from public.support_followup_sweep();
+select pg_temp.assert(pg_temp.st('J-1') = 'waiting_customer', 'journey: 60 days of silence leaves the case waiting, never resolved');
+select public.support_followup_propose_resolution('J-1');
+select pg_temp.assert(public.support_followup_verify_resolution('J-1', false) = 'open', 'journey: outcome check fails, work continues');
+select public.support_followup_propose_resolution('J-1');
+select pg_temp.assert(public.support_followup_verify_resolution('J-1', true) = 'resolved_verified', 'journey: outcome verified');
+select pg_temp.assert(public.support_followup_customer_reply('J-1') = 'reopened', 'journey: customer reply reopens');
+select pg_temp.assert(public.support_followup_record_attempt('J-1', 'j-b1', 'first_response', 'failed') = 'recorded'
+                  and public.support_followup_record_attempt('J-1', 'j-b2', 'first_response', 'failed') = 'recorded'
+                  and public.support_followup_record_attempt('J-1', 'j-b3', 'first_response', 'failed') = 'recorded', 'journey: dead transport, three bounded attempts');
+select pg_temp.assert(pg_temp.st('J-1') = 'unresolved_exhausted', 'journey: ends honestly as unresolved_exhausted, not as success');
+select pg_temp.assert((select reopened_count from public.support_followup where case_ref = 'J-1') = 1, 'journey: reopen history kept');
+
 -- ===== metrics: counts only, no case identifiers =====
 select pg_temp.assert((select reopened_cases from public.support_followup_metrics) >= 2, 'metrics count reopened cases');
 select pg_temp.assert((select resolved_verified from public.support_followup_metrics) = 0, 'metrics: reopened case is no longer resolved');
