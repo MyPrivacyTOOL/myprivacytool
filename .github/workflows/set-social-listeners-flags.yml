@@ -1,0 +1,45 @@
+name: Set Telegram test-account flags (social-listeners)
+
+# MPC-7892: manual. Actions -> "Set Telegram test-account flags" -> Run workflow (or the GitHub API workflow_dispatch endpoint).
+# Switches TELEGRAM_BASELINE_SCAN (MPC-7891) and TELEGRAM_DEEP_SCAN (MPC-7892) on or off for the social-listeners Worker and changes nothing else.
+# Both features still only act for senders in PROBE_TELEGRAM_IDS (the allow-list must already be set on the Worker; this job refuses otherwise).
+# Run with mode dry-run first: it prints binding names and types, never values. Rollback: run again with value off.
+# If a later "Deploy core-brain & social-listeners" drops the flags (check with a dry-run), they must move to wrangler.toml; see docs/telegram-deep-scan.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      value:
+        description: Flag value
+        type: choice
+        options: ["on", "off"]
+        default: "on"
+      mode:
+        description: dry-run prints the plan; apply changes the Worker
+        type: choice
+        options: ["dry-run", "apply"]
+        default: "dry-run"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: set-social-listeners-flags
+  cancel-in-progress: false
+
+jobs:
+  flags:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Change the flags
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FLAG_VALUE: ${{ inputs.value }}
+          MODE: ${{ inputs.mode }}
+        run: node scripts/ci/worker-flags.mjs
