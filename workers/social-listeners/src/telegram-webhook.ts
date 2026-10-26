@@ -2,6 +2,7 @@
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
+import { handleFixWizard, isFixWizardUpdate } from "./fix-wizard";
 import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
@@ -47,6 +48,14 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const deep = handleDeepCommand(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(deep);
     else await deep;
+    return done(new Response("OK"));
+  }
+
+  // MPC-7894 fix wizard (default off, allow-listed test accounts): "/fix" and its callback buttons; handled here so core-brain never sees them.
+  if (isFixWizardUpdate(env, payload)) {
+    const wiz = handleFixWizard(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(wiz);
+    else await wiz;
     return done(new Response("OK"));
   }
 

@@ -43,6 +43,8 @@ export interface Env {
   TELEGRAM_BASELINE_SCAN?: string;
   /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
   PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
+  /** MPC-7894 Telegram fix wizard: "on" enables /fix and its buttons for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
+  TELEGRAM_FIX_WIZARD?: string;
   /** MPC-7892 Telegram DEEP username check: "on" enables it for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
   TELEGRAM_DEEP_SCAN?: string;
   /** Days until deep_jobs rows expire (default 90, clamped 1-365). */
