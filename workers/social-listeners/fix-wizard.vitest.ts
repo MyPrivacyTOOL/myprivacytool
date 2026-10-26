@@ -248,7 +248,7 @@ describe("Scan again and sharing", () => {
     await t.post(cb(`fw|${B8}|r`, 90));
     const text = t.shown();
     expect(text).toMatch(/OBSERVED by the bot, same fields both times/);
-    expect(text).toMatch(/Before \(2026-10-26\): \d+ of \d+ returned/);
+    expect(text).toMatch(/Before \(26th October 2026\): \d+ of \d+ returned/);
     expect(text).toMatch(/SELF-CONFIRMED by you \(not checked, kept separate\): 1 of 5/);
     expect(text).toMatch(/not proof that you are safer/);
     expect(text).toContain("https://myprivacytool.io/scan?");
@@ -272,6 +272,18 @@ describe("Scan again and sharing", () => {
     await t.post(cb(`fw|${B8}|r`, 92));
     expect(t.shown()).toMatch(/could not re-check/);
     expect(t.shown()).not.toMatch(/Before \(/);
+  });
+});
+
+describe("dates", () => {
+  it("shows Hong Kong time in 29th October 2026 format", async () => {
+    const { day } = await import("./src/fix-wizard");
+    expect(day("2026-10-28T17:00:00Z")).toBe("29th October 2026"); // 01:00 on the 29th in Hong Kong
+    expect(day("2026-10-26T14:24:10Z")).toBe("26th October 2026");
+    expect(day("2026-11-01T00:00:00Z")).toBe("1st November 2026");
+    expect(day("2026-11-12T00:00:00Z")).toBe("12th November 2026");
+    expect(day("2026-11-22T00:00:00Z")).toBe("22nd November 2026");
+    expect(day("2026-11-23T00:00:00Z")).toBe("23rd November 2026");
   });
 });
 

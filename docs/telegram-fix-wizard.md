@@ -35,3 +35,6 @@ Max 5 re-checks per sender per hour. A replayed `update_id` is processed once (u
 
 ## Switches, deploy, rollback
 `TELEGRAM_FIX_WIZARD=on` and the sender in `PROBE_TELEGRAM_IDS`. Merging to `main` auto-deploys `social-listeners`: treat the merge as a production action. Order: apply `supabase/migrations/20261026220000_mpc_7894_fix_wizard.sql` by hand (after approval) -> deploy -> set the var. Rollback: unset `TELEGRAM_FIX_WIZARD`; `drop table public.fix_wizard_items;` (re-check rows in `profile_snapshots` have `scan_version telegram-recheck-1` and expire on their own).
+
+## Decisions recorded (Chris, 2026-10-26)
+Risk stays a count out of 30 (risk-count-1), no weights; before/after is a count, not the old 0-10 score. A wording and legal pass is approved and required before any real user. Every date shown to users is Hong Kong time in "29th October 2026" format. Task due date: 29th October 2026 (the Due Date property).

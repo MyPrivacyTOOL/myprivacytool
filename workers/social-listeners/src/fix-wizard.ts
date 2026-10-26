@@ -60,7 +60,13 @@ type Button = { text: string; callback_data?: string; url?: string };
 interface View { text: string; keyboard?: Button[][] }
 const b8 = (id: string): string => id.replace(/-/g, "").slice(0, 8);
 const data = (base: BaselineRow, ...parts: string[]): string => ["fw", b8(base.id), ...parts].join("|");
-const day = (iso: string): string => iso.slice(0, 10);
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const ordinal = (n: number): string => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : n % 10 <= 3 ? ["th", "st", "nd", "rd"][n % 10] : "th"}`;
+/** Every date shown to the user: Hong Kong time, "29th October 2026". */
+export const day = (iso: string): string => {
+  const hk = new Date(new Date(iso).getTime() + 8 * 3_600_000);
+  return `${ordinal(hk.getUTCDate())} ${MONTHS[hk.getUTCMonth()]} ${hk.getUTCFullYear()}`;
+};
 
 async function loadBaseline(env: Env, senderId: string): Promise<BaselineRow | "error" | null> {
   const r = await rest(env, "GET", `profile_snapshots?sender_id=eq.${senderId}&scan_version=eq.${SCAN_VERSION}&status=eq.complete&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc&limit=1&select=id,created_at,scan_version,risk_version,report`);
