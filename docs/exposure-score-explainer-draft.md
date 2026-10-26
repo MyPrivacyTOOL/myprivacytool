@@ -1,4 +1,4 @@
-# DRAFT, NOT APPROVED: "How we calculate your score"
+# APPROVED TEXT: "How we calculate your score"
 
 **Status: APPROVED by Chris on 2026-10-26 (reply "approved" to the wording, the O-1 finding and the baseline migration) and published as `src/pages/ScoreMethod.tsx` at `/how-we-calculate-your-score`. The page generates its weights and bands from `shared/hexagon-registry/score.js`; this file is the approved text, kept for reference. Any change to the wording needs Chris again.**
 
