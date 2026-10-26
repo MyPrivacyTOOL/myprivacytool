@@ -48,7 +48,7 @@ describe('scan-complete dialog (EmailCaptureModal)', () => {
     expect(dialogs).toHaveLength(1);
     expect(dialogs[0]).toHaveAccessibleName('You finished your scan');
     expect(dialogs[0]).toHaveAccessibleDescription(/does not change any of it/);
-    expect(within(dialogs[0]).getByTestId('scan-complete-result')).toHaveTextContent('Medium Risk — 78/100');
+    expect(within(dialogs[0]).getByTestId('scan-complete-result')).toHaveTextContent('High exposure — 78/100');
     expect(within(dialogs[0]).getByPlaceholderText('your@email.com')).toBeInTheDocument();
   });
 
@@ -62,7 +62,7 @@ describe('scan-complete dialog (EmailCaptureModal)', () => {
     open();
     act(() => { vi.advanceTimersByTime(60_000); });
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    expect(screen.getByTestId('scan-complete-result')).toHaveTextContent('Medium Risk — 78/100');
+    expect(screen.getByTestId('scan-complete-result')).toHaveTextContent('High exposure — 78/100');
   });
 
   it('keeps the consent controls: unticked box, same wording, No thanks, unsubscribe line', () => {
@@ -132,7 +132,7 @@ describe('score and label match the page (shared contract)', () => {
     const label = getPageRiskLabel(risk.percentage, true);
     const { unmount } = render(<RiskScore confirmed={4} total={4} counts={scanCounts(hexagons)} hexagons={hexagons} fingerprint={null} />);
     expect(screen.getByText(label)).toBeInTheDocument();
-    expect(screen.getByText(`${risk.percentage}%`)).toBeInTheDocument();
+    expect(screen.getByText(String(risk.percentage))).toBeInTheDocument();
     unmount();
     render(<EmailCaptureModal riskScore={risk.percentage} confirmedCount={4} onClose={() => {}} onSubmit={() => {}} />);
     expect(screen.getByTestId('scan-complete-result')).toHaveTextContent(`${label} — ${risk.percentage}/100`);
@@ -144,8 +144,10 @@ describe('score and label match the page (shared contract)', () => {
     expect(screen.getByTestId('scan-complete-result')).toHaveTextContent(`${getPageRiskLabel(risk.percentage, true)} — ${risk.percentage}/100`);
   });
 
-  it('thresholds are the page thresholds: 80 High, 50 Medium, 1 Low', () => {
-    expect([100, 80, 79, 50, 49, 1].map((n) => getPageRiskLabel(n))).toEqual(['High Risk', 'High Risk', 'Medium Risk', 'Medium Risk', 'Low Risk', 'Low Risk']);
+  it('thresholds are the one shared definition: Low 0-39, Medium 40-69, High 70-100; no score is never Low', () => {
+    expect([100, 70, 69, 40, 39, 0].map((n) => getPageRiskLabel(n))).toEqual(['High exposure', 'High exposure', 'Medium exposure', 'Medium exposure', 'Low exposure', 'Low exposure']);
+    expect(getPageRiskLabel(null)).toBe('Scanning...');
+    expect(getPageRiskLabel(null, true)).toBe('Not enough checked to score');
   });
 });
 

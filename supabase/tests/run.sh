@@ -54,5 +54,23 @@ psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 echo "== support follow-up assertions (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/support-followup.test.sql
 
+# MPC-7471-F4: the PROPOSED baseline score_version migration (supabase/proposed/, not in supabase/migrations/) on rows saved the old way, then its own rollback.
+echo "== proposed migration: baseline score_version (MPC-7471-F4)"
+PROPOSED=supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql
+# rows saved the old way (no score_version column yet), as production holds them
+psql_ "$TEST_URL" -c "insert into public.mpt_score_baselines (email_hash, overall_score, category_scores) values (repeat('a', 64), 40, '{\"fingerprint\":50}'), (repeat('d', 64), 85, '{}')"
+before=$(psql_ "$TEST_URL" -At -c "select count(*) || ':' || coalesce(sum(overall_score),0) from public.mpt_score_baselines")
+psql_ "$TEST_URL" -f "$PROPOSED"
+psql_ "$TEST_URL" -f "$PROPOSED"   # idempotent: a second run changes nothing
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-baseline-score-version.test.sql
+echo "   rollback (text taken from the migration header)"
+sed -n '/^-- ROLLBACK/,/^$/p' "$PROPOSED" | sed -n 's/^--   //p' > "${TMPDIR:-/tmp}/f4-rollback.sql"
+test -s "${TMPDIR:-/tmp}/f4-rollback.sql" || { echo "::error::no rollback text found in $PROPOSED"; exit 1; }
+psql_ "$TEST_URL" -f "${TMPDIR:-/tmp}/f4-rollback.sql"
+after=$(psql_ "$TEST_URL" -At -c "select count(*) || ':' || coalesce(sum(overall_score),0) from public.mpt_score_baselines")
+[ "$before" = "$after" ] || { echo "::error::rollback did not restore the legacy rows ($before vs $after)"; exit 1; }
+psql_ "$TEST_URL" -At -c "select 1 from pg_constraint where conname='mpt_score_baselines_email_hash_key'" | grep -q 1 || { echo "::error::rollback did not restore the unique(email_hash) key"; exit 1; }
+echo "   legacy rows identical before and after: $before"
+
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

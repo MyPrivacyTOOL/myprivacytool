@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Shield, Briefcase, Heart, Zap, ChevronRight, AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { bandFor, BAND_LABEL } from '../../shared/hexagon-registry/score.js';
 
 export type RiskProfile = 'professional' | 'parent' | 'activist' | 'general';
 
@@ -63,11 +64,8 @@ export default function RiskProfileSelector({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return { label: 'High Risk', class: 'text-foreground' };
-    if (risk >= 40) return { label: 'Medium Risk', class: 'text-foreground' };
-    return { label: 'Low Risk', class: 'text-foreground' };
-  };
+  // MPC-7471-F4: the band comes from the one shared definition (shared/hexagon-registry/score.js).
+  const getRiskLabel = (risk: number) => ({ label: BAND_LABEL[bandFor(Math.round(risk)) ?? 'low'], class: 'text-foreground' });
 
   const { label: riskLabel } = getRiskLabel(riskScore);
 

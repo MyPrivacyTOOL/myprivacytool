@@ -5,12 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getPageRiskLabel } from '@/lib/scanResult';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { percentHalfUp, SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { loadTurnstile, TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 
 interface EmailCaptureModalProps {
-  riskScore: number;
+  /** The shared exposure score (MPC-7471-F4); null when nothing could be checked. */
+  riskScore: number | null;
   categoryScores?: Record<string, number>;
+  /** Version of the contract that produced riskScore; stored with the baseline so scores of different versions are never compared. */
+  scoreVersion?: string;
+  /** Coverage = checked / true registry total, from the same contract. */
+  coveragePercent?: number;
   confirmedCount: number;
   /** MPC-7471-F2: when given, the popup states confirmed / checked / total in the same words as the summary. */
   counts?: ScanCounts;
@@ -24,12 +30,18 @@ interface Baseline {
   overall_score: number;
   created_at: string;
   is_first: boolean;
-  delta: number;
+  delta: number | null;
+  /** The method that produced the stored baseline. 'legacy' = saved before exposure-v1. */
+  score_version?: string;
+  /** False when the stored baseline used a different method: no delta is given and none may be implied. */
+  comparable?: boolean;
 }
 
 export default function EmailCaptureModal({
   riskScore,
   categoryScores,
+  scoreVersion = SCORE_VERSION,
+  coveragePercent,
   confirmedCount,
   counts,
   onClose,
@@ -66,7 +78,6 @@ export default function EmailCaptureModal({
     };
   }, []);
 
-  // MPC-7471-F1: label from the shared page result (80 / 50), not a local copy of the thresholds.
   // MPC-7471-F1: confetti fires once when this dialog opens, briefly, behind the dialog layer so it cannot cover text or controls.
   // Not at all for visitors who ask for reduced motion; the message is the same either way.
   useEffect(() => {
@@ -83,14 +94,10 @@ export default function EmailCaptureModal({
     });
   }, []);
 
-  const getRiskLabel = (risk: number) => {
-    const label = getPageRiskLabel(risk, true);
-    if (label === 'High Risk') return { label, color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
-    if (label === 'Medium Risk') return { label, color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
-    return { label, color: 'text-foreground', bg: 'bg-risk-low-soft border-risk-low/30' };
-  };
-
-  const { label: riskLabel, color: riskColor, bg: riskBg } = getRiskLabel(riskScore);
+  // MPC-7471-F4: the label comes from the one shared band definition (Low 0-39, Medium 40-69, High 70-100); no score means nothing was checked.
+  const riskLabel = getPageRiskLabel(riskScore, true);
+  const riskColor = 'text-foreground';
+  const riskBg = riskLabel === 'High exposure' ? 'bg-risk-high-soft border-risk-high/30' : riskLabel === 'Medium exposure' ? 'bg-risk-mid-soft border-risk-mid/30' : riskLabel === 'Low exposure' ? 'bg-risk-low-soft border-risk-low/30' : 'bg-muted border-border';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +129,7 @@ export default function EmailCaptureModal({
         body: JSON.stringify({
           email: trimmed,
           riskScore,
+          scoreVersion,
           categoryScores,
           confirmedCount,
           source: 'web_scan_summary',
@@ -150,7 +158,7 @@ export default function EmailCaptureModal({
     }
   };
 
-  const exposurePct = Math.round((confirmedCount / HEXAGON_COUNT) * 100);
+  const coveragePct = coveragePercent ?? percentHalfUp(Math.min(confirmedCount, counts?.total ?? HEXAGON_COUNT), counts?.total ?? HEXAGON_COUNT);
 
   const contentRef = useRef<HTMLDivElement>(null);
   // The dialog has no Trigger (it opens on scan completion), so Radix has nothing to return focus to: remember what had focus when it opened.
@@ -192,10 +200,13 @@ export default function EmailCaptureModal({
             <AlertTriangle className={`w-5 h-5 ${riskColor} shrink-0`} aria-hidden="true" />
             <div className="text-sm">
               <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
-              <span className="text-muted-foreground"> — {riskScore}/100 risk score · {exposurePct}% exposure</span>
+              <span className="text-muted-foreground"> — {riskScore === null ? 'no score yet' : `${riskScore}/100 exposure score`} · {coveragePct}% coverage</span>
               {counts && <p className="mt-1 text-muted-foreground" data-testid="scan-counts-line">{scanCountsLine(counts)}</p>}
             </div>
           </div>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            <a href="/how-we-calculate-your-score" target="_blank" rel="noopener" className="underline" data-testid="score-method-link">How we calculate your score</a>
+          </p>
 
           <div>
             <h3 className="text-base font-semibold text-foreground leading-tight">Get your full privacy fix guide</h3>
@@ -224,10 +235,12 @@ export default function EmailCaptureModal({
               {baseline && (
                 <p className="text-sm text-foreground">
                   {baseline.is_first
-                    ? `Baseline saved: ${baseline.overall_score}/100 risk (${new Date(baseline.created_at).toLocaleDateString()}).`
-                    : `Your baseline: ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}). Now ${riskScore}/100, ${
-                        baseline.delta === 0 ? 'no change' : `${Math.abs(baseline.delta)} points ${baseline.delta < 0 ? 'lower (better)' : 'higher (worse)'}`
-                      }.`}
+                    ? `Baseline saved: ${baseline.overall_score}/100 exposure score (${new Date(baseline.created_at).toLocaleDateString()}).`
+                    : baseline.comparable === false || baseline.delta === null
+                      ? `Your earlier score, ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}), used an older method, so it cannot be compared with today's.`
+                      : `Your baseline: ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}). Now ${riskScore}/100, ${
+                          baseline.delta === 0 ? 'no change' : `${Math.abs(baseline.delta)} points ${baseline.delta < 0 ? 'lower' : 'higher'}`
+                        }.`}
                 </p>
               )}
               <Button
