@@ -30,10 +30,10 @@ HK_SPAM_ENABLED = "true"
 # Rollback: set "false" (test mode) or HK_SPAM_ENABLED = "false" and merge, or Actions -> Rollback Worker -> mpt-scan-report. Sends already made cannot be undone.
 HK_SPAM_EMAILS_LIVE = "true"
 
-# MPC-8452 Tier 2: search public GitHub commits for the visitor's address. This is the only check that sends the PLAIN address to a third party (owner approved the
-# check on 2026-10-26). OFF. Turn it on ("true", exact) only after the Privacy page line for it says it is on, and ideally set the Worker secret GITHUB_SEARCH_TOKEN
-# (a GitHub token with no scopes) because the unauthenticated search allows about 10 requests a minute. Anything but "true" runs nothing. See docs/osint-list-mpc-8452.md.
-EMAIL_GITHUB_COMMITS_ENABLED = "false"
+# MPC-8452 Tier 2: search public GitHub commits for the visitor's address. This is the only check that sends the PLAIN address to a third party. ON since
+# 2026-10-26 on the owner's instruction, after the Privacy page sentence for it went live (PR 528). Only the exact string "true" runs it; "false" is the rollback.
+# Set the Worker secret GITHUB_SEARCH_TOKEN (a GitHub token with no scopes) because the unauthenticated search allows about 10 requests a minute. See docs/osint-list-mpc-8452.md.
+EMAIL_GITHUB_COMMITS_ENABLED = "true"
 
 # MPC-7465/7470: save the visitor's scan with the email request (POST /api/scan with scan + save_consent:true, the separate tick box at the contact step).
 # ON since 2026-10-12 (MPC-7470: wording approved by Chris, decision D12, production migrations applied). Anything but "true" saves nothing, so "false" is the rollback.

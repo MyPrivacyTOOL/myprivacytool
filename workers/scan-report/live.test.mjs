@@ -118,9 +118,10 @@ check(!buildReportEmail({ scan: { id: ID, score: null, risk_level: null, partial
   check(rr.items.length === 6 && rr.done === true && rr.items.at(-1).id === 'email-github-commits' && !('value' in rr.items.at(-1)), 'switch ON: six finished => done, and the unverified view carries no detail');
   const vr = await (await handleLive({ ...env, EMAIL_GITHUB_COMMITS_ENABLED: 'true' }, new Request('https://x/api/scan/live', { headers: { Origin: 'https://myprivacytool.io', Authorization: `Bearer ${await makeLiveLink(env, ID, Date.now()).then((l) => l.match(/#v=(.+)$/)?.[1])}` } }), 'https://myprivacytool.io', json, { allowedOrigins: ORIGINS, limited: async () => false, sb: sbWith([{ signal_type: 'email-github-commits', check_status: 'found', details: 'at least 2 public commits' }]) })).json();
   check(vr.verified === true && vr.items[0]?.value === 'at least 2 public commits', 'verified (email link) view: the GitHub finding carries its detail');
-  const withGh = buildReportEmail({ scan: { id: ID, score: null, risk_level: null, partial: true, categories_checked: [], categories_unchecked: [] }, breachStatus: 'not_checked', emailChecks: [{ id: 'email-github-commits', status: 'found', value: 'x' }] });
-  const without = buildReportEmail({ scan: { id: ID, score: null, risk_level: null, partial: true, categories_checked: [], categories_unchecked: [] }, breachStatus: 'not_checked' });
-  check(withGh.html.length === without.html.length || !withGh.html.includes('Public code commits'), 'report email: an unregistered GitHub result is ignored, the report does not change');
+  const base = { scan: { id: ID, score: null, risk_level: null, partial: true, categories_checked: [], categories_unchecked: [] }, breachStatus: 'not_checked' };
+  const withGh = buildReportEmail({ ...base, emailChecks: [{ id: 'email-github-commits', status: 'found', value: 'This address is the author of at least 2 public commits on GitHub.' }] });
+  const without = buildReportEmail(base);
+  check(withGh.html.includes('Public code commits') && without.html.includes('Public code commits') && withGh.html.includes('FOUND') && /\[NOT CHECKED[^\n]*Public code commits|Public code commits[^\n]*NOT CHECKED/.test(without.text + without.html), 'report email: the GitHub hexagon is part of every report, FOUND with a result and NOT CHECKED without one');
 }
 
 console.log(ok ? 'ALL PASS' : 'FAILURES'); process.exit(ok ? 0 : 1);
