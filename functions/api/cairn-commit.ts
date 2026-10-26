@@ -11,7 +11,21 @@
  * - Unit tests verify round-trip and no plaintext in logs/DB
  */
 
-import { createHash, randomBytes } from "crypto";
+// No Node built-ins here: Cloudflare Pages Functions only bundle with the Web Crypto API unless the project enables
+// the nodejs_compat flag, and an unresolved import fails the whole Pages build (so no site deploy goes out).
+
+const toBase64 = (bytes: Uint8Array): string => {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+};
+
+const fromBase64 = (b64: string): Uint8Array => {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
 
 export interface CairnCommitEnv {
   SUPABASE_URL?: string;
@@ -48,20 +62,12 @@ interface CairnFactRecord {
 }
 
 /**
- * Generate a cryptographic salt using Node.js crypto (Cloudflare Workers support).
- * Falls back to crypto.getRandomValues() if needed.
+ * Generate a cryptographic salt with the Web Crypto API (available in Cloudflare Workers and Node 19+).
  */
 function generateSalt(length: number = 32): string {
-  try {
-    // Node.js crypto (available in Cloudflare Workers)
-    const salt = randomBytes(length);
-    return salt.toString("base64");
-  } catch {
-    // Fallback to Web Crypto API
-    const buffer = new Uint8Array(length);
-    crypto.getRandomValues(buffer);
-    return Buffer.from(buffer).toString("base64");
-  }
+  const buffer = new Uint8Array(length);
+  crypto.getRandomValues(buffer);
+  return toBase64(buffer);
 }
 
 /**
@@ -83,7 +89,7 @@ async function hashFactValue(
 ): Promise<{ hash: string; salt: string }> {
   const HASH_ROUNDS = Math.pow(2, rounds); // 2^12 = 4096 iterations (industry standard)
   const actualSalt = salt || generateSalt(32);
-  const saltBuffer = Buffer.from(actualSalt, "base64");
+  const saltBuffer = fromBase64(actualSalt);
 
   // Use Web Crypto API (available in Cloudflare Workers)
   const encoder = new TextEncoder();
@@ -109,7 +115,7 @@ async function hashFactValue(
   );
 
   const hashBytes = new Uint8Array(derivedBits);
-  const hash = Buffer.from(hashBytes).toString("base64");
+  const hash = toBase64(hashBytes);
 
   return { hash, salt: actualSalt };
 }
