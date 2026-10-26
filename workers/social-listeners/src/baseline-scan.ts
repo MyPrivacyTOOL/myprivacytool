@@ -1,6 +1,7 @@
 // MPC-7891 Telegram baseline scan v1 (allow-listed test accounts only, default off). After core-brain moves the sender from
 // awaiting_confirmation to confirmed (the Y to the consent question), runs getChat + getUserProfilePhotos for THE SENDER ONLY,
 // replies with a scored report and saves a snapshot to public.profile_snapshots. Wording is DRAFT pending Chris's approval (strategy 9.9, 11).
+import { ARRIVAL, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import type { Env } from "./shared";
@@ -57,7 +58,49 @@ const result = (a: Answer): Record<string, unknown> | null => {
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
 
 export interface Item { field: Field; label: string; returned: boolean; penalty: number }
-export interface Report { score: number; items: Item[]; insights: string[]; text: string }
+export interface HexagonState { id: string; channel: "TG"; arrival: ArrivalId; state: ObservationState }
+export interface Report { score: number; items: Item[]; insights: string[]; hexagons: HexagonState[]; text: string }
+
+const has = (o: Record<string, unknown>, k: string): boolean => o[k] !== undefined && o[k] !== null && o[k] !== "";
+
+/**
+ * One state per Telegram hexagon (shared/hexagon-registry/channels.js, 30 of them). "returned" = this bot received it in this successful check;
+ * "not_returned" = a successful check did not return it (may be a privacy setting, or simply unset: never "hidden"); "not_checked" = disabled or
+ * not looked up in the baseline. Pure.
+ */
+export function hexagonStates(update: unknown, chat: Record<string, unknown>, photoSets: unknown[]): HexagonState[] {
+  const from = (update as { message?: { from?: Record<string, unknown>; date?: unknown; text?: unknown } }).message?.from ?? {};
+  const msg = (update as { message?: { date?: unknown; text?: unknown } }).message ?? {};
+  const usernames = Array.isArray(chat.active_usernames) ? chat.active_usernames.length : 0;
+  const uniq = photoSets.flatMap((x) => (Array.isArray(x) ? x : [])).some((p: { file_unique_id?: unknown }) => typeof p?.file_unique_id === "string");
+  const idNum = typeof chat.id === "number" ? chat.id : null;
+  const accent = typeof chat.accent_color_id === "number" ? chat.accent_color_id : null;
+  const returned: Record<string, boolean> = {
+    "tg.numeric_id": idNum !== null, "tg.first_name": has(chat, "first_name") || has(from, "first_name"), "tg.last_name": has(chat, "last_name") || has(from, "last_name"),
+    "tg.username": has(chat, "username") || usernames > 0 || has(from, "username"), "tg.language": has(from, "language_code"),
+    "tg.message_time": typeof msg.date === "number", "tg.message_text": typeof msg.text === "string", "tg.update_counter": typeof (update as { update_id?: unknown }).update_id === "number",
+    "tg.bio": has(chat, "bio"), "tg.birthday": has(chat, "birthdate"), "tg.photo_current": photoSets.length > 0 || has(chat, "photo"), "tg.photo_history": photoSets.length > 1,
+    "tg.photo_fingerprint": uniq, "tg.extra_usernames": usernames > 1, "tg.premium": chat.is_premium === true, "tg.emoji_status": has(chat, "emoji_status_custom_emoji_id"),
+    "tg.profile_colour": has(chat, "profile_accent_color_id") || (accent !== null && idNum !== null && accent !== idNum % 7), "tg.profile_background": has(chat, "profile_background_custom_emoji_id"),
+    "tg.gift_settings": has(chat, "accepted_gift_types"), "tg.business_intro": has(chat, "business_intro"), "tg.business_location": has(chat, "business_location"),
+    "tg.business_hours": has(chat, "business_opening_hours"), "tg.personal_channel": has(chat, "personal_chat"),
+    "tg.forward_privacy": has(chat, "has_private_forwards"), "tg.voice_restriction": has(chat, "has_restricted_voice_and_video_messages"),
+  };
+  return TELEGRAM_HEXAGONS.map((x) => ({
+    id: x.id, channel: "TG" as const, arrival: x.arrival,
+    state: !x.enabled || !(x.id in returned) ? "not_checked" : returned[x.id] ? "returned" : "not_returned",
+  }));
+}
+
+/** "Telegram hexagons returned: 9 of 30 (...)" with the count per arrival class; hexagons not checked are left out of the denominator. */
+function hexagonSummary(hexagons: HexagonState[]): string {
+  const checked = hexagons.filter((x) => x.state !== "not_checked");
+  const parts = (Object.keys(ARRIVAL) as ArrivalId[]).map((a) => {
+    const of = checked.filter((x) => x.arrival === a);
+    return of.length ? `${ARRIVAL[a].label}: ${of.filter((x) => x.state === "returned").length} of ${of.length}` : null;
+  }).filter(Boolean);
+  return `Telegram (TG) hexagons returned: ${checked.filter((x) => x.state === "returned").length} of ${checked.length} checked (${hexagons.length} possible). ${parts.join("; ")}.`;
+}
 
 /** Pure: builds the report from successful answers. Returns null if a required call failed (no score is ever invented). */
 export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer): Report | null {
@@ -106,6 +149,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
   if (chat.accepted_gift_types && typeof chat.accepted_gift_types === "object") engagement.push("gift settings returned");
   if (engagement.length > 0) insights.push(`How Telegram describes your account: ${engagement.join(", ")}.`);
 
+  const hexagons = hexagonStates(update, chat, photoSets);
   const found = items.filter((i) => i.returned), notFound = items.filter((i) => !i.returned);
   const text = [
     `Telegram baseline scan (draft test report): ${score}/10`,
@@ -116,11 +160,12 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
     ...(notFound.length ? notFound.map((i) => `- ${i.label}`) : ["- nothing in the list"]),
     "",
     "Never provided to bots by Telegram: phone number, last seen, IP address, device. We cannot inspect those settings.",
+    "", hexagonSummary(hexagons),
     ...(insights.length ? ["", "What this shows:", ...insights.map((i) => `- ${i}`)] : []),
     "",
     "Next: change settings yourself in Telegram > Settings > Privacy, then ask for a re-check. Score uses " + RISK_VERSION + " (draft weights).",
   ].join("\n");
-  return { score, items, insights, text };
+  return { score, items, insights, hexagons, text };
 }
 
 async function post(env: Env, path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
@@ -171,7 +216,7 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
       consent: { state_before: "awaiting_confirmation", state_after: "confirmed", confirming_update_id: updateId, consent_text_key: "bot.first_hexagon.question" },
       consent_at: typeof date === "number" ? new Date(date * 1000).toISOString() : null,
       get_chat: stripFileIds(chat), photos: stripFileIds(photos),
-      report: report ? { items: report.items, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
+      report: report ? { channel: "TG", items: report.items, hexagons: report.hexagons, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
       expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString(),
     }, log);
     const text = report ? report.text : FAILED_TEXT;

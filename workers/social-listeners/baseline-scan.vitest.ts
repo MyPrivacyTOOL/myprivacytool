@@ -168,3 +168,36 @@ describe("/scanstatus", () => {
     expect(none.tg("sendMessage")[0].body.text).not.toMatch(/allow-list/); // goes to core-brain as before when PROBE_MODE is not on
   });
 });
+
+describe("channel hexagons (TG)", () => {
+  const ok = (r: unknown) => ({ status: 200, response: r });
+  it("gives every one of the 30 Telegram hexagons a state, tagged with the channel code and arrival class", () => {
+    const { hexagons } = buildReport(yes(), ok(CHAT), ok(PHOTOS))!;
+    expect(hexagons).toHaveLength(30);
+    expect(hexagons.every((h) => h.channel === "TG" && h.id.startsWith("tg.") && ["A", "B", "C", "D"].includes(h.arrival))).toBe(true);
+    const by = Object.fromEntries(hexagons.map((h) => [h.id, h.state]));
+    expect(by["tg.numeric_id"]).toBe("returned");
+    expect(by["tg.bio"]).toBe("returned");
+    expect(by["tg.birthday"]).toBe("returned");
+    expect(by["tg.business_hours"]).toBe("not_returned"); // successful check, field absent: never "hidden"
+    expect(by["tg.message_counter"]).toBe("not_checked"); // disabled until measured
+    expect(by["tg.phone_shared"]).toBe("not_checked"); // no share button exists
+    expect(by["tg.group_role"]).toBe("not_checked");
+  });
+  it("a locked-down account returns far fewer hexagons than a public one, and the summary says which tool and how many", () => {
+    const locked = buildReport(yes(), ok({ ok: true, result: { id: ID, type: "private", first_name: "T" } }), ok({ ok: true, result: { total_count: 0, photos: [] } }))!;
+    const full = buildReport(yes(), ok(CHAT), ok(PHOTOS))!;
+    const n = (r: { hexagons: { state: string }[] }) => r.hexagons.filter((h) => h.state === "returned").length;
+    expect(n(locked)).toBeLessThan(n(full));
+    expect(full.text).toMatch(/Telegram \(TG\) hexagons returned: \d+ of \d+ checked \(30 possible\)/);
+    expect(full.text).toMatch(/Sent with every message: \d+ of 8/);
+  });
+  it("stores the hexagon states and channel code in the snapshot report", async () => {
+    const { post, snaps } = setup();
+    await post(yes());
+    const report = snaps()[0].body.report;
+    expect(report.channel).toBe("TG");
+    expect(report.hexagons).toHaveLength(30);
+    expect(JSON.stringify(report)).not.toMatch(/SECRET/);
+  });
+});
