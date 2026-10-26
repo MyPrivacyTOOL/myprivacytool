@@ -251,6 +251,7 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
       console.log(`scan ${job.id}: processing (attempt ${job.report_attempts + 1}/${MAX_ATTEMPTS})`);
       const r = await processScan(env, sb, job, fetchImpl);
       if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
+      else if (r.cancelled) { console.warn(`scan ${job.id}: cancelled before sending`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_attempts: job.report_attempts, report_last_error: r.cancelled }); out.cancelled++; }
       else { out.sent++; console.log(`scan ${job.id}: sent`); }
     } catch (e) {
       out.failed++;
@@ -299,6 +300,9 @@ async function processScan(env, sb, job, fetchImpl) {
   const links = await unsubLinks(env, email);
   const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
   const referral = await referralFor(env, sb, job.user_id, email);
+  // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
+  const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
+  if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
   const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);

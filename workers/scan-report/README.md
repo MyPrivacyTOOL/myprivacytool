@@ -56,6 +56,8 @@ On by default since MPC-7385: `src/pages/Scan.tsx` posts to `https://mpt-scan-re
 ## Test
 `node workers/scan-report/worker.test.mjs` (stubbed fetch, no network).
 
+Request lifecycle (what `queued` / `running` / `completed` mean, why nothing is called "delivered", known gaps, operator runbook): `docs/scan-lifecycle-ck-8503.md`. Test: `node workers/scan-report/lifecycle.test.mjs`.
+
 ## Web scan saving (MPC-7465, MPC-7488, MPC-7470 / decision D12)
 
 A saved scan is **personal data, not anonymous**: `results` holds what the browser reported per hexagon, which includes IP addresses and fingerprint-style values. There is no connection-IP column, no email and no user id on `web_scans`; the contact is linked only through `web_scan_contacts`. (An earlier comment and doc said no IP is stored; that was wrong.)
