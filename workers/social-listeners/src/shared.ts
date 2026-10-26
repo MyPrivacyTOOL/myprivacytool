@@ -39,6 +39,10 @@ export interface Env {
   PROBE_LOG_OPTIN_IDS?: string;
   /** Full event log: days until a row expires (default 90, clamped 1-365), or "forever" for no expiry. */
   PROBE_LOG_RETENTION_DAYS?: string;
+  /** MPC-7891 Telegram baseline scan: "on" runs it for senders in PROBE_TELEGRAM_IDS after the consent Y; anything else (default) is off. */
+  TELEGRAM_BASELINE_SCAN?: string;
+  /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
+  PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
   /** Preferred: service binding to the core-brain Worker (MPC-8601). */
   CORE_BRAIN?: { fetch(request: Request): Promise<Response> };
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */
