@@ -32,6 +32,7 @@ function fake({ resendFail = false } = {}) {
       if (u.pro_months_earned < 12) { u.pro_months_earned++; r.rewarded_at = 'now'; return res(200, [{ referrer_user_id: u.id, rewarded: true, pro_months_earned: u.pro_months_earned }]); }
       return res(200, [{ referrer_user_id: u.id, rewarded: false, pro_months_earned: u.pro_months_earned }]);
     }
+    if (url.includes('/rest/v1/rpc/')) return res(404, { code: 'PGRST202' });   // like PostgREST for a function that does not exist (CK-8503: handleScan then falls back to check-then-insert)
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
     if (method === 'POST') {
       const row = { id: `id${++n}`, created_at: new Date().toISOString(), pro_months_earned: 0, ...JSON.parse(o.body) };

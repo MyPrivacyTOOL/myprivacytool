@@ -25,6 +25,21 @@ export function fake(opts = {}) {
       r.status = 'completed'; const u = db.users.find((x) => x.id === r.referrer_user_id); u.pro_months_earned = (u.pro_months_earned || 0) + 1; return res(200, [{ referrer_user_id: u.id, rewarded: true, pro_months_earned: u.pro_months_earned }]);
     }
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
+    if (url.includes('/rpc/mpt_request_scan')) {   // CK-8503: same rules as the SQL function; atomic here because nothing awaits between the check and the insert
+      if (opts.noDedupeRpc) return res(404, { code: 'PGRST202', message: 'Could not find the function public.mpt_request_scan' });   // migration not applied yet
+      const a = JSON.parse(o.body); const since = Date.now() - 24 * 3600 * 1000;
+      const hit = db.scans.filter((x) => x.user_id === a.p_user_id && Date.parse(x.created_at) >= since).sort((x, y) => String(x.created_at).localeCompare(y.created_at) || String(x.id).localeCompare(y.id))[0];
+      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true }]);
+      const row = { id: crypto.randomUUID(), report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: 'web_scan' }; db.scans.push(row);
+      return res(200, [{ scan_id: row.id, duplicate: false }]);
+    }
+    if (url.includes('/rpc/mpt_record_email_receipt')) {   // CK-8503: same ranking as the SQL function
+      if (opts.noReceiptRpc) return res(404, { code: 'PGRST202', message: 'Could not find the function public.mpt_record_email_receipt' });
+      const a = JSON.parse(o.body); const rank = { sent: 0, delivery_delayed: 1, delivered: 2, bounced: 3, failed: 3, complained: 4 };
+      if (!(a.p_status in rank)) return res(400, { code: '22023' });
+      const hit = db.scans.filter((x) => x.resend_message_id === a.p_message_id && rank[a.p_status] > (x.delivery_status in rank ? rank[x.delivery_status] : -1));
+      hit.forEach((x) => { x.delivery_status = a.p_status; x.delivery_status_at = a.p_at; }); return res(200, hit.length);
+    }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/); const t = m[1]; const q = new URLSearchParams(m[2] || '');
     if (o.method === 'DELETE' && q.get('email')) { const v = decodeURIComponent(q.get('email').replace(/^(eq|ilike)\./, '')).replace(/\\(.)/g, '$1').toLowerCase(); db[t] = db[t].filter((x) => String(x.email).toLowerCase() !== v); return res(204); }   // CK-7721 fix 3
     if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }

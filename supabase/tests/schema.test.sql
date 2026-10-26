@@ -784,5 +784,39 @@ select pg_temp.assert((select count(*) from public.mpt_hexagon_events where hexa
 select pg_temp.assert((select shown_people from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 3 and (select not_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1 and (select yes_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1, 'learning: the rollup counts 3 shown and each person''s first answer once (a change of mind is not double counted)');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.rollup_and_purge_hexagon_events(interval '1 hour')$$) = 'P0001', 'learning: retention under one day is refused');
 
+
+-- ===== CK-8503: scan delivery receipts and atomic one-scan-per-window =====
+reset role;
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_request_scan(gen_random_uuid(), 'a@example.com')$$) = '42501', 'mpt_request_scan: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_request_scan(gen_random_uuid(), 'a@example.com')$$) = '42501', 'mpt_request_scan: authenticated must not execute');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_record_email_receipt('m', 'delivered')$$) = '42501', 'mpt_record_email_receipt: anon must not execute');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_record_email_receipt('m', 'delivered')$$) = '42501', 'mpt_record_email_receipt: authenticated must not execute');
+insert into public.users (id, email) values ('00000000-0000-4000-8000-0000000000a1', 'ck8503-a@example.com'), ('00000000-0000-4000-8000-0000000000a2', 'ck8503-b@example.com');
+set local role service_role;
+create temp table ck8503_r (n int, scan_id uuid, dup boolean) on commit drop;
+grant all on ck8503_r to service_role;
+insert into ck8503_r select 1, scan_id, duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000a1', 'ck8503-a@example.com');
+insert into ck8503_r select 2, scan_id, duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000a1', 'ck8503-a@example.com');
+insert into ck8503_r select 3, scan_id, duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000a2', 'ck8503-b@example.com');
+select pg_temp.assert((select dup from ck8503_r where n = 1) = false and (select dup from ck8503_r where n = 2) = true, 'mpt_request_scan: the first call creates a scan, the second inside the window is a duplicate');
+select pg_temp.assert((select scan_id from ck8503_r where n = 1) = (select scan_id from ck8503_r where n = 2), 'mpt_request_scan: the duplicate returns the existing scan id');
+select pg_temp.assert((select dup from ck8503_r where n = 3) = false and (select count(*) from public.scans where user_id in ('00000000-0000-4000-8000-0000000000a1','00000000-0000-4000-8000-0000000000a2')) = 2, 'mpt_request_scan: another user is unaffected; two scans exist in total');
+select pg_temp.assert((select report_status from public.scans where id = (select scan_id from ck8503_r where n = 1)) = 'pending' and (select source from public.scans where id = (select scan_id from ck8503_r where n = 1)) = 'web_scan' and (select report_attempts from public.scans where id = (select scan_id from ck8503_r where n = 1)) = 0, 'mpt_request_scan: the new scan is a pending web_scan with no attempts');
+update public.scans set created_at = now() - interval '25 hours' where id = (select scan_id from ck8503_r where n = 1);
+select pg_temp.assert((select duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000a1', 'ck8503-a@example.com')) = false, 'mpt_request_scan: a scan older than 24h does not block a new one');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_request_scan(gen_random_uuid(), 'x@example.com', interval '30 days')$$) = '22023', 'mpt_request_scan: a window over 7 days is refused');
+-- receipts: ranked, monotonic, matched by provider message id only
+update public.scans set resend_message_id = 'msg_ck8503_a', report_status = 'sent' where id = (select scan_id from ck8503_r where n = 3);
+select pg_temp.assert(public.mpt_record_email_receipt('msg_ck8503_a', 'delivered', now()) = 1, 'receipt: delivered updates the matching scan (1 row)');
+select pg_temp.assert((select delivery_status from public.scans where resend_message_id = 'msg_ck8503_a') = 'delivered', 'receipt: delivered is recorded against the matching message id');
+select pg_temp.assert(public.mpt_record_email_receipt('msg_ck8503_a', 'delivery_delayed', now()) = 0, 'receipt: a late "delayed" event changes nothing');
+select pg_temp.assert((select delivery_status from public.scans where resend_message_id = 'msg_ck8503_a') = 'delivered', 'receipt: a late "delayed" event cannot move delivered backwards');
+select pg_temp.assert(public.mpt_record_email_receipt('msg_ck8503_a', 'delivered', now()) = 0, 'receipt: the same event twice changes nothing');
+select pg_temp.assert(public.mpt_record_email_receipt('msg_ck8503_a', 'complained', now()) = 1, 'receipt: a complaint after delivery updates the scan');
+select pg_temp.assert((select delivery_status from public.scans where resend_message_id = 'msg_ck8503_a') = 'complained', 'receipt: a complaint after delivery is recorded');
+select pg_temp.assert(public.mpt_record_email_receipt('msg_unknown', 'delivered', now()) = 0, 'receipt: an unknown message id changes nothing');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_record_email_receipt('msg_ck8503_a', 'opened')$$) = '22023', 'receipt: an unknown status is refused');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.scans set delivery_status = 'nonsense' where resend_message_id = 'msg_ck8503_a'$$) = '23514', 'receipt: the table itself rejects a status outside the list');
+reset role;
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

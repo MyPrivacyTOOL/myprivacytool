@@ -50,5 +50,16 @@ done <<< "$out"
 echo "== schema assertions"
 psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 
+echo "== CK-8503: simultaneous scan requests for one user create exactly one scan (real concurrent sessions)"
+psql_ "$TEST_URL" -c "insert into public.users (id, email) values ('00000000-0000-4000-8000-0000000000c1', 'ck8503-race@example.com')"
+for i in 1 2 3 4 5 6 7 8; do
+  psql_ "$TEST_URL" -At -c "select duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000c1', 'ck8503-race@example.com')" >> "${TMPDIR:-/tmp}/ck8503-race.$$" &
+done
+wait
+created=$(grep -c '^f$' "${TMPDIR:-/tmp}/ck8503-race.$$" || true); dups=$(grep -c '^t$' "${TMPDIR:-/tmp}/ck8503-race.$$" || true); rm -f "${TMPDIR:-/tmp}/ck8503-race.$$"
+total=$(psql_ "$TEST_URL" -At -c "select count(*) from public.scans where user_id = '00000000-0000-4000-8000-0000000000c1'")
+[ "$created" = 1 ] && [ "$dups" = 7 ] && [ "$total" = 1 ] || { echo "::error::concurrent mpt_request_scan: created=$created duplicates=$dups rows=$total (want 1, 7, 1)"; exit 1; }
+echo "   PASS 8 simultaneous requests -> 1 scan created, 7 told duplicate, 1 row"
+
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

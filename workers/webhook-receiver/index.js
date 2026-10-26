@@ -11,6 +11,7 @@
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState, purgeExpiredState } from './state-store.js';
 import { createHubSpotContact } from './hubspot-client.js';
+import { sendJson } from './send.js';
 import { recordEngagement } from './supabase-client.js';
 import {
   verifyTelegram, verifyMeta, verifyTwilio, verifySharedSecret, escapeHtml, escapeXml, clip,
@@ -120,11 +121,7 @@ async function handleTelegram(request, env) {
 
 async function sendTelegram(env, chatId, text) {
   const key = env.TELEGRAM_BOT_KEY;
-  await fetch(`https://api.telegram.org/bot${key}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-  });
+  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' });
 }
 
 // ─── FACEBOOK MESSENGER ──────────────────────────────────────────────────────
@@ -166,11 +163,7 @@ async function sendMessenger(env, recipientId, text) {
   // Requires META_PAGE_ACCESS_KEY — stub until Meta App is approved
   if (!env.META_PAGE_ACCESS_KEY) return;
   // MPC-7350: bearer header, not a query string (URLs end up in logs and proxies).
-  await fetch('https://graph.facebook.com/v19.0/me/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` },
-    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
-  });
+  return sendJson('messenger', 'https://graph.facebook.com/v19.0/me/messages', { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, message: { text } });
 }
 
 // ─── INSTAGRAM DM ────────────────────────────────────────────────────────────
@@ -233,11 +226,7 @@ async function handleWhatsApp(request, env) {
 async function sendWhatsApp(env, to, text) {
   // Requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_KEY
   if (!env.META_WHATSAPP_KEY || !env.WHATSAPP_PHONE_NUMBER_ID) return;
-  await fetch(`https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
-  });
+  return sendJson('whatsapp', `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } });
 }
 
 // ─── SMS / TWILIO ─────────────────────────────────────────────────────────────

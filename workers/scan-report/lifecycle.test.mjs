@@ -8,6 +8,7 @@ import { fake } from './test-support/fake-backend.mjs';
 import { requestLifecycle } from './lib/lifecycle.js';
 import { makeLiveLink, makeLiveToken } from './lib/live.js';
 import { unsubscribeToken } from './lib/onboarding.js';
+import { signReceipt } from './lib/receipts.js';
 
 let ok = true; const check = (c, m) => { process.stdout.write(`${c ? 'PASS' : 'FAIL'} ${m}\n`); if (!c) ok = false; };
 const trace = (m) => process.stdout.write(`TRACE ${m}\n`);
@@ -52,7 +53,11 @@ class Killed extends Error { constructor() { super('worker killed'); } }
     [row({ report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }), 'cancelled', 'not_sent'],
   ];
   check(cases.every(([r, s, d]) => { const l = requestLifecycle(r); return l.state === s && l.delivery === d; }), 'contract: every persisted combination maps to one lifecycle state (queued, recovering, running, completed, failed, cancelled)');
-  check(cases.every(([r]) => requestLifecycle(r).receipt === 'not_observable') && !cases.some(([r]) => /deliver(ed)?$/.test(requestLifecycle(r).state)), 'contract: no row can ever read as "delivered": the most observable is provider_accepted and the receipt is not_observable (no delivery webhook exists)');
+  check(cases.every(([r]) => requestLifecycle(r).receipt === 'not_observed') && !cases.some(([r]) => ['delivered', 'delivery_failed'].includes(requestLifecycle(r).state)), 'contract: with no provider receipt on the row nothing reads as delivered: the most it can say is completed / provider_accepted and receipt not_observed');
+  const sent = (o) => requestLifecycle(row({ report_status: 'sent', resend_message_id: 'msg_1', ...o }));
+  check(sent({ delivery_status: 'delivered' }).state === 'delivered' && sent({ delivery_status: 'delivered' }).delivery === 'delivered' && sent({ delivery_status: 'complained' }).state === 'delivered', 'contract: only a provider receipt of delivered (or a later complaint, which implies arrival) makes a row delivered');
+  check(sent({ delivery_status: 'bounced' }).state === 'delivery_failed' && sent({ delivery_status: 'failed' }).delivery === 'undeliverable', 'contract: a bounce or failure receipt is delivery_failed / undeliverable, never completed');
+  check(['sent', 'delivery_delayed'].every((d) => sent({ delivery_status: d }).state === 'completed' && sent({ delivery_status: d }).delivery === 'provider_accepted'), 'contract: "sent" and "delayed" receipts are still only provider_accepted');
   check(requestLifecycle(row({ report_status: 'sent' })).delivery === 'unknown', 'contract: a "sent" row with no provider message id is "unknown", not provider_accepted');
 }
 
@@ -71,7 +76,7 @@ class Killed extends Error { constructor() { super('worker killed'); } }
   trace(`report job ran          -> ${JSON.stringify(lc(F))}`);
   const s = scanOf(F, A);
   check(seen.includes('running'), 'journey 1: while the scan ran the persisted state was running (observed from inside the HIBP call)');
-  check(lc(F).state === 'completed' && lc(F).delivery === 'provider_accepted' && lc(F).receipt === 'not_observable' && s.resend_message_id === [...F.provider.values()].at(-1), 'journey 1: after the report job the state is completed / provider_accepted, with the provider message id on the row, and receipt not_observable');
+  check(lc(F).state === 'completed' && lc(F).delivery === 'provider_accepted' && lc(F).receipt === 'not_observed' && s.resend_message_id === [...F.provider.values()].at(-1), 'journey 1: after the report job the state is completed / provider_accepted, with the provider message id on the row, and no receipt observed');
   check(F.db.signals.length > 0 && F.db.signals.every((x) => x.scan_id === s.id) && F.db.hexagon_scores.length === 8 && s.report_sent_at && s.privacy_score === 100 && s.categories_checked.join() === 'email' && s.categories_unchecked.length === 7, 'journey 1: the scan output is persisted for this scan only (signals, 8 hexagon scores); the score is partial: only the email category was checked and the other 7 are listed as unchecked');
   check(resends(F).length === 2 && resends(F).every((c) => JSON.parse(c.body).to[0] === A) && keysOf(F, 'report-').length === 1, 'journey 1: two emails in total (confirmation, report), both to the requester only; the provider holds one report message');
   await run(F);
@@ -87,17 +92,24 @@ class Killed extends Error { constructor() { super('worker killed'); } }
   check(F.db.scans.length === 1 && F.provider.size === 2 && keysOf(F, 'report-').length === 1, 'duplicate: a request after the report went out is still the same scan, and there is still one report');
 }
 {
-  // The fake serialises calls, which hides races. Hold every "is there a scan in the last 24h?" read until all three requests have made it, so none can see another's insert.
-  let waiting = [], arrived = 0; const N = 3;
-  const F = harness({ onRequest: (url, o) => { if ((o.method || 'GET') === 'GET' && /rest\/v1\/scans\?user_id=/.test(url)) { arrived++; if (arrived === N) waiting.forEach((r) => r()); else return new Promise((r) => waiting.push(r)).then(() => undefined); } } });
+  // The fake serialises calls, which hides races. Hold every "is there a scan in the last 24h?" read (and the atomic request call) until all requests have arrived, so none can see another's insert.
+  const barrier = (N, match) => { let waiting = [], arrived = 0; return (url, o) => { if (match(url, o)) { arrived++; if (arrived === N) waiting.forEach((r) => r()); else return new Promise((r) => waiting.push(r)).then(() => undefined); } }; };
+  // G5 fixed: the rule is decided inside the database (public.mpt_request_scan, advisory lock; proven on real Postgres by supabase/tests/run.sh with 8 parallel sessions).
+  const F = harness({ onRequest: barrier(3, (url) => /rpc\/mpt_request_scan/.test(url)) });
   await Promise.all([request(F), request(F), request(F)]);
-  const confirms = keysOf(F, 'confirm-');
-  // KNOWN GAP G5 (not fixed here, see docs/scan-lifecycle-ck-8503.md): the 24h duplicate rule is check-then-insert with no database constraint, so truly simultaneous requests all pass the check.
-  // In production a double click is stopped earlier (a Turnstile token is single use, MPC-8430; per-IP limit). The real fix is a database guard = a migration = a production action needing approval.
-  process.stdout.write(`KNOWN-GAP G5 three simultaneous requests for one address (read-before-write barrier) -> ${F.db.scans.length} scans, ${confirms.length} confirmations\n`);
-  check(F.db.scans.length === N && confirms.length === N, 'duplicate: documents the current behaviour of the unguarded race (3 scans). If this fails the race was fixed: update gap G5 and make it assert 1');
+  check(F.db.scans.length === 1 && keysOf(F, 'confirm-').length === 1, 'duplicate: three simultaneous requests for one address create ONE scan and send ONE confirmation');
   await run(F);
-  check(keysOf(F, 'report-').length === F.db.scans.length, 'duplicate: each scan row still produces exactly one report (no scan is reported twice)');
+  check(keysOf(F, 'report-').length === 1, 'duplicate: and one report');
+  // Rollout window: while the migration is not applied (function missing, 404) the Worker falls back to check-then-insert. Everything still works; only the old race remains.
+  const G = harness({ noDedupeRpc: true });
+  await request(G); await run(G);
+  check(G.db.scans.length === 1 && lc(G).state === 'completed' && keysOf(G, 'report-').length === 1, 'duplicate: with the migration not applied the Worker falls back and a normal request still completes once');
+  const H = harness({ noDedupeRpc: true, onRequest: barrier(3, (url, o) => (o.method || 'GET') === 'GET' && /rest\/v1\/scans\?user_id=/.test(url)) });
+  await Promise.all([request(H), request(H), request(H)]);
+  process.stdout.write(`KNOWN-RESIDUAL during rollout only: migration not applied -> ${H.db.scans.length} scans from 3 simultaneous requests (old check-then-insert)\n`);
+  check(H.db.scans.length === 3, 'duplicate: documents that the fallback keeps the old race, which is why the migration must be applied');
+  await run(H);
+  check(keysOf(H, 'report-').length === H.db.scans.length, 'duplicate: even then each scan row produces exactly one report');
 }
 
 // ============================================================ 3. worker restart
@@ -241,6 +253,56 @@ const unsub = async (F, email) => { sandbox(F); return worker.fetch(new Request(
   const gated = { ...env, RECIPIENT_ALLOWLIST: 'someone-else@example.com' };
   await post(F, { email: A, consent: true }, gated); await quiet(() => runReportJob(gated, F.f));
   check(resends(F).length === 0 && lc(F).state === 'queued' && scanOf(F, A).report_attempts === 0, 'recipient gate: with the allowlist on, an unlisted address is accepted and held: nothing sent, no attempt burned (the go-live gate still governs real sends)');
+}
+
+// ============================================================ 13. provider receipts (G4): signed events turn "provider accepted" into "delivered" or "delivery_failed"
+{
+  const SECRET = `whsec_${btoa('lifecycle-test-secret-0123456789')}`;
+  const renv = { ...env, RESEND_WEBHOOK_SECRET: SECRET };
+  const F = harness();
+  await request(F); await run(F);
+  const msgId = scanOf(F, A).resend_message_id;
+  const hook = async (type, { id = msgId, e = renv, ts = Math.floor(Date.now() / 1000), secret = SECRET, method = 'POST', sigOverride, extra = {} } = {}) => {
+    const body = JSON.stringify({ type, created_at: new Date().toISOString(), data: { email_id: id, to: [A], subject: 'x', ...extra } });
+    const msgid = `msg_${Math.random().toString(36).slice(2)}`;
+    sandbox(F);
+    const rs = await worker.fetch(new Request('https://x/api/resend-webhook', { method, headers: { 'content-type': 'application/json', 'svix-id': msgid, 'svix-timestamp': String(ts), 'svix-signature': sigOverride ?? await signReceipt(secret, msgid, ts, body) }, body: method === 'POST' ? body : undefined }), e, { waitUntil: () => {} });
+    return { status: rs.status, text: await rs.text() };
+  };
+  check(lc(F).state === 'completed' && lc(F).receipt === 'not_observed', 'receipts: before any event the row is completed / not_observed');
+  check((await hook('email.delivered', { e: env })).status === 404 && lc(F).state === 'completed', 'receipts: with no RESEND_WEBHOOK_SECRET the endpoint is off (404) and nothing changes');
+  const bad = [await hook('email.delivered', { secret: `whsec_${btoa('another-secret-0123456789abcdef')}` }), await hook('email.delivered', { sigOverride: 'v1,AAAA' }), await hook('email.delivered', { sigOverride: '' }), await hook('email.delivered', { ts: Math.floor(Date.now() / 1000) - 3600 })];
+  check(bad.every((r) => r.status === 401) && lc(F).state === 'completed' && !scanOf(F, A).delivery_status, 'receipts: a wrong secret, bad or missing signature, or a one-hour-old timestamp (replay) is refused (401) and changes nothing');
+  check((await hook('email.delivered', { method: 'GET' })).status === 404, 'receipts: GET is not served');
+  sandbox(F); const big = await worker.fetch(new Request('https://x/api/resend-webhook', { method: 'POST', headers: { 'content-length': '999999', 'svix-id': 'x', 'svix-timestamp': '1', 'svix-signature': 'x' }, body: 'x' }), renv, { waitUntil: () => {} });
+  check(big.status === 413, 'receipts: an oversized body is refused before it is read (413)');
+  check((await hook('email.opened')).status === 200 && (await hook('email.clicked')).status === 200 && !scanOf(F, A).delivery_status, 'receipts: signed events we do not use (opened, clicked) are acknowledged and ignored');
+  check((await hook('email.delivery_delayed')).status === 200 && lc(F).state === 'completed' && scanOf(F, A).delivery_status === 'delivery_delayed', 'receipts: a delayed event is recorded but the row is still only completed / provider_accepted');
+  const ok1 = await hook('email.delivered');
+  trace(`signed delivered event   -> ${JSON.stringify(lc(F))}`);
+  check(ok1.status === 200 && lc(F).state === 'delivered' && lc(F).delivery === 'delivered' && lc(F).receipt === 'delivered', 'receipts: a correctly signed delivered event moves the row to delivered');
+  await hook('email.delivery_delayed'); await hook('email.delivered');
+  check(lc(F).state === 'delivered' && scanOf(F, A).delivery_status === 'delivered', 'receipts: a late delayed event and a replayed delivered event change nothing');
+  check((await hook('email.delivered', { id: 'msg_not_ours' })).status === 200 && F.db.scans.filter((x) => x.delivery_status).length === 1, 'receipts: an event for an unknown message id (e.g. a confirmation email) is acknowledged and changes nothing');
+  check(!/@/.test(ok1.text) && !JSON.stringify(F.calls.map((c) => c.body).filter((b) => /rpc|receipt/.test(String(b)))).includes(A), 'receipts: the address in the event is never stored or echoed (only the message id and status are used)');
+  await hook('email.complained');
+  check(lc(F).state === 'delivered' && lc(F).receipt === 'complained', 'receipts: a complaint after delivery is recorded and still reads as delivered (it arrived)');
+}
+{
+  const SECRET = `whsec_${btoa('lifecycle-test-secret-0123456789')}`;
+  const renv = { ...env, RESEND_WEBHOOK_SECRET: SECRET };
+  const F = harness(); await request(F, B); await run(F);
+  const id = scanOf(F, B).resend_message_id; const ts = Math.floor(Date.now() / 1000);
+  const send = async (type) => { const body = JSON.stringify({ type, data: { email_id: id } }); sandbox(F); return (await worker.fetch(new Request('https://x/api/resend-webhook', { method: 'POST', headers: { 'svix-id': 'm1', 'svix-timestamp': String(ts), 'svix-signature': await signReceipt(SECRET, 'm1', ts, body) }, body }), renv, { waitUntil: () => {} })).status; };
+  check(await send('email.bounced') === 200 && lc(F, B).state === 'delivery_failed' && lc(F, B).delivery === 'undeliverable', 'receipts: a bounce moves the row to delivery_failed / undeliverable (the person did not get the report)');
+  await send('email.delivered');
+  check(lc(F, B).state === 'delivery_failed', 'receipts: a bounce is not overwritten by a later delivered event');
+  const G = harness({ noReceiptRpc: true }); await request(G, B); await run(G);
+  const body = JSON.stringify({ type: 'email.delivered', data: { email_id: scanOf(G, B).resend_message_id } });
+  sandbox(G);
+  const sig = await signReceipt(SECRET, 'm3', ts, body);
+  const r2 = await quiet(() => worker.fetch(new Request('https://x/api/resend-webhook', { method: 'POST', headers: { 'svix-id': 'm3', 'svix-timestamp': String(ts), 'svix-signature': sig }, body }), renv, { waitUntil: () => {} }));
+  check(r2.status === 500 && lc(G, B).state === 'completed', 'receipts: if the migration is not applied the endpoint answers 500 so Resend retries later, and the row is unchanged');
 }
 
 globalThis.fetch = realFetch;

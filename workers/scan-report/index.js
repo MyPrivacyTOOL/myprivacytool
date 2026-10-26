@@ -11,6 +11,7 @@ import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
+import { handleResendWebhook } from './lib/receipts.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
@@ -64,6 +65,8 @@ export default {
     if (request.method === 'POST' && url.pathname === '/api/referral/invite') return handleReferralInvite(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
+    // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
+    if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env) });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -159,15 +162,31 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref 
   if (ref && isNewUser && referralTester(env, email)) await attachReferral(sb, { ref, userId: user.id, email, isNewUser }).catch((e) => console.error('referral attach failed:', String(e).replace(/\S+@\S+/g, '[email]')));
 
   // One report per address per 24h: stops the form being used to mail-bomb someone.
-  const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
-  const recent = await sb.select(`scans?user_id=eq.${user.id}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`);
-  if (recent.length) return { duplicate: true, scanId: recent[0].id };
+  const scan = await requestScan(sb, user.id, email, now);
+  if (scan.duplicate) return { duplicate: true, scanId: scan.scanId };
 
-  const scan = await sb.insert('scans', { user_id: user.id, email_scanned: email, source: 'web_scan' });
-  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl), confirm(env, sb, scan.id, email, fetchImpl)];
+  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl), confirm(env, sb, scan.scanId, email, fetchImpl)];
   const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e)))));
   if (ctx?.waitUntil) ctx.waitUntil(all); else await all;
-  return { duplicate: false, scanId: scan.id };
+  return { duplicate: false, scanId: scan.scanId };
+}
+
+// CK-8503 (G5): the one-scan-per-24h rule is decided inside the database (public.mpt_request_scan takes a per-user advisory lock, then checks and
+// inserts), so simultaneous requests cannot all pass the check. While that function does not exist (migration not applied yet: HTTP 404 /
+// PGRST202) this falls back to the old check-then-insert, so Worker and migration can ship in either order. Any other error is a real failure.
+async function requestScan(sb, userId, email, now) {
+  try {
+    const row = (await sb.rpc('mpt_request_scan', { p_user_id: userId, p_email: email }))?.[0];
+    if (!row?.scan_id) throw new Error('mpt_request_scan returned no scan');
+    return { scanId: row.scan_id, duplicate: Boolean(row.duplicate) };
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+  const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+  const recent = await sb.select(`scans?user_id=eq.${userId}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`);
+  if (recent.length) return { scanId: recent[0].id, duplicate: true };
+  const scan = await sb.insert('scans', { user_id: userId, email_scanned: email, source: 'web_scan' });
+  return { scanId: scan.id, duplicate: false };
 }
 
 async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
