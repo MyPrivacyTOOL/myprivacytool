@@ -25,14 +25,15 @@ const json = (body: unknown, status = 200): Response =>
 
 const trustedKeys = (env: SignedReportEnv): string[] => (env.REPORT_SIGNING_PUBLIC_KEYS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
+// Either `res` (an error to return as is) or `value`. A plain shape, not a tagged union, so it also type-checks under the app's non-strict tsconfig.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function readJson(request: Request): Promise<{ ok: true; value: Record<string, any> } | { ok: false; res: Response }> {
+async function readJson(request: Request): Promise<{ value?: Record<string, any>; res?: Response }> {
   const text = await request.text();
-  if (text.length > MAX_BODY) return { ok: false, res: json({ error: "too_large" }, 413) };
+  if (text.length > MAX_BODY) return { res: json({ error: "too_large" }, 413) };
   try {
-    return { ok: true, value: JSON.parse(text) };
+    return { value: JSON.parse(text) };
   } catch {
-    return { ok: false, res: json({ error: "invalid_json" }, 400) };
+    return { res: json({ error: "invalid_json" }, 400) };
   }
 }
 
@@ -42,7 +43,7 @@ export async function handleDownload(request: Request, env: SignedReportEnv, dep
   if (env.REPORT_SIGNING_ENABLED !== "1" || !env.REPORT_SIGNING_KEY) return json({ error: "signing_unavailable" }, 503);
   if (!(await deps.level2Passed(request, env))) return json({ error: "level2_required" }, 403);
   const body = await readJson(request);
-  if (!body.ok) return body.res;
+  if (body.res) return body.res;
   let key;
   try {
     key = await importSigningKey(env.REPORT_SIGNING_KEY);
@@ -68,7 +69,7 @@ export async function handleDownload(request: Request, env: SignedReportEnv, dep
 export async function handleVerify(request: Request, env: SignedReportEnv): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const body = await readJson(request);
-  if (!body.ok) return body.res;
+  if (body.res) return body.res;
   const keys = trustedKeys(env);
   const v = body.value;
   if (v && typeof v.pdf_base64 === "string" && v.signature) {
