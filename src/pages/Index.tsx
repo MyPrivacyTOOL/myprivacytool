@@ -1,5 +1,10 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1 } from '@/lib/scanCopy';
+import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
+import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
+import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
@@ -7,6 +12,7 @@ import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } fro
 import { RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import HkStopSpamCard from '@/components/HkStopSpamCard';
 import logoFull from '@/assets/logo-full.png';
 import {
   trackFunnelStep,
@@ -18,6 +24,11 @@ import {
   trackNewsletterSignup
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
+import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
+import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
+import ScanNumberNotice from '@/components/ScanNumberNotice';
+import WelcomeBack from '@/components/WelcomeBack';
+import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 
@@ -30,6 +41,23 @@ const Index = () => {
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
+
+  // MPC-7470 (D12): when the scan first completes it is kept in this browser only (sessionStorage), never sent. It is saved on the server only
+  // if the visitor reaches the contact step, gives an email and ticks the separate save box. Not on every live orientation refresh. Off unless VITE_SAVE_WEB_SCANS is "true".
+  const scanRemembered = useRef(false);
+  useEffect(() => {
+    if (loading || hexagons.length === 0 || scanRemembered.current) return;
+    scanRemembered.current = true;
+    rememberCompletedScan(hexagons);
+  }, [loading, hexagons]);
+
+  // MPC-7493: funnel steps for a saved scan. The scan starts when the page opens; once the results are on screen we report "results viewed" and the
+  // time spent there. Under D12 (MPC-7470) a scan is saved only at the contact step, so before that there is no scan number and nothing is sent.
+  useEffect(() => {
+    markScanStarted();
+  }, []);
+  const resultsShown = !loading && hexagons.length > 0;
+  useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
@@ -130,16 +158,21 @@ const Index = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Load HubSpot embed script dynamically
+  // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
-    if (document.getElementById(scriptId)) return;
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
-    script.defer = true;
-    document.body.appendChild(script);
+    const load = () => {
+      if (!hasConsent() || document.getElementById(scriptId)) return;
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
+      script.defer = true;
+      document.body.appendChild(script);
+    };
+    load();
+    const unsubscribe = onConsentChange(load);
     return () => {
+      unsubscribe();
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };
@@ -219,12 +252,30 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
-          <p className="text-sm sm:text-lg text-foreground">
-            <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
-          </p>
-          <p className="text-sm sm:text-lg text-foreground">
-            Click the ones that are correct.
-          </p>
+          {hexTileV2Enabled() ? (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span>: {HERO_TILES_LINE1}
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">{HERO_TILES_LINE2}</p>
+            </>
+          ) : honeycombDashboardEnabled() ? (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span>{heroDashboardLine1(HEXAGON_COUNT)}
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">{HERO_DASHBOARD_LINE2}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm sm:text-lg text-foreground">
+                <span className="text-brand font-semibold">MyPrivacyTOOL</span> found <span className="text-brand font-semibold">6+ data points</span> about you without asking.
+              </p>
+              <p className="text-sm sm:text-lg text-foreground">
+                Click the ones that are correct.
+              </p>
+            </>
+          )}
         </section>
 
         {/* Live Device Tracking Hero */}
@@ -257,8 +308,36 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">This only takes a few seconds</p>
             </div>
           ) : (
-            <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+            <>
+              {/* The scan is complete here (loading is over), which is when WebScanDashboard must mount: it keeps its own answers from then on. */}
+              {honeycombDashboardEnabled() ? (
+                <WebScanDashboard scanned={hexagons} title="Your Digital Footprint" />
+              ) : (
+                <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+              )}
+              <ScanSavingNotice variant="scan" />
+              <WelcomeBack hexagons={hexagons} />
+              <ScanNumberNotice />
+            </>
           )}
+        </section>
+
+        {/* MPC-7446: Hong Kong visitors only; hidden until the /HongKongSpam launch flag is on */}
+        <HkStopSpamCard placement="home" />
+
+        {/* Footprint teaser: /footprint/ is a static page (public/footprint), so this is a plain link, not a router Link. */}
+        <section className="pb-12 px-4" aria-labelledby="footprint-teaser-heading">
+          <div className="max-w-2xl mx-auto text-center rounded-2xl border border-surface-border bg-brand-soft p-6 sm:p-8">
+            <h2 id="footprint-teaser-heading" className="text-xl sm:text-2xl font-bold text-foreground mb-2">
+              See your footprint as a beehive
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground mb-5">
+              Open the curtain and watch the 54 data points appear one by one.
+            </p>
+            <Button asChild>
+              <a href="/footprint/">Open the footprint</a>
+            </Button>
+          </div>
         </section>
 
         {/* Journey teaser */}
@@ -275,6 +354,20 @@ const Index = () => {
             </Button>
           </div>
         </section>
+
+        {/* Trust strip (MPC-6545): links only, no claims beyond what /trust and /privacy already state */}
+        <nav
+          className="pb-4 px-4 text-center text-xs text-muted-foreground"
+          aria-label="Trust and legal"
+        >
+          <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <li><Link to="/trust" className="underline hover:text-foreground">Trust Centre</Link></li>
+            <li><Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link></li>
+            <li><Link to="/cookies" className="underline hover:text-foreground">Cookie Policy</Link></li>
+            <li><Link to="/terms" className="underline hover:text-foreground">Terms</Link></li>
+            <li><Link to="/dpa" className="underline hover:text-foreground">DPA</Link></li>
+          </ul>
+        </nav>
 
         {/* Newsletter Sign-Up */}
         <section ref={footerRef} className="py-4 mt-12" aria-label="Newsletter sign-up">
@@ -294,7 +387,7 @@ const Index = () => {
 
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
               The scan runs in your browser and its results aren't stored on our
-              servers. We only store what you choose to submit, such as your email
+              servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only store what you choose to submit, such as your email
               address, and we use analytics only with your consent.{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { blogCtaHref } from "@/lib/blogTracking";
 
 export const sections = [
   { id: "what-removal-means", title: "What removing your information really means" },
@@ -161,7 +162,7 @@ const Content = () => (
     <p>
       Manual searching misses a lot, because many broker pages are not indexed well by
       search engines. A{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=remove-personal-information-from-internet">free scan</Link>{" "}
+      <Link to={blogCtaHref("remove-personal-information-from-internet")}>free scan</Link>{" "}
       can show where your details appear across data-broker and people-search sites, so you
       know which requests are worth your time.
     </p>
@@ -406,7 +407,7 @@ const Content = () => (
       Whichever route you choose, ask which sites and countries are actually covered, since
       a service built around US brokers may do little for data held in Asia-Pacific. At
       MyPrivacyTOOL, the{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=remove-personal-information-from-internet">free scan</Link>{" "}
+      <Link to={blogCtaHref("remove-personal-information-from-internet")}>free scan</Link>{" "}
       shows where your data is exposed, and removal requests can be automated once you know
       what needs to go. Use the scan results as a to-do list even if you decide to handle
       requests yourself.
@@ -647,7 +648,7 @@ const Content = () => (
     </p>
     <p>
       If you would rather not manage all of this by hand, you can start with a{" "}
-      <Link to="/scan?utm_source=blog&utm_medium=remove-personal-information-from-internet">free scan</Link>{" "}
+      <Link to={blogCtaHref("remove-personal-information-from-internet")}>free scan</Link>{" "}
       to see where your information is exposed, and then decide which requests you want to
       handle yourself.
     </p>

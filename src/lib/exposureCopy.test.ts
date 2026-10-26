@@ -1,0 +1,65 @@
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  buildTeaser, TOP_SIX_EXPLAINERS, TOP_SIX_IDS, ALICE_QUIET_IDS, ALICE_INTRO, ALICE_WEBRTC_LEAK, aliceQuietLine,
+} from './exposureCopy';
+
+describe('exposureCopy', () => {
+  it('has one explainer per top-six id and none with alarm words or percentages', () => {
+    for (const id of TOP_SIX_IDS) {
+      const s = TOP_SIX_EXPLAINERS[id];
+      expect(s).toBeTruthy();
+      expect(s).not.toMatch(/%|\bscary|danger|warning|extremely|unique to you/i);
+    }
+  });
+  it('names up to three found top-six items and the real remaining count', () => {
+    const ids = ['device', 'webrtc-leak', 'canvas-fingerprint', 'dns-leak', 'audio-fingerprint', 'browser'];
+    const t = buildTeaser(ids, { 'webrtc-leak': 'WebRTC leak status', 'canvas-fingerprint': 'canvas fingerprint', 'dns-leak': 'DNS leak status' });
+    expect(t).toBe('We found your WebRTC leak status, canvas fingerprint and DNS leak status, plus 3 more things.');
+  });
+  it('skips top-six items the browser did not produce', () => {
+    expect(buildTeaser(['device', 'audio-fingerprint'], { 'audio-fingerprint': 'audio signature' }))
+      .toBe('We found your audio signature, plus 1 more thing.');
+  });
+  it('falls back to a plain count when none of the top six exist', () => {
+    expect(buildTeaser(['device', 'browser'], {})).toBe('We found 2 things your browser tells every site.');
+  });
+});
+
+describe('Alice script (CK-8313)', () => {
+  it('keeps exactly the bottom fifteen quiet and none of the top six', () => {
+    expect(ALICE_QUIET_IDS.size).toBe(15);
+    for (const id of TOP_SIX_IDS) expect(ALICE_QUIET_IDS.has(id)).toBe(false);
+    expect(ALICE_QUIET_IDS.has('primary-language')).toBe(true);
+  });
+  it('has no percentage, "we know" or alarm words in any new Alice line', () => {
+    const lines = [ALICE_INTRO, ALICE_WEBRTC_LEAK, aliceQuietLine('Browser', 'Chrome 141'), ...Object.values(TOP_SIX_EXPLAINERS)];
+    for (const s of lines) expect(s).not.toMatch(/%|we know|critical|danger|attacker/i);
+  });
+  it('does not say "hover" in the intro and mentions tapping', () => {
+    expect(ALICE_INTRO).not.toMatch(/hover/i);
+    expect(ALICE_INTRO).toMatch(/tap/i);
+  });
+});
+
+describe('Alice spoken copy has no invented statistics (CK-7799 cleanup)', () => {
+  // vitest runs from the repo root; import.meta.url is not a file: URL in this environment
+  const src = readFileSync(resolve(process.cwd(), 'src/components/VoiceAI.tsx'), 'utf8');
+  it('contains none of the removed unbacked percentage claims', () => {
+    for (const banned of ['97% unique', '99% trackable', '99% identifiable', 'approximately 90%', '${percentage}%', '${uniquenessPercentage}', 'approximately 80% of websites', 'about 30% of users']) {
+      expect(src).not.toContain(banned);
+    }
+  });
+});
+
+describe('final summary has no invented uniqueness figure (CK-7799)', () => {
+  it('FinalSummaryPanel no longer computes or exports a "1 in N" uniqueness', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/components/FinalSummaryPanel.tsx'), 'utf8');
+    for (const banned of ['uniquenessEstimate', 'fingerprint.uniqueness', 'Uniqueness']) expect(src).not.toContain(banned);
+  });
+  it('the unused VoiceAI final-summary builder does not print a uniqueness percentage', () => {
+    const src = readFileSync(resolve(process.cwd(), 'src/components/VoiceAI.tsx'), 'utf8');
+    expect(src).not.toContain('% unique`');
+  });
+});

@@ -15,9 +15,13 @@
     "title": "Employee Privacy Protection for Business | MyPrivacyTOOL",
     "description": "Protect your team from data broker exposure and social engineering. Request a business privacy assessment from MyPrivacyTOOL."
   },
+  "/enterprise": {
+    "title": "Enterprise Privacy Exposure Monitoring | MyPrivacyTOOL",
+    "description": "Enterprise-grade monitoring and removal of employee data broker exposure, with Hong Kong, Singapore and Australia coverage. Book a demo."
+  },
   "/start": {
     "title": "Start Your Free Privacy Scan | MyPrivacyTOOL",
-    "description": "Start a free privacy scan from WhatsApp, Telegram, Messenger, Instagram or email and see what is exposed about you."
+    "description": "Join the waitlist for a free privacy scan, or message us on WhatsApp, Telegram, Messenger, Instagram or email."
   },
   "/newsletter": {
     "title": "Privacy Newsletter | MyPrivacyTOOL",
@@ -51,6 +55,10 @@
     "title": "Cookie Policy | MyPrivacyTOOL",
     "description": "Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
   },
+  "/acceptable-use": {
+    "title": "Acceptable Use Policy | MyPrivacyTOOL",
+    "description": "Rules for using MyPrivacyTOOL: what you may and may not do when scanning for data breach and dark web exposure."
+  },
   "/dpa": {
     "title": "Data Processing Agreement Summary | MyPrivacyTOOL",
     "description": "Plain-language summary of how MyPrivacyTOOL processes personal data on behalf of business customers: roles, sub-processors, security, transfers and deletion."
@@ -60,9 +68,8 @@
     "description": "How MyPrivacyTOOL handles your data: privacy policy, terms, cookie policy and data processing summary in one place."
   },
   "/pricing": {
-    "title": "Pricing",
-    "description": "Simple, transparent pricing for individuals and families is on its way.",
-    "noindex": true
+    "title": "Pricing | MyPrivacyTOOL",
+    "description": "Free exposure scan. Planned paid plans, not open yet: Basic at $7.99/month, Pro at $14.99/month and Executive at $49.99/month, planned to remove your data from brokers. Add family members for $5/month each."
   },
   "/about": {
     "title": "About | MyPrivacyTOOL",
@@ -84,5 +91,20 @@
   "/developers": {
     "title": "Developers: API Reference & Quick Start | MyPrivacyTOOL",
     "description": "Request and response examples for the MyPrivacyTOOL endpoints, how access and rate limits work, and JavaScript, Python and Go snippets."
+  },
+  "/unsubscribe": {
+    "title": "Unsubscribe",
+    "description": "Stop MyPrivacyTOOL scan report and follow-up emails. Confirm from the link in your email, or ask for a confirmation link.",
+    "noindex": true
+  },
+  "/invite": {
+    "title": "Invite Friends",
+    "description": "Invite friends to check what their browser and email give away. Earn a free month of Pro for each friend who gets their report.",
+    "noindex": true
+  },
+  "/scan/deep-dive": {
+    "title": "Your Deep Dive",
+    "description": "Confirm or dispute what we found for your number. Private link, expires after 24 hours.",
+    "noindex": true
   }
 }

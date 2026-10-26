@@ -1,0 +1,60 @@
+name: Rotate Supabase secret key (manual)
+
+# MPC-7385-F5. One-off, manual. Copies a NEW Supabase secret key from the GitHub secret NEW_SUPABASE_SECRET_KEY onto every
+# Worker that already holds SUPABASE_SERVICE_ROLE_KEY, so the old key can then be revoked in the Supabase dashboard.
+#
+# Order (nothing breaks until step 5):
+#   1. Supabase dashboard -> Project Settings -> API Keys -> Secret keys -> New secret key (name: rotation_2026_10_12).
+#   2. GitHub -> Settings -> Secrets and variables -> Actions -> New repository secret NEW_SUPABASE_SECRET_KEY = that key.
+#   3. Run this workflow (Actions -> "Rotate Supabase secret key (manual)" -> Run workflow).
+#   4. Check the log: canary 200, then "set ..." for each Worker, no "FAILED".
+#   5. Only then revoke the OLD key in the Supabase dashboard.
+# The workflow never prints a key. It only touches Workers that already have the secret (oauth-poc omits it on purpose and
+# is skipped; a Worker that is not deployed is skipped). core-brain and social-listeners hold the same key as SUPABASE_KEY (also synced
+# by deploy.yml, which now prefers NEW_SUPABASE_SECRET_KEY). The Cloudflare PAGES secret (site edge capture) is NOT reachable
+# from here: replace it by hand in the Cloudflare dashboard.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Canary - the new key must read the database before any Worker is touched
+        env:
+          NEW_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY }}
+        run: |
+          if [ -z "$NEW_KEY" ]; then echo "::error::GitHub secret NEW_SUPABASE_SECRET_KEY is not set"; exit 1; fi
+          # Same header pattern the Workers use (apikey + Authorization: Bearer).
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "apikey: $NEW_KEY" -H "Authorization: Bearer $NEW_KEY" \
+            "https://xmdmkumwxpgahmlweuug.supabase.co/rest/v1/scans?select=id&limit=1")
+          echo "canary HTTP $code"
+          if [ "$code" != "200" ]; then echo "::error::new key did not read scans (HTTP $code); no Worker was changed"; exit 1; fi
+
+      - name: Set SUPABASE_SERVICE_ROLE_KEY on each Worker that already has it
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NEW_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY }}
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        run: |
+          failed=0
+          for entry in scan-report:SUPABASE_SERVICE_ROLE_KEY mpt-leads:SUPABASE_SERVICE_ROLE_KEY mpt-metrics-collector:SUPABASE_SERVICE_ROLE_KEY github-channel:SUPABASE_SERVICE_ROLE_KEY oauth-poc:SUPABASE_SERVICE_ROLE_KEY webhook-receiver:SUPABASE_SERVICE_ROLE_KEY core-brain:SUPABASE_KEY social-listeners:SUPABASE_KEY; do
+            dir="${entry%%:*}"; secret="${entry##*:}"
+            cd "workers/$dir"
+            names=$(npx --yes wrangler@3 secret list --format json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).map(x=>x.name).join(" "))}catch{console.log("")}})')
+            if echo " $names " | grep -q " $secret "; then
+              if printf '%s' "$NEW_KEY" | npx --yes wrangler@3 secret put "$secret" >/dev/null 2>&1; then echo "set $dir ($secret)"; else echo "FAILED $dir"; failed=1; fi
+            else
+              echo "skipped $dir (no $secret secret there, or Worker not deployed)"
+            fi
+            cd ../..
+          done
+          exit $failed

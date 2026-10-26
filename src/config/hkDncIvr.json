@@ -1,0 +1,29 @@
+{
+  "_readme": "The ONLY place to change the Hong Kong DNC hotline key presses and pause lengths (MPC-7450, rewritten from the 2026-10-13 hand-recorded call). Edit values here; no code change needed. status: UNVERIFIED = placeholder/guess, REPORTED = heard once, VERIFIED = confirmed on real calls by people who understood the menu in Cantonese, Mandarin and English (Chris and speakers, 2026-10-13/14, approved by Chris 2026-10-14). VERIFIED covers the KEYS only; whether Android and iPhone send them automatically with these pauses is still tested on real handsets (MPC-7540), and the large on-screen keys remain the backup. Set IVR_VERIFIED=true in hkDnc.ts only when every key is VERIFIED (a unit test enforces this). Menu as recorded: intro in 3 languages (1 Cantonese, 2 Mandarin, 3 English); then the SAME service menu in that language: 1 = pre-recorded messages, 2 = fax (ignored on purpose, nobody uses it), 3 = short messages (SMS/MMS); then for each service: 1 = register YOUR number (the one you call from), 2 = register another number (the call tells you it cannot be done), 3 = follow up on a number already registered. Star goes back to the menu, hash ends the call. The call says the number is registered by the end of the day and the law applies after 10 days. There is no 'all three' option, so the combined flow chains: language, short messages, 1, star, pre-recorded, 1. Keys can be typed straight away, before the spoken menu ends. Procedure: docs/hk-dnc-ivr-procedure.md.",
+  "pauses": {
+    "_note": "Each unit is one comma, about 2 seconds on Android. Keys are accepted before the spoken menu finishes (type-ahead), so these are short but still UNVERIFIED on a real phone: the hotline answers after a moment and the greeting runs about 12 s before English is spoken. afterRegister is the wait after '1' before pressing star, so the 'registered by the end of the day / 10 days' message is not cut off: UNVERIFIED.",
+    "beforeFirstKey": 3,
+    "betweenKeys": 2,
+    "afterRegister": 8
+  },
+  "language": {
+    "_note": "Intro in 3 languages: 1 Cantonese, 2 Mandarin (unused by us), 3 English. Service and register keys are the same in every language (reported 2026-10-13).",
+    "en": { "key": "3", "status": "VERIFIED" },
+    "yue": { "key": "1", "status": "VERIFIED" }
+  },
+  "services": {
+    "_note": "Service menu after the language. 1 = pre-recorded messages, 3 = short messages (SMS/MMS). 2 = fax is ignored on purpose.",
+    "sms": { "key": "3", "status": "VERIFIED" },
+    "prerecorded": { "key": "1", "status": "VERIFIED" }
+  },
+  "register": {
+    "_note": "Per service: 1 = register YOUR number (the one calling). 2 = another number (cannot be done), 3 = follow up on a registered number.",
+    "key": "1",
+    "status": "VERIFIED"
+  },
+  "back": {
+    "_note": "Star goes back to the menu so a second service can be registered in the same call. Hash ends the call.",
+    "key": "*",
+    "status": "VERIFIED"
+  }
+}

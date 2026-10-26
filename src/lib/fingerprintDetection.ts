@@ -10,7 +10,7 @@ export interface FingerprintResult {
   hash: string;
   technique: string;
   risk: 'low' | 'medium' | 'high';
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export interface CanvasFingerprintResult extends FingerprintResult {
@@ -168,7 +168,9 @@ function simpleHash(str: string): string {
 function hashNumberArray(arr: number[] | Uint8Array | Float32Array | Uint8ClampedArray): string {
   let hash = 0;
   for (let i = 0; i < arr.length; i++) {
-    hash = ((hash << 5) - hash) + (arr[i] || 0);
+    // CK-8321 follow-up: -Infinity or NaN (a silent bin) counts as 0. It used to reset the whole hash to 0 at that bin
+    // (ToInt32(-Infinity) is 0), which threw away every bin before it.
+    hash = ((hash << 5) - hash) + (Number.isFinite(arr[i]) ? arr[i] : 0);
     hash = hash & hash;
   }
   return Math.abs(hash).toString(16).padStart(8, '0');
@@ -283,7 +285,7 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
     const extensions = gl.getSupportedExtensions() || [];
     
     // Get various WebGL parameters
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
     const paramNames = [
       'MAX_VERTEX_ATTRIBS',
       'MAX_VERTEX_UNIFORM_VECTORS',
@@ -300,7 +302,7 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
     
     paramNames.forEach(name => {
       try {
-        const param = (gl as any)[name];
+        const param = (gl as unknown as Record<string, number | undefined>)[name];
         if (param !== undefined) {
           params[name] = gl.getParameter(param);
         }
@@ -343,12 +345,27 @@ export async function detectWebGLFingerprint(): Promise<WebGLFingerprintResult |
 // ============================================
 
 /**
+ * CK-8321: the hash of one frame of frequency data, or null when the read did not really happen.
+ * A silent, suspended or blocked audio context gives -Infinity (or NaN) in every bin. hashNumberArray turns that into "00000000",
+ * which the page then showed as a finding. No finite bin, or an all-zero hash, means the read failed: the hexagon is "not checked".
+ */
+export function audioSignalHash(frequencyData: Float32Array | number[]): string | null {
+  let finite = false;
+  for (let i = 0; i < frequencyData.length; i++) {
+    if (Number.isFinite(frequencyData[i])) { finite = true; break; }
+  }
+  if (!finite) return null;
+  const hash = hashNumberArray(frequencyData as Float32Array);
+  return /^0+$/.test(hash) ? null : hash;
+}
+
+/**
  * Detect audio fingerprinting by generating and analyzing audio
  */
 export async function detectAudioFingerprint(): Promise<AudioFingerprintResult | null> {
   try {
     // Check if AudioContext is available
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) {
       console.warn('[FingerprintDetection] AudioContext not available');
       return null;
@@ -386,8 +403,8 @@ export async function detectAudioFingerprint(): Promise<AudioFingerprintResult |
         setTimeout(() => {
           analyser.getFloatFrequencyData(frequencyData);
           
-          // Generate hash from frequency data
-          const hash = hashNumberArray(frequencyData);
+          // Generate hash from frequency data (null when the context was silent or blocked: CK-8321)
+          const hash = audioSignalHash(frequencyData);
           
           // Cleanup
           oscillator.stop();
@@ -397,6 +414,10 @@ export async function detectAudioFingerprint(): Promise<AudioFingerprintResult |
           gain.disconnect();
           audioContext.close().catch(() => {});
           
+          if (hash === null) {
+            resolve(null);
+            return;
+          }
           resolve({
             hash,
             technique: 'Audio',
@@ -1025,6 +1046,47 @@ export async function calculateProtectionScore(): Promise<ProtectionStatus> {
 // ============================================
 
 /**
+ * CK-8305: pull the connection address out of an ICE candidate line
+ * ("candidate:<foundation> <component> <protocol> <priority> <address> <port> typ ...").
+ * Returns null for mDNS hostnames (browser privacy placeholders), anything that is not a valid
+ * IPv4/IPv6 address, and the foundation id; related addresses (raddr) are not read.
+ */
+export function parseIceCandidateAddress(
+  candidate: string
+): { address: string; kind: 'local' | 'public' } | null {
+  const fields = candidate.trim().split(/\s+/);
+  const address = fields[4]?.replace(/^\[|\]$/g, '');
+  if (!address) return null;
+
+  const v4 = address.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if ([v4[1], v4[2], v4[3], v4[4]].some((n) => Number(n) > 255)) return null;
+    const local =
+      a === 0 || a === 10 || a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127);
+    return { address, kind: local ? 'local' : 'public' };
+  }
+
+  // IPv6: hex groups and colons only, at least two colons, at most one "::"
+  if (/^[0-9a-fA-F:]+$/.test(address) && (address.match(/:/g) || []).length >= 2 && address.split('::').length <= 2) {
+    const groups = address.split(':').filter((g) => g !== '');
+    if (groups.length > 8 || groups.some((g) => g.length > 4)) return null;
+    const lower = address.toLowerCase();
+    const local =
+      lower === '::' || lower === '::1' ||
+      /^fe[89ab]/.test(lower) || // fe80::/10 link-local
+      /^f[cd]/.test(lower); // fc00::/7 unique local
+    return { address, kind: local ? 'local' : 'public' };
+  }
+
+  return null; // mDNS "<uuid>.local" or any other hostname
+}
+
+/**
  * Detect WebRTC IP leaks that can expose real IP even behind VPN
  * ⚠️ PRIVACY WARNING: This API can reveal your real IP address
  */
@@ -1076,25 +1138,11 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
 
         const candidate = event.candidate.candidate;
         
-        // Extract IP addresses from ICE candidate
-        const ipRegex = /(\d{1,3}\.){3}\d{1,3}|([a-fA-F0-9:]+:+)+[a-fA-F0-9]+/g;
-        const matches = candidate.match(ipRegex);
-        
-        if (matches) {
-          matches.forEach((ip) => {
-            // Classify as local or public
-            if (ip.startsWith('192.168.') || 
-                ip.startsWith('10.') || 
-                ip.startsWith('172.') ||
-                ip.startsWith('169.254.') ||
-                ip === '0.0.0.0' ||
-                ip.startsWith('::') ||
-                ip.startsWith('fe80:')) {
-              if (!localIPs.includes(ip)) localIPs.push(ip);
-            } else {
-              if (!publicIPs.includes(ip)) publicIPs.push(ip);
-            }
-          });
+        // CK-8305: read the connection address field only; ignore mDNS names and foundation ids
+        const parsed = parseIceCandidateAddress(candidate);
+        if (parsed) {
+          const list = parsed.kind === 'public' ? publicIPs : localIPs;
+          if (!list.includes(parsed.address)) list.push(parsed.address);
         }
       };
     });

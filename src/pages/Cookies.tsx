@@ -54,9 +54,10 @@ const Cookies = () => {
                   forgery attacks
                 </li>
                 <li>
-                  <strong>Consent Choice:</strong> Records your cookie choices via
-                  our consent manager (Consentmanager) so we do not ask again on
-                  every visit
+                  <strong>Consent Choice:</strong> Records your cookie choice
+                  (accept analytics, or essential only) and the date in your own
+                  browser storage so we do not ask again on every visit. It is
+                  not sent to us
                 </li>
                 <li>
                   <strong>User Preferences:</strong> Remembers your language and

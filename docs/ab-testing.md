@@ -11,6 +11,51 @@ Where: submit button of the email form on `/start`.
 
 It ships **off**: everyone sees `control` until `VITE_AB_START_CTA_ENABLED=true` is set on Cloudflare Pages and the site redeploys. Copy needs Chris's approval first.
 
+## Pricing page experiments (MPC-7638)
+Four independent tests on `/pricing`, all **off** until their flag is `true` on Cloudflare Pages (then redeploy). Copy needs Chris's approval first. Bucketing is per experiment, so analyse each on its own.
+| Experiment (flag) | Variants |
+|---|---|
+| `pricing_headline` (`VITE_AB_PRICING_HEADLINE_ENABLED`) | `control` "Pricing" / `free_first` "Know your exposure for free. Removal is planned." |
+| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` solid "Join the waitlist" / `outline` outline button / `notify_text` "Notify me when plans open" (paid tiers only) |
+| `pricing_tiers` (`VITE_AB_PRICING_TIERS_ENABLED`) | `control` equal cards / `highlight_pro` Pro card emphasised |
+| `pricing_social_proof` (`VITE_AB_PRICING_SOCIAL_PROOF_ENABLED`) | `control` none / `above_plans` / `below_plans` trust line |
+
+- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the on-page waitlist form, MPC-7626), split by the `ab_pricing_*` dimension for the test (those events carry `ab_<experiment_id>`, not `variant_id`), divided by `experiment_exposure` for the same `experiment_id` and `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
+- Time on page and bounce rate: GA4 engagement time and engaged-session rate, broken down by the same `variant_id`.
+- Preview: `/pricing?ab_pricing_cta=outline` (forced views are never counted).
+- Social proof: no real testimonial or customer count exists, so the trust line only repeats what the Free plan states. Do not add numbers or quotes without a verified source.
+- Run at least 14 days. The 20%+ lift goal needs far more traffic than the sample-size rule suggests; use the guidance below and call a winner only at 95% confidence. Rolling out a winner: see "Rotating a winner" (for pricing, edit `HEADLINE`, `PAID_CTA_LABEL`, etc. in `src/pages/Pricing.tsx`).
+
+## Referral programme experiments (MPC-7645)
+Three tests across the referral funnel, all **off**. Copy needs Chris's approval first. Referral traffic is small (only people who got a report), so run one test at a time and treat early results as direction, not proof.
+| Step | Experiment | Switch | Variants | Chosen by | Read results from |
+|---|---|---|---|---|---|
+| Report email block | `referral_report_block` | Worker `REFERRAL_AB_REPORT_BLOCK="true"` | `control` "Invite 3 friends, earn free Pro" / `friend_first` "Know someone who would want to see this?" | Worker, hash of the referral code, stored in `users.referral_block_variant` | database (below) + GA4 `experiment_exposure` when the private page opens |
+| `/invite` page | `referral_invite_layout` | Pages `VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED=true` | `control` share link first / `email_first` | browser, per tab session | GA4 `experiment_exposure`, `experiment_cta_click`, `referral_invites_sent` |
+| Invitation email | `referral_invite_subject` | Worker `REFERRAL_AB_INVITE_SUBJECT="true"` | `control` "A friend thought you would want to see this" / `specific_subject` "See what your browser and email address give away about you" | Worker, hash of the invited address, stored in `referrals.invite_variant` | database (below) + GA4 `experiment_exposure` on the landing page (`iv` in the link) |
+- Apply migration `20261013110000_mpc_7645_referral_ab.sql` before turning a Worker switch on.
+- Only the subject line differs in the invitation email, and the block keeps the same honest reward line in both variants.
+- Server-chosen tests are counted from the database, so cookie consent does not hide anyone. Run in the Supabase SQL editor:
+```sql
+-- report block: users who were shown a code, and how many of them sent at least one invitation / had a friend complete
+select u.referral_block_variant as variant, count(*) as users_with_code,
+       count(*) filter (where exists (select 1 from referrals r where r.referrer_user_id = u.id and r.source = 'invite_email')) as sent_invites,
+       count(*) filter (where exists (select 1 from referrals r where r.referrer_user_id = u.id and r.status = 'completed')) as had_completion
+from users u where u.referral_block_variant is not null group by 1;
+-- invitation subject: friends mailed, signed up, got their report
+select invite_variant as variant, count(*) as mailed,
+       count(*) filter (where status in ('signed_up','completed')) as signed_up,
+       count(*) filter (where status = 'completed') as completed
+from referrals where invite_variant is not null group by 1;
+```
+- A winner needs 95% confidence (two-proportion test) and, given these volumes, will often be "no difference": then keep the control.
+
+## Launch log
+| Date | Experiment | Event |
+|---|---|---|
+| 2026-10-13 | `pricing_headline`, `pricing_cta`, `pricing_tiers`, `pricing_social_proof` | Copy approved; `VITE_AB_PRICING_*_ENABLED=true` set in Cloudflare Pages Production and the site rebuilt. Earliest readout 14 days after the start date (MPC-7638). |
+| 2026-10-13 | `pricing_tiers`, `pricing_social_proof` | Switched off (flags removed in Cloudflare Pages) to concentrate low traffic (about 6 sessions/day) on `pricing_headline` and `pricing_cta`. Code unchanged; unset flag means everyone sees the control. Headline and CTA data collected so far stays valid; ignore tiers/trust-line data from the first hours (MPC-7638). |
+
 ## How it behaves
 - Variant picked once per browser tab session (`sessionStorage`), weighted random. Closing the tab forgets it, so nothing identifies a person across visits.
 - Preview a variant: `/start?ab_start_cta=early_access`. Forced views are never counted.

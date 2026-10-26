@@ -6,7 +6,7 @@ Status 2026-10-07: copy only. Nothing here has been posted or scheduled anywhere
 
 Format and tone follow `docs/channels/linkedin-publishing.md` and `docs/gtm/mpc-117/social-posts.md`: a hook line, short bullets, one link, no link-only posts. UTM convention follows MPC-7033 / MPC-7503 (`utm_source=<channel>&utm_medium=social&utm_campaign=<campaign>`), here `mpc-7262-golive`.
 
-Every claim comes from the site itself (`index.html` meta, `src/pages/Scan.tsx`, the pillar post `/blog/how-exposed-are-you`). Do not add claims (counts of brokers, speed, "no data stored") unless verified first.
+Every claim comes from the site itself, checked against the live /scan page on 2026-10-10 (badge "FREE · NO CREDIT CARD"; the form asks for an email) (`index.html` meta, `src/pages/Scan.tsx`, the pillar post `/blog/how-exposed-are-you`). Use the page's hedged wording ("may be listed"). Do not add claims (counts of brokers, speed, "no data stored") unless verified first.
 
 ## Links
 
@@ -27,8 +27,7 @@ Your data is everywhere. Now you can see where.
 MyPrivacyTOOL is live. Run a free exposure scan and get a clear picture of what is out there about you, and what to do about it.
 
 What you get:
-• A free scan. No credit card.
-• Results in seconds, not days.
+• A free scan. No credit card, just your email.
 • Plain-language next steps, so the risk is understandable and actionable.
 
 Try it: {LINKEDIN_LINK}
@@ -50,7 +49,7 @@ Variant A:
 ```
 Your data is everywhere. See where. Take it back.
 
-MyPrivacyTOOL is live. Run a free exposure scan, no credit card, and see what is out there about you.
+MyPrivacyTOOL is live. Run a free exposure scan, no credit card, just your email, and see where your information may be listed.
 
 {X_LINK}
 ```
@@ -59,7 +58,7 @@ Variant B:
 ```
 We just launched MyPrivacyTOOL.
 
-Free exposure scan: see where your data is, understand the risk, then take control. It takes seconds.
+Free exposure scan (just your email): see where your data is, understand the risk, then take control.
 
 {X_LINK}
 ```
@@ -77,7 +76,7 @@ I built a free tool that shows where your personal data is exposed (maker here, 
 
 Body:
 ```
-I'm part of the team behind MyPrivacyTOOL, which went live today. It runs a free exposure scan (no credit card, takes seconds) and shows where your data is, how risky it is, and what you can do about it.
+I'm part of the team behind MyPrivacyTOOL, which went live today. It runs a free exposure scan (no credit card, just your email) and shows where your data is, how risky it is, and what you can do about it.
 
 I'm posting because I would like feedback from people who actually care about this, not clicks:
 - Is the explanation of the risk clear, or does it feel hand-wavy?
@@ -95,7 +94,7 @@ Free tool to check how exposed an individual is to phishing-relevant data (maker
 
 Body:
 ```
-I work on MyPrivacyTOOL (live as of today). It has a free exposure scan that shows what personal data is findable about a person, which is the raw material for targeted phishing.
+I work on MyPrivacyTOOL (live as of today). It has a free exposure scan (just an email to start) that shows where a person's data may be listed, which is the raw material for targeted phishing.
 
 Not a product pitch: I would like to hear what a practitioner would want in a report like this before we build more. What is missing, and what would you ignore?
 

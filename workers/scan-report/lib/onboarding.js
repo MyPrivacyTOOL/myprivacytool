@@ -1,12 +1,14 @@
 // MPC-7261: first-100 onboarding follow-ups. Copy is DRAFT for Chris to approve; every line is true today
 // (same rule as the confirmation email: do not promise anything the report does not deliver).
+import { shell, para, tagLinks, SIGN_OFF } from './email.js';
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const DAY = 24 * 3600 * 1000;
 export const FOLLOWUP_DELAYS_MS = [3 * DAY, 7 * DAY];      // stage 1 at +3 days, stage 2 at +7 days after the report
 export const COHORT_SIZE = 100;
 
 const hex = (bytes) => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-async function hmac(secret, msg) {
+export async function hmac(secret, msg) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg)));
 }
@@ -18,6 +20,12 @@ export async function verifyUnsubscribe(secret, email, token) {
   let d = 0; for (let i = 0; i < want.length; i++) d |= want.charCodeAt(i) ^ String(token).charCodeAt(i);   // constant-time compare
   return d === 0;
 }
+// Link shown in email bodies: the branded unsubscribe page on the main site (same signed token as the Worker link below).
+export async function unsubscribePageUrl(env, email) {
+  const base = env.SITE_URL || 'https://myprivacytool.io';
+  return `${base}/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email)}`;
+}
+// Worker endpoint used by the List-Unsubscribe one-click header (mail apps POST to it directly).
 export async function unsubscribeUrl(env, email) {
   const base = env.PUBLIC_URL || 'https://mpt-scan-report.myprivacytool.workers.dev';
   return `${base}/api/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email)}`;
@@ -52,9 +60,14 @@ export function buildFollowUpEmail({ stage, mirror, cohortNumber, unsubscribeLin
     htmlBody = `<p>It has been a week since your privacy report. We would like to know what to improve.</p>
 <p>Reply to this email with one thing that was useful and one thing that was missing. A person reads every reply.</p>${founding ? `<p>${esc(founding)}</p>` : ''}`;
   }
-  const text = [...lines, '', 'The MyPrivacyTOOL team', '', foot].join('\n').replace(/\n{3,}/g, '\n\n');
-  const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#111">${htmlBody}
-<p>The MyPrivacyTOOL team</p><hr style="border:none;border-top:1px solid #eee">
-<p style="font-size:12px;color:#999">You are getting this because you requested a privacy scan. <a href="${esc(unsubscribeLink)}">Unsubscribe</a> &middot; MyPrivacyTOOL &middot; myprivacytool.io</p></body></html>`;
-  return { subject, text, html };
+  const text = [...lines, '', ...SIGN_OFF, '', foot].join('\n').replace(/\n{3,}/g, '\n\n');
+  const styled = htmlBody
+    .replace(/<p>/g, '<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">')
+    .replace(/<ol>/g, '<ol style="margin:0 0 12px 0;padding-left:22px;font-size:15px;line-height:23px;color:#374151">')
+    .replace(/<li>/g, '<li style="margin-bottom:6px">');
+  const html = shell(subject, subject, `<h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">${esc(subject)}</h1>
+${styled}
+${para(`<strong>${SIGN_OFF[0]}</strong><br>${SIGN_OFF[1]}`)}`, unsubscribeLink);
+  const campaign = `followup-${stage === 1 ? '3d' : '7d'}`;
+  return { subject, text: tagLinks(text, campaign), html: tagLinks(html, campaign, { html: true }) };
 }

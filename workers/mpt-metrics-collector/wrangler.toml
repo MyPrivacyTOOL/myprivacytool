@@ -1,0 +1,25 @@
+# mpt-metrics-collector: daily raw-metrics collector (MPC-7377, MPT analytics 2/9).
+# MyPrivacyTOOL Cloudflare account 35cb17172c65a20f5cf1baf131485382.
+name = "mpt-metrics-collector"
+main = "worker.js"
+workers_dev = true
+compatibility_date = "2024-09-23"
+
+[observability]
+enabled = true
+
+# Daily at 16:15 UTC = 00:15 HKT: just after each Hong Kong day ends, so "yesterday" (HKT) is complete.
+# The GA4 property must report in Asia/Hong_Kong (the GA4 collector refuses any other timezone).
+# Mondays 01:00 UTC = 09:00 HKT: Slack digest for Chris (MPC-7383), five lines max, reads the tracker only.
+# NOTE: the Cloudflare Free plan allows 5 cron triggers per account (error 10072), and this account is at the limit, so the KPI scorecard
+# (MPC-7618) refreshes on the daily run. To refresh every 30 minutes, upgrade to Workers Paid (or free a slot) and add "*/30 * * * *" here.
+[triggers]
+crons = ["15 16 * * *", "0 1 * * 1"]
+
+# Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
+# Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).
+
+# MPC-7493: the weekly learning-loop page (aggregates only) is created under this Notion page: the Inbound Funnels strategy page.
+# Not a secret. The NOTION_TOKEN integration must have access to the page.
+[vars]
+NOTION_LEARNING_LOOP_PARENT_PAGE_ID = "3f628547eaa7814082b4fc9cd266ae1f"

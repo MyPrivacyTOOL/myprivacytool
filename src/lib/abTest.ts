@@ -38,6 +38,57 @@ export const EXPERIMENTS = {
       { id: "early_access", weight: 50 }, // "Get early access, free"
     ],
   },
+  // /pricing experiments (MPC-7638). Four independent tests, each switched off until its flag is "true".
+  // Concurrent tests are bucketed independently; read each one on its own (experiment_id breakdown).
+  pricing_headline: {
+    id: "pricing_headline",
+    description: "H1 and sub-line on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_HEADLINE_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // "Pricing"
+      { id: "free_first", weight: 50 }, // "Know your exposure for free. Removal is planned."
+    ],
+  },
+  pricing_cta: {
+    id: "pricing_cta",
+    description: "Paid-plan button style and text on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_CTA_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 34 }, // solid button, "Join the waitlist"
+      { id: "outline", weight: 33 }, // outline button, same text
+      { id: "notify_text", weight: 33 }, // solid button, "Notify me when plans open"
+    ],
+  },
+  pricing_tiers: {
+    id: "pricing_tiers",
+    description: "Plan card presentation on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_TIERS_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // four equal cards
+      { id: "highlight_pro", weight: 50 }, // Pro card visually emphasised
+    ],
+  },
+  pricing_social_proof: {
+    id: "pricing_social_proof",
+    description: "Placement of the trust line on /pricing",
+    enabled: import.meta.env.VITE_AB_PRICING_SOCIAL_PROOF_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 34 }, // no trust line
+      { id: "above_plans", weight: 33 },
+      { id: "below_plans", weight: 33 },
+    ],
+  },
+  // /invite for a signed-in referrer (MPC-7645): which action comes first. The other two referral tests (report email block, invitation subject) are chosen
+  // by the Worker and counted from the database; the page only reports the exposure for them (see docs/ab-testing.md).
+  referral_invite_layout: {
+    id: "referral_invite_layout",
+    description: "Order of the share link and the email form on /invite",
+    enabled: import.meta.env.VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // share link first, then "we email them for you"
+      { id: "email_first", weight: 50 }, // email form first, then the share link
+    ],
+  },
 } as const satisfies Record<string, Experiment>;
 
 export type ExperimentId = keyof typeof EXPERIMENTS;

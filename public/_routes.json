@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "include": [
+    "/*"
+  ],
+  "exclude": [
+    "/assets/*",
+    "/blog/*",
+    "/email/*",
+    "/media/*",
+    "/favicon.ico",
+    "/og-image.jpg",
+    "/placeholder.svg",
+    "/site.webmanifest"
+  ]
+}

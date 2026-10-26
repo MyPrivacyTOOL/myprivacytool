@@ -23,3 +23,24 @@ Other observation: `generatelead2` (125 events) sits beside `generate_lead` (135
 2. Re-run the report after 24-48 hours (`eventName = privacy_scan_completed`).
 3. Re-authorise the Google Analytics connection with `https://www.googleapis.com/auth/analytics.edit`, then retry creating the custom dimensions (`step_name`, `hexagon_count`) from the connector. Alternatively create them in the GA4 UI (Admin > Custom definitions).
 4. Register `hexagon_count` as a custom metric before building dashboards on it.
+
+## Update 2026-10-19: the event now has two emitters
+
+The findings above are from 2026-10-06 and describe the old grid only. They are kept as the record of that check.
+
+Since 2026-10-19 (PR #419, site build 65902cb) the home page shows the honeycomb dashboard by default, and it sends the same event from a second place:
+
+| | Old grid (`?view=grid`) | Dashboard (default) |
+|---|---|---|
+| Code | `HexagonGrid.tsx` calls `trackScanCompleted` | `WebScanDashboard.tsx` calls `trackScanCompleted` |
+| `privacy_scan_completed` fires | Once per page session, when all 46+ hexagons are confirmed | Once per page session, when no purple "Is this you?" tile is left, or on arrival if the scan had none |
+| `hexagon_count` | Hexagons confirmed (46+) | Hexagons on the page (54) |
+| `scan_started` fires | First hexagon interaction | The visitor's first answer |
+
+What this means for anyone reading the numbers:
+
+- The count will not be comparable before and after 2026-10-19. Treat that date as a break in the series.
+- Both emitters go through the same consent rules in `src/lib/analytics.ts`, and each fires once per page session.
+- Readers that use the event: the metrics collector (`workers/mpt-metrics-collector`: the channel-osint collector and the learning-loop publisher).
+- Tests: `e2e/ga4-scan-completed.spec.ts` covers the old grid (`/?view=grid`); `e2e/honeycomb-dashboard.spec.ts` covers the dashboard.
+- Open question for the funnel owner: whether to use a separate event name for the old meaning, so the series stays comparable. Do not change the event again without asking.

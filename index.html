@@ -52,21 +52,45 @@
     <!-- Preconnect to external domains for performance -->
     <!-- MPC-7200: ipify/ipapi preconnects removed (the scan now asks our own Worker, /whoami); they were unused and
          opened connections to third parties before any consent choice. Preconnect only what the home page really uses. -->
-    <link rel="preconnect" href="https://mpt-leads.myprivacytool.workers.dev" crossorigin />
-    <link rel="preconnect" href="https://c.delivery.consentmanager.net" crossorigin />
+    <link rel="preconnect" href="https://api.myprivacytool.io" crossorigin />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-    <link rel="dns-prefetch" href="https://cdn.consentmanager.net" />
 
-    <!-- Consent Manager -->
-    <script type="text/javascript" data-cmp-ab="1" src="https://cdn.consentmanager.net/delivery/autoblocking/e71fec59020f9.js" data-cmp-host="c.delivery.consentmanager.net" data-cmp-cdn="cdn.consentmanager.net" data-cmp-codesrc="16"></script>
-
-    <!-- Google tag (gtag.js) — Property: 515216281 | Measurement ID: G-1BWMDBJSPL -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1BWMDBJSPL"></script>
+    <!-- Google tag (gtag.js) — Property: 515216281 | Measurement ID: G-1BWMDBJSPL
+         Loaded only after consent: no request to googletagmanager.com / google-analytics.com
+         before the visitor chooses "Accept analytics" in our own cookie banner (src/components/CookieBanner.tsx, choice kept in
+         localStorage under mpt_cookie_consent, MPC-8450). Withdrawing consent sets the ga-disable flag so no further hits are sent. -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-1BWMDBJSPL');
+      (function () {
+        var GA_ID = 'G-1BWMDBJSPL';
+        var loaded = false;
+        // Production only: localhost and *.pages.dev previews must never send hits to the production property (MPC-7376).
+        var h = location.hostname;
+        var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
+        window['ga-disable-' + GA_ID] = true;
+        function allowed() {
+          if (!isProd) return false;
+          try {
+            var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
+            return !!(c && c.v === 1 && c.analytics === true);
+          } catch (e) { return false; }
+        }
+        function sync() {
+          var ok = allowed();
+          window['ga-disable-' + GA_ID] = !ok;
+          if (!ok || loaded) return;
+          loaded = true;
+          var s = document.createElement('script');
+          s.async = true;
+          s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+          document.head.appendChild(s);
+          gtag('js', new Date());
+          gtag('config', GA_ID);
+        }
+        window.addEventListener('mpt:consent', sync);
+        sync();
+      })();
     </script>
   </head>
 

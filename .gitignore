@@ -38,3 +38,5 @@ test-results
 # wrangler local dev state
 .wrangler
 supabase/.env
+e2e-screenshots
+playwright-report-live/

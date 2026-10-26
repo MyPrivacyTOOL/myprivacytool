@@ -1,0 +1,122 @@
+# mpt-metrics-collector
+
+Daily raw-metrics collector for MPT analytics (MPC-7377, task 2/9; strategy: Notion "MPT Data & Analytics Strategy").
+Appends one row per source per run to `public.mpt_raw_metrics` (created by MPC-7376, `supabase/sql/`).
+
+- Cron: `15 16 * * *` UTC = 00:15 HKT every day, just after the Hong Kong day ends. All days and weeks are Hong Kong days (Monday start); the GA4 property must report in Asia/Hong_Kong. Manual run: `POST /run` with `Authorization: Bearer <COLLECTOR_TRIGGER_TOKEN>`. `GET /health` reports `configured`.
+- Collectors are modules in `collectors/` exporting `{source, report, collect(env) -> {payload, error?}}`; register them in `worker.js`.
+  A failing collector writes a `status=error` row and the others still run.
+- `collectors/supabase-counts.js`: row counts of scans, users, leads, subscribers, mpt_user_engagement, interaction_log (counts only, no personal data).
+- `collectors/ga4.js` (MPC-7378): GA4 Data API `runReport` for property 515216281 only, last complete Hong Kong day. One row per report, API response untouched in `payload`:
+  `daily_overview` (sessions, activeUsers, screenPageViews, eventCount by date), `daily_events` (by eventName, incl. privacy_scan_completed), `daily_source_medium`, `daily_country`, `daily_landing_page`, and on Mondays `weekly_overview` (previous Mon..Sun activeUsers).
+  A failed call writes `status=error` with an empty payload, so `mpt_daily_metrics` cells stay blank; nothing is estimated.
+  Auth: Google service account (Viewer on the property, `analytics.readonly`); its JSON key is the Worker secret `GA4_SERVICE_ACCOUNT_JSON`.
+- Secrets (names only, set in Cloudflare by a human): see `EXPECTED_SECRETS.txt`. Values never appear in the repo, logs or rows.
+
+Deploy: `.github/workflows/deploy-mpt-metrics-collector.yml` (tests, deploy, secret-name check, health check).
+Test: `node workers/mpt-metrics-collector/worker.test.mjs`.
+
+## Cloudflare analytics collector (MPC-7381, task 6/9)
+
+`collectors/cloudflare-analytics.js` pulls the previous full Hong Kong day from the Cloudflare GraphQL Analytics API as a cross-check on GA4 (Worker invocations use the exact HKT window; the zone dataset only buckets by UTC date, so zone numbers are for the UTC date with the same calendar date and are labelled `payload.zone_utc_day`):
+zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and Workers `mpt-leads`, `core-brain`, `social-listeners`
+(invocations + errors, `workersInvocationsAdaptive`). Both untouched responses are stored in `payload.zone` / `payload.workers`.
+
+- Zone query also returns bandwidth (`sum.bytes`), `cachedRequests`/`cachedBytes`, the `responseStatusMap` (4xx/5xx) and `threats`. A third query (`firewallEventsAdaptiveGroups`, action=block) is stored in `payload.firewall`; it is optional, so if the plan/token cannot read it the row stays `ok` with `payload.firewall = null` and a `firewall_note`.
+- Secrets (set by a human): `CLOUDFLARE_ANALYTICS_TOKEN` = a token with **Analytics Read only** (CK-7318 notes `mpt-openclaw-readonly` already exists; never use the deploy token), and `CLOUDFLARE_ZONE_ID` = zone ID of myprivacytool.io.
+- A failed call writes `status=error`; the failed half stays `null` (blank), the other half is kept.
+- `supabase/sql/mpt-cloudflare-daily-metrics.sql`: view `mpt_cloudflare_daily` (visitors, requests, bandwidth, cached requests, cache-hit ratio, 4xx/5xx, threats blocked, per-Worker invocations/errors per day; re-run the file in the Supabase SQL editor to pick up the added columns). `supabase/sql/mpt-cloudflare-daily-join.sql` (applied 2026-10-12) adds a one-row-per-day view `mpt_cloudflare_day`, appends the Cloudflare columns to `mpt_daily_metrics`, and makes `cloudflare_threats_blocked` fall back to the zone's `sum.threats` when the firewall query is denied for the zone. `mpt_daily_metrics` joins it on `metric_date` to show `cloudflare_visitors` next to GA4 active users.
+
+## Notion publisher (MPC-7382, task 7/9)
+
+`publishers/notion.js` runs after the collectors on every scheduled run and writes counts and summaries (no personal data) to Notion, reading the Supabase views `mpt_daily_metrics` / `mpt_weekly_metrics`.
+
+- **Daily row** (yesterday's Hong Kong day) in *Management & Data Analytics MPT Hub* (data source `5bf43eae-1da1-438e-859d-56b241b5b1ac`), existing column names: `GA4 Sessions`, `Website Visitors` (GA4 active users), `Supabase Signups` (users created that day), `Newsletter Signups` (subscribers created that day), `Total Leads` (latest `supabase/table_counts` pull). Source and read time go in `Notes`. Columns with no source yet are not written.
+- **Weekly row** (Mondays, for the week that just ended) in *MPT Total Project Channel Analytics and Metrics* (data source `49361779-2050-4d96-8f69-ad1da1636810`): `Entry` = `Week of YYYY-MM-DD`, `Week Of`, `Cumulative Scans`, `Conversion Rate %`, `Current MRR`, `GA4 Active Users`, `Blog Posts Published`, `X Threads Posted`, `Previous Week` (relation to the prior week's row), `Linked Objective` = O3, `Agent Insights` (source and read time of every number). `Pace Status` is set after writing, from Notion's own `Pace Gap %` formula: On Track at 0 or above, At Risk from 0 to -15, Behind below -15.
+- **Idempotent:** rows are found by `Date` / `Week Of`; a re-run updates the same row. More than one match is an error, not a guess.
+- **Existing rows are never edited:** a row is only updated if its `Notes` / `Agent Insights` starts with `[mpt-metrics-collector]`. Hand-made rows (e.g. the manual `Week of 2026-10-05` entry) are skipped and reported as `skipped_not_ours`. Older outreach columns are never written.
+- **Blank, not estimated:** a NULL from the views (source missing or `status=error`) leaves the cell blank.
+- Secret `NOTION_TOKEN` (internal integration token). Chris must share both databases with that integration. Optional vars `NOTION_DAILY_DATA_SOURCE_ID`, `NOTION_WEEKLY_DATA_SOURCE_ID` override the defaults above.
+- Manual run: `POST /publish?day=YYYY-MM-DD&week=YYYY-MM-DD` with the same bearer token as `/run`.
+- Test: `node workers/mpt-metrics-collector/publisher.test.mjs`.
+
+## YouTube collector (MPC-7380, task 5/9)
+
+`collectors/youtube.js` pulls the previous full Hong Kong day from the YouTube Data API v3 with `YOUTUBE_API_KEY` (sent as the `x-goog-api-key` header, never in the URL). Stores subscribers, total views and videos, videos published that day, per-video views/likes/comments in `payload.summary`, and the untouched responses in `payload.raw`. Channel `UC-chigimJFz4Rs8ulbDUeFQ` (override with `YOUTUBE_CHANNEL_ID`).
+
+- Impressions are `null`: they need the YouTube Analytics API with OAuth from the channel owner (follow-up).
+- X is not collected: the paid API tier is not approved.
+- `supabase/sql/mpt-youtube-daily-metrics.sql`: view `mpt_youtube_daily` (not yet applied).
+
+## HubSpot collector (MPC-7379, task 4/9)
+
+`collectors/hubspot.js` stores one `source=hubspot, report=portal_daily` row per run for MPT's portal **246502821** (constant `HUBSPOT_PORTAL_ID`). Counts and aggregates only: total contacts, contacts created on the previous Hong Kong day, contacts per lifecycle stage (plus `(none)`), deals per pipeline/stage with count and amount sum. No emails, names, phone numbers or deal names are requested or stored; searches ask for one record with only `hs_object_id` and keep just `total`.
+
+- **Portal guard:** the first call is `GET /account-info/v3/details`. If the portal ID differs from 246502821, or cannot be read, the row is `status=error` and nothing else is read (`payload.guard`).
+- **Read-only:** secret `HUBSPOT_READONLY_TOKEN` (a read-only private-app token; not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY` other Workers hold). `hubspotRead()` only allows GET and the contact/deal search endpoints. The token is redacted from error text, and error text carries the HTTP status only.
+- Scopes needed on the private app: `crm.objects.contacts.read`, `crm.objects.deals.read`, `crm.schemas.contacts.read`, `crm.schemas.deals.read` (pipelines, lifecycle options).
+- `supabase/sql/mpt-hubspot-daily.sql`: view `mpt_hubspot_daily` and `hubspot_total_contacts` / `hubspot_new_contacts` appended to `mpt_daily_metrics`. Total contacts is the count when the run happened; new contacts is for the Hong Kong day in `payload.day`.
+- **Form submissions and email engagement** (extension): `payload.forms` = `{submissions_on_day, forms_counted}` (forms from `GET /marketing/v3/forms/`, submissions from `GET /form-integrations/v1/submissions/forms/{id}`, newest first, counted for the Hong Kong day; submitted values are never stored) and `payload.email` = `{sent, delivered, opens, clicks, bounces, unsubscribes}` (`GET /marketing/v3/emails/statistics/list`, aggregate counters; all null if no marketing email was sent). Extra scopes on the private app: `forms` and `content`. If the token lacks one (HTTP 403) that section is `null`, a warning is logged and named in `payload.scope_warnings`, and the row stays `ok`; other failures make the row `status=error`.
+- Test: `node workers/mpt-metrics-collector/hubspot.test.mjs`.
+
+## Monday Slack digest (MPC-7383, task 8/9)
+
+`publishers/slack-digest.js` + `lib/digest.js`. Second cron `0 1 * * 1` = Monday 01:00 UTC = **09:00 Hong Kong**. It reads the latest two rows of the weekly tracker (the Monday 00:15 HKT publish has just written the week that ended) and posts **at most five lines** to Chris:
+scans against target, pace status, biggest mover up and down (week on week), the agent's plan, and failed sources plus anything needing his decision.
+
+- **Never an estimate.** A blank cell stays blank and is not used as a mover. Failed sources are named (`DATA GAP: ga4, hubspot failed`): any source whose latest pull per report in the last 48h is `status=error` in `mpt_raw_metrics`. If the tracker cannot be read, the message says so and shows no figures.
+- **Agent plan / decision:** read from `Plan:` and `Decision:` lines in the row's `Agent Insights` (written by the agent, task 9/9). Missing => "none recorded" / "nothing".
+- **Secrets (set by a human in Cloudflare; names only here):** `SLACK_BOT_TOKEN` (bot token with `chat:write`, bot invited to the channel or allowed to DM) and `MPTSLACK_CHANNEL_ID` (Chris's DM or the channel). Until both are set the digest cron logs "digest skipped" and does nothing; the daily run is unaffected.
+- **Manual / verification:** `POST /digest?dry=1` returns the text without posting; `POST /digest` posts and returns `{ts, channel, permalink}` (same bearer token as `/run`). Record the permalink as evidence.
+- **Agent task counts (MPC-7654):** the agent line also carries `Agent tasks: N done of M, X% finish rate, R rejected (Override_Outcome or Approval_Status = Rejected), B blocked`, counted from the Tasks Fleet Master database (rows with Assigned Actor = MyPrivacyToolClaw, not archived; override the data source with `NOTION_TASKS_DATA_SOURCE_ID`; the integration must be shared with that database). Finish rate = Done / (Done + Cancelled). `Amendments` is a general notes log (ID renumbering, dispatch notes), not an override signal, so it is not shown; overrides come from `Override_Outcome` and `Approval_Status`. The Tasks DB fields `Minutes_Saved_Chris`, `Errors_Caught`, `Override_Outcome` (Accepted as is / Amended / Rejected) and `Revenue_Impact_GBP` (approved 2026-10-12) add `X min saved, Y errors caught, Z% accepted as is, £R revenue impacted` to that line, each only once at least one task has a value; blank is never shown as 0. If the Tasks DB cannot be read the line says `Agent stats unavailable.` and the rest of the digest still posts.
+- Test: `node workers/mpt-metrics-collector/digest.test.mjs`.
+- Chris's page: **MPT Dashboard** under the MyPrivacyTOOL hub (linked views only, no copied data): https://app.notion.com/p/3f528547eaa78102917edbc1acc368ee
+
+## Machine mirror (MPC-7492, inbound funnels F3)
+
+A daily record of which bots and AIs read MyPrivacyTOOL. Bot and AI rows only: person and unknown rows are never returned, stored or published (they are counted only in the total used as the denominator for "share of all traffic"). No IP address is read.
+
+- `supabase/migrations/20261012170000_mpc_7492_machine_visits_daily.sql`: `mpt_machine_visits_daily(p_from, p_to)` (service_role only) aggregates `edge_visits` per class and user agent.
+- `collectors/edge-machines.js` (`source=edge, report=machine_daily`, runs with the other collectors at 00:15 HKT) stores one row for the previous Hong Kong day: `payload.families[]` (family, class, requests, pages_taken, pages, first_seen, last_seen, share_pct of all traffic, robots_fetches, fetched_robots_txt, first_ever), `total_requests`, `machine_requests`, `machine_share_pct` and `flags[]`. This is the row the weekly KPI tracker can read. No edge visits that day => an `ok` row with zero totals and a note, nothing estimated.
+- `lib/machine-mirror.js`: family names (from the self-declared user agent; a test keeps them in step with the classifier tokens in `shared/edge-capture/ruleset.ts`), the rollup and the flags.
+- **Flags:** `new_family` (the family's first sighting ever is inside the day); `tenfold_up` / `tenfold_down` (requests changed by 10x or more against the previous Hong Kong day; a family that vanished counts as down; the busier day needs at least 20 requests so 1 -> 10 is not noise).
+- **robots.txt:** `fetched_robots_txt` = the family requested `/robots.txt` that day. `public/robots.txt` has no Disallow rules, so obeying a rule cannot be measured yet.
+- `publishers/machine-mirror.js`: one page per day, "Machine mirror — YYYY-MM-DD", under the Inbound Funnels strategy page (id in `STRATEGY_PAGE_ID`). It reads the stored row, not raw visits. Idempotent (a re-run replaces that page), skips pages without its marker, and writes nothing when the day has no edge data. **Chris must share the strategy page with the Notion integration (`NOTION_TOKEN`).** Manual: `POST /publish-mirror?day=YYYY-MM-DD` with the bearer token.
+- Test: `node workers/mpt-metrics-collector/machine-mirror.test.mjs`; SQL assertions in `supabase/tests/schema.test.sql`.
+- **Needs before data flows:** the migration applied to the live project, and edge capture on (MPC-7491, Chris's sign-off).
+
+## Daily /scan gap check (MPC-7535)
+
+`collectors/scan-gap.js` runs with the daily collection (00:15 HKT) for the previous Hong Kong day. It counts the distinct addresses that submitted the
+/scan page (HubSpot "Start Scan" form, `source_tag = scan-page`, read-only token) and checks each against `scans` rows with `source = web_scan`
+(created within 24h before the day started, because the Worker makes one report per address per 24h). Any submission without an accepted request
+posts an alert to the usual Slack channel (`SLACK_BOT_TOKEN` + `MPTSLACK_CHANNEL_ID`, the same as the Monday digest). A check that cannot run
+(HubSpot scope missing, Supabase unreadable, more than 40 submissions in a day) posts an alert too. Stored payload and alert text hold counts only.
+Needs the HubSpot read-only token to have the `forms` scope. Manual run: `POST /run` with the trigger token.
+
+## Channel OSINT analytics (MPC-7641)
+
+Channel OSINT (the X / LinkedIn / Telegram bots) tracked apart from website scans, one row per platform per Hong Kong day.
+
+- `supabase/migrations/20261013100000_mpc_7641_channel_osint_daily.sql`: `mpt_channel_osint_daily(p_from, p_to)` (service_role only, counts only, no sender id or text): `dms_received` (interaction_log rows), `scan_requests` (intent `scan`), `consents_given` (awaiting_confirmation -> confirmed), `conversions` (leads with `utm_medium=channel_osint`, grouped by `utm_source`). SQL assertions in `supabase/tests/schema.test.sql`.
+- `collectors/channel-osint.js` (`source=channel_osint, report=funnel_daily`, runs with the other collectors at 00:15 HKT): adds from GA4, for sessions with `utm_medium=channel_osint`: `clicks` (sessions) and `scans_completed` (`privacy_scan_completed` events). edge_visits drops the query string and web_scans has no campaign, so neither can attribute them. GA4 unreadable => funnel counts kept, `clicks` and `scans_completed` null, row `status=error` naming it. Nothing is estimated.
+- **Tagging convention:** every link a channel bot sends to the main site carries `utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply`. The Telegram bots (`workers/telegram-webhook`, `workers/social-listeners`) now do this; underscores inside URLs are escaped (`\_`) before sending because Telegram's legacy Markdown reads `_` as italics. The site already records UTMs on GA4 events and leads. Any new channel's links must follow the same rule (X and LinkedIn bots send no links today).
+- `publishers/channel-osint.js` + `lib/channel-osint.js`: Monday 09:00 HKT Slack note to Chris (same cron as the digest, same `SLACK_BOT_TOKEN` / `MPTSLACK_CHANNEL_ID`, no Notion token needed): per platform DMs, consents, scan requests, scans, clicks, leads, **leads per 100 DMs**, a "best return" line (only when two platforms each have 10+ DMs), and named data gaps. There is no spend data, so "ROI" is leads per 100 DMs, not money.
+- Manual: `POST /channel-osint?dry=1` returns the text for the previous week, `POST /channel-osint` posts it (bearer `COLLECTOR_TRIGGER_TOKEN`). Test: `node workers/mpt-metrics-collector/channel-osint.test.mjs`.
+- **Notion dashboard (section 5 of the MPT Dashboard):** database "Channel OSINT Daily (MPC-7641)" (data source `7929984d-9ee4-4b76-955c-6a5ce6c33e6a`, override `NOTION_CHANNEL_OSINT_DATA_SOURCE_ID`) under the MPT Dashboard page. `publishers/channel-osint.js` `publishChannelOsintDay` writes one row per platform per Hong Kong day from the stored `channel_osint/funnel_daily` row, after the other publishes (same `NOTION_TOKEN`; **the integration must have access to the new database, it sits under the MPT Dashboard page**). Idempotent by Name (`YYYY-MM-DD · platform`); rows without the `[mpt-metrics-collector]` marker in Notes are never touched. Manual: `POST /publish-channel-osint?day=YYYY-MM-DD`.
+- **Limits:** the X bot has no state row, so its consents stay 0 until X is a stateful channel (docs/core-brain.md). X and LinkedIn bots send no links today; when they do, tag them as above.
+
+## KPI scorecard on the MPT Dashboard (MPC-7618)
+
+`publishers/kpi-dashboard.js` + `lib/kpi.js`. The daily run (00:15 HKT, after the other publishes) rewrites **one callout block** at the top of Chris's MPT Dashboard page (id `DASHBOARD_PAGE_ID`; first line starts with `[mpt-metrics-collector KPI scorecard]`). It collects nothing and writes no raw rows; other blocks on the page (the four linked views) are never touched, and two marked blocks is an error, not a guess.
+
+- **Progress to the North Star:** scans vs 10,000, paid conversions vs 1,000, ARR vs $120,000 (MRR x 12), each with % complete and the weekly run rate needed to hit it by 2027-08-31 (`GOALS` in `lib/kpi.js`).
+- **Weekly growth:** new scans in the last full week against the week before (blank unless both exist and the earlier one is above zero), plus this week so far.
+- **Top 5 traffic sources:** GA4 `daily_source_medium` summed over the last 7 complete Hong Kong days (newest pull per day only).
+- **Funnel, 7 complete days:** GA4 sessions -> scans -> saved scans (visitors who gave a contact and ticked the save box, `web_scan_contacts.save_consent_at`) -> paid. Each step shows its rate against the previous step and the drop-off. A step with no data reads "not collected" and the steps after it show no rate.
+- **Last 7 days:** sessions, new scans, new users per day.
+- **Freshness:** refreshed once a day at 00:15 HKT, and on demand with `POST /publish-kpi`. Scans, paid users and saved scans are live counts at refresh time. A 30-minute refresh needs a third cron (`*/30 * * * *`): the Cloudflare Free plan allows only 5 cron triggers per account (deploy error 10072, MPC-7618), so it needs Workers Paid or a freed slot; the Worker already handles that cron. Sessions and sources come from the daily GA4 pull, so today's sessions stay blank until tomorrow. Nothing is estimated.
+- **Known gap:** paid conversions in the funnel are "not collected" because paid history is not stored (only the current total is known). It fills in once a paid-date history exists.
+- **Secrets:** none new. It needs `NOTION_TOKEN` (the integration must be able to edit the MPT Dashboard page), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+- **Manual refresh:** `POST /publish-kpi` with the collector bearer token.
+- Test: `node workers/mpt-metrics-collector/kpi.test.mjs`.

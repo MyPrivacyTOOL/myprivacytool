@@ -1,4 +1,4 @@
-# MPC-6677: scan -> confirmation -> 48-hour privacy report. One Worker owns both the confirmation
+# MPC-6677: scan -> confirmation -> privacy report (normally minutes; 48h is the overdue deadline). One Worker owns both the confirmation
 # email and the report (no duplicate senders). Deploy to the MyPrivacyTOOL Cloudflare account.
 name = "mpt-scan-report"
 main = "index.js"
@@ -12,12 +12,60 @@ crons = ["*/5 * * * *"]
 [vars]
 SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
 HUBSPOT_LEAD_SOURCE = "web_scan"
-# Safety gate until the privacy policy (MPC-6545) is live and Chris approves a real-user send:
-# only these addresses (gmail "+tag" ignored) get emails. Remove/empty to open to everyone.
-RECIPIENT_ALLOWLIST = "testingnt69@gmail.com,testingnt7@gmail.com"
+# MPC-7261 GO LIVE: empty = open to everyone (privacy pages live, Chris content sign-off 2026-10-07, email copy approved).
+# Rollback: put the test addresses back (comma separated; gmail "+tag" ignored) and redeploy to restrict sends again.
+RECIPIENT_ALLOWLIST = ""
 # Free mode: send the report even without a HIBP key (breaches shown as "not yet checked" + self-check link).
 # With HIBP_API_KEY set, breaches are checked for real. Set "false" to HOLD reports until HIBP works.
 ALLOW_PARTIAL_REPORT = "true"
+
+# MPC-7448: HK Spam day-10 "you are now protected" email. Two switches, both anything-but-"true" = off:
+#  HK_SPAM_ENABLED     "false": the job does nothing at all (no database read, no email).
+#  HK_SPAM_EMAILS_LIVE "false": test mode. Nothing goes to registrants and no row is marked sent; the job only sends sample emails
+#                      (one per language that has someone due) to HK_SPAM_TEST_INBOXES (comma separated, a Worker secret/var, never real users).
+# Real sending is switched on at Chris's sign-off (MPC-7545), after the scan go-live (MPC-7385). See docs/hk-spam-day10-email-mpc-7448.md.
+# It runs on the */5 trigger at 01:00-04:00 UTC (09:00 HKT first run, hourly retries), see isHkSpamSlot in lib/hkSpam.js; no separate cron (Workers Free allows 5 per account).
+HK_SPAM_ENABLED = "true"
+# MPC-7545: LIVE from this change. Chris gave the launch word for real HK day-10 emails on 2026-10-26 (wording approved, MPC-7385 scan go-live Done).
+# Rollback: set "false" (test mode) or HK_SPAM_ENABLED = "false" and merge, or Actions -> Rollback Worker -> mpt-scan-report. Sends already made cannot be undone.
+HK_SPAM_EMAILS_LIVE = "true"
+
+# MPC-8452 Tier 2: search public GitHub commits for the visitor's address. This is the only check that sends the PLAIN address to a third party. ON since
+# 2026-10-26 on the owner's instruction, after the Privacy page sentence for it went live (PR 528). Only the exact string "true" runs it; "false" is the rollback.
+# Set the Worker secret GITHUB_SEARCH_TOKEN (a GitHub token with no scopes) because the unauthenticated search allows about 10 requests a minute. See docs/osint-list-mpc-8452.md.
+EMAIL_GITHUB_COMMITS_ENABLED = "true"
+
+# MPC-7465/7470: save the visitor's scan with the email request (POST /api/scan with scan + save_consent:true, the separate tick box at the contact step).
+# ON since 2026-10-12 (MPC-7470: wording approved by Chris, decision D12, production migrations applied). Anything but "true" saves nothing, so "false" is the rollback.
+# The site has a matching flag, VITE_SAVE_WEB_SCANS (a Cloudflare Pages build variable): the tick box only shows when BOTH are on.
+WEB_SCAN_SAVE_ENABLED = "true"
+
+# MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). ON since 2026-10-12 on Chris's instruction, after he approved the
+# screen, the threshold and the exact opt-in wording, and after the recognise-opt-in migration (20261012240000) was applied. Recognition runs only for a browser
+# holding a scan saved with BOTH the save consent and the separate "recognise this device" consent. Needs WEB_SCAN_SAVE_ENABLED too. "false" is the rollback;
+# anything but "true" does nothing.
+RECOGNITION_ENABLED = "true"
+
+# MPC-7645 ON 2026-10-14 IN TESTER MODE: the Worker secret REFERRALS_TEST_RECIPIENTS limits every referral feature to the listed test addresses. Deleting that secret opens the programme to ALL users. Rollback: "false".
+# MPC-7645: referral programme ("Invite 3 friends", one free month of Pro per friend who gets a report). OFF. Turn on only after Chris has approved the
+# email copy (lib/referralEmail.js) and the Privacy text, and migration 20261013100000_mpc_7645_referrals.sql is applied. Needs UNSUBSCRIBE_SECRET.
+# The site has a matching flag, VITE_REFERRALS_ENABLED. Anything but "true" does nothing: no link, no block in the report, no reward, endpoints answer 404.
+REFERRALS_ENABLED = "true"
+# Tester mode: set the Worker SECRET REFERRALS_TEST_RECIPIENTS (comma separated addresses, `wrangler secret put`, never in this file) to limit the programme to
+# those addresses while it is tested: the invite block, invite page, invitations (to listed addresses only) and reward emails. Everyone else is unchanged.
+# Delete the secret to open the programme to every user. Order matters: set the secret BEFORE setting REFERRALS_ENABLED = "true".
+
+# MPC-7645 A/B tests across the referral funnel, both OFF (anything but "true" = everyone gets the control and nothing is recorded). Copy needs Chris's approval before either goes on.
+#  REFERRAL_AB_REPORT_BLOCK   wording of the invite block in the report email (control / friend_first), stored in users.referral_block_variant
+#  REFERRAL_AB_INVITE_SUBJECT subject line of the invitation to the friend (control / specific_subject), stored in referrals.invite_variant
+# The site has a third, in-browser test (VITE_AB_REFERRAL_INVITE_LAYOUT_ENABLED). Reading results: docs/ab-testing.md.
+REFERRAL_AB_REPORT_BLOCK = "false"
+REFERRAL_AB_INVITE_SUBJECT = "false"
+
+# MPC-8430: Cloudflare Turnstile on POST /api/scan. Needs the Worker secret TURNSTILE_SECRET_KEY (the widget created for this Worker; no secret = off).
+# TURNSTILE_ENFORCE "false" = report-only: a missing/invalid token is logged (TURNSTILE_FAILED, truncated IP) but the request goes through.
+# "true" = a failed check answers 403 and nothing is stored or sent. Rollback: set back to "false" and redeploy.
+TURNSTILE_ENFORCE = "true"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
@@ -30,3 +78,10 @@ name = "RATE_LIMITER"
 type = "ratelimit"
 namespace_id = "7351"
 simple = { limit = 5, period = 60 }
+
+# MPC-8452: per-IP limit on the live view (GET /api/scan/live, polled every few seconds): 40 requests / 60s. Fails open if the binding is missing.
+[[unsafe.bindings]]
+name = "LIVE_LIMITER"
+type = "ratelimit"
+namespace_id = "7352"
+simple = { limit = 40, period = 60 }

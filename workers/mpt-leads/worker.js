@@ -22,6 +22,47 @@ async function rateLimitState(env, request) {
 }
 const rateLimited = async (env, request) => (await rateLimitState(env, request)) === 'limited';
 
+// MPC-8368: Cloudflare Turnstile (privacy-preserving, no cookies, no puzzle). The widget on the scan form sends a token as
+// `cf-turnstile-response`; it is verified against TURNSTILE_SECRET_KEY. Returns 'absent' (secret not set: feature off),
+// 'ok', 'failed' (missing, invalid, reused or wrong-hostname token) or 'error' (siteverify unreachable: fails open, like the
+// rate limiter, so a Cloudflare hiccup never drops a real lead). Blocking is opt-in via TURNSTILE_ENFORCE = "true"; until then
+// a 'failed' result is only logged so the Worker can ship before the site that sends tokens.
+// Privacy: the TURNSTILE_FAILED log keeps a coarse network prefix (IPv4 /24, IPv6 /48), never the visitor's full address.
+// It still groups repeat offenders and shows which network a false positive came from. Workers Logs retention is fixed by
+// plan (3 days Free, 7 days Paid) and cannot be set per log line, so the address is cut before it is written.
+function maskIp(ip) {
+  const s = String(ip || '');
+  const v4 = s.match(/(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/); // also IPv4-mapped IPv6 (::ffff:1.2.3.4)
+  if (v4) return v4[1] + '.0/24';
+  if (s.includes(':')) {
+    const g = s.split(':');
+    return g[0] && g[1] && g[2] ? `${g[0]}:${g[1]}:${g[2]}::/48` : 'ipv6';
+  }
+  return '';
+}
+const TURNSTILE_HOSTS = ['myprivacytool.io', 'www.myprivacytool.io', 'wwwmyprivacytool.pages.dev'];
+async function turnstileState(env, request, token, info = {}) {
+  if (!env.TURNSTILE_SECRET_KEY) return 'absent';
+  if (typeof token !== 'string' || !token) { info.reason = 'missing_token'; return 'failed'; }
+  if (token.length > 2048) { info.reason = 'token_too_long'; return 'failed'; }
+  try {
+    const fd = new FormData();
+    fd.append('secret', env.TURNSTILE_SECRET_KEY);
+    fd.append('response', token);
+    const ip = request.headers.get('CF-Connecting-IP');
+    if (ip) fd.append('remoteip', ip);
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: fd });
+    if (!res.ok) { console.warn('turnstile siteverify http', res.status); return 'error'; }
+    const out = await res.json();
+    if (!out.success) { info.reason = 'rejected:' + (out['error-codes'] || []).join(',').slice(0, 100); console.warn('turnstile rejected:', (out['error-codes'] || []).join(',').slice(0, 200)); return 'failed'; }
+    if (out.hostname && !TURNSTILE_HOSTS.includes(out.hostname)) { info.reason = 'hostname_mismatch:' + clip(out.hostname, 100); console.warn('turnstile hostname mismatch:', clip(out.hostname, 100)); return 'failed'; }
+    return 'ok';
+  } catch (e) {
+    console.warn('turnstile error:', String(e && e.message || e).slice(0, 200));
+    return 'error';
+  }
+}
+
 function whoami(request, cors, rlState) {
   const cf = request.cf || {};
   let country = cf.country || '';
@@ -40,9 +81,37 @@ function whoami(request, cors, rlState) {
   });
 }
 
+// CK-7721 fix 4: retention for the Notion leads database. The Privacy Policy keeps lead records for 24 months after last engagement; every
+// submission creates its own Notion page, so a page's created time is its last engagement. Older pages are ARCHIVED (Notion keeps archived
+// pages in its trash for 30 days, then deletes them). Counts only are logged: never a name or an email. Fail-soft; at most LEAD_PURGE_LIMIT per run.
+export const LEAD_RETENTION_MONTHS = 24;
+const LEAD_PURGE_LIMIT = 100;
+export async function purgeOldLeads(env, now = new Date(), fetchImpl = fetch) {
+  if (!env.NOTION_TOKEN || !env.LEADS_DB_ID) return { archived: 0, skipped: 'notion not configured' };
+  const cutoff = new Date(now); cutoff.setUTCMonth(cutoff.getUTCMonth() - LEAD_RETENTION_MONTHS);
+  const headers = { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' };
+  let archived = 0;
+  try {
+    const q = await fetchImpl(`https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ page_size: LEAD_PURGE_LIMIT, filter: { timestamp: 'created_time', created_time: { before: cutoff.toISOString() } } }),
+    });
+    if (!q.ok) { console.error('lead purge query failed:', q.status); return { archived, failed: `query ${q.status}` }; }
+    for (const page of (await q.json()).results || []) {
+      const r = await fetchImpl(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', headers, body: JSON.stringify({ archived: true }) });
+      if (r.ok) archived++; else console.error('lead purge archive failed:', r.status);
+    }
+  } catch (e) { console.error('lead purge error:', String(e).slice(0, 200)); }
+  if (archived) console.log(`lead purge: archived ${archived} Notion lead page(s) older than ${LEAD_RETENTION_MONTHS} months`);
+  return { archived };
+}
+
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweepPending(env).catch((e) => console.error('Sweep error:', String(e))));
+    // The cron runs every 5 minutes; the retention purge runs once a day, on the 19:00 UTC tick (03:00 HKT).
+    const t = new Date(event.scheduledTime ?? Date.now());
+    if (t.getUTCHours() === 19 && t.getUTCMinutes() < 5) ctx.waitUntil(purgeOldLeads(env, t).catch((e) => console.error('Lead purge error:', String(e))));
   },
 
   async fetch(request, env, ctx) {
@@ -87,6 +156,7 @@ export default {
       let categoryScores = null; // MPC-7173: per-category risk scores for the baseline snapshot
       let riskScore = null; // MPC-6956: only the post-scan email modal sends this
       let consentRaw = null, consentSourceRaw = '', sourceRaw = ''; // MPC-6971: explicit consent only
+      let turnstileToken = ''; // MPC-8368: Turnstile response from the scan form
       const ct = request.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const b = await request.json();
@@ -97,6 +167,7 @@ export default {
         utm_campaign = b.utm_campaign || ''; utm_content = b.utm_content || '';
         referrer = b.referrer || '';
         consentRaw = b.consent ?? null; consentSourceRaw = b.consent_source || ''; sourceRaw = b.source || '';
+        turnstileToken = b['cf-turnstile-response'] || '';
       } else {
         const fd = await request.formData();
         riskScore = fd.get('riskScore') || null;
@@ -105,6 +176,7 @@ export default {
         utm_campaign = fd.get('utm_campaign') || ''; utm_content = fd.get('utm_content') || '';
         referrer = fd.get('referrer') || '';
         consentRaw = fd.get('consent'); consentSourceRaw = fd.get('consent_source') || ''; sourceRaw = fd.get('source') || '';
+        turnstileToken = fd.get('cf-turnstile-response') || '';
       }
       // MPC-7350: strings only, bounded lengths (Notion/HubSpot/Slack get nothing unbounded).
       email = String(email).trim(); name = clip(name, 100).trim(); phone = clip(phone, 32).trim();
@@ -128,6 +200,24 @@ export default {
         });
       }
 
+      // MPC-8368: bot check. Runs after the watchdog health check (which has no browser and no token) and before any write.
+      const tsInfo = {};
+      const ts = await turnstileState(env, request, turnstileToken, tsInfo);
+      if (ts === 'failed') {
+        // MPC-8368: one structured line per failure (search the Worker logs for TURNSTILE_FAILED) so false positives can be
+        // reviewed during the enforcement trial. Carries a truncated IP, timestamp, reason, country and Origin; never the email or token.
+        const enforce = String(env.TURNSTILE_ENFORCE).toLowerCase() === 'true';
+        console.warn('TURNSTILE_FAILED ' + JSON.stringify({
+          ts: new Date().toISOString(),
+          ip: maskIp(request.headers.get('CF-Connecting-IP')),
+          country: request.cf?.country || '',
+          origin: origin || '',
+          reason: tsInfo.reason || 'unknown',
+          action: enforce ? 'blocked_403' : 'allowed_report_only',
+        }));
+        if (enforce) return reject(403, 'Verification failed');
+      }
+
       // Capture technical metadata from the request
       const ip = request.headers.get('CF-Connecting-IP') || '';
       const country = request.cf?.country || '';
@@ -140,8 +230,8 @@ export default {
       // MPC-7120: record the engagement funnel step in Supabase (RLS-protected mpt_user_engagement)
       // BEFORE the Notion write and independent of it: a Notion failure must never block the engagement row.
       // Fail-soft and off the response path; stores no PII (random session id + funnel booleans).
-      const engagement = recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
-      ctx.waitUntil(engagement);
+      // MPC-7616: awaited (not just waitUntil) so the answer can say whether the row really landed. Still fail-soft: it never throws.
+      const engagementRecorded = await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
@@ -245,11 +335,7 @@ export default {
           `${hktTime.fullDate} > ${hktTime.time} HKT`,
           `Total Leads: ${totalLeads}`,
           ``,
-          `Name: ${slackEsc(name) || '(not given)'}`,
-          `Email: ${slackEsc(email)}`,
-          phone ? `Phone: ${slackEsc(phone)}` : null,
-          ``,
-          `IP: ${ip || '—'} | ${city || '—'}, ${country || '—'}`,
+          `Country: ${country || '—'}`,   // CK-7721 fix 4: no name, email, phone, IP address or city in Slack (data minimisation); the contact details stay in the Notion lead row (24-month retention)
           `Browser: ${browser || '—'} | OS: ${os || '—'} | Device: ${device || '—'}`,
           ``,
           `Other Info: ${slackEsc(otherInfo)}`,
@@ -338,7 +424,9 @@ export default {
 
       ctx.waitUntil(Promise.all(side));
 
-      return new Response(JSON.stringify({ success: true, ...(baseline ? { baseline } : {}) }), {
+      // MPC-7616: `engagement_recorded` is false when the Supabase write was skipped or failed (the error is in the Worker log with the target host),
+      // so a lead that reached Notion but not the database is visible to a caller instead of looking like a full success.
+      return new Response(JSON.stringify({ success: true, engagement_recorded: engagementRecorded, ...(baseline ? { baseline } : {}) }), {
         status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
       });
 
@@ -357,19 +445,23 @@ export default {
 // this is the in-Worker path that fires within seconds. Never throws.
 async function alertHighPriority(env, lead) {
   if (!(lead.score > HIGH_PRIORITY_THRESHOLD)) return;
+  const role = lead.props?.jobtitle ? `Role: ${slackEsc(lead.props.jobtitle)}${lead.props.company ? ' @ ' + slackEsc(lead.props.company) : ''}` : null;
+  const breakdown = `Breakdown: domain ${lead.parts.domain} / role ${lead.parts.role} / geo ${lead.parts.geo}`;
+  // CK-7721 fix 4: the Slack alert carries no name or email (the lead is in Notion and HubSpot); the alert EMAIL to ALERT_EMAIL keeps them.
+  const slackText = [`:fire: *High Priority lead* (score ${lead.score}/100)`, role, breakdown].filter(Boolean).join('\n');
   const text = [
     `:fire: *High Priority lead* (score ${lead.score}/100)`,
     `Name: ${slackEsc(lead.name) || '(not given)'}`,
     `Email: ${slackEsc(lead.email)}`,
-    lead.props?.jobtitle ? `Role: ${slackEsc(lead.props.jobtitle)}${lead.props.company ? ' @ ' + slackEsc(lead.props.company) : ''}` : null,
-    `Breakdown: domain ${lead.parts.domain} / role ${lead.parts.role} / geo ${lead.parts.geo}`,
+    role,
+    breakdown,
   ].filter(Boolean).join('\n');
   const sends = [];
   if (env.SLACK_BOT_TOKEN) {
     sends.push(fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text, unfurl_links: false }),
+      body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text: slackText, unfurl_links: false }),
     }));
   }
   if (env.RESEND_API_KEY && env.ALERT_EMAIL) {
@@ -391,15 +483,25 @@ async function alertHighPriority(env, lead) {
 // ('pending'), so every B2B signup is enriched within ~5 minutes even if Hunter had a blip. Bounded and fail-soft.
 const SWEEP_LIMIT = 25;
 async function sweepPending(env) {
-  if (!env.HUBSPOT_TOKEN || !env.HUNTER_API_KEY) return { retried: 0 };
+  // MPC-102: no HUNTER_API_KEY is fine here: enrichAndScore then scores on domain and geo only.
+  if (!env.HUBSPOT_TOKEN) return { retried: 0 };
   const hs = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
   const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
     method: 'POST', headers: hs,
     body: JSON.stringify({
-      filterGroups: [{ filters: [
-        { propertyName: 'mpt_lead_enrich_status', operator: 'EQ', value: 'pending' },
-        { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
-      ] }],
+      filterGroups: [
+        { filters: [
+          { propertyName: 'mpt_lead_enrich_status', operator: 'EQ', value: 'pending' },
+          { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
+        ] },
+        // MPC-102: /enterprise demo requests are submitted straight to the HubSpot form (consent evidence and the
+        // form conversion stay intact), so they arrive unscored. Pick them up here, within 5 minutes.
+        { filters: [
+          { propertyName: 'source_tag', operator: 'EQ', value: 'enterprise-demo' },
+          { propertyName: 'mpt_lead_enrich_status', operator: 'NOT_HAS_PROPERTY' },
+          { propertyName: 'createdate', operator: 'GTE', value: String(Date.now() - 24 * 3600 * 1000) },
+        ] },
+      ],
       properties: ['email', 'firstname', 'lastname'], limit: SWEEP_LIMIT,
     }),
   });
@@ -429,6 +531,8 @@ async function sweepPending(env) {
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
 const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+// MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
+const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
 async function recordEngagement(env, sessionId, flags) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('Supabase not configured - skipping engagement write');
@@ -446,12 +550,12 @@ async function recordEngagement(env, sessionId, flags) {
       body: JSON.stringify({ session_id: sessionId, ...flags }),
     });
     if (!res.ok) {
-      console.error('Supabase mpt_user_engagement insert failed:', res.status, (await res.text()).slice(0, 200));
+      console.error('Supabase mpt_user_engagement insert failed:', res.status, supabaseHost(env), (await res.text()).slice(0, 200));
       return false;
     }
     return true;
   } catch (err) {
-    console.error('Supabase mpt_user_engagement insert error:', String(err));
+    console.error('Supabase mpt_user_engagement insert error:', supabaseHost(env), String(err));
     return false;
   }
 }
@@ -596,14 +700,18 @@ function inferSource(utm_source, utm_medium, utm_campaign, referrer) {
 }
 
 function buildConfirmationEmail(firstName, source) {
-  return `<!DOCTYPE html><html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
-<h2 style="color:#1a1a2e">Hi ${firstName},</h2>
-<p>Thanks for signing up — you're on the list.</p>
-<p>We're preparing your free privacy exposure scan across 46 data categories including data brokers, social platforms, and AI training datasets.</p>
-<p>You'll hear from us shortly with your full report.</p>
-<p>In the meantime, if you have any questions, just reply to this email.</p>
-<p style="margin-top:30px">Stay private,<br><strong>The MyPrivacyTOOL Team</strong></p>
-<hr style="margin-top:40px;border:none;border-top:1px solid #eee">
-<p style="font-size:12px;color:#999">MyPrivacyTOOL · myprivacytool.io</p>
-</body></html>`;
+  const p = (t) => `<p style="margin:0 0 12px 0;font-size:15px;line-height:23px;color:#374151">${t}</p>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Your privacy scan is being prepared</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;-webkit-text-size-adjust:100%">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827">
+<tr><td style="background:#15803d;padding:20px 28px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:.2px">MyPrivacyTOOL</td></tr>
+<tr><td style="padding:28px 28px 8px 28px"><h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#111827">Hi ${firstName},</h1>
+${p('Thanks for signing up &mdash; you&rsquo;re on the list.')}
+${p('We&rsquo;re preparing your free privacy exposure scan across 46 data categories including data brokers, social platforms, and AI training datasets.')}
+${p('You&rsquo;ll hear from us shortly with your full report.')}
+${p('In the meantime, if you have any questions, just reply to this email.')}
+${p('Stay private,<br><strong>The MyPrivacyTOOL Team</strong>')}</td></tr>
+<tr><td style="padding:20px 28px 28px 28px;border-top:1px solid #e5e7eb;font-size:12px;line-height:18px;color:#6b7280">Questions, or want your data deleted? Reply to this email or write to <a href="mailto:hello@myprivacytool.io" style="color:#6b7280">hello@myprivacytool.io</a>. We never sell your data. To stop hearing from us, reply with &ldquo;unsubscribe&rdquo; and we will remove you.<br>MyPrivacyTOOL &middot; <a href="https://myprivacytool.io/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=lead-confirmation" style="color:#6b7280">myprivacytool.io</a></td></tr>
+</table></td></tr></table></body></html>`;
 }

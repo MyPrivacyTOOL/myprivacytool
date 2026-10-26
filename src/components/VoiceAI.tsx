@@ -31,9 +31,16 @@ import AliceHDBadge from './AliceHDBadge';
 import AliceHDModal from './AliceHDModal';
 import FreeVoiceBadge from './FreeVoiceBadge';
 import { trackUpgradeModalOpened } from '@/lib/analytics';
+import { TOP_SIX_EXPLAINERS, ALICE_QUIET_IDS, ALICE_INTRO, ALICE_WEBRTC_LEAK, aliceQuietLine } from '@/lib/exposureCopy';
+import { scanHint, aliceTileMessage } from '@/lib/scanCopy';
+import { hexTileV2Enabled } from '@/config/hexagonTile';
+import type { HexagonTile } from '@/lib/hexagonTile';
+import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 
 interface VoiceAIProps {
   hexagonData: HexagonData | null;
+  /** Tile state of hexagonData (honest tiles flag, MPC-7916). With the flag on Alice says what the tile says, with no counts, percentages or "click to confirm". */
+  tile?: HexagonTile;
   confirmedCount: number;
   totalCount: number;
 }
@@ -110,8 +117,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     const coreMatch = value.match(/(\d+)\s*cores/);
     const cores = coreMatch ? coreMatch[1] : 'multiple';
     const isHighEnd = value.toLowerCase().includes('high') || (parseInt(cores) >= 8);
-    const percentage = isHighEnd ? '15' : '35';
-    return `I detected your hardware configuration: ${cores} CPU cores with ${isHighEnd ? 'high-end' : 'standard'} specifications. Combined with your GPU from WebGL, this creates a unique hardware fingerprint. About ${percentage}% of users share your exact hardware profile. ${isHighEnd ? 'High-end hardware actually makes you MORE trackable because it\'s less common.' : ''}`;
+    return `I detected your hardware configuration: ${cores} CPU cores with ${isHighEnd ? 'high-end' : 'standard'} specifications. Combined with your GPU from WebGL, this creates a unique hardware fingerprint. ${isHighEnd ? 'High-end hardware actually makes you MORE trackable because it\'s less common.' : ''}`;
   }
   
   if (label.includes('display profile') || label.includes('screen fingerprint')) {
@@ -152,20 +158,18 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     const mics = micMatch ? micMatch[1] : '0';
     const speakers = spkMatch ? spkMatch[1] : '0';
     const totalDevices = parseInt(cameras) + parseInt(mics) + parseInt(speakers);
-    const percentage = totalDevices > 3 ? '65' : '28';
-    return `You have ${cameras} cameras, ${mics} microphones, and ${speakers} speakers connected. The specific combination of media devices is ${percentage}% unique. ${totalDevices > 3 ? 'Professional setups with multiple devices are especially identifying.' : ''} Even the order in which devices are enumerated creates a fingerprint.`;
+    return `You have ${cameras} cameras, ${mics} microphones, and ${speakers} speakers connected. The specific combination of media devices can help tell your device apart. ${totalDevices > 3 ? 'Professional setups with multiple devices are especially identifying.' : ''} Even the order in which devices are enumerated creates a fingerprint.`;
   }
   
   // CORE FINGERPRINTING HEXAGONS
   if (label.includes('canvas fingerprint')) {
-    return "I detected your canvas fingerprint. This is a unique signature created by how your browser renders images. Even tiny differences in graphics hardware and software create a distinct pattern. This makes you 99% trackable across websites, even without cookies.";
+    return TOP_SIX_EXPLAINERS['canvas-fingerprint'];
   }
   if (label.includes('webgl')) {
-    const gpuName = value.length > 3 ? value.replace('...', '') : 'your graphics card';
-    return `Your WebGL signature reveals your graphics card: ${gpuName}. This is one of the most powerful fingerprinting methods because GPU configurations are highly unique. Combined with other factors, this makes you extremely identifiable.`;
+    return TOP_SIX_EXPLAINERS['webgl-fingerprint'];
   }
   if (label.includes('audio signature') || label.includes('audio fingerprint')) {
-    return "I found your audio fingerprint. Your browser's audio processing creates tiny variations that are unique to your device. While less reliable than canvas or WebGL, it still contributes to your overall trackability.";
+    return TOP_SIX_EXPLAINERS['audio-fingerprint'];
   }
   if (label.includes('installed fonts') || label.includes('font')) {
     const fontMatch = value.match(/(\d+)/);
@@ -174,7 +178,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
   }
   if (label.includes('extensions') || label.includes('plugin')) {
     if (value.toLowerCase().includes('ad blocker: yes')) {
-      return "I can see you're using an ad blocker. While this protects your privacy from ads, it also makes you more unique—only about 30% of users have ad blockers. This paradoxically makes you more trackable through fingerprinting.";
+      return "I can see you're using an ad blocker. While this protects your privacy from ads, it can also make your browser easier to tell apart through fingerprinting.";
     }
     const pluginMatch = value.match(/(\d+)/);
     if (pluginMatch) {
@@ -256,7 +260,7 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     }
     const serviceMatch = value.match(/(\d+)\s*services?/i);
     const serviceCount = serviceMatch ? parseInt(serviceMatch[1]) : 1;
-    return `I detected you're logged into Google services. This is significant because Google can now track you across approximately 80% of websites through Google Analytics, even when you're not using Google products directly. Every YouTube video, every search, every Gmail you read—it's all connected to build your advertising profile. With ${serviceCount > 1 ? serviceCount + ' services' : 'your account'} active, Google has deep visibility into your online behavior.`;
+    return `I detected you're logged into Google services. This is significant because Google can now follow you across the many websites that use Google Analytics, even when you're not using Google products directly. Every YouTube video, every search, every Gmail you read—it's all connected to build your advertising profile. With ${serviceCount > 1 ? serviceCount + ' services' : 'your account'} active, Google has deep visibility into your online behavior.`;
   }
   
   if (label.includes('meta services') || label.includes('facebook')) {
@@ -470,9 +474,9 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
     const patternMatch = value.toLowerCase().includes('human') ? 'human' : value.toLowerCase().includes('bot') ? 'bot' : 'unknown';
     
     if (value.toLowerCase().includes('collecting')) {
-      return "I'm currently tracking your mouse movements. Every cursor position, speed change, and acceleration pattern creates a behavioral signature that's 97% unique. Keep moving your mouse and watch the data accumulate.";
+      return "I'm currently tracking your mouse movements. Every cursor position, speed change, and acceleration pattern creates a behavioral signature that can help recognise you. Keep moving your mouse and watch the data accumulate.";
     }
-    return `I've been tracking your mouse movements. In just a few seconds, I recorded ${movements} movements averaging ${speed} pixels per second. Your pattern was classified as ${patternMatch}. The way you move your mouse—the speed, acceleration, and even micro-corrections—creates a behavioral signature that's 97% unique. This can identify you across different websites even without cookies.`;
+    return `I've been tracking your mouse movements. In just a few seconds, I recorded ${movements} movements averaging ${speed} pixels per second. Your pattern was classified as ${patternMatch}. The way you move your mouse—the speed, acceleration, and even micro-corrections—creates a behavioral signature that can help recognise you across different websites, even without cookies.`;
   }
   
   if (label.includes('keystroke') || label.includes('typing pattern')) {
@@ -748,9 +752,7 @@ const generateBehaviorAssessmentMessage = (
     timeOnSite > 0
   ].filter(Boolean).length;
   
-  const uniquenessPercentage = Math.min(95, 60 + (dataPoints * 7));
-  
-  return `Behavioral tracking is perhaps the most insidious form of surveillance because it works without cookies or storage, can't be blocked by privacy tools, continues even in incognito mode, is completely invisible to users, and is highly accurate for identification. Your combined behavioral signature—mouse, keyboard, clicks, scrolls, and timing—is approximately ${uniquenessPercentage}% unique. This means you can be tracked and identified across websites even if you use a VPN, block cookies, randomize your fingerprint, and browse in private mode. I need to be honest: protecting against behavioral tracking is nearly impossible. The only real defense is awareness. Know that every movement, every click, every scroll is being recorded, analyzed, and used to build a profile of you.`;
+  return `Behavioral tracking is perhaps the most insidious form of surveillance because it works without cookies or storage, can't be blocked by privacy tools, continues even in incognito mode, is completely invisible to users, and is highly accurate for identification. Your combined behavioral signature—mouse, keyboard, clicks, scrolls, and timing—can help recognise you based on the ${dataPoints} kinds of behaviour seen so far. This means you may be recognised across websites even if you use a VPN, block cookies, randomize your fingerprint, and browse in private mode. I need to be honest: protecting against behavioral tracking is nearly impossible. The only real defense is awareness. Know that every movement, every click, every scroll is being recorded, analyzed, and used to build a profile of you.`;
 };
 
 // Generate final comprehensive summary
@@ -758,10 +760,11 @@ const generateFinalSummary = (
   confirmedCount: number,
   totalCount: number,
   riskScore: number,
-  fingerprintUniqueness?: number
+  _fingerprintUniqueness?: number
 ): string => {
   const riskLevel = riskScore >= 70 ? 'high' : riskScore >= 40 ? 'medium' : 'low';
-  const uniquenessText = fingerprintUniqueness ? `${fingerprintUniqueness}% unique` : 'highly trackable';
+  // CK-7799: no invented uniqueness percentage here (the old calculation was a hard-coded entropy table, not a measurement).
+  const uniquenessText = 'something sites can read';
   
   let summary = `I've now analyzed all ${confirmedCount} aspects of your digital shadow across 7 categories: your device and network, your language and location, your physical device orientation, your browser fingerprint which is ${uniquenessText}, your stored data, your connected accounts, your security checks, and your behavioral patterns. `;
   
@@ -844,7 +847,8 @@ const speakText = (text: string, onEnd?: () => void) => {
   return false;
 };
 
-export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: VoiceAIProps) {
+export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount }: VoiceAIProps) {
+  const v2 = hexTileV2Enabled();
   const [message, setMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -855,24 +859,27 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
   const [showRateLimitModal, setShowRateLimitModal] = useState(false);
   const { toast } = useToast();
 
-  // Get current risk score for debug panel
-  const { score: currentRiskScore } = calculateRiskScore(confirmedCount, totalCount);
+  // Get current risk score for debug panel. With the honest tiles on there is no score at all: the old one is a function of how many
+  // tiles were tapped, so it is neither computed, stored, logged nor shown (MPC-7916).
+  const currentRiskScore = v2 ? null : calculateRiskScore(confirmedCount, totalCount).score;
 
   // Update previous risk score when confirmed count changes
   useEffect(() => {
+    if (v2) return;
     const { score } = calculateRiskScore(confirmedCount, totalCount);
     // Store current as previous for next comparison
     return () => {
       setPreviousRiskScore(score);
     };
-  }, [confirmedCount, totalCount]);
+  }, [confirmedCount, totalCount, v2]);
 
   // Simulate completing all hexagons (for debug panel)
   const handleSimulateComplete = useCallback(() => {
     // This would need to be passed up to parent, for now just track
+    if (v2) return; // debug simulation of the old tap-based score and scan count: nothing to simulate with the honest tiles
     incrementScansCompleted();
     updateBestRiskScore(0);
-  }, []);
+  }, [v2]);
 
   const handleVoiceClick = useCallback(() => {
     if (isSpeaking) {
@@ -902,7 +909,9 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       
       // Use introduction for first interaction, then 4-part response
       const isFirstInteraction = !hasIntroduced;
-      const structuredResponse = generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction, previousRiskScore);
+      const structuredResponse = v2
+        ? aliceTileMessage(hexagonData, tile, confirmedCount)
+        : generateAliceResponse(hexagonData, confirmedCount, totalCount, isFirstInteraction, previousRiskScore);
       
       // Add response to history for debug panel
       addResponseToHistory(structuredResponse);
@@ -912,10 +921,12 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         trackVoiceIntroPlayed();
       }
       
-      // Update previous score after generating response
-      const { score } = calculateRiskScore(confirmedCount, totalCount);
-      setPreviousRiskScore(score);
-      updateBestRiskScore(score);
+      // Update previous score after generating response (old tap-based score; not computed or stored with the honest tiles)
+      const score = v2 ? null : calculateRiskScore(confirmedCount, totalCount).score;
+      if (score !== null) {
+        setPreviousRiskScore(score);
+        updateBestRiskScore(score);
+      }
       
       // Track hexagon if one is selected
       if (hexagonData?.id && hexagonData?.label) {
@@ -932,17 +943,18 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         trackVoiceSessionComplete({
           hexagonsCompleted: confirmedCount,
           totalHexagons: totalCount,
-          userCompletedScan: confirmedCount === totalCount && totalCount > 0,
+          // With the honest tiles a tap only means "seen", so tapping every tile is not a completed scan.
+          userCompletedScan: !v2 && confirmedCount === totalCount && totalCount > 0,
         });
         
-        // If scan is complete, track it
-        if (confirmedCount === totalCount && totalCount > 0) {
+        // If scan is complete, track it (old tap-based completion and score; not tracked with the honest tiles)
+        if (!v2 && score !== null && confirmedCount === totalCount && totalCount > 0) {
           incrementScansCompleted();
           trackVoiceScanCompleted(totalCount, score);
         }
       });
     }
-  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced, previousRiskScore]);
+  }, [isSpeaking, hexagonData, confirmedCount, totalCount, toast, hasIntroduced, previousRiskScore, v2, tile]);
 
   useEffect(() => {
     // Load voices (some browsers need this)
@@ -955,11 +967,16 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
     const category = hexagonData?.category || '';
 
     // Determine the message based on state
-    if (hexagonData && !hexagonData.confirmed) {
+    if (v2) {
+      newMessage = aliceTileMessage(hexagonData, tile, confirmedCount);
+    } else if (hexagonData && !hexagonData.confirmed && ALICE_QUIET_IDS.has(hexagonData.id)) {
+      // CK-8313: the bottom fifteen stay short
+      newMessage = aliceQuietLine(hexagonData.label, hexagonData.value);
+    } else if (hexagonData && !hexagonData.confirmed) {
       // Special messages for fingerprint hexagons
       if (category === 'fingerprint') {
         if (label.includes('canvas')) {
-          newMessage = `Canvas Fingerprint detected: ${hexagonData.value}. This unique signature is created by how your browser renders graphics. You're 99% trackable with this alone. Click to confirm.`;
+          newMessage = `Canvas Fingerprint detected: ${hexagonData.value}. ${TOP_SIX_EXPLAINERS['canvas-fingerprint']} Click to confirm.`;
         } else if (label.includes('webgl')) {
           newMessage = `WebGL Signature found: ${hexagonData.value}. Your GPU creates one of the most powerful identifiers. Click to confirm if this is your graphics card.`;
         } else if (label.includes('audio')) {
@@ -979,14 +996,14 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         } else if (label.includes('webrtc')) {
           const hasLeak = hexagonData.value?.toLowerCase().includes('leaking') || hexagonData.value?.toLowerCase().includes('leak');
           if (hasLeak) {
-            newMessage = `WebRTC is sharing your real IP: ${hexagonData.value}. This bypasses your VPN. Click to confirm and learn how to fix.`;
+            newMessage = `${ALICE_WEBRTC_LEAK} Click to confirm and learn more.`;
           } else {
             newMessage = `WebRTC Status: ${hexagonData.value}. Click to confirm your IP leak status.`;
           }
         } else if (label.includes('cpu') || label.includes('hardware')) {
           newMessage = `Hardware Profile: ${hexagonData.value}. Your CPU and RAM create a unique fingerprint. Click to confirm.`;
         } else if (label.includes('display') || label.includes('screen fingerprint')) {
-          newMessage = `Display Profile: ${hexagonData.value}. Your screen config is ${hexagonData.confidence}% identifiable. Click to confirm.`;
+          newMessage = `Display Profile: ${hexagonData.value}. Your screen config can help tell your device apart. Click to confirm.`;
         } else if (label.includes('timezone')) {
           const hasMismatch = hexagonData.risk?.toLowerCase().includes('mismatch');
           newMessage = hasMismatch 
@@ -1002,7 +1019,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       // BEHAVIOR HEXAGONS - Unconfirmed messages
       } else if (category === 'behavior') {
         if (label.includes('mouse tracking') || label.includes('mouse movement')) {
-          newMessage = `🖱️ Mouse Tracking: ${hexagonData.value}. Your movement patterns are 97% unique. I'm recording speed, acceleration, and micro-corrections. Click to confirm.`;
+          newMessage = `🖱️ Mouse Tracking: ${hexagonData.value}. Your movement patterns can help recognise you. I'm recording speed, acceleration, and micro-corrections. Click to confirm.`;
         } else if (label.includes('keystroke') || label.includes('typing')) {
           newMessage = `⌨️ Keystroke Dynamics: ${hexagonData.value}. I'm capturing your typing rhythm—not content. This biometric can identify you. Click to confirm.`;
         } else if (label.includes('click')) {
@@ -1020,7 +1037,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         newMessage = `${hexagonData.label}: ${hexagonData.value}. Confidence: ${hexagonData.confidence}%. ${hexagonData.risk} Click to confirm if correct.`;
       }
     } else if (confirmedCount === 0 && totalCount > 0) {
-      newMessage = `Hi, I'm Alice, your privacy expert. I peek behind the digital curtain to find what's hidden about you. I found ${totalCount} data points without asking. Hover over any hexagon to see what I found, then click to confirm if it's correct.`;
+      newMessage = ALICE_INTRO;
     } else if (confirmedCount === 1) {
       newMessage = `Great! That boosted my confidence. I'm scanning deeper... ${totalCount - confirmedCount} more to go.`;
     } else if (confirmedCount === 2) {
@@ -1050,12 +1067,12 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       newMessage = `🖱️ Behavioral tracking active! I'm now analyzing your mouse movements, typing patterns, clicks, and scrolls. This is the most insidious form of tracking—it cannot be blocked.`;
       trackVoiceAIMessage('behavior_wave');
     } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= 46) {
-      newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that's approximately 90% unique. This can identify you even in incognito mode.`;
+      newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that can help recognise you, even in private browsing.`;
     } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < 46) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow.`;
     } else if (confirmedCount === totalCount && totalCount >= 46) {
       // Final comprehensive summary for full 46 hexagons
-      newMessage = `COMPLETE! I've analyzed all 46 aspects of your digital shadow across 7 categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
+      newMessage = `COMPLETE! I've analyzed all ${HEXAGON_COUNT} aspects of your digital shadow across ${HEXAGON_GROUP_COUNT} categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
       trackVoiceAIMessage('full_scan_complete');
     } else if (confirmedCount === totalCount && totalCount > 0) {
       newMessage = `Complete! Your digital shadow is fully mapped. Data brokers collect and sell this kind of data. Ready to take back control?`;
@@ -1063,7 +1080,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       // Special confirmed messages for fingerprint hexagons
       if (category === 'fingerprint') {
         if (label.includes('canvas')) {
-          newMessage = `Canvas fingerprint confirmed! This signature makes you 99% identifiable across websites, even in private browsing mode.`;
+          newMessage = `Canvas fingerprint confirmed. ${TOP_SIX_EXPLAINERS['canvas-fingerprint']}`;
         } else if (label.includes('webgl') && !label.includes('webrtc')) {
           newMessage = `WebGL signature confirmed! Your graphics card is now part of your verified digital shadow.`;
         } else if (label.includes('audio')) {
@@ -1107,7 +1124,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       // BEHAVIOR HEXAGONS - Confirmed messages
       } else if (category === 'behavior') {
         if (label.includes('mouse tracking') || label.includes('mouse movement')) {
-          newMessage = `🖱️ Mouse tracking confirmed! Your movement patterns—speed, acceleration, micro-corrections—create a 97% unique behavioral signature. This can identify you across websites even without cookies.`;
+          newMessage = `🖱️ Mouse tracking confirmed! Your movement patterns—speed, acceleration, micro-corrections—create a behavioral signature that can help recognise you across websites, even without cookies.`;
         } else if (label.includes('keystroke') || label.includes('typing')) {
           newMessage = `⌨️ Keystroke dynamics confirmed! Your typing rhythm is like a fingerprint. Websites use this for biometric authentication and cross-site tracking.`;
         } else if (label.includes('click')) {
@@ -1144,7 +1161,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
         setIsTyping(false);
       }, 150);
     }
-  }, [confirmedCount, totalCount, hexagonData, message]);
+  }, [confirmedCount, totalCount, hexagonData, message, v2, tile]);
 
   return (
     <>
@@ -1181,7 +1198,7 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
           {/* Voice AI Button */}
           <div className="w-full text-center">
             <p className="text-muted-foreground text-sm leading-relaxed mb-2">
-              Hover over any hexagon to see what I found, then click to confirm if it's correct.
+              {scanHint()}
             </p>
             
             {/* Free Voice Badge */}
@@ -1224,7 +1241,8 @@ export default function VoiceAI({ hexagonData, confirmedCount, totalCount }: Voi
       </div>
 
       {/* Stats badge for users */}
-      <VoiceStatsBadge />
+      {/* The badge shows a stored best risk score and a scan count, both derived from taps: not shown with the honest tiles. */}
+      {!v2 && <VoiceStatsBadge />}
 
       {/* Debug panel for developers */}
       <VoiceDebugPanel 

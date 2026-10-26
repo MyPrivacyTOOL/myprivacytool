@@ -9,7 +9,20 @@ workers_dev = true
 # the deploy workflow pushes them from GitHub Actions secrets (.github/workflows/deploy.yml).
 # Names (also in EXPECTED_SECRETS.txt):
 #   SUPABASE_URL, SUPABASE_KEY, TWILIO_SID, TWILIO_AUTH_TOKEN, META_APP_SECRET,
-#   X_CONSUMER_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward)
+#   X_BEARER_TOKEN + X_USER_ACCESS_TOKEN (MPC-7628 Mirror bot: public profile lookup / DM replies),
+#   X_CLIENT_ID + X_CLIENT_SECRET + X_REFRESH_TOKEN (MPC-7628: keep the X user token fresh; the rotating pair is stored in Supabase public.mpt_x_oauth_tokens, X_REFRESH_TOKEN only seeds it),
+#   X_CONSUMER_SECRET, LINKEDIN_CLIENT_SECRET, TELEGRAM_WEBHOOK_SECRET, CORE_BRAIN_TOKEN (must equal core-brain's WEBHOOK_SECRET; sent on every forward),
+#   TELEGRAM_BOT_TOKEN (BotFather token; sends the reply core-brain chose. Without it Telegram messages are ingested but not answered)
+
+# Channel probe reader (docs/channel-probe.md): plain vars, NOT secrets. PROBE_MODE unset (or anything but "on"/"all") = off.
+#   PROBE_MODE="on"  + PROBE_TELEGRAM_IDS="<our test account ids>": allow-listed test accounts only (7 day expiry).
+#   PROBE_MODE="all": EVERY non-bot sender is captured, with wider public lookups. Stores real-user PII (PROBE_RETENTION_DAYS, default 90,
+#   clamp 1-365; PROBE_LOOKUP_HOURS, default 24, throttles repeat lookups). Do not enable until the stored-data rules and privacy wording are aligned.
+# Full event log (docs/channel-probe.md): only with PROBE_MODE="on", for senders in PROBE_TELEGRAM_IDS or PROBE_LOG_OPTIN_IDS (comma-separated numeric
+#   ids). Saves inbound updates, outbound Bot API calls and the core-brain answer to telegram_event_log. PROBE_LOG_RETENTION_DAYS: default 90,
+#   clamp 1-365, or "forever" (no expiry). Mode "all" never writes to it.
+# Set them in the Cloudflare dashboard (Worker > Settings > Variables) or `wrangler deploy --var PROBE_MODE:on`; never commit real ids.
+# Rollback: unset PROBE_MODE.
 
 [observability]
 enabled = true
@@ -17,6 +30,7 @@ enabled = true
 # MPC-8301: inbound webhook routes, served by src/index.ts:
 #   /webhook/x         -> src/x-webhook.ts        (CRC GET + signed POST)
 #   /webhook/telegram  -> src/telegram-webhook.ts (secret-token POST)
+#   /webhook/linkedin  -> src/linkedin-webhook.ts (MPC-7640: challenge GET + X-LI-Signature POST)
 # Both forward verified payloads to core-brain (MPC-8601) at POST /ingest/social with `Authorization: Bearer CORE_BRAIN_TOKEN`.
 [[services]]
 binding = "CORE_BRAIN"
@@ -25,3 +39,19 @@ service = "core-brain"
 # HTTP fallback instead of the service binding: remove [[services]] above and set CORE_BRAIN_URL here.
 # [vars]
 # CORE_BRAIN_URL = "https://core-brain.<account>.workers.dev"
+
+# MPC-7628: Mirror bot limits (every scan spends X API credits). Same syntax as core-brain/mpt-leads: the deploy action's wrangler 3.90.0
+# ignores the newer [[ratelimits]] table, so this must be [[unsafe.bindings]] type = "ratelimit" (a test pins it). Per sender: 3
+# Mirror commands / 60 s; global backstop 30 / 60 s. Over the limit the DM is dropped without a reply. Fails open if unbound.
+# namespace_id values are account-unique integers (core-brain 8601/8602, mpt-leads 7350, scan-report 7351).
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "7628"
+simple = { limit = 3, period = 60 }
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER_GLOBAL"
+type = "ratelimit"
+namespace_id = "7629"
+simple = { limit = 30, period = 60 }

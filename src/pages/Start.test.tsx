@@ -14,7 +14,7 @@ describe("Start", () => {
     vi.stubGlobal("fetch", f);
     const user = userEvent.setup();
     renderPage(<Start />);
-    await user.click(screen.getByRole("button", { name: /yes, that's me/i }));
+    await user.click(screen.getByRole("button", { name: /join the list/i }));
     await user.type(screen.getByPlaceholderText("your@email.com"), " me@example.com ");
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /check my exposure/i }));
@@ -29,7 +29,7 @@ describe("Start", () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ message: "Rate limited" }, 429)));
     const user = userEvent.setup();
     renderPage(<Start />);
-    await user.click(screen.getByRole("button", { name: /yes, that's me/i }));
+    await user.click(screen.getByRole("button", { name: /join the list/i }));
     await user.type(screen.getByPlaceholderText("your@email.com"), "me@example.com");
     await user.click(screen.getByRole("checkbox"));
     await user.click(screen.getByRole("button", { name: /check my exposure/i }));
@@ -42,16 +42,16 @@ describe("Start", () => {
     vi.stubGlobal("fetch", f);
     const user = userEvent.setup();
     renderPage(<Start />);
-    await user.click(screen.getByRole("button", { name: /yes, that's me/i }));
+    await user.click(screen.getByRole("button", { name: /join the list/i }));
     await user.type(screen.getByPlaceholderText("your@email.com"), "me@example.com");
     await user.click(screen.getByRole("button", { name: /check my exposure/i }));
     expect(f).not.toHaveBeenCalled();
   });
 
-  it('routes "Not me" to a fresh scan and lists the messaging channels', async () => {
+  it('routes "Not now" to the scan and lists the messaging channels', async () => {
     const user = userEvent.setup();
     renderPage(<Start />);
-    await user.click(screen.getByRole("button", { name: /not me/i }));
+    await user.click(screen.getByRole("button", { name: /not now/i }));
     expect(screen.getByRole("link", { name: /check my exposure/i })).toHaveAttribute("href", "/scan");
     for (const n of ["WhatsApp", "Telegram", "Messenger", "Instagram", "Email"]) expect(screen.getByRole("link", { name: n })).toBeInTheDocument();
   });

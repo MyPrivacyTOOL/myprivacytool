@@ -303,22 +303,26 @@ export default function FingerprintVerification({
       let result: string = 'Tested';
       
       switch (method) {
-        case 'webrtc':
+        case 'webrtc': {
           const webrtc = await detectWebRTCLeak();
           result = webrtc.isLeaking ? 'Still leaking' : 'Protected';
           break;
-        case 'canvas':
+        }
+        case 'canvas': {
           const fp = await calculateFingerprintUniqueness();
           result = fp.canvas?.hash ? 'Hash: ' + fp.canvas.hash.substring(0, 8) + '...' : 'N/A';
           break;
-        case 'webgl':
+        }
+        case 'webgl': {
           const fp2 = await calculateFingerprintUniqueness();
           result = fp2.webgl?.renderer?.substring(0, 20) + '...' || 'N/A';
           break;
-        case 'uniqueness':
+        }
+        case 'uniqueness': {
           const fp3 = await calculateFingerprintUniqueness();
           result = fp3.uniqueness;
           break;
+        }
       }
       
       // Brief display of result

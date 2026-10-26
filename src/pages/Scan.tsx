@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Home, Phone, Users, MapPin, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,59 +6,97 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
-import { trackStartSignup } from "@/lib/analytics";
+import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
+import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
+import ScanSavingNotice from "@/components/ScanSavingNotice";
+import TurnstileBox from "@/components/TurnstileBox";
+import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
+import LiveScanPanel from "@/components/LiveScanPanel";
+import ScanNumberNotice from "@/components/ScanNumberNotice";
+import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
+import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
+import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
+import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
   import.meta.env.VITE_HUBSPOT_START_FORM_ID || "22ee30ae-6cf9-419b-aa46-b656b0e7b1bf";
 const SOURCE_TAG = "scan-page";
 
-// MPC-6677: scan-report Worker (confirmation email + 48h report). Unset = feature off, HubSpot-only as before.
-const SCAN_API_URL = import.meta.env.VITE_SCAN_API_URL as string | undefined;
-
-async function requestScanReport(email: string): Promise<void> {
-  if (!SCAN_API_URL) return;
-  const q = new URLSearchParams(window.location.search);
-  const res = await fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/scan`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email,
-      consent: true, // only called after the consent checkbox is ticked
-      consent_source: "scan_page",
-      utm_source: q.get("utm_source") ?? "",
-      utm_medium: q.get("utm_medium") ?? "",
-      utm_campaign: q.get("utm_campaign") ?? "",
-      utm_content: q.get("utm_content") ?? "",
-      referrer: document.referrer,
-    }),
-  });
-  if (!res.ok) throw new Error(`scan-report ${res.status}`);
-}
-
 const Scan = () => {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
+  // MPC-7470: the save box exists only while saving is on AND this browser holds a finished scan (the visitor ran the scan on the home page).
+  const [offerSave] = useState(() => canOfferScanSave());
+  const [saveConsent, setSaveConsent] = useState(false);
+  // MPC-7494: a second, separate, optional box, only while recognition is on; ticking it needs the save box ticked first.
+  const [offerRecognise] = useState(() => canOfferScanSave() && recognitionEnabled());
+  const [recogniseConsent, setRecogniseConsent] = useState(false);
+  const onSaveChange = (v: boolean) => {
+    setSaveConsent(v);
+    if (!v) setRecogniseConsent(false);   // un-ticking the save box withdraws the recognise tick
+  };
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  // MPC-7535: on a retry after a failed report request the HubSpot lead is not sent a second time.
+  const hubspotSent = useRef(false);
+  // MPC-8430: Turnstile token for the report request. A blocked script means no widget, and the form still submits (the Worker decides).
+  const [tsToken, setTsToken] = useState("");
+  const [tsReset, setTsReset] = useState(0);
+  const tsWidgets = useRef(0);
+  // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
+  const [waitingForToken, setWaitingForToken] = useState(false);
+  // MPC-8452: key for the live results shown under the thank-you (memory only: a refresh starts again)
+  const [liveToken, setLiveToken] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
+  // already saved a scan; the drop-off before it is read from the GA4 events.
+  useEffect(() => {
+    reportStep("contact_step_opened");
+    // MPC-7645: a visitor who came from a friend's link may go and run the scan on the home page first; keep the code for this visit.
+    if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !consent || submitting) return;
+    // The save box is optional: unticked = the report is still requested, the scan is just not saved.
+    if (!email.trim() || !consent || submitting || waitingForToken) return;
+    if (tsWidgets.current > 0 && !tsToken) {
+      setErrorMsg("");
+      setWaitingForToken(true);
+      return;
+    }
+    void sendReport(tsToken);
+  };
+
+  const sendReport = async (token: string) => {
     setSubmitting(true);
     setErrorMsg("");
     try {
-      await submitHubSpotForm({
-        formId: FORM_ID,
-        fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("scan_page") },
-        pageName: "Free exposure scan",
-      });
-      try {
-        await requestScanReport(email.trim());
-      } catch (reportErr) {
-        console.error("Scan report request failed", reportErr); // never block the HubSpot lead
+      if (!hubspotSent.current) {
+        await submitHubSpotForm({
+          formId: FORM_ID,
+          fields: { email: email.trim(), source_tag: SOURCE_TAG, ...consentFields("scan_page") },
+          pageName: "Free exposure scan",
+        });
+        hubspotSent.current = true; // the lead is kept whatever happens to the report request
       }
+      let sent: { liveToken?: string } = {};
+      try {
+        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
+      } catch (reportErr) {
+        const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
+        const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
+        console.error("Scan report request failed", kind, status);
+        trackReportFailed("scan_page", kind, status);
+        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        setTsToken(""); // a Turnstile token is single use: get a fresh one for the retry
+        setTsReset((n) => n + 1);
+        return;
+      }
+      if (sent.liveToken) setLiveToken(sent.liveToken);
+      trackReportRequested("scan_page", offerSave && saveConsent);
       trackStartSignup({ source: "scan_page" });
       setSubmitted(true);
     } catch (err: unknown) {
@@ -67,6 +105,14 @@ const Scan = () => {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (waitingForToken && tsToken) {
+      setWaitingForToken(false);
+      void sendReport(tsToken);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForToken, tsToken]);
 
   const renderForm = (idSuffix: string) => (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:flex-wrap gap-3 max-w-md mx-auto">
@@ -82,12 +128,27 @@ const Scan = () => {
       />
       <Button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || waitingForToken}
         className="font-bold h-12 px-8 text-base whitespace-nowrap"
       >
-        {submitting ? "Sending…" : "Check My Exposure →"}
+        {submitting ? "Sending…" : waitingForToken ? "Verifying…" : "Check My Exposure →"}
       </Button>
+      <TurnstileBox
+        sitekey={SCAN_TURNSTILE_SITE_KEY}
+        onToken={setTsToken}
+        onRendered={(on) => { tsWidgets.current += on ? 1 : -1; }}
+        resetSignal={tsReset}
+      />
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      {offerSave && (
+        <>
+          <SaveScanConsentCheckbox id={`scan-save-consent-${idSuffix}`} checked={saveConsent} onChange={onSaveChange} disabled={submitting} />
+          {offerRecognise && (
+            <RecogniseConsentCheckbox id={`scan-recognise-consent-${idSuffix}`} checked={recogniseConsent} onChange={setRecogniseConsent} disabled={submitting || !saveConsent} />
+          )}
+          <ScanSavingNotice variant="contact" />
+        </>
+      )}
     </form>
   );
 
@@ -98,6 +159,8 @@ const Scan = () => {
       <p className="text-muted-foreground text-sm">
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
+      <ScanNumberNotice />
+      {liveToken && <LiveScanPanel token={liveToken} />}
     </div>
   );
 
@@ -123,6 +186,7 @@ const Scan = () => {
         </p>
 
         {!submitted ? renderForm("top") : thanks}
+        {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 
         <p className="text-muted-foreground text-xs mt-4">

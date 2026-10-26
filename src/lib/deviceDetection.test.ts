@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { captureDeviceData } from "./deviceDetection";
+import { captureDeviceData, estimateDemographic, type DeviceData } from "./deviceDetection";
 
 // MPC-7350: the IP and location lookup goes to our own Worker, never to third-party lookup services.
 describe("captureDeviceData IP and location lookup", () => {
@@ -34,5 +34,24 @@ describe("captureDeviceData IP and location lookup", () => {
     expect(data.ip).toBe("Unknown");
     expect(data.location.city).toBe("Unknown");
     expect(data.network.isp).toBe("Unknown ISP");
+  });
+});
+
+describe('estimateDemographic', () => {
+  const at = (hour: number, os: string, browser = 'Chrome', type: 'Desktop' | 'Mobile' = 'Desktop') => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 20, hour, 0, 0));
+    try { return estimateDemographic({ device: { os, browser, type } } as unknown as DeviceData); } finally { vi.useRealTimers(); }
+  };
+  it('calls only Android in the small hours a Young Adult (the late-night rule used to match any OS before 07:00)', () => {
+    expect(at(23, 'Android 14', 'Chrome', 'Mobile')).toBe('Young Adult (18-30)');
+    expect(at(3, 'Android 14', 'Chrome', 'Mobile')).toBe('Young Adult (18-30)');
+    expect(at(3, 'Windows 11')).toBe('Adult (30-55)');
+    expect(at(3, 'macOS 14')).toBe('Professional (25-50)');
+    expect(at(3, 'Linux')).toBe('Adult (25-55)');
+  });
+  it('keeps the daytime answers', () => {
+    expect(at(14, 'Android 14', 'Chrome', 'Mobile')).toBe('Adult (25-55)');
+    expect(at(3, 'iOS 17', 'Safari', 'Mobile')).toBe('Adult (25-45)');
   });
 });

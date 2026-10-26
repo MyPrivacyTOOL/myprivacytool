@@ -2,6 +2,13 @@ import worker from './worker.js';
 let calls=[]; let supa='ok'; let notionFail=false; let baselineRow=null;
 globalThis.fetch = async (url, opts) => {
   calls.push({url:String(url), body: opts?.body});
+  if (String(url).includes('challenges.cloudflare.com/turnstile/v0/siteverify')) {
+    const tok=opts.body.get('response');
+    if (tok==='throw') throw new Error('network down');
+    if (tok==='down') return {ok:false,status:500,json:async()=>({}),text:async()=>''};
+    if (tok==='wronghost') return {ok:true,status:200,json:async()=>({success:true,hostname:'evil.example'}),text:async()=>''};
+    return {ok:true,status:200,json:async()=>tok==='good'?{success:true,hostname:'myprivacytool.io'}:{success:false,'error-codes':['invalid-input-response']},text:async()=>''};
+  }
   if (String(url).includes('mpt_score_baselines')) {
     if (opts?.method==='POST') { if (baselineRow) return {ok:true,status:201,text:async()=>'',json:async()=>[]};
       const b=JSON.parse(opts.body); baselineRow={overall_score:b.overall_score,created_at:'2026-10-05T00:00:00Z'}; return {ok:true,status:201,text:async()=>'',json:async()=>[baselineRow]}; }
@@ -55,4 +62,73 @@ const limited={...env,RATE_LIMITER:{limit:async()=>({success:false})}}; r=await 
 const brokenRl={...env,RATE_LIMITER:{limit:async()=>{throw new Error('x')}}}; r=await raw({email:'a@b.co'},{e:brokenRl}); check(r.status===200,'rate limiter error fails open');
 await raw({email:'a@b.co',name:'<b>x</b> & <https://evil|click>'}); const slack=calls.find(c=>c.url.includes('slack.com')); check(slack&&!/<b>|<https:/.test(JSON.parse(slack.body).text.split('\n').filter(l=>l.startsWith('Name:')).join('')),'Slack text escapes user-supplied < > &');
 r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.find(c=>c.url.includes('api.notion.com/v1/pages')); check(r.status===200&&!JSON.parse(nb.body).properties.Referrer,'non-http(s) referrer dropped');
+
+// CK-7721 fix 4: Slack carries no IP address or city; the Notion lead page is archived after 24 months, once a day.
+{
+  const slackCalls=()=>calls.filter(c=>c.url.includes('slack.com'));
+  calls=[]; const waits=[]; const sreq=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'203.0.113.7'},body:JSON.stringify({email:'s@t.co',name:'S T',phone:'+85291234567'})});
+  await worker.fetch(sreq,env,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
+  const slackText=JSON.parse(slackCalls()[0].body).text;
+  check(!slackText.includes('203.0.113.7')&&!/\bIP:/.test(slackText)&&!/City/i.test(slackText)&&!slackText.includes('s@t.co')&&!slackText.includes('S T')&&!slackText.includes('91234567')&&!/(Email|Name|Phone):/.test(slackText)&&slackText.includes('Total Leads')&&slackText.includes('Open Notion Leads DB'),'Slack lead post carries no name, email, phone, IP address or city, but keeps the count and the Notion link');
+}
+{
+  const realFetch=globalThis.fetch; const seen=[];
+  globalThis.fetch=async (url,opts)=>{ seen.push({url:String(url),method:opts?.method,body:opts?.body});
+    if (String(url).includes('/databases/abc-def/query')) return {ok:true,status:200,json:async()=>({results:[{id:'old1'},{id:'old2'}]}),text:async()=>''};
+    return {ok:true,status:200,json:async()=>({results:[],has_more:false}),text:async()=>''}; };
+  const tick=async (iso)=>{ seen.length=0; const w=[]; await worker.scheduled({scheduledTime:Date.parse(iso)},env,{waitUntil:p=>w.push(p)}); await Promise.all(w); return seen.slice(); };
+  let s1=await tick('2026-10-14T19:00:00Z');
+  const q=s1.find(x=>x.url.includes('/databases/abc-def/query')); const cutoff=JSON.parse(q.body).filter.created_time.before;
+  check(q&&cutoff.startsWith('2024-10-14T19:00'),'daily tick queries Notion for leads created before now minus 24 months');
+  check(s1.filter(x=>x.method==='PATCH'&&/\/v1\/pages\/old[12]$/.test(x.url)&&JSON.parse(x.body).archived===true).length===2,'each lead page older than 24 months is archived');
+  s1=await tick('2026-10-14T19:05:00Z'); check(!s1.some(x=>x.url.includes('/databases/abc-def/query')),'other 5-minute ticks do not run the retention purge');
+  s1=await tick('2026-10-14T07:00:00Z'); check(!s1.some(x=>x.url.includes('/databases/abc-def/query')),'purge does not run at other hours');
+  globalThis.fetch=async (url)=>({ok:false,status:500,json:async()=>({}),text:async()=>'x'});
+  let threw=false; try { await tick('2026-10-14T19:00:00Z'); } catch { threw=true; } check(!threw,'a Notion failure during the purge never breaks the scheduled run');
+  globalThis.fetch=realFetch;
+}
+
+// MPC-8368: Turnstile verification on the scan email form
+{
+  const ts=(tok,e)=>run({email:'t@t.co',riskScore:5,...(tok===undefined?{}:{'cf-turnstile-response':tok})},e);
+  const sv=()=>calls.filter(c=>c.url.includes('siteverify'));
+  const tsEnv={...env,TURNSTILE_SECRET_KEY:'sek'};
+  let r=await ts(undefined,env); check(r.status===200&&sv().length===0,'no TURNSTILE_SECRET_KEY => feature off, no siteverify call, lead accepted');
+  r=await ts('good',tsEnv); check(r.status===200&&sv().length===1,'valid token => siteverify called, lead accepted');
+  const fdv=sv()[0].body; check(fdv.get('secret')==='sek'&&fdv.get('response')==='good','siteverify receives the secret and the token');
+  r=await ts('bad',tsEnv); check(r.status===200,'report-only (TURNSTILE_ENFORCE unset): invalid token is logged, lead still accepted');
+  r=await ts(undefined,tsEnv); check(r.status===200&&sv().length===0,'report-only: missing token is accepted without calling siteverify');
+  const enf={...tsEnv,TURNSTILE_ENFORCE:'true'};
+  r=await ts('bad',enf); check(r.status===403&&r.json.error==='Verification failed'&&r.supa.length===0,'enforce: invalid token => 403 and nothing written');
+  r=await ts(undefined,enf); check(r.status===403&&r.supa.length===0,'enforce: missing token => 403 and nothing written');
+  r=await ts('wronghost',enf); check(r.status===403,'enforce: token issued for another hostname => 403');
+  {
+    const lines=[]; const rw=console.warn; console.warn=(...a)=>{ lines.push(a.join(' ')); };
+    calls=[]; const w=[]; const b403=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'198.51.100.9'},body:JSON.stringify({email:'secret@leak.co',riskScore:5,'cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w.push(p)}); await Promise.all(w);
+    console.warn=rw;
+    const tl=lines.find(l=>l.startsWith('TURNSTILE_FAILED ')); const j=tl&&JSON.parse(tl.slice('TURNSTILE_FAILED '.length));
+    check(b403.status===403&&j&&j.ip==='198.51.100.0/24'&&/^\d{4}-\d\d-\d\dT/.test(j.ts)&&j.action==='blocked_403'&&j.reason.startsWith('rejected:')&&j.origin==='https://myprivacytool.io','enforce: a 403 logs one TURNSTILE_FAILED line with ip, ISO timestamp, reason, origin and action');
+    check(tl&&!tl.includes('secret@leak.co')&&!tl.includes('"bad"'),'the TURNSTILE_FAILED log line carries no email and no token');
+    check(tl&&!tl.includes('198.51.100.9'),'the TURNSTILE_FAILED log line never carries the full IPv4 address');
+    const ipOf=async(ipHeader)=>{ const L=[]; const keep=console.warn; console.warn=(...a)=>{ L.push(a.join(' ')); }; const w2=[];
+      await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io',...(ipHeader?{'CF-Connecting-IP':ipHeader}:{})},body:JSON.stringify({email:'m@m.co','cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w2.push(p)}); await Promise.all(w2); console.warn=keep;
+      const line=L.find(l=>l.startsWith('TURNSTILE_FAILED ')); return line&&JSON.parse(line.slice('TURNSTILE_FAILED '.length)).ip; };
+    check(await ipOf('2001:db8:85a3:8a2e:370:7334:1234:5678')==='2001:db8:85a3::/48','IPv6 is cut to its /48 prefix');
+    check(await ipOf('::ffff:203.0.113.77')==='203.0.113.0/24','IPv4-mapped IPv6 is cut to the IPv4 /24');
+    check(await ipOf('::1')==='ipv6','a short or loopback IPv6 is logged as the bare word ipv6');
+    check(await ipOf(null)==='','a missing IP is logged as empty');
+    const l2=[]; console.warn=(...a)=>{ l2.push(a.join(' ')); }; await ts(undefined,enf); await ts('bad',tsEnv); console.warn=rw;
+    const miss=l2.find(l=>l.includes('missing_token')); check(miss&&JSON.parse(miss.slice('TURNSTILE_FAILED '.length)).action==='blocked_403','missing token logs reason missing_token');
+    check(l2.some(l=>l.includes('"action":"allowed_report_only"')),'report-only failures are logged too, marked allowed_report_only');
+  }
+  r=await ts('good',enf); check(r.status===200&&r.json.success,'enforce: valid token => 200');
+  r=await ts('throw',enf); check(r.status===200,'enforce: siteverify unreachable fails open (a Cloudflare outage never drops a lead)');
+  r=await ts('down',enf); check(r.status===200,'enforce: siteverify HTTP 500 fails open');
+  r=await run({email:'x@healthcheck.io'},enf); check(r.json.note==='healthcheck'&&sv().length===0,'enforce: watchdog health check needs no token');
+  // form-encoded submits carry the token too
+  calls=[]; const waits=[]; const fd=new FormData(); fd.set('email','f@f.co'); fd.set('cf-turnstile-response','good');
+  const fr=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{Origin:'https://myprivacytool.io'},body:fd}),enf,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
+  check(fr.status===200&&sv().length===1,'form-encoded submit: token read from cf-turnstile-response');
+}
+
 process.exit(ok?0:1);

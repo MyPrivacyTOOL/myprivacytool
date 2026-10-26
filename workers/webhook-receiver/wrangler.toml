@@ -14,6 +14,20 @@ compatibility_flags = ["nodejs_compat"]
 # See DEPLOYMENT.md for the full list and descriptions.
 # Never hardcode values in this file.
 
+# ─── SCHEDULE ────────────────────────────────────────────────────────────────
+# No Cron Trigger: the account is at the Workers Free limit of 5 (Cloudflare error 10072). Expired state in Supabase
+# (mpt_conversation_state, 24 h life) is purged hourly by Supabase pg_cron (migration 20261019160000) and after each successful
+# start-deep-dive instead. See index.js. MPC-8320.
+
+# ─── RATE LIMIT ──────────────────────────────────────────────────────────────
+# POST /api/learning/event (MPC-7915), per client address. Syntax: [[unsafe.bindings]] because wrangler 3.90.0 (installed by the deploy action)
+# ignores [[ratelimits]]. Pinned by workers/ratelimit-config.vitest.mjs. The code fails open if the binding is missing.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "7915"
+simple = { limit = 30, period = 60 }
+
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
 enabled = true

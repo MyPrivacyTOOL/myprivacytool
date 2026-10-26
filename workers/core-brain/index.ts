@@ -4,7 +4,9 @@
 //                (OpenAI-compatible endpoint), looks up the sender's trust level in Supabase
 //                `conversation_states`, and returns a localized response KEY (MPT-1003 `public.localization`).
 //                The caller resolves the key to text and sends it; this Worker never talks to the platforms.
-// POST /ingest/social  MPC-8301 hand-off from social-listeners: { source: "x"|"telegram", receivedAt, payload }.
+//                After deciding, it records the sender's next state and one `interaction_log` row through the
+//                `mpt_brain_record` RPC (best effort: a failed write never blocks or changes the reply).
+// POST /ingest/social  MPC-8301 hand-off from social-listeners: { source: "x"|"telegram"|"linkedin", receivedAt, payload }.
 //                Auth: `Authorization: Bearer <WEBHOOK_SECRET>` (social-listeners holds it as CORE_BRAIN_TOKEN), required on
 //                the service-binding path too. Verified events with no user text answer 200 { ignored: true }, no retry.
 // GET  /health   liveness + whether the required bindings are present (booleans only).
@@ -15,6 +17,9 @@
 //
 // Secrets come from `env` only (see EXPECTED_SECRETS.txt): SUPABASE_KEY, WEBHOOK_SECRET (+ optional QWEN_API_KEY).
 // Non-secret vars (wrangler.toml [vars]): SUPABASE_URL, QWEN_BASE_URL, QWEN_MODEL.
+// Rate limit (MPC-7257): per sender 10 requests / 60s (RATE_LIMITER), plus an optional global backstop (RATE_LIMITER_GLOBAL).
+//                Runs after auth and body parsing and before Qwen or Supabase. Over the limit: 429 { error: { code: "rate_limited" } }
+//                with Retry-After. Fails open when a binding is missing or errors (callers already hold the secret).
 // Never log message text, sender ids or keys: log() fields are event metadata only.
 
 import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } from "@mpt/utils";
@@ -27,11 +32,20 @@ type Env = {
   QWEN_BASE_URL?: string;
   QWEN_MODEL?: string;
   LOG_LEVEL?: string;
+  /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional: absent means no limit (fail open). */
+  RATE_LIMITER?: RateLimiter;
+  RATE_LIMITER_GLOBAL?: RateLimiter;
 };
+
+type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
 
 type Intent = "scan" | "help" | "verify" | "unknown";
 type Inbound = { platform: string; senderId: string; text: string; locale: string };
 type BrainState = { trustLevel: number; state: string; source: "supabase" | "anonymous" | "fallback" };
+// What the conversation becomes after this message. trustFloor only ever RAISES trust (the database applies
+// greatest(existing, floor)), so a message can never lower it. state null = keep whatever is stored.
+type NextState = { state: string | null; trustFloor: number };
+type Decision = { keys: string[]; next: NextState };
 
 const WORKER = "core-brain";
 // QWEN_API_KEY is optional: without it intent falls back to the rules classifier.
@@ -48,7 +62,7 @@ const INTENTS: Intent[] = ["scan", "help", "verify", "unknown"];
 const LOCALES = ["en", "ja", "zh", "ko", "vi", "es", "de", "fr", "pt", "ar"];
 const DEFAULT_LOCALE = "en";
 
-// conversation_states.channel is constrained to these values; other platforms (e.g. X) have no state row yet.
+// conversation_states.channel is constrained to these values; other platforms (e.g. X, LinkedIn) have no state row yet.
 const STATE_CHANNELS = ["web", "email", "sms", "whatsapp", "telegram"];
 
 // ASSUMPTION (product decision to confirm): trust_level is 0..5 with no documented meaning. We treat >= 1 as
@@ -65,6 +79,7 @@ const KEYS = {
   confirmedYes: ["bot.confirmed_y.title", "bot.confirmed_y.generating", "bot.confirmed_y.cta", "bot.confirmed_y.duration"],
   confirmedNo: ["bot.confirmed_n.title", "bot.confirmed_n.cta", "bot.confirmed_n.duration"],
   confirmPrompt: ["bot.confirm_prompt"],
+  contactUnsupported: ["bot.contact_unsupported"],
   welcome: ["bot.unknown.title", "bot.unknown.body", "bot.unknown.free"],
 };
 
@@ -92,18 +107,28 @@ function normalizeLocale(raw: unknown): string {
   return LOCALES.includes(base) ? base : DEFAULT_LOCALE;
 }
 
+/** Reads a nested key path from untyped JSON; undefined at the first non-object step (what `a?.b?.c` gave on a parsed payload). */
+function pick(value: unknown, ...path: string[]): unknown {
+  let cur = value;
+  for (const key of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
+}
+
 // Accepts the listener format or a raw Telegram update. Returns null when the structure is invalid.
-function parseInbound(body: any): Inbound | null {
+function parseInbound(body: unknown): Inbound | null {
   if (!body || typeof body !== "object") return null;
-  let platform = body.platform;
-  let senderId = body.sender_id;
-  let text = body.message_text;
-  let locale = body.locale;
-  if (body.message?.chat && platform === undefined) {
+  let platform = pick(body, "platform");
+  let senderId = pick(body, "sender_id");
+  let text = pick(body, "message_text");
+  let locale = pick(body, "locale");
+  if (pick(body, "message", "chat") && platform === undefined) {
     platform = "telegram";
-    senderId = body.message.chat.id;
-    text = body.message.text;
-    locale = locale ?? body.message.from?.language_code;
+    senderId = pick(body, "message", "chat", "id");
+    text = pick(body, "message", "text");
+    locale = locale ?? pick(body, "message", "from", "language_code");
   }
   if (typeof platform !== "string" || !/^[a-z][a-z0-9_-]{0,31}$/i.test(platform)) return null;
   if (typeof senderId === "number") senderId = String(senderId);
@@ -117,6 +142,12 @@ function redact(text: string): string {
   return text
     .replace(/[^\s@]+@[^\s@]+\.[^\s@]+/g, "[email]")
     .replace(/\+?\d[\d\s().-]{5,}\d/g, "[phone]");
+}
+
+// MPC-7518: the bot cannot take contact details in chat yet. Matches a message that is only an email or phone number.
+function isContactDetail(text: string): boolean {
+  const t = text.trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t) || /^\+?\d[\d\s().-]{5,}\d$/.test(t);
 }
 
 function ruleIntent(text: string): Intent {
@@ -155,8 +186,8 @@ async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent
       log.warn("qwen http error", { status: res.status });
       return null;
     }
-    const data: any = await res.json();
-    const raw = String(data?.choices?.[0]?.message?.content ?? "");
+    const data: unknown = await res.json();
+    const raw = String(pick(data, "choices", "0", "message", "content") ?? "");
     const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
     const intent = String(parsed.intent ?? "").toLowerCase() as Intent;
     const confidence = Number(parsed.confidence);
@@ -168,7 +199,7 @@ async function qwenIntent(text: string, env: Env, log: Logger): Promise<{ intent
   }
 }
 
-// ASSUMPTION: conversation_states has no sender column, so the listener's id is matched on context->>sender_id.
+// The sender is matched on conversation_states.sender_id (the platform's id as text) within its channel.
 // Missing row, unsupported platform or any Supabase failure degrade to an anonymous user (trust 0), never an error.
 async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainState> {
   const anonymous: BrainState = { trustLevel: 0, state: "new", source: "anonymous" };
@@ -176,7 +207,7 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
   const qs = new URLSearchParams({
     select: "trust_level,state",
     channel: `eq.${msg.platform}`,
-    "context->>sender_id": `eq.${msg.senderId}`,
+    sender_id: `eq.${msg.senderId}`,
     order: "updated_at.desc",
     limit: "1",
   });
@@ -188,27 +219,66 @@ async function lookupState(msg: Inbound, env: Env, log: Logger): Promise<BrainSt
       log.warn("supabase http error", { status: res.status });
       return { ...anonymous, source: "fallback" };
     }
-    const rows: any[] = await res.json();
+    const rows = (await res.json()) as unknown[];
     const row = rows[0];
     if (!row) return anonymous;
-    const trustLevel = Number(row.trust_level);
-    return { trustLevel: Number.isInteger(trustLevel) ? trustLevel : 0, state: String(row.state ?? "new"), source: "supabase" };
+    const trustLevel = Number(pick(row, "trust_level"));
+    return { trustLevel: Number.isInteger(trustLevel) ? trustLevel : 0, state: String(pick(row, "state") ?? "new"), source: "supabase" };
   } catch (err) {
     log.warn("supabase failed", { error: (err as Error).name });
     return { ...anonymous, source: "fallback" };
   }
 }
 
-function decide(intent: Intent, text: string, st: BrainState): string[] {
+// State machine (conversation_states.state): new -> awaiting_confirmation -> confirmed | declined.
+//   First Hexagon teaser sent            -> awaiting_confirmation (it ends with a Y/N question)
+//   "yes" while awaiting_confirmation    -> confirmed, trust raised to CONFIRMED_TRUST_LEVEL
+//   "no"  while awaiting_confirmation    -> declined (trust unchanged)
+//   anything else leaves the state as it was.
+function decide(intent: Intent, text: string, st: BrainState): Decision {
+  const stay: NextState = { state: st.state, trustFloor: 0 };
+  if (intent === "unknown" && isContactDetail(text)) return { keys: KEYS.contactUnsupported, next: stay };
   if (intent === "verify" && st.state === "awaiting_confirmation") {
     const t = text.trim();
-    if (YES.test(t)) return KEYS.confirmedYes;
-    if (NO.test(t)) return KEYS.confirmedNo;
-    return KEYS.confirmPrompt;
+    if (YES.test(t)) return { keys: KEYS.confirmedYes, next: { state: "confirmed", trustFloor: CONFIRMED_TRUST_LEVEL } };
+    if (NO.test(t)) return { keys: KEYS.confirmedNo, next: { state: "declined", trustFloor: 0 } };
+    return { keys: KEYS.confirmPrompt, next: stay };
   }
   // "verify" with nothing pending has nothing to confirm: treat it as a scan.
-  if (intent === "scan" || intent === "verify") return st.trustLevel >= CONFIRMED_TRUST_LEVEL ? KEYS.confirmedYes : KEYS.firstHexagon;
-  return KEYS.welcome;
+  if (intent === "scan" || intent === "verify") {
+    return st.trustLevel >= CONFIRMED_TRUST_LEVEL
+      ? { keys: KEYS.confirmedYes, next: { state: "confirmed", trustFloor: 0 } }
+      : { keys: KEYS.firstHexagon, next: { state: "awaiting_confirmation", trustFloor: 0 } };
+  }
+  return { keys: KEYS.welcome, next: stay };
+}
+
+// Records the sender's next state and one interaction_log row in a single atomic RPC (public.mpt_brain_record).
+// Best effort: this runs after the reply is decided, so any failure (Supabase down, migration not applied yet) is
+// logged as a warning and never reaches the user. Sends no message text; the sender id goes to the database only.
+async function recordInteraction(
+  msg: Inbound, intent: Intent, intentSource: string, responseKey: string, next: NextState, env: Env, log: Logger,
+): Promise<void> {
+  // Platforms outside conversation_states' channel check (X) are log-only: no sender, no state change.
+  const stateful = STATE_CHANNELS.includes(msg.platform);
+  try {
+    const res = await fetchWithTimeout(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_brain_record`, {
+      method: "POST",
+      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        p_channel: msg.platform,
+        p_sender_id: stateful ? msg.senderId : null,
+        p_intent: intent,
+        p_intent_source: intentSource,
+        p_response_key: responseKey,
+        p_new_state: next.state,
+        p_trust_floor: next.trustFloor,
+      }),
+    }, SUPABASE_TIMEOUT_MS);
+    if (!res.ok) log.warn("state write failed", { status: res.status });
+  } catch (err) {
+    log.warn("state write failed", { error: (err as Error).name });
+  }
 }
 
 /** Shared front door for the POST routes: method, configuration, auth, size and JSON checks. */
@@ -234,14 +304,47 @@ async function readAuthorizedJson(request: Request, env: Env, log: Logger, autho
   }
 }
 
+const RATE_LIMIT_RETRY_AFTER_SECONDS = "60";
+
+/**
+ * MPC-7257: true when this sender (or the whole Worker) is over its limit. Keys are `platform:sender_id` for the
+ * per-sender binding and a fixed key for the global one; neither is logged. A missing binding or a limiter error
+ * fails open: every caller has already passed the shared-secret check, and a limiter outage must not take the brain down.
+ */
+async function isRateLimited(msg: Inbound, env: Env, log: Logger): Promise<boolean> {
+  const checks: [string, RateLimiter | undefined, string][] = [
+    ["sender", env.RATE_LIMITER, `${msg.platform}:${msg.senderId}`],
+    ["global", env.RATE_LIMITER_GLOBAL, "core-brain"],
+  ];
+  for (const [scope, limiter, key] of checks) {
+    if (!limiter) continue;
+    try {
+      if (!(await limiter.limit({ key })).success) {
+        log.warn("rate_limited", { scope, platform: msg.platform });
+        return true;
+      }
+    } catch (err) {
+      log.warn("rate_limiter_error", { scope, error: (err as Error).name });
+    }
+  }
+  return false;
+}
+
 /** Intent + state -> localized response keys. Shared by /webhook and /ingest/social. */
-async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
+async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
+  if (await isRateLimited(msg, env, log)) {
+    return json({ error: { code: "rate_limited", message: "Too many requests" } }, 429, { "retry-after": RATE_LIMIT_RETRY_AFTER_SECONDS });
+  }
   const st = await lookupState(msg, env, log);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).
   let intent: Intent;
   let intentSource: "qwen" | "rules";
-  if (st.state === "awaiting_confirmation" && (YES.test(msg.text) || NO.test(msg.text))) {
+  if (isContactDetail(msg.text)) {
+    // No Qwen call for contact details (privacy), and decide() answers with the "not supported yet" message.
+    intent = "unknown";
+    intentSource = "rules";
+  } else if (st.state === "awaiting_confirmation" && (YES.test(msg.text) || NO.test(msg.text))) {
     intent = "verify";
     intentSource = "rules";
   } else {
@@ -255,8 +358,25 @@ async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
     }
   }
 
-  const messageKeys = decide(intent, msg.text, st);
-  log.info("routed", { platform: msg.platform, intent, intentSource, stateSource: st.source, trustLevel: st.trustLevel, key: messageKeys[0] });
+  const { keys: messageKeys, next } = decide(intent, msg.text, st);
+  // Never move the state when we cannot be sure what it is: X has no state channel, and after a failed lookup we only
+  // *assume* "new", so writing from that guess could reset a confirmed conversation. null keeps the stored state.
+  const nextState: NextState = !STATE_CHANNELS.includes(msg.platform)
+    ? { state: st.state, trustFloor: 0 }
+    : st.source === "fallback"
+      ? { state: null, trustFloor: 0 }
+      : next;
+
+  // Write back after the decision. In production the write runs after the reply is sent (waitUntil); without an
+  // ExecutionContext (tests) it is awaited so the outcome is deterministic.
+  const write = recordInteraction(msg, intent, intentSource, messageKeys[0], nextState, env, log);
+  if (ctx?.waitUntil) ctx.waitUntil(write);
+  else await write;
+
+  log.info("routed", {
+    platform: msg.platform, intent, intentSource, stateSource: st.source, trustLevel: st.trustLevel,
+    state: st.state, nextState: nextState.state ?? "unchanged", key: messageKeys[0],
+  });
   return json({
     ok: true,
     intent,
@@ -264,23 +384,24 @@ async function respond(msg: Inbound, env: Env, log: Logger): Promise<Response> {
     trust_level: st.trustLevel,
     state: st.state,
     state_source: st.source,
+    next_state: nextState.state,
     locale: msg.locale,
     response_key: messageKeys[0],
     message_keys: messageKeys,
   });
 }
 
-async function handleWebhook(request: Request, env: Env, log: Logger): Promise<Response> {
+async function handleWebhook(request: Request, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
   const body = await readAuthorizedJson(request, env, log, (r) =>
     constantTimeEqual(r.headers.get("x-mpt-webhook-secret") || "", env.WEBHOOK_SECRET));
   if (body instanceof Response) return body;
   const msg = parseInbound(body);
   if (!msg) throw new MptError("bad_request", "Invalid payload");
-  return respond(msg, env, log);
+  return respond(msg, env, log, ctx);
 }
 
 // MPC-8301 hand-off. social-listeners verifies the platform signature, then forwards
-// { source: "x" | "telegram", receivedAt, payload } here with `Authorization: Bearer <token>`.
+// { source: "x" | "telegram" | "linkedin", receivedAt, payload } here with `Authorization: Bearer <token>`.
 // DECISION: the bearer token is this Worker's WEBHOOK_SECRET (social-listeners holds it as CORE_BRAIN_TOKEN) and is
 // required on the service-binding path too, because the Worker is also reachable on its public workers.dev address.
 function bearerMatches(request: Request, secret: string): boolean {
@@ -289,42 +410,70 @@ function bearerMatches(request: Request, secret: string): boolean {
 }
 
 // X Account Activity API: a DM arrives as direct_message_events[].message_create. Ignore our own echoes.
-function parseXEnvelope(payload: any): Inbound | null {
-  const events: any[] = Array.isArray(payload?.direct_message_events) ? payload.direct_message_events : [];
+function parseXEnvelope(payload: unknown): Inbound | null {
+  const dms = pick(payload, "direct_message_events");
+  const events: unknown[] = Array.isArray(dms) ? dms : [];
   for (const ev of events) {
-    const mc = ev?.type === "message_create" ? ev.message_create : null;
-    const sender = mc?.sender_id;
-    const text = mc?.message_data?.text;
+    const mc = pick(ev, "type") === "message_create" ? pick(ev, "message_create") : null;
+    const sender = pick(mc, "sender_id");
+    const text = pick(mc, "message_data", "text");
     if (typeof sender !== "string" || typeof text !== "string" || !text.trim()) continue;
-    if (sender === String(payload?.for_user_id ?? "")) continue;
+    if (sender === String(pick(payload, "for_user_id") ?? "")) continue;
     return parseInbound({ platform: "x", sender_id: sender, message_text: text });
   }
   return null;
 }
 
-async function handleIngestSocial(request: Request, env: Env, log: Logger): Promise<Response> {
-  const body: any = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
+// LinkedIn (MPC-7640). Messaging is partner-gated, so the delivered shape is an ASSUMPTION to confirm against the approved
+// product: { organization|for_user: "<urn>", events: [{ from|sender: "<urn>", message|text|message_text: "..." }] }.
+// A bare single event (no `events` array) is accepted too. Our own echoes (sender == organization) are ignored.
+function parseLinkedInEnvelope(payload: unknown): Inbound | null {
+  const listed = pick(payload, "events");
+  const events: unknown[] = Array.isArray(listed) ? listed : payload && typeof payload === "object" ? [payload] : [];
+  const self = String(pick(payload, "organization") ?? pick(payload, "for_user") ?? "");
+  const textOf = (v: unknown): string | undefined => {
+    const inner = pick(v, "text");
+    return typeof v === "string" ? v : typeof inner === "string" ? inner : undefined;
+  };
+  for (const ev of events) {
+    const sender = pick(ev, "from") ?? pick(ev, "sender");
+    const text = textOf(pick(ev, "message")) ?? textOf(pick(ev, "text")) ?? textOf(pick(ev, "message_text"));
+    if (typeof sender !== "string" || !text?.trim()) continue;
+    if (self && sender === self) continue;
+    return parseInbound({ platform: "linkedin", sender_id: sender, message_text: text, locale: pick(ev, "locale") });
+  }
+  return null;
+}
+
+async function handleIngestSocial(request: Request, env: Env, log: Logger, ctx?: ExecutionContext): Promise<Response> {
+  const body = await readAuthorizedJson(request, env, log, (r) => bearerMatches(r, env.WEBHOOK_SECRET));
   if (body instanceof Response) return body;
-  const source = body?.source;
-  if (source !== "x" && source !== "telegram") throw new MptError("bad_request", "Unknown source");
-  const msg = source === "telegram" ? parseInbound(body.payload) : parseXEnvelope(body.payload);
+  const source = pick(body, "source");
+  if (source !== "x" && source !== "telegram" && source !== "linkedin") throw new MptError("bad_request", "Unknown source");
+  const msg = source === "telegram" ? parseInbound(pick(body, "payload"))
+    : source === "linkedin" ? parseLinkedInEnvelope(pick(body, "payload")) : parseXEnvelope(pick(body, "payload"));
   if (!msg) {
     // Verified but carries no user text (follows, likes, edits, our own messages). 200 so the platform does not retry.
     log.info("ignored", { source });
     return json({ ok: true, ignored: true });
   }
-  return respond(msg, env, log);
+  return respond(msg, env, log, ctx);
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const log = createLogger(WORKER, env.LOG_LEVEL).child({ requestId: crypto.randomUUID() });
     const { pathname } = new URL(request.url);
     try {
-      if (pathname === "/webhook") return await handleWebhook(request, env, log);
-      if (pathname === "/ingest/social") return await handleIngestSocial(request, env, log);
+      if (pathname === "/webhook") return await handleWebhook(request, env, log, ctx);
+      if (pathname === "/ingest/social") return await handleIngestSocial(request, env, log, ctx);
       if (pathname === "/health" && request.method === "GET") {
-        return json({ ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0 });
+        // rate_limit: whether each Workers Rate Limiting binding is attached at runtime (booleans only). Lets an operator tell
+        // "binding missing, so the limiter fails open" apart from "binding present but not counting" (MPC-7257).
+        return json({
+          ok: true, worker: WORKER, configured: missingEnv(env, REQUIRED_ENV).length === 0,
+          rate_limit: { sender: Boolean(env.RATE_LIMITER), global: Boolean(env.RATE_LIMITER_GLOBAL) },
+        });
       }
       throw new MptError("not_found", "No such route");
     } catch (err) {

@@ -14,6 +14,7 @@ criteria, rollback plan are at the bottom).
 | Supabase integration (RLS, constraints, cascades, "first baseline wins") | psql against a **throwaway Postgres 16** | `supabase/tests/` | `db` |
 | End-to-end: waitlist signup (`/start`), newsletter, contact form, site shell | Playwright (desktop + mobile Chromium) against the production build, all third parties mocked | `e2e/` | `build` → `e2e` |
 | Deploy-safety scripts + workflow guards | Vitest | `scripts/ci/*.vitest.mjs` | `pipeline-guards` |
+| Cloudflare Pages Functions bundle (`functions/`), so an unresolvable import fails the PR, not the deploy | `wrangler pages functions build` (offline) | `functions/**` | `pages-functions` |
 
 Everything is hermetic: no secrets, no real signups, no calls to the live Supabase project. The integration
 tests refuse to run against a `*.supabase.co` URL.
@@ -60,9 +61,9 @@ typecheck. Clear the backlog, then drop `continue-on-error`.
 
 | Check | Where | What it does |
 |---|---|---|
-| Pre-deploy | `scripts/ci/check-env.mjs`, first step of `deploy-mpt-leads`, `deploy-oauth-poc`, `deploy-scan-report` | Fails before anything ships when `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are missing or blank (names only, never values), `wrangler.toml` has `REPLACE_*` placeholders, no `name`/`main`, or `EXPECTED_SECRETS.txt` contains anything but secret **names**. |
+| Pre-deploy | `scripts/ci/check-env.mjs`, first step of `deploy-mpt-leads`, `deploy-oauth-poc`, `deploy-scan-report`, `deploy-webhook-receiver` | Fails before anything ships when `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are missing or blank (names only, never values), `wrangler.toml` has `REPLACE_*` placeholders, no `name`/`main`, or `EXPECTED_SECRETS.txt` contains anything but secret **names**. |
 | Secrets survive | existing steps in each deploy workflow | Secret names before vs. after the deploy must match (unchanged). |
-| Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads` and `deploy-oauth-poc` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. |
+| Post-deploy smoke | `scripts/ci/smoke-test.mjs`, last step of `deploy-mpt-leads`, `deploy-oauth-poc` and `deploy-webhook-receiver` | Hits the live Worker with retries. mpt-leads: CORS preflight, the side-effect-free `@healthcheck.io` POST, POST-only 404. oauth-poc: `/health`, 302 to Google with an HttpOnly state cookie, 404. webhook-receiver: `/health`, unsigned WhatsApp POST 401, verify GET 403, deep-dive start without secret 401, deep-dive Firestore lookup, 404. |
 | Auto-rollback | same workflows | If the smoke step fails, `wrangler rollback` restores the previous version and the smoke test re-runs. The job stays red either way. |
 | Site smoke | `.github/workflows/smoke-site.yml` | After each push to `main` (waits up to ~10 min for Cloudflare Pages), every 6 h, and on demand: 7 conversion routes return 200 with the SPA shell, sitemap is served, plus both public Workers. |
 
@@ -72,7 +73,7 @@ Run any smoke test by hand: `node scripts/ci/smoke-test.mjs <site|mpt-leads|oaut
 
 | Component | Procedure | Tested by |
 |---|---|---|
-| **Cloudflare Worker** (`mpt-leads`, `oauth-poc`, `scan-report`, `core-brain`) | *Actions → Rollback Worker → Run workflow*, choose the Worker. `dry_run` is **on by default** and only lists versions. For a real rollback untick `dry_run` (optionally give a `version_id`). The run snapshots secret names, rolls back, verifies the secret names are unchanged, then smoke-tests the live Worker. CLI equivalent: `cd workers/<name> && npx wrangler rollback [version-id]`. Manual fallback: Cloudflare dashboard → Workers → *name* → Deployments → *Rollback*. | **Weekly rollback drill** (Mondays 06:23 UTC): the same workflow in dry-run mode for all four Workers proves the token works, the Worker exists and previous versions are listed. Auto-rollback on a failed post-deploy smoke test is the same `wrangler rollback` call. `pipeline-guards` fails CI if a deploy workflow loses its smoke/rollback steps or `rollback.yml` stops covering a deployed Worker. |
+| **Cloudflare Worker** (`mpt-leads`, `oauth-poc`, `scan-report`, `core-brain`, `webhook-receiver`) | *Actions → Rollback Worker → Run workflow*, choose the Worker. `dry_run` is **on by default** and only lists versions. For a real rollback untick `dry_run` (optionally give a `version_id`). The run snapshots secret names, rolls back, verifies the secret names are unchanged, then smoke-tests the live Worker. CLI equivalent: `cd workers/<name> && npx wrangler rollback [version-id]`. Manual fallback: Cloudflare dashboard → Workers → *name* → Deployments → *Rollback*. | **Weekly rollback drill** (Mondays 06:23 UTC): the same workflow in dry-run mode for all four Workers proves the token works, the Worker exists and previous versions are listed. Auto-rollback on a failed post-deploy smoke test is the same `wrangler rollback` call. `pipeline-guards` fails CI if a deploy workflow loses its smoke/rollback steps or `rollback.yml` stops covering a deployed Worker. |
 | **Marketing site** (Cloudflare Pages `wwwmyprivacytool`, auto-deploys `main`) | Fastest: Cloudflare dashboard → Workers & Pages → project → Deployments → pick the last good one → *Rollback to this deployment*. Or `git revert <sha>` on `main` (the revert PR must pass CI). | `smoke-site.yml` detects a bad deploy (red run after the push); `ci.yml` build + E2E run on the PR before it merges. |
 | **Supabase schema** | Migrations are additive. Each migration documents its rollback SQL in its header (e.g. `20261006120000_channel_tokens_worker_columns.sql`). Apply it as a **new** migration; never edit an applied one. The cutover plan is **not** part of this work (blocked by MPC-6950). | `db` job applies every migration from scratch to a clean Postgres on each PR and asserts constraints and RLS. |
 | **This testing work itself** | Everything is additive (tests, scripts, workflows). Revert the PR. To stop enforcement only, remove the **CI gate** required check in branch protection; the deploy workflows stay safe because the smoke/rollback steps only run after a deploy. | n/a |
@@ -89,9 +90,9 @@ not per version, so they are kept; the workflow verifies the names to be sure.
   deliberately side-effect free (no real signup is created).
 * **Scan engine** (`src/lib/*Detection*`, TensorFlow models, hexagon logic) has only the pre-existing `HexagonGrid` test.
   Not part of the critical-path coverage gate.
-* **Workers without unit tests in Vitest:** `webhook-receiver`, `telegram-webhook` (no deploy workflow either; its
+* **Workers without unit tests in Vitest:** `telegram-webhook` (no deploy workflow either; its
   `wrangler.toml` still has a `REPLACE_WITH_KV_NAMESPACE_ID` placeholder). `scan-report` and `github-channel` keep their
-  existing node:test suites, run in CI but not in the coverage gate.
+  existing node:test suites, run in CI but not in the coverage gate. `webhook-receiver` has Vitest tests (`workers/webhook-receiver/deepDive.vitest.ts`).
 * **Real rollback of a live Worker is not exercised automatically** (only the dry-run drill and the post-failure
   rollback). Do a supervised real rollback once and record it here.
 * `wrangler rollback` flags were written against wrangler 3.x as shipped by `cloudflare/wrangler-action@v3`; the first

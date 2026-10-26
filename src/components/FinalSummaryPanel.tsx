@@ -13,13 +13,23 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
+import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
+import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
+import { SUMMARY_LABELS } from '@/lib/scanCopy';
+import { signedReportEnabled } from '@/config/signedReport';
+import { requestSignedJson, requestPdfSignature, downloadBlob, signedReportMessage, SignedReportError } from '@/lib/signedReport';
 
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
   confirmedCount: number;
+  /** Tile state (VITE_HEXAGON_TILES). When set, "confirmed" means verified by a check, not tapped, and no score, percentage or ratio is shown. */
+  tiles?: Map<string, HexagonTile>;
   fingerprint?: CompositeFingerprint | null;
   languagePrediction?: LanguagePrediction | null;
   onStartOver?: () => void;
+  /** Level 2 (proof of possession, MPC-7902) passed. The signed download stays hidden until this is true; the server checks it again. */
+  level2Complete?: boolean;
 }
 
 interface CategoryStats {
@@ -43,13 +53,26 @@ interface PrivacyConcern {
 }
 
 export default function FinalSummaryPanel({
-  hexagons,
-  confirmedCount,
+  hexagons: rawHexagons,
+  confirmedCount: tappedCount,
+  tiles,
   fingerprint,
   languagePrediction,
   onStartOver,
+  level2Complete = false,
 }: FinalSummaryPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [signedMessage, setSignedMessage] = useState<string | null>(null);
+  const showSigned = signedReportEnabled() && level2Complete;
+  const tilesOn = !!tiles;
+  // Tile mode: a hexagon counts as "confirmed" only if a check verified it. A tap means "seen" and says nothing about the value, so
+  // concerns, positives and category counts below no longer follow taps or the raw values of tiles that could not be checked.
+  const hexagons = useMemo(
+    () => (tiles ? rawHexagons.map((h) => ({ ...h, confirmed: tiles.get(h.id)?.kind === 'clear' })) : rawHexagons),
+    [rawHexagons, tiles]
+  );
+  const board = useMemo(() => riskProfile(tiles ? [...tiles.values()] : []), [tiles]);
+  const confirmedCount = tilesOn ? board.clear : tappedCount;
 
   // Calculate category stats for all 8 categories
   const categoryStats = useMemo((): CategoryStats[] => {
@@ -289,7 +312,7 @@ export default function FinalSummaryPanel({
   }, [hexagons]);
 
   // Calculate overall privacy risk score (FINAL FORMULA); also returns each category's 0-100 risk (MPC-7173 baseline)
-  const { overall: overallRisk, categoryRisk } = useMemo(() => {
+  const { categoryRisk } = useMemo(() => {
     const weights = {
       device: 0.05,      // 5%
       privacy: 0.05,     // 5%
@@ -324,37 +347,34 @@ export default function FinalSummaryPanel({
     return { overall: Math.min(Math.round(totalRisk), 100), categoryRisk };
   }, [categoryStats, fingerprint]);
 
-  // MPC-7120: offer the email capture once the scan is complete (this panel only renders after all hexagons are confirmed)
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setShowEmailModal(true), 1500);
-    return () => window.clearTimeout(t);
-  }, []);
+  // MPC-7471-F1: the headline score and label are the PAGE result (RiskScore.tsx, via src/lib/scanResult.ts), not a second calculation.
+  // The category scores above still feed the MPC-7173 baseline unchanged.
+  const overallRisk = useMemo(
+    () => computePageRisk({ confirmed: confirmedCount, total: hexagons.length, hexagons, fingerprint }).percentage,
+    [confirmedCount, hexagons, fingerprint],
+  );
 
-  // Calculate uniqueness estimate
-  const uniquenessEstimate = useMemo(() => {
-    const totalDataPoints = confirmedCount;
-    // Rough estimate: each confirmed data point increases uniqueness
-    const uniqueness = Math.min(Math.pow(2, totalDataPoints / 4), 1000000);
-    return Math.round(uniqueness);
-  }, [confirmedCount]);
+  // MPC-7120 / MPC-7471-F1: this panel only renders once the scan has genuinely completed, so the one scan-complete dialog opens
+  // with it, with no timer. State lives here: closing it sets it false and nothing in this component opens it again.
+  const [showEmailModal, setShowEmailModal] = useState(true);
+
+  // CK-7799: the "uniqueness 1 in N" figure that used to be here was 2^(confirmed / 4), an invented number, and the fingerprint's
+  // "1 in X" came from a hard-coded entropy table. Neither is shown or exported any more.
 
   const getRiskColor = (risk: number) => {
-    if (risk >= 70) return 'text-foreground';
-    if (risk >= 40) return 'text-foreground';
+    if (risk >= 80) return 'text-foreground';
+    if (risk >= 50) return 'text-foreground';
     return 'text-risk-low';
   };
 
   const getRiskBgColor = (risk: number) => {
-    if (risk >= 70) return 'bg-risk-high';
-    if (risk >= 40) return 'bg-risk-mid';
+    if (risk >= 80) return 'bg-risk-high';
+    if (risk >= 50) return 'bg-risk-mid';
     return 'bg-risk-low';
   };
 
   const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return 'High Risk';
-    if (risk >= 40) return 'Medium Risk';
-    return 'Low Risk';
+    return getPageRiskLabel(risk, true);
   };
 
   const getSeverityColor = (severity: string) => {
@@ -366,7 +386,7 @@ export default function FinalSummaryPanel({
     }
   };
 
-  const handleExportPDF = async () => {
+  const exportPdf = async (signed: boolean) => {
     setIsExporting(true);
     
     try {
@@ -423,7 +443,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted); // Gray
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      pdf.text('Complete Privacy Analysis - 46 Data Points', margin, 28);
+      pdf.text(`Complete Privacy Analysis - ${HEXAGON_COUNT} Data Points`, margin, 28);
       pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 35);
       
       yPos = 55;
@@ -441,31 +461,31 @@ export default function FinalSummaryPanel({
       
       // Data Points
       pdf.setTextColor(...PDF.brand);
-      pdf.text('46', margin + colWidth * 0 + 10, statsY);
+      pdf.text(String(HEXAGON_COUNT), margin + colWidth * 0 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Data Points', margin + colWidth * 0 + 10, statsY + 8);
       
       // Risk Score
       pdf.setFontSize(18);
-      pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
+      pdf.setTextColor(...(overallRisk >= 80 ? PDF.riskHigh : overallRisk >= 50 ? PDF.riskMid : PDF.brand));
       pdf.text(String(overallRisk), margin + colWidth * 1 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Risk Score', margin + colWidth * 1 + 10, statsY + 8);
       
-      // Uniqueness
+      // Categories (a true count; this slot used to show an invented "uniqueness" figure)
       pdf.setFontSize(14);
       pdf.setTextColor(...PDF.purple);
-      pdf.text(`1:${uniquenessEstimate.toLocaleString()}`, margin + colWidth * 2 + 10, statsY);
+      pdf.text(String(HEXAGON_GROUP_COUNT), margin + colWidth * 2 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
-      pdf.text('Uniqueness', margin + colWidth * 2 + 10, statsY + 8);
+      pdf.text('Categories', margin + colWidth * 2 + 10, statsY + 8);
       
       // Exposure
       pdf.setFontSize(18);
       pdf.setTextColor(...PDF.cyan);
-      pdf.text(`${Math.round((confirmedCount / 46) * 100)}%`, margin + colWidth * 3 + 10, statsY);
+      pdf.text(`${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`, margin + colWidth * 3 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Exposure', margin + colWidth * 3 + 10, statsY + 8);
@@ -473,10 +493,10 @@ export default function FinalSummaryPanel({
       yPos += 45;
 
       // Risk Level Badge
-      pdf.setFillColor(...(overallRisk >= 70 ? PDF.riskHighSoft : overallRisk >= 40 ? PDF.riskMidSoft : PDF.brandSoft));
+      pdf.setFillColor(...(overallRisk >= 80 ? PDF.riskHighSoft : overallRisk >= 50 ? PDF.riskMidSoft : PDF.brandSoft));
       pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
       pdf.setFontSize(9);
-      pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
+      pdf.setTextColor(...(overallRisk >= 80 ? PDF.riskHigh : overallRisk >= 50 ? PDF.riskMid : PDF.brand));
       pdf.text(`${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
       
       yPos += 20;
@@ -529,7 +549,7 @@ export default function FinalSummaryPanel({
         }
       });
 
-      yPos = (pdf as any).lastAutoTable.finalY + 15;
+      yPos = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
 
       // Draw a simple bar chart for categories
       checkNewPage(60);
@@ -692,12 +712,25 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text('All 46 data points were analyzed in your browser. Nothing was transmitted to any server.', margin, yPos + 12);
+      pdf.text(`All ${HEXAGON_COUNT} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
       pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
 
-      // Save the PDF
-      pdf.save(`digital-shadow-report-${Date.now()}.pdf`);
+      // Save the PDF. A signed export saves the same bytes plus a detached signature over them (MPC-8281).
+      const stamp = Date.now();
+      if (signed) {
+        const bytes = new Uint8Array(pdf.output('arraybuffer'));
+        const signature = await requestPdfSignature(bytes);
+        downloadBlob(bytes, 'application/pdf', `digital-shadow-report-${stamp}.pdf`);
+        downloadBlob(JSON.stringify({ file: `digital-shadow-report-${stamp}.pdf`, signature }, null, 2), 'application/json', `digital-shadow-report-${stamp}.pdf.sig.json`);
+      } else {
+        pdf.save(`digital-shadow-report-${stamp}.pdf`);
+      }
     } catch (error) {
+      if (signed && error instanceof SignedReportError) {
+        setSignedMessage(signedReportMessage(error.code));
+        setIsExporting(false);
+        return;
+      }
       console.error('PDF export failed:', error);
       alert('Failed to generate PDF. Please try the JSON export instead.');
     }
@@ -705,24 +738,27 @@ export default function FinalSummaryPanel({
     setIsExporting(false);
   };
 
-  const handleExportJSON = () => {
+  const handleExportPDF = () => exportPdf(false);
+
+  const buildJsonReport = () => {
     const report = {
       generatedAt: new Date().toISOString(),
-      summary: {
-        totalDataPoints: 46,
+      summary: tilesOn
+        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, youToldUs: board.youToldUs, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
+        : {
+        totalDataPoints: HEXAGON_COUNT,
         confirmedDataPoints: confirmedCount,
         overallPrivacyRisk: overallRisk,
         riskLevel: getRiskLabel(overallRisk),
-        uniqueness: `1 in ${uniquenessEstimate.toLocaleString()} browsers`,
-        trackingExposure: `${Math.round((confirmedCount / 46) * 100)}%`,
+        trackingExposure: `${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`,
       },
       categories: categoryStats.map((cat) => ({
         name: cat.name,
         detectedItems: cat.total,
-        confirmedItems: cat.confirmed,
+        ...(tilesOn ? {} : { confirmedItems: cat.confirmed }),
         criticalIssues: cat.criticalIssues,
         warnings: cat.warnings,
-        accuracyRate: cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0,
+        ...(tilesOn ? { verifiedItems: cat.confirmed, notYetChecked: cat.total - cat.confirmed } : { accuracyRate: cat.total > 0 ? Math.round((cat.confirmed / cat.total) * 100) : 0 }),
       })),
       topConcerns: topConcerns.map(c => ({
         title: c.title,
@@ -740,7 +776,6 @@ export default function FinalSummaryPanel({
         : null,
       fingerprint: fingerprint
         ? {
-            uniqueness: fingerprint.uniqueness,
             riskLevel: fingerprint.totalRisk,
             compositeHash: fingerprint.compositeHash,
           }
@@ -753,26 +788,45 @@ export default function FinalSummaryPanel({
         confirmed: hex.confirmed,
         category: hex.category,
       })),
-      privacyNote: 'This report was generated locally in your browser. No data was sent to any server.',
+      privacyNote: 'This report was generated locally in your browser. We store your scan result only if you tick the save box with your email.',
     };
 
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `digital-shadow-report-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return report;
+  };
+
+  const handleExportJSON = () => {
+    downloadBlob(JSON.stringify(buildJsonReport(), null, 2), 'application/json', `digital-shadow-report-${Date.now()}.json`);
+  };
+
+  // MPC-8281: the server signs the report. The PDF goes with a detached signature; tile mode has no PDF, so it is JSON only.
+  const handleDownloadSigned = async () => {
+    setSignedMessage(null);
+    setIsExporting(true);
+    try {
+      const signed = await requestSignedJson(buildJsonReport());
+      downloadBlob(JSON.stringify(signed, null, 2), 'application/json', `digital-shadow-report-${Date.now()}.signed.json`);
+    } catch (error) {
+      setSignedMessage(signedReportMessage(error instanceof SignedReportError ? error.code : 'failed'));
+      setIsExporting(false);
+      return;
+    }
+    setIsExporting(false);
+    if (!tilesOn) await exportPdf(true);
   };
 
   const handleShare = () => {
-    const shareText = `🎯 My Complete Digital Shadow - Final Report
+    const shareText = tilesOn
+      ? `🎯 My Digital Shadow
 
-📊 46 data points analyzed
-🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / 46) * 100)}%)
+🔍 ${board.clear} ${SUMMARY_LABELS.clear} · ${board.needsFixing} ${SUMMARY_LABELS.fixing} · ${board.notChecked} ${SUMMARY_LABELS.notYet}
+
+Test yours at: ${window.location.origin}`
+      : `🎯 My Complete Digital Shadow - Final Report
+
+📊 ${HEXAGON_COUNT} data points analyzed
+🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%)
 Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
-🔍 Uniqueness: 1 in ${uniquenessEstimate.toLocaleString()} browsers
-${fingerprint ? `🔴 Fingerprint: ${fingerprint.uniqueness}` : ''}
+🔍 ${HEXAGON_GROUP_COUNT} categories looked at
 
 Test yours at: ${window.location.origin}`;
 
@@ -804,17 +858,29 @@ Test yours at: ${window.location.origin}`;
               </Badge>
             </CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
-              Complete analysis of 46 data points across 8 categories
+              {tilesOn
+                ? `${HEXAGON_COUNT} hexagons looked at across ${HEXAGON_GROUP_COUNT} categories`
+                : `Complete analysis of ${HEXAGON_COUNT} data points across ${HEXAGON_GROUP_COUNT} categories`}
             </p>
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-6 pt-6">
-        {/* Overall Statistics */}
+        {tilesOn ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="final-board-summary">
+            {([['clear', board.clear], ['fixing', board.needsFixing], ...(board.youToldUs > 0 ? [['toldUs', board.youToldUs] as const] : []), ['notYet', board.notChecked]] as const).map(([k, n]) => (
+              <div key={k} className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
+                <p className="text-2xl font-bold text-foreground">{n}</p>
+                <p className="text-xs text-muted-foreground">{SUMMARY_LABELS[k]}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-risk-low">46</p>
+            <p className="text-2xl font-bold text-risk-low">{HEXAGON_COUNT}</p>
             <p className="text-xs text-muted-foreground">Data Points</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
@@ -822,11 +888,11 @@ Test yours at: ${window.location.origin}`;
             <p className="text-xs text-muted-foreground">Risk Score</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-lg font-bold text-foreground">1:{uniquenessEstimate.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">Uniqueness</p>
+            <p className="text-lg font-bold text-foreground">{HEXAGON_GROUP_COUNT}</p>
+            <p className="text-xs text-muted-foreground">Categories</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / 46) * 100)}%</p>
+            <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%</p>
             <p className="text-xs text-muted-foreground">Exposure</p>
           </div>
         </div>
@@ -839,7 +905,7 @@ Test yours at: ${window.location.origin}`;
               <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
               <circle
                 cx="50" cy="50" r="40" fill="none"
-                stroke={overallRisk >= 70 ? 'hsl(var(--risk-high))' : overallRisk >= 40 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
+                stroke={overallRisk >= 80 ? 'hsl(var(--risk-high))' : overallRisk >= 50 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
                 strokeWidth="8" strokeLinecap="round"
                 strokeDasharray={`${overallRisk * 2.51} 251`}
                 className="transition-all duration-1000 ease-out"
@@ -853,10 +919,12 @@ Test yours at: ${window.location.origin}`;
             </div>
           </div>
           <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold mt-4 ${getRiskBgColor(overallRisk)}/20 ${getRiskColor(overallRisk)} border border-current/30`}>
-            {overallRisk >= 70 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+            {overallRisk >= 80 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
             {getRiskLabel(overallRisk)}
           </div>
         </div>
+          </>
+        )}
 
         {/* Category Breakdown */}
         <div className="space-y-3">
@@ -878,14 +946,18 @@ Test yours at: ${window.location.origin}`;
                             {cat.criticalIssues} high priority
                           </Badge>
                         )}
-                        <span className="text-xs text-muted-foreground">{cat.confirmed}/{cat.total}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {tilesOn ? `${cat.confirmed} ${SUMMARY_LABELS.clear} · ${cat.total - cat.confirmed} ${SUMMARY_LABELS.notYet}` : `${cat.confirmed}/${cat.total}`}
+                        </span>
                       </div>
                     </div>
-                    <Progress value={percentage} className="h-1.5 bg-risk-low-soft" />
+                    {!tilesOn && <Progress value={percentage} className="h-1.5 bg-risk-low-soft" />}
                   </div>
-                  <span className={`text-sm font-mono ${percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-foreground' : 'text-risk-low'}`}>
-                    {percentage}%
-                  </span>
+                  {!tilesOn && (
+                    <span className={`text-sm font-mono ${percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-foreground' : 'text-risk-low'}`}>
+                      {percentage}%
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -973,10 +1045,12 @@ Test yours at: ${window.location.origin}`;
 
         {/* Action Buttons */}
         <div className="grid grid-cols-3 gap-3">
+          {!tilesOn && (
           <Button variant="outline" onClick={handleExportPDF} disabled={isExporting} className="border-risk-low/30 text-foreground hover:bg-risk-low-soft">
             <FileText className="w-4 h-4 mr-2" />
             {isExporting ? 'Generating...' : 'Export PDF'}
           </Button>
+          )}
           <Button variant="outline" onClick={handleExportJSON} className="border-brand/30 text-foreground hover:bg-muted">
             <FileJson className="w-4 h-4 mr-2" />
             Export JSON
@@ -986,6 +1060,15 @@ Test yours at: ${window.location.origin}`;
             Share
           </Button>
         </div>
+        {showSigned && (
+          <div className="space-y-2">
+            <Button variant="default" onClick={handleDownloadSigned} disabled={isExporting} data-testid="download-signed-report" className="w-full">
+              <Shield className="w-4 h-4 mr-2" />
+              {isExporting ? 'Signing...' : 'Download signed report'}
+            </Button>
+            {signedMessage && <p role="alert" data-testid="signed-report-message" className="text-sm text-muted-foreground">{signedMessage}</p>}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <Button variant="default" onClick={onStartOver} className="flex-1 bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white">
@@ -1002,7 +1085,11 @@ Test yours at: ${window.location.origin}`;
         <div className="flex items-center gap-3 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
           <span className="text-xl">🔒</span>
           <p className="text-xs text-risk-low">
-            <strong>100% Local:</strong> All 46 data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide.
+            {tilesOn ? (
+              <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
+            ) : (
+              <><strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
+            )}
           </p>
         </div>
       </CardContent>

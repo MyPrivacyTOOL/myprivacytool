@@ -85,3 +85,47 @@ Method: static review of the repo and the Cloudflare account. I could not query 
 - Pre-consent IP/location lookups (ipify, ipapi.co) are now disclosed in the Cookie Policy and Privacy 2.2. They are still made before consent; Decision (Chris, 2026-10-07): they do NOT wait for consent; disclosure only. Do not gate them without asking.
 - HubSpot: the site never loads the HubSpot tracking script (no `hs-scripts` in `index.html` or `src/`); it only POSTs forms to `api.hsforms.com` on submit and reads `hubspotutk` if present. If a `hubspotutk` cookie exists it must come from the Consentmanager tag configuration; the Cookie Policy wording should be checked against that dashboard.
 - GA4 consent gating is still unverified in a browser (needs the Network screenshot of the first requests on a fresh load).
+
+## Status update 2026-10-10
+
+Done in this change
+- Homepage trust strip: a link-only row (Trust Centre, Privacy, Cookies, Terms, DPA) above the newsletter block in `src/pages/Index.tsx`. It makes no claims beyond what `/trust` and `/privacy` already say.
+
+Still open (needs a person, not code)
+| Item | Owner | What is needed |
+|---|---|---|
+| Legal review (MPC-6798) | Chris / counsel | Done: signed off 2026-10-10. |
+| `/pricing` | Chris | Decide: ship real pricing, or keep the noindex `ComingSoonPage` stub. Nothing is built because no pricing has been decided. |
+| GA4 consent gating | Anyone with a browser | Not a blocker; moved to a follow-up task. See checklist below. The cloud sandbox cannot reach myprivacytool.io (proxy 403), so this could not be tested here. |
+| Mailboxes | Chris | Not a blocker; moved to the same follow-up task. Confirm each address below receives mail. |
+
+GA4 consent-gating check (about 5 minutes, clean/incognito browser, DevTools Network tab, filter `google|gtm|collect`)
+1. Load `https://www.myprivacytool.io/` and do not touch the banner: no request to `googletagmanager.com/gtag/js` or `google-analytics.com/g/collect` may fire.
+2. Choose "Reject": still none.
+3. Reopen via footer "Manage cookies", accept analytics: requests now fire.
+4. Reject again after accepting: no further `collect` requests.
+Known separate gap (security audit finding): `fingerprintDetection.ts` pings `google-analytics.com`, and `deviceDetection.ts` calls ipify/ipapi, without a consent gate.
+
+Mailboxes to confirm (all appear in the site): `privacy@` (20 references), `support@`, `dpo@`, `legal@`, `accessibility@`, `scan@`, `chris@` at `myprivacytool.io`. Send a test to each and note where it lands.
+
+### Follow-up task progress (GA4 gating + mailboxes)
+
+Follow-up to MPC-6545 (not a blocker). Two human checks remain; neither can run from the cloud sandbox (myprivacytool.io returns proxy 403).
+
+| Check | Status | Result / where it lands |
+|---|---|---|
+| GA4 consent gating | Mostly verified 2026-10-11 (merged in #197) | Fresh incognito load, banner untouched: 9 requests only (consentmanager, favicons, local script, font, video); no `googletagmanager.com`, `google-analytics.com` or `hsforms` requests; console clean. After "Accept all": `googletagmanager` (gtag), `collect?v=2&tid=G-1BWMDBJSPL` and the HubSpot form frame (`hsforms`) load. Reject-all and accept-then-reject are covered by an automated test of the real inline script against a fake consentmanager (`scripts/index-consent-gate.test.mjs`, 2026-10-12: no gtag request on Reject, hits disabled after withdrawing consent, one script load only, fails closed). Not covered by a live browser test: the real consentmanager Reject payload (only the Accept path was seen live). Note: this gate applies to all regions; TID-7234 records the decision to target consent by region, deferred until legal review MPC-6798. |
+| privacy@myprivacytool.io | Confirmed 2026-10-11 (most referenced address, 20 places) | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:03). A Cloudflare "Missing email" notice also arrived there: it is the standard same-account dedupe notice, not a fault. |
+| support@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| dpo@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| legal@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| accessibility@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| scan@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| chris@myprivacytool.io | Confirmed 2026-10-11 | Forwards to cransford@gmail.com (mail from testingnt7@gmail.com arrived in that Inbox). |
+
+Notes:
+- Mailbox check run 2026-10-10/11. Test mails (subject "MPC mailbox test: <name>@ (2026-10-10)") were sent with testingnt7@gmail.com on CC. Check Cloudflare Email Routing for the myprivacytool.io zone for the rule and destination of each address.
+- `index.html` loads gtag.js directly with no Consent Mode default, so the Consentmanager autoblocking script is the only gate. If the browser test shows early requests, add `gtag('consent','default',{ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500})` before `gtag('js', ...)` and grant via a Consentmanager consent callback (or its built-in Google Consent Mode setting). Not applied: an unverified change could silence analytics after consent.
+- ipify/ipapi pre-consent calls remain disclosure-only (Chris, 2026-10-07).
+- 2026-10-10 evidence so far (incognito, narrow responsive viewport, Keep log on, no clean first-load capture): GA4 `a?id=G-1BWMDBJSPL` and `collect?v=2` requests exist in the log (timing vs consent unknown), and the HubSpot forms embed (`src/pages/Index.tsx`) loads and pings (`ipl`, `tracking`, `rhumb`) with no consent check. Note: the DevTools Network filter treats `|` literally; use `/google|gtm|collect/` for a regex. Superseded by the 2026-10-11 result in the table above.
+- Code change (#197, merged): gtag.js (`index.html`) and the HubSpot embed script load only after consentmanager reports consent (`hasConsent` / `onConsentChange` in `src/lib/cookieConsent.ts`); withdrawing consent sets `ga-disable-G-1BWMDBJSPL`. Confirmed in a browser that Accept turns both on, so the `__cmp('getCMPData')` assumption held. Side effect: the home-page newsletter form stays blank until consent is given.

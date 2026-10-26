@@ -34,6 +34,22 @@ describe("X webhook", () => {
   });
 });
 
+describe("core-brain rate limit (MPC-7257)", () => {
+  const limited = () => ({ fetch: vi.fn(async () => Response.json({ error: { code: "rate_limited" } }, { status: 429 })) });
+  it("acknowledges X when core-brain throttles the sender, so X does not retry", async () => {
+    const body = "{}";
+    const r = await call("/webhook/x", { method: "POST", body, headers: { "X-Twitter-Webhooks-Signature": sig("xs", body) } }, env(limited()));
+    expect(r.status).toBe(200);
+  });
+  it("acknowledges Telegram when core-brain throttles the sender, and sends no reply", async () => {
+    const b = limited(); const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const r = await call("/webhook/telegram", { method: "POST", body: '{"update_id":1}', headers: { "X-Telegram-Bot-Api-Secret-Token": "tg" } }, { ...env(b), TELEGRAM_BOT_TOKEN: "123:abc" });
+    expect(r.status).toBe(200);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+});
+
 describe("Telegram webhook", () => {
   const h = (s: string) => ({ "X-Telegram-Bot-Api-Secret-Token": s });
   it("requires the secret token and fails closed when unset", async () => {
@@ -62,5 +78,34 @@ describe("core-brain auth (MPC-8601)", () => {
     const b2 = brain();
     await call("/webhook/telegram", { method: "POST", body: '{"update_id":1}', headers: h }, env(b2));
     expect((b2.fetch.mock.calls[0][0] as Request).headers.get("authorization")).toBeNull();
+  });
+});
+
+describe("LinkedIn webhook (MPC-7640)", () => {
+  const li = (secret: string, body: string) => "hmacsha256=" + createHmac("sha256", secret).update(body).digest("hex");
+  const lenv = (b = brain()) => ({ LINKEDIN_CLIENT_SECRET: "ls", CORE_BRAIN: b });
+  const post = (body: string, headers: Record<string, string>, e: object) => call("/webhook/linkedin", { method: "POST", body, headers }, e);
+
+  it("answers the challenge with a hex HMAC and fails closed without a secret", async () => {
+    const r = await call("/webhook/linkedin?challengeCode=abc", {}, lenv());
+    expect(await r.json()).toEqual({ challengeCode: "abc", challengeResponse: createHmac("sha256", "ls").update("abc").digest("hex") });
+    expect((await call("/webhook/linkedin?challengeCode=abc", {}, {})).status).toBe(400);
+  });
+  it("rejects missing/bad signature and unset secret, without forwarding", async () => {
+    const b = brain(); const body = '{"events":[]}';
+    expect((await post(body, {}, lenv(b))).status).toBe(401);
+    expect((await post(body, { "X-LI-Signature": li("bad", body) }, lenv(b))).status).toBe(401);
+    expect((await post(body, { "X-LI-Signature": li("ls", body) }, { CORE_BRAIN: b })).status).toBe(401);
+    expect(b.fetch).not.toHaveBeenCalled();
+  });
+  it("forwards a verified payload untouched as source linkedin", async () => {
+    const b = brain(); const body = '{"events":[{"from":"u","message":{"text":"hi"}}]}';
+    expect((await post(body, { "X-LI-Signature": li("ls", body) }, lenv(b))).status).toBe(200);
+    expect(await (b.fetch.mock.calls[0][0] as Request).json()).toMatchObject({ source: "linkedin", payload: { events: [{ from: "u" }] } });
+  });
+  it("returns 502 when core-brain fails so LinkedIn retries, 400 on malformed JSON", async () => {
+    const b = { fetch: vi.fn(async () => new Response("no", { status: 500 })) };
+    expect((await post("{}", { "X-LI-Signature": li("ls", "{}") }, lenv(b))).status).toBe(502);
+    expect((await post("nope", { "X-LI-Signature": li("ls", "nope") }, lenv())).status).toBe(400);
   });
 });

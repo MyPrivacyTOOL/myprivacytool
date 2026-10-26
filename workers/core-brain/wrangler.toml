@@ -28,3 +28,21 @@ QWEN_MODEL = "qwen-plus"
 
 [observability]
 enabled = true
+
+# MPC-7257: rate limits (Workers Rate Limiting binding; no KV). Per sender: 10 requests / 60s, so the 11th inside a
+# minute gets 429. The global one is a cost backstop for the Qwen call; tune it from real traffic. Both fail open if the
+# binding is missing. namespace_id values are account-unique integers (mpt-leads 7350, scan-report 7351).
+# Syntax note: the deploy action installs wrangler 3.90.0, which IGNORES the newer [[ratelimits]] table (it only warns
+# 'Unexpected fields found in top-level field: "ratelimits"'), so the Worker went live with no limiter. Declare the binding
+# as [[unsafe.bindings]] type = "ratelimit", exactly like workers/mpt-leads/wrangler.toml.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "8601"
+simple = { limit = 10, period = 60 }
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER_GLOBAL"
+type = "ratelimit"
+namespace_id = "8602"
+simple = { limit = 300, period = 60 }

@@ -1,0 +1,15 @@
+# Cloudflare Pages redirects (https://developers.cloudflare.com/pages/configuration/redirects/).
+#
+# /wa is the one stable WhatsApp entry point: the QR codes and the "WhatsApp" button on /start all point here, so the
+# business number lives in this single line. On a phone, wa.me opens the WhatsApp app (or a "Continue to chat" page).
+#
+# Until the number is linked this sends people to /start. To go live, replace the target with the chat link, digits only,
+# international format, e.g.:
+#   /wa  https://wa.me/85212345678?text=hi  302
+/wa  /start  302
+
+# Short links used in the X bot's DMs (MPC-7628), so a message shows a clean link instead of a long utm URL.
+#   /x       is the static page public/x.html: it carries the link-preview tags (title, description, image) that X shows under the link
+#            and sends the visitor on to /scan with the same utm tracking the long link had.
+#   /follow  opens X's own one-tap follow page for @MyPrivacyTOOL.
+/follow  https://x.com/intent/follow?screen_name=MyPrivacyTOOL  302

@@ -63,6 +63,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Secret scan (blocking; prints file:line and pattern name only, never the value)
+        run: npm run scan:secrets
       - name: Typecheck
         run: npx tsc -p tsconfig.app.json --noEmit
       - name: Lint test code (blocking)
@@ -122,6 +124,25 @@ jobs:
           path: dist
           retention-days: 3
 
+  pages-functions:
+    name: Pages Functions build (wrangler)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Bundle functions/ the way Cloudflare Pages does
+        # The site build (job `build`) never touches functions/. Cloudflare Pages bundles it on every deploy, and
+        # one unresolvable import (for example a Node built-in such as "crypto" without nodejs_compat) fails the
+        # whole Pages build, so no website deploy goes out until it is fixed. Offline: no credentials needed.
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npx wrangler pages functions build functions --outdir "$RUNNER_TEMP/pages-functions"
+
   e2e:
     name: E2E (Playwright, desktop + mobile)
     needs: build
@@ -142,6 +163,13 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run E2E against the production build
         run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: enterprise-screenshots
+          path: e2e-screenshots
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -165,12 +193,12 @@ jobs:
       - run: npx vitest run scripts
       - name: Worker configs are deployable (no placeholders, valid secret-name lists)
         run: |
-          node scripts/ci/check-env.mjs --worker workers/mpt-leads --worker workers/oauth-poc --worker workers/scan-report --worker workers/telegram-webhook
+          node scripts/ci/check-env.mjs --worker workers/mpt-leads --worker workers/oauth-poc --worker workers/scan-report --worker workers/mirror-risk --worker workers/partner-api
 
   ci-gate:
     name: CI gate
     if: always()
-    needs: [unit, lint, db, build, e2e, pipeline-guards]
+    needs: [unit, lint, db, build, pages-functions, e2e, pipeline-guards]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded

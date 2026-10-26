@@ -51,7 +51,7 @@
     "author": "MyPrivacyTOOL",
     "category": "Privacy Awareness",
     "readTime": 8,
-    "image": "/blog/exposure-guide.jpg"
+    "image": "/blog/exposure-guide-v2.jpg"
   },
   {
     "slug": "25-years-mass-surveillance",
@@ -70,7 +70,7 @@
     "author": "MyPrivacyTOOL",
     "category": "Social Media",
     "readTime": 6,
-    "image": "/blog/linkedin-privacy.jpg"
+    "image": "/blog/linkedin-privacy-v2.jpg"
   },
   {
     "slug": "ai-training-data-opt-out",
@@ -80,6 +80,6 @@
     "author": "MyPrivacyTOOL",
     "category": "AI & Emerging Threats",
     "readTime": 7,
-    "image": "/blog/ai-training-data.jpg"
+    "image": "/blog/ai-training-data-v2.jpg"
   }
 ]

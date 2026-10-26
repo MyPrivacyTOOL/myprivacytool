@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Shield, Eye, MapPin, Phone, Mail, Globe, Database, ArrowRight, Check, X, MessageCircle, Send, MessageSquare, Instagram } from "lucide-react";
+import { Shield, Eye, MapPin, Mail, Globe, ArrowRight, Check, X, MessageCircle, Send, MessageSquare, Instagram } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
@@ -23,13 +23,12 @@ const FORM_ID =
   import.meta.env.VITE_HUBSPOT_START_FORM_ID || "22ee30ae-6cf9-419b-aa46-b656b0e7b1bf";
 const SOURCE_TAG = "start-scan";
 
+// What the scan looks at. These describe the categories only; /start runs no scan and shows no findings.
 const hexagonData = [
-  { icon: Eye, label: "Name", value: "Detected from your profile", color: "hsl(var(--brand-green))" },
-  { icon: MapPin, label: "Location", value: "City & country visible", color: "hsl(var(--brand-green-hover))" },
-  { icon: Phone, label: "Phone", value: "Checking public records...", color: "hsl(var(--brand-green))" },
-  { icon: Mail, label: "Email", value: "Associated addresses found", color: "hsl(var(--brand-green-hover))" },
-  { icon: Globe, label: "Social Profiles", value: "Multiple platforms linked", color: "hsl(var(--brand-green))" },
-  { icon: Database, label: "Data Broker Exposure", value: "Estimated 40+ sites", color: "hsl(var(--brand-green-hover))" },
+  { icon: Eye, label: "Device & browser", value: "What your browser tells every site", color: "hsl(var(--brand-green))" },
+  { icon: MapPin, label: "Location", value: "Your city and country, from your network", color: "hsl(var(--brand-green-hover))" },
+  { icon: Globe, label: "Network", value: "Your IP address and connection", color: "hsl(var(--brand-green))" },
+  { icon: Mail, label: "Email", value: "What an email address can reveal", color: "hsl(var(--brand-green-hover))" },
 ];
 
 // MPC-7400 A/B test: submit-button copy. The first entry is the control and matches the pre-test copy.
@@ -39,7 +38,7 @@ const CTA_LABEL: Record<string, string> = {
 };
 
 const channels = [
-  { name: "WhatsApp", Icon: MessageCircle, url: "https://wa.me/YOUR_WHATSAPP_NUMBER?text=scan+me" },
+  { name: "WhatsApp", Icon: MessageCircle, url: "/wa" },
   { name: "Telegram", Icon: Send, url: "https://t.me/MyPrivacyToolBot?start=scan" },
   { name: "Messenger", Icon: MessageSquare, url: "https://m.me/myprivacytool" },
   { name: "Instagram", Icon: Instagram, url: "https://ig.me/m/myprivacytool" },
@@ -120,13 +119,13 @@ export default function Start() {
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Intro */}
         <div className="mb-10">
-          <p className="text-muted-foreground text-xs tracking-widest uppercase mb-3">What we know about you right now</p>
+          <p className="text-muted-foreground text-xs tracking-widest uppercase mb-3">A free check of your digital footprint</p>
           <h1 className="text-3xl font-bold text-foreground mb-4 leading-tight">
             Your data is everywhere.<br />
             <span className="text-brand">See where. Take it back.</span>
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Based on publicly available data and data broker records, here is what anyone can find about you today, so you can see your footprint and take control of it.
+            A free check of what your browser tells websites about you, plus what your email address reveals. No data broker search is included yet.
           </p>
         </div>
 
@@ -151,9 +150,9 @@ export default function Start() {
         {/* Confirmation prompt */}
         {confirmed === null && (
           <div className="bg-card border border-border rounded-xl p-6 mb-8">
-            <p className="text-foreground text-sm mb-2 font-semibold">Is this data about you?</p>
+            <p className="text-foreground text-sm mb-2 font-semibold">Want your free privacy report?</p>
             <p className="text-muted-foreground text-xs mb-6">
-              Confirm, then join the list and we'll email you when your free privacy report is ready.
+              Join the list and we'll email you when your free privacy report is ready.
             </p>
             <div className="flex gap-3">
               <button
@@ -161,14 +160,14 @@ export default function Start() {
                 className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 <Check size={16} />
-                Yes, that's me
+                Join the list
               </button>
               <button
                 onClick={() => handleConfirm(false)}
                 className="flex-1 flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground text-sm font-bold py-3 px-6 rounded-lg transition-colors"
               >
                 <X size={16} />
-                Not me
+                Not now
               </button>
             </div>
           </div>
@@ -246,9 +245,9 @@ export default function Start() {
         {/* N — not me */}
         {confirmed === false && (
           <div className="bg-card border border-border rounded-xl p-6 mb-8 animate-fade-in">
-            <p className="text-foreground font-semibold mb-1">Let's find the right profile.</p>
+            <p className="text-foreground font-semibold mb-1">No problem.</p>
             <p className="text-muted-foreground text-xs mb-4">
-              No problem — enter your name and we'll run a fresh scan specifically for you.
+              You can run the free scan yourself any time.
             </p>
             <a
               href="/scan"

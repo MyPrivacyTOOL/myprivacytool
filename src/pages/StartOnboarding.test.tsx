@@ -32,7 +32,7 @@ const renderStart = (url = "/start") =>
     </MemoryRouter>,
   );
 
-const openForm = () => fireEvent.click(screen.getByRole("button", { name: /yes, that's me/i }));
+const openForm = () => fireEvent.click(screen.getByRole("button", { name: /join the list/i }));
 
 describe("/start onboarding form", () => {
   beforeEach(() => {
