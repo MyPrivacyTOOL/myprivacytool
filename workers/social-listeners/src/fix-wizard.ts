@@ -122,7 +122,19 @@ const OUTCOME_TEXT: Record<Outcome, string> = {
   partial: "Only part of the check worked, so I cannot compare this item. Nothing was scored.",
 };
 
-async function runRecheck(env: Env, base: BaselineRow, senderId: string, from: unknown, updateId: number): Promise<{ r: Recheck; saved: boolean; duplicate: boolean; rateLimited: boolean; snapshotId: string | null }> {
+type Run = { r: Recheck; saved: boolean; duplicate: boolean; rateLimited: boolean; snapshotId: string | null; consent?: "withdrawn" | "unknown" };
+const NO_RUN = { r: { completeness: "failed", hexagons: [], notes: [] } as Recheck, saved: false, duplicate: false, rateLimited: false, snapshotId: null };
+
+/** core-brain's stored consent state for this sender (conversation_states). Only "confirmed" allows a re-check; any other state, or a failed lookup, stops it before any Telegram call. */
+async function consentState(env: Env, senderId: string): Promise<"confirmed" | "withdrawn" | "unknown"> {
+  const r = await rest(env, "GET", `conversation_states?channel=eq.telegram&sender_id=eq.${senderId}&order=updated_at.desc&limit=1&select=state`);
+  if (!r.ok) return "unknown";
+  return r.rows[0] ? (r.rows[0].state === "confirmed" ? "confirmed" : "withdrawn") : "withdrawn";
+}
+
+async function runRecheck(env: Env, base: BaselineRow, senderId: string, from: unknown, updateId: number): Promise<Run> {
+  const consent = await consentState(env, senderId);
+  if (consent !== "confirmed") return { ...NO_RUN, consent };
   const since = encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString());
   const recent = await rest(env, "GET", `profile_snapshots?sender_id=eq.${senderId}&scan_version=eq.${RECHECK_VERSION}&created_at=gte.${since}&select=id`);
   if (recent.ok && recent.rows.length >= MAX_RECHECKS_PER_HOUR) return { r: { completeness: "failed", hexagons: [], notes: ["rate limited"] }, saved: false, duplicate: false, rateLimited: true, snapshotId: null };
@@ -166,6 +178,10 @@ async function send(env: Env, chatId: string, messageId: number | null, v: View)
 }
 
 const plain = (text: string): View => ({ text: text + "\n\n" + HELP_LINE });
+const CONSENT_TEXT = {
+  withdrawn: "I can only re-check while your consent to the scan is confirmed, and it is not confirmed now. Nothing was looked up.",
+  unknown: "I could not confirm your consent just now, so I looked nothing up. Try again later.",
+};
 const NO_BASELINE = plain("I have no current scan to work from (none yet, or it has expired or been deleted). Run the scan first, then send /fix.");
 const STORAGE_ERROR = plain("I could not load your saved scan just now, so nothing was changed. Try again later.");
 const STALE = plain("That list is out of date. Send /fix for a fresh one.");
@@ -220,6 +236,7 @@ async function fixed(env: Env, base: BaselineRow, senderId: string, from: unknow
   if (g.kind === "self") return { text: `${g.label}: recorded as SELF-CONFIRMED. I cannot check this setting, so it is not verified and it does not change any score.\n\n${HELP_LINE}`, keyboard: back };
   if (!g.hexagon) return STALE;
   const run = await runRecheck(env, base, senderId, from, updateId);
+  if (run.consent) return { text: `${g.label}: your 'I fixed it' is recorded as SELF-CONFIRMED, but I did not re-check. ${CONSENT_TEXT[run.consent]}\n\n${HELP_LINE}`, keyboard: back };
   if (run.rateLimited) return { text: "You have asked for several re-checks in the last hour. Your 'I fixed it' is recorded as SELF-CONFIRMED; try the re-check again later.\n\n" + HELP_LINE, keyboard: back };
   if (run.duplicate) return { text: `${g.label}: this request was already processed.\n\n${HELP_LINE}`, keyboard: back };
   const outcome = issueOutcome(base, run.r, g.hexagon);
@@ -231,6 +248,7 @@ async function fixed(env: Env, base: BaselineRow, senderId: string, from: unknow
 async function rescan(env: Env, base: BaselineRow, senderId: string, update: unknown, items: Map<string, Item>, log: Logger): Promise<View> {
   const q = (update as { update_id: number; callback_query: { from: unknown } });
   const run = await runRecheck(env, base, senderId, q.callback_query.from, q.update_id);
+  if (run.consent) return plain("I did not re-check. " + CONSENT_TEXT[run.consent]);
   if (run.rateLimited) return plain("You have asked for several re-checks in the last hour. Please try again later.");
   if (run.duplicate) return plain("That request was already processed. Send /fix to continue.");
   log.info("fix_wizard_rescan", { completeness: run.r.completeness, saved: run.saved, comparable: comparable(base) });

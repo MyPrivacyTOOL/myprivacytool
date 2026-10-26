@@ -22,7 +22,7 @@ const PHOTOS = { total_count: 1, photos: [[{ file_unique_id: "u1", width: 1, hei
 const baselineHexagons = () => hexagonStates({ update_id: 1, message: { from: fromUser, date: 1, text: "Y" } }, BASE_CHAT, PHOTOS.photos);
 const baselineRow = (over: Record<string, unknown> = {}) => ({ id: BASE_ID, created_at: "2026-10-26T14:24:10Z", scan_version: SCAN_VERSION, risk_version: RISK_VERSION, report: { channel: "TG", hexagons: baselineHexagons() }, ...over });
 
-interface Opts { baseline?: any | null; items?: any[]; chat?: any; chatStatus?: number; photos?: any; photosStatus?: number; sbFail?: boolean; recentRechecks?: number; dupe?: boolean; editFails?: boolean }
+interface Opts { baseline?: any | null; items?: any[]; chat?: any; chatStatus?: number; photos?: any; photosStatus?: number; sbFail?: boolean; recentRechecks?: number; dupe?: boolean; editFails?: boolean; consent?: string | null; consentFail?: boolean }
 function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
   const calls: { url: string; method: string; body: any }[] = [];
   const logs: string[] = [];
@@ -40,6 +40,7 @@ function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
       if (url.endsWith("/editMessageText") && o.editFails) return Response.json({ ok: false }, { status: 400 });
       return Response.json({ ok: true, result: {} });
     }
+    if (url.includes("/rest/v1/conversation_states")) return o.consentFail ? new Response("", { status: 500 }) : Response.json(o.consent === null ? [] : [{ state: o.consent ?? "confirmed" }]);
     if (o.sbFail) return new Response("", { status: 500 });
     if (url.includes("/rest/v1/profile_snapshots")) {
       if (method === "GET") {
@@ -239,6 +240,29 @@ describe("re-check: honest outcomes", () => {
     expect(r.calls.some((c) => c.url.endsWith("/getChat"))).toBe(false);
     expect(r.shown()).toMatch(/SELF-CONFIRMED/);
     expect(r.items.find((i) => i.issue_id === "bi").recheck_outcome).toBeUndefined();
+  });
+});
+
+describe("consent at re-check time", () => {
+  for (const [name, o, text] of [["declined", { consent: "declined" }, /not confirmed now/], ["no state row", { consent: null }, /not confirmed now/], ["lookup failure", { consentFail: true }, /could not confirm your consent/]] as const) {
+    it(`does not look anything up when consent is ${name}, and keeps the self-report separate`, async () => {
+      const t = setup({}, o as any);
+      await t.post(cb(`fw|${B8}|f|bi`, 120));
+      expect(t.calls.some((c) => c.url.endsWith("/getChat") || c.url.endsWith("/getUserProfilePhotos"))).toBe(false);
+      expect(t.stored).toHaveLength(0);
+      expect(t.shown()).toMatch(text);
+      expect(t.items.find((i) => i.issue_id === "bi")).toMatchObject({ intention: "change" });
+      expect(t.items.find((i) => i.issue_id === "bi").recheck_outcome).toBeUndefined();
+      const s = setup({}, o as any);
+      await s.post(cb(`fw|${B8}|r`, 121));
+      expect(s.calls.some((c) => c.url.endsWith("/getChat"))).toBe(false);
+      expect(s.shown()).toMatch(/did not re-check/);
+    });
+  }
+  it("self-confirmed-only items never need the consent lookup", async () => {
+    const t = setup({}, { consent: "declined" });
+    await t.post(cb(`fw|${B8}|f|pn`, 122));
+    expect(t.shown()).toMatch(/recorded as SELF-CONFIRMED/);
   });
 });
 
