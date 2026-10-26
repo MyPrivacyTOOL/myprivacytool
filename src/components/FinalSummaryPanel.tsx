@@ -16,6 +16,8 @@ import EmailCaptureModal from '@/components/EmailCaptureModal';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
 import { SUMMARY_LABELS } from '@/lib/scanCopy';
+import { signedReportEnabled } from '@/config/signedReport';
+import { requestSignedJson, requestPdfSignature, downloadBlob, signedReportMessage, SignedReportError } from '@/lib/signedReport';
 
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
@@ -25,6 +27,8 @@ interface FinalSummaryPanelProps {
   fingerprint?: CompositeFingerprint | null;
   languagePrediction?: LanguagePrediction | null;
   onStartOver?: () => void;
+  /** Level 2 (proof of possession, MPC-7902) passed. The signed download stays hidden until this is true; the server checks it again. */
+  level2Complete?: boolean;
 }
 
 interface CategoryStats {
@@ -54,8 +58,11 @@ export default function FinalSummaryPanel({
   fingerprint,
   languagePrediction,
   onStartOver,
+  level2Complete = false,
 }: FinalSummaryPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [signedMessage, setSignedMessage] = useState<string | null>(null);
+  const showSigned = signedReportEnabled() && level2Complete;
   const tilesOn = !!tiles;
   // Tile mode: a hexagon counts as "confirmed" only if a check verified it. A tap means "seen" and says nothing about the value, so
   // concerns, positives and category counts below no longer follow taps or the raw values of tiles that could not be checked.
@@ -376,7 +383,7 @@ export default function FinalSummaryPanel({
     }
   };
 
-  const handleExportPDF = async () => {
+  const exportPdf = async (signed: boolean) => {
     setIsExporting(true);
     
     try {
@@ -705,9 +712,22 @@ export default function FinalSummaryPanel({
       pdf.text(`All ${HEXAGON_COUNT} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
       pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
 
-      // Save the PDF
-      pdf.save(`digital-shadow-report-${Date.now()}.pdf`);
+      // Save the PDF. A signed export saves the same bytes plus a detached signature over them (MPC-8281).
+      const stamp = Date.now();
+      if (signed) {
+        const bytes = new Uint8Array(pdf.output('arraybuffer'));
+        const signature = await requestPdfSignature(bytes);
+        downloadBlob(bytes, 'application/pdf', `digital-shadow-report-${stamp}.pdf`);
+        downloadBlob(JSON.stringify({ file: `digital-shadow-report-${stamp}.pdf`, signature }, null, 2), 'application/json', `digital-shadow-report-${stamp}.pdf.sig.json`);
+      } else {
+        pdf.save(`digital-shadow-report-${stamp}.pdf`);
+      }
     } catch (error) {
+      if (signed && error instanceof SignedReportError) {
+        setSignedMessage(signedReportMessage(error.code));
+        setIsExporting(false);
+        return;
+      }
       console.error('PDF export failed:', error);
       alert('Failed to generate PDF. Please try the JSON export instead.');
     }
@@ -715,7 +735,9 @@ export default function FinalSummaryPanel({
     setIsExporting(false);
   };
 
-  const handleExportJSON = () => {
+  const handleExportPDF = () => exportPdf(false);
+
+  const buildJsonReport = () => {
     const report = {
       generatedAt: new Date().toISOString(),
       summary: tilesOn
@@ -766,13 +788,27 @@ export default function FinalSummaryPanel({
       privacyNote: 'This report was generated locally in your browser. We store your scan result only if you tick the save box with your email.',
     };
 
-    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `digital-shadow-report-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return report;
+  };
+
+  const handleExportJSON = () => {
+    downloadBlob(JSON.stringify(buildJsonReport(), null, 2), 'application/json', `digital-shadow-report-${Date.now()}.json`);
+  };
+
+  // MPC-8281: the server signs the report. The PDF goes with a detached signature; tile mode has no PDF, so it is JSON only.
+  const handleDownloadSigned = async () => {
+    setSignedMessage(null);
+    setIsExporting(true);
+    try {
+      const signed = await requestSignedJson(buildJsonReport());
+      downloadBlob(JSON.stringify(signed, null, 2), 'application/json', `digital-shadow-report-${Date.now()}.signed.json`);
+    } catch (error) {
+      setSignedMessage(signedReportMessage(error instanceof SignedReportError ? error.code : 'failed'));
+      setIsExporting(false);
+      return;
+    }
+    setIsExporting(false);
+    if (!tilesOn) await exportPdf(true);
   };
 
   const handleShare = () => {
@@ -1021,6 +1057,15 @@ Test yours at: ${window.location.origin}`;
             Share
           </Button>
         </div>
+        {showSigned && (
+          <div className="space-y-2">
+            <Button variant="default" onClick={handleDownloadSigned} disabled={isExporting} data-testid="download-signed-report" className="w-full">
+              <Shield className="w-4 h-4 mr-2" />
+              {isExporting ? 'Signing...' : 'Download signed report'}
+            </Button>
+            {signedMessage && <p role="alert" data-testid="signed-report-message" className="text-sm text-muted-foreground">{signedMessage}</p>}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <Button variant="default" onClick={onStartOver} className="flex-1 bg-primary text-primary-foreground hover:bg-primary-hover hover:text-brand-white">
