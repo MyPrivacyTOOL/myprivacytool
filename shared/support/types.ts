@@ -119,7 +119,8 @@ export interface ModelRequest { system: string; caseText: string; knowledge: { i
 export interface ModelResponse { text: string; toolCalls?: { tool: string; args: Record<string, unknown> }[] }
 export interface Model { complete(req: ModelRequest): Promise<ModelResponse> }
 
-export interface Notifier { send(caseRef: string, channel: Channel, text: string, threadKey?: string): Promise<{ providerMessageId: string }> }
+/** Throw on any failed or unconfirmed send: the service records the reply as undelivered. `to` is the address/handle that sent the inbound message, never one found in message text. */
+export interface Notifier { send(caseRef: string, channel: Channel, text: string, threadKey?: string, to?: string): Promise<{ providerMessageId: string }> }
 
 export interface Verifier {
   /** Resolve a proof (session token, one-time code check done out of band) to an Identity. Unknown proof => anonymous. */

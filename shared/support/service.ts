@@ -91,7 +91,7 @@ export async function handleInbound(d: SupportDeps, ev: InboundEvent, proof?: st
   const msg = await d.store.addOutbound(c.id, text, "ai", at());
   let delivered = false;
   try {
-    await d.notifier.send(c.ref, ev.channel, text, ev.threadKey);
+    await d.notifier.send(c.ref, ev.channel, text, ev.threadKey, ev.senderHandle);
     delivered = true;
     await d.store.setDelivery(msg.id, "sent", at());
   } catch {

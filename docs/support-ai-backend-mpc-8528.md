@@ -30,6 +30,22 @@ invents no policy: the shipped policy approves nothing, every action tool is dis
 - **GitHub write access:** no blocker was observed from this session. It pushed a branch, opened a PR and merged it (PR #548) using the GitHub integration. The criterion's "actual blocker" is therefore "none observed here"; access from other runtimes is unknown.
 - **MPC-8530 is quarantined.** At 13:20Z its page shows `Status_Readiness = Needs_Info` and a REAPER blocker reason: "Quarantined, non-conforming task ... missing_due_date: Priority 2 task has no Due Date." It has no run receipt, outputs or recorded decisions. Fix: someone with authority sets a Due Date and re-sets readiness to Ready. This session did not edit that record.
 
+## Update 2026-10-26 (fourth PR): adapters and hosting Worker (all OFF)
+
+Built to the recommended answers the task owner authorised as **build targets**. They are not approved policy and nothing is enabled.
+
+| Piece | What it does | What keeps it off |
+|---|---|---|
+| `shared/support/faq-knowledge.ts` | Keyword retrieval over the published FAQ (`src/data/faqs.ts`). | Every entry is a DRAFT unless the FAQ owners supply a version and approver (`SUPPORT_FAQ_APPROVAL_VERSION`/`SUPPORT_FAQ_APPROVED_BY`); `retrieve()` drops drafts, so the service answers nothing from the FAQ until then. |
+| `shared/support/report-status.ts` | Read-only status of one account's latest scan report (`scans.user_id`, four columns), coarse wording, never claims delivery or a retry. | Used only by the `diagnose_report_status` tool, which the shipped policy does not approve and which needs a verified identity. Assumes verified subject id = `public.users.id` (open identity-flow decision). |
+| `shared/support/email-notifier.ts` | Resend reply to the inbound sender only, threaded, idempotent, throws unless Resend returns an id. In-band notifier for web (the reply rides the HTTP response; "delivered" means only that). | No API key or sender configured means no email notifier; an unsupported channel throws and is recorded undelivered. |
+| `shared/support/openai-compatible-model.ts` | Chat-completions adapter: customer text as delimited untrusted data, only gateway-allowed tools offered, other tool names dropped. | Not constructed without `MODEL_*` configuration; a provider that receives customer text needs its DPA and Privacy listing first. |
+| `workers/support/` | `POST /intake`, `GET /health`. 503 unless `SUPPORT_AI_ENABLED=1`, all bindings present AND a rate limiter bound; bearer-token auth; 32 KB cap; stored-before-reference; never logs message text. | No route, `workers_dev = false`, no deploy workflow, flag `"0"`. No verifier is wired, so every caller is at most `channel_asserted`, and the policy approves no tool. |
+
+**Not built, deliberately:** the identity verifier (the one-time-proof flow needs its own store, an email-sending step and a decision on subject ids, all open MPC-8530 items). Until it exists private tools cannot run.
+
+**To enable (all required):** approved MPC-8530 decisions; production approval to move `supabase/proposed/mpc_8528_support_cases.sql` into migrations; a rate-limiter binding; the secrets in `workers/support/EXPECTED_SECRETS.txt`; a listed provider if `MODEL_*` is set; an approved FAQ version; a route and a deploy workflow; the MPC-8531 review. None of these exists today.
+
 ## Routing and intake trace (from code; mailbox side is unverified)
 
 | Path | What the code does | Durable case? |
@@ -48,11 +64,11 @@ Findings for the owners of those tasks (no change made here): the Contact page t
 |---|---|---|
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` for `RestCaseStore` | the Worker that hosts the service | Not configured here. No Worker exists yet. |
 | `SupportPolicy` (`policy.ts`) | MPC-8530 decisions | Shipped as `unapproved-0`: no tool approved. |
-| `KnowledgeSource` | MPC-7560/7561 content, MPC-8530 approval | Not implemented. |
-| `Model` | provider decision plus DPA/Privacy sub-processor listing first | Not implemented. |
+| `KnowledgeSource` | MPC-7560/7561 content, MPC-8530 approval | `FaqKnowledgeSource` built; drafts only until an owner approves a version. |
+| `Model` | provider decision plus DPA/Privacy sub-processor listing first | `ChatCompletionsModel` built; off without configuration. |
 | `Verifier` | MPC-8530 identity flow | Not implemented. |
-| `Notifier` per channel | MPC-8532 (and email via the existing scan-report mail path) | Not implemented. |
-| `ReportStatusReader` | MPC-8530 (what status may be read) | Not implemented. |
+| `Notifier` per channel | MPC-8532 (and email via the existing scan-report mail path) | `ResendNotifier` (email) and `InBandNotifier` (web) built; other channels unsupported. |
+| `ReportStatusReader` | MPC-8530 (what status may be read) | `ScansReportStatusReader` built, unwired to any enabled tool. |
 
 ## Existing components reused or deliberately not reused
 
