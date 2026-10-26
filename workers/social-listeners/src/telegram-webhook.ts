@@ -1,5 +1,6 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, runBaselineScan } from "./baseline-scan";
+import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
@@ -36,6 +37,14 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const run = (p: Promise<void>) => (ctx?.waitUntil ? (ctx.waitUntil(p), undefined) : p);
     if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log, events)); return done(new Response("OK")); }
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
+  }
+
+  // MPC-7892 DEEP (default off, allow-listed test accounts): exact commands only; handled here so core-brain never sees them.
+  if (isDeepCommand(env, payload)) {
+    const deep = handleDeepCommand(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(deep);
+    else await deep;
+    return done(new Response("OK"));
   }
 
   const brain = await callCoreBrain(env, { source: "telegram", receivedAt: new Date().toISOString(), payload }, log);
