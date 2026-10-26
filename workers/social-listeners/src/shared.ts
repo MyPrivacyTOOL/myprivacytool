@@ -43,6 +43,10 @@ export interface Env {
   TELEGRAM_BASELINE_SCAN?: string;
   /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
   PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
+  /** MPC-7893 one-time dashboard link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "dashboard"; anything else (default) is off. */
+  TELEGRAM_DASHBOARD_LINKS?: string;
+  /** Base URL of the dashboard site (https only). Default https://www.myprivacytool.io. */
+  DASHBOARD_BASE_URL?: string;
   /** MPC-7892 Telegram DEEP username check: "on" enables it for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
   TELEGRAM_DEEP_SCAN?: string;
   /** Days until deep_jobs rows expire (default 90, clamped 1-365). */

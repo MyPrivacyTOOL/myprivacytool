@@ -9,6 +9,7 @@ import Layout from "./components/layout/Layout";
 import Index from "./pages/Index";
 const Scan = lazy(() => import("./pages/Scan"));
 const ScanLiveView = lazy(() => import("./pages/ScanLiveView"));
+const TelegramDashboard = lazy(() => import("./pages/TelegramDashboard"));
 const DeepDive = lazy(() => import("./pages/DeepDive"));
 const Report = lazy(() => import("./pages/Report"));
 const Business = lazy(() => import("./pages/Business"));
@@ -59,6 +60,8 @@ const App = () => (
             {/* Marketing landing pages */}
             <Route path="/scan" element={<Scan />} />
             <Route path="/scan/live" element={<ScanLiveView />} />
+            {/* MPC-7893: private Telegram dashboard; entered only through the one-time link /d/<uuid> (Pages Function), which redirects here. */}
+            <Route path="/dashboard" element={<TelegramDashboard />} />
             <Route path="/scan/deep-dive" element={<DeepDive />} />
             <Route path="/report" element={<Report />} />
             <Route path="/business" element={<Business />} />
