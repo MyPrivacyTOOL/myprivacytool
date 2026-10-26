@@ -49,8 +49,8 @@ reset role;
 set local role service_role;
 insert into public.mpt_score_baselines (email_hash, overall_score, category_scores)
   values (repeat('a', 64), 40, '{"fingerprint":50}');
--- the Worker POSTs with Prefer: resolution=ignore-duplicates  ==  ON CONFLICT DO NOTHING
-insert into public.mpt_score_baselines (email_hash, overall_score) values (repeat('a', 64), 99) on conflict (email_hash) do nothing;
+-- the Worker POSTs with Prefer: resolution=ignore-duplicates  ==  ON CONFLICT DO NOTHING (no target: the unique key is now (email_hash, score_version), MPC-7471-F4)
+insert into public.mpt_score_baselines (email_hash, overall_score) values (repeat('a', 64), 99) on conflict do nothing;
 select pg_temp.assert((select overall_score from public.mpt_score_baselines where email_hash = repeat('a', 64)) = 40, 'first baseline must win');
 select pg_temp.assert((select count(*) from public.mpt_score_baselines) = 1, 'one baseline per email hash');
 reset role;
