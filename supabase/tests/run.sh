@@ -57,6 +57,23 @@ psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 echo "== support follow-up assertions (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/support-followup.test.sql
 
+echo "== dashboard links and sessions (MPC-7893)"
+psql_ "$TEST_URL" -At -f supabase/tests/dashboard-links.test.sql
+# Real concurrency: 8 separate connections try to redeem ONE link at the same moment. Exactly one may win.
+psql_ "$TEST_URL" -c "insert into public.profile_snapshots (id, sender_id, update_id, status, scan_version, risk_version, consent, get_chat, photos, expires_at) values ('00000000-0000-0000-0000-0000000000c1', '333', 1, 'complete', 'telegram-baseline-1', 'risk-count-1', '{}', '{}', '{}', now() + interval '90 days')" \
+  -c "insert into public.dashboard_links (token_hash, sender_id, snapshot_id, expires_at) values (repeat('e',64), '333', '00000000-0000-0000-0000-0000000000c1', now() + interval '15 minutes')"
+race_dir=$(mktemp -d)
+for i in 1 2 3 4 5 6 7 8; do
+  ( psql_ "$TEST_URL" -At -c "select public.mpt_redeem_dashboard_link(repeat('e',64), repeat('$i',64), 30)" > "$race_dir/$i" ) &
+done
+wait
+wins=$(cat "$race_dir"/* | grep -c '^t$' || true)
+[ "$wins" -eq 1 ] || { echo "::error::concurrent redemption: expected exactly 1 winner, got $wins"; exit 1; }
+sessions=$(psql_ "$TEST_URL" -At -c "select count(*) from public.dashboard_sessions where sender_id = '333'")
+[ "$sessions" -eq 1 ] || { echo "::error::concurrent redemption created $sessions sessions"; exit 1; }
+echo "   8 concurrent redemptions: 1 winner, 1 session"
+rm -rf "$race_dir"
+
 # MPC-8528: the PROPOSED AI-support schema (applied by the supabase/proposed loop above; not read by deploy-supabase.yml).
 echo "== proposed schema: AI support cases (MPC-8528)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
