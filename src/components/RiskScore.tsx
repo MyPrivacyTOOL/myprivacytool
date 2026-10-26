@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert, Activity } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
+import { exposureForPage, byBand, BAND_LABEL } from '@/lib/exposureScore';
 
 interface RiskScoreProps {
   confirmed: number;
@@ -12,23 +13,8 @@ interface RiskScoreProps {
 }
 
 export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
-  // Calculate weighted risk score with all categories including security and behavior
+  // MPC-7471-F4: the score itself comes from the shared contract; this block only derives the display flags (social, security, behaviour levels).
   const riskData = useMemo(() => {
-    // FINAL CATEGORY WEIGHTS - Total 100%
-    const weights = {
-      device: 0.05,      // 5% (device + network combined)
-      privacy: 0.05,     // 5%
-      language: 0.05,    // 5%
-      orientation: 0.05, // 5%
-      fingerprint: 0.25, // 25%
-      storage: 0.10,     // 10%
-      social: 0.20,      // 20%
-      security: 0.15,    // 15%
-      behavior: 0.10,    // 10%
-    };
-
-    let weightedScore = 0;
-    let totalWeight = 0;
     let socialRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
     let securityRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
     let behaviorRiskLevel: 'low' | 'medium' | 'high' | null = null;
@@ -113,90 +99,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         }
       });
 
-      // Device/network risk (8%)
-      const deviceCats = ['device', 'network'];
-      const deviceTotal = deviceCats.reduce((acc, c) => acc + (categoryRates[c]?.total || 0), 0);
-      const deviceConfirmed = deviceCats.reduce((acc, c) => acc + (categoryRates[c]?.confirmed || 0), 0);
-      if (deviceTotal > 0) {
-        weightedScore += (deviceConfirmed / deviceTotal) * 100 * weights.device;
-        totalWeight += weights.device;
-      }
-
-      // Privacy risk (7%)
-      const privacyCats = ['privacy', 'profile'];
-      const privacyTotal = privacyCats.reduce((acc, c) => acc + (categoryRates[c]?.total || 0), 0);
-      const privacyConfirmed = privacyCats.reduce((acc, c) => acc + (categoryRates[c]?.confirmed || 0), 0);
-      if (privacyTotal > 0) {
-        weightedScore += (privacyConfirmed / privacyTotal) * 100 * weights.privacy;
-        totalWeight += weights.privacy;
-      }
-
-      // Language risk (5%)
-      const langCat = categoryRates['language'];
-      if (langCat && langCat.total > 0) {
-        weightedScore += (langCat.confirmed / langCat.total) * 100 * weights.language;
-        totalWeight += weights.language;
-      }
-
-      // Orientation risk (5%)
-      const orientCat = categoryRates['orientation'];
-      if (orientCat && orientCat.total > 0) {
-        weightedScore += (orientCat.confirmed / orientCat.total) * 100 * weights.orientation;
-        totalWeight += weights.orientation;
-      }
-
-      // Fingerprint risk (25%)
-      const fpCat = categoryRates['fingerprint'];
-      if (fpCat && fpCat.total > 0) {
-        let fpRisk = (fpCat.confirmed / fpCat.total) * 100;
-        
-        if (fingerprint) {
-          const fpRiskMap = { high: 95, medium: 70, low: 40 };
-          fpRisk = Math.max(fpRisk, fpRiskMap[fingerprint.totalRisk] || fpRisk);
-          
-          if (fingerprint.protection) {
-            const reductionMap = { high: 0.4, medium: 0.25, low: 0.1, none: 0 };
-            fpRisk *= 1 - (reductionMap[fingerprint.protection.effectiveness] || 0);
-          }
-        }
-        
-        weightedScore += fpRisk * weights.fingerprint;
-        totalWeight += weights.fingerprint;
-      }
-
-      // Storage risk (10%)
-      const storageCat = categoryRates['storage'];
-      if (storageCat && storageCat.total > 0) {
-        const storageRisk = (storageCat.confirmed / storageCat.total) * 100;
-        weightedScore += storageRisk * weights.storage;
-        totalWeight += weights.storage;
-      }
-
       // Social risk (20%) - heavily weighted based on logged-in services
       const socialCat = categoryRates['social'];
       if (socialCat && socialCat.total > 0) {
-        let socialRisk = 0;
-        
-        // Base risk from confirmation rate
-        socialRisk = (socialCat.confirmed / socialCat.total) * 30;
-        
-        // Add risk based on logged-in services
-        if (loggedInServices >= 3) {
-          socialRisk += 60; // 3+ services: +60 points
-        } else if (loggedInServices >= 1) {
-          socialRisk += 30; // 1-2 services: +30 points
-        }
-        
-        // Google or Facebook: +20 each
-        if (hasGoogle) socialRisk += 20;
-        if (hasFacebook) socialRisk += 20;
-        
-        // SSO detected: +40 (critical)
-        if (hasSSO) socialRisk += 40;
-        
-        // Cap at 100
-        socialRisk = Math.min(socialRisk, 100);
-        
         // Determine social risk level
         if (hasSSO || (hasGoogle && hasFacebook) || loggedInServices >= 4) {
           socialRiskLevel = 'critical';
@@ -207,31 +112,11 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         } else {
           socialRiskLevel = 'low';
         }
-        
-        weightedScore += socialRisk * weights.social;
-        totalWeight += weights.social;
       }
 
       // Security risk (20%) - CRITICAL weight for vulnerabilities
       const securityCat = categoryRates['security'];
       if (securityCat && securityCat.total > 0) {
-        let securityRisk = 0;
-        
-        // Base risk from confirmation rate
-        securityRisk = (securityCat.confirmed / securityCat.total) * 20;
-        
-        // Critical vulnerabilities add massive risk
-        if (hasDNSLeak) securityRisk += 40;      // DNS leak: +40 (critical)
-        if (hasWebRTCLeak) securityRisk += 30;   // WebRTC leak: +30 (critical)
-        if (hasHTTPOnly) securityRisk += 20;     // HTTP only: +20
-        if (hasOutdatedBrowser) securityRisk += 25; // Outdated browser: +25
-        
-        // Additional issues
-        securityRisk += Math.min(securityIssuesCount * 10, 30);
-        
-        // Cap at 100
-        securityRisk = Math.min(securityRisk, 100);
-        
         // Determine security risk level
         if (hasDNSLeak || hasWebRTCLeak) {
           securityRiskLevel = 'critical';
@@ -242,33 +127,13 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         } else {
           securityRiskLevel = 'low';
         }
-        
-        weightedScore += securityRisk * weights.security;
-        totalWeight += weights.security;
       }
 
       // Behavior risk (12%) - tracking through user interactions
       const behaviorCat = categoryRates['behavior'];
       if (behaviorCat && behaviorCat.total > 0) {
-        let behaviorRisk = 0;
-        
-        // Base risk from confirmation rate
-        behaviorRisk = (behaviorCat.confirmed / behaviorCat.total) * 50;
-        
         // Track behavior data points
         behaviorDataPoints = behaviorCat.confirmed;
-        
-        // More data points = higher risk
-        if (behaviorDataPoints >= 5) {
-          behaviorRisk += 40; // 5+ data points: +40
-        } else if (behaviorDataPoints >= 3) {
-          behaviorRisk += 25; // 3-4 data points: +25
-        } else if (behaviorDataPoints >= 1) {
-          behaviorRisk += 15; // 1-2 data points: +15
-        }
-        
-        // Cap at 100
-        behaviorRisk = Math.min(behaviorRisk, 100);
         
         // Determine behavior risk level
         if (behaviorDataPoints >= 5) {
@@ -278,21 +143,17 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         } else {
           behaviorRiskLevel = 'low';
         }
-        
-        weightedScore += behaviorRisk * weights.behavior;
-        totalWeight += weights.behavior;
       }
     }
 
-    // Fallback to simple percentage if no detailed data
-    const percentage = totalWeight > 0 
-      ? Math.round(weightedScore / totalWeight)
-      : total > 0 
-        ? Math.round((confirmed / total) * 100)
-        : 0;
+    // MPC-7471-F4: the number is the shared exposure score; nothing here weighs categories any more. Provisional until every point is confirmed.
+    const exposure = exposureForPage(hexagons ?? [], total > 0 && confirmed >= total);
+    const percentage = exposure.score;
 
     return {
-      percentage: Math.min(percentage, 100),
+      percentage,
+      band: exposure.band,
+      provisional: exposure.provisional,
       hasFingerprint: hexagons?.some((h) => h.category === 'fingerprint' && h.confirmed) || false,
       fingerprintRisk: fingerprint?.totalRisk || null,
       hasSocial: hexagons?.some((h) => h.category === 'social' && h.confirmed) || false,
@@ -310,6 +171,8 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
 
   const { 
     percentage, 
+    band,
+    provisional,
     hasFingerprint, 
     fingerprintRisk, 
     hasSocial, 
@@ -324,14 +187,14 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
     behaviorDataPoints,
   } = riskData;
   
-  const getRiskLevel = (pct: number) => {
-    if (pct >= 80) return { label: 'High Risk', Icon: AlertCircle };
-    if (pct >= 50) return { label: 'Medium Risk', Icon: AlertTriangle };
-    if (pct >= 1) return { label: 'Low Risk', Icon: Shield };
+  const getRiskLevel = () => {
+    if (band === 'high') return { label: BAND_LABEL.high, Icon: AlertCircle };
+    if (band === 'medium') return { label: BAND_LABEL.medium, Icon: AlertTriangle };
+    if (band === 'low') return { label: BAND_LABEL.low, Icon: Shield };
     return { label: 'Scanning...', Icon: Shield };
   };
 
-  const risk = getRiskLevel(percentage);
+  const risk = getRiskLevel();
 
   return (
     <div className="bg-surface/95 border border-surface-border rounded-xl p-4 sm:p-6 mx-2 sm:mx-auto mb-4 shadow-card max-w-[460px]">
@@ -354,17 +217,17 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
               cy="50"
               r="40"
               fill="none"
-              stroke={percentage >= 80 ? 'hsl(var(--risk-high))' : percentage >= 50 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
+              stroke={byBand(band, 'hsl(var(--risk-high))', 'hsl(var(--risk-mid))', 'hsl(var(--risk-low))', 'hsl(var(--muted))')}
               strokeWidth="8"
               strokeLinecap="round"
-              strokeDasharray={`${percentage * 2.51} 251`}
+              strokeDasharray={`${(percentage ?? 0) * 2.51} 251`}
               className="transition-all duration-500 ease-out"
               
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-risk-mid' : 'text-risk-low')}>
-              {percentage}%
+            <span className={cn("text-xl sm:text-2xl font-bold", byBand(band, 'text-foreground', 'text-risk-mid', 'text-risk-low', 'text-muted-foreground'))}>
+              {percentage ?? '–'}
             </span>
           </div>
         </div>
@@ -373,12 +236,10 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         <div className="flex-1 text-center sm:text-left">
           <div className={cn(
             "inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-2 border",
-            percentage >= 80 ? "bg-risk-high-soft text-foreground border-risk-high/30" : 
-            percentage >= 50 ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" : 
-            "bg-risk-low-soft text-foreground border-risk-low/30"
+            byBand(band, "bg-risk-high-soft text-foreground border-risk-high/30", "bg-risk-mid-soft text-risk-mid border-risk-mid/30", "bg-risk-low-soft text-foreground border-risk-low/30", "bg-muted text-muted-foreground border-border")
           )}>
             <risk.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            {risk.label}
+            {risk.label}{band && provisional ? ' (provisional)' : ''}
           </div>
 
           <div className="text-muted-foreground text-sm sm:text-base">
@@ -448,9 +309,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             <div 
               className={cn(
                 "h-full rounded-full transition-all duration-500 ease-out",
-                percentage >= 80 ? "bg-risk-high" : percentage >= 50 ? "bg-risk-mid" : "bg-risk-low"
+                byBand(band, "bg-risk-high", "bg-risk-mid", "bg-risk-low", "bg-muted")
               )}
-              style={{ width: `${percentage}%` }}
+              style={{ width: `${percentage ?? 0}%` }}
             />
           </div>
         </div>

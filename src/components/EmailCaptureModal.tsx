@@ -2,11 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { Shield, Lock, X, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { bandFor, percentHalfUp, BAND_LABEL, SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 import { loadTurnstile, TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 
 interface EmailCaptureModalProps {
-  riskScore: number;
+  /** The shared exposure score (MPC-7471-F4); null when nothing could be checked. */
+  riskScore: number | null;
   categoryScores?: Record<string, number>;
+  /** Version of the contract that produced riskScore; stored with the baseline so scores of different versions are never compared. */
+  scoreVersion?: string;
+  /** Coverage = checked / true registry total, from the same contract. */
+  coveragePercent?: number;
   confirmedCount: number;
   onClose: () => void;
   onSubmit: (email: string) => void;
@@ -18,12 +24,18 @@ interface Baseline {
   overall_score: number;
   created_at: string;
   is_first: boolean;
-  delta: number;
+  delta: number | null;
+  /** The method that produced the stored baseline. 'legacy' = saved before exposure-v1. */
+  score_version?: string;
+  /** False when the stored baseline used a different method: no delta is given and none may be implied. */
+  comparable?: boolean;
 }
 
 export default function EmailCaptureModal({
   riskScore,
   categoryScores,
+  scoreVersion = SCORE_VERSION,
+  coveragePercent,
   confirmedCount,
   onClose,
   onSubmit,
@@ -59,13 +71,10 @@ export default function EmailCaptureModal({
     };
   }, []);
 
-  const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return { label: 'High Risk', color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
-    if (risk >= 40) return { label: 'Medium Risk', color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
-    return { label: 'Low Risk', color: 'text-foreground', bg: 'bg-risk-low-soft border-risk-low/30' };
-  };
-
-  const { label: riskLabel, color: riskColor, bg: riskBg } = getRiskLabel(riskScore);
+  const band = bandFor(riskScore);
+  const riskLabel = band ? BAND_LABEL[band] : 'Not enough checked to score';
+  const riskColor = 'text-foreground';
+  const riskBg = band === 'high' ? 'bg-risk-high-soft border-risk-high/30' : band === 'medium' ? 'bg-risk-mid-soft border-risk-mid/30' : band === 'low' ? 'bg-risk-low-soft border-risk-low/30' : 'bg-muted border-border';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +106,7 @@ export default function EmailCaptureModal({
         body: JSON.stringify({
           email: trimmed,
           riskScore,
+          scoreVersion,
           categoryScores,
           confirmedCount,
           source: 'web_scan_summary',
@@ -125,7 +135,7 @@ export default function EmailCaptureModal({
     }
   };
 
-  const exposurePct = Math.round((confirmedCount / HEXAGON_COUNT) * 100);
+  const coveragePct = coveragePercent ?? percentHalfUp(Math.min(confirmedCount, HEXAGON_COUNT), HEXAGON_COUNT);
 
   return (
     /* Backdrop */
@@ -169,7 +179,7 @@ export default function EmailCaptureModal({
             <AlertTriangle className={`w-5 h-5 ${riskColor} shrink-0`} />
             <div className="text-sm">
               <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
-              <span className="text-muted-foreground"> — {riskScore}/100 risk score · {exposurePct}% exposure</span>
+              <span className="text-muted-foreground"> — {riskScore === null ? 'no score yet' : `${riskScore}/100 exposure score`} · {coveragePct}% coverage</span>
             </div>
           </div>
 
@@ -195,10 +205,12 @@ export default function EmailCaptureModal({
               {baseline && (
                 <p className="text-sm text-foreground">
                   {baseline.is_first
-                    ? `Baseline saved: ${baseline.overall_score}/100 risk (${new Date(baseline.created_at).toLocaleDateString()}).`
-                    : `Your baseline: ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}). Now ${riskScore}/100, ${
-                        baseline.delta === 0 ? 'no change' : `${Math.abs(baseline.delta)} points ${baseline.delta < 0 ? 'lower (better)' : 'higher (worse)'}`
-                      }.`}
+                    ? `Baseline saved: ${baseline.overall_score}/100 exposure score (${new Date(baseline.created_at).toLocaleDateString()}).`
+                    : baseline.comparable === false || baseline.delta === null
+                      ? `Your earlier score, ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}), used an older method, so it cannot be compared with today's.`
+                      : `Your baseline: ${baseline.overall_score}/100 (${new Date(baseline.created_at).toLocaleDateString()}). Now ${riskScore}/100, ${
+                          baseline.delta === 0 ? 'no change' : `${Math.abs(baseline.delta)} points ${baseline.delta < 0 ? 'lower' : 'higher'}`
+                        }.`}
                 </p>
               )}
               <Button

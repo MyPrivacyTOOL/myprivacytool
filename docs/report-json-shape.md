@@ -12,6 +12,14 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
     "id": "<web scan id>|null",
     "created_at": "<ISO time>|null",
     "summary": { "found": 0, "clear": 0, "not_checked": 0, "total": 54 },   // null when saved is false
+    "exposure": {                      // MPC-7471-F4: the shared exposure score for this web scan, null when saved is false. Higher = the browser revealed more.
+      "score_version": "exposure-v1", "status": "scored|no_checked_items", "provisional": false,
+      "score": 55, "band": "medium",   // score is null (never 0) when nothing was checked; band follows the rounded score: low 0-39, medium 40-69, high 70-100
+      "coverage": { "checked": 9, "total": 54, "percent": 17 },
+      "counts": { "found": 5, "clear": 4, "not_checked": 3, "checked": 9 },
+      "categories": { /* per weight category: weight, found, clear, checked, exposure (null when nothing checked) */ },
+      "excluded_categories": [], "rejected": [], "warnings": []
+    },
     "hexagons": [
       {
         "id": "location",              // registry id, stable
@@ -28,7 +36,7 @@ Every "Your privacy report" email carries one file, `my-privacy-scan-<report id>
     "summary": { "found": 0, "clear": 0, "not_checked": 0, "total": 4 },
     "hexagons": [ /* same hexagon shape: email-breaches, email-name, email-provider, email-profile */ ]
   },
-  "score": { "value": 90, "risk_level": "low", "partial": true }   // null when nothing was scored
+  "score": { "value": 90, "risk_level": "low", "partial": true }   // null when nothing was scored. NOT the web exposure score: the email-footprint "privacy health" score, where HIGHER IS SAFER
 }
 ```
 

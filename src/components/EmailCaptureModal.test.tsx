@@ -5,9 +5,10 @@ import userEvent from "@testing-library/user-event";
 import { jsonResponse } from "@/test/render";
 import EmailCaptureModal from "./EmailCaptureModal";
 import { HEXAGON_COUNT } from "../../shared/hexagon-registry/registry.js";
+import { percentHalfUp } from "../../shared/hexagon-registry/score.js";
 
 afterEach(() => vi.unstubAllGlobals());
-const setup = (riskScore = 55) => {
+const setup = (riskScore: number | null = 55) => {
   const onClose = vi.fn(), onSubmit = vi.fn();
   render(<EmailCaptureModal riskScore={riskScore} categoryScores={{ fingerprint: 50 }} confirmedCount={23} onClose={onClose} onSubmit={onSubmit} />);
   return { onClose, onSubmit, user: userEvent.setup() };
@@ -16,11 +17,18 @@ const email = () => screen.getByPlaceholderText("your@email.com");
 const send = () => screen.getByRole("button", { name: /send my privacy check/i });
 
 describe("EmailCaptureModal", () => {
-  it.each([[75, "High Risk"], [50, "Medium Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
+  it.each([[75, "High exposure"], [70, "High exposure"], [69, "Medium exposure"], [40, "Medium exposure"], [39, "Low exposure"], [10, "Low exposure"]])("labels exposure score %i as %s and shows coverage", (score, label) => {
     setup(score);
     expect(screen.getByText(label)).toBeInTheDocument();
-    // MPC-7466: the exposure percentage divides by the registry hexagon count (was a hard-coded 46).
-    expect(screen.getByText(new RegExp(`${Math.round((23 / HEXAGON_COUNT) * 100)}% exposure`))).toBeInTheDocument();
+    // MPC-7471-F4: coverage = checked / the true registry total, rounded half up (the old "exposure %" was the same ratio under a misleading name).
+    expect(screen.getByText(new RegExp(`${percentHalfUp(23, HEXAGON_COUNT)}% coverage`))).toBeInTheDocument();
+  });
+
+  it("with nothing checked there is no score and no band, never a Low label", () => {
+    setup(null);
+    expect(screen.getByText("Not enough checked to score")).toBeInTheDocument();
+    expect(screen.queryByText(/Low exposure/)).not.toBeInTheDocument();
+    expect(screen.getByText(/no score yet/)).toBeInTheDocument();
   });
 
   it("validates the email and requires consent before calling the Worker", async () => {
@@ -50,17 +58,27 @@ describe("EmailCaptureModal", () => {
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("api.myprivacytool.io");
     expect(JSON.parse(init.body as string)).toMatchObject({
-      email: "ok@example.com", riskScore: 55, confirmedCount: 23, consent: true, consent_source: "web_scan_summary", categoryScores: { fingerprint: 50 },
+      email: "ok@example.com", riskScore: 55, scoreVersion: "exposure-v1", confirmedCount: 23, consent: true, consent_source: "web_scan_summary", categoryScores: { fingerprint: 50 },
     });
   });
 
-  it.each([[-10, "lower (better)"], [10, "higher (worse)"], [0, "no change"]])("describes a re-scan delta of %i", async (delta, text) => {
+  it.each([[-10, "lower"], [10, "higher"], [0, "no change"]])("describes a re-scan delta of %i", async (delta, text) => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ baseline: { overall_score: 50, created_at: "2026-10-01T00:00:00Z", is_first: false, delta } })));
     const { user } = setup();
     await user.type(email(), "ok@example.com");
     await user.click(screen.getByRole("checkbox"));
     await user.click(send());
-    expect(await screen.findByText(new RegExp(`Your baseline: 50/100.*${text.replace(/[()]/g, "\\$&")}`))).toBeInTheDocument();
+    expect(await screen.findByText(new RegExp(`Your baseline: 50/100.*${text}`))).toBeInTheDocument();
+  });
+
+  it("a baseline from another method is shown as not comparable, with no delta", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ baseline: { overall_score: 85, created_at: "2026-10-01T00:00:00Z", is_first: false, delta: null, score_version: "legacy", comparable: false } })));
+    const { user } = setup();
+    await user.type(email(), "ok@example.com");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(send());
+    expect(await screen.findByText(/used an older method, so it cannot be compared/)).toBeInTheDocument();
+    expect(screen.queryByText(/points (lower|higher)|no change/)).not.toBeInTheDocument();
   });
 
   it("shows an error when the Worker fails, and tolerates a non-JSON success body", async () => {

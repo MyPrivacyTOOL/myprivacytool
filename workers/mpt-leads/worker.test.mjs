@@ -1,5 +1,5 @@
 import worker from './worker.js';
-let calls=[]; let supa='ok'; let notionFail=false; let baselineRow=null;
+let calls=[]; let supa='ok'; let notionFail=false; let baselineRow=null; let versionedRows=null;
 globalThis.fetch = async (url, opts) => {
   calls.push({url:String(url), body: opts?.body});
   if (String(url).includes('challenges.cloudflare.com/turnstile/v0/siteverify')) {
@@ -8,6 +8,14 @@ globalThis.fetch = async (url, opts) => {
     if (tok==='down') return {ok:false,status:500,json:async()=>({}),text:async()=>''};
     if (tok==='wronghost') return {ok:true,status:200,json:async()=>({success:true,hostname:'evil.example'}),text:async()=>''};
     return {ok:true,status:200,json:async()=>tok==='good'?{success:true,hostname:'myprivacytool.io'}:{success:false,'error-codes':['invalid-input-response']},text:async()=>''};
+  }
+  if (String(url).includes('mpt_score_baselines') && versionedRows) {
+    // MPC-7471-F4: the table after the proposed migration: unique on (email_hash, score_version), old rows default to 'legacy'.
+    if (opts?.method==='POST') { const b=JSON.parse(opts.body); const v=b.score_version??'legacy';
+      if (versionedRows.some(r=>r.email_hash===b.email_hash&&r.score_version===v)) return {ok:true,status:201,text:async()=>'',json:async()=>[]};
+      const row={...b,score_version:v,created_at:'2026-10-26T00:00:00Z'}; versionedRows.push(row); return {ok:true,status:201,text:async()=>'',json:async()=>[row]}; }
+    const q=new URL(String(url)).searchParams; const rows=versionedRows.filter(r=>r.email_hash===q.get('email_hash').replace('eq.','')&&(!q.get('score_version')||r.score_version===q.get('score_version').replace('eq.','')));
+    return {ok:true,status:200,text:async()=>'',json:async()=>rows};
   }
   if (String(url).includes('mpt_score_baselines')) {
     if (opts?.method==='POST') { if (baselineRow) return {ok:true,status:201,text:async()=>'',json:async()=>[]};
@@ -49,6 +57,24 @@ r=await run({email:'base@line.co',riskScore:25}); check(r.json.baseline?.is_firs
 r=await run({email:'z@z.co'}); check(!('baseline' in r.json)&&bl().length===0,'no riskScore => no baseline write');
 r=await run({email:'z@z.co',riskScore:140}); check(!('baseline' in r.json)&&bl().length===0,'out-of-range score => no baseline write');
 r=await run({email:'z@z.co',riskScore:30},{...env,SUPABASE_SERVICE_ROLE_KEY:undefined}); check(r.status===200&&!('baseline' in r.json),'missing key => lead still succeeds, no baseline');
+// MPC-7471-F4: baselines carry the score version; legacy and versioned scores are never compared
+baselineRow=null;
+r=await run({email:'v@v.co',riskScore:60,scoreVersion:'exposure-v1'}); check(!('baseline' in r.json)&&bl().length===0,'before the migration is applied (flag off) a versioned score is NOT stored: it could not be tagged');
+r=await run({email:'v@v.co',riskScore:60}); check(r.json.baseline?.is_first===true&&r.json.baseline.score_version==='legacy'&&!('score_version' in JSON.parse(bl()[0].body)),'flag off: an unversioned (old page) score is stored exactly as before, as legacy');
+const envV={...env,BASELINE_SCORE_VERSION_COLUMN:'true'};
+versionedRows=[{email_hash:'x',overall_score:1,score_version:'legacy'}];
+r=await run({email:'old@user.co',riskScore:85},envV); check(r.json.baseline?.is_first===true&&r.json.baseline.score_version==='legacy','flag on: an unversioned score is stored as legacy');
+r=await run({email:'old@user.co',riskScore:30,scoreVersion:'exposure-v1',categoryScores:{fingerprint:30}},envV);
+check(r.json.baseline?.is_first===true&&r.json.baseline.overall_score===30&&r.json.baseline.score_version==='exposure-v1'&&r.json.baseline.delta===0&&versionedRows.filter(x=>x.score_version==='legacy').length===2,'a legacy user\'s first versioned scan creates its own baseline; the legacy row is kept untouched');
+r=await run({email:'old@user.co',riskScore:20,scoreVersion:'exposure-v1'},envV); check(r.json.baseline?.is_first===false&&r.json.baseline.delta===-10&&r.json.baseline.comparable===true,'a later versioned scan is compared with the versioned baseline only (not with the 85 legacy one)');
+r=await run({email:'old@user.co',riskScore:90},envV); check(r.json.baseline?.overall_score===85&&r.json.baseline.score_version==='legacy'&&r.json.baseline.delta===5,'legacy scans still compare with legacy');
+r=await run({email:'old@user.co',riskScore:20,scoreVersion:'exposure-v9'},envV); check(r.json.baseline?.score_version==='legacy','an unknown version is treated as legacy, never stored under a name this Worker does not know');
+// a store that returns a different-version row (should not happen with the unique key, but the Worker must not subtract across versions)
+versionedRows=null; baselineRow=null;
+versionedRows=[]; { const orig=globalThis.fetch; globalThis.fetch=async(u,o)=>{ if(String(u).includes('mpt_score_baselines')&&o?.method!=='POST') return {ok:true,status:200,text:async()=>'',json:async()=>[{overall_score:85,created_at:'2026-10-01T00:00:00Z',score_version:'legacy'}]}; if(String(u).includes('mpt_score_baselines')) return {ok:true,status:201,text:async()=>'',json:async()=>[]}; return orig(u,o); };
+  r=await run({email:'m@m.co',riskScore:30,scoreVersion:'exposure-v1'},envV); globalThis.fetch=orig; }
+check(r.json.baseline?.comparable===false&&r.json.baseline.delta===null&&r.json.baseline.score_version==='legacy','a stored baseline of another version yields delta null and comparable:false, never a subtraction');
+versionedRows=null;
 // MPC-7350: security hardening
 const raw=async(body,{origin='https://myprivacytool.io',headers={},e=env}={})=>{ calls=[]; const waits=[]; const h={'content-type':'application/json',...headers}; if(origin) h.Origin=origin;
   const res=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:h,body:typeof body==='string'?body:JSON.stringify(body)}),e,{waitUntil:p=>waits.push(p)}); await Promise.all(waits); return {status:res.status, json:await res.json(), cors:res.headers.get('access-control-allow-origin')}; };
