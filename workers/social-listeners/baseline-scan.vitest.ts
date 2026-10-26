@@ -55,7 +55,7 @@ describe("baseline scan gating", () => {
     expect(tg("getUserProfilePhotos")[0].body.user_id).toBe(ID);
     expect(snaps()).toHaveLength(1);
     expect(tg("sendMessage")).toHaveLength(2); // the existing Y reply, then the report
-    expect(tg("sendMessage")[1].body.text).toMatch(/\/10/);
+    expect(tg("sendMessage")[1].body.text).toMatch(/risk \(draft test report\): \d+ \/ 30 - (Low|Medium|High) exposure/);
   });
   it("does nothing when the flag is off (default) or the sender is not allow-listed; existing reply unchanged", async () => {
     for (const over of [{ TELEGRAM_BASELINE_SCAN: undefined }, { PROBE_TELEGRAM_IDS: "999" }, { PROBE_TELEGRAM_IDS: undefined }]) {
@@ -99,13 +99,13 @@ describe("failure handling", () => {
     await post(yes());
     expect(snaps()[0].body.status).toBe("failed");
     expect(snaps()[0].body.score).toBeNull();
-    expect(tg("sendMessage")[1].body.text).not.toMatch(/\/10/);
+    expect(tg("sendMessage")[1].body.text).not.toMatch(/ \/ 30|exposure/);
   });
   it("Telegram timeout/outage and database failure never fail the webhook", async () => {
     expect((await setup({}, { tgThrows: true }).post(yes())).status).toBe(200);
     const db = setup({}, { dbThrows: true });
     expect((await db.post(yes())).status).toBe(200);
-    expect(db.tg("sendMessage")[1].body.text).toMatch(/\/10/); // report still sent when only storage failed
+    expect(db.tg("sendMessage")[1].body.text).toMatch(/ \/ 30 - /); // report still sent when only storage failed
     expect((await setup({}, { dbStatus: 500 }).post(yes())).status).toBe(200);
   });
 });
@@ -131,18 +131,23 @@ describe("data handling", () => {
 
 describe("report contract", () => {
   const ok = (r: unknown) => ({ status: 200, response: r });
-  it("scores from the versioned ranking and keeps score and snapshot items consistent", () => {
+  it("risk is the number of returned hexagons out of 30 (no weights), with the website's bands", () => {
     const full = buildReport(yes(), ok(CHAT), ok(PHOTOS))!;
     const locked = buildReport(yes(), ok({ ok: true, result: { id: ID, type: "private", first_name: "T" } }), ok({ ok: true, result: { total_count: 0, photos: [] } }))!;
-    expect(full.score).toBeLessThan(locked.score);
-    expect(full.score).toBeGreaterThanOrEqual(0);
-    expect(full.score).toBe(Math.round(Math.max(0, 10 - full.items.reduce((s, i) => s + i.penalty, 0)) * 10) / 10);
-    expect(full.items.find((i) => i.field === "username")!.penalty).toBe(3);
+    expect(full.risk.possible).toBe(30);
+    expect(full.risk.returned).toBe(full.hexagons.filter((h) => h.state === "returned").length);
+    expect(full.risk.returned).toBeGreaterThan(locked.risk.returned);
+    expect(full.risk.percent).toBe(Math.round((full.risk.returned / 30) * 100));
+    expect(full.risk.band).toBe(full.risk.percent >= 70 ? "high" : full.risk.percent >= 40 ? "medium" : "low");
+    expect(locked.risk.band).toBe("low");
+    expect(full.risk.notChecked).toBeGreaterThan(0); // disabled hexagons are reported, never counted
   });
   it("makes no hidden/verified-privacy claims and keeps unsupported insights out", () => {
     const { text } = buildReport(yes(), ok(CHAT), ok(PHOTOS))!;
-    expect(text).not.toMatch(/✅|hidden from everyone|protected|message count|account (age|era|created)/i);
-    expect(text).toMatch(/cannot inspect/);
+    expect(text).not.toMatch(/hidden from everyone|protected|message count|account (age|era|created)/i);
+    expect(text).toMatch(/✅ Never sent to bots by Telegram: phone number \(unless you tap a share button\), last seen, IP address, device\./);
+    expect(text).toMatch(/not a check of your own privacy settings/);
+    expect(text).toMatch(/does not verify your settings|not a check of your own/);
     expect(text).not.toMatch(/SECRET|file_id/);
   });
   it("missing or partial fields degrade gracefully; failures yield null", () => {
@@ -189,14 +194,19 @@ describe("channel hexagons (TG)", () => {
     const full = buildReport(yes(), ok(CHAT), ok(PHOTOS))!;
     const n = (r: { hexagons: { state: string }[] }) => r.hexagons.filter((h) => h.state === "returned").length;
     expect(n(locked)).toBeLessThan(n(full));
-    expect(full.text).toMatch(/Telegram \(TG\) hexagons returned: \d+ of \d+ checked \(30 possible\)/);
-    expect(full.text).toMatch(/Sent with every message: \d+ of 8/);
+    expect(full.text).toMatch(/\d+ \/ 30/);
+    expect(full.text).toMatch(/\[A\] Sent with every message: \d+ of 8/);
+    expect(full.text).toMatch(/\[B\] Public profile lookup: \d+ of 17/);
   });
   it("stores the hexagon states and channel code in the snapshot report", async () => {
     const { post, snaps } = setup();
     await post(yes());
     const report = snaps()[0].body.report;
     expect(report.channel).toBe("TG");
+    expect(report.risk).toMatchObject({ possible: 30 });
+    expect(report.never_sent).toContain("last seen");
+    expect(snaps()[0].body.score).toBeNull();
+    expect(snaps()[0].body.risk_version).toBe("risk-count-1");
     expect(report.hexagons).toHaveLength(30);
     expect(JSON.stringify(report)).not.toMatch(/SECRET/);
   });
