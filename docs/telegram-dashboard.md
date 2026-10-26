@@ -18,7 +18,7 @@ Private dashboard for a Telegram baseline scan, on the existing site (Vite/React
 ## Not done / open
 - "Pre-filled with Telegram context": `/scan` is NOT given any Telegram context. There is no approved server-side contract for it; putting it in a URL would break the no-personal-data rule. Decision needed.
 - The global HELP header entry (PR #533) is not merged; this page has its own Help text.
-- `TELEGRAM_DASHBOARD_LINKS` is switched with "Set Telegram test-account flags" (it moves together with the baseline and DEEP flags). If a later Worker deploy drops it, re-run the workflow (dry-run first).
+- `TELEGRAM_DASHBOARD_LINKS` is switched with "Set Telegram test-account flags" (run it with flags = dashboard; the other sets are not touched). If a later Worker deploy drops it, re-run the workflow (dry-run first).
 - Retention of `dashboard_links` rows: expired rows are removed by `mpt_purge_dashboard_credentials()`; no pg_cron job is created by this change.
 - Wording is English-only draft, like MPC-7891.
 
