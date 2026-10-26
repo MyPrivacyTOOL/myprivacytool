@@ -29,6 +29,16 @@ Rules every check must meet before it is built:
 | Web archive mentions | Whether the address appears on archived public pages | The plain address goes to the archive; results are noisy |
 | Known breaches (`email-breaches`) | Whether the address is in a known data breach | Registered but NOT BUILT since MPC-7467: the source's commercial-use terms were never confirmed, and a paid key (Have I Been Pwned) would be the clean route. The plain address goes to the provider |
 
+### Owner decision, 2026-10-26 (given in chat; recorded here, not yet built)
+
+The owner approved the recommendation on the ticket: **GitHub public commit search** and **a paid-key breach source** may receive the plain address, each only after its Privacy page wording is approved and live (rule 4 above). **PGP key servers and web archive mentions are not approved** and stay held.
+
+Why nothing is built yet (what must exist first):
+1. **GitHub commit search** (`GET https://api.github.com/search/commits?q=author-email:<address>`): unauthenticated search is limited to about 10 requests a minute per IP, and Workers share IPs, so without a token most lookups would end as NOT CHECKED. Needs a GitHub token with no scopes (public data only) stored as a Worker secret, set by a human. A check must return FOUND only for a real match, CLEAR only for a 200 with zero results, and NOT CHECKED for 403, 422, 429, timeouts and anything else.
+2. **Breach source:** the paid-key route is Have I Been Pwned. Rule 1 (free and public) is waived for this one source by the owner's approval, but a key has to be bought and set as `HIBP_API_KEY`, and the plain address then goes to that provider. `email-breaches` is already registered; its provider wiring is what is missing.
+3. **Privacy page** wording naming each provider (see "Adding a check", step 4), approved by Chris and deployed before either check runs.
+4. **Careful wiring.** `workers/scan-report/lib/live.js` marks the live view done when the number of finished items reaches `Object.keys(EMAIL_HEXAGONS).length`. A check that is registered but switched off would leave the live view on "still looking" for ever, so a switch must remove the check from the count as well as from `runEmailHexagons`. The registry count in `report-email.test.mjs`, `live.test.mjs`, `worker.test.mjs` and `registry.test.mjs` moves with every added check.
+
 ## Tier 3: possible with more work (domain only, but slow or noisy)
 
 | Idea | What it would show | Note |

@@ -1,115 +1,38 @@
-# MPC-8452 design note: live thank-you page
+# MPC-8452: live thank-you page (as shipped)
 
-**Status: option A approved by the owner (2026-10-23). Build step 1 is in this PR behind a flag that is OFF by default (`VITE_LIVE_THANKYOU`, or `?live_ty=1` in one tab). Still open: storage decision, Alice image, Chris's sign-off on the copy.** All visitor-facing copy below is a proposal and needs Chris's sign-off before it ships (swarm run and real-people check, per the ticket). Lines marked **[approved]** already exist in the codebase; everything else is **[proposed]**.
+Ticket: https://app.notion.com/p/40228547eaa781c4874ed5b7c0e4f2df
 
-Notion ticket: https://app.notion.com/p/40228547eaa781c4874ed5b7c0e4f2df
+This note first proposed three options (A replay the browser scan, B live email checks, C both). The owner approved A on 2026-10-23, but the same week main shipped the server-backed path (B) in #502 and #508, so the A component was dropped (closed PR #498; it stays in that branch's history). **This version describes what is live, and what is still unverified or unapproved.** The earlier proposal is in this file's git history.
 
-## 1. What exists today (read from the repo)
+## What visitors get
 
-- The "thank-you" is one box in `src/pages/Scan.tsx` (`thanks`, role="status"): "Thanks, we have your email." plus the address and `ScanNumberNotice`. It shows after `POST /api/scan` succeeds.
-- `POST /api/scan` (`src/lib/scanReport.ts`, Worker `workers/scan-report`) returns nothing the page can show. The report is built in the Worker and emailed. There is **no endpoint that streams or polls findings**. Only `/api/web-scan/step` exists, and it is write-only funnel timing.
-- The browser scan result is kept in `sessionStorage` (`rememberCompletedScan`) **only when saving is on** (`VITE_SAVE_WEB_SCANS`), and only until the contact step. A visitor who arrives on `/scan` directly has no scan.
-- Hexagons: `shared/hexagon-registry` (54 web hexagons plus 4 email hexagons) and its FOUND / CHECKED AND CLEAR / NOT CHECKED rule (`status.js`). `trust_score` is deliberately null; this design shows no score.
-- The four email hexagons (`email-breaches`, `email-name`, `email-provider`, `email-profile`) run in the Worker when the report is prepared. `email-breaches` is **not built** (terms unconfirmed, `docs/email-hexagons-mpc-7467.md`).
-- Curtain reveal already exists on `/footprint/` (`public/footprint/index.html`, settings in `curtain.json`, doc `docs/footprint-curtain.md`). Reuse its approach, not its code path.
-- Alice: locked spec in `assets/alice/`, voice rules in `assets/alice/spec/voice.md`, approved character sheet MPC-7438. Expression plates are in `assets/branding/alice-mpc-7795/` (flat rasters, not locked, "unchecked against the Brand Bible"). Voice: warm, clear, unhurried, plain words, no jargon, no alarm, no sales voice, short sentences, British spelling. Claims must be on the approved claims list (MPC-7402).
-
-## 2. The decision that shapes everything (owner to choose)
-
-"Findings arrive live" needs a real source. Honest options:
-
-| Option | What the visitor sees | Needs | Risk |
-|---|---|---|---|
-| **A. Replay the finished browser scan** (recommended first) | Hexagons from the scan they already ran fill in one by one. Nothing new is checked; Alice says so. | Scan kept in sessionStorage for this visit; works without a new endpoint. | Only for visitors who ran the scan first. Others get state S2-no-scan. |
-| **B. Live email checks** | The 4 email hexagons fill as the Worker finishes them. | New read endpoint (or the `/api/scan` response) returning per-hexagon status; no email content in URLs; breach check still unbuilt so that hexagon stays NOT CHECKED. | New server surface, privacy review (address or its hash reaches Cloudflare DoH and Gravatar already, `docs/email-hexagons-mpc-7467.md`). |
-| **C. A then B** | Browser hexagons first, then email hexagons, then the report section. | Both. | Largest build. |
-
-Recommendation: ship **A** first (no new data leaves the browser), design the states so **B** drops in without a rewrite.
-
-## 3. Screens and states
-
-One page (`/scan`), one column on mobile, hexagons below the thank-you. The page never navigates; state changes in place.
-
-| # | State | What shows | Exit |
-|---|---|---|---|
-| S0 | Form (today) | Unchanged. | Submit succeeds. |
-| S1 | Thanks | Existing thank-you box stays exactly as is (heading, address, scan number). Under it, a still frame of Alice behind a closed curtain. | After the box is announced, the curtain begins to open. |
-| S2 | Curtain reveal | Image fades in slowly from behind the curtain (about 4 s). Reduced motion: image simply present, no animation. | Reveal ends. |
-| S2-no-scan | No scan in this browser | Alice: offers the free scan (link to `/`), no hexagons shown, no empty grid. Report email still on its way. | Visitor leaves or taps the link. |
-| S3 | Hexagons fill | Grid of hexagons, all starting **"waiting"** (neutral outline, no colour meaning). They resolve one at a time, in registry order, about 150 ms apart, each to FOUND, CHECKED AND CLEAR or NOT CHECKED, using the existing tile styles. | All resolved. |
-| S4 | Report section builds | Under the grid: a plain summary using the existing counts (`SUMMARY_LABELS`: clear, need fixing, you told us, not checked yet), then "your report is in your inbox" with the address. | Static end state. |
-| S5 | Left early | Nothing to do on the page. The Worker already sends the emailed report; this design does not touch that pipeline. | n/a |
-| S6 | Error or offline | Existing error and retry behaviour for the form is unchanged. If the grid cannot load, Alice says the report is still coming and the page stops. | n/a |
-
-Rules for every state:
-- A hexagon never shows a value, colour or count until it has an actual status from the registry rule. "Waiting" is not a finding.
-- The summary counts only resolved hexagons. NOT CHECKED is shown as "not checked", never folded into "clear".
-- There is no score and no percentage anywhere (registry `trust_score` is null).
-- Finished state is the same whether the visitor stayed for all of it or opened the page late.
-
-## 4. Alice: lines (all [proposed] unless marked; Chris signs off)
-
-Voice: short, one idea each, British spelling, no alarm. Spoken-length lines can double as on-screen captions. She narrates; she never states a finding the grid has not resolved.
-
-| When | Line | Source |
+| Step | What happens | Code |
 |---|---|---|
-| S1 | "Thank you. Your report is on its way to your inbox." | proposed |
-| S2 | "Let me draw back the curtain." | proposed |
-| S3 start | "I'll show you what your browser told every website, and how we know each thing." | proposed, adapted from approved `ALICE_TILES_INTRO` |
-| S3 per hexagon | Uses the existing tile text from `aliceTileMessage()` for that hexagon; no new per-hexagon copy. | [approved] |
-| S3 halfway | "Some of these say they weren't checked. For those I make no claim, and I won't guess." | adapted from [approved] `ALICE_TILES_NEXT` |
-| S4 | "That's everything I checked. The full report is in your inbox, with what to change first." | proposed |
-| S2-no-scan | "You haven't run the free scan in this browser yet. Your report email is still coming. Want me to show you?" | proposed |
-| S6 | "I couldn't show that here. Your report is still on its way." | proposed |
-| Reduced motion | Same lines, shown instantly. | proposed |
+| 1. Form | Unchanged `/scan` form. Submit sends the lead to HubSpot and `POST /api/scan` to the report Worker. | `src/pages/Scan.tsx` |
+| 2. Thank-you | The existing box stays ("Thanks, we have your email."). If the Worker returned a `liveToken`, the live panel appears under it. No token (Worker off, error): nothing extra, the report email still arrives. | `Scan.tsx` |
+| 3. Curtain | Alice's picture (`/footprint/alice-curtain.jpg`) sits behind a cover that slides away over 2.6 s. Reduced motion: the cover is hidden (`motion-reduce:hidden`). | `LiveScanPanel.tsx` |
+| 4. Checks arrive | The page polls `GET /api/scan/live?t=<token>` every 3 s (up to 100 polls, about five minutes; a hidden tab asks nothing). Each check the Worker has finished is listed as "Found something", "Nothing found" or "Could not check this one". Results are never taken away once shown. | `LiveScanPanel.tsx`, `src/lib/liveScan.ts`, `workers/scan-report/lib/live.js` |
+| 5. Done | Alice: "That is what I can see from the outside. The full picture is on its way to your inbox." | `LiveScanPanel.tsx` |
+| 6. Email button | The confirmation and report emails carry a button to `/scan/live#v=<key>`. The key is in the URL fragment (never sent to a server), read into memory and removed from the address bar. Opening it proves inbox ownership, so found checks then show their detail, and the page keeps watching (every 30 s for about an hour). A refresh needs the button again. | `src/pages/ScanLiveView.tsx` |
+| 7. Left early | Nothing to do. The report pipeline is unchanged and still emails the report. | Worker |
 
-Image: use a plate from `assets/branding/alice-mpc-7795/` (candidates: `alice-presenting`, `alice-curious`) or the existing `alice-curtain.jpg`. **Open:** these plates are not locked and are unchecked against the Brand Bible; owner to pick or approve. Per `assets/alice/README.md`, do not redraw or restyle her.
+Alice's lines as shipped (all marked in code as first draft, needing Chris's approval): "Hold on, I am having a look behind the curtain." / "I have found something. I am still looking." / "That is what I can see from the outside. The full picture is on its way to your inbox." / "That is what I can see so far. I will keep watching and add anything new." / "This link has expired. Press the button in your email again, or run a new scan."
 
-## 5. Motion rules
+## Rules this meets
 
-- Reveal: opacity 0 to 1 over 4 s, ease-out, with the curtain element sliding off (`left`, 1.3 s, as `curtain.json`). Hexagon stagger about 150 ms. Nothing loops. Nothing flashes.
-- `prefers-reduced-motion: reduce`: no fade, no slide, no stagger. Final state appears at once; Alice's lines appear as static text. Meaning never relies on motion alone.
-- Total animation under about 12 s for the full 54-hexagon grid on a mid-range phone; if the tab is hidden, jump to the end state.
-- Animate only `opacity` and `transform`. No autoplay audio or video (voice playback, if offered later, is tap to play).
+- **Honesty:** every line is a real check result from the Worker; a failed or timed-out lookup is "Could not check this one", never "Nothing found". No score and no percentage.
+- **Privacy:** the first view shows what was checked and whether it found something, never the value. Values show only after the inbox is proven. Nothing about the visitor is in a URL or stored in the browser (token in memory only). No third-party script added.
+- **Fallback:** if the visitor leaves, the emailed report arrives as before.
+- **Accessibility:** `role="status"` for Alice, a polite live list for results, a screen-reader-only heading, status words (not colour) carry meaning, motion off for reduced-motion.
 
-## 6. Privacy and access
+## Differences from the first proposal
 
-- No personal data in URLs: no email, scan number or findings in the query string or hash. The page stays at `/scan`.
-- No third-party scripts added. The existing Turnstile and analytics behaviour is unchanged. Images self-hosted.
-- The live view shows only what the visitor's own consented scan produced. With save off (today's default), option A must not write new storage; it reads what the browser already holds for this visit. Decision needed: `rememberCompletedScan` currently does nothing unless saving is on, so option A needs either that flag on or a narrow sessionStorage hand-off that is cleared on use. **Owner to decide.**
-- If option B is chosen: the new endpoint takes an opaque, short-lived token (not the address), returns hexagon ids and statuses only, is rate limited, and gets a privacy-policy line (MPC-7470).
+- The live list shows the **email checks the Worker runs**, not a replay of the 54 browser hexagons, and there is no per-hexagon "waiting" grid or summary count. The picture is the existing 160 px curtain image, not a new Alice plate.
+- Polling replaces the proposed stagger, so what appears is paced by the Worker.
+- Phone layout is a single column list; whether 54 browser hexagons should ever be added is no longer a question for this ticket.
 
-## 7. Accessibility
+## Not yet verified or approved
 
-- One `aria-live="polite"` region announces Alice's lines and a single "N of 54 checked" update every few seconds, not one announcement per hexagon.
-- Hexagons are focusable only once resolved; each has a text label with its status (word, not colour only). Tap a hexagon shows detail, as today.
-- Alice's image has descriptive alt text; decorative frames are `alt=""`.
-- Mobile first: single column, 44 px minimum targets, no hover-only information, readable at 320 px.
-- Keyboard: no focus trap; focus stays on the thank-you box when the page updates.
-
-## 8. Analytics
-
-Reuse existing events through `src/lib/analytics.ts`: add only counts (reveal seen, grid completed, left early), no findings or address.
-
-## 9. Approvals needed before build
-
-1. Option A, B or C (section 2) and the storage decision (section 6).
-2. Chris: all [proposed] Alice lines and the thank-you/summary copy.
-3. Owner: which Alice image (section 4).
-4. Whether the 54-hexagon grid is right on a phone or a short "top findings" view replaces it.
-
-## 10. Build plan after approval
-
-1. Presentational components with fixtures (curtain, hexagon stagger, Alice captions) and tests for reduced motion and the honesty rule (no value before status).
-2. Wire to the chosen data source behind a feature flag, default off.
-3. Playwright e2e at 375 px and with `reducedMotion: 'reduce'`.
-4. Owner and Chris review on a preview deploy, then flag on.
-
-## 11. Build log
-
-- **Decision (owner, 2026-10-23): option A.** Replay the scan already in this browser.
-- **Built, flag off by default:** `src/config/liveThankYou.ts` (flag), `src/lib/liveThankYou.ts` (reads the status decided at capture; unknown means "not checked"; no value, score or percentage is carried), `src/components/LiveThankYou.tsx` (curtain, waiting then resolved hexagons, one polite live region, reduced-motion and hidden-tab jump to the end state), wired under the existing thank-you box in `src/pages/Scan.tsx`. The existing thank-you box and the report request are untouched.
-- **Draft copy** lives in `LIVE_COPY` (`src/lib/liveThankYou.ts`) and must not ship until Chris signs it off.
-- **Image:** the existing `/footprint/alice-curtain.jpg` is used as a placeholder (prop `imageSrc`); swap once an image is chosen.
-- **Still open:** the page reads the scan through `pendingScan()`, which holds a scan only when `VITE_SAVE_WEB_SCANS` is on. With it off, every visitor sees the "no scan" state. Owner to choose: turn it on, or add a narrow hand-off cleared on use (section 6).
-- **Not done:** Playwright e2e at 375 px and with reduced motion (step 3), and the phone view decision (section 9, item 4).
+1. **Chris's approval** of every line above, the email paragraphs and button wording, the new hexagon labels and the Privacy text. The swarm run and real-people check (PR checklist) have not been done for this ticket.
+2. **A run on the production site** on a phone and with reduced motion. A scripted attempt on 2026-10-26 from the build sandbox could not finish: the sandbox blocks HubSpot and Cloudflare Turnstile, and the Worker answered the request with 403 (most likely because no Turnstile token could be sent). Nothing was sent or created by that attempt. Someone needs to do it by hand: submit `/scan` with a `+test` alias, watch steps 3 to 5, press the email button, and repeat with the OS "reduce motion" setting on.
+3. **Tier 2 checks** (plain address to a third party) are covered in `docs/osint-list-mpc-8452.md`.
