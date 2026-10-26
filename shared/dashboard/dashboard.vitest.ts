@@ -1,6 +1,7 @@
 // @vitest-environment node
 // MPC-7893: one-time link, session and the three honest views. Synthetic senders and an in-memory store only; nothing here talks to Supabase.
 import { describe, expect, it } from "vitest";
+import { supabaseStore } from "./store";
 import { handleData, handleLanding, handleRedeem } from "./handlers";
 import { sha256Hex, SESSION_COOKIE } from "./crypto";
 import type { DashboardStore, DeepJobRow, DeepResultRow, Read, SessionRow, SnapshotRow } from "./store";
@@ -252,5 +253,14 @@ describe("views", () => {
     expect(f.reasons[0]).toMatch(/risk version risk-count-1 vs risk-rank-1/);
     expect([f.baseline_at, f.recheck_at]).toEqual([base.created_at, later.created_at]);
     expect((finalView(base, { ok: true, value: snap({ id: "s4", sender_id: "111", created_at: "2026-10-27T10:00:00Z", schema_version: 2 }) }) as { state: string }).state).toBe("incomparable");
+  });
+});
+
+describe("storage configuration", () => {
+  it("accepts either service key variable name and refuses to run without one", () => {
+    expect(supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "a" })).not.toBeNull();
+    expect(supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_ROLE_KEY: "b" })).not.toBeNull();
+    expect(supabaseStore({ SUPABASE_URL: "https://x.test" })).toBeNull();
+    expect(supabaseStore({ SUPABASE_SERVICE_KEY: "a" })).toBeNull();
   });
 });

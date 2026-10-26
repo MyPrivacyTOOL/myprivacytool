@@ -2,7 +2,7 @@
 // Reads the Worker's current settings from the Cloudflare API, changes only the allow-listed plain-text flag bindings and PATCHes the
 // full binding list back with every other binding marked "inherit" (secrets keep their values). Values are never printed, only names.
 // Env: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, FLAG_VALUE ("on" | "off"), MODE ("dry-run" | "apply").
-const FLAGS = ["TELEGRAM_BASELINE_SCAN", "TELEGRAM_DEEP_SCAN"];
+const FLAGS = ["TELEGRAM_BASELINE_SCAN", "TELEGRAM_DEEP_SCAN", "TELEGRAM_DASHBOARD_LINKS"]; // MPC-7893 added the dashboard link flag
 const WORKER = "social-listeners";
 const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: account, FLAG_VALUE: value, MODE: mode } = process.env;
 if (!token || !account) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required");

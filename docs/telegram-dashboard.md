@@ -18,7 +18,7 @@ Private dashboard for a Telegram baseline scan, on the existing site (Vite/React
 ## Not done / open
 - "Pre-filled with Telegram context": `/scan` is NOT given any Telegram context. There is no approved server-side contract for it; putting it in a URL would break the no-personal-data rule. Decision needed.
 - The global HELP header entry (PR #533) is not merged; this page has its own Help text.
-- Link issuance needs the flag workflow (`.github/workflows/set-social-listeners-flags.yml`, PR #560 area) extended with `TELEGRAM_DASHBOARD_LINKS`; until then set it in the Cloudflare dashboard (a deploy can wipe dashboard-set variables).
+- `TELEGRAM_DASHBOARD_LINKS` is switched with "Set Telegram test-account flags" (it moves together with the baseline and DEEP flags). If a later Worker deploy drops it, re-run the workflow (dry-run first).
 - Retention of `dashboard_links` rows: expired rows are removed by `mpt_purge_dashboard_credentials()`; no pg_cron job is created by this change.
 - Wording is English-only draft, like MPC-7891.
 
@@ -27,7 +27,7 @@ Private dashboard for a Telegram baseline scan, on the existing site (Vite/React
 - Deleting a person's snapshots (`mpt_delete_profile_snapshots`) cascades to their links and sessions.
 
 ## Deploy and rollback
-Merging to `main` auto-deploys the site and the `social-listeners` Worker: treat the merge as a production action. Order: apply `supabase/migrations/20261026220000_mpc_7893_dashboard_links.sql` by hand (after approval) -> deploy -> set Pages variable `DASHBOARD_ENABLED=1` (plus `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` secrets on Pages) -> set `TELEGRAM_DASHBOARD_LINKS=on` on the Worker. Rollback: unset both flags; `drop function public.mpt_redeem_dashboard_link(text, text, integer); drop function public.mpt_purge_dashboard_credentials(); drop table public.dashboard_sessions; drop table public.dashboard_links;`
+Merging to `main` auto-deploys the site and the `social-listeners` Worker: treat the merge as a production action. Order: apply `supabase/migrations/20261026220000_mpc_7893_dashboard_links.sql` by hand (after approval) -> deploy -> set Pages variable `DASHBOARD_ENABLED=1` (Pages also needs `SUPABASE_URL` and a service key under `SUPABASE_SERVICE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`, as a secret) -> set `TELEGRAM_DASHBOARD_LINKS=on` on the Worker. Rollback: unset both flags; `drop function public.mpt_redeem_dashboard_link(text, text, integer); drop function public.mpt_purge_dashboard_credentials(); drop table public.dashboard_sessions; drop table public.dashboard_links;`
 
 ## Tests
 `npx vitest run shared/dashboard shared/edge-capture src/pages/TelegramDashboard.test.tsx workers/social-listeners`; `DATABASE_URL=<throwaway postgres> bash supabase/tests/run.sh` (includes 8 concurrent redemptions on separate connections).
