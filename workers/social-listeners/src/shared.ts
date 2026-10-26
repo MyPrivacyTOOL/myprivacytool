@@ -43,6 +43,12 @@ export interface Env {
   TELEGRAM_BASELINE_SCAN?: string;
   /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
   PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
+  /** MPC-7892 Telegram DEEP username check: "on" enables it for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
+  TELEGRAM_DEEP_SCAN?: string;
+  /** Days until deep_jobs rows expire (default 90, clamped 1-365). */
+  DEEP_RETENTION_DAYS?: string;
+  /** Max DEEP jobs per sender per 24h (default 3, clamped 1-20). */
+  DEEP_JOBS_PER_DAY?: string;
   /** Preferred: service binding to the core-brain Worker (MPC-8601). */
   CORE_BRAIN?: { fetch(request: Request): Promise<Response> };
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */
