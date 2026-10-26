@@ -57,6 +57,20 @@ export interface CompositeFingerprint {
 }
 
 // Advanced fingerprinting result interfaces
+/**
+ * CK-8494: why the WebRTC reading came out as it did. The old result could not tell "nothing visible" from "could not look", so a re-check
+ * could never say more than "no leak detected" (registry: detection_change_to_make_checkable). Only `none_found` is a real "no public address".
+ *   found       a public address was gathered
+ *   none_found  gathering finished, at least one candidate was seen (even a hidden mDNS name), and none was a public address
+ *   blocked     gathering finished with no candidate at all (WebRTC blocked or restricted): not the same as none_found
+ *   timed_out   gathering did not finish in time
+ *   unsupported the browser has no RTCPeerConnection
+ *   error       the check threw
+ */
+export type WebRTCState = 'found' | 'none_found' | 'blocked' | 'timed_out' | 'unsupported' | 'error';
+/** Bump whenever the rule that maps a gathering to a WebRTCState changes: a re-check is only comparable with the same version. */
+export const WEBRTC_DETECTOR_VERSION = 'webrtc-state-1';
+
 export interface WebRTCLeakResult {
   localIPs: string[];
   publicIPs: string[];
@@ -64,6 +78,16 @@ export interface WebRTCLeakResult {
   vpnDetected: boolean;
   risk: 'critical' | 'high' | 'low';
   technique: 'WebRTC';
+  /** CK-8494: the distinct outcome; additive, nothing existing reads it. */
+  state: WebRTCState;
+  detectorVersion: string;
+}
+
+/** The one rule from a finished gathering to a state, pure so tests can pin it. */
+export function webrtcStateFrom(g: { publicCount: number; candidateCount: number; completed: boolean }): WebRTCState {
+  if (g.publicCount > 0) return 'found';
+  if (!g.completed) return 'timed_out';
+  return g.candidateCount > 0 ? 'none_found' : 'blocked';
 }
 
 export interface HardwareConcurrencyResult {
@@ -1105,6 +1129,8 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
         vpnDetected: false,
         risk: 'low',
         technique: 'WebRTC',
+        state: 'unsupported',
+        detectorVersion: WEBRTC_DETECTOR_VERSION,
       };
     }
 
@@ -1122,6 +1148,8 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
     pc.createDataChannel('');
 
     // Promise to collect ICE candidates
+    let completed = false;
+    let candidateCount = 0;
     const ipPromise = new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
         pc.close();
@@ -1130,12 +1158,14 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
 
       pc.onicecandidate = (event) => {
         if (!event || !event.candidate) {
+          completed = true;
           clearTimeout(timeout);
           pc.close();
           resolve();
           return;
         }
 
+        candidateCount++;
         const candidate = event.candidate.candidate;
         
         // CK-8305: read the connection address field only; ignore mDNS names and foundation ids
@@ -1172,6 +1202,8 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
       vpnDetected,
       risk,
       technique: 'WebRTC',
+      state: webrtcStateFrom({ publicCount: publicIPs.length, candidateCount, completed }),
+      detectorVersion: WEBRTC_DETECTOR_VERSION,
     };
 
   } catch (error) {
@@ -1183,6 +1215,8 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
       vpnDetected: false,
       risk: 'low',
       technique: 'WebRTC',
+      state: 'error',
+      detectorVersion: WEBRTC_DETECTOR_VERSION,
     };
   }
 }
