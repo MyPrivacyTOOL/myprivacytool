@@ -8,3 +8,4 @@ export * from "./knowledge";
 export * from "./intake";
 export * from "./reply";
 export * from "./service";
+export * from "./rest-store";
