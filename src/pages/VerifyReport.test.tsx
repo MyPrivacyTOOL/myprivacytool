@@ -16,11 +16,13 @@ describe('VerifyReport page', () => {
     expect(screen.getByTestId('check-report')).toBeDisabled();
   });
   it('shows a verified result in plain words', async () => {
-    verifyUploaded.mockResolvedValue({ kind: 'verified', signedAt: '2026-10-26T00:00:00.000Z', timestamped: false });
+    verifyUploaded.mockResolvedValue({ kind: 'verified', signedAt: '2026-10-26T00:00:00.000Z', timestamped: true });
     render(<VerifyReport />);
     choose();
     fireEvent.click(screen.getByTestId('check-report'));
-    await waitFor(() => expect(screen.getByTestId('verdict')).toHaveTextContent(/Verified\. Created by MyPrivacyTOOL on 2026-10-26/));
+    await waitFor(() => expect(screen.getByTestId('verdict')).toHaveTextContent(/Verified\. This file was signed by MyPrivacyTOOL on 2026-10-26, and has not been changed since\./));
+    expect(screen.getByTestId('verdict')).toHaveTextContent(/does not, on its own, prove the scan results/);
+    expect(screen.getByTestId('verdict')).not.toHaveTextContent(/time stamp/i);
   });
   it('lists why a file is not verified', async () => {
     verifyUploaded.mockResolvedValue({ kind: 'not_verified', reasons: ['The signature does not match the file.'] });
