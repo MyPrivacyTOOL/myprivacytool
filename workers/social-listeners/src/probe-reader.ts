@@ -102,7 +102,7 @@ async function telegram(env: Env, method: string, body: Record<string, unknown>,
   return result;
 }
 
-async function call(env: Env, method: string, body: Record<string, unknown>): Promise<{ status: number; response: unknown }> {
+export async function call(env: Env, method: string, body: Record<string, unknown>): Promise<{ status: number; response: unknown }> {
   try {
     const res = await fetch(`${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
       method: "POST",

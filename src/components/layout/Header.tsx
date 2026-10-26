@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import logoHeader from "@/assets/logo-header.png";
 import SessionBadge from "@/components/layout/SessionBadge";
+import HelpButton from "@/components/layout/HelpButton";
 
 interface NavItem {
   label: string;
@@ -89,6 +90,8 @@ const Header = () => {
 
         <div className="hidden md:flex items-center gap-6">{renderLinks()}</div>
 
+        <div className="flex items-center gap-2">
+        <HelpButton />
         <div className="hidden md:block">
           <Button asChild>
             <Link to="/scan">Check My Exposure</Link>
@@ -119,6 +122,7 @@ const Header = () => {
             </div>
           </SheetContent>
         </Sheet>
+        </div>
       </nav>
       <SessionBadge />
     </header>
