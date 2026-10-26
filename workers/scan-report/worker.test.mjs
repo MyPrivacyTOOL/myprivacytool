@@ -76,6 +76,7 @@ function fake(opts = {}) {
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
       if (t === 'hexagon_scores' && rows.some((x) => db.hexagon_scores.some((h) => h.scan_id === x.scan_id && h.category === x.category))) return res(409, { code: '23505' });   // unique (scan_id, category)
+      if (t === 'scans' && rows[0].request_id && db.scans.some((x) => x.request_id === rows[0].request_id)) return res(409, { code: '23505' });   // MPC-7471-F3: unique partial index on scans.request_id
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
@@ -94,6 +95,8 @@ function fake(opts = {}) {
     if (q.get('email')?.startsWith('ilike.')) { const v = decodeURIComponent(q.get('email').slice(6)).replace(/\\(.)/g, '$1').toLowerCase(); rows = rows.filter((x) => String(x.email).toLowerCase() === v); }
     const eh = q.get('email_hash'); if (eh?.startsWith('eq.')) rows = rows.filter((x) => x.email_hash === eh.slice(3));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
+    const rq = q.get('request_id')?.replace('eq.', ''); if (rq) rows = rows.filter((x) => x.request_id === rq);   // MPC-7471-F3
+    const cid = q.get('contact_id')?.replace('eq.', ''); if (cid) rows = rows.filter((x) => x.contact_id === decodeURIComponent(cid));   // MPC-7471-F3
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
     if (t === 'scans' && q.get('or')) rows = rows.slice(Number(q.get('offset') || 0), Number(q.get('offset') || 0) + Number(q.get('limit') || rows.length));   // oldest first = insertion order
@@ -667,5 +670,81 @@ const resendCount = (F) => F.calls.filter((c) => c.url.includes('resend')).lengt
   await handleScan({ ...RB, REFERRALS_ENABLED: 'false' }, null, { ...input, email: 'friend@example.com', ref: 'ABCDEFGH' }, G.f); await runReportJob({ ...RB, REFERRALS_ENABLED: 'false' }, G.f);
   const off = G.calls.filter((c) => c.url.includes('resend')).map((c) => JSON.parse(c.body));
   check(G.db.referrals.length === 0 && G.db.users[0].pro_months_earned === 0 && off.every((m) => !/invite 3 friends/i.test(m.text)) && !off.some((m) => m.to[0] === 'ref@example.com') && !G.calls.some((c) => c.url.includes('mpt_complete_referral')), 'referral: switch off => no link, no block in the report, no reward, no call');
+}
+
+// ---- MPC-7471-F3: the post-scan popup uses this same route. Scan saved BEFORE the first email (so it carries the number), unticked save = report only,
+// a retry of the SAME submit (request_id) gets the original outcome, nobody else does.
+{
+  const ON = { ...env, WEB_SCAN_SAVE_ENABLED: 'true', REPORT_REQUEST_ID_ENABLED: 'true', UNSUBSCRIBE_SECRET: 'unsub-secret', RECIPIENT_ALLOWLIST: '' };
+  const V = '2026-10-12-v1';
+  const RID = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
+  const hex = (n = 3) => Array.from({ length: n }, (_, i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `Test value ${i}`, icon: 'x', confidence: 80, risk: 'low', confirmed: true, category: 'device' }));
+  const post = async (e, body, { F } = {}) => {
+    F = F || fake(); globalThis.fetch = F.f; const w = [];
+    const rs = await worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify(body) }), e, { waitUntil: (pr) => w.push(pr) });
+    await Promise.all(w); return { rs, F, j: await rs.clone().json().catch(() => null) };
+  };
+  const popup = (n, extra = {}) => ({ email: `mpc7471f3+${n}@example.com`, consent: true, consent_source: 'web_scan_summary', request_id: RID, scan: hex(), save_consent: true, save_consent_version: V, ...extra });
+  const mails = (F) => F.calls.filter((c) => c.url.includes('api.resend.com')).map((c) => JSON.parse(c.body));
+
+  // save ticked: ONE user, lead, scan, link; the number in the answer is the stored scan's id and is in the first email
+  let o = await post(ON, popup('save'));
+  let F3 = o.F; let m = mails(F3);
+  check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === true && F3.db.web_scans.length === 1 && o.j.scan_number === F3.db.web_scans[0].id, 'F3 popup, save ticked: scan saved, number returned = the stored scan id');
+  check(F3.db.users.length === 1 && F3.db.leads.length === 1 && F3.db.scans.length === 1 && F3.db.web_scan_contacts.length === 1 && F3.db.web_scan_contacts[0].contact_id === F3.db.scans[0].id && F3.db.web_scan_contacts[0].web_scan_id === o.j.scan_number && F3.db.scans[0].request_id === RID, 'F3 popup, save ticked: one user, one lead, one report request, one link to THAT request');
+  check(m.length === 1 && m[0].subject === 'Your privacy scan is starting' && m[0].text.includes(`Your scan number: ${o.j.scan_number}. Quote this number if you want this scan deleted.`) && m[0].html.includes(o.j.scan_number), 'F3 popup, save ticked: the first email carries the same scan number and the deletion guidance');
+  check(/unsubscribe/i.test(m[0].headers?.['List-Unsubscribe'] || '') && /unsubscribe/i.test(m[0].text), 'F3: the first email keeps its unsubscribe link and List-Unsubscribe header');
+  check(Math.abs(Date.now() - Date.parse(F3.db.web_scan_contacts[0].save_consent_at)) < 60000 && F3.db.web_scan_contacts[0].save_consent_version === V && F3.db.users[0].consent_source === 'web_scan_summary', 'F3: one consent record per submit: save consent time + wording version on the link, report consent source on the user');
+  const rep = await runReportJob(ON, F3.f); m = mails(F3);
+  check(rep.sent === 1 && m.length === 2 && m[1].text.includes(`Your scan number: ${o.j.scan_number}.`), 'F3: the report shows the same scan number');
+
+  // timeout after a successful write: the SAME request again gets the original outcome, nothing is written twice
+  const before = { u: F3.db.users.length, l: F3.db.leads.length, s: F3.db.scans.length, w: F3.db.web_scans.length, c: F3.db.web_scan_contacts.length, e: F3.db.web_scan_events.length, mail: mails(F3).length, hs: F3.calls.filter((c) => c.url.includes('hubapi')).length };
+  const o2 = await post(ON, popup('save'), { F: F3 });
+  check(o2.rs.status === 200 && o2.j.duplicate === true && o2.j.replay === true && o2.j.scan_saved === true && o2.j.scan_number === o.j.scan_number && !('live_token' in o2.j), 'F3 replay (same request_id): the original scan number comes back, flagged as a replay');
+  check(F3.db.users.length === before.u && F3.db.leads.length === before.l && F3.db.scans.length === before.s && F3.db.web_scans.length === before.w && F3.db.web_scan_contacts.length === before.c && F3.db.web_scan_events.length === before.e && mails(F3).length === before.mail && F3.calls.filter((c) => c.url.includes('hubapi')).length === before.hs, 'F3 replay: no second user, lead, scan, saved scan, link, event, CRM write or email');
+
+  // a different submit for the same address (no key, or another key) learns nothing: the number is not handed to whoever types the address
+  for (const [name, extra] of Object.entries({ 'no request_id': { request_id: undefined }, 'another request_id': { request_id: '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d' } })) {
+    const o3 = await post(ON, popup('save', extra), { F: F3 });
+    check(o3.rs.status === 200 && o3.j.duplicate === true && o3.j.scan_saved === false && !('scan_number' in o3.j) && !('replay' in o3.j) && F3.db.web_scans.length === 1, `F3 wrong requester (${name}): duplicate answer only, no scan number, nothing new saved`);
+  }
+  // another address that reuses someone's request_id gets nothing of theirs and saves nothing
+  { const o4 = await post(ON, popup('thief'), { F: F3 });
+    check(!JSON.stringify(o4.j).includes(o.j.scan_number) && F3.db.web_scans.length === 1 && F3.db.web_scan_contacts.length === 1, 'F3 wrong user (another address, same request_id): the first visitor\'s scan number is not returned and no scan is saved for them'); }
+
+  // save NOT ticked: the report is still requested and the first email goes out, but nothing optional is stored and no number is promised
+  o = await post(ON, { email: 'mpc7471f3+nosave@example.com', consent: true, consent_source: 'web_scan_summary', request_id: RID });
+  F3 = o.F; m = mails(F3);
+  check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && !('scan_number' in o.j) && F3.db.scans.length === 1 && F3.db.web_scans.length === 0 && F3.db.web_scan_contacts.length === 0 && F3.db.web_scan_events.length === 0, 'F3 popup, save not ticked: report request created, no saved scan, link or event, no scan number');
+  check(m.length === 1 && !/Your scan number/.test(m[0].text + m[0].html), 'F3 popup, save not ticked: the first email makes no scan-number promise');
+  check((await runReportJob(ON, F3.f)).sent === 1 && mails(F3).length === 2 && !/Your scan number/.test(mails(F3)[1].text), 'F3 popup, save not ticked: the report is still delivered (and says it has no saved scan)');
+
+  // consent to the report itself is mandatory; save consent never implied
+  o = await post(ON, popup('noconsent', { consent: false })); check(o.rs.status === 400 && o.F.db.scans.length === 0 && o.F.db.web_scans.length === 0 && mails(o.F).length === 0, 'F3: no report consent => 400, nothing stored or sent');
+  o = await post(ON, popup('nosc', { save_consent: undefined })); check(o.rs.status === 400 && o.F.db.web_scans.length === 0 && o.F.db.scans.length === 0, 'F3: a scan without save consent is refused, nothing stored');
+
+  // request_id must be a UUID v4; ignored entirely while the switch is off
+  for (const bad of ['nope', 123, '3f1c2d4e-5a6b-1c7d-8e9f-0a1b2c3d4e5f', '']) { o = await post(ON, popup('badid', { request_id: bad })); check(o.rs.status === 400 && o.F.db.scans.length === 0 && o.F.db.users.length === 0, `F3: invalid request_id (${JSON.stringify(bad)}) => 400, nothing stored`); }
+  o = await post({ ...ON, REPORT_REQUEST_ID_ENABLED: 'false' }, popup('swoff'));
+  check(o.rs.status === 200 && o.j.scan_saved === true && !('request_id' in o.F.db.scans[0]), 'F3 switch off: request_id ignored, the column is never written (safe before the migration is applied)');
+  { const F = fake(); await post({ ...ON, REPORT_REQUEST_ID_ENABLED: 'false' }, popup('swoff2'), { F }); o = await post({ ...ON, REPORT_REQUEST_ID_ENABLED: 'false' }, popup('swoff2'), { F });
+    check(o.j.duplicate === true && !('replay' in o.j) && !('scan_number' in o.j), 'F3 switch off: a retry is answered as an ordinary duplicate'); }
+
+  // partial failure: the link (consent record) cannot be written -> email and report request still succeed, honestly without a number, scan removed again, no personal data in the logs
+  { const F = fake({ linkFail: true }); const logs = []; const ce = console.error; const cw = console.warn; console.error = (...a) => logs.push(a.join(' ')); console.warn = (...a) => logs.push(a.join(' '));
+    try { o = await post(ON, popup('linkfail'), { F }); } finally { console.error = ce; console.warn = cw; }
+    check(o.rs.status === 200 && o.j.success === true && o.j.scan_saved === false && !('scan_number' in o.j) && F.db.scans.length === 1 && F.db.web_scans.length === 0 && mails(F).length === 1 && !/Your scan number/.test(mails(F)[0].text), 'F3 partial failure: report requested and first email sent, no scan left stored, no number promised');
+    check(!logs.join('\n').includes('mpc7471f3') && !logs.join('\n').includes('Test value'), 'F3: logs contain no email address and no scan values');
+    // a replay after that partial failure reports the truth: requested, not saved
+    o = await post(ON, popup('linkfail'), { F }); check(o.j.replay === true && o.j.scan_saved === false && !('scan_number' in o.j) && F.db.scans.length === 1, 'F3 replay after a failed save: requested, not saved, no number invented'); }
+
+  // unsubscribe / suppression: an explicit report request is transactional (the existing contract), but it never lifts an opt-out: the user keeps email_opt_out_at, the
+  // hash stays suppressed, and the follow-up job (cancel-if-unsubscribed) sends nothing to them.
+  { const F = fake(); const addr = 'mpc7471f3+supp@example.com'; const h = await emailHash(addr); const optOut = '2026-10-01T00:00:00.000Z';
+    F.db.email_suppressions.push({ id: 's1', email_hash: h }); F.db.users.push({ id: 'u-supp', email: addr, email_opt_out_at: optOut });
+    o = await post(ON, popup('supp'), { F }); await runReportJob(ON, F.f);
+    const sentBefore = mails(F).length; F.db.scans.forEach((x) => { x.report_sent_at = new Date(Date.now() - 8 * 864e5).toISOString(); }); await runFollowUpJob(ON, F.f);
+    check(o.rs.status === 200 && F.db.users.find((u) => u.email === addr).email_opt_out_at === optOut && F.db.email_suppressions.length === 1 && mails(F).length === sentBefore, 'F3 unsubscribe: the popup request does not lift an opt-out or the suppression, and no follow-up is sent to that address'); }
 }
 process.exit(ok ? 0 : 1);

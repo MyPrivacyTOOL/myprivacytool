@@ -783,6 +783,13 @@ select pg_temp.assert(public.rollup_and_purge_hexagon_events() = 6, 'learning: t
 select pg_temp.assert((select count(*) from public.mpt_hexagon_events where hexagon_id = 'isp') = 1, 'learning: a recent row survives the purge');
 select pg_temp.assert((select shown_people from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 3 and (select not_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1 and (select yes_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1, 'learning: the rollup counts 3 shown and each person''s first answer once (a change of mind is not double counted)');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.rollup_and_purge_hexagon_events(interval '1 hour')$$) = 'P0001', 'learning: retention under one day is refused');
+-- MPC-7471-F3: a per-submit key on the report request
+insert into public.users (id, email) values ('44444444-4444-4444-4444-444444444444', 'f3@example.com');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.scans (id, user_id, email_scanned, request_id) values ('33333333-3333-3333-3333-333333333331', '44444444-4444-4444-4444-444444444444', 'f3@example.com', '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f')$$) = '', 'F3: a report request can carry a request_id');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.scans (id, user_id, email_scanned, request_id) values ('33333333-3333-3333-3333-333333333332', '44444444-4444-4444-4444-444444444444', 'f3b@example.com', '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f')$$) = '23505', 'F3: the same request_id cannot create a second report request (unique)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.scans (id, user_id, email_scanned) values ('33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444', 'f3c@example.com')$$) = '' and pg_temp.try_as('service_role', $$insert into public.scans (id, user_id, email_scanned) values ('33333333-3333-3333-3333-333333333334', '44444444-4444-4444-4444-444444444444', 'f3d@example.com')$$) = '', 'F3: requests without a key are unaffected (many nulls allowed)');
+select pg_temp.assert(pg_temp.try_as('anon', $$select request_id from public.scans$$) = '42501', 'F3: anon cannot read request_id');
+
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

@@ -40,6 +40,11 @@ EMAIL_GITHUB_COMMITS_ENABLED = "true"
 # The site has a matching flag, VITE_SAVE_WEB_SCANS (a Cloudflare Pages build variable): the tick box only shows when BOTH are on.
 WEB_SCAN_SAVE_ENABLED = "true"
 
+# MPC-7471-F3: the post-scan popup sends a per-submit request_id so a retry after a lost answer gets the original outcome (and scan number) back instead of "already
+# requested". Reads and writes scans.request_id, so it needs migration 20261026200000_mpc_7471_f3_scans_request_id.sql applied FIRST (not applied yet; needs Chris's
+# approval). OFF = request_id is ignored and the column is never touched. "false" is the rollback.
+REPORT_REQUEST_ID_ENABLED = "false"
+
 # MPC-7494: the open mirror ("Welcome back, we recognised your device without a cookie"). ON since 2026-10-12 on Chris's instruction, after he approved the
 # screen, the threshold and the exact opt-in wording, and after the recognise-opt-in migration (20261012240000) was applied. Recognition runs only for a browser
 # holding a scan saved with BOTH the save consent and the separate "recognise this device" consent. Needs WEB_SCAN_SAVE_ENABLED too. "false" is the rollback;
