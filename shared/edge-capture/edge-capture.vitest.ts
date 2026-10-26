@@ -3,7 +3,7 @@
 // The retention cut is tested against a real Postgres in supabase/tests/schema.test.sql. All rows here are made up.
 import { describe, expect, it, vi } from "vitest";
 import { classify, treatAsPerson } from "./classify";
-import { buildVisit, captureEnabled, captureVisit, cleanQuery, cleanReferrer, recordVisit, safeCf, type CaptureEnv } from "./capture";
+import { buildVisit, captureEnabled, captureVisit, cleanQuery, cleanReferrer, redactSecretPath, recordVisit, safeCf, type CaptureEnv } from "./capture";
 import { RULES, RULESET_VERSION, type RequestFacts } from "./ruleset";
 import { onRequest } from "../../functions/_middleware";
 import routes from "../../public/_routes.json";
@@ -191,5 +191,18 @@ describe("store failure and no delay", () => {
     const res = new Response("page");
     const out = await onRequest({ request: req("https://x.test/"), env, next: async () => res, waitUntil: () => { throw new Error("x"); } });
     expect(out).toBe(res);
+  });
+});
+
+describe("MPC-7893: the one-time dashboard link is never logged", () => {
+  const tok = "3f6c9f0e-5d0a-4c1e-9b0e-0a1b2c3d4e5f";
+  it("path and referrer keep /d/ but drop the credential", () => {
+    expect(redactSecretPath(`/d/${tok}`)).toBe("/d/[redacted]");
+    expect(redactSecretPath("/dashboard")).toBe("/dashboard");
+    expect(redactSecretPath("/blog/d/x")).toBe("/blog/d/x");
+    const row = buildVisit(new Request(`https://myprivacytool.io/d/${tok}`, { headers: { referer: `https://myprivacytool.io/d/${tok}` } }), 200);
+    expect(JSON.stringify(row)).not.toContain(tok);
+    expect(row.path).toBe("/d/[redacted]");
+    expect(cleanReferrer(`https://myprivacytool.io/d/${tok}?x=1`)).toBe("https://myprivacytool.io/d/[redacted]");
   });
 });

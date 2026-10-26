@@ -56,12 +56,15 @@ export const captureEnabled = (env: CaptureEnv | undefined): boolean => /^(1|tru
 
 const cut = (v: string | null | undefined, n: number): string | null => (v == null || v === "" ? null : v.slice(0, n));
 
+/** MPC-7893: /d/<uuid> is a one-time bearer link to a private dashboard. The credential must never reach the visit log, as a path or as a referrer. */
+export const redactSecretPath = (pathname: string): string => pathname.replace(/^\/d\/[^/]*/i, "/d/[redacted]");
+
 /** Referrer reduced to origin + path: query strings and fragments can carry personal data. */
 export function cleanReferrer(ref: string | null): string | null {
   if (!ref) return null;
   try {
     const u = new URL(ref);
-    return cut(u.origin + u.pathname, 512);
+    return cut(u.origin + redactSecretPath(u.pathname), 512);
   } catch {
     return null;
   }
@@ -140,7 +143,7 @@ export function buildVisit(request: Request, status: number | null): VisitRow {
   const ip = cut(request.headers.get("cf-connecting-ip"), 64);
   return {
     host: cut(url.host, 255),
-    path: url.pathname.slice(0, 512),
+    path: redactSecretPath(url.pathname).slice(0, 512),
     method: request.method.slice(0, 16),
     status,
     user_agent: cut(ua, 512),
