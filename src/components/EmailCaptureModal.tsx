@@ -5,12 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { getPageRiskLabel } from '@/lib/scanResult';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { loadTurnstile, TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 
 interface EmailCaptureModalProps {
   riskScore: number;
   categoryScores?: Record<string, number>;
   confirmedCount: number;
+  /** MPC-7471-F2: when given, the popup states confirmed / checked / total in the same words as the summary. */
+  counts?: ScanCounts;
   onClose: () => void;
   onSubmit: (email: string) => void;
 }
@@ -28,6 +31,7 @@ export default function EmailCaptureModal({
   riskScore,
   categoryScores,
   confirmedCount,
+  counts,
   onClose,
   onSubmit,
 }: EmailCaptureModalProps) {
@@ -189,6 +193,7 @@ export default function EmailCaptureModal({
             <div className="text-sm">
               <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
               <span className="text-muted-foreground"> — {riskScore}/100 risk score · {exposurePct}% exposure</span>
+              {counts && <p className="mt-1 text-muted-foreground" data-testid="scan-counts-line">{scanCountsLine(counts)}</p>}
             </div>
           </div>
 
