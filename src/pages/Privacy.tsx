@@ -485,10 +485,10 @@ const Privacy = () => {
                   and to Libravatar to see whether a public profile or avatar
                   exists. Where we check whether your address appears in a data
                   breach, we name that provider here when the check is switched on.
-                  The same applies to a search of public code commits on GitHub:
-                  if we switch it on, your email address itself (not a hash) goes
-                  to GitHub, in a search for public commits that name it as the
-                  author, and we say so here at that point
+                  We also search public code commits on GitHub: your email address
+                  itself (not a hash) goes to GitHub, in a search for public
+                  commits that name it as the author, so we can tell you if your
+                  address is published in public code
                 </li>
                 <li>
                   <strong>Legal Authorities:</strong> When required by law or to
