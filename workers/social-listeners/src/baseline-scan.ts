@@ -1,26 +1,34 @@
 // MPC-7891 Telegram baseline scan v1 (allow-listed test accounts only, default off). After core-brain moves the sender from
 // awaiting_confirmation to confirmed (the Y to the consent question), runs getChat + getUserProfilePhotos for THE SENDER ONLY,
-// replies with a scored report and saves a snapshot to public.profile_snapshots. Wording is DRAFT pending Chris's approval (strategy 9.9, 11).
+// replies with a risk report (hexagons returned out of 30) and saves a snapshot to public.profile_snapshots. Wording is DRAFT pending Chris's approval (strategy 9.9, 11).
+import { ARRIVAL, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
+import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import type { Env } from "./shared";
 
 export const SCAN_VERSION = "telegram-baseline-1";
-export const RISK_VERSION = "risk-rank-1";
+export const RISK_VERSION = "risk-count-1";
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
 const DEFAULT_RETENTION_DAYS = 90; // the consent text says "up to 90 days"; D-A (9.9) retention policy is still to be fixed
 
-/** Risk-ranking contract (strategy 9.10 tiers). PROPOSED penalty weights: not yet approved. Score = 10 minus penalties for fields observed, floored at 0. */
-export const RISK_RANKING = {
-  version: RISK_VERSION,
-  weights: { critical: 3, high: 1.5, medium: 1, low: 0.25 },
-  tiers: {
-    username: "critical", bio: "high", birthdate: "high", numeric_id: "high", names: "medium", photo: "medium",
-    language: "low", accent_color: "low", is_premium: "low",
-  },
-} as const;
-type Field = keyof typeof RISK_RANKING.tiers;
+/**
+ * Risk contract risk-count-1 (owner's decision, 2026-10-26): risk = how many of the 30 Telegram hexagons this bot received, out of 30. Each counts 1
+ * (no weights). Higher = more exposed, like the website's exposure score; the band edges come from that score (shared/hexagon-registry/score.js).
+ * Hexagons that are not checked in the baseline (disabled, or not looked up) can never be counted, so they are reported next to the risk.
+ */
+export interface Risk { returned: number; possible: number; notChecked: number; percent: number; band: "low" | "medium" | "high"; label: string }
+
+export function riskFrom(hexagons: HexagonState[]): Risk {
+  const returned = hexagons.filter((x) => x.state === "returned").length;
+  const percent = Math.round((returned / hexagons.length) * 100);
+  const band = bandFor(percent) as Risk["band"];
+  return { returned, possible: hexagons.length, notChecked: hexagons.filter((x) => x.state === "not_checked").length, percent, band, label: BAND_LABEL[band] };
+}
+
+/** Things Telegram never gives a bot, whatever the account's settings. Shown as wins, worded as how Telegram's bot system works, not as a check of the person's settings. */
+export const NEVER_SENT = ["phone number (unless you tap a share button)", "last seen", "IP address", "device"] as const;
 
 /** Insights that stay off until their interpretation is approved or measured (see the task's measurement results). */
 export const DISABLED_INSIGHTS = { message_count: "message_id measurement not run", account_era: "no approved id-to-era table" } as const;
@@ -56,8 +64,53 @@ const result = (a: Answer): Record<string, unknown> | null => {
 };
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
 
-export interface Item { field: Field; label: string; returned: boolean; penalty: number }
-export interface Report { score: number; items: Item[]; insights: string[]; text: string }
+export interface HexagonState { id: string; channel: "TG"; arrival: ArrivalId; state: ObservationState }
+export interface Report { risk: Risk; insights: string[]; hexagons: HexagonState[]; text: string }
+
+const has = (o: Record<string, unknown>, k: string): boolean => o[k] !== undefined && o[k] !== null && o[k] !== "";
+
+/**
+ * One state per Telegram hexagon (shared/hexagon-registry/channels.js, 30 of them). "returned" = this bot received it in this successful check;
+ * "not_returned" = a successful check did not return it (may be a privacy setting, or simply unset: never "hidden"); "not_checked" = disabled or
+ * not looked up in the baseline. Pure.
+ */
+export function hexagonStates(update: unknown, chat: Record<string, unknown>, photoSets: unknown[]): HexagonState[] {
+  const from = (update as { message?: { from?: Record<string, unknown>; date?: unknown; text?: unknown } }).message?.from ?? {};
+  const msg = (update as { message?: { date?: unknown; text?: unknown } }).message ?? {};
+  const usernames = Array.isArray(chat.active_usernames) ? chat.active_usernames.length : 0;
+  const uniq = photoSets.flatMap((x) => (Array.isArray(x) ? x : [])).some((p: { file_unique_id?: unknown }) => typeof p?.file_unique_id === "string");
+  const idNum = typeof chat.id === "number" ? chat.id : null;
+  const accent = typeof chat.accent_color_id === "number" ? chat.accent_color_id : null;
+  const returned: Record<string, boolean> = {
+    "tg.numeric_id": idNum !== null, "tg.first_name": has(chat, "first_name") || has(from, "first_name"), "tg.last_name": has(chat, "last_name") || has(from, "last_name"),
+    "tg.username": has(chat, "username") || usernames > 0 || has(from, "username"), "tg.language": has(from, "language_code"),
+    "tg.message_time": typeof msg.date === "number", "tg.message_text": typeof msg.text === "string", "tg.update_counter": typeof (update as { update_id?: unknown }).update_id === "number",
+    "tg.bio": has(chat, "bio"), "tg.birthday": has(chat, "birthdate"), "tg.photo_current": photoSets.length > 0 || has(chat, "photo"), "tg.photo_history": photoSets.length > 1,
+    "tg.photo_fingerprint": uniq, "tg.extra_usernames": usernames > 1, "tg.premium": chat.is_premium === true, "tg.emoji_status": has(chat, "emoji_status_custom_emoji_id"),
+    "tg.profile_colour": has(chat, "profile_accent_color_id") || (accent !== null && idNum !== null && accent !== idNum % 7), "tg.profile_background": has(chat, "profile_background_custom_emoji_id"),
+    "tg.gift_settings": has(chat, "accepted_gift_types"), "tg.business_intro": has(chat, "business_intro"), "tg.business_location": has(chat, "business_location"),
+    "tg.business_hours": has(chat, "business_opening_hours"), "tg.personal_channel": has(chat, "personal_chat"),
+    "tg.forward_privacy": has(chat, "has_private_forwards"), "tg.voice_restriction": has(chat, "has_restricted_voice_and_video_messages"),
+  };
+  return TELEGRAM_HEXAGONS.map((x) => ({
+    id: x.id, channel: "TG" as const, arrival: x.arrival,
+    state: !x.enabled || !(x.id in returned) ? "not_checked" : returned[x.id] ? "returned" : "not_returned",
+  }));
+}
+
+/** One block per arrival class: "[A] Sent with every message: 7 of 8", then what came back and what did not. Not-checked hexagons are left out of the counts. */
+function hexagonLines(hexagons: HexagonState[]): string[] {
+  const label = (id: string) => TELEGRAM_HEXAGONS.find((x) => x.id === id)?.label ?? id;
+  const out: string[] = [];
+  for (const a of Object.keys(ARRIVAL) as ArrivalId[]) {
+    const checked = hexagons.filter((x) => x.arrival === a && x.state !== "not_checked");
+    if (!checked.length) continue;
+    const got = checked.filter((x) => x.state === "returned").map((x) => label(x.id));
+    const not = checked.filter((x) => x.state !== "returned").map((x) => label(x.id));
+    out.push("", `[${a}] ${ARRIVAL[a].label}: ${got.length} of ${checked.length}`, `  Returned: ${got.join(", ") || "none"}`, ...(not.length ? [`  Not returned: ${not.join(", ")}`] : []));
+  }
+  return out;
+}
 
 /** Pure: builds the report from successful answers. Returns null if a required call failed (no score is ever invented). */
 export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer): Report | null {
@@ -65,34 +118,16 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
   if (!chat || !photos) return null;
   const m = (update as { update_id?: unknown; message?: { from?: { id?: number; first_name?: string; last_name?: string; language_code?: string } } }).message?.from ?? {};
   const photoSets = Array.isArray(photos.photos) ? photos.photos : [];
-  const returned: Record<Field, boolean> = {
-    username: !!(str(chat.username) || (Array.isArray(chat.active_usernames) && chat.active_usernames.length > 0)),
-    bio: !!str(chat.bio),
-    birthdate: !!chat.birthdate && typeof chat.birthdate === "object",
-    numeric_id: typeof chat.id === "number",
-    names: !!(str(chat.first_name) || str(chat.last_name)),
-    photo: photoSets.length > 0 || !!chat.photo,
-    language: !!str(m.language_code),
-    accent_color: false, // only a deviation from the default colour counts (below)
-    is_premium: chat.is_premium === true,
-  };
+  const hexagons = hexagonStates(update, chat, photoSets);
+  const got = (id: string) => hexagons.find((x) => x.id === id)?.state === "returned";
   const idNum = typeof chat.id === "number" ? chat.id : null;
   const accent = typeof chat.accent_color_id === "number" ? chat.accent_color_id : null;
   const defaultColour = idNum !== null && accent !== null && accent === idNum % 7;
-  if (accent !== null && !defaultColour) returned.accent_color = true;
-  const labels: Record<Field, string> = {
-    username: "@username", bio: "Bio", birthdate: "Birthday (day/month)", numeric_id: "Numeric Telegram id", names: "Name",
-    photo: "Profile photo", language: "Language setting", accent_color: "Custom profile colour", is_premium: "Premium status",
-  };
-  const items: Item[] = (Object.keys(RISK_RANKING.tiers) as Field[]).map((field) => ({
-    field, label: labels[field], returned: returned[field],
-    penalty: returned[field] ? RISK_RANKING.weights[RISK_RANKING.tiers[field]] : 0,
-  }));
-  const score = Math.round(Math.max(0, 10 - items.reduce((s, i) => s + i.penalty, 0)) * 10) / 10;
+  const risk = riskFrom(hexagons);
 
   const insights: string[] = [];
-  if (returned.birthdate) insights.push("Birthday: your day and month were returned to this bot. A birthday is a common security-question answer.");
-  if (returned.language) insights.push(`Language: your app sent "${m.language_code}" with your message. That is a language setting, not your location or nationality.`);
+  if (got("tg.birthday")) insights.push("Birthday: your day and month were returned to this bot. A birthday is a common security-question answer.");
+  if (got("tg.language")) insights.push(`Language: your app sent "${m.language_code}" with your message. That is a language setting, not your location or nationality.`);
   if (idNum !== null && accent !== null) insights.push(defaultColour
     ? "Name colour: Telegram's default for your id; no custom profile colour was returned (seen on one test account so far)."
     : "Name colour: a custom colour was returned.");
@@ -106,21 +141,18 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
   if (chat.accepted_gift_types && typeof chat.accepted_gift_types === "object") engagement.push("gift settings returned");
   if (engagement.length > 0) insights.push(`How Telegram describes your account: ${engagement.join(", ")}.`);
 
-  const found = items.filter((i) => i.returned), notFound = items.filter((i) => !i.returned);
   const text = [
-    `Telegram baseline scan (draft test report): ${score}/10`,
+    `Telegram risk (draft test report): ${risk.returned} / ${risk.possible} - ${risk.label}`,
+    `That is how many of the ${risk.possible} pieces of information Telegram could send this bot actually reached it in this check (${risk.notChecked} cannot be checked yet). Higher = more exposed. Not returned only means this bot did not receive it: it does not verify your privacy settings.`,
+    ...hexagonLines(hexagons),
     "",
-    "Returned to this bot:", ...(found.length ? found.map((i) => `- ${i.label}`) : ["- nothing in the list"]),
-    "",
-    "Not returned to this bot in this check (may be hidden by your settings, or not set; this does not verify your settings):",
-    ...(notFound.length ? notFound.map((i) => `- ${i.label}`) : ["- nothing in the list"]),
-    "",
-    "Never provided to bots by Telegram: phone number, last seen, IP address, device. We cannot inspect those settings.",
+    `✅ Never sent to bots by Telegram: ${NEVER_SENT.join(", ")}.`,
+    "This is how Telegram's bot system works for every account. It is not a check of your own privacy settings.",
     ...(insights.length ? ["", "What this shows:", ...insights.map((i) => `- ${i}`)] : []),
     "",
-    "Next: change settings yourself in Telegram > Settings > Privacy, then ask for a re-check. Score uses " + RISK_VERSION + " (draft weights).",
+    "Next: change settings yourself in Telegram > Settings > Privacy, then ask for a re-check. Risk version " + RISK_VERSION + ".",
   ].join("\n");
-  return { score, items, insights, text };
+  return { risk, insights, hexagons, text };
 }
 
 async function post(env: Env, path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
@@ -167,11 +199,11 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
     const date = (update as { message?: { date?: unknown } }).message?.date;
     const saved = await saveSnapshot(env, {
       platform: "telegram", sender_id: sender.id, update_id: updateId, status: report ? "complete" : "failed",
-      scan_version: SCAN_VERSION, risk_version: RISK_VERSION, schema_version: 1, score: report?.score ?? null,
+      scan_version: SCAN_VERSION, risk_version: RISK_VERSION, schema_version: 1, score: null, // risk lives in report.risk (count out of 30); the legacy 0-10 column stays empty
       consent: { state_before: "awaiting_confirmation", state_after: "confirmed", confirming_update_id: updateId, consent_text_key: "bot.first_hexagon.question" },
       consent_at: typeof date === "number" ? new Date(date * 1000).toISOString() : null,
       get_chat: stripFileIds(chat), photos: stripFileIds(photos),
-      report: report ? { items: report.items, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
+      report: report ? { channel: "TG", risk: report.risk, never_sent: NEVER_SENT, hexagons: report.hexagons, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
       expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString(),
     }, log);
     const text = report ? report.text : FAILED_TEXT;
