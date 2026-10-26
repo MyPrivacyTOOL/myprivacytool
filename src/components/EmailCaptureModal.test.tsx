@@ -6,6 +6,9 @@ import { jsonResponse } from "@/test/render";
 import EmailCaptureModal from "./EmailCaptureModal";
 import { HEXAGON_COUNT } from "../../shared/hexagon-registry/registry.js";
 
+// MPC-7471-F1: the dialog fires confetti on open; jsdom has no canvas, so stub it everywhere in this file.
+vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
+
 afterEach(() => vi.unstubAllGlobals());
 const setup = (riskScore = 55) => {
   const onClose = vi.fn(), onSubmit = vi.fn();
@@ -16,7 +19,7 @@ const email = () => screen.getByPlaceholderText("your@email.com");
 const send = () => screen.getByRole("button", { name: /send my privacy check/i });
 
 describe("EmailCaptureModal", () => {
-  it.each([[75, "High Risk"], [50, "Medium Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
+  it.each([[85, "High Risk"], [80, "High Risk"], [79, "Medium Risk"], [50, "Medium Risk"], [49, "Low Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
     setup(score);
     expect(screen.getByText(label)).toBeInTheDocument();
     // MPC-7466: the exposure percentage divides by the registry hexagon count (was a hard-coded 46).
