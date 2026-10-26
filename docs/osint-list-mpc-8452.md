@@ -24,20 +24,24 @@ Rules every check must meet before it is built:
 
 | Idea | What it would show | Why it is held |
 |---|---|---|
-| Public code commits | Whether the address appears as the author of public GitHub commits (a common, avoidable exposure) | The plain address goes to GitHub's search; Privacy page and sub-processor wording need changing first |
+| Public code commits | Whether the address appears as the author of public GitHub commits (a common, avoidable exposure) | **Built, OFF** (owner approved 2026-10-26): see the decision below |
 | PGP key servers | Whether a public encryption key is published for the address | The plain address goes to the key server |
 | Web archive mentions | Whether the address appears on archived public pages | The plain address goes to the archive; results are noisy |
 | Known breaches (`email-breaches`) | Whether the address is in a known data breach | Registered but NOT BUILT since MPC-7467: the source's commercial-use terms were never confirmed, and a paid key (Have I Been Pwned) would be the clean route. The plain address goes to the provider |
 
-### Owner decision, 2026-10-26 (given in chat; recorded here, not yet built)
+### Owner decision, 2026-10-26 (given in chat)
 
-The owner approved the recommendation on the ticket: **GitHub public commit search** and **a paid-key breach source** may receive the plain address, each only after its Privacy page wording is approved and live (rule 4 above). **PGP key servers and web archive mentions are not approved** and stay held.
+The owner approved **GitHub public commit search** as the Tier 2 check, and said **no money is to be spent on Have I Been Pwned**. PGP key servers and web archive mentions are not approved and stay held.
 
-Why nothing is built yet (what must exist first):
-1. **GitHub commit search** (`GET https://api.github.com/search/commits?q=author-email:<address>`): unauthenticated search is limited to about 10 requests a minute per IP, and Workers share IPs, so without a token most lookups would end as NOT CHECKED. Needs a GitHub token with no scopes (public data only) stored as a Worker secret, set by a human. A check must return FOUND only for a real match, CLEAR only for a 200 with zero results, and NOT CHECKED for 403, 422, 429, timeouts and anything else.
-2. **Breach source:** the paid-key route is Have I Been Pwned. Rule 1 (free and public) is waived for this one source by the owner's approval, but a key has to be bought and set as `HIBP_API_KEY`, and the plain address then goes to that provider. `email-breaches` is already registered; its provider wiring is what is missing.
-3. **Privacy page** wording naming each provider (see "Adding a check", step 4), approved by Chris and deployed before either check runs.
-4. **Careful wiring.** `workers/scan-report/lib/live.js` marks the live view done when the number of finished items reaches `Object.keys(EMAIL_HEXAGONS).length`. A check that is registered but switched off would leave the live view on "still looking" for ever, so a switch must remove the check from the count as well as from `runEmailHexagons`. The registry count in `report-email.test.mjs`, `live.test.mjs`, `worker.test.mjs` and `registry.test.mjs` moves with every added check.
+**`email-github-commits` is built and OFF** (Worker var `EMAIL_GITHUB_COMMITS_ENABLED = "false"` in `workers/scan-report/wrangler.toml`; only the exact string `"true"` runs it).
+- It sends the **plain address** to `api.github.com/search/commits?q=author-email:<address>`, one request per run. It is the only check that does. The Privacy page already carries a conditional sentence for it; change that sentence to say it is on in the same change that sets the switch to `"true"`.
+- FOUND: GitHub reports at least one public commit (count and one repository name; the name shows only in the inbox-verified view and the report). CLEAR: HTTP 200, zero results, not marked incomplete. NOT CHECKED: anything else (403, 429, 422, 5xx, incomplete results, timeout, bad body). GitHub indexes only default-branch commits, so CLEAR never means "appears nowhere".
+- Optional Worker secret `GITHUB_SEARCH_TOKEN` (a GitHub token with **no scopes**, free). Without it the search allows about 10 requests a minute per IP and Workers share IPs, so expect many NOT CHECKED results. It is deliberately not in `EXPECTED_SECRETS.txt`, so the deploy does not need it.
+- The live view's "done" count uses `enabledEmailHexagonIds(env)` (`lib/emailHexagons.js`), so a switched-off check is not waited for. Tested in `live.test.mjs`.
+- Not yet in the registry (`shared/hexagon-registry`) or the report email: the check shows in the live view and is stored as a `signals` row, but a registry entry would put a permanent NOT CHECKED hexagon in every report while the switch is off. Add the registry entry, the generated hexagons and the report counts (`report-email.test.mjs`, `registry.test.mjs`) in the change that turns the switch on.
+- The report job and the live run each call the check, so one scan can make two GitHub searches.
+
+**Breach source (`email-breaches`): stays NOT BUILT.** No paid Have I Been Pwned key. We will not build our own breach database: collecting leaked data to search it is a legal and ethical risk we do not take. The only free route is a public API such as XposedOrNot, whose commercial-use terms are still unconfirmed (see `docs/email-hexagons-mpc-7467.md`; its site cannot be reached from the build sandbox and a web search found no terms). Someone with a normal browser has to read https://xposedornot.com/terms; if commercial use of the free API is allowed, the check can go into `emailHexagons.js` the same way as the GitHub one (plain address, so it needs its own Privacy sentence).
 
 ## Tier 3: possible with more work (domain only, but slow or noisy)
 

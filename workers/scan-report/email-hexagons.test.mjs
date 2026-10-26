@@ -1,6 +1,6 @@
 // MPC-7467 email hexagons. Stubbed fetch, no network. Run: node workers/scan-report/email-hexagons.test.mjs
 // '+' test addresses only (testingnt69+...@gmail.com style); no real person's address appears here.
-import { checkDomainRecord, checkLibravatar, checkNameInAddress, checkProviderAndDomain, checkPublicProfile, runEmailHexagons, emailHexagonSignalRows, EMAIL_HEXAGONS } from './lib/emailHexagons.js';
+import { checkDomainRecord, checkGithubCommits, enabledEmailHexagonIds, checkLibravatar, checkNameInAddress, checkProviderAndDomain, checkPublicProfile, runEmailHexagons, emailHexagonSignalRows, EMAIL_HEXAGONS } from './lib/emailHexagons.js';
 import { runReportJob } from './index.js';
 
 let ok = true; let count = 0;
@@ -74,7 +74,7 @@ check(seen[0].includes(h1), 'profile: hash is case-insensitive');
 
 // ---- run all: never throws, never slow
 const all = await runEmailHexagons('testingnt69+a@gmail.com', {}, async (u) => (/gravatar|libravatar|rdap\.org/.test(String(u)) ? res(404) : res(200, { Status: 0, Answer: [] })));
-check(all.length === 5 && all.map((h) => h.id).join() === Object.keys(EMAIL_HEXAGONS).join(), 'run: five hexagons returned in registry order');
+check(all.length === 5 && all.map((h) => h.id).join() === enabledEmailHexagonIds({}).join(), 'run: five hexagons returned in registry order (the switched-off GitHub check is not among them)');
 const t0 = Date.now();
 const slow = await runEmailHexagons('testingnt69+a@gmail.com', { EMAIL_HEXAGON_TIMEOUT_MS: '50' }, () => new Promise(() => {}));
 check(Date.now() - t0 < 1500 && slow.filter((h) => !['email-name', 'email-domain-record'].includes(h.id)).every((h) => h.status === 'not_checked') && slow.find((h) => h.id === 'email-domain-record').status === 'clear', 'run: hung outside services => not_checked within the budget, pure check unaffected');
@@ -113,6 +113,41 @@ check(rows.length === 5 && rows.every((x) => x.category === 'email' && ['found',
   // a hung lookup: like a real fetch, the stub rejects when the check's AbortSignal fires
   const hung = await checkDomainRecord('a@own-domain.example', (u, o) => new Promise((_, reject) => o.signal.addEventListener('abort', () => reject(new Error('aborted')))), { timeoutMs: 40 });
   check(hung.status === 'not_checked' && /timed out/.test(hung.reason), 'rdap: a hung lookup is cut off by the timeout');
+}
+
+// ---- MPC-8452 Tier 2: public code commits (GitHub commit search). The ONE check that sends the plain address; off unless EMAIL_GITHUB_COMMITS_ENABLED === "true".
+{
+  const seen = []; const heads = [];
+  const spy = (status, body) => async (u, o) => { seen.push(String(u)); heads.push(o?.headers || {}); return res(status, body); };
+  const hit = { total_count: 3, incomplete_results: false, items: [{ repository: { full_name: 'jane-example/dotfiles' } }] };
+  let x = await checkGithubCommits('Jane.Smith+tag@Example.com', spy(200, hit));
+  check(x.status === 'found' && /at least 3 public commits/.test(x.value) && /jane-example\/dotfiles/.test(x.value), 'github: results => found, with a count and one repository');
+  check(seen[0].startsWith('https://api.github.com/search/commits?q=author-email%3A') && decodeURIComponent(seen[0]).includes('author-email:jane.smith+tag@example.com') && seen.length === 1, 'github: exactly one search, with the lower-cased plain address (the disclosed exception)');
+  check(!('authorization' in heads[0]), 'github: no token => no Authorization header');
+  await checkGithubCommits('a@example.com', spy(200, hit), { token: 'tok123' });
+  check(heads[heads.length - 1].authorization === 'Bearer tok123', 'github: a token is sent as a Bearer header, never in the URL');
+  check(!seen.join().includes('tok123'), 'github: the token never appears in a URL');
+  x = await checkGithubCommits('a@example.com', spy(200, { total_count: 1, items: [{ repository: { full_name: 'evil<script>/x y' } }] }));
+  check(!/[<> ]script|<script/.test(x.value) && x.status === 'found', 'github: a hostile repository name is stripped');
+  check((await checkGithubCommits('a@example.com', spy(200, { total_count: 0, incomplete_results: false, items: [] }))).status === 'clear', 'github: 200 with zero results => clear');
+  check((await checkGithubCommits('a@example.com', spy(200, { total_count: 0, incomplete_results: true, items: [] }))).status === 'not_checked', 'github: zero results marked incomplete => not_checked, never clear');
+  for (const st of [403, 422, 429, 500, 503, 404]) check((await checkGithubCommits('a@example.com', spy(st, {}))).status === 'not_checked', `github: HTTP ${st} => not_checked, never clear`);
+  check((await checkGithubCommits('a@example.com', spy(200, { nope: 1 }))).status === 'not_checked', 'github: unexpected body => not_checked');
+  check((await checkGithubCommits('a@example.com', async () => { throw new Error('down'); })).status === 'not_checked' && (await checkGithubCommits('bad')).status === 'not_checked' && (await checkGithubCommits('a b@example.com')).status === 'not_checked', 'github: network error or invalid address => not_checked');
+  const hungG = await checkGithubCommits('a@example.com', (u, o) => new Promise((_, reject) => o.signal.addEventListener('abort', () => reject(new Error('aborted')))), { timeoutMs: 40 });
+  check(hungG.status === 'not_checked' && /timed out/.test(hungG.reason), 'github: a hung lookup is cut off by the timeout');
+  check(/plain email address/.test(EMAIL_HEXAGONS['email-github-commits'].services[0]), 'github: the plain-address exception is stated in services (for the Privacy page)');
+
+  const urls = []; const stub = async (u) => { urls.push(String(u)); return /api\.github\.com/.test(String(u)) ? res(200, { total_count: 0, items: [] }) : /gravatar|libravatar|rdap\.org/.test(String(u)) ? res(404) : res(200, { Status: 0, Answer: [] }); };
+  let all2 = await runEmailHexagons('testingnt69+a@gmail.com', {}, stub);
+  check(all2.length === 5 && !urls.some((u) => u.includes('api.github.com')), 'github: OFF by default: the plain address is never sent and the run has five checks');
+  all2 = await runEmailHexagons('testingnt69+a@gmail.com', { EMAIL_GITHUB_COMMITS_ENABLED: 'yes' }, stub);
+  check(all2.length === 5 && !urls.some((u) => u.includes('api.github.com')), 'github: only the exact string "true" turns it on');
+  all2 = await runEmailHexagons('testingnt69+a@gmail.com', { EMAIL_GITHUB_COMMITS_ENABLED: 'true', GITHUB_SEARCH_TOKEN: 't' }, stub);
+  check(all2.length === 6 && all2.some((h) => h.id === 'email-github-commits' && h.status === 'clear') && urls.some((u) => u.includes('api.github.com')), 'github: ON: six checks, the GitHub one runs');
+  check(enabledEmailHexagonIds({}).length === 5 && enabledEmailHexagonIds({ EMAIL_GITHUB_COMMITS_ENABLED: 'true' }).length === 6, 'github: the enabled-check list follows the switch');
+  const allG = await runEmailHexagons('testingnt69+a@gmail.com', { EMAIL_GITHUB_COMMITS_ENABLED: 'true' }, (u) => (/api\.github\.com/.test(String(u)) ? new Promise(() => {}) : stub(u)));
+  check(allG.length === 6 && allG.find((h) => h.id === 'email-github-commits').status === 'not_checked', 'github: a GitHub call that never answers cannot stall the run');
 }
 
 // ---- report job: hexagons stored, report not blocked by failures

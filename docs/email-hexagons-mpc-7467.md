@@ -16,8 +16,9 @@ Four checks run on the address the user gave, inside the `mpt-scan-report` Worke
 2. **Gravatar** (`gravatar.com/avatar/<hash>`, `api.gravatar.com/v3/profiles/<hash>`): receives a **SHA-256 hash of the lower-cased address**, not the address itself. A hash of a known address can still be matched by anyone who tries that address, so the policy should call it pseudonymous, not anonymous.
 3. **Libravatar** (`seccdn.libravatar.org/avatar/<hash>`, MPC-8452): receives a **SHA-256 hash of the lower-cased address**, like Gravatar.
 4. **rdap.org and the domain registry it redirects to** (MPC-8452): receive the **domain only**, for domains that are not shared webmail domains.
-5. Not built yet: the breach source. If XposedOrNot is used it receives the **full address**.
-6. Existing, unchanged: Supabase (stores it), Resend (sends the email), HubSpot (contact).
+5. **GitHub commit search** (`api.github.com/search/commits`, MPC-8452 Tier 2, built but OFF by default): receives the **plain address**. This is the only check that does. Details and switch: `docs/osint-list-mpc-8452.md`.
+6. Not built yet: the breach source. If XposedOrNot is used it receives the **full address**.
+7. Existing, unchanged: Supabase (stores it), Resend (sends the email), HubSpot (contact).
 No other service is contacted. No company's sign-up or login page is probed.
 
 ## Breach check: held, terms not confirmed
