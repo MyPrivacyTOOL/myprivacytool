@@ -197,7 +197,8 @@ export async function handlePop(request: Request, env: Env): Promise<Response | 
 
   if (path === '/api/pop/status') {
     const g = await checkPossession(env, { token: b.session_token });
-    return g.ok ? jsonRes({ verified: true }, 200, hdr) : jsonRes({ verified: false, error: g.error, ...(g.ok === false && g.prompt ? { prompt: g.prompt } : {}) }, g.status, hdr);
+    if (g.ok === true) return jsonRes({ verified: true }, 200, hdr);
+    return jsonRes({ verified: false, error: g.error, ...(g.prompt ? { prompt: g.prompt } : {}) }, g.status, hdr);
   }
 
   // challenge

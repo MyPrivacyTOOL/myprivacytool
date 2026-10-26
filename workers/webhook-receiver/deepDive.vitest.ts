@@ -85,7 +85,7 @@ describe('deep dive flow', () => {
     const session_token = await verified();
     spamMode = 'hang'; vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const p = call('/api/scan/start-deep-dive', { wa_id: WA, session_token }, srv); let done = false; p.then(() => { done = true; });
-    for (let i = 0; i < 50 && !done; i++) { await vi.advanceTimersByTimeAsync(1000); await new Promise((res) => setImmediate(res)); }   // real crypto/IO between ticks
+    for (let i = 0; i < 400 && !done; i++) { await vi.advanceTimersByTimeAsync(500); for (let k = 0; k < 5; k++) await new Promise((res) => setImmediate(res)); }   // real crypto/IO between ticks
     const r = await p; vi.useRealTimers();
     expect((await r.json() as any).hexagons.find((h: any) => h.id === 'hex_security_spam_flag')).toMatchObject({ status: 'not_checked', data: null });
   });
