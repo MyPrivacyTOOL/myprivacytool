@@ -1,7 +1,7 @@
 // @vitest-environment node
 // MPC-8528: adapters (FAQ knowledge, report status, email notifier, chat model). Fake fetch only: no network, no provider, no database.
 import { describe, it, expect } from "vitest";
-import { FaqKnowledgeSource, ScansReportStatusReader, ResendNotifier, InBandNotifier, ChannelNotifier, ChatCompletionsModel, retrieve, handleInbound, buildTools, type SupportDeps, type SupportPolicy } from "./index";
+import { redactForModel, FaqKnowledgeSource, ScansReportStatusReader, ResendNotifier, InBandNotifier, ChannelNotifier, ChatCompletionsModel, retrieve, handleInbound, buildTools, type SupportDeps, type SupportPolicy } from "./index";
 import { MemoryCaseStore } from "./memory-store";
 
 const FAQS = [
@@ -106,6 +106,15 @@ describe("ChatCompletionsModel", () => {
     expect(JSON.stringify(body)).not.toContain("SECRET");
     expect(out.toolCalls).toEqual([{ tool: "get_case_status", args: {} }]); // "refund" was not allowed, so it is dropped
     expect(out.text).toBe("Kept for 12 months.");
+  });
+  it("redacts email addresses and phone numbers before the text reaches the provider", async () => {
+    const f = fake(() => ({ body: { choices: [{ message: { content: "ok" } }] } }));
+    await new ChatCompletionsModel({ baseUrl: "https://m.test/v1", apiKey: "k", model: "m", fetchImpl: f.fetchImpl })
+      .complete({ ...req, caseText: "my report never came, write to jane.doe@example.com or call +852 9123 4567" });
+    const sent = JSON.parse(f.calls[0].init.body as string).messages[1].content as string;
+    expect(sent).toContain("[email]"); expect(sent).toContain("[phone]");
+    expect(sent).not.toContain("jane.doe"); expect(sent).not.toContain("9123");
+    expect(redactForModel("no contact details here")).toBe("no contact details here");
   });
   it("offers no tools when none are allowed, and throws on HTTP errors and empty responses (service treats that as outage)", async () => {
     const f = fake(() => ({ body: { choices: [{ message: { content: "x" } }] } }));

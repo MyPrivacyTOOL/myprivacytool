@@ -13,3 +13,4 @@ export * from "./faq-knowledge";
 export * from "./report-status";
 export * from "./email-notifier";
 export * from "./openai-compatible-model";
+export * from "./proof";

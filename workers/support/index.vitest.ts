@@ -50,6 +50,19 @@ describe("fail-closed gates", () => {
   });
 });
 
+describe("identity proof", () => {
+  const goodToken = "A".repeat(43);
+  it("a well-formed proof reaches the verifier; a malformed one is dropped before it", async () => {
+    const seen: (string | undefined)[] = [];
+    const verifier = { resolve: async (p: string | undefined) => { seen.push(p); return { level: "anonymous" as const }; } };
+    const t = setup({ verifier });
+    await t.handler(post(body({ proof: goodToken })), env());
+    await t.handler(post(body({ proof: "not-a-token" })), env());
+    await t.handler(post(body({ proof: 12345 })), env());
+    expect(seen).toEqual([goodToken]); // the verifier is only ever asked about the well-formed one
+  });
+});
+
 describe("request validation", () => {
   it("rejects bad JSON, unknown channel, missing event id, empty text, oversize bodies", async () => {
     const t = setup();

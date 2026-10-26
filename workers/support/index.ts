@@ -1,17 +1,18 @@
 // MPT support Worker (MPC-8528). Hosts the shared AI support service (shared/support). SCAFFOLD: disabled by default, no route, no deploy workflow.
 //
 // POST /intake   { channel, providerEventId, text, threadKey?, senderHandle?, locale?, helpOnly?, journeyRef? }
+//                `proof` (optional string): a one-time identity proof emailed to the account holder.
 //                Auth: `Authorization: Bearer <SUPPORT_INTAKE_TOKEN>` (the channel adapters of MPC-8527/MPC-8532 hold it; they authenticate the
 //                provider first). Answers { caseRef, state, duplicate, delivered, reply } only after the case is durably stored.
 // GET  /health   booleans only.
 //
 // Fails closed: 503 unless SUPPORT_AI_ENABLED === "1", every required binding is present AND the rate limiter is bound (the model call
-// has no other cost backstop). No verifier is wired (the identity flow is an open MPC-8530 decision), so every caller is at most
-// `channel_asserted` and private tools cannot run. The shipped policy approves no tool. Message text, sender handles and keys are never logged.
+// has no other cost backstop). Callers are at most `channel_asserted` unless they present a one-time proof (`proof`) that the database
+// redeems exactly once; nothing issues proofs yet, so in practice private tools cannot run. The shipped policy approves no tool. Message text, sender handles and keys are never logged.
 
 import {
   handleInbound, DEFAULT_POLICY, RestCaseStore, buildTools, ScansReportStatusReader, ResendNotifier, InBandNotifier, ChannelNotifier,
-  ChatCompletionsModel, FaqKnowledgeSource, type SupportDeps, type InboundEvent, type Channel,
+  ChatCompletionsModel, FaqKnowledgeSource, RestProofStore, ProofVerifier, isProofToken, type SupportDeps, type InboundEvent, type Channel,
 } from "../../shared/support";
 import { FAQS } from "../../src/data/faqs";
 
@@ -61,8 +62,14 @@ export function buildDeps(env: Env): SupportDeps {
     }),
     model: env.MODEL_BASE_URL && env.MODEL_API_KEY && env.MODEL_NAME ? new ChatCompletionsModel({ baseUrl: env.MODEL_BASE_URL, apiKey: env.MODEL_API_KEY, model: env.MODEL_NAME }) : undefined,
     knowledge: new FaqKnowledgeSource(FAQS, approval),
-    // verifier intentionally absent: identity flow not decided (MPC-8530). Everyone stays channel_asserted at most.
+    // Only a redeemed one-time proof makes a caller `verified`. Issuing proofs is NOT wired (it sends email: approval-gated).
+    verifier: new ProofVerifier(new RestProofStore({ baseUrl: env.SUPABASE_URL!, serviceKey: env.SUPABASE_SERVICE_ROLE_KEY! })),
   };
+}
+
+function parseProof(raw: unknown): string | undefined {
+  const p = raw && typeof raw === "object" ? (raw as Record<string, unknown>).proof : undefined;
+  return isProofToken(p) ? p : undefined; // anything malformed is simply not a proof
 }
 
 function parseEvent(raw: unknown): InboundEvent | string {
@@ -111,7 +118,7 @@ export function createHandler(build: (env: Env) => SupportDeps = buildDeps) {
     let deps: SupportDeps;
     try { deps = build(env); } catch { return err(503, "not_configured"); }
     try {
-      const r = await handleInbound(deps, ev);
+      const r = await handleInbound(deps, ev, parseProof(raw));
       if (!r.caseRef) {
         // helpOnly and validation replies carry no case; a missing reference on a real message means it was NOT stored.
         return ev.helpOnly ? J(200, { reply: r.replyText, caseRef: null }) : err(503, "not_recorded", { reply: r.replyText });
