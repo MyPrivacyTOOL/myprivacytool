@@ -28,6 +28,7 @@ export interface DashboardEnv {
   DASHBOARD_ENABLED?: string; // "1" to serve; anything else answers 503 and redeems nothing
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string; // the edge capture uses this name; either one works here
 }
 
 const SNAPSHOT_COLUMNS = "id,created_at,sender_id,status,scan_version,risk_version,schema_version,expires_at,report";
@@ -35,9 +36,10 @@ const TIMEOUT_MS = 5000;
 const enc = encodeURIComponent;
 
 export function supabaseStore(env: DashboardEnv, fetchImpl: typeof fetch = fetch): DashboardStore | null {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return null;
+  const key = env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!env.SUPABASE_URL || !key) return null;
   const base = env.SUPABASE_URL.replace(/\/+$/, "") + "/rest/v1/";
-  const headers = { apikey: env.SUPABASE_SERVICE_KEY, authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`, "content-type": "application/json" };
+  const headers = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
   async function get<T>(path: string): Promise<Read<T[]>> {
     try {
       const res = await fetchImpl(base + path, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });

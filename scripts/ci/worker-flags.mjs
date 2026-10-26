@@ -3,7 +3,7 @@
 // full binding list back with every other binding marked "inherit" (secrets keep their values). Values are never printed, only names.
 // Env: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, FLAG_SET (optional), FLAG_VALUE ("on" | "off"), MODE ("dry-run" | "apply").
 // MPC-7894: FLAG_SET picks which flags this run changes; every other binding is left as it is. Default = the original pair.
-const FLAG_SETS = { "baseline-and-deep": ["TELEGRAM_BASELINE_SCAN", "TELEGRAM_DEEP_SCAN"], "fix-wizard": ["TELEGRAM_FIX_WIZARD"] };
+const FLAG_SETS = { "baseline-and-deep": ["TELEGRAM_BASELINE_SCAN", "TELEGRAM_DEEP_SCAN"], "fix-wizard": ["TELEGRAM_FIX_WIZARD"], dashboard: ["TELEGRAM_DASHBOARD_LINKS"] }; // MPC-7893: the dashboard link flag is its own set
 const FLAGS = FLAG_SETS[process.env.FLAG_SET || "baseline-and-deep"];
 if (!FLAGS) throw new Error(`FLAG_SET must be one of: ${Object.keys(FLAG_SETS).join(", ")}`);
 const WORKER = "social-listeners";
