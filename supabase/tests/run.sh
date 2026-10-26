@@ -31,6 +31,7 @@ echo "== bootstrap + repo SQL"
 psql_ "$TEST_URL" -f supabase/tests/bootstrap.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-operational-rls.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
+psql_ "$TEST_URL" -f supabase/sql/mpc-8529-support-followup.sql   # MPC-8529: provisional, hand-applied SQL (not a migration)
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 for f in $(ls supabase/migrations/*.sql | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 
@@ -49,6 +50,9 @@ done <<< "$out"
 
 echo "== schema assertions"
 psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
+
+echo "== support follow-up assertions (MPC-8529)"
+psql_ "$TEST_URL" -At -f supabase/tests/support-followup.test.sql
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"
