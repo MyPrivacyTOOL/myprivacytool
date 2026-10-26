@@ -1,4 +1,5 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
+import { baselineScanEnabled, baselineSender, isConsentConfirmation, runBaselineScan } from "./baseline-scan";
 import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
@@ -42,7 +43,9 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   if (brain === RATE_LIMITED) return done(new Response("OK")); // throttled sender: acknowledge so Telegram does not retry
   if (!brain) return done(new Response("Upstream Unavailable", { status: 502 }));
   // Answer Telegram right away; sending the reply must never delay or fail the webhook (a non-2xx makes Telegram retry).
-  const send = sendTelegramReply(env, payload, brain, log, events);
+  // MPC-7891 baseline scan (default off, allow-listed test accounts only): only after core-brain confirms the stored consent state moved to confirmed.
+  const scan = baselineScanEnabled(env) && baselineSender(env, payload) ? (await brain.clone().json().catch(() => null)) as Parameters<typeof isConsentConfirmation>[0] : null;
+  const send = sendTelegramReply(env, payload, brain, log, events).then(() => (isConsentConfirmation(scan) ? runBaselineScan(env, payload, log) : undefined));
   if (ctx?.waitUntil) ctx.waitUntil(send);
   else await send;
   return done(new Response("OK"));

@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils';
 import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert, Activity } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
-import { exposureForPage, byBand, BAND_LABEL } from '@/lib/exposureScore';
+import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
+import { byBand } from '@/lib/exposureScore';
 
 interface RiskScoreProps {
   confirmed: number;
@@ -13,161 +14,11 @@ interface RiskScoreProps {
 }
 
 export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
-  // MPC-7471-F4: the score itself comes from the shared contract; this block only derives the display flags (social, security, behaviour levels).
-  const riskData = useMemo(() => {
-    let socialRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
-    let securityRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
-    let behaviorRiskLevel: 'low' | 'medium' | 'high' | null = null;
-    let loggedInServices = 0;
-    let hasGoogle = false;
-    let hasFacebook = false;
-    let hasSSO = false;
-    let hasDNSLeak = false;
-    let hasWebRTCLeak = false;
-    let hasHTTPOnly = false;
-    let hasOutdatedBrowser = false;
-    let securityIssuesCount = 0;
-    let behaviorDataPoints = 0;
-
-    if (hexagons && hexagons.length > 0) {
-      // Calculate confirmation rates by category
-      const categoryRates: Record<string, { confirmed: number; total: number }> = {};
-      
-      hexagons.forEach((hex) => {
-        const cat = hex.category || 'device';
-        if (!categoryRates[cat]) {
-          categoryRates[cat] = { confirmed: 0, total: 0 };
-        }
-        categoryRates[cat].total++;
-        if (hex.confirmed) categoryRates[cat].confirmed++;
-        
-        // Track social service logins for risk calculation
-        if (cat === 'social' && hex.confirmed) {
-          const value = hex.value?.toLowerCase() || '';
-          const label = hex.label?.toLowerCase() || '';
-          
-          if (!value.includes('not detected') && !value.includes('no platform') && !value.includes('not linked')) {
-            if (label.includes('google')) {
-              hasGoogle = true;
-              loggedInServices++;
-            } else if (label.includes('meta') || label.includes('facebook')) {
-              hasFacebook = true;
-              loggedInServices++;
-            } else if (label.includes('microsoft')) {
-              loggedInServices++;
-            } else if (label.includes('social platform')) {
-              const match = value.match(/(\d+)/);
-              loggedInServices += match ? parseInt(match[1]) : 1;
-            } else if (label.includes('cross-site') || label.includes('identity')) {
-              if (value.includes('linked') || value.includes('connection')) {
-                hasSSO = true;
-              }
-            }
-          }
-        }
-        
-        // Track security vulnerabilities for risk calculation
-        if (cat === 'security' && hex.confirmed) {
-          const value = hex.value?.toLowerCase() || '';
-          const label = hex.label?.toLowerCase() || '';
-          
-          if (label.includes('dns') && (value.includes('leak') || value.includes('leaking'))) {
-            hasDNSLeak = true;
-            securityIssuesCount++;
-          }
-          if (label.includes('webrtc') && value.includes('leak')) {
-            hasWebRTCLeak = true;
-            securityIssuesCount++;
-          }
-          if ((label.includes('connection') || label.includes('https')) && value.includes('insecure')) {
-            hasHTTPOnly = true;
-            securityIssuesCount++;
-          }
-          if (label.includes('browser') && (value.includes('outdated') || value.includes('vulnerable'))) {
-            hasOutdatedBrowser = true;
-            securityIssuesCount++;
-          }
-          if (label.includes('mixed') && !value.includes('none')) {
-            securityIssuesCount++;
-          }
-          if (label.includes('headers') && value.includes('weak')) {
-            securityIssuesCount++;
-          }
-          if (label.includes('encryption') && value.includes('weak')) {
-            securityIssuesCount++;
-          }
-        }
-      });
-
-      // Social risk (20%) - heavily weighted based on logged-in services
-      const socialCat = categoryRates['social'];
-      if (socialCat && socialCat.total > 0) {
-        // Determine social risk level
-        if (hasSSO || (hasGoogle && hasFacebook) || loggedInServices >= 4) {
-          socialRiskLevel = 'critical';
-        } else if (loggedInServices >= 2 || hasGoogle || hasFacebook) {
-          socialRiskLevel = 'high';
-        } else if (loggedInServices >= 1) {
-          socialRiskLevel = 'medium';
-        } else {
-          socialRiskLevel = 'low';
-        }
-      }
-
-      // Security risk (20%) - CRITICAL weight for vulnerabilities
-      const securityCat = categoryRates['security'];
-      if (securityCat && securityCat.total > 0) {
-        // Determine security risk level
-        if (hasDNSLeak || hasWebRTCLeak) {
-          securityRiskLevel = 'critical';
-        } else if (hasHTTPOnly || hasOutdatedBrowser) {
-          securityRiskLevel = 'high';
-        } else if (securityIssuesCount >= 2) {
-          securityRiskLevel = 'medium';
-        } else {
-          securityRiskLevel = 'low';
-        }
-      }
-
-      // Behavior risk (12%) - tracking through user interactions
-      const behaviorCat = categoryRates['behavior'];
-      if (behaviorCat && behaviorCat.total > 0) {
-        // Track behavior data points
-        behaviorDataPoints = behaviorCat.confirmed;
-        
-        // Determine behavior risk level
-        if (behaviorDataPoints >= 5) {
-          behaviorRiskLevel = 'high';
-        } else if (behaviorDataPoints >= 3) {
-          behaviorRiskLevel = 'medium';
-        } else {
-          behaviorRiskLevel = 'low';
-        }
-      }
-    }
-
-    // MPC-7471-F4: the number is the shared exposure score; nothing here weighs categories any more. Provisional until every point is confirmed.
-    const exposure = exposureForPage(hexagons ?? [], total > 0 && confirmed >= total);
-    const percentage = exposure.score;
-
-    return {
-      percentage,
-      band: exposure.band,
-      provisional: exposure.provisional,
-      hasFingerprint: hexagons?.some((h) => h.category === 'fingerprint' && h.confirmed) || false,
-      fingerprintRisk: fingerprint?.totalRisk || null,
-      hasSocial: hexagons?.some((h) => h.category === 'social' && h.confirmed) || false,
-      socialRiskLevel,
-      loggedInServices,
-      hasSecurity: hexagons?.some((h) => h.category === 'security' && h.confirmed) || false,
-      securityRiskLevel,
-      securityIssuesCount,
-      hasCriticalSecurity: hasDNSLeak || hasWebRTCLeak,
-      hasBehavior: hexagons?.some((h) => h.category === 'behavior' && h.confirmed) || false,
-      behaviorRiskLevel,
-      behaviorDataPoints,
-    };
-  }, [confirmed, total, hexagons, fingerprint]);
+  // MPC-7471-F4: the score and band come from the shared exposure contract via computePageRisk; provisional until every point is confirmed.
+  const riskData = useMemo(
+    () => computePageRisk({ confirmed, total, hexagons, fingerprint }),
+    [confirmed, total, hexagons, fingerprint],
+  );
 
   const { 
     percentage, 
@@ -188,10 +39,10 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
   } = riskData;
   
   const getRiskLevel = () => {
-    if (band === 'high') return { label: BAND_LABEL.high, Icon: AlertCircle };
-    if (band === 'medium') return { label: BAND_LABEL.medium, Icon: AlertTriangle };
-    if (band === 'low') return { label: BAND_LABEL.low, Icon: Shield };
-    return { label: 'Scanning...', Icon: Shield };
+    const label = getPageRiskLabel(percentage);
+    if (band === 'high') return { label, Icon: AlertCircle };
+    if (band === 'medium') return { label, Icon: AlertTriangle };
+    return { label, Icon: Shield };
   };
 
   const risk = getRiskLevel();

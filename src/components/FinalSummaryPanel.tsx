@@ -13,9 +13,9 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
-import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 import { exposureForPage, categoryExposure, byBand, BAND_LABEL } from '@/lib/exposureScore';
+import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
 import { SUMMARY_LABELS } from '@/lib/scanCopy';
 import { signedReportEnabled } from '@/config/signedReport';
@@ -312,19 +312,17 @@ export default function FinalSummaryPanel({
     return [...new Set(positives)].slice(0, 5);
   }, [hexagons]);
 
-  // MPC-7471-F4: the score, band and coverage come from the one shared contract (exposure-v1). Nothing here calculates its own.
+  // MPC-7471-F4: the score, band and coverage come from the one shared contract (exposure-v1), the same one the page card reads
+  // (RiskScore.tsx, via src/lib/scanResult.ts). Nothing here calculates its own; the old "FINAL FORMULA" and its fingerprint bonus are gone.
   const exposure = useMemo(() => exposureForPage(rawHexagons, true), [rawHexagons]);
   const categoryRisk = useMemo(() => categoryExposure(exposure), [exposure]);
   const overallRisk = exposure.score;       // null when nothing could be checked: shown as "not enough checked", never as 0 or safe
   const band = exposure.band;
   const coveragePct = exposure.coverage.percent;
 
-  // MPC-7120: offer the email capture once the scan is complete (this panel only renders after all hexagons are confirmed)
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setShowEmailModal(true), 1500);
-    return () => window.clearTimeout(t);
-  }, []);
+  // MPC-7120 / MPC-7471-F1: this panel only renders once the scan has genuinely completed, so the one scan-complete dialog opens
+  // with it, with no timer. State lives here: closing it sets it false and nothing in this component opens it again.
+  const [showEmailModal, setShowEmailModal] = useState(true);
 
   // CK-7799: the "uniqueness 1 in N" figure that used to be here was 2^(confirmed / 4), an invented number, and the fingerprint's
   // "1 in X" came from a hard-coded entropy table. Neither is shown or exported any more.

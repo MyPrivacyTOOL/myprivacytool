@@ -54,6 +54,7 @@ h1 { font: 700 clamp(30px, 6vw, 52px)/1.05 var(--display); margin: 8px 0 12px; t
 @media (max-width: 760px) { .main { grid-template-columns: minmax(0, 1fr); } }
 svg { width: 100%; height: auto; display: block; }
 .hex { cursor: pointer; outline: none; }
+.legend .hex { cursor: default; }
 .hex polygon { stroke-width: 2.5; transition: fill .35s, stroke .35s; }
 .hex .ic { fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transition: stroke .35s; }
 .hex text.lab { font: 600 13px var(--display); transition: fill .35s; }
@@ -85,6 +86,10 @@ svg { width: 100%; height: auto; display: block; }
 .hex.s-minor text.lab { fill: var(--fg); }
 .hex.s-minor .ic { stroke: var(--fg); }
 .hex.s-minor .bd circle { fill: var(--minor); }
+.hex.s-seen polygon { fill: var(--surface); stroke: var(--fg); stroke-width: 3; }
+.hex.s-seen text.lab { fill: var(--fg); }
+.hex.s-seen .ic { stroke: var(--fg); }
+.hex.s-seen .bd { display: none; }
 .hex.sel:not(.s-checking) polygon { stroke: var(--fg); stroke-width: 3.5; }
 @keyframes march { to { stroke-dashoffset: -24; } }
 @media (prefers-reduced-motion: reduce) { .hex.s-checking polygon { animation: none; } }
@@ -108,6 +113,21 @@ svg { width: 100%; height: auto; display: block; }
 .path { font-size: 14px; color: var(--muted); margin-top: 6px !important; }
 .status { font: 500 12px var(--mono); color: var(--muted); }
 .hint { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+.cue { margin-top: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 14px 16px; display: grid; gap: 8px; }
+.cue h3 { font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; margin: 0; display: flex; align-items: center; gap: 8px; }
+.cue h3 svg { width: 14px; height: 20px; fill: var(--fg); flex: none; }
+.cue p { margin: 0; font-size: 14px; }
+.cue .scope { font-size: 12px; color: var(--muted); }
+.cue .empty { color: var(--muted); }
+.cue ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.cue li { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--bg); padding: 2px 4px 2px 12px; font-size: 13px; }
+.cue li button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; width: 24px; height: 24px; border-radius: 50%; }
+.cue li button:hover:not(:disabled) { background: var(--line); color: var(--fg); }
+.cue li button:disabled { opacity: .35; cursor: default; }
+.cue li button:focus-visible { outline: 3px solid var(--guess); }
+.cta { font: 600 14px var(--display); border: 1.5px solid var(--fg); border-radius: 4px; padding: 10px 18px; color: var(--fg); text-decoration: none; display: inline-block; }
+.cta:focus-visible { outline: 3px solid var(--guess); outline-offset: 3px; }
+.exnote { font-size: 13px; color: var(--muted); font-style: italic; margin: 0; }
 .note { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; margin: 0; }
 </style>
 </head>
@@ -117,21 +137,24 @@ svg { width: 100%; height: auto; display: block; }
   <header>
     <div class="eyebrow">MyPrivacyTool · Exposure map</div>
     <h1>Hexagon Taxonomy</h1>
-    <p class="lede">Twelve places your personal data lives online. Every hexagon starts as a purple guess behind a curtain. Footprints step in from the bottom right, one foot at a time. Where they step, the curtain opens and the hexagon is checked. Behind the footprints, each shows its result.</p>
+    <p class="lede">Twelve places your personal data can live online. Every hexagon starts unknown: purple, behind a curtain. Tap one and your footprints walk there, one foot at a time. The hexagons ahead of you stay unknown, the footprints are where you have been, and you can remove any step. Nothing is checked on this page. Your real scan checks your own browser.</p>
   </header>
 
   <div class="bar">
-    <button type="button" id="replay">Replay example scan</button>
-    <button type="button" id="clear" class="ghost">Clear</button>
+    <button type="button" id="replay">See an example scan</button>
+    <button type="button" id="clear" class="ghost">Clear my footprints</button>
     <span class="summary" id="summary" aria-live="polite"></span>
+    <a class="cta" href="/scan">Run your real scan</a>
   </div>
 
   <div class="legend" id="legend"></div>
+  <p class="exnote" id="exnote" hidden></p>
 
   <div class="main">
     <div>
       <div class="stage" id="stage"><svg id="grid" viewBox="0 0 450 440" role="group" aria-label="Twelve privacy exposure categories"></svg></div>
-      <p class="hint">Click any hexagon to send the footprints there. The dashed frame is what the close-up follows.</p>
+      <p class="hint">Tap a hexagon to take a step there. The dashed frame is what the close-up follows.</p>
+      <section class="cue" id="cue" aria-labelledby="cue-h"></section>
     </div>
     <div class="side">
       <div class="stage zoomed" id="zstage"><svg id="zoomsvg" viewBox="0 0 160 104" aria-hidden="true"><use href="#scene"/></svg></div>
@@ -139,7 +162,7 @@ svg { width: 100%; height: auto; display: block; }
     </div>
   </div>
 
-  <p class="note">The example scan is sample data and does not describe a real person. Removal paths are summaries, not legal advice.</p>
+  <p class="note">Nothing you tap on this page is saved or sent. The example scan is sample data and does not describe a real person. Removal paths are summaries, not legal advice.</p>
 </div>
 
 <script>
@@ -157,16 +180,22 @@ var ICONS = {
   location: ["M12 21s-6-6-6-11a6 6 0 0112 0c0 5-6 11-6 11z", "C12,10,2"],
   finance: ["M3 6h18v12H3z", "M3 10h18", "M6 15h4"]
 };
-// Scan state of a hexagon. guess = not checked yet, checking = footprint is on it, the rest are results.
+// State of a hexagon. guess = ahead of you, checking = the footprints are walking there, seen = you have looked at it,
+// the rest are example results (sample data). Wording for the result states follows the product tiles (src/lib/hexagonTile.ts).
 var STATE = {
-  guess:    { label: "Our guess",    badge: "?", text: "We have not checked this one yet, so this is an estimate." },
-  checking: { label: "Checking",     badge: "…", text: "The footprints are on this one right now." },
+  guess:    { label: "Not looked at yet", badge: "?", text: "You haven't looked at this one yet. It stays purple until the footprints reach it." },
+  checking: { label: "Next step",         badge: "…", text: "The footprints are walking here." },
+  seen:     { label: "Looked at",         badge: "",  text: "You have looked at this one. Nothing was checked: this page only explains. Your real scan checks your own browser." },
   clear:    { label: "Clear",        badge: "✓", text: "We checked and found nothing to fix." },
   fix:      { label: "Needs fixing", badge: "!", text: "We checked and found a real exposure." },
   told:     { label: "You told us",  badge: "✓", text: "You answered this one, so we did not measure it." },
-  minor:    { label: "Seen, minor",  badge: "i", text: "We saw it and it is low risk." }
+  minor:    { label: "Seen · minor", badge: "i", text: "We saw it and it is low risk." }
 };
-var DOT = { guess: "var(--guess)", checking: "var(--guess)", clear: "var(--clear)", fix: "var(--fix)", told: "var(--told)", minor: "var(--minor)" };
+var DOT = { guess: "var(--guess)", checking: "var(--guess)", seen: "var(--fg)", clear: "var(--clear)", fix: "var(--fix)", told: "var(--told)", minor: "var(--minor)" };
+// The footprints promise, as in the product (src/components/FootprintsCue.tsx; draft copy pending MPC-6798). Scope line is true for this page.
+var PROMISE = "Your footprints are behind you. Remove a step and its footprint goes. Close this session and your path is gone.";
+var SCOPE = "Nothing you tap on this page is saved or sent. Anonymous server logs are separate.";
+var EMPTY = "No footprints yet. Tap a hexagon to take your first step.";
 var LEVEL = {
   r: { g: "●", t: "Removable" },
   p: { g: "◐", t: "Partly removable" },
@@ -404,20 +433,39 @@ function tweenR(c, to, ms) {
 function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+var exnote = document.getElementById("exnote"), cue = document.getElementById("cue");
+var RESULTS = { clear: 1, fix: 1, told: 1, minor: 1 };
+
 function paint(i) {
   var s = st[i], n = nodes[i], k = visited.indexOf(i);
   n.g.setAttribute("class", "hex s-" + s + (k > -1 ? " done" : "") + (i === current ? " sel" : ""));
   n.badge.textContent = STATE[s].badge;
   n.num.textContent = k > -1 ? k + 1 : "";
 }
+var COUNT_NAMES = { guess: "not looked at yet", seen: "looked at", clear: "clear", fix: "need fixing", minor: "seen · minor", told: "you told us" };
 function updateSummary() {
-  var c = {};
-  st.forEach(function (s) { var key = s === "checking" ? "guess" : s; c[key] = (c[key] || 0) + 1; });
-  var names = { clear: "clear", fix: "need fixing", minor: "seen, minor", told: "you told us", guess: "still a guess" };
-  summary.innerHTML = ["clear", "fix", "minor", "told", "guess"].map(function (k) {
-    return '<span><i style="background:' + DOT[k] + '"></i>' + (c[k] || 0) + " " + names[k] + "</span>";
+  var c = {}, anyResult = false;
+  st.forEach(function (s) { var key = s === "checking" ? "guess" : s; c[key] = (c[key] || 0) + 1; if (RESULTS[s]) anyResult = true; });
+  summary.innerHTML = ["seen", "clear", "fix", "minor", "told", "guess"].filter(function (k) { return c[k]; }).map(function (k) {
+    return '<span><i style="background:' + DOT[k] + '"></i>' + c[k] + " " + COUNT_NAMES[k] + "</span>";
   }).join("");
+  exnote.hidden = !anyResult;
+  exnote.textContent = anyResult ? "Example scan: these results are sample data, not a check of you." : "";
 }
+
+function renderCue() {
+  var items = visited.map(function (i) {
+    return '<li><span>' + esc(CATS[i].name) + '</span><button type="button" data-rm="' + i + '" aria-label="Remove footprint: ' + esc(CATS[i].name) + '"' + (busy ? " disabled" : "") + ">×</button></li>";
+  }).join("");
+  cue.innerHTML =
+    '<h3 id="cue-h"><svg viewBox="-6 -12 12 24" aria-hidden="true"><use href="#fp"/></svg>Your footprints</h3>' +
+    "<p>" + PROMISE + '</p><p class="scope">' + SCOPE + "</p>" +
+    (visited.length ? '<ol aria-label="Your footprints, oldest first">' + items + "</ol>" : '<p class="empty">' + EMPTY + "</p>");
+}
+cue.addEventListener("click", function (e) {
+  var b = e.target.closest && e.target.closest("button[data-rm]");
+  if (b && !b.disabled) removeStep(+b.getAttribute("data-rm"));
+});
 
 function select(i) {
   current = i;
@@ -429,8 +477,8 @@ function select(i) {
     '<div class="head"><span class="bdg"></span><div><div class="num">' + String(i + 1).padStart(2, "0") + " / 12</div>" +
     "<h2>" + esc(c.name) + "</h2></div></div>" +
     '<div><span class="pill st" style="border-color:' + DOT[st[i]] + '">' + s.label + '</span> <span class="pill">' + lv.g + " " + lv.t + '</span> <span class="status">' +
-    (k > -1 ? "Step " + (k + 1) + " of the scan" : "") + "</span></div>" +
-    "<p>" + s.text + "</p>" +
+    (k > -1 ? "Step " + (k + 1) + " on your path" : "") + "</span></div>" +
+    "<p>" + s.text + (RESULTS[st[i]] ? " This is an example result: sample data, not a real scan." : "") + "</p>" +
     "<div><h3>What it is</h3><p>" + esc(c.what) + "</p></div>" +
     "<div><h3>Who exposes you</h3><p>" + esc(c.who) + "</p></div>" +
     "<div><h3>Why it matters</h3><p>" + esc(c.why) + "</p></div>" +
@@ -438,7 +486,7 @@ function select(i) {
   panel.querySelector(".bdg").appendChild(icon);
 }
 
-// One footprint on the ground. The newest print is dark; older ones fade to the trail.
+// One footprint on the ground. The newest print is dark; older ones fade to the trail. Left and right feet alternate.
 function placePrint(x, y, deg) {
   side = -side;
   if (lastPrint) lastPrint.setAttribute("class", "print trail");
@@ -449,21 +497,42 @@ function placePrint(x, y, deg) {
   if (+holeFoot.getAttribute("r") === 0) { holeFoot.setAttribute("cx", holeTo.x); holeFoot.setAttribute("cy", holeTo.y); holeFoot.setAttribute("r", 54); }
 }
 
-function finish(i) {
-  st[i] = CATS[i].res;
-  if (visited.indexOf(i) === -1) visited.push(i);
-  tweenR(holes[i], 104, 800);
-  updateSummary();
+// After a step is removed: redraw the trail from the entry point through the steps that are left (no animation).
+function rebuildTrail() {
+  while (trailLayer.firstChild) trailLayer.removeChild(trailLayer.firstChild);
+  lastPrint = null; side = 1;
+  if (!visited.length) { foot = null; holeTo = null; tweenR(holeFoot, 0, 0); return; }
+  var px = FW + 30, py = FH + 36;
+  visited.forEach(function (i) {
+    var tx = pos[i].fx, ty = pos[i].fy, dx = tx - px, dy = ty - py, dist = Math.hypot(dx, dy);
+    var n = Math.max(1, Math.round(dist / STRIDE)), deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+    for (var k = 1; k <= n; k++) placePrint(px + dx * k / n, py + dy * k / n, deg);
+    px = tx; py = ty; heading = deg;
+  });
+}
+function removeStep(i) {
+  if (busy) return;
+  visited = visited.filter(function (v) { return v !== i; });
+  st[i] = "guess";
+  tweenR(holes[i], 0, 300);
+  rebuildTrail();
+  updateSummary(); renderCue(); select(current);
 }
 
-async function walkTo(t) {
-  var my = gen, to = { x: pos[t].fx, y: pos[t].fy };
+function finish(i, asResult) {
+  st[i] = asResult ? CATS[i].res : "seen";
+  if (visited.indexOf(i) === -1) visited.push(i);
+  tweenR(holes[i], 104, 800);
+  updateSummary(); renderCue();
+}
+
+async function walkTo(job) {
+  var t = job.i, my = gen, to = { x: pos[t].fx, y: pos[t].fy };
   var fresh = st[t] === "guess";
   if (fresh) st[t] = "checking";
   select(t);
-  if (!foot) {
-    placePrint(to.x, to.y, heading);
-  } else if (foot.x !== to.x || foot.y !== to.y) {
+  if (!foot) { foot = { x: FW + 30, y: FH + 36 }; heading = -45; }   // the footprints enter from the bottom right
+  if (foot.x !== to.x || foot.y !== to.y) {
     var sx = foot.x, sy = foot.y, dx = to.x - sx, dy = to.y - sy, dist = Math.hypot(dx, dy);
     var n = Math.max(1, Math.round(dist / STRIDE));
     heading = Math.atan2(dy, dx) * 180 / Math.PI + 90;
@@ -474,21 +543,21 @@ async function walkTo(t) {
   }
   if (fresh) {
     if (!reduce) { await sleep(DWELL_MS); if (my !== gen) return; }
-    finish(t);
+    finish(t, job.res);
   }
   select(t);
 }
 
 async function run() {
-  busy = true;
+  busy = true; renderCue();
   var my = gen;
   while (queue.length && my === gen) await walkTo(queue.shift());
-  if (my === gen) busy = false;
+  if (my === gen) { busy = false; renderCue(); }
 }
 function walk(i) {
   select(i);
-  if (st[i] !== "guess" && !busy && !queue.length && foot && foot.x === pos[i].fx && foot.y === pos[i].fy) return;
-  queue.push(i);
+  if (st[i] !== "guess") return;     // only hexagons ahead of you need a step
+  queue.push({ i: i, res: false });
   if (!busy) run();
 }
 
@@ -498,15 +567,12 @@ function clearAll() {
   holes.forEach(function (h) { tweenR(h, 0, 0); });
   tweenR(holeFoot, 0, 0);
   while (trailLayer.firstChild) trailLayer.removeChild(trailLayer.firstChild);
-  updateSummary();
-  select(current);
+  updateSummary(); renderCue(); select(current);
 }
+// The example scan: a full walk with sample results, so every colour can be seen. Not a check of the visitor.
 function replay() {
   clearAll();
-  // The footprints start just outside the map, at the bottom right
-  foot = { x: FW + 30, y: FH + 36 };
-  heading = -45;
-  ORDER.forEach(function (i) { queue.push(i); });
+  ORDER.forEach(function (i) { queue.push({ i: i, res: true }); });
   run();
 }
 
@@ -515,16 +581,17 @@ function swatch(st2) {
   return '<span class="sw"><svg viewBox="-12 -12 24 24" aria-hidden="true"><g class="hex s-' + st2 + '"><polygon points="' + hexPoints(11) + '" style="stroke-width:2"/></g></svg>' + STATE[st2].label + "</span>";
 }
 document.getElementById("legend").innerHTML =
-  '<span class="grp"><b>Ahead of the footprints</b>' + swatch("guess") + "</span>" +
-  '<span class="grp"><b>On them</b>' + swatch("checking") + "</span>" +
-  '<span class="grp"><b>Behind them</b>' + swatch("clear") + swatch("fix") + swatch("told") + swatch("minor") + "</span>";
+  '<span class="grp"><b>Ahead of you</b>' + swatch("guess") + "</span>" +
+  '<span class="grp"><b>On the way</b>' + swatch("checking") + "</span>" +
+  '<span class="grp"><b>Behind you</b>' + swatch("seen") + "</span>" +
+  '<span class="grp"><b>Example scan only</b>' + swatch("clear") + swatch("fix") + swatch("told") + swatch("minor") + "</span>";
 
 document.getElementById("replay").addEventListener("click", replay);
 document.getElementById("clear").addEventListener("click", clearAll);
 
 select(11);
 updateSummary();
-setTimeout(replay, 600);
+renderCue();
 </script>
 </body>
 </html>
