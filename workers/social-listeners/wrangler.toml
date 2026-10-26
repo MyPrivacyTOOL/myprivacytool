@@ -46,6 +46,9 @@ service = "core-brain"
 # TELEGRAM_BASELINE_SCAN (MPC-7891) is managed separately.
 [vars]
 TELEGRAM_DEEP_SCAN = "on"
+# MPC-7893: kept here so a deploy does not wipe it (the flags workflow sets it, the next deploy dropped other workflow-set flags). Only acts for senders in
+# PROBE_TELEGRAM_IDS, and the link only works while the Pages variable DASHBOARD_ENABLED=1. Rollback: set "off" (or delete this line) and deploy.
+TELEGRAM_DASHBOARD_LINKS = "on"
 
 # MPC-7628: Mirror bot limits (every scan spends X API credits). Same syntax as core-brain/mpt-leads: the deploy action's wrangler 3.90.0
 # ignores the newer [[ratelimits]] table, so this must be [[unsafe.bindings]] type = "ratelimit" (a test pins it). Per sender: 3
