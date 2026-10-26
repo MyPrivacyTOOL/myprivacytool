@@ -23,6 +23,9 @@ const hex = (): HexagonData[] =>
   [0, 1, 2].map((i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `v${i}`, icon: "x", confidence: 80, risk: "low", confirmed: true, category: "device" }));
 const withSavedScanOffered = () => { vi.stubEnv("VITE_SAVE_WEB_SCANS", "true"); rememberCompletedScan(hex()); };
 
+// MPC-7471-F1: the dialog fires confetti on open; jsdom has no canvas, so stub it everywhere in this file.
+vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
+
 const setup = (riskScore = 55) => {
   const onClose = vi.fn(), onSubmit = vi.fn();
   render(<EmailCaptureModal riskScore={riskScore} categoryScores={{ fingerprint: 50 }} confirmedCount={23} onClose={onClose} onSubmit={onSubmit} />);
@@ -42,7 +45,7 @@ async function fill(user: ReturnType<typeof userEvent.setup>, { save = false } =
 }
 
 describe("EmailCaptureModal: shows the score", () => {
-  it.each([[75, "High Risk"], [50, "Medium Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
+  it.each([[85, "High Risk"], [80, "High Risk"], [79, "Medium Risk"], [50, "Medium Risk"], [49, "Low Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
     setup(score);
     expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(`${Math.round((23 / HEXAGON_COUNT) * 100)}% exposure`))).toBeInTheDocument();

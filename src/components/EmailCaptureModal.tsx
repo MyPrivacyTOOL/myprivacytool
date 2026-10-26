@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Shield, Lock, X, ChevronRight, AlertTriangle } from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { Lock, ChevronRight, AlertTriangle, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { getPageRiskLabel } from '@/lib/scanResult';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { loadTurnstile, SCAN_TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 import ConsentCheckbox from '@/components/ConsentCheckbox';
@@ -72,10 +75,28 @@ export default function EmailCaptureModal({
     };
   }, []);
 
+  // MPC-7471-F1: label from the shared page result (80 / 50), not a local copy of the thresholds.
+  // MPC-7471-F1: confetti fires once when this dialog opens, briefly, behind the dialog layer so it cannot cover text or controls.
+  // Not at all for visitors who ask for reduced motion; the message is the same either way.
+  useEffect(() => {
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    confetti({
+      particleCount: 70,
+      spread: 90,
+      startVelocity: 35,
+      ticks: 90,
+      origin: { x: 0.5, y: 0.25 },
+      zIndex: 40,
+      disableForReducedMotion: true,
+      colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
+    });
+  }, []);
+
   const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return { label: 'High Risk', color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
-    if (risk >= 40) return { label: 'Medium Risk', color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
-    return { label: 'Low Risk', color: 'text-foreground', bg: 'bg-risk-low-soft border-risk-low/30' };
+    const label = getPageRiskLabel(risk, true);
+    if (label === 'High Risk') return { label, color: 'text-foreground', bg: 'bg-risk-high-soft border-risk-high/30' };
+    if (label === 'Medium Risk') return { label, color: 'text-foreground', bg: 'bg-risk-mid-soft border-risk-mid/30' };
+    return { label, color: 'text-foreground', bg: 'bg-risk-low-soft border-risk-low/30' };
   };
 
   const { label: riskLabel, color: riskColor, bg: riskBg } = getRiskLabel(riskScore);
@@ -130,50 +151,53 @@ export default function EmailCaptureModal({
 
   const exposurePct = Math.round((confirmedCount / HEXAGON_COUNT) * 100);
 
-  return (
-    /* Backdrop */
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/30 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl shadow-card overflow-hidden">
+  const contentRef = useRef<HTMLDivElement>(null);
+  // The dialog has no Trigger (it opens on scan completion), so Radix has nothing to return focus to: remember what had focus when it opened.
+  const [opener] = useState<HTMLElement | null>(() => (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null));
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors z-10"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        ref={contentRef}
+        data-testid="scan-complete-dialog"
+        className="w-[calc(100%-2rem)] max-w-md max-h-[90dvh] overflow-y-auto overflow-x-hidden gap-0 p-0 bg-card border-border rounded-2xl shadow-2xl shadow-card sm:rounded-2xl [&>button]:z-10 [&>button]:top-4 [&>button]:right-4"
+        // Focus the dialog itself, not the email box: the congratulations is read first and a phone keyboard does not cover it.
+        onOpenAutoFocus={(e) => { e.preventDefault(); contentRef.current?.focus(); }}
+        onCloseAutoFocus={(e) => { e.preventDefault(); if (opener && opener !== document.body && opener.isConnected) opener.focus(); }}
+      >
 
         {/* Top accent bar */}
         <div className="h-1 w-full bg-primary" />
 
         <div className="p-6 space-y-5">
 
-          {/* Header */}
-          <div className="flex items-start gap-3">
+          {/* MPC-7471-F1: congratulations (wording is a draft until Chris approves it), then the result, then the form as before. */}
+          <div className="flex items-start gap-3 pr-6">
             <div className="p-2 rounded-lg bg-risk-low-soft shrink-0">
-              <Shield className="w-6 h-6 text-risk-low" />
+              <PartyPopper className="w-6 h-6 text-risk-low" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-foreground leading-tight">
-                Get your privacy report
-              </h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                We'll email you a report based on your scan results.
-              </p>
+              <DialogTitle className="text-lg font-bold text-foreground leading-tight">
+                You finished your scan
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground mt-0.5">
+                Here is what your browser showed us. Finishing a scan does not change any of it.
+              </DialogDescription>
             </div>
           </div>
 
           {/* Risk summary pill */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg border ${riskBg}`}>
-            <AlertTriangle className={`w-5 h-5 ${riskColor} shrink-0`} />
+          <div className={`flex items-center gap-3 p-3 rounded-lg border ${riskBg}`} data-testid="scan-complete-result">
+            <AlertTriangle className={`w-5 h-5 ${riskColor} shrink-0`} aria-hidden="true" />
             <div className="text-sm">
               <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
               <span className="text-muted-foreground"> — {riskScore}/100 risk score · {exposurePct}% exposure</span>
             </div>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold text-foreground leading-tight">Get your privacy report</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">We'll email you a report based on your scan results.</p>
           </div>
 
           {/* What you'll get */}
@@ -231,7 +255,6 @@ export default function EmailCaptureModal({
                   placeholder="your@email.com"
                   disabled={status === 'loading'}
                   className="w-full px-4 py-3 rounded-lg bg-secondary border border-surface-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-risk-low/50 focus:ring-1 focus:ring-risk-low transition-colors disabled:opacity-50"
-                  autoFocus
                 />
                 {errorMsg && (
                   <p role="alert" className="mt-1.5 text-xs text-foreground border-l-2 border-destructive pl-2">{errorMsg}</p>
@@ -284,7 +307,7 @@ export default function EmailCaptureModal({
             <span>Your email is never sold or shared. Unsubscribe in one click.{offerSave && ' If you save your scan, quote its scan number to have it deleted.'}</span>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

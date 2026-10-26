@@ -49,9 +49,9 @@ Not covered: the real Supabase, Resend and HubSpot; a mobile run of the full-sca
 
 ## Copy and flow for Chris to approve
 
-Changed words in the popup (the header will be rewritten by MPC-7471-F1; these lines match what the pipeline delivers):
+Changed words in the popup. MPC-7471-F1 is merged (#538): its header, "You finished your scan", and its dialog shell are kept. F3 changes only the lines below it so they match what the pipeline delivers:
 
-- Heading: ~~Get your full privacy fix guide~~ -> **Get your privacy report**
+- Form heading (F1 left it as the old text): ~~Get your full privacy fix guide~~ -> **Get your privacy report**
 - Sub-line: ~~We'll send step-by-step instructions based on your scan results.~~ -> **We'll email you a report based on your scan results.**
 - Bullets: ~~Personalised fix plan... / One-click data broker removal checklist / Privacy Check, our monthly newsletter~~ -> **Your browser findings, replayed with what each one found / What your email address reveals / A first email straight away, then your report within a few minutes**
 - Report box: ~~Email me my fix guide and Privacy Check, the monthly newsletter. I can unsubscribe at any time.~~ -> **Email me my results and occasional privacy tips. I can unsubscribe at any time.** (the existing `/scan` wording)
@@ -66,7 +66,7 @@ Flow: scan finishes -> popup -> email + report box (+ optional save box) -> send
 
 ## Open decisions and conflicts (need Chris or the owning task)
 
-1. **MPC-7471-F1 is not merged and no PR exists** (its session is active on `claude/mpc-7471-f1-scan-popup-hdimbj`). F3 edits only the form block of the same file; expect a rebase. F1 also owns the popup score (the 78% Medium vs 85/100 High question). Screenshots here show 88/100 High from the current main logic; F3 does not change the score. Criterion 5 is therefore **not met** until F1 lands.
+1. **MPC-7471-F1 is merged (#538) and merged into this branch.** The popup score and label now come from F1's page score (`src/lib/scanResult.ts`); F3 does not change them. The screenshots in `docs/screenshots/mpc-7471-f3/` were taken BEFORE that merge, so they show the old header and score; they need to be retaken for the approval review. Criterion 5 is expected to be met but is not separately verified by an F3 test. F1's tests were updated for the F3 wording (consent box text, button name, two tick boxes).
 2. **Scan reference format.** The spec says "for example the first 8 characters". The deletion route (MPC-7488, `mpt_delete_web_scan`) takes the full scan number, and the report and `ScanNumberNotice` already show the full one. I kept **one** reference everywhere (the full server-issued number). A short code would be a different identifier and would need either a new column or a deletion route that accepts a prefix, which would make deletion easier to guess. Decide: keep the full number, or approve a short code with a migration.
 3. **Newsletter and the score baseline.** The old popup route also signed people up for the newsletter and stored the baseline score ("Baseline saved: 85/100"). Under one route the popup no longer does either. The baseline feature (MPC-7173) is **not shown in the popup any more**; `mpt-leads` is unchanged and nothing else calls it for baselines. Decide whether baselines move into the report pipeline, or stay dropped. A separate newsletter box would need its own approved wording and a Worker field; none exists.
 4. **Migration approval.** Without `scans.request_id` the Worker still works (switch off), but a lost answer cannot be replayed safely; a retry then shows "already have a report request" without the scan number. Apply the migration, then set `REPORT_REQUEST_ID_ENABLED = "true"`.

@@ -126,6 +126,25 @@ jobs:
           path: dist
           retention-days: 3
 
+  pages-functions:
+    name: Pages Functions build (wrangler)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Bundle functions/ the way Cloudflare Pages does
+        # The site build (job `build`) never touches functions/. Cloudflare Pages bundles it on every deploy, and
+        # one unresolvable import (for example a Node built-in such as "crypto" without nodejs_compat) fails the
+        # whole Pages build, so no website deploy goes out until it is fixed. Offline: no credentials needed.
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npx wrangler pages functions build functions --outdir "$RUNNER_TEMP/pages-functions"
+
   e2e:
     name: E2E (Playwright, desktop + mobile)
     needs: build
@@ -181,7 +200,7 @@ jobs:
   ci-gate:
     name: CI gate
     if: always()
-    needs: [unit, lint, db, build, e2e, pipeline-guards]
+    needs: [unit, lint, db, build, pages-functions, e2e, pipeline-guards]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded
