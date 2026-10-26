@@ -13,7 +13,6 @@ const SUB_PROCESSORS = [
   { name: "Slack", purpose: "Internal notifications when a new lead or enquiry arrives" },
   { name: "Telegram", purpose: "Messaging channel, only if you choose to talk to us there" },
   { name: "Google (Analytics 4, Cloud APIs)", purpose: "Usage analytics (after consent) and Google-hosted services we use" },
-  { name: "Consentmanager", purpose: "Cookie consent banner and consent records" },
   {
     name: "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
     purpose:

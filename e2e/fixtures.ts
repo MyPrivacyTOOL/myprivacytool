@@ -17,21 +17,15 @@ export const test = base.extend<{ net: { captured: Captured; mocks: Mocks } }>({
   net: [async ({ page }, provide) => {
     const captured: Captured = { hubspot: [], supabase: [], leads: [] };
     const mocks: Mocks = { hubspotStatus: 200, supabaseStatus: 201, leadsStatus: 200 };
-    // The third-party consent-manager banner (cdn.consentmanager.net, #cmpwrapper) can overlay the page and
-    // swallow clicks on CI runners with real network. Serve it as an empty script and hide its container too.
+    // MPC-8450: our own cookie banner sits at the bottom of the page and can cover buttons. Start every test as a visitor who already chose
+    // "Essential only", so it never shows (and no analytics script is requested).
     await page.addInitScript(() => {
-      const hide = () => {
-        const st = document.createElement("style");
-        st.textContent = "#cmpwrapper,.cmpwrapper{display:none!important;pointer-events:none!important}";
-        document.documentElement.appendChild(st);
-      };
-      if (document.documentElement) hide(); else document.addEventListener("DOMContentLoaded", hide);
+      try { window.localStorage.setItem("mpt_cookie_consent", JSON.stringify({ v: 1, analytics: false, at: "2026-01-01T00:00:00.000Z" })); } catch { /* ignore */ }
     });
     await page.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, async (route) => {
       const req = route.request();
       const url = req.url();
       const preflight = req.method() === "OPTIONS";
-      if (/consentmanager\.net/.test(url) && req.resourceType() === "script") return route.fulfill({ status: 200, contentType: "application/javascript", body: "" });
       if (preflight) return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
       if (url.startsWith("https://api.hsforms.com/")) {
         captured.hubspot.push({ url, body: parse(req) });

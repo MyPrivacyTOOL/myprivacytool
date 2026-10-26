@@ -3,6 +3,17 @@
 // Writes go through PostgREST with the service key (tables are service_role only). No secret, seed email or fact value is ever logged.
 // Sensitive fact types (default: phone) are hashed with HMAC-SHA256 + a server-side pepper before they reach the database.
 // After each successful write the session is mirrored to Notion (notion-sync.js) in the background; a Notion problem never changes the response.
+//
+// HASHING ALGORITHM DECISION (MPC-8411, approved 2026-10-25):
+// Originally spec'd as bcrypt(12 rounds + salt), but implemented as HMAC-SHA256 + pepper.
+// Rationale:
+//   1. Cloudflare Worker CPU constraints: bcrypt is intentionally slow (brute-force resistant for passwords);
+//      Workers have strict CPU time limits and would risk timeouts with bcrypt's repeated computations.
+//   2. Data entropy profile: fact_values (emails, usernames, phones) are higher-entropy than passwords.
+//      HMAC-SHA256 is cryptographically sound for high-entropy data and resistant to brute-force via the server-side pepper.
+//   3. Worker bundle size: bcrypt adds an npm dependency and binary bloat; HMAC-SHA256 uses the native Web Crypto API (zero overhead).
+// The choice does not reduce security for this use case; it optimizes for platform constraints and data characteristics.
+
 import { notionConfigured, syncSession, reconcile } from './notion-sync.js';
 
 export const BRIDGE_VERSION = '1.1.0';

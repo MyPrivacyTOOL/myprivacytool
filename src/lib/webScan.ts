@@ -124,6 +124,26 @@ export function pendingScan(): Record<string, unknown>[] | null {
   }
 }
 
+/**
+ * Footprints cue: the visitor removed this hexagon's footprint, so it must not be saved either. Takes it out of the scan held in this browser
+ * (nothing is sent); when that was the last one the held scan is dropped, so there is nothing left to save. Returns true when something was removed.
+ */
+export function forgetPendingHexagon(id: string): boolean {
+  try {
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (!raw) return false;
+    const list = JSON.parse(raw) as unknown;
+    if (!Array.isArray(list)) return false;
+    const kept = list.filter((h) => !(h && typeof h === "object" && (h as { id?: unknown }).id === id));
+    if (kept.length === list.length) return false;
+    if (kept.length === 0) sessionStorage.removeItem(PENDING_KEY);
+    else sessionStorage.setItem(PENDING_KEY, JSON.stringify(kept));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** True when saving is on and this browser holds a finished scan: only then does the contact step show the save tick box. */
 export const canOfferScanSave = (): boolean => saveWebScansEnabled() && pendingScan() !== null;
 

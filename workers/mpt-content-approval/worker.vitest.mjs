@@ -337,6 +337,35 @@ describe('process (approval flow)', () => {
     expect(makeCalls()).toHaveLength(0);
     expect(slackTexts()).toEqual(['Rejected. Awaiting next cycle.', 'Already decided for this cycle; ignoring.']);
   });
+  it('a click on an already-published message replaces its buttons with the COMPLETED banner', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    const blocks = [{ type: 'header' }, { type: 'actions', elements: [] }];
+    await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target });
+    fetchMock.mockClear();
+    const out = await processApproval(mkEnv(db), { action: 'reject', taskId: TASK, approver: 'chris', target: { ...target, blocks } });
+    expect(out).toEqual({ status: 200, message: 'already decided' });
+    const [, init] = fetchMock.mock.calls.find(([u]) => u === 'https://slack.com/api/chat.update');
+    const body = JSON.parse(init.body);
+    expect(body.blocks.map((b) => b.type)).toEqual(['header', 'section']);
+    expect(body.blocks.at(-1).text.text).toMatch(/^✅ \*COMPLETED\*: already approved/);
+  });
+  it('a click on an already-rejected message replaces its buttons with the REJECTED banner', async () => {
+    const db = fakeD1(); seed(db, sixDrafts());
+    await processApproval(mkEnv(db), { action: 'reject', taskId: TASK, approver: 'chris', target });
+    fetchMock.mockClear();
+    await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target: { ...target, blocks: [{ type: 'actions' }] } });
+    const [, init] = fetchMock.mock.calls.find(([u]) => u === 'https://slack.com/api/chat.update');
+    expect(JSON.parse(init.body).blocks.at(-1).text.text).toMatch(/^❌ \*REJECTED\*: already rejected/);
+    expect(makeCalls()).toHaveLength(0);
+  });
+  it('logs when Slack refuses the message edit', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const db = fakeD1(); seed(db, sixDrafts());
+    fetchMock = vi.fn(async (url) => (url === 'https://slack.com/api/chat.update' ? new Response('{"ok":false,"error":"cant_update_message"}') : new Response('{"ok":true}')));
+    vi.stubGlobal('fetch', fetchMock);
+    await processApproval(mkEnv(db), { action: 'reject', taskId: TASK, approver: 'chris', target: { ...target, blocks: [{ type: 'actions' }] } });
+    expect(err).toHaveBeenCalledWith('slack update refused', 'cant_update_message');
+  });
   it('skips Slack replies without a token and swallows Slack errors', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
     await processApproval(mkEnv(db, { SLACK_BOT_TOKEN: undefined }), { action: 'reject', taskId: TASK, approver: 'chris', target });

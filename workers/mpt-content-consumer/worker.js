@@ -18,6 +18,8 @@ const PLATFORM_RULES = {
 const BRAND_KEYWORDS = /voice|tone|messag|language|social|do'?s|don'?t|never|always|guardrail/i;
 const BRAND_CHAR_CAP = 6000;
 const CTA = 'Check your exposure';
+// Must equal CAMPAIGN in workers/mpt-content-approval/worker.js so a post's text link and its link card report as one GA4 campaign.
+const CAMPAIGN = 'mpc-7033-daily';
 const TITLED = ['pinterest', 'youtube'];
 
 export const taskIdFor = (date) => `daily-posts-${date}`;
@@ -66,7 +68,7 @@ export function buildPrompt(platform, topic, date, guardrailText, hint = {}) {
       ...(hint.pillar ? [`Content pillar: ${hint.pillar}`] : []),
       ...(hint.format_type ? [`Format: ${hint.format_type}`] : []),
       `Rules: ${PLATFORM_RULES[platform]}`,
-      `End with the CTA "${CTA}" linking to https://myprivacytool.io?utm_source=${platform}&utm_medium=social&utm_campaign=oct-sprint`,
+      `End with the CTA "${CTA}" linking to https://myprivacytool.io?utm_source=${platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
       'Return JSON: {"copy": string' + (TITLED.includes(platform) ? ', "title": string' : '') + (platform === 'youtube' ? ', "script": string' : '') + (platform === 'instagram' ? ', "slides": string[]' : '') + '}',
     ].join('\n'),
   };

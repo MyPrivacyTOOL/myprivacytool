@@ -2698,6 +2698,76 @@ export const EMAIL_HEXAGONS = [
     "trust_score": null,
     "source": "workers/scan-report/lib/emailHexagons.js",
     "build_status": "built"
+  },
+  {
+    "id": "email-libravatar",
+    "label": "Second public avatar service",
+    "group": "Email address",
+    "category": "email",
+    "order": 5,
+    "artwork": {
+      "file": null,
+      "emoji": "🧑‍🎨",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "Libravatar avatar (d=404) using a SHA-256 hash of the address (MPC-8452).",
+    "value_type": "text",
+    "presence": "always",
+    "example_value": "A public Libravatar avatar is linked to this address. Anyone who knows the address can see it.",
+    "truth": {
+      "level": "measured",
+      "sensitivity": "medium",
+      "note": "Covers libravatar.org only; absence says nothing about other sites."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "CHECKED_AND_CLEAR",
+        "NOT_CHECKED"
+      ],
+      "found": "Avatar returned 200.",
+      "clear": "Returned 404.",
+      "not_checked": "Rate limited, errored or timed out."
+    },
+    "trust_score": null,
+    "source": "workers/scan-report/lib/emailHexagons.js",
+    "build_status": "built"
+  },
+  {
+    "id": "email-domain-record",
+    "label": "Public domain registration",
+    "group": "Email address",
+    "category": "email",
+    "order": 6,
+    "artwork": {
+      "file": null,
+      "emoji": "📜",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "Public RDAP record of the address's domain (rdap.org, then the registry): registration year, registrar, and whether the owner's contact details are visible. Only the domain is sent; shared webmail domains are skipped (MPC-8452).",
+    "value_type": "text",
+    "presence": "always",
+    "example_value": "The public registration record for example.com (registered in 2012), through Example Registrar, shows contact details for the owner. Anyone can look this up.",
+    "truth": {
+      "level": "measured",
+      "sensitivity": "medium",
+      "note": "Only meaningful for your own domain. Registries differ in what they publish; a missing record is NOT CHECKED, never clear."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "CHECKED_AND_CLEAR",
+        "NOT_CHECKED"
+      ],
+      "found": "The record answered and the registrant's name, organisation, email, address or phone is visible.",
+      "clear": "The record answered and the owner's details are hidden or redacted, or the domain is a shared webmail domain.",
+      "not_checked": "No record available, rate limited, errored or timed out."
+    },
+    "trust_score": null,
+    "source": "workers/scan-report/lib/emailHexagons.js",
+    "build_status": "built"
   }
 ];
 

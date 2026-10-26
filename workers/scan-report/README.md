@@ -102,3 +102,18 @@ The Scan page shows a Cloudflare Turnstile widget (`interaction-only`, cookieles
 - `TURNSTILE_ENFORCE = "false"` (wrangler.toml) = report-only: every failed check logs one `TURNSTILE_FAILED` line (truncated IP, country, origin, reason, action) and the request goes through. `"true"` = answer 403 `Verification failed`, nothing stored or sent. Rollback: set back to `"false"` and merge.
 - Separate widget from the mpt-leads one (`mpt-scan-report (MPC-8430)`; site key is public in `src/lib/turnstile.ts`, override `VITE_SCAN_API_URL`-style with `VITE_SCAN_TURNSTILE_SITE_KEY`). Hostnames: myprivacytool.io, www, wwwmyprivacytool.pages.dev.
 - Enforcing since 2026-10-23 (report-only ran about 5 hours with no real traffic; enforced on the owner's instruction). Watch the stuck-scan alert (above) and the `TURNSTILE_FAILED` lines. A visitor whose browser blocks the Turnstile script sends no token and gets the generic "could not request your report" message; rollback is `TURNSTILE_ENFORCE = "false"`.
+
+## Live results after the request (MPC-8452, first increment)
+
+`POST /api/scan` (a request that is not a 24h repeat) returns `live_token`, a short-lived stream key: `scanId.expiry.HMAC` (HMAC-SHA256 with `UNSUBSCRIBE_SECRET`, nothing stored, 15 minutes). The same request starts the three fast email checks at once (`lib/live.js` `runLiveChecks`, written as `signals` rows; the cron report job later rewrites them). The thank-you screen polls `GET /api/scan/live?t=<token>` every 3 seconds (`LiveScanPanel`), per-IP limited by `LIVE_LIMITER` (40/60s, fails open).
+
+- **Low sensitivity only.** The endpoint returns each check's id, label and status (found / clear / not_checked), never a value or detail. Anyone can type anyone's address, so the detail stays in the report email, which only the inbox owner receives. Showing detail live needs proof of inbox ownership (next increment: the link in the report email).
+- The key is not the scan number (that is the visitor's deletion handle). No `UNSUBSCRIBE_SECRET` = no key = no live view.
+- Memory only on the page: a refresh forgets everything and the view starts again.
+- Rollback: remove `UNSUBSCRIBE_SECRET`'s use here by reverting the PR; the report pipeline is unchanged either way.
+
+### Increment 2: the email link proves inbox ownership and unlocks the detail
+
+The confirmation email (and the report email) carry a button to `https://www.myprivacytool.io/scan/live#v=<token>`. The token (`scanId.expiry.HMAC`, message `verify:<scanId>:<expiry>`, 7 days, same `UNSUBSCRIBE_SECRET`) is in the URL **fragment**, which browsers never send to a server; the page reads it into memory, removes it from the address bar, and sends it to `GET /api/scan/live` as `Authorization: Bearer <token>` (never in a URL, so never in a request log). Only someone who can read the inbox has the link, so this is the proof of ownership: a verified request also reads `details`, and a found check carries its `value`. A stream token (`?t=`) can never unlock the detail, and the database `details` column is not even selected for it.
+
+The `/scan/live` page keeps watching after the first results (every 30 seconds, up to an hour) so new or changed findings appear. `noindex` and `Disallow: /scan/live` in robots.txt. A refresh forgets the key: press the button in the email again.

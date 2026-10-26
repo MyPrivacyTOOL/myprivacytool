@@ -11,12 +11,10 @@ import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
 import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
+import LiveScanPanel from "@/components/LiveScanPanel";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
-import { canOfferScanSave, pendingScan, recognitionEnabled, reportStep } from "@/lib/webScan";
-import LiveThankYou from "@/components/LiveThankYou";
-import { liveThankYouEnabled } from "@/config/liveThankYou";
-import { liveCells } from "@/lib/liveThankYou";
+import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
 import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 
@@ -47,6 +45,10 @@ const Scan = () => {
   const [tsToken, setTsToken] = useState("");
   const [tsReset, setTsReset] = useState(0);
   const tsWidgets = useRef(0);
+  // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
+  const [waitingForToken, setWaitingForToken] = useState(false);
+  // MPC-8452: key for the live results shown under the thank-you (memory only: a refresh starts again)
+  const [liveToken, setLiveToken] = useState("");
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -56,14 +58,19 @@ const Scan = () => {
     if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // The save box is optional: unticked = the report is still requested, the scan is just not saved.
-    if (!email.trim() || !consent || submitting) return;
+    if (!email.trim() || !consent || submitting || waitingForToken) return;
     if (tsWidgets.current > 0 && !tsToken) {
-      setErrorMsg("Verifying you are human. Please try again in a moment.");
+      setErrorMsg("");
+      setWaitingForToken(true);
       return;
     }
+    void sendReport(tsToken);
+  };
+
+  const sendReport = async (token: string) => {
     setSubmitting(true);
     setErrorMsg("");
     try {
@@ -75,8 +82,9 @@ const Scan = () => {
         });
         hubspotSent.current = true; // the lead is kept whatever happens to the report request
       }
+      let sent: { liveToken?: string } = {};
       try {
-        await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, tsToken);
+        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
       } catch (reportErr) {
         const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
@@ -87,6 +95,7 @@ const Scan = () => {
         setTsReset((n) => n + 1);
         return;
       }
+      if (sent.liveToken) setLiveToken(sent.liveToken);
       trackReportRequested("scan_page", offerSave && saveConsent);
       trackStartSignup({ source: "scan_page" });
       setSubmitted(true);
@@ -96,6 +105,14 @@ const Scan = () => {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    if (waitingForToken && tsToken) {
+      setWaitingForToken(false);
+      void sendReport(tsToken);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForToken, tsToken]);
 
   const renderForm = (idSuffix: string) => (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row sm:flex-wrap gap-3 max-w-md mx-auto">
@@ -111,10 +128,10 @@ const Scan = () => {
       />
       <Button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || waitingForToken}
         className="font-bold h-12 px-8 text-base whitespace-nowrap"
       >
-        {submitting ? "Sending…" : "Check My Exposure →"}
+        {submitting ? "Sending…" : waitingForToken ? "Verifying…" : "Check My Exposure →"}
       </Button>
       <TurnstileBox
         sitekey={SCAN_TURNSTILE_SITE_KEY}
@@ -143,6 +160,7 @@ const Scan = () => {
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
       <ScanNumberNotice />
+      {liveToken && <LiveScanPanel token={liveToken} />}
     </div>
   );
 
@@ -168,8 +186,7 @@ const Scan = () => {
         </p>
 
         {!submitted ? renderForm("top") : thanks}
-        {/* MPC-8452: OFF by default. Replays the scan already held in this browser; the report email is unaffected. */}
-        {submitted && liveThankYouEnabled() && <LiveThankYou cells={liveCells(pendingScan())} />}
+        {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
 
         <p className="text-muted-foreground text-xs mt-4">

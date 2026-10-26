@@ -19,9 +19,9 @@ export const REPORT_FAILED_MESSAGE =
   "We could not request your report just now, so nothing has been sent yet. Your email is still filled in: please press the button to try again.";
 export const REPORT_WAIT_MESSAGE = "You have tried a few times in a row. Please wait a minute, then press the button again.";
 
-export async function requestScanReport(email: string, saveScan: boolean, recognise: boolean, turnstileToken = ""): Promise<void> {
+export async function requestScanReport(email: string, saveScan: boolean, recognise: boolean, turnstileToken = ""): Promise<{ liveToken?: string }> {
   const base = resolveScanApiUrl();
-  if (!base) return; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
+  if (!base) return {}; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
   const q = new URLSearchParams(window.location.search);
   const ref = getReferralCode(); // MPC-7645: a friend's code, only while the referral switch is on
   let res: Response;
@@ -47,6 +47,9 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
     throw new ReportRequestError("network", 0);
   }
   if (!res.ok) throw new ReportRequestError(res.status === 429 ? "rate_limited" : res.status >= 500 ? "server" : "rejected", res.status);
-  if (saveScan) noteSaveResult(await res.json().catch(() => null));
+  const data = (await res.json().catch(() => null)) as { live_token?: unknown } | null;
+  if (saveScan) noteSaveResult(data);
+  // MPC-8452: a short-lived key for the live view on the thank-you screen (absent for a repeat request or when the feature is off)
+  return typeof data?.live_token === "string" ? { liveToken: data.live_token } : {};
 }
 
