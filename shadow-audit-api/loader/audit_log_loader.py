@@ -62,12 +62,15 @@ SENSITIVE_EVENT = "sensitive_data_accessed"
 COLUMNS = ("ts", "text", "tool", "session", "vault_start", "vault_end", "agent_id", "nonce", "sender", "dest_region")
 
 
-def _text(event: str, tool: str, d: Dict) -> str:
+def _text(event: str, tool: str, d: Dict, args: Optional[Dict] = None) -> str:
     det = d.get("details") or {}
     if event == "tool_execution_started":
         keys = det.get("param_keys")
         keys = ",".join(str(k) for k in keys) if isinstance(keys, list) else str(keys or "")
-        return f"tool {tool} started; params: {keys}"          # stable text so repeated calls look identical (#51)
+        base = f"tool {tool} started; params: {keys}"          # stable text so repeated calls look identical (#51)
+        if args:                                               # MPC-8428: masked values from the router sidecar
+            base += " | args: " + "; ".join(f"{k}={v}" for k, v in args.items() if k != "_truncated")
+        return base
     if event == "tool_execution_completed":
         return f"tool {tool} completed: {det.get('outcome_summary') or ''}"   # duration left out on purpose
     if event == "tool_execution_failed":
@@ -79,7 +82,7 @@ def _text(event: str, tool: str, d: Dict) -> str:
     return f"sensitive data accessed ({d.get('sensitivity_level')}): {cats}"
 
 
-def to_row(d: Dict) -> Optional[Dict]:
+def to_row(d: Dict, args: Optional[Dict] = None) -> Optional[Dict]:
     """One audit record -> one log-table row, or None if it is not an agent action."""
     event = d.get("event_type")
     if event not in TOOL_EVENTS and event != SENSITIVE_EVENT:
@@ -90,7 +93,7 @@ def to_row(d: Dict) -> Optional[Dict]:
     tool = str(d.get("target_id") or "") if d.get("target_type") == "tool" else None
     return {
         "ts": str(d["timestamp"]),
-        "text": mask(_text(event, tool or "-", d)),
+        "text": mask(_text(event, tool or "-", d, args)),
         "tool": tool,
         "session": str(d.get("correlation_id") or det.get("task_id") or "") or None,   # VERIFY: correlation_id is the session
         "vault_start": [],
@@ -116,14 +119,26 @@ def read_records(paths: Iterable[str]) -> Iterator[Tuple[Optional[Dict], bool]]:
                     yield None, False
 
 
-def build_rows(paths: Iterable[str], agent: str, since: Optional[str] = None) -> Tuple[List[Dict], Dict]:
+def load_args(paths: Iterable[str]) -> Dict[str, Dict]:
+    """MPC-8428: event_id -> already-masked argument values, from the router's args-*.jsonl sidecar.
+    Absent unless the router has argument logging switched on for the agent."""
+    out: Dict[str, Dict] = {}
+    for d, ok in read_records(paths):
+        if ok and d.get("event_id") and isinstance(d.get("args"), dict):
+            out[str(d["event_id"])] = d["args"]
+    return out
+
+
+def build_rows(paths: Iterable[str], agent: str, since: Optional[str] = None,
+               args: Optional[Dict[str, Dict]] = None) -> Tuple[List[Dict], Dict]:
     rows, stats = [], Counter()
     for d, ok in read_records(paths):
         if not ok:
             stats["unparseable"] += 1
             continue
         stats["records"] += 1
-        row = to_row(d)
+        a = (args or {}).get(str(d.get("event_id"))) if d.get("event_type") == "tool_execution_started" else None
+        row = to_row(d, a)
         if row is None:
             stats["skipped_not_agent_action"] += 1
         elif row["agent_id"] != agent:
@@ -133,6 +148,8 @@ def build_rows(paths: Iterable[str], agent: str, since: Optional[str] = None) ->
         else:
             rows.append(row)
             stats["loaded:" + str(d["event_type"])] += 1
+            if a:
+                stats["with_arg_values"] += 1
     rows.sort(key=lambda r: r["ts"])
     return rows, dict(stats)
 
@@ -218,7 +235,8 @@ def main(argv=None) -> int:
         print(f"no audit files under {a.audit_dir}", file=sys.stderr)
         return 2
     since = a.since or read_state(a.state_file)
-    rows, stats = build_rows(paths, a.agent, since)
+    arg_paths = sorted(glob.glob(a.audit_dir.rstrip("/") + "/args-*.jsonl"))
+    rows, stats = build_rows(paths, a.agent, since, load_args(arg_paths) if arg_paths else None)
     print(f"files: {len(paths)}  agent: {a.agent}  rows: {len(rows)}")
     for k in sorted(stats):
         print(f"  {k}: {stats[k]}")
