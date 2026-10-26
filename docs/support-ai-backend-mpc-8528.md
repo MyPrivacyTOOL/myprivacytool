@@ -77,5 +77,5 @@ Findings for the owners of those tasks (no change made here): the Contact page t
 ## Tests
 
 `npx vitest run shared/support` runs 35 isolated tests (29 service, 6 `RestCaseStore` with a fake fetch) against the in-memory store (no network, no provider, no production
-backing). `supabase/proposed/mpc_8528_support_cases.test.sql` is run by hand on a throwaway Postgres after
-`supabase/tests/bootstrap.sql`. Neither proves real channel delivery or live behaviour.
+backing). `supabase/tests/proposed-mpc-8528-support-cases.test.sql` runs inside `supabase/tests/run.sh` (`npm run test:db`) against the throwaway Postgres
+after the `supabase/proposed/` loop has applied the schema. Neither proves real channel delivery or live behaviour.

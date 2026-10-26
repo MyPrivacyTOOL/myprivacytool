@@ -1,7 +1,6 @@
--- Run by hand against a THROWAWAY database after supabase/tests/bootstrap.sql. Any failed assertion aborts (ON_ERROR_STOP).
+-- MPC-8528: assertions for the PROPOSED support schema (supabase/proposed/mpc_8528_support_cases.sql). supabase/tests/run.sh has already
+-- applied that file to the THROWAWAY database; this re-applies it once to prove it is idempotent. Any failed assertion aborts (ON_ERROR_STOP).
 \set ON_ERROR_STOP on
-\i supabase/proposed/mpc_8528_support_cases.sql
--- idempotent re-apply
 \i supabase/proposed/mpc_8528_support_cases.sql
 insert into support_cases (ref, channel, policy_version, thread_key) values ('SUP-ABCDEFGH','web','p1','t1');
 do $$ begin

@@ -56,6 +56,10 @@ psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 echo "== support follow-up assertions (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/support-followup.test.sql
 
+# MPC-8528: the PROPOSED AI-support schema (applied by the supabase/proposed loop above; not read by deploy-supabase.yml).
+echo "== proposed schema: AI support cases (MPC-8528)"
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
+
 # MPC-7471-F4: the PROPOSED baseline score_version migration (supabase/proposed/, not in supabase/migrations/) on rows saved the old way, then its own rollback.
 echo "== proposed migration: baseline score_version (MPC-7471-F4)"
 PROPOSED=supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql
