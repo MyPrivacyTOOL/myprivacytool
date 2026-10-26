@@ -124,3 +124,28 @@ describe("Privacy: Telegram bot (draft wording, unreviewed)", () => {
     expect(text).not.toContain("{contact}");
   });
 });
+
+// MPC-7915: the section about answers to a hexagon appears only when the learning build flag is on, so the policy says it exactly when collection is enabled.
+describe("Privacy: answers about a hexagon (2.4A)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is not shown while the learning flag is off", () => {
+    vi.stubEnv("VITE_LEARNING_EVENTS", "");
+    renderPage(<Privacy />);
+    expect(screen.queryByRole("heading", { name: "2.4A Your Answers About a Hexagon" })).not.toBeInTheDocument();
+  });
+
+  it("when on, says what is and is not recorded, the consent condition, the 30-person rule, the 90 days and how to ask for deletion", () => {
+    vi.stubEnv("VITE_LEARNING_EVENTS", "true");
+    renderPage(<Privacy />);
+    expect(screen.getByRole("heading", { name: "2.4A Your Answers About a Hexagon" })).toBeInTheDocument();
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("If you accepted analytics in the cookie banner");
+    expect(text).toContain("If you did not accept analytics, nothing is sent.");
+    expect(text).toContain("We do not record what we found");
+    expect(text).toContain("after at least 30 people have answered about it");
+    expect(text).toContain("We keep each answer for about 90 days.");
+    expect(text).toContain("To ask us to delete the answers linked to your random code, write to privacy@myprivacytool.io");
+  });
+});
+
