@@ -18,7 +18,15 @@ export const EMAIL_HEXAGONS = {
   // MPC-8452 (OSINT list, batch 1): both send a hash or the domain only, never the address.
   'email-libravatar': { label: 'Second public avatar service', source: 'Libravatar', services: ['Libravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
   'email-domain-record': { label: 'Public domain registration', source: 'RDAP (public domain registration data)', services: ['rdap.org and the domain registry it redirects to (receive the domain only, the part after the @)'] },
+  // MPC-8452 Tier 2 (owner approved 2026-10-26): the ONE check that sends the plain address to a third party. OFF unless EMAIL_GITHUB_COMMITS_ENABLED is "true",
+  // and that must only be set after the Privacy page names GitHub (docs/osint-list-mpc-8452.md).
+  'email-github-commits': { label: 'Public code commits', source: 'GitHub commit search', services: ['GitHub (receives the plain email address, in a search for public commits that name it as author)'] },
 };
+
+// The checks that run for this deployment. The live view is "done" when this many have finished, so a switched-off check must not be counted.
+export const GITHUB_COMMITS_ID = 'email-github-commits';
+export const githubCommitsEnabled = (env = {}) => env.EMAIL_GITHUB_COMMITS_ENABLED === 'true';
+export const enabledEmailHexagonIds = (env = {}) => Object.keys(EMAIL_HEXAGONS).filter((id) => id !== GITHUB_COMMITS_ID || githubCommitsEnabled(env));
 
 const result = (id, status, extra = {}) => ({ id, label: EMAIL_HEXAGONS[id].label, status, source: EMAIL_HEXAGONS[id].source, services: EMAIL_HEXAGONS[id].services, ...extra });
 const notChecked = (id, reason) => result(id, 'not_checked', { reason: String(reason).slice(0, 200) });
@@ -204,6 +212,36 @@ export async function checkDomainRecord(email, fetchImpl = fetch, { timeoutMs = 
   }
 }
 
+// ------------------------------------------------------------------ 7. public code commits (GitHub commit search, PLAIN address) - MPC-8452 Tier 2
+// GitHub only indexes commits on a repository's default branch, so "no results" is never proof that the address appears nowhere: the wording says so.
+// The search is rate limited (about 10 a minute without a token): any non-200 answer, and any answer GitHub marks incomplete, is NOT CHECKED, never clear.
+const GITHUB_COMMIT_SEARCH = 'https://api.github.com/search/commits';
+export async function checkGithubCommits(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS, token = '' } = {}) {
+  const id = GITHUB_COMMITS_ID;
+  const parts = splitEmail(email);
+  if (!parts || !/^[^\s@"<>]+$/.test(parts.local)) return notChecked(id, 'not a valid email address');
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const headers = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'MyPrivacyTOOL-scan-report', ...(token ? { authorization: `Bearer ${token}` } : {}) };
+    const q = encodeURIComponent(`author-email:${parts.local}@${parts.domain}`);
+    const res = await fetchImpl(`${GITHUB_COMMIT_SEARCH}?q=${q}&per_page=1`, { headers, signal: ctl.signal });
+    if (res.status !== 200) return notChecked(id, `GitHub HTTP ${res.status}`);      // 403/429 rate limited, 422 unsearchable, 5xx: not "clear"
+    const j = await res.json();
+    if (!j || typeof j.total_count !== 'number') return notChecked(id, 'GitHub answered in an unexpected shape');
+    if (j.total_count > 0) {
+      const repo = String(j.items?.[0]?.repository?.full_name || '').replace(/[^\w./-]/g, '').slice(0, 100);
+      return result(id, 'found', { value: `This address is the author of at least ${j.total_count} public ${j.total_count === 1 ? 'commit' : 'commits'} on GitHub${repo ? `, for example in ${repo}` : ''}. Anyone can search for these.` });
+    }
+    if (j.incomplete_results === true) return notChecked(id, 'GitHub search timed out on its side');
+    return result(id, 'clear');
+  } catch (e) {
+    return notChecked(id, ctl.signal.aborted ? 'GitHub lookup timed out' : `GitHub lookup failed: ${String(e).slice(0, 100)}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ------------------------------------------------------------------ run all (never throws, never exceeds the budget)
 export async function runEmailHexagons(email, env = {}, fetchImpl = fetch) {
   const budget = Number(env.EMAIL_HEXAGON_TIMEOUT_MS) || CHECK_TIMEOUT_MS;
@@ -217,6 +255,7 @@ export async function runEmailHexagons(email, env = {}, fetchImpl = fetch) {
     guard('email-profile', checkPublicProfile(email, fetchImpl, { timeoutMs: budget })),
     guard('email-libravatar', checkLibravatar(email, fetchImpl, { timeoutMs: budget })),
     guard('email-domain-record', checkDomainRecord(email, fetchImpl, { timeoutMs: budget })),
+    ...(githubCommitsEnabled(env) ? [guard(GITHUB_COMMITS_ID, checkGithubCommits(email, fetchImpl, { timeoutMs: budget, token: String(env.GITHUB_SEARCH_TOKEN || '') }))] : []),
   ]);
 }
 

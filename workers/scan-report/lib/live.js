@@ -4,7 +4,7 @@
 // owner of the inbox receives. Showing the detail live needs proof of inbox ownership (a later increment).
 // Access is a short-lived stream token (HMAC with UNSUBSCRIBE_SECRET, nothing stored). It is NOT the scan number, which is shown to the visitor
 // as the deletion handle. The token goes in the URL query of a read-only GET; it expires after LIVE_TTL_MS.
-import { EMAIL_HEXAGONS, emailHexagonSignalRows, runEmailHexagons } from './emailHexagons.js';
+import { EMAIL_HEXAGONS, emailHexagonSignalRows, enabledEmailHexagonIds, runEmailHexagons } from './emailHexagons.js';
 
 export const LIVE_TTL_MS = 15 * 60 * 1000;
 export const VERIFY_TTL_MS = 7 * 24 * 3600 * 1000;   // the email link: possession of it proves the reader controls the inbox the scan was requested for
@@ -103,7 +103,7 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
       sb.select(`scans?id=eq.${scanId}&select=report_status&limit=1`),
     ]);
     const items = liveItems(rows, { verified });
-    return json({ items, done: items.length >= Object.keys(EMAIL_HEXAGONS).length, report_sent: scan[0]?.report_status === 'sent', verified });
+    return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified });
   } catch (e) {
     console.error('live read failed:', String(e).replace(/\S+@\S+/g, '[email]'));
     return json({ error: 'Unavailable' }, 503);
