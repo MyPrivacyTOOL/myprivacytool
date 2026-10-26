@@ -123,8 +123,8 @@ check(res.status === 200 && makeCalls.length === 1 && makeCalls[0].posts.length 
 const li = makeCalls[0].posts.find((c) => c.platform === 'linkedin');
 check(li.body === 'linkedin copy' && li.title && li.link_url && li.asset_url && li.cta && li.publish_timestamp.endsWith('+08:00') && makeCalls[0].approved_by === 'chris' && makeCalls[0].approval_timestamp === '2026-10-21T06:15:00+08:00', 'envelope carries approver, HKT timestamps and per-post fields');
 check(makeCalls[0].posts.find((c) => c.platform === 'youtube').script === 'spoken', 'youtube script passes through');
-check(env.AGENT_LOGS.metrics.length === 6 && env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'social_metrics + published logged');
-check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /^✅ \*COMPLETED\*: approved by chris at \d\d:\d\d HKT\. Make\.com accepted the hand-off \(HTTP 200\) for 6 posts: X, LinkedIn, IG, FB, Pinterest, YouTube\./.test(slackPosts[0].text), 'thread reply says COMPLETED and names platforms');
+check(env.AGENT_LOGS.metrics.length === 0 && env.AGENT_LOGS.logs.some((r) => r.status === 'handed_off') && !env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'CK-8482: a Make 200 logs handed_off, never published, and seeds no metrics');
+check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /^✅ \*HANDED OFF\*: approved by chris at \d\d:\d\d HKT\. Make\.com accepted the hand-off \(HTTP 200\) for 6 posts: X, LinkedIn, IG, FB, Pinterest, YouTube\./.test(slackPosts[0].text), 'thread reply says HANDED OFF and names platforms');
 makeCalls.length = 0;
 await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId }, { authorization: 'Bearer tok' }), aenv, ctx);
 check(makeCalls.length === 0, 'second approval is a no-op');

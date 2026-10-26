@@ -1,4 +1,6 @@
 import { enrichAndScore, HIGH_PRIORITY_THRESHOLD } from './lead-scoring.js';
+// MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
+import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 
 // MPC-7350 input hardening helpers.
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
@@ -155,12 +157,14 @@ export default {
       let utm_source = '', utm_medium = '', utm_campaign = '', utm_content = '', referrer = '';
       let categoryScores = null; // MPC-7173: per-category risk scores for the baseline snapshot
       let riskScore = null; // MPC-6956: only the post-scan email modal sends this
+      let scoreVersionRaw = null; // MPC-7471-F4: which scoring contract produced riskScore; absent = a page from before the contract = legacy
       let consentRaw = null, consentSourceRaw = '', sourceRaw = ''; // MPC-6971: explicit consent only
       let turnstileToken = ''; // MPC-8368: Turnstile response from the scan form
       const ct = request.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const b = await request.json();
         riskScore = b.riskScore ?? null;
+        scoreVersionRaw = b.scoreVersion ?? null;
         categoryScores = b.categoryScores ?? null;
         name = b.name || ''; email = b.email || ''; phone = b.phone || '';
         utm_source = b.utm_source || ''; utm_medium = b.utm_medium || '';
@@ -171,6 +175,7 @@ export default {
       } else {
         const fd = await request.formData();
         riskScore = fd.get('riskScore') || null;
+        scoreVersionRaw = fd.get('scoreVersion') || null;
         name = fd.get('name') || ''; email = fd.get('email') || ''; phone = fd.get('phone') || '';
         utm_source = fd.get('utm_source') || ''; utm_medium = fd.get('utm_medium') || '';
         utm_campaign = fd.get('utm_campaign') || ''; utm_content = fd.get('utm_content') || '';
@@ -235,7 +240,7 @@ export default {
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
-      const baseline = await saveBaseline(env, email, riskScore, categoryScores);
+      const baseline = await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION);
 
       // 1. Save to Notion
       const properties = {
@@ -561,11 +566,17 @@ async function recordEngagement(env, sessionId, flags) {
 }
 
 // MPC-7173: baseline snapshot. Keyed by SHA-256(lower-cased email); stores only scores, never the email.
-// Returns { overall_score, created_at, is_first, delta } (delta = this scan minus baseline) or null.
-async function saveBaseline(env, email, riskScore, categoryScores) {
+// MPC-7471-F4: every baseline carries the score version that produced it. Old rows are 'legacy' (the column default) and are kept as they are;
+// a score is only ever compared with a baseline of the SAME version, and a legacy and a versioned score are never subtracted.
+// BASELINE_SCORE_VERSION_COLUMN = "true" once supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql is applied. Until then only
+// legacy submissions are stored (exactly as before) and a versioned score is not stored at all: it cannot be tagged, and an untagged row would be read as legacy.
+// Returns { overall_score, created_at, is_first, delta, score_version, comparable } (delta = this scan minus the baseline of the same version, else null) or null.
+async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion = LEGACY_SCORE_VERSION) {
   const score = Number(riskScore);
   if (riskScore === null || riskScore === '' || !Number.isFinite(score) || score < 0 || score > 100) return null;
   if (!env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const versioned = env.BASELINE_SCORE_VERSION_COLUMN === 'true';
+  if (!versioned && scoreVersion !== LEGACY_SCORE_VERSION) return null;
   const overall = Math.round(score);
   const cats = {};
   if (categoryScores && typeof categoryScores === 'object' && !Array.isArray(categoryScores)) {
@@ -580,11 +591,11 @@ async function saveBaseline(env, email, riskScore, categoryScores) {
     const base = `${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_score_baselines`;
     const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' };
 
-    // First scan wins: insert and ignore the conflict if a baseline already exists, then read it back.
+    // First scan of this version wins: insert and ignore the conflict if one exists, then read it back.
     const ins = await fetch(base, {
       method: 'POST',
       headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ email_hash: emailHash, overall_score: overall, category_scores: cats }),
+      body: JSON.stringify({ email_hash: emailHash, overall_score: overall, category_scores: cats, ...(versioned ? { score_version: scoreVersion } : {}) }),
     });
     if (!ins.ok) {
       console.error('Supabase mpt_score_baselines insert failed:', ins.status, (await ins.text()).slice(0, 200));
@@ -592,16 +603,18 @@ async function saveBaseline(env, email, riskScore, categoryScores) {
     }
     const created = await ins.json();
     if (Array.isArray(created) && created.length) {
-      return { overall_score: created[0].overall_score, created_at: created[0].created_at, is_first: true, delta: 0 };
+      return { overall_score: created[0].overall_score, created_at: created[0].created_at, is_first: true, delta: 0, score_version: scoreVersion, comparable: true };
     }
-    const sel = await fetch(`${base}?email_hash=eq.${emailHash}&select=overall_score,created_at&limit=1`, { headers });
+    const sel = await fetch(`${base}?email_hash=eq.${emailHash}${versioned ? `&score_version=eq.${scoreVersion}` : ''}&select=overall_score,created_at${versioned ? ',score_version' : ''}&limit=1`, { headers });
     if (!sel.ok) {
       console.error('Supabase mpt_score_baselines select failed:', sel.status);
       return null;
     }
     const rows = await sel.json();
     if (!Array.isArray(rows) || !rows.length) return null;
-    return { overall_score: rows[0].overall_score, created_at: rows[0].created_at, is_first: false, delta: overall - rows[0].overall_score };
+    const rowVersion = rows[0].score_version ?? LEGACY_SCORE_VERSION;
+    if (rowVersion !== scoreVersion) return { overall_score: rows[0].overall_score, created_at: rows[0].created_at, is_first: false, delta: null, score_version: rowVersion, comparable: false };
+    return { overall_score: rows[0].overall_score, created_at: rows[0].created_at, is_first: false, delta: overall - rows[0].overall_score, score_version: rowVersion, comparable: true };
   } catch (err) {
     console.error('Supabase mpt_score_baselines error:', String(err));
     return null;

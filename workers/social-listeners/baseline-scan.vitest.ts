@@ -151,3 +151,20 @@ describe("report contract", () => {
     expect(buildReport(yes(), ok(CHAT), { status: 200, response: { ok: false } })).toBeNull();
   });
 });
+
+describe("/scanstatus", () => {
+  it("answers three yes/no lines only, never a value, and only in PROBE_MODE=on", async () => {
+    const on = setup({ PROBE_MODE: "on", TELEGRAM_BASELINE_SCAN: "on" });
+    await on.post(yes({ text: "/scanstatus" }));
+    const text = on.tg("sendMessage")[0].body.text as string;
+    expect(text).toBe("Baseline scan switch on: yes\nYour id is on the allow-list: yes\nSnapshot storage configured: yes");
+    expect(text).not.toContain(String(ID));
+    expect(on.brain).not.toHaveBeenCalled();
+    const off = setup({ PROBE_MODE: "on", TELEGRAM_BASELINE_SCAN: undefined, PROBE_TELEGRAM_IDS: "999" });
+    await off.post(yes({ text: "/scanstatus" }));
+    expect(off.tg("sendMessage")[0].body.text).toMatch(/switch on: no\nYour id is on the allow-list: no/);
+    const none = setup({}, {});
+    await none.post(yes({ text: "/scanstatus" }));
+    expect(none.tg("sendMessage")[0].body.text).not.toMatch(/allow-list/); // goes to core-brain as before when PROBE_MODE is not on
+  });
+});

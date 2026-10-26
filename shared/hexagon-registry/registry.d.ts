@@ -12,6 +12,8 @@ export interface HexagonRegistryEntry {
   value_to_user: string;
   value_type: string;
   presence: 'always' | 'conditional';
+  /** MPC-7471-F2: optional. Names a device capability; the entry is left out of the scan total only when the device is known not to have it. */
+  applies_when?: { capability: string };
   user_can_check: 'yes' | 'partly' | 'no';
   example_value: string;
   truth: {
