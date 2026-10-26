@@ -2768,6 +2768,41 @@ export const EMAIL_HEXAGONS = [
     "trust_score": null,
     "source": "workers/scan-report/lib/emailHexagons.js",
     "build_status": "built"
+  },
+  {
+    "id": "email-github-commits",
+    "label": "Public code commits",
+    "group": "Email address",
+    "category": "email",
+    "order": 7,
+    "artwork": {
+      "file": null,
+      "emoji": "💻",
+      "note": "No image file exists; drawn as an inline SVG hexagon with this emoji."
+    },
+    "captures": "GitHub commit search for public commits whose author email is the address (MPC-8452 Tier 2). The only email hexagon that sends the plain address to a third party.",
+    "value_type": "text",
+    "presence": "always",
+    "example_value": "This address is the author of at least 3 public commits on GitHub, for example in owner/repo. Anyone can search for these.",
+    "truth": {
+      "level": "measured",
+      "sensitivity": "medium",
+      "note": "GitHub indexes only default-branch commits, so a clear result never means the address appears nowhere."
+    },
+    "status": {
+      "kind": "risk-check",
+      "allowed": [
+        "FOUND",
+        "CHECKED_AND_CLEAR",
+        "NOT_CHECKED"
+      ],
+      "found": "Search returned at least one commit.",
+      "clear": "HTTP 200, zero results, not marked incomplete.",
+      "not_checked": "Rate limited (403/429), unsearchable (422), error, incomplete result or timed out."
+    },
+    "trust_score": null,
+    "source": "workers/scan-report/lib/emailHexagons.js",
+    "build_status": "built"
   }
 ];
 
