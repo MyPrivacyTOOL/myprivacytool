@@ -34,6 +34,8 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 psql_ "$TEST_URL" -f supabase/sql/mpc-8529-support-followup.sql   # MPC-8529: provisional, hand-applied SQL (not a migration)
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 for f in $(ls supabase/migrations/*.sql | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+# CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
+for f in $(ls supabase/proposed/*.sql 2>/dev/null | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 
 echo "== RLS isolation test (supabase/sql/mpt-operational-rls.test.sql)"
 out=$(psql_ "$TEST_URL" -At -F '|' -f supabase/sql/mpt-operational-rls.test.sql | grep '|' || true)
