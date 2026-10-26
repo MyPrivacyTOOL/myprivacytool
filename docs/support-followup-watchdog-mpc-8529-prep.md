@@ -144,7 +144,7 @@ Receipts (run 2026-10-26 on this branch; expected = pass):
 
 | Check | Expected | Actual |
 |---|---|---|
-| `supabase/tests/run.sh` incl. `support-followup.test.sql` | all assertions pass | pass (10 RLS rows, schema assertions, ~45 follow-up assertions) |
+| `supabase/tests/run.sh` incl. `support-followup.test.sql` | all assertions pass | pass (10 RLS rows, schema assertions, 58 follow-up assertion calls) |
 | `vitest` supportFollowup + HelpButton | pass | 63 / 63 |
 | eslint (changed files), `tsc --noEmit -p tsconfig.app.json` | clean | clean |
 | Playwright `support-degraded.spec.ts` | pass | 24 / 24 |
