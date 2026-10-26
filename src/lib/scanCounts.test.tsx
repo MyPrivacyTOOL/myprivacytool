@@ -11,6 +11,9 @@ import { HEXAGONS, HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.
 import { scanCounts, scanCountsLine, coverageLine } from '../../shared/hexagon-registry/counts.js';
 import { WEB_HEXAGONS, normaliseHexagons, tally } from '../../workers/scan-report/lib/reportHex.js';
 
+// F1's scan-complete dialog fires confetti when the summary opens; jsdom has no canvas.
+vi.mock('canvas-confetti', () => ({ default: vi.fn() }));
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 // One value per registry hexagon that the shared status rule reads as FOUND, except where a scenario says otherwise.
