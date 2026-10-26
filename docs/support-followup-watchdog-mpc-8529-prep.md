@@ -1,6 +1,6 @@
-# MPC-8529 — Support follow-up watchdog, outage fallback and journey tests (PREPARATORY DESIGN)
+# MPC-8529 — Support follow-up watchdog, outage fallback and journey tests
 
-**Status: prepared design only.** Nothing here is implemented, installed, scheduled or verified.
+**Status: design (merged in #532) plus a PROVISIONAL, isolated-tested build (section 9).** Nothing is installed in production, scheduled or verified live.
 MPC-8529 is **not claimed**. Two of its three prerequisites have no delivered outputs as of 2026-10-26 (see §1), so
 acceptance stays open. This file is a separately bounded, docs-only preparation: no code, no migrations,
 no schedules, no live messages, no new infrastructure, no spend.
@@ -124,3 +124,45 @@ Aggregate counts only in shared logs and artifacts; no email, token or free text
 | Installed | No |
 | Scheduled | No |
 | Verified | No |
+
+## 9. Provisional build and test receipts (added after the owner chose to build on provisional contracts)
+
+Built on the section 3 design **without** MPC-8528 / MPC-8530. Treat as provisional: re-point `case_ref` and re-run the tests
+when MPC-8528 lands a real case schema, and replace the proposed backoff and bound when MPC-8530 approves numbers.
+
+| Piece | File | State |
+|---|---|---|
+| Follow-up engine (tables, lease claim, idempotent attempts, bounded backoff, exhaustion, verify, reopen, sweep, metrics view) | `supabase/sql/mpc-8529-support-followup.sql` | Tested on a throwaway Postgres 16. **Not applied to production.** Deliberately not in `supabase/migrations/`, which auto-deploys. |
+| Sweep schedule (`mpt-support-followup-sweep`, every 5 min) | same file, commented out | **Not scheduled.** Needs approval. |
+| Honest outage wording and bound helpers | `src/lib/supportFollowup.ts` (+ test) | Unit-tested; **not wired into any UI or worker yet**. |
+| HELP-under-outage browser checks (11 routes incl. 404, desktop + mobile, keyboard, focus return, no token/email in requests) | `e2e/support-degraded.spec.ts` | Run on a production build with all non-local traffic blocked. |
+
+Run command: `npm run test:support` (needs `DATABASE_URL` of a disposable Postgres and a built `dist/`; see `docs/ci-cd-testing.md`).
+Disable: `select cron.unschedule('mpt-support-followup-sweep');` (nothing to undo while it is unscheduled). Remove: drop the objects in the SQL file.
+
+Receipts (run 2026-10-26 on this branch; expected = pass):
+
+| Check | Expected | Actual |
+|---|---|---|
+| `supabase/tests/run.sh` incl. `support-followup.test.sql` | all assertions pass | pass (10 RLS rows, schema assertions, 58 follow-up assertion calls) |
+| `vitest` supportFollowup + HelpButton | pass | 63 / 63 |
+| eslint (changed files), `tsc --noEmit -p tsconfig.app.json` | clean | clean |
+| Playwright `support-degraded.spec.ts` | pass | 24 / 24 |
+
+Evidence class: **mocked / isolated integration only.** No real channel, no production database, no live message.
+
+### Acceptance criteria against this build
+
+| Criterion | Status |
+|---|---|
+| Persistent next-action / next-update scheduling, bounded retries, backoff, idempotency, lease against duplicate workers | Met in isolated DB tests (provisional schema) |
+| Orphan and stalled-lease detection; explicit waiting / unresolved / exhausted states; no close-on-silence; verification; reopen | Met in isolated DB tests |
+| Sanitised defect handoff to the engineering workflow | **Unmet.** Only the `engineering_handoff` state exists; no sender. |
+| Failed acknowledgement / reply detection from a real transport | **Unmet.** Needs MPC-8528 delivery receipts and a worker. |
+| Independently reachable help/status/intake fallback | **Unmet.** Needs an approved host other than Cloudflare Pages. `describeAvailability` only labels shared-host fallbacks as not independent. |
+| HELP across routes, desktop/mobile, keyboard, honest copy | Met for the current HELP (11 routes in browser, all route patterns in HELP's own unit test) |
+| Full main journey (diagnosis, action, case reference, delivered follow-up, verified outcome, reopen) | **Unmet.** Needs MPC-8528 backend; only the follow-up state transitions are tested. |
+| Wrong-user access, broken login, disputed finding, billing boundary, malicious prompts, cost exhaustion | **Unmet.** Belong to the MPC-8528 gateway and MPC-8530 policy. |
+| Production schedule, live tests, load test | **Not done; approval required.** |
+
+So acceptance is **not** met overall. The task cannot honestly be marked Done until MPC-8528 / MPC-8530 land and the unmet rows are re-tested.
