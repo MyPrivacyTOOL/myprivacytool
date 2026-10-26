@@ -1,4 +1,7 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
+import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
+import { handleDeepCommand, isDeepCommand } from "./deep-scan";
+import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
 import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
@@ -34,7 +37,17 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   if (mode !== "off") {
     const run = (p: Promise<void>) => (ctx?.waitUntil ? (ctx.waitUntil(p), undefined) : p);
     if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log, events)); return done(new Response("OK")); }
+    if (mode === "on" && isScanStatusRequest(payload)) { await run(replyScanStatus(env, payload, log)); return done(new Response("OK")); }
+    if (mode === "on" && isPhotoExifRequest(payload)) { await run(replyPhotoExif(env, payload, log)); return done(new Response("OK")); }
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
+  }
+
+  // MPC-7892 DEEP (default off, allow-listed test accounts): exact commands only; handled here so core-brain never sees them.
+  if (isDeepCommand(env, payload)) {
+    const deep = handleDeepCommand(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(deep);
+    else await deep;
+    return done(new Response("OK"));
   }
 
   const brain = await callCoreBrain(env, { source: "telegram", receivedAt: new Date().toISOString(), payload }, log);
@@ -42,7 +55,9 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   if (brain === RATE_LIMITED) return done(new Response("OK")); // throttled sender: acknowledge so Telegram does not retry
   if (!brain) return done(new Response("Upstream Unavailable", { status: 502 }));
   // Answer Telegram right away; sending the reply must never delay or fail the webhook (a non-2xx makes Telegram retry).
-  const send = sendTelegramReply(env, payload, brain, log, events);
+  // MPC-7891 baseline scan (default off, allow-listed test accounts only): only after core-brain confirms the stored consent state moved to confirmed.
+  const scan = baselineScanEnabled(env) && baselineSender(env, payload) ? (await brain.clone().json().catch(() => null)) as Parameters<typeof isConsentConfirmation>[0] : null;
+  const send = sendTelegramReply(env, payload, brain, log, events).then(() => (isConsentConfirmation(scan) ? runBaselineScan(env, payload, log) : undefined));
   if (ctx?.waitUntil) ctx.waitUntil(send);
   else await send;
   return done(new Response("OK"));

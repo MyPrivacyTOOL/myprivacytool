@@ -215,7 +215,7 @@ describe('postToMake', () => {
 });
 
 describe('process (approval flow)', () => {
-  it('approve_all success: validates, POSTs one payload, logs, replies COMPLETED', async () => {
+  it('approve_all success: validates, POSTs one payload, logs, replies HANDED OFF (not published)', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
     const out = await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target });
     expect(out).toEqual({ status: 200, message: 'approved' });
@@ -223,11 +223,12 @@ describe('process (approval flow)', () => {
     const sent = JSON.parse(makeCalls()[0][1].body);
     expect(validateMakePayload(sent).ok).toBe(true);
     expect(sent.posts.map((p) => p.platform)).toEqual(PLATFORMS);
-    expect(statuses(db)).toEqual(expect.arrayContaining(['approved', 'published']));
+    expect(statuses(db)).toEqual(expect.arrayContaining(['approved', 'handed_off']));
     expect(statuses(db)).not.toContain('failed');
-    expect(db.tables.social_metrics).toHaveLength(6);
+    expect(statuses(db)).not.toContain('published'); // a Make 2xx is never recorded as published
+    expect(db.tables.social_metrics).toHaveLength(0); // metrics rows now wait for a verified receipt
     expect(db.tables.make_webhook_log).toHaveLength(1);
-    expect(slackTexts()).toEqual(['✅ *COMPLETED*: approved by chris at 07:00 HKT. Make.com accepted the hand-off (HTTP 200) for 6 posts: X, LinkedIn, IG, FB, Pinterest, YouTube. Publishing is done by the Make.com scenario.']);
+    expect(slackTexts()).toEqual(['✅ *HANDED OFF*: approved by chris at 07:00 HKT. Make.com accepted the hand-off (HTTP 200) for 6 posts: X, LinkedIn, IG, FB, Pinterest, YouTube. Not yet verified as published: platform receipts will confirm each post.']);
   });
   it('does not claim the posts are live: the completion text says handed off / accepted', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
@@ -235,7 +236,7 @@ describe('process (approval flow)', () => {
     expect(slackTexts()[0]).not.toMatch(/Posted to/);
     expect(slackTexts()[0]).toMatch(/accepted the hand-off/);
   });
-  it('replaces the buttons on the original message with the COMPLETED banner', async () => {
+  it('replaces the buttons on the original message with the HANDED OFF banner', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
     const blocks = [{ type: 'header' }, { type: 'section' }, { type: 'actions', elements: [] }];
     await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target: { ...target, blocks } });
@@ -243,7 +244,7 @@ describe('process (approval flow)', () => {
     const body = JSON.parse(init.body);
     expect(body).toMatchObject({ channel: 'C1', ts: '111.222' });
     expect(body.blocks.map((b) => b.type)).toEqual(['header', 'section', 'section']);
-    expect(body.blocks.at(-1).text.text).toMatch(/^✅ \*COMPLETED\*/);
+    expect(body.blocks.at(-1).text.text).toMatch(/^✅ \*HANDED OFF\*/);
   });
   it('skips the message update when there are no original blocks or no token', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
@@ -337,7 +338,7 @@ describe('process (approval flow)', () => {
     expect(makeCalls()).toHaveLength(0);
     expect(slackTexts()).toEqual(['Rejected. Awaiting next cycle.', 'Already decided for this cycle; ignoring.']);
   });
-  it('a click on an already-published message replaces its buttons with the COMPLETED banner', async () => {
+  it('a click on an already-published message replaces its buttons with the HANDED OFF banner', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
     const blocks = [{ type: 'header' }, { type: 'actions', elements: [] }];
     await processApproval(mkEnv(db), { action: 'approve_all', taskId: TASK, timestamp: APPROVED_AT, approver: 'chris', target });
@@ -347,7 +348,7 @@ describe('process (approval flow)', () => {
     const [, init] = fetchMock.mock.calls.find(([u]) => u === 'https://slack.com/api/chat.update');
     const body = JSON.parse(init.body);
     expect(body.blocks.map((b) => b.type)).toEqual(['header', 'section']);
-    expect(body.blocks.at(-1).text.text).toMatch(/^✅ \*COMPLETED\*: already approved/);
+    expect(body.blocks.at(-1).text.text).toMatch(/^✅ \*HANDED OFF\*: already approved/);
   });
   it('a click on an already-rejected message replaces its buttons with the REJECTED banner', async () => {
     const db = fakeD1(); seed(db, sixDrafts());
@@ -461,7 +462,7 @@ describe('fetch handler (POST /approve)', () => {
       expect(res.status).toBe(200);
       await Promise.all(c.pending);
       expect(makeCalls()).toHaveLength(1);
-      expect(slackTexts()[0]).toMatch(/^✅ \*COMPLETED\*: approved by ck at \d\d:\d\d HKT\. Make\.com accepted the hand-off \(HTTP 200\) for 6 posts/);
+      expect(slackTexts()[0]).toMatch(/^✅ \*HANDED OFF\*: approved by ck at \d\d:\d\d HKT\. Make\.com accepted the hand-off \(HTTP 200\) for 6 posts/);
       expect(JSON.parse(makeCalls()[0][1].body).approved_by).toBe('ck');
     });
     it('falls back to the configured approver when Slack omits the user', async () => {

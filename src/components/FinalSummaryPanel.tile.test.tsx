@@ -26,7 +26,7 @@ describe('FinalSummaryPanel with tiles', () => {
     expect(board).toHaveTextContent(/need fixing/);
     expect(board).toHaveTextContent(/not checked yet/);
     const text = container.textContent ?? '';
-    expect(text).not.toMatch(/Risk Score|Overall Privacy Risk|Uniqueness|Exposure|Export PDF/);
+    expect(text).not.toMatch(/Risk Score|Exposure score|Overall exposure score|Coverage|Uniqueness|Exposure|Export PDF/);
     expect(text).not.toMatch(/\d+%/);
     expect(text).not.toMatch(/\d+\/\d+/);
     expect(text).not.toMatch(/Complete analysis|100% Local/);
@@ -47,9 +47,10 @@ describe('FinalSummaryPanel with tiles', () => {
     }
   });
 
-  it('without tiles the old score, percentages and PDF button are unchanged', () => {
+  it('without tiles the shared exposure score, coverage and PDF button are shown', () => {
     const { container } = render(<FinalSummaryPanel hexagons={hexagons} confirmedCount={4} />);
-    expect(container.textContent).toMatch(/Risk Score/);
+    expect(container.textContent).toMatch(/Exposure score/);
+    expect(container.textContent).toMatch(/Coverage/);
     expect(container.textContent).toMatch(/Export PDF/);
     expect(container.textContent).toMatch(/100% Local/);
   });

@@ -31,10 +31,9 @@ import {
   trackActivity,
   trackScanStarted
 } from '@/lib/analytics';
-import { AlertTriangle, X, PartyPopper } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import confetti from 'canvas-confetti';
-import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { scanCounts } from '../../shared/hexagon-registry/counts.js';
 import { hexTileV2Enabled, hexScreenV2Enabled } from '@/config/hexagonTile';
 import { toTile, riskProfile, riskProfileParts, withUserStatement, withGuessAnswer, cannotCheckLast, HexagonTile, type GuessOutcome } from '@/lib/hexagonTile';
 import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
@@ -146,7 +145,6 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
   
   // Final summary state
   const [showFinalSummary, setShowFinalSummary] = useState(false);
-  const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   
   // Behavior state
   const [showBehaviorPanel, setShowBehaviorPanel] = useState(false);
@@ -198,6 +196,12 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     [getOrderedHexagons, confirmedHexagons, v2]
   );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
+  // MPC-7471-F2: X (confirmed), Y (checked) and Z (total) for THIS scan, from the registry and the whole scan, not the part revealed so far.
+  // One snapshot feeds the summary card, the popup, the share text and the PDF.
+  const counts = useMemo(
+    () => scanCounts(orderedHexagons, { confirmedIds: confirmedHexagons, ctx: captureContext(allHexagons) }),
+    [orderedHexagons, confirmedHexagons, allHexagons]
+  );
 
   // MPC-7916: what each visible tile says, decided in one place from the captured value and the registry.
   const tiles = useMemo(() => {
@@ -335,8 +339,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       trackFunnelStep('all_hexagons_confirmed');
       trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
-      // Trigger celebration confetti. MPC-7916: not with the honest tiles on: finishing the taps is not a result.
-      if (!v2) triggerCompletionCelebration();
+      // MPC-7471-F1: the congratulations banner and confetti moved into the one scan-complete dialog (EmailCaptureModal).
     }
   }, [confirmedCount, progressCount, revealWaves, orderedHexagons.length, visibleCount, showLanguagePanel, showFinalSummary, loadFingerprintData, v2]);
 
@@ -353,41 +356,6 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
       stopBehaviorTracking();
       clearInterval(behaviorInterval);
     };
-  }, []);
-
-  // Trigger completion celebration with confetti
-  const triggerCompletionCelebration = useCallback(() => {
-    setShowCompletionCelebration(true);
-    
-    // Fire confetti
-    const duration = 3000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
-
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-    const interval = setInterval(() => {
-      const timeLeft = animationEnd - Date.now();
-      if (timeLeft <= 0) {
-        clearInterval(interval);
-        setTimeout(() => setShowCompletionCelebration(false), 2000);
-        return;
-      }
-
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-        colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
-      });
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-        colors: ['#27AE60', '#1E8449', '#1A1A1A', '#F4F4F4'],
-      });
-    }, 250);
   }, []);
 
   // Check for critical security issues (DNS leak, WebRTC leak)
@@ -929,6 +897,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         <RiskScore 
           confirmed={confirmedCount} 
           total={visibleCount}
+          counts={counts}
           hexagons={visibleHexagons}
           fingerprint={fingerprintData}
         />
@@ -994,34 +963,6 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         </div>
       )}
 
-      {/* Completion Celebration Banner */}
-      {!v2 && showCompletionCelebration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-surface border border-surface-border shadow-card px-8 py-6 rounded-2xl animate-scale-in text-center pointer-events-auto">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
-              <h2 className="text-2xl font-bold text-foreground">Complete Digital Shadow Revealed!</h2>
-              <PartyPopper className="w-8 h-8 text-brand animate-bounce" />
-            </div>
-            <p className="text-muted-foreground text-sm">All {HEXAGON_COUNT} hexagons analyzed across {HEXAGON_GROUP_COUNT} categories</p>
-            <div className="flex items-center justify-center gap-4 mt-4">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-brand">{HEXAGON_COUNT}</p>
-                <p className="text-xs text-muted-foreground">Data Points</p>
-              </div>
-              <div className="text-center">
-                <p className="text-3xl font-bold text-brand">{HEXAGON_GROUP_COUNT}</p>
-                <p className="text-xs text-muted-foreground">Categories</p>
-              </div>
-              <div className="text-center">
-                <p className="text-3xl font-bold text-brand">100%</p>
-                <p className="text-xs text-muted-foreground">Complete</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Final Summary Panel - shown after all hexagons confirmed */}
       {!v2 && showFinalSummary && (
         <div className="mt-8 animate-fade-in">
@@ -1029,6 +970,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <FinalSummaryPanel
               hexagons={visibleHexagons}
               confirmedCount={confirmedCount}
+              counts={counts}
               tiles={v2 ? tiles : undefined}
               fingerprint={fingerprintData}
               languagePrediction={languagePrediction}
