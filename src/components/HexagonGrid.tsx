@@ -33,7 +33,7 @@ import {
 } from '@/lib/analytics';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { scanCounts } from '../../shared/hexagon-registry/counts.js';
 import { hexTileV2Enabled, hexScreenV2Enabled } from '@/config/hexagonTile';
 import { toTile, riskProfile, riskProfileParts, withUserStatement, withGuessAnswer, cannotCheckLast, HexagonTile, type GuessOutcome } from '@/lib/hexagonTile';
 import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
@@ -196,6 +196,12 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
     [getOrderedHexagons, confirmedHexagons, v2]
   );
   const visibleHexagons = orderedHexagons.slice(0, visibleCount);
+  // MPC-7471-F2: X (confirmed), Y (checked) and Z (total) for THIS scan, from the registry and the whole scan, not the part revealed so far.
+  // One snapshot feeds the summary card, the popup, the share text and the PDF.
+  const counts = useMemo(
+    () => scanCounts(orderedHexagons, { confirmedIds: confirmedHexagons, ctx: captureContext(allHexagons) }),
+    [orderedHexagons, confirmedHexagons, allHexagons]
+  );
 
   // MPC-7916: what each visible tile says, decided in one place from the captured value and the registry.
   const tiles = useMemo(() => {
@@ -891,6 +897,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
         <RiskScore 
           confirmed={confirmedCount} 
           total={visibleCount}
+          counts={counts}
           hexagons={visibleHexagons}
           fingerprint={fingerprintData}
         />
@@ -963,6 +970,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <FinalSummaryPanel
               hexagons={visibleHexagons}
               confirmedCount={confirmedCount}
+              counts={counts}
               tiles={v2 ? tiles : undefined}
               fingerprint={fingerprintData}
               languagePrediction={languagePrediction}

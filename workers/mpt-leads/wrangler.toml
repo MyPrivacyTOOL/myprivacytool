@@ -33,6 +33,12 @@ head_sampling_rate = 1
 [vars]
 CONFIRMATION_OWNER = "scan-report"
 
+# MPC-7471-F4: baselines carry a score_version. "true" only because supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql was
+# applied to production on 2026-10-26 (score_version column + unique(email_hash, score_version); the 4 existing rows are all 'legacy').
+# Rollback: set "false" and merge. Versioned scores are then simply not stored; legacy submissions keep working exactly as before.
+# Declared here because `wrangler deploy` replaces dashboard-set plain vars.
+BASELINE_SCORE_VERSION_COLUMN = "true"
+
 # MPC-8368: Turnstile on the scan email form. TURNSTILE_SECRET_KEY is a Worker secret (set already, see EXPECTED_SECRETS.txt).
 # "true" = reject failed/missing tokens with 403 (enforcing since 2026-10-20). "false" = verify and log only (instant rollback:
 # change this and merge). Every failure is logged either way as one line starting TURNSTILE_FAILED (ts, ip, country, origin,

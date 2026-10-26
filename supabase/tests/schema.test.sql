@@ -49,8 +49,8 @@ reset role;
 set local role service_role;
 insert into public.mpt_score_baselines (email_hash, overall_score, category_scores)
   values (repeat('a', 64), 40, '{"fingerprint":50}');
--- the Worker POSTs with Prefer: resolution=ignore-duplicates  ==  ON CONFLICT DO NOTHING
-insert into public.mpt_score_baselines (email_hash, overall_score) values (repeat('a', 64), 99) on conflict (email_hash) do nothing;
+-- the Worker POSTs with Prefer: resolution=ignore-duplicates  ==  ON CONFLICT DO NOTHING (no target: the unique key is now (email_hash, score_version), MPC-7471-F4)
+insert into public.mpt_score_baselines (email_hash, overall_score) values (repeat('a', 64), 99) on conflict do nothing;
 select pg_temp.assert((select overall_score from public.mpt_score_baselines where email_hash = repeat('a', 64)) = 40, 'first baseline must win');
 select pg_temp.assert((select count(*) from public.mpt_score_baselines) = 1, 'one baseline per email hash');
 reset role;
@@ -783,6 +783,42 @@ select pg_temp.assert(public.rollup_and_purge_hexagon_events() = 6, 'learning: t
 select pg_temp.assert((select count(*) from public.mpt_hexagon_events where hexagon_id = 'isp') = 1, 'learning: a recent row survives the purge');
 select pg_temp.assert((select shown_people from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 3 and (select not_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1 and (select yes_me from public.mpt_hexagon_event_rollups where hexagon_id = 'isp') = 1, 'learning: the rollup counts 3 shown and each person''s first answer once (a change of mind is not double counted)');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.rollup_and_purge_hexagon_events(interval '1 hour')$$) = 'P0001', 'learning: retention under one day is refused');
+
+-- ===== CK-8493 learning decisions: immutable header, append-only events, approval controls =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.learning_decisions$$) = '42501', 'decisions: anon cannot read');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.learning_decision_events$$) = '42501', 'decisions: authenticated cannot read');
+select pg_temp.assert((select relforcerowsecurity from pg_class where oid = 'public.learning_decisions'::regclass) and (select relforcerowsecurity from pg_class where oid = 'public.learning_decision_events'::regclass), 'decisions: RLS forced');
+insert into public.learning_decisions (id, owner, hypothesis, target_kind, hexagon_id, source, tile_kind, baseline, proposed_from, proposed_to, bound_min, bound_max, guardrails, evidence, primary_approver, second_approver_required, next_outcome_check_due, policy_version, rules_version)
+values ('00000000-0000-4000-8000-000000000001', 'chris', 'SYNTHETIC: showing 0.25 instead of 0.95 matches what people say', 'confidence', 'location', 'web-scan', 'our_guess', '{"responders":60}', 0.95, 0.25, 0.25, 0.95, '[{"name":"honesty","description":"no stronger claim than the data"}]', '{"basis":"accuracy"}', 'chris', false, now() + interval '14 days', 'p1', 'r1'),
+       ('00000000-0000-4000-8000-000000000002', 'chris', 'SYNTHETIC: dispute threshold', 'dispute_threshold', 'cookies-status', 'web-scan', 'needs_fixing', '{"responders":60}', 0.8, 0.7, 0.7, 0.8, '[{"name":"honesty","description":"x"}]', '{"basis":"dispute"}', 'chris', true, now() + interval '14 days', 'p1', 'r1');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decisions (owner, hypothesis, target_kind, hexagon_id, source, baseline, proposed_from, proposed_to, bound_min, bound_max, guardrails, evidence, primary_approver, second_approver_required, next_outcome_check_due, policy_version, rules_version) values ('chris','h','confidence','location','web-scan','{}',0.9,0.99,0.5,0.95,'[{"name":"g","description":"d"}]','{}','chris',false,now()+interval '1 day','p','r')$$) = '23514', 'decisions: a change outside its bounds is refused');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decisions (owner, hypothesis, target_kind, hexagon_id, source, baseline, proposed_from, proposed_to, bound_min, bound_max, guardrails, evidence, primary_approver, second_approver_required, next_outcome_check_due, policy_version, rules_version) values ('chris','h','confidence','location','web-scan','{}',0.9,0.8,0.5,0.95,'[]','{}','chris',false,now()+interval '1 day','p','r')$$) = '23514', 'decisions: at least one guardrail is required');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decisions (owner, hypothesis, target_kind, hexagon_id, source, baseline, proposed_from, proposed_to, bound_min, bound_max, guardrails, evidence, primary_approver, second_approver_required, next_outcome_check_due, policy_version, rules_version) values ('chris','h','confidence','location','web-scan','{"person_key":"abc"}',0.9,0.8,0.5,0.95,'[{"name":"g","description":"d"}]','{}','chris',false,now()+interval '1 day','p','r')$$) = '23514', 'decisions: a person key can never be part of the stored baseline');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.learning_decisions set owner = 'someone'$$) = '42501', 'decisions: service_role cannot edit a header (privilege)');
+select pg_temp.assert(pg_temp.try_as('postgres', $$update public.learning_decisions set owner = 'someone'$$) = 'P0001', 'decisions: even a privileged role cannot edit a header (trigger)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$delete from public.learning_decisions$$) = '42501', 'decisions: service_role cannot delete a header');
+-- decision 1: no approval -> cannot implement; then the full change path
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','implemented','claude','{"configVersion":1}')$$) = 'P0001', 'decisions: cannot implement before any decision');
+insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','decided','chris','{"decision":"change","reason":"SYNTHETIC interval excludes 0.95"}');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','decided','chris','{"decision":"keep","reason":"again"}')$$) = '23505', 'decisions: a decision is recorded once');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','implemented','claude','{"configVersion":1}')$$) = 'P0001', 'decisions: cannot implement without the primary approver');
+insert into public.learning_decision_events (decision_id, kind, actor) values ('00000000-0000-4000-8000-000000000001','approved','chris');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decision_events (decision_id, kind, actor) values ('00000000-0000-4000-8000-000000000001','approved','CHRIS')$$) = '23505', 'decisions: one approval per person');
+insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','implemented','chris','{"configVersion":1}');
+insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','outcome_checked','claude','{"result":"insufficient_evidence","causal":false}');
+insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000001','rolled_back','chris','{"toConfigVersion":0,"reason":"SYNTHETIC rollback"}');
+select pg_temp.assert((select count(*) from public.learning_decision_events where decision_id = '00000000-0000-4000-8000-000000000001') = 5, 'decisions: the chain decided, approved, implemented, checked, rolled back is stored');
+select pg_temp.assert(pg_temp.try_as('service_role', $$update public.learning_decision_events set actor = 'x'$$) = '42501', 'decisions: service_role cannot edit an event (privilege)');
+select pg_temp.assert(pg_temp.try_as('postgres', $$update public.learning_decision_events set actor = 'x'$$) = 'P0001', 'decisions: even a privileged role cannot edit an event (trigger)');
+select pg_temp.assert(pg_temp.try_as('service_role', $$delete from public.learning_decision_events$$) = '42501', 'decisions: events are never deleted');
+-- decision 2: the dispute threshold needs a second, different approver
+insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000002','decided','chris','{"decision":"change","reason":"SYNTHETIC"}');
+insert into public.learning_decision_events (decision_id, kind, actor) values ('00000000-0000-4000-8000-000000000002','approved','chris');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000002','implemented','chris','{"configVersion":2}')$$) = 'P0001', 'decisions: the 80% threshold cannot be implemented on Chris''s approval alone');
+insert into public.learning_decision_events (decision_id, kind, actor) values ('00000000-0000-4000-8000-000000000002','approved','second-approver-synthetic');
+insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000002','rejected','chris','{"reason":"SYNTHETIC changed mind"}');
+select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.learning_decision_events (decision_id, kind, actor, payload) values ('00000000-0000-4000-8000-000000000002','implemented','chris','{"configVersion":2}')$$) = 'P0001', 'decisions: nothing follows a rejection');
+select pg_temp.assert((select count(*) from public.mpt_hexagon_events where hexagon_id in ('cookies-status')) = 0, 'decisions: raw observations were never touched');
 
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
