@@ -5,18 +5,28 @@ import worker from './index.js';
 
 const SECRET = 'dd-secret';
 const WA = '85212345678';
-const ENV = { DEEP_DIVE_SECRET: SECRET, SUPABASE_SERVICE_ROLE_KEY: 'svc', META_APP_SECRET: 'app-secret',
+const ENV = { PHONE_SCAN_WEB_ENABLED: '1', POP_HMAC_SECRET: 'p'.repeat(40), DEEP_DIVE_SECRET: SECRET, SUPABASE_SERVICE_ROLE_KEY: 'svc', META_APP_SECRET: 'app-secret',
   WHATSAPP_PHONE_NUMBER_ID: '999', META_WHATSAPP_KEY: 'tok', RAPIDAPI_KEY: 'rk', RAPIDAPI_WHATSAPP_HOST: 'wa.example', SPAM_API_URL: 'https://spam.example/v1', SPAM_API_KEY: 'sk' };
 
+let msgSeq = 0;
 let metaBodies: any[]; let docs: Record<string, any>; let calls: string[]; let metaStatus: number; let spamMode: 'ok' | 'hang'; let engagement: any[]; let interactions: any[]; let tuning: any[];
 
 beforeEach(() => {
-  docs = { [`whatsapp:${WA}`]: { profileName: 'Alex', inbound_message_timestamp: 1760000000 } }; calls = []; metaBodies = []; metaStatus = 200; spamMode = 'ok'; engagement = []; interactions = []; tuning = [];
+  docs = { [`whatsapp:${WA}`]: { profileName: 'Alex' } }; msgSeq = 0; calls = []; metaBodies = []; metaStatus = 200; spamMode = 'ok'; engagement = []; interactions = []; tuning = [];
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     const url = String(input); calls.push(url);
     if (url.includes('/rest/v1/mpt_conversation_state')) {   // scan / conversation state (Supabase)
-      if (init.method === 'POST') { const row = JSON.parse(init.body); docs[row.key] = row.state; return new Response('', { status: 201 }); }
-      if (init.method === 'DELETE') return new Response('', { status: 200, headers: { 'Content-Range': '*/0' } });   // purge of expired rows
+      if (init.method === 'POST') {
+        const row = JSON.parse(init.body);
+        if (String(init.headers?.Prefer).includes('ignore-duplicates')) { if (row.key in docs) return new Response('[]'); docs[row.key] = row.state; return new Response(JSON.stringify([{ key: row.key }])); }
+        docs[row.key] = row.state; return new Response('', { status: 201 });
+      }
+      if (init.method === 'DELETE') {
+        const m = /key=eq\.([^&]+)/.exec(url);   // atomic take of one row, else the purge of expired rows
+        if (!m) return new Response('', { status: 200, headers: { 'Content-Range': '*/0' } });
+        const k = decodeURIComponent(m[1]); const had = docs[k]; delete docs[k];
+        return new Response(JSON.stringify(had ? [{ state: had }] : []));
+      }
       const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(url)![1]);
       return new Response(JSON.stringify(docs[key] ? [{ state: docs[key] }] : []));
     }
@@ -34,7 +44,7 @@ afterEach(() => vi.unstubAllGlobals());
 const call = (path: string, body?: any, headers: Record<string, string> = {}, method = 'POST', env = ENV) =>
   worker.fetch(new Request('https://x' + path, { method, body: body === undefined ? undefined : JSON.stringify(body), headers }), env, { waitUntil() {} });
 async function whatsapp(text: string, from = WA) {
-  const raw = JSON.stringify({ entry: [{ changes: [{ value: { contacts: [{ profile: { name: 'Alex' } }], messages: [{ from, timestamp: '1760000001', text: { body: text } }] } }] }] });
+  const raw = JSON.stringify({ entry: [{ changes: [{ value: { contacts: [{ profile: { name: 'Alex' } }], messages: [{ id: `wamid.${++msgSeq}`, from, timestamp: '1760000001', text: { body: text } }] } }] }] });
   const hmac = await crypto.subtle.sign('HMAC', await crypto.subtle.importKey('raw', new TextEncoder().encode('app-secret'), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']), new TextEncoder().encode(raw));
   const sig = 'sha256=' + [...new Uint8Array(hmac)].map((b) => b.toString(16).padStart(2, '0')).join('');
   return worker.fetch(new Request('https://x/webhook/whatsapp', { method: 'POST', body: raw, headers: { 'X-Hub-Signature-256': sig } }), ENV, { waitUntil() {} });
@@ -42,13 +52,23 @@ async function whatsapp(text: string, from = WA) {
 const srv = { 'X-Webhook-Secret': SECRET };
 const web = { Origin: 'https://myprivacytool.io' };
 
-async function start() { const r = await call('/api/scan/start-deep-dive', { wa_id: WA }, srv); return { r, j: await r.json() as any }; }
+/** The real handshake: the web asks for a challenge, the person sends the code from their own number, then the scan starts with that session. */
+async function verified(wa = WA) {
+  const nMeta = metaBodies.length, nCalls = calls.length;
+  const c = await (await call('/api/pop/challenge', { target: wa, consent: true }, web)).json() as any;
+  await whatsapp(c.code, wa);
+  metaBodies.splice(nMeta); calls.splice(nCalls);   // the handshake's own confirmation reply is not part of what these tests count
+  return c.session_token as string;
+}
+async function start() { const session_token = await verified(); const r = await call('/api/scan/start-deep-dive', { wa_id: WA, session_token }, srv); return { r, j: await r.json() as any }; }
 
 describe('deep dive flow', () => {
   it('start: needs the secret, fails closed, needs PoP', async () => {
-    expect((await call('/api/scan/start-deep-dive', { wa_id: WA })).status).toBe(401);
-    expect((await call('/api/scan/start-deep-dive', { wa_id: WA }, srv, 'POST', { ...ENV, DEEP_DIVE_SECRET: undefined })).status).toBe(401);
+    const tok = await verified();
+    expect((await call('/api/scan/start-deep-dive', { wa_id: WA, session_token: tok })).status).toBe(401);
+    expect((await call('/api/scan/start-deep-dive', { wa_id: WA, session_token: tok }, srv, 'POST', { ...ENV, DEEP_DIVE_SECRET: undefined })).status).toBe(401);
     expect((await call('/api/scan/start-deep-dive', { wa_id: '85299999999' }, srv)).status).toBe(403);
+    expect((await call('/api/scan/start-deep-dive', { wa_id: WA }, srv)).status).toBe(403);   // a number that has messaged us is not enough without the bound session
     expect(calls.some((u) => u.includes('wa.example') || u.includes('spam.example'))).toBe(false);   // no provider saw an unverified number
   });
 
@@ -62,8 +82,11 @@ describe('deep dive flow', () => {
   });
 
   it('start: a hanging spam registry is cut off and reported not_checked', async () => {
+    const session_token = await verified();
     spamMode = 'hang'; vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    const p = call('/api/scan/start-deep-dive', { wa_id: WA }, srv); await vi.advanceTimersByTimeAsync(5100); const r = await p; vi.useRealTimers();
+    const p = call('/api/scan/start-deep-dive', { wa_id: WA, session_token }, srv); let done = false; p.then(() => { done = true; });
+    for (let i = 0; i < 50 && !done; i++) { await vi.advanceTimersByTimeAsync(1000); await new Promise((res) => setImmediate(res)); }   // real crypto/IO between ticks
+    const r = await p; vi.useRealTimers();
     expect((await r.json() as any).hexagons.find((h: any) => h.id === 'hex_security_spam_flag')).toMatchObject({ status: 'not_checked', data: null });
   });
 
