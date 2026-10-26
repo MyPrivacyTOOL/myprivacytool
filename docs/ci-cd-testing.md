@@ -14,6 +14,7 @@ criteria, rollback plan are at the bottom).
 | Supabase integration (RLS, constraints, cascades, "first baseline wins") | psql against a **throwaway Postgres 16** | `supabase/tests/` | `db` |
 | End-to-end: waitlist signup (`/start`), newsletter, contact form, site shell | Playwright (desktop + mobile Chromium) against the production build, all third parties mocked | `e2e/` | `build` → `e2e` |
 | Deploy-safety scripts + workflow guards | Vitest | `scripts/ci/*.vitest.mjs` | `pipeline-guards` |
+| Cloudflare Pages Functions bundle (`functions/`), so an unresolvable import fails the PR, not the deploy | `wrangler pages functions build` (offline) | `functions/**` | `pages-functions` |
 
 Everything is hermetic: no secrets, no real signups, no calls to the live Supabase project. The integration
 tests refuse to run against a `*.supabase.co` URL.
