@@ -7,6 +7,8 @@ export interface RestStoreConfig {
   serviceKey: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Path prefix of the REST API. Supabase serves PostgREST under /rest/v1 (the default); a standalone PostgREST (CI) serves at the root: "". */
+  restPrefix?: string;
 }
 
 type Row = Record<string, unknown>;
@@ -50,7 +52,7 @@ export class RestCaseStore implements CaseStore {
   }
 
   private async call(method: string, path: string, body?: unknown, prefer?: string): Promise<unknown> {
-    const res = await this.f(`${this.c.baseUrl.replace(/\/$/, "")}/rest/v1/${path}`, {
+    const res = await this.f(`${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/${path}`, {
       method,
       headers: {
         apikey: this.c.serviceKey, Authorization: `Bearer ${this.c.serviceKey}`, "Content-Type": "application/json",
