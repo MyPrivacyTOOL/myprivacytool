@@ -68,7 +68,7 @@ describe('MPC-7471-F2 count contract on the real registry', () => {
     const share = vi.fn();
     vi.stubGlobal('navigator', Object.assign(Object.create(navigator), { share }));
     render(<FinalSummaryPanel hexagons={scan} confirmedCount={live.confirmed} counts={live} />);
-    fireEvent.click(screen.getByRole('button', { name: /share/i }));
+    fireEvent.click(screen.getByRole('button', { name: /share/i, hidden: true }));
     expect(share).toHaveBeenCalledOnce();
     expect(share.mock.calls[0][0].text).toContain(line);
   });

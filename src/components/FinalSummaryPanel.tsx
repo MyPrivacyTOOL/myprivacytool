@@ -13,6 +13,7 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
+import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { scanCounts, scanCountsLine, totalLabel, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { captureContext } from '@/lib/webScan';
@@ -320,7 +321,7 @@ export default function FinalSummaryPanel({
   }, [hexagons]);
 
   // Calculate overall privacy risk score (FINAL FORMULA); also returns each category's 0-100 risk (MPC-7173 baseline)
-  const { overall: overallRisk, categoryRisk } = useMemo(() => {
+  const { categoryRisk } = useMemo(() => {
     const weights = {
       device: 0.05,      // 5%
       privacy: 0.05,     // 5%
@@ -355,32 +356,34 @@ export default function FinalSummaryPanel({
     return { overall: Math.min(Math.round(totalRisk), 100), categoryRisk };
   }, [categoryStats, fingerprint]);
 
-  // MPC-7120: offer the email capture once the scan is complete (this panel only renders after all hexagons are confirmed)
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setShowEmailModal(true), 1500);
-    return () => window.clearTimeout(t);
-  }, []);
+  // MPC-7471-F1: the headline score and label are the PAGE result (RiskScore.tsx, via src/lib/scanResult.ts), not a second calculation.
+  // The category scores above still feed the MPC-7173 baseline unchanged.
+  const overallRisk = useMemo(
+    () => computePageRisk({ confirmed: confirmedCount, total: hexagons.length, hexagons, fingerprint }).percentage,
+    [confirmedCount, hexagons, fingerprint],
+  );
+
+  // MPC-7120 / MPC-7471-F1: this panel only renders once the scan has genuinely completed, so the one scan-complete dialog opens
+  // with it, with no timer. State lives here: closing it sets it false and nothing in this component opens it again.
+  const [showEmailModal, setShowEmailModal] = useState(true);
 
   // CK-7799: the "uniqueness 1 in N" figure that used to be here was 2^(confirmed / 4), an invented number, and the fingerprint's
   // "1 in X" came from a hard-coded entropy table. Neither is shown or exported any more.
 
   const getRiskColor = (risk: number) => {
-    if (risk >= 70) return 'text-foreground';
-    if (risk >= 40) return 'text-foreground';
+    if (risk >= 80) return 'text-foreground';
+    if (risk >= 50) return 'text-foreground';
     return 'text-risk-low';
   };
 
   const getRiskBgColor = (risk: number) => {
-    if (risk >= 70) return 'bg-risk-high';
-    if (risk >= 40) return 'bg-risk-mid';
+    if (risk >= 80) return 'bg-risk-high';
+    if (risk >= 50) return 'bg-risk-mid';
     return 'bg-risk-low';
   };
 
   const getRiskLabel = (risk: number) => {
-    if (risk >= 70) return 'High Risk';
-    if (risk >= 40) return 'Medium Risk';
-    return 'Low Risk';
+    return getPageRiskLabel(risk, true);
   };
 
   const getSeverityColor = (severity: string) => {
@@ -474,7 +477,7 @@ export default function FinalSummaryPanel({
       
       // Risk Score
       pdf.setFontSize(18);
-      pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
+      pdf.setTextColor(...(overallRisk >= 80 ? PDF.riskHigh : overallRisk >= 50 ? PDF.riskMid : PDF.brand));
       pdf.text(String(overallRisk), margin + colWidth * 1 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
@@ -499,10 +502,10 @@ export default function FinalSummaryPanel({
       yPos += 45;
 
       // Risk Level Badge
-      pdf.setFillColor(...(overallRisk >= 70 ? PDF.riskHighSoft : overallRisk >= 40 ? PDF.riskMidSoft : PDF.brandSoft));
+      pdf.setFillColor(...(overallRisk >= 80 ? PDF.riskHighSoft : overallRisk >= 50 ? PDF.riskMidSoft : PDF.brandSoft));
       pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
       pdf.setFontSize(9);
-      pdf.setTextColor(...(overallRisk >= 70 ? PDF.riskHigh : overallRisk >= 40 ? PDF.riskMid : PDF.brand));
+      pdf.setTextColor(...(overallRisk >= 80 ? PDF.riskHigh : overallRisk >= 50 ? PDF.riskMid : PDF.brand));
       pdf.text(`${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
       
       yPos += 20;
@@ -911,7 +914,7 @@ Test yours at: ${window.location.origin}`;
               <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
               <circle
                 cx="50" cy="50" r="40" fill="none"
-                stroke={overallRisk >= 70 ? 'hsl(var(--risk-high))' : overallRisk >= 40 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
+                stroke={overallRisk >= 80 ? 'hsl(var(--risk-high))' : overallRisk >= 50 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
                 strokeWidth="8" strokeLinecap="round"
                 strokeDasharray={`${overallRisk * 2.51} 251`}
                 className="transition-all duration-1000 ease-out"
@@ -925,7 +928,7 @@ Test yours at: ${window.location.origin}`;
             </div>
           </div>
           <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold mt-4 ${getRiskBgColor(overallRisk)}/20 ${getRiskColor(overallRisk)} border border-current/30`}>
-            {overallRisk >= 70 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+            {overallRisk >= 80 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
             {getRiskLabel(overallRisk)}
           </div>
         </div>
