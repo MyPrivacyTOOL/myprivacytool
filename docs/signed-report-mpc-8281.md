@@ -16,3 +16,8 @@
 3. ~~Download button + PDF~~ built (see above). Remaining: pass `level2Complete` from the Level 2 flow once MPC-7902 exists, set `VITE_SIGNED_REPORT=true` for the build, and tell users how to check a file (an upload page for `/api/verify-report`).
 4. **TSA choice** (`REPORT_TSA_URL`) and, if wanted, full validation of the token's CMS signature.
 5. Production end-to-end test: download, upload, verified.
+
+## Known limits (2026-10-26 review)
+- **What a signature proves.** The report is built in the browser and the server signs what it receives, so a signature proves "this exact file was signed by MyPrivacyTOOL", not "MyPrivacyTOOL found these results". The /verify-report page says so. The real fix is for the server to sign scan data it holds itself (look up the saved scan by id), which needs a server-side data source (Supabase credentials as a Pages secret) and the MPC-7898 ledger. Do this before relying on signatures as evidence.
+- **Timestamps.** The page no longer mentions the outside time stamp: the authority's own signature on the token is not validated yet, and the digest check is a plain byte search.
+- **Real-browser coverage.** `e2e/verify-report.spec.ts` covers the upload page in Chromium (desktop and mobile). The multi-file download button is covered only in jsdom because it needs `VITE_SIGNED_REPORT` set at build time; add an e2e when the feature is switched on.
