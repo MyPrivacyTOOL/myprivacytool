@@ -23,6 +23,8 @@ import { SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 import worker from '../../workers/mpt-leads/worker.js';
 import { WEB_HEXAGONS, normaliseHexagons, buildReportJson } from '../../workers/scan-report/lib/reportHex.js';
 
+vi.mock('canvas-confetti', () => ({ default: vi.fn() }));   // jsdom has no canvas; F1's dialog fires confetti on open
+
 const modalProps: Record<string, unknown>[] = [];
 vi.mock('@/components/EmailCaptureModal', async (orig) => {
   const real = await orig<typeof import('@/components/EmailCaptureModal')>();
