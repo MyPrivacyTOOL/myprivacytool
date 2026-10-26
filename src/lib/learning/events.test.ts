@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPersonKey, learningEventsEnabled, recordAnswer, recordShown, resetShownForTests, PERSON_KEY_STORAGE } from './events';
 
 const tile = { hexagonId: 'location', tileKind: 'our_guess', confidence: 0.95 };
@@ -68,3 +68,26 @@ describe('getPersonKey', () => {
     expect(getPersonKey(null)).toBeNull();
   });
 });
+
+// The real consent gate (not an injected flag): only "Accept analytics" in the cookie banner lets an event out.
+describe('consent gate wiring', () => {
+  const base = { enabled: true, base: 'https://api.example', personKey: 'abcdefghijklmnop' };
+  afterEach(() => window.localStorage.clear());
+  const choose = (analytics: boolean) => window.localStorage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics, at: new Date().toISOString() }));
+
+  it('sends nothing with no choice or "Essential only"', async () => {
+    for (const setup of [() => {}, () => choose(false)]) {
+      window.localStorage.clear(); setup();
+      const f = ok();
+      expect(await recordAnswer(tile, 'not_me', { ...base, fetchImpl: f })).toBe(false);
+      expect(f).not.toHaveBeenCalled();
+    }
+  });
+  it('sends after "Accept analytics"', async () => {
+    choose(true);
+    const f = ok();
+    expect(await recordAnswer(tile, 'not_me', { ...base, fetchImpl: f })).toBe(true);
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+});
+

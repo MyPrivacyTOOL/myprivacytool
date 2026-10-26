@@ -2,8 +2,9 @@
 // Design: https://app.notion.com/p/3fe28547eaa781bbb748c984b7601dd3
 //
 // OFF unless the build sets VITE_LEARNING_EVENTS to "true" (also "1", "on", "yes"). Nothing is read from the address bar, so nobody can turn it on
-// for a visitor. Even when on, nothing is sent unless (a) an API address is set, and (b) the visitor has made a choice in the consent layer and
-// granted at least one purpose (`hasConsent`, the gate the site already uses for analytics scripts). The Worker has its own switch too.
+// for a visitor. Even when on, nothing is sent unless (a) an API address is set, and (b) the visitor chose "Accept analytics" in our cookie banner
+// (`hasConsent`, the same gate Google Analytics and the HubSpot forms script use; "Essential only", no choice, or blocked storage all send nothing).
+// The Worker has its own switch too.
 // What is sent: a random id the browser makes (no account, phone or email), the hexagon id, which look the tile had, the confidence shown, and
 // the answer. NEVER the finding's value. Sending never throws and never changes what the visitor sees.
 import { hasConsent } from '@/lib/cookieConsent';
