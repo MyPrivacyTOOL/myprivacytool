@@ -175,7 +175,7 @@ class ArgValueSidecarTests(unittest.TestCase):
         d = rec("tool_execution_started", param_keys=["q"])
         d["event_id"] = "e1"
         r = L.to_row(d, {"q": "SELECT 1; DROP TABLE users", "key": "AKIA" + "X" * 16})
-        self.assertIn("params: q | args: q=SELECT 1; DROP TABLE users; key=AKIAXXXXXXXXXXXXXXXX", r["text"])
+        self.assertIn("params: q | args: q=SELECT 1; DROP TABLE users; key=" + "AKIA" + "X" * 16, r["text"])
         self.assertEqual(L.to_row(d)["text"], "tool shell started; params: q")   # no sidecar -> unchanged text
 
     def test_a_raw_secret_that_slipped_into_the_sidecar_is_still_masked(self):
