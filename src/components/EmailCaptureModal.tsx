@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { getPageRiskLabel } from '@/lib/scanResult';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { percentHalfUp, SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
+import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { loadTurnstile, TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 
 interface EmailCaptureModalProps {
@@ -17,6 +18,8 @@ interface EmailCaptureModalProps {
   /** Coverage = checked / true registry total, from the same contract. */
   coveragePercent?: number;
   confirmedCount: number;
+  /** MPC-7471-F2: when given, the popup states confirmed / checked / total in the same words as the summary. */
+  counts?: ScanCounts;
   onClose: () => void;
   onSubmit: (email: string) => void;
 }
@@ -40,6 +43,7 @@ export default function EmailCaptureModal({
   scoreVersion = SCORE_VERSION,
   coveragePercent,
   confirmedCount,
+  counts,
   onClose,
   onSubmit,
 }: EmailCaptureModalProps) {
@@ -154,7 +158,7 @@ export default function EmailCaptureModal({
     }
   };
 
-  const coveragePct = coveragePercent ?? percentHalfUp(Math.min(confirmedCount, HEXAGON_COUNT), HEXAGON_COUNT);
+  const coveragePct = coveragePercent ?? percentHalfUp(Math.min(confirmedCount, counts?.total ?? HEXAGON_COUNT), counts?.total ?? HEXAGON_COUNT);
 
   const contentRef = useRef<HTMLDivElement>(null);
   // The dialog has no Trigger (it opens on scan completion), so Radix has nothing to return focus to: remember what had focus when it opened.
@@ -197,6 +201,7 @@ export default function EmailCaptureModal({
             <div className="text-sm">
               <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
               <span className="text-muted-foreground"> — {riskScore === null ? 'no score yet' : `${riskScore}/100 exposure score`} · {coveragePct}% coverage</span>
+              {counts && <p className="mt-1 text-muted-foreground" data-testid="scan-counts-line">{scanCountsLine(counts)}</p>}
             </div>
           </div>
           <p className="-mt-2 text-xs text-muted-foreground">

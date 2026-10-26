@@ -3,21 +3,25 @@ import { cn } from '@/lib/utils';
 import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert, Activity } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
+import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
 import { byBand } from '@/lib/exposureScore';
 
 interface RiskScoreProps {
+  /** The ring's input (unchanged by MPC-7471-F2): confirmed taps out of the hexagons revealed so far. */
   confirmed: number;
   total: number;
+  /** MPC-7471-F2: confirmed (X), checked (Y) and total (Z), from the registry. Words only; the ring does not use it. */
+  counts: ScanCounts;
   hexagons?: HexagonData[];
   fingerprint?: CompositeFingerprint | null;
 }
 
-export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
+export default function RiskScore({ confirmed, total, counts, hexagons, fingerprint }: RiskScoreProps) {
   // MPC-7471-F4: the score and band come from the shared exposure contract via computePageRisk; provisional until every point is confirmed.
   const riskData = useMemo(
-    () => computePageRisk({ confirmed, total, hexagons, fingerprint }),
-    [confirmed, total, hexagons, fingerprint],
+    () => computePageRisk({ confirmed, total, hexagons, fingerprint, scanTotal: counts.total }),
+    [confirmed, total, hexagons, fingerprint, counts.total],
   );
 
   const { 
@@ -93,9 +97,8 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             {risk.label}{band && provisional ? ' (provisional)' : ''}
           </div>
 
-          <div className="text-muted-foreground text-sm sm:text-base">
-            <span className="font-medium text-risk-low">{confirmed}</span> of{' '}
-            <span className="font-medium text-risk-low">{total}</span> data points confirmed
+          <div className="text-muted-foreground text-sm sm:text-base" data-testid="scan-counts-line">
+            {scanCountsLine(counts)}
           </div>
 
           {/* Risk indicators row */}

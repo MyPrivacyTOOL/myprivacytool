@@ -12,8 +12,9 @@ export { BAND_LABEL };
  * (the same rules that stamp a saved scan), so the page and a saved scan of the same values agree. `final` is true only once
  * the scan has finished; until then the result is marked provisional.
  */
-export function exposureForPage(hexagons: HexagonData[], final: boolean): ExposureResult {
-  return exposureFromHexagons(hexagons, captureContext(hexagons), { final });
+export function exposureForPage(hexagons: HexagonData[], final: boolean, total?: number): ExposureResult {
+  // `total` is Z from the scan counts (MPC-7471-F2) so the coverage line and the counts line can never disagree; default: the registry count.
+  return exposureFromHexagons(hexagons, captureContext(hexagons), { final, ...(total ? { total } : {}) });
 }
 
 /** Per-category exposure (0-100) for the categories that had something checked; used for the saved baseline. */

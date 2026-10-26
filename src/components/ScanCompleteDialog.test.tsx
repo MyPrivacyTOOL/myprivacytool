@@ -8,6 +8,7 @@ import EmailCaptureModal from './EmailCaptureModal';
 import FinalSummaryPanel from './FinalSummaryPanel';
 import RiskScore from './RiskScore';
 import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
+import { scanCounts } from '../../shared/hexagon-registry/counts.js';
 import type { HexagonData } from '@/lib/deviceDetection';
 
 vi.mock('canvas-confetti', () => ({ default: vi.fn() }));
@@ -129,7 +130,7 @@ describe('score and label match the page (shared contract)', () => {
   it('RiskScore on the page and the dialog read the same number and label', () => {
     const risk = computePageRisk({ confirmed: 4, total: 4, hexagons, fingerprint: null });
     const label = getPageRiskLabel(risk.percentage, true);
-    const { unmount } = render(<RiskScore confirmed={4} total={4} hexagons={hexagons} fingerprint={null} />);
+    const { unmount } = render(<RiskScore confirmed={4} total={4} counts={scanCounts(hexagons)} hexagons={hexagons} fingerprint={null} />);
     expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.getByText(String(risk.percentage))).toBeInTheDocument();
     unmount();

@@ -20,6 +20,8 @@ import { exposureForPage } from '@/lib/exposureScore';
 import { toPayload } from '@/lib/webScan';
 import { getHexagon } from '../../shared/hexagon-registry/registry.js';
 import { SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
+import { scanCounts } from '../../shared/hexagon-registry/counts.js';
+import { captureContext } from '@/lib/webScan';
 import worker from '../../workers/mpt-leads/worker.js';
 import { WEB_HEXAGONS, normaliseHexagons, buildReportJson } from '../../workers/scan-report/lib/reportHex.js';
 
@@ -56,6 +58,7 @@ const SCAN: HexagonData[] = [
   hx('cookies-status', 'Empty'), hx('localstorage-status', 'Empty'), hx('mixed-content', 'None'), hx('https-status', 'Secure (HTTPS)'),
   hx('font-detection', '0 fonts'), hx('google-services', 'Signed in'), hx('dns-leak', 'No Leak Detected'),
 ];
+const COUNTS = scanCounts(SCAN, { ctx: captureContext(SCAN) });
 const EXPECTED = { score: 55, band: 'medium', coverage: 17, checked: 9, found: 5, clear: 4, notChecked: 3 };
 
 describe('exposure-v1 replay across every consumer', () => {
@@ -69,13 +72,21 @@ describe('exposure-v1 replay across every consumer', () => {
     expect(r.provisional).toBe(false);
   });
 
+  it('coverage agrees with the scan counts (F2): same checked count and the same total Z', () => {
+    const r = exposureForPage(SCAN, true, COUNTS.total);
+    expect(r.coverage.checked).toBe(COUNTS.checked);
+    expect(r.coverage.total).toBe(COUNTS.total);
+    expect(r.counts.found).toBe(COUNTS.found);
+    expect(r.counts.clear).toBe(COUNTS.clear);
+  });
+
   it('page ring: same number; provisional while the scan is unfinished, not once complete', () => {
-    const { container, unmount } = render(<RiskScore confirmed={SCAN.length} total={SCAN.length} hexagons={SCAN} />);
+    const { container, unmount } = render(<RiskScore confirmed={SCAN.length} total={SCAN.length} counts={COUNTS} hexagons={SCAN} />);
     expect(container.textContent).toContain(String(EXPECTED.score));
     expect(container.textContent).toContain('Medium exposure');
     expect(container.textContent).not.toContain('provisional');
     unmount();
-    const mid = render(<RiskScore confirmed={5} total={54} hexagons={SCAN} />);
+    const mid = render(<RiskScore confirmed={5} total={54} counts={COUNTS} hexagons={SCAN} />);
     expect(mid.container.textContent).toContain(String(EXPECTED.score));
     expect(mid.container.textContent).toContain('(provisional)');
   });

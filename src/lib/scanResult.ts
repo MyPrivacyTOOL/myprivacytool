@@ -12,6 +12,8 @@ export interface PageRiskInput {
   total: number;
   hexagons?: HexagonData[];
   fingerprint?: CompositeFingerprint | null;
+  /** Z from the scan counts (MPC-7471-F2), used as the coverage total. */
+  scanTotal?: number;
 }
 
 export type RiskLabel = 'High exposure' | 'Medium exposure' | 'Low exposure' | 'Scanning...' | 'Not enough checked to score';
@@ -24,7 +26,7 @@ export function getPageRiskLabel(pct: number | null, complete = false): RiskLabe
   return complete ? 'Not enough checked to score' : 'Scanning...';
 }
 
-export function computePageRisk({ confirmed, total, hexagons, fingerprint }: PageRiskInput) {
+export function computePageRisk({ confirmed, total, hexagons, fingerprint, scanTotal }: PageRiskInput) {
   let socialRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
   let securityRiskLevel: 'low' | 'medium' | 'high' | 'critical' | null = null;
   let behaviorRiskLevel: 'low' | 'medium' | 'high' | null = null;
@@ -157,7 +159,7 @@ export function computePageRisk({ confirmed, total, hexagons, fingerprint }: Pag
   }
 
   // Provisional until every point is confirmed. Null = nothing could be checked yet: no score, never 0.
-  const exposure = exposureForPage(hexagons ?? [], total > 0 && confirmed >= total);
+  const exposure = exposureForPage(hexagons ?? [], total > 0 && confirmed >= total, scanTotal);
 
   return {
     percentage: exposure.score,

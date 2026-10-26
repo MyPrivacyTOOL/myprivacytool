@@ -16,6 +16,8 @@ import EmailCaptureModal from '@/components/EmailCaptureModal';
 import { SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 import { exposureForPage, categoryExposure, byBand, BAND_LABEL } from '@/lib/exposureScore';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { scanCounts, scanCountsLine, totalLabel, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
+import { captureContext } from '@/lib/webScan';
 import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
 import { SUMMARY_LABELS } from '@/lib/scanCopy';
 import { signedReportEnabled } from '@/config/signedReport';
@@ -24,6 +26,8 @@ import { requestSignedJson, requestPdfSignature, downloadBlob, signedReportMessa
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
   confirmedCount: number;
+  /** MPC-7471-F2: the scan's X, Y and Z from the grid, so the summary and the popup share one snapshot. Computed here from `hexagons` when absent or in tile mode. */
+  counts?: ScanCounts;
   /** Tile state (VITE_HEXAGON_TILES). When set, "confirmed" means verified by a check, not tapped, and no score, percentage or ratio is shown. */
   tiles?: Map<string, HexagonTile>;
   fingerprint?: CompositeFingerprint | null;
@@ -56,6 +60,7 @@ interface PrivacyConcern {
 export default function FinalSummaryPanel({
   hexagons: rawHexagons,
   confirmedCount: tappedCount,
+  counts: countsProp,
   tiles,
   fingerprint,
   languagePrediction,
@@ -74,6 +79,10 @@ export default function FinalSummaryPanel({
   );
   const board = useMemo(() => riskProfile(tiles ? [...tiles.values()] : []), [tiles]);
   const confirmedCount = tilesOn ? board.clear : tappedCount;
+  const counts = useMemo(
+    () => (!tilesOn && countsProp ? countsProp : scanCounts(hexagons, { ctx: captureContext(hexagons) })),
+    [tilesOn, countsProp, hexagons]
+  );
 
   // Calculate category stats for all 8 categories
   const categoryStats = useMemo((): CategoryStats[] => {
@@ -314,7 +323,7 @@ export default function FinalSummaryPanel({
 
   // MPC-7471-F4: the score, band and coverage come from the one shared contract (exposure-v1), the same one the page card reads
   // (RiskScore.tsx, via src/lib/scanResult.ts). Nothing here calculates its own; the old "FINAL FORMULA" and its fingerprint bonus are gone.
-  const exposure = useMemo(() => exposureForPage(rawHexagons, true), [rawHexagons]);
+  const exposure = useMemo(() => exposureForPage(rawHexagons, true, counts.total), [rawHexagons, counts.total]);
   const categoryRisk = useMemo(() => categoryExposure(exposure), [exposure]);
   const overallRisk = exposure.score;       // null when nothing could be checked: shown as "not enough checked", never as 0 or safe
   const band = exposure.band;
@@ -398,7 +407,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted); // Gray
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Complete Privacy Analysis - ${HEXAGON_COUNT} Data Points`, margin, 28);
+      pdf.text(`Complete Privacy Analysis - ${totalLabel(counts)} Data Points`, margin, 28);
       pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 35);
       
       yPos = 55;
@@ -416,7 +425,7 @@ export default function FinalSummaryPanel({
       
       // Data Points
       pdf.setTextColor(...PDF.brand);
-      pdf.text(String(HEXAGON_COUNT), margin + colWidth * 0 + 10, statsY);
+      pdf.text(totalLabel(counts), margin + colWidth * 0 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Data Points', margin + colWidth * 0 + 10, statsY + 8);
@@ -670,7 +679,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`All ${HEXAGON_COUNT} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
+      pdf.text(`All ${totalLabel(counts)} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
       pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
 
       // Save the PDF. A signed export saves the same bytes plus a detached signature over them (MPC-8281).
@@ -702,9 +711,10 @@ export default function FinalSummaryPanel({
     const report = {
       generatedAt: new Date().toISOString(),
       summary: tilesOn
-        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, youToldUs: board.youToldUs, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
+        ? { totalDataPoints: counts.total, clear: board.clear, youToldUs: board.youToldUs, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
         : {
-        totalDataPoints: HEXAGON_COUNT,
+        totalDataPoints: counts.total,
+        checkedDataPoints: counts.checked,
         confirmedDataPoints: confirmedCount,
         scoreVersion: exposure.score_version,
         exposureScore: overallRisk,
@@ -785,8 +795,7 @@ export default function FinalSummaryPanel({
 Test yours at: ${window.location.origin}`
       : `🎯 My Complete Digital Shadow - Final Report
 
-📊 ${HEXAGON_COUNT} data points analyzed
-🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%)
+📊 ${scanCountsLine(counts)}
 Exposure score: ${scoreText}/100 (${getRiskLabel()}), coverage ${coveragePct}%
 🔍 ${HEXAGON_GROUP_COUNT} categories looked at
 
@@ -821,8 +830,8 @@ Test yours at: ${window.location.origin}`;
             </CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
               {tilesOn
-                ? `${HEXAGON_COUNT} hexagons looked at across ${HEXAGON_GROUP_COUNT} categories`
-                : `Complete analysis of ${HEXAGON_COUNT} data points across ${HEXAGON_GROUP_COUNT} categories`}
+                ? `${totalLabel(counts)} hexagons in this scan, across ${HEXAGON_GROUP_COUNT} categories`
+                : `Complete analysis of ${totalLabel(counts)} data points across ${HEXAGON_GROUP_COUNT} categories`}
             </p>
           </div>
         </div>
@@ -842,7 +851,7 @@ Test yours at: ${window.location.origin}`;
           <>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-risk-low">{HEXAGON_COUNT}</p>
+            <p className="text-2xl font-bold text-risk-low">{totalLabel(counts)}</p>
             <p className="text-xs text-muted-foreground">Data Points</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
@@ -1050,7 +1059,7 @@ Test yours at: ${window.location.origin}`;
             {tilesOn ? (
               <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
             ) : (
-              <><strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
+              <><strong>100% Local:</strong> All {totalLabel(counts)} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
             )}
           </p>
         </div>
@@ -1062,6 +1071,7 @@ Test yours at: ${window.location.origin}`;
           scoreVersion={exposure.score_version}
           coveragePercent={coveragePct}
           confirmedCount={confirmedCount}
+          counts={counts}
           onClose={() => setShowEmailModal(false)}
           onSubmit={() => {}}
         />
