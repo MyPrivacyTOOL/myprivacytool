@@ -13,11 +13,19 @@ Audit API log table `agent_logs.logs`. Standard library only (Python 3.8+). It d
 | built from `event_type` + `details.outcome_summary` / `error` / `reason` / `param_keys` | `text` (masked, max 500 chars) |
 | none | `vault_start`, `vault_end` (empty), `nonce`, `sender`, `dest_region` (NULL) |
 
-The source holds tool names, timing, outcomes and the **names** of parameters, never their values. So
+By default the source holds tool names, timing, outcomes and the **names** of parameters, never their values. So
 detectors #41, #42 and #99 have nothing to read, #9, #65 and #119 have no data, and #51 (tool loops) and
 #57/#58 (secrets, only inside outcome summaries and errors) are the ones that can fire. `details._raw` can
 contain raw tool output and is never read. Only agent tool events and sensitive-data events are loaded;
 `log_rolled` housekeeping is skipped.
+
+## Argument values (MPC-8428, opt-in per agent)
+When the router runs with `AUDIT_ARG_VALUES_AGENTS=<agent>`, it writes masked argument values to a separate
+`args-YYYY-MM-DD.jsonl` sidecar (30-day retention, outside the hash chain). The loader joins it to the
+`tool_execution_started` event by `event_id` and appends `| args: k=v; ...` to `text`; the run summary shows
+`with_arg_values`. With the sidecar absent, output is unchanged and #41/#42/#99 stay **partial coverage**.
+Values are masked in the router and masked again here. Masking covers secrets and emails only, not names or
+phone numbers, so keep this to non-prod agents until personal-data rules exist.
 
 ## Masking
 Done on the droplet, before anything leaves it. Secrets are replaced but keep the shape the detectors look

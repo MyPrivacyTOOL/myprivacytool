@@ -167,5 +167,33 @@ class EndToEndTests(unittest.TestCase):
         self.assertIsNotNone(hit)
 
 
+
+class ArgValueSidecarTests(unittest.TestCase):
+    """MPC-8428: masked argument values from the router's args-*.jsonl sidecar."""
+
+    def test_args_are_appended_to_started_text_and_detected(self):
+        d = rec("tool_execution_started", param_keys=["q"])
+        d["event_id"] = "e1"
+        r = L.to_row(d, {"q": "SELECT 1; DROP TABLE users", "key": "AKIA" + "X" * 16})
+        self.assertIn("params: q | args: q=SELECT 1; DROP TABLE users; key=AKIAXXXXXXXXXXXXXXXX", r["text"])
+        self.assertEqual(L.to_row(d)["text"], "tool shell started; params: q")   # no sidecar -> unchanged text
+
+    def test_a_raw_secret_that_slipped_into_the_sidecar_is_still_masked(self):
+        d = rec("tool_execution_started", param_keys=["q"])
+        r = L.to_row(d, {"q": "mail bob@example.com password: hunter2"})
+        self.assertNotIn("bob@example.com", r["text"])
+        self.assertNotIn("hunter2", r["text"])
+
+    def test_build_rows_joins_on_event_id_and_counts(self):
+        with tempfile.TemporaryDirectory() as t:
+            a = os.path.join(t, "audit-2026-10-26.jsonl")
+            s = os.path.join(t, "args-2026-10-26.jsonl")
+            d = rec("tool_execution_started", param_keys=["cmd"]); d["event_id"] = "e9"
+            open(a, "w").write(json.dumps(d) + "\n")
+            open(s, "w").write(json.dumps({"event_id": "e9", "args": {"cmd": "npm install left-pad"}}) + "\n{bad\n")
+            rows, stats = L.build_rows([a], "testingnt69", args=L.load_args([s]))
+            self.assertIn("cmd=npm install left-pad", rows[0]["text"])
+            self.assertEqual(stats["with_arg_values"], 1)
+
 if __name__ == "__main__":
     unittest.main()
