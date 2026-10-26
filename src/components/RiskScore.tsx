@@ -3,24 +3,31 @@ import { cn } from '@/lib/utils';
 import { Shield, AlertTriangle, AlertCircle, Fingerprint, Users, ShieldAlert, Activity } from 'lucide-react';
 import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
+import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
+import { byBand } from '@/lib/exposureScore';
 
 interface RiskScoreProps {
+  /** The ring's input (unchanged by MPC-7471-F2): confirmed taps out of the hexagons revealed so far. */
   confirmed: number;
   total: number;
+  /** MPC-7471-F2: confirmed (X), checked (Y) and total (Z), from the registry. Words only; the ring does not use it. */
+  counts: ScanCounts;
   hexagons?: HexagonData[];
   fingerprint?: CompositeFingerprint | null;
 }
 
-export default function RiskScore({ confirmed, total, hexagons, fingerprint }: RiskScoreProps) {
-  // Calculate weighted risk score with all categories including security and behavior
+export default function RiskScore({ confirmed, total, counts, hexagons, fingerprint }: RiskScoreProps) {
+  // MPC-7471-F4: the score and band come from the shared exposure contract via computePageRisk; provisional until every point is confirmed.
   const riskData = useMemo(
-    () => computePageRisk({ confirmed, total, hexagons, fingerprint }),
-    [confirmed, total, hexagons, fingerprint],
+    () => computePageRisk({ confirmed, total, hexagons, fingerprint, scanTotal: counts.total }),
+    [confirmed, total, hexagons, fingerprint, counts.total],
   );
 
   const { 
     percentage, 
+    band,
+    provisional,
     hasFingerprint, 
     fingerprintRisk, 
     hasSocial, 
@@ -35,14 +42,14 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
     behaviorDataPoints,
   } = riskData;
   
-  const getRiskLevel = (pct: number) => {
-    const label = getPageRiskLabel(pct);
-    if (label === 'High Risk') return { label, Icon: AlertCircle };
-    if (label === 'Medium Risk') return { label, Icon: AlertTriangle };
+  const getRiskLevel = () => {
+    const label = getPageRiskLabel(percentage);
+    if (band === 'high') return { label, Icon: AlertCircle };
+    if (band === 'medium') return { label, Icon: AlertTriangle };
     return { label, Icon: Shield };
   };
 
-  const risk = getRiskLevel(percentage);
+  const risk = getRiskLevel();
 
   return (
     <div className="bg-surface/95 border border-surface-border rounded-xl p-4 sm:p-6 mx-2 sm:mx-auto mb-4 shadow-card max-w-[460px]">
@@ -65,17 +72,17 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
               cy="50"
               r="40"
               fill="none"
-              stroke={percentage >= 80 ? 'hsl(var(--risk-high))' : percentage >= 50 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
+              stroke={byBand(band, 'hsl(var(--risk-high))', 'hsl(var(--risk-mid))', 'hsl(var(--risk-low))', 'hsl(var(--muted))')}
               strokeWidth="8"
               strokeLinecap="round"
-              strokeDasharray={`${percentage * 2.51} 251`}
+              strokeDasharray={`${(percentage ?? 0) * 2.51} 251`}
               className="transition-all duration-500 ease-out"
               
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={cn("text-xl sm:text-2xl font-bold", percentage >= 80 ? 'text-foreground' : percentage >= 50 ? 'text-risk-mid' : 'text-risk-low')}>
-              {percentage}%
+            <span className={cn("text-xl sm:text-2xl font-bold", byBand(band, 'text-foreground', 'text-risk-mid', 'text-risk-low', 'text-muted-foreground'))}>
+              {percentage ?? '–'}
             </span>
           </div>
         </div>
@@ -84,17 +91,14 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
         <div className="flex-1 text-center sm:text-left">
           <div className={cn(
             "inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm font-semibold mb-2 border",
-            percentage >= 80 ? "bg-risk-high-soft text-foreground border-risk-high/30" : 
-            percentage >= 50 ? "bg-risk-mid-soft text-risk-mid border-risk-mid/30" : 
-            "bg-risk-low-soft text-foreground border-risk-low/30"
+            byBand(band, "bg-risk-high-soft text-foreground border-risk-high/30", "bg-risk-mid-soft text-risk-mid border-risk-mid/30", "bg-risk-low-soft text-foreground border-risk-low/30", "bg-muted text-muted-foreground border-border")
           )}>
             <risk.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            {risk.label}
+            {risk.label}{band && provisional ? ' (provisional)' : ''}
           </div>
 
-          <div className="text-muted-foreground text-sm sm:text-base">
-            <span className="font-medium text-risk-low">{confirmed}</span> of{' '}
-            <span className="font-medium text-risk-low">{total}</span> data points confirmed
+          <div className="text-muted-foreground text-sm sm:text-base" data-testid="scan-counts-line">
+            {scanCountsLine(counts)}
           </div>
 
           {/* Risk indicators row */}
@@ -159,9 +163,9 @@ export default function RiskScore({ confirmed, total, hexagons, fingerprint }: R
             <div 
               className={cn(
                 "h-full rounded-full transition-all duration-500 ease-out",
-                percentage >= 80 ? "bg-risk-high" : percentage >= 50 ? "bg-risk-mid" : "bg-risk-low"
+                byBand(band, "bg-risk-high", "bg-risk-mid", "bg-risk-low", "bg-muted")
               )}
-              style={{ width: `${percentage}%` }}
+              style={{ width: `${percentage ?? 0}%` }}
             />
           </div>
         </div>

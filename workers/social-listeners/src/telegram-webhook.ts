@@ -1,5 +1,5 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
-import { baselineScanEnabled, baselineSender, isConsentConfirmation, runBaselineScan } from "./baseline-scan";
+import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
@@ -36,6 +36,7 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   if (mode !== "off") {
     const run = (p: Promise<void>) => (ctx?.waitUntil ? (ctx.waitUntil(p), undefined) : p);
     if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log, events)); return done(new Response("OK")); }
+    if (mode === "on" && isScanStatusRequest(payload)) { await run(replyScanStatus(env, payload, log)); return done(new Response("OK")); }
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
   }
 

@@ -25,6 +25,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Faq = lazy(() => import("./pages/Faq"));
+const ScoreMethod = lazy(() => import("./pages/ScoreMethod"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Cookies = lazy(() => import("./pages/Cookies"));
@@ -40,6 +41,7 @@ const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const ScanResults = lazy(() => import("./pages/ScanResults"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
+const VerifyReport = lazy(() => import("./pages/VerifyReport"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // MPC-7200: every route except the home page is code-split so the first paint only downloads what it renders.
@@ -79,6 +81,7 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/faq" element={<Faq />} />
+            <Route path="/how-we-calculate-your-score" element={<ScoreMethod />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
@@ -103,6 +106,8 @@ const App = () => (
             <Route path="/HongKongSpam" element={<HongKongSpam />} />
             <Route path="/stop-spam-hk" element={<Navigate to="/HongKongSpam" replace />} />
             <Route path="/hong-kong-spam" element={<Navigate to="/HongKongSpam" replace />} />
+            {/* MPC-8281: check a signed report. Noindex and unlinked until signed reports are switched on. */}
+            <Route path="/verify-report" element={<VerifyReport />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Route>

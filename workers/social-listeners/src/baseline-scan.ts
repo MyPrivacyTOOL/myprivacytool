@@ -181,3 +181,25 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
     log.warn("baseline_scan_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
 }
+
+/** "/scanstatus": a sender asks whether the baseline scan would run for them. Replies with three yes/no answers only, never a variable's value. PROBE_MODE=on only. */
+export const isScanStatusRequest = (update: unknown): boolean => {
+  const text = (update as { message?: { text?: unknown } } | null)?.message?.text;
+  return typeof text === "string" && /^\/scanstatus(@\w+)?$/i.test(text.trim());
+};
+
+export async function replyScanStatus(env: Env, update: unknown, log: Logger): Promise<void> {
+  try {
+    const s = telegramSender(update);
+    if (!s || !env.TELEGRAM_BOT_TOKEN) return;
+    const yn = (b: boolean) => (b ? "yes" : "no");
+    const text = [
+      `Baseline scan switch on: ${yn(baselineScanEnabled(env))}`,
+      `Your id is on the allow-list: ${yn(probeIds(env).has(s.id))}`,
+      `Snapshot storage configured: ${yn(!!env.SUPABASE_URL && !!env.SUPABASE_KEY)}`,
+    ].join("\n");
+    await call(env, "sendMessage", { chat_id: s.chatId, text });
+  } catch (err) {
+    log.warn("scan_status_failed", { error: err instanceof Error ? err.name : "unknown" });
+  }
+}
