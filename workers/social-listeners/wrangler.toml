@@ -40,6 +40,19 @@ service = "core-brain"
 # [vars]
 # CORE_BRAIN_URL = "https://core-brain.<account>.workers.dev"
 
+# MPC-7892: Telegram DEEP username check. Plain var kept here because every deploy replaces plain-text vars set outside this file
+# (the flag set through the Cloudflare API was wiped by the next deploy). Inert for everyone except the allow-listed test accounts
+# in the PROBE_TELEGRAM_IDS secret, and the Worker also needs the deep_jobs tables. Rollback: set "off" (or delete this block) and deploy.
+# TELEGRAM_BASELINE_SCAN (MPC-7891) is managed separately.
+[vars]
+TELEGRAM_DEEP_SCAN = "on"
+# MPC-7893: kept here so a deploy does not wipe it (the flags workflow sets it, the next deploy dropped other workflow-set flags). Only acts for senders in
+# PROBE_TELEGRAM_IDS, and the link only works while the Pages variable DASHBOARD_ENABLED=1. Rollback: set "off" (or delete this line) and deploy.
+TELEGRAM_DASHBOARD_LINKS = "on"
+# MPC-7894: /fix wizard, kept here so a deploy does not wipe it (the flags workflow value was dropped by the next deploy, so /fix fell through to the normal bot).
+# Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) whose stored consent is confirmed; needs the fix_wizard_items table. Rollback: set "off" (or delete this line) and deploy.
+TELEGRAM_FIX_WIZARD = "on"
+
 # MPC-7628: Mirror bot limits (every scan spends X API credits). Same syntax as core-brain/mpt-leads: the deploy action's wrangler 3.90.0
 # ignores the newer [[ratelimits]] table, so this must be [[unsafe.bindings]] type = "ratelimit" (a test pins it). Per sender: 3
 # Mirror commands / 60 s; global backstop 30 / 60 s. Over the limit the DM is dropped without a reply. Fails open if unbound.

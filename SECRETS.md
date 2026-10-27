@@ -87,7 +87,12 @@ itself off while it is unset. See `docs/SECRETS-AUDIT.md`.
 | mpt-metrics-collector | `SUPABASE_SERVICE_ROLE_KEY`, `COLLECTOR_TRIGGER_TOKEN`, `CLOUDFLARE_ANALYTICS_TOKEN`, `YOUTUBE_API_KEY`, `GA4_SERVICE_ACCOUNT_JSON`, `NOTION_TOKEN`, `SLACK_BOT_TOKEN` (MPC-7383 Monday digest, `chat:write` only), `HUBSPOT_READONLY_TOKEN` (read-only HubSpot private-app token for portal 246502821; deliberately not the write-capable `HUBSPOT_TOKEN` / `HUBSPOT_API_KEY`) (non-secret config: `SUPABASE_URL`, `CLOUDFLARE_ZONE_ID`, `MPTSLACK_CHANNEL_ID` (set as a secret so `wrangler deploy` does not replace it)) |
 | oauth-poc | `GOOGLE_CLIENT_SECRET`, `STATE_SIGNING_KEY`, `SUPABASE_SERVICE_ROLE_KEY` † |
 | scan-report | `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `HIBP_API_KEY`, `HUBSPOT_TOKEN`, `UNSUBSCRIBE_SECRET` † |
-| webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` |
+| webhook-receiver | `EMAIL_WEBHOOK_SECRET`, `FIRESTORE_SA_TOKEN`, `HUBSPOT_API_KEY`, `META_APP_SECRET`, `META_PAGE_ACCESS_KEY`, `META_VERIFY_KEY`, `META_WHATSAPP_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TELEGRAM_BOT_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN`, `BREACH_API_KEY`, `DEEP_DIVE_SECRET`, `RAPIDAPI_KEY`, `SPAM_API_KEY` |
+| mpt-cairn-blackboard | `CAIRN_BRIDGE_TOKEN`, `CAIRN_HASH_PEPPER`, `NOTION_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY` (non-secret config: `SUPABASE_URL`) |
+| mpt-content-approval | `APPROVAL_API_TOKEN`, `MAKE_WEBHOOK_URL`, `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `RECEIPT_SIGNING_SECRET` |
+| mpt-content-consumer | `ANTHROPIC_API_KEY`, `SLACK_BOT_TOKEN` |
+| partner-api | `SUPABASE_SERVICE_ROLE_KEY`, `HIBP_API_KEY` (non-secret config: `SUPABASE_URL`) |
+| mirror-risk | none |
 
 GitHub Actions also holds: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_PROJECT_ID`,
 `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`, `SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`,
@@ -99,9 +104,11 @@ Revoke and reissue at the provider, then update **both** the Worker (`wrangler s
 
 - [ ] **Shared values: change everywhere in the same window**
   - `WEBHOOK_SECRET` (core-brain) and `CORE_BRAIN_TOKEN` (social-listeners) must stay equal.
-  - `SUPABASE_SERVICE_ROLE_KEY` is used by github-channel, mpt-leads, mpt-metrics-collector, oauth-poc, scan-report
-    and webhook-receiver. Only scan-report is synced by CI (`SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`); set the rest
-    by hand with `wrangler secret put`.
+  - `SUPABASE_SERVICE_ROLE_KEY` is used by github-channel, mpt-leads, mpt-metrics-collector, mpt-cairn-blackboard,
+    oauth-poc, partner-api, scan-report and webhook-receiver (core-brain and social-listeners hold it as
+    `SUPABASE_KEY`). Use the manual workflow `rotate-supabase-key.yml` (see "Supabase key rotation" below).
+    The workflow now includes `mpt-cairn-blackboard` and `partner-api` (added 2026-10-26; before that they were not
+    covered, so the 2026-10-14 rotation may have missed them).
   - `HUBSPOT_API_KEY` / `HUBSPOT_TOKEN`, `RESEND_API_KEY`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_KEY`,
     `TELEGRAM_WEBHOOK_SECRET`, `META_APP_SECRET`, `TWILIO_AUTH_TOKEN` appear in several Workers. Confirm each
     pair of near-identical names (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_KEY`, `HUBSPOT_API_KEY`/`HUBSPOT_TOKEN`)
@@ -114,7 +121,25 @@ Revoke and reissue at the provider, then update **both** the Worker (`wrangler s
 - [ ] **Cloudflare:** reissue `CLOUDFLARE_API_TOKEN` last, since CI needs it to push the other secrets.
 - [ ] Keep `EXPECTED_SECRETS.txt` to *required* names only. Add a † name only if its feature becomes mandatory.
 - [ ] Redeploy every Worker, run `npx wrangler secret list` in each, and hit the smoke checks in `DEPLOYMENT_RUNBOOK.md`.
-- [ ] Run `node scripts/ci/scan-secrets.mjs` (last run: clean, 417 files).
+- [ ] Run `node scripts/ci/scan-secrets.mjs` (last run 2026-10-26: clean, 1039 files).
+
+## Supabase key rotation (how the 2026-10-14 rotation was done)
+
+Record of the procedure; the evidence and owner decisions are in Notion (MPC-7821). No values here.
+
+1. Create the new secret key in the Supabase dashboard (Settings, API Keys). Do not delete the old one yet.
+2. Save it as the GitHub Actions secret `NEW_SUPABASE_SECRET_KEY` (deploy workflows prefer it over
+   `SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY`).
+3. Run **Rotate Supabase secret key (manual)** (`.github/workflows/rotate-supabase-key.yml`). Log must show
+   `canary HTTP 200`, then `set <worker>` for each Worker and no `FAILED`.
+4. Replace by hand what the workflow cannot reach: the Cloudflare **Pages** secret `SUPABASE_SERVICE_ROLE_KEY`
+   (then redeploy the site) and the droplet env line `SUPABASE_SECRET_KEY_MYPRIVACYTOOL` in `/root/.env`.
+5. Check the Supabase API logs: new key returns 200/201 and there are no 401/403.
+6. Only then delete the old key or disable the legacy JWT keys. Disabling legacy keys also disables the legacy anon key.
+7. Prove it: a request with the old key must return 401. (On 2026-10-14 to 19 this last check was not completed; the
+   owner accepted the dashboard showing legacy keys disabled.)
+
+Secret keys (`sb_secret_...`) go in the `apikey` header only, not `Authorization: Bearer`.
 
 ## Rules
 

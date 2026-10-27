@@ -34,6 +34,19 @@
 /sitemap.xml
   Cache-Control: public, max-age=3600
 
+# MPC-7893: the private Telegram dashboard and its one-time link. Never cached, never indexed, no referrer. (The Functions also set these on their own responses.)
+/d/*
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/dashboard
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/api/dashboard
+  Cache-Control: no-store, private
+  X-Robots-Tag: noindex, nofollow, noarchive
+
 # MPC-7350: security response headers for Cloudflare Pages (served on every route).
 # CSP is intentionally NOT enforced here: the site loads GTM (after the visitor accepts analytics in our own cookie banner, MPC-8450), and index.html
 # has inline scripts. Roll out a Content-Security-Policy-Report-Only first (see docs/security-audit-mpc-7350.md).

@@ -16,7 +16,7 @@ const SUB_PROCESSORS = [
   {
     name: "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
     purpose:
-      "Language models used to work out what a message sent through a messaging channel is about. They receive the message text only, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data",
+      "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data",
   },
 ];
 

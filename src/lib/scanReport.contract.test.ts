@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { requestScanReport, ReportRequestError } from "./scanReport";
 import { rememberCompletedScan, resolveScanApiUrl, DEFAULT_SCAN_API_URL } from "./webScan";
-import { parseSaveRequest } from "../../workers/scan-report/lib/webScan.js";
+import { parseRequestId, parseSaveRequest } from "../../workers/scan-report/lib/webScan.js";
 import type { HexagonData } from "./deviceDetection";
 
 const hex = (): HexagonData[] =>
@@ -48,6 +48,46 @@ describe("the site's POST /api/scan body is accepted by the Worker's validators"
     const b = await sentBody(true, true);
     expect(b.recognise_consent).toBe(true);
     expect((parseSaveRequest(b) as { error?: string }).error).toBeUndefined();
+  });
+});
+
+// MPC-7471-F3: the post-scan popup sends the same request with its own consent source and a per-form request_id; the Worker's validators must accept it.
+describe("the popup's POST /api/scan body is accepted by the Worker's validators (MPC-7471-F3)", () => {
+  const RID = "3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f";
+  const popupBody = async (save: boolean) => {
+    const f = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }) as unknown as Response);
+    vi.stubGlobal("fetch", f);
+    await requestScanReport("mpc7471f3+contract@example.com", save, false, "", { consentSource: "web_scan_summary", requestId: RID });
+    return JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string) as Record<string, unknown>;
+  };
+  it("report only: consent, source and request_id; no save fields", async () => {
+    const b = await popupBody(false);
+    expect(b).toMatchObject({ consent: true, consent_source: "web_scan_summary", request_id: RID });
+    expect(parseSaveRequest(b)).toEqual({ none: true });
+    expect(parseRequestId(b)).toEqual({ requestId: RID });
+  });
+  it("report + saved scan: the save fields are accepted alongside the request_id", async () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    rememberCompletedScan(hex());
+    const b = await popupBody(true);
+    expect((parseSaveRequest(b) as { error?: string }).error).toBeUndefined();
+    expect(parseRequestId(b)).toEqual({ requestId: RID });
+  });
+  it("no request_id is allowed (the /scan page sends none)", async () => {
+    const f = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }) as unknown as Response);
+    vi.stubGlobal("fetch", f);
+    await requestScanReport("a+b@example.com", false, false);
+    const b = JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(b).not.toHaveProperty("request_id");
+    expect(b.consent_source).toBe("scan_page");
+  });
+  it("returns what the Worker said: scan number only when it was saved", async () => {
+    vi.stubEnv("VITE_SAVE_WEB_SCANS", "true");
+    rememberCompletedScan(hex());
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true, duplicate: true, scan_saved: true, scan_number: "0f2b6c1e-8a3d-4e57-9b10-6c2d4f8a1e93" }) }) as unknown as Response));
+    expect(await requestScanReport("a+b@example.com", true, false, "", { requestId: RID })).toMatchObject({ scanSaved: true, scanNumber: "0f2b6c1e-8a3d-4e57-9b10-6c2d4f8a1e93", duplicate: true });
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ success: true, scan_saved: false, scan_number: "0f2b6c1e-8a3d-4e57-9b10-6c2d4f8a1e93" }) }) as unknown as Response));
+    expect((await requestScanReport("a+b@example.com", true, false)).scanNumber).toBeUndefined();   // a number without scan_saved:true is not trusted
   });
 });
 

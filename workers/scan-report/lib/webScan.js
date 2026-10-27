@@ -37,6 +37,15 @@ const REQUIRED = ['id', 'label', 'value'];
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
 export const webScanEnabled = (env) => env.WEB_SCAN_SAVE_ENABLED === 'true';
+// MPC-7471-F3: a per-submit key from the popup, so a retry of the SAME submit is recognised. Needs scans.request_id (migration 20261026200000, not applied until Chris approves it);
+// REPORT_REQUEST_ID_ENABLED must be exactly "true" for the Worker to read or write that column. Absent = {none:true}; present but not a UUID v4 = refused.
+export const requestIdEnabled = (env) => env.REPORT_REQUEST_ID_ENABLED === 'true';
+const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function parseRequestId(b) {
+  if (!('request_id' in b)) return { none: true };
+  if (typeof b.request_id !== 'string' || !REQUEST_ID_RE.test(b.request_id)) return { error: 'Invalid request' };
+  return { requestId: b.request_id.toLowerCase() };
+}
 export const isScanNumber = (v) => typeof v === 'string' && SCAN_NUMBER_RE.test(v);
 
 // Returns { hexagons } or { error } for the list of hexagons. Never echoes the offending value back.

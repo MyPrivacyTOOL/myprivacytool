@@ -121,7 +121,7 @@ check(!buildReportEmail({ scan: { id: ID, score: null, risk_level: null, partial
   const base = { scan: { id: ID, score: null, risk_level: null, partial: true, categories_checked: [], categories_unchecked: [] }, breachStatus: 'not_checked' };
   const withGh = buildReportEmail({ ...base, emailChecks: [{ id: 'email-github-commits', status: 'found', value: 'This address is the author of at least 2 public commits on GitHub.' }] });
   const without = buildReportEmail(base);
-  check(withGh.html.includes('Public code commits') && without.html.includes('Public code commits') && withGh.html.includes('FOUND') && /\[NOT CHECKED[^\n]*Public code commits|Public code commits[^\n]*NOT CHECKED/.test(without.text + without.html), 'report email: the GitHub hexagon is part of every report, FOUND with a result and NOT CHECKED without one');
+  check(withGh.html.includes('Public code changes') && without.html.includes('Public code changes') && withGh.html.includes('FOUND') && /\[NOT CHECKED[^\n]*Public code changes|Public code changes[^\n]*NOT CHECKED/.test(without.text + without.html), 'report email: the GitHub hexagon is part of every report, FOUND with a result and NOT CHECKED without one');
 }
 
 console.log(ok ? 'ALL PASS' : 'FAILURES'); process.exit(ok ? 0 : 1);

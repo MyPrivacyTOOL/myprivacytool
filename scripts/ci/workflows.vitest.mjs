@@ -42,7 +42,7 @@ describe("ci.yml (merge blocking)", () => {
   });
   it("covers unit+coverage, db integration, e2e, build and lint", () => {
     const all = Object.keys(wf.jobs).flatMap((j) => runs(wf, j)).join("\n");
-    for (const needle of ["test:coverage", "test:workers:node", "supabase/tests/run.sh", "test:e2e", "npm run build", "tsc -p tsconfig.app.json", "lint:tests"]) {
+    for (const needle of ["test:coverage", "test:workers:node", "supabase/tests/run.sh", "test:e2e", "npm run build", "tsc -p tsconfig.app.json", "lint:tests", "wrangler pages functions build"]) {
       expect(all).toContain(needle);
     }
   });

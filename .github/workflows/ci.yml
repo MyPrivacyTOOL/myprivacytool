@@ -97,6 +97,59 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
         run: bash supabase/tests/run.sh
 
+  support-rest:
+    # MPC-8528: the support case store over a REAL PostgREST on a throwaway Postgres (never a Supabase project).
+    # The unit job runs the same test file with SUPPORT_REST_URL unset, where it skips itself.
+    name: Support store over PostgREST (throwaway Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGURL: postgres://postgres:postgres@localhost:5432/postgres
+      # Throwaway values for this job only. Not a secret: the database and API live and die with the runner.
+      SUPPORT_REST_JWT_SECRET: ci-throwaway-jwt-secret-0123456789abcdef0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply bootstrap + the proposed support schema
+        run: |
+          psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/tests/bootstrap.sql
+          psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/proposed/mpc_8528_support_cases.sql
+          psql -X -v ON_ERROR_STOP=1 "$PGURL" -c "create role authenticator login noinherit password 'ci-auth'" -c "grant anon, authenticated, service_role to authenticator"
+      - name: Start PostgREST
+        run: |
+          docker run -d --name postgrest --network host \
+            -e PGRST_DB_URI="postgres://authenticator:ci-auth@localhost:5432/postgres" \
+            -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET="$SUPPORT_REST_JWT_SECRET" -e PGRST_SERVER_PORT=3000 \
+            postgrest/postgrest:v12.2.3
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/ >/dev/null 2>&1 && { echo "PostgREST up"; exit 0; }
+            sleep 2
+          done
+          docker logs postgrest | tail -30; echo "::error::PostgREST did not start"; exit 1
+      - name: Run the store tests against it
+        env:
+          SUPPORT_REST_URL: http://localhost:3000
+        run: npx vitest run shared/support/rest-store.integration.vitest.ts
+      - name: PostgREST logs (on failure)
+        if: failure()
+        run: docker logs postgrest 2>&1 | tail -60
+
   build:
     name: Production build
     runs-on: ubuntu-latest
@@ -112,6 +165,8 @@ jobs:
         env:
           # Test-only GUID so the E2E suite exercises the real HubSpot submit path on /contact.
           VITE_HUBSPOT_CONTACT_FORM_ID: e2e-contact-form
+          # MPC-7471-F3: production builds with saving on (MPC-7470), and e2e/popup-report.spec.ts needs the save tick box the popup then offers.
+          VITE_SAVE_WEB_SCANS: "true"
         run: npm run build
       - name: Verify build output
         run: |
@@ -123,6 +178,25 @@ jobs:
           name: dist
           path: dist
           retention-days: 3
+
+  pages-functions:
+    name: Pages Functions build (wrangler)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Bundle functions/ the way Cloudflare Pages does
+        # The site build (job `build`) never touches functions/. Cloudflare Pages bundles it on every deploy, and
+        # one unresolvable import (for example a Node built-in such as "crypto" without nodejs_compat) fails the
+        # whole Pages build, so no website deploy goes out until it is fixed. Offline: no credentials needed.
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npx wrangler pages functions build functions --outdir "$RUNNER_TEMP/pages-functions"
 
   e2e:
     name: E2E (Playwright, desktop + mobile)
@@ -179,7 +253,7 @@ jobs:
   ci-gate:
     name: CI gate
     if: always()
-    needs: [unit, lint, db, build, e2e, pipeline-guards]
+    needs: [unit, lint, db, support-rest, build, pages-functions, e2e, pipeline-guards]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded

@@ -79,6 +79,10 @@
     "title": "Contact Us | MyPrivacyTOOL",
     "description": "Get in touch with the MyPrivacyTOOL team for support, data removal requests, business enquiries or press."
   },
+  "/how-we-calculate-your-score": {
+    "title": "How we calculate your score | MyPrivacyTOOL",
+    "description": "What your exposure score means, how the bands and weights work, what coverage is, and why scores from different versions cannot be compared."
+  },
   "/faq": {
     "title": "FAQ | MyPrivacyTOOL",
     "description": "Answers about MyPrivacyTOOL: how the scan works, what stays in your browser, which third parties are contacted and how to reach us."

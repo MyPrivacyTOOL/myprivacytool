@@ -9,7 +9,7 @@ const POLL_MS = 3000;
 const MAX_POLLS = 100; // about five minutes, then the page just stays as it is
 const WATCH_POLL_MS = 30000; // the email-link view keeps watching after the first results, slowly
 const MAX_WATCH_POLLS = 120; // about an hour
-const STATUS_TEXT: Record<LiveStatus, string> = { found: "Found something", clear: "Nothing found", not_checked: "Could not check this one" };
+const STATUS_TEXT: Record<LiveStatus, string> = { found: "Found something", clear: "Nothing seen in the places we looked", not_checked: "Could not check this one" };
 
 export default function LiveScanPanel({ token, kind = "stream" }: { token: string; kind?: LiveKind }) {
   const [items, setItems] = useState<LiveItem[]>([]);
@@ -52,9 +52,9 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
   const alice = gone
     ? "This link has expired. Press the button in your email again, or run a new scan."
     : done && kind === "verified"
-      ? "That is what I can see so far. I will keep watching and add anything new."
+      ? "That is what I can see so far. This page keeps checking for about an hour while it stays open."
       : done
-    ? "That is what I can see from the outside. The full picture is on its way to your inbox."
+    ? "That is what I can see from the outside. A fuller report is on its way to your inbox."
     : found > 0
       ? "I have found something. I am still looking."
       : "Hold on, I am having a look behind the curtain.";
