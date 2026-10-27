@@ -5,6 +5,7 @@ import { ARRIVAL, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } fro
 import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
+import { redactStoredId, senderKey } from "./sender-key";
 import type { Env } from "./shared";
 
 export const SCAN_VERSION = "telegram-baseline-1";
@@ -199,6 +200,7 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
     if (!sender || !env.TELEGRAM_BOT_TOKEN) return;
     const updateId = (update as { update_id?: unknown }).update_id;
     if (typeof updateId !== "number") return;
+    const storedId = await senderKey(env, sender.id);   // gate 3: HMAC when TELEGRAM_ID_HMAC_KEY is set; throws on a bad key (caught below, nothing stored)
     const [chat, photos] = await Promise.all([
       call(env, "getChat", { chat_id: sender.id }),
       call(env, "getUserProfilePhotos", { user_id: Number(sender.id), limit: 5 }),
@@ -206,11 +208,11 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
     const report = buildReport(update, chat, photos);
     const date = (update as { message?: { date?: unknown } }).message?.date;
     const saved = await saveSnapshot(env, {
-      platform: "telegram", sender_id: sender.id, update_id: updateId, status: report ? "complete" : "failed",
+      platform: "telegram", sender_id: storedId, update_id: updateId, status: report ? "complete" : "failed",
       scan_version: SCAN_VERSION, risk_version: RISK_VERSION, schema_version: 1, score: null, // risk lives in report.risk (count out of 30); the legacy 0-10 column stays empty
       consent: { state_before: "awaiting_confirmation", state_after: "confirmed", confirming_update_id: updateId, consent_text_key: "bot.first_hexagon.question" },
       consent_at: typeof date === "number" ? new Date(date * 1000).toISOString() : null,
-      get_chat: stripFileIds(chat), photos: stripFileIds(photos),
+      get_chat: redactStoredId(stripFileIds(chat), env), photos: stripFileIds(photos),
       report: report ? { channel: "TG", risk: report.risk, never_sent: NEVER_SENT, hexagons: report.hexagons, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
       expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString(),
     }, log);
