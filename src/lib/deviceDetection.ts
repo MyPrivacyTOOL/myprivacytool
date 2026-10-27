@@ -109,6 +109,8 @@ export interface HexagonData {
   headline?: string;
   explanation?: string;
   category?: 'device' | 'network' | 'privacy' | 'language' | 'profile' | 'orientation' | 'fingerprint' | 'storage' | 'social' | 'security' | 'behavior';
+  /** CK-8494: the distinct, versioned outcome behind `value` for a re-checkable hexagon (WebRTC only so far). Never holds the finding itself. */
+  observation?: { state: string; detectorVersion: string };
 }
 
 // Fingerprint data interface
@@ -883,6 +885,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       risk: webrtcRisk,
       confirmed: false,
       category: 'fingerprint',
+      observation: { state: webrtcResult.state, detectorVersion: webrtcResult.detectorVersion },
     });
   }
   
