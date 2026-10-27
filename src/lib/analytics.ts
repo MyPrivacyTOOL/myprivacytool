@@ -34,6 +34,11 @@ export const trackEvent = (
   }
 };
 
+// MPC-8451: a click on a share button. Carries only the channel and where on the site it was, never the visitor's address or results.
+export const trackShare = (channel: string, where: string) => {
+  trackEvent('share_click', { channel, where });
+};
+
 // Route-change page view for the single-page app (MPC-7376). gtag reads page_location and page_title itself.
 export const trackPageView = () => {
   trackEvent('page_view');
