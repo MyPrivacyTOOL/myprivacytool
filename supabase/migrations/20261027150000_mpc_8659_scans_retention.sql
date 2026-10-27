@@ -2,7 +2,7 @@
 --
 -- Owner decision 2026-10-27 (TTL schedule): public.scans = 7 days. Until now the column default was 30 days and nothing purged expired rows.
 --
--- Why this is in supabase/proposed/ and does NOT schedule the purge:
+-- Moved from supabase/proposed/ to supabase/migrations/ on owner approval (2026-10-28) so deploy-supabase.yml applies it on merge. It does NOT schedule the purge:
 --   1. The KPI views (supabase/sql/mpt-raw-metrics.sql, mpt-hk-days.sql) compute cumulative_scans and conversion_rate_pct with count(*) over public.scans.
 --      Purging scans would make "Cumulative Scans" go DOWN. This migration adds public.scan_hourly_counts (counts only, no user link) and backfills it, so the views can
 --      be switched to it first (MPC-8655). Only then should the purge be scheduled (step 3 below).

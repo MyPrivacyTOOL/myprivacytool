@@ -1,7 +1,7 @@
--- MPC-8659: assertions for the PROPOSED scans retention migration (supabase/proposed/20261027150000_mpc_8659_scans_retention.sql).
+-- MPC-8659: assertions for the PROPOSED scans retention migration (supabase/migrations/20261027150000_mpc_8659_scans_retention.sql).
 -- supabase/tests/run.sh has already applied it to the THROWAWAY database; this re-applies it once to prove it is idempotent. Any failed assertion aborts.
 \set ON_ERROR_STOP on
-\i supabase/proposed/20261027150000_mpc_8659_scans_retention.sql
+\i supabase/migrations/20261027150000_mpc_8659_scans_retention.sql
 
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if not ok then raise exception 'FAIL: %', msg; end if; end $$;
 

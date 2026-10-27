@@ -79,7 +79,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
-# MPC-8659: the PROPOSED scans retention migration (supabase/proposed/20261027150000_mpc_8659_scans_retention.sql, applied by the proposed loop above).
+# MPC-8659: the PROPOSED scans retention migration (supabase/migrations/20261027150000_mpc_8659_scans_retention.sql, applied by the migrations loop above).
 echo "== proposed migration: scans retention (MPC-8659)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8659-scans-retention.test.sql
 
