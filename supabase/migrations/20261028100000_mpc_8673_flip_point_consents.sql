@@ -3,8 +3,8 @@
 -- Rule enforced here: NO done-for-you eradication job can be queued or started without a valid consent: it exists, is not withdrawn, is inside its
 -- 24-hour start window, and covers the category. The check lives in these functions, not only in a Worker, so no caller can skip it.
 --
--- Lives in supabase/proposed/ on purpose: deploy-supabase.yml ignores this folder, so merging the PR applies NOTHING to production.
--- Moving it to supabase/migrations/ is the production step and needs the owner's explicit go-ahead.
+-- Moved from supabase/proposed/ to supabase/migrations/ on the owner's approval (2026-10-28), so deploy-supabase.yml applies it when this reaches main.
+-- Merging is a SEPARATE step that needs the owner's go-ahead.
 --
 -- Privacy: no item content, names or personal URLs in either table. scan_ref is an opaque uuid with NO foreign key, so purging scans (7 days) does not
 -- delete the consent record, which is kept 12 months after eradication completes (approved by counsel per the owner, 2026-10-28).

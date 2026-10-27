@@ -1,7 +1,7 @@
--- MPC-8673: assertions for the PROPOSED Flip Point schema (supabase/proposed/20261028100000_mpc_8673_flip_point_consents.sql).
+-- MPC-8673: assertions for the PROPOSED Flip Point schema (supabase/migrations/20261028100000_mpc_8673_flip_point_consents.sql).
 -- supabase/tests/run.sh has already applied it to the THROWAWAY database; this re-applies it once to prove it is idempotent. Any failed assertion aborts.
 \set ON_ERROR_STOP on
-\i supabase/proposed/20261028100000_mpc_8673_flip_point_consents.sql
+\i supabase/migrations/20261028100000_mpc_8673_flip_point_consents.sql
 
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'FAIL: %', msg; end if; end $$;
 create or replace function pg_temp.err(q text) returns text language plpgsql as $$ begin execute q; return 'no error'; exception when others then return sqlerrm; end $$;

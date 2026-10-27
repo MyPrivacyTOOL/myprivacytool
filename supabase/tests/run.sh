@@ -79,7 +79,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
-# MPC-8673: the PROPOSED Flip Point schema (supabase/proposed/20261028100000_mpc_8673_flip_point_consents.sql, applied by the proposed loop above).
+# MPC-8673: the PROPOSED Flip Point schema (supabase/migrations/20261028100000_mpc_8673_flip_point_consents.sql, applied by the migrations loop above).
 echo "== proposed schema: Flip Point consents (MPC-8673)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8673-flip-point.test.sql
 
