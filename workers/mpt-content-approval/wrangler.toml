@@ -31,6 +31,6 @@ DEFAULT_ASSET_URL = "https://www.myprivacytool.io/og-image.jpg"
 # CK-8482: platforms the live Make scenario (MPC-6952) can publish (LinkedIn Page, Facebook Page, Instagram photo; checked against the live blueprint 2026-10-27). Others are recorded as not_routed and are NOT sent or reported as handed off.
 # Add a platform here only once Make has a route for it. Remove this line to send every drafted platform (legacy behaviour).
 ROUTED_PLATFORMS = "linkedin,facebook,instagram"
-# LinkedIn thumbnail (MPC-8366 image route): R2 key in mpt-brand-assets, e.g. "social/mpt-yt-still06-brand-end-card.png".
-# Unset on purpose until that object is confirmed to exist in R2: Make fetches it for every LinkedIn post, so a wrong key fails the post.
-# DEFAULT_IMAGE_KEY = "social/mpt-yt-still06-brand-end-card.png"
+# LinkedIn thumbnail (MPC-8366 image route): R2 key in mpt-brand-assets. The Make route fetches it for every LinkedIn post, so a wrong key fails the post.
+# Verified: this object was used in the live LinkedIn test on 2026-10-26 (see the MPC-8366 page).
+DEFAULT_IMAGE_KEY = "social/mpt-yt-still06-brand-end-card.png"
