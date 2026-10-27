@@ -7,12 +7,12 @@
 --      Purging scans would make "Cumulative Scans" go DOWN. This migration adds public.scan_hourly_counts (counts only, no user link) and backfills it, so the views can
 --      be switched to it first (MPC-8655). Only then should the purge be scheduled (step 3 below).
 --   2. Deleting a scan cascades to signals and then removal_tasks. The purge therefore skips scans that still have an open removal task
---      (not_started / in_progress), until p_hold_days past expiry, so work in progress is not silently deleted.
+--      (not_started / in_progress). Owner decision 2026-10-27: NEVER delete a scan while it has an open removal task; it goes on the first run after the task is completed or failed.
 --
 -- Rollout:  1. apply this file (adds the counter + function; changes the default for NEW rows only; deletes nothing)
 --           2. switch the KPI views to public.scan_hourly_counts (MPC-8655), then check: select public.mpt_purge_expired_scans(true);   -- dry run
 --           3. schedule:  select cron.schedule('mpt-purge-expired-scans', '35 19 * * *', 'select public.mpt_purge_expired_scans(false)');
--- Rollback: select cron.unschedule('mpt-purge-expired-scans');  drop function if exists public.mpt_purge_expired_scans(boolean, integer);
+-- Rollback: select cron.unschedule('mpt-purge-expired-scans');  drop function if exists public.mpt_purge_expired_scans(boolean);
 --           drop trigger if exists scans_count_hourly on public.scans;  drop function if exists public.mpt_count_scan_hourly();
 --           drop table if exists public.scan_hourly_counts;  alter table public.scans alter column expires_at set default (now() + interval '30 days');
 
@@ -48,32 +48,29 @@ create trigger scans_count_hourly after insert on public.scans for each row exec
 alter table public.scans alter column expires_at set default (now() + interval '7 days');
 
 -- ---------------------------------------------------------------- purge (dry run by default)
-create or replace function public.mpt_purge_expired_scans(p_dry_run boolean default true, p_hold_days integer default 30)
+create or replace function public.mpt_purge_expired_scans(p_dry_run boolean default true)
 returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare n_due int; n_held int; n_no_expiry int; n_deleted int := 0;
 begin
-  if p_hold_days is null or p_hold_days < 0 or p_hold_days > 365 then raise exception 'p_hold_days must be 0-365'; end if;
-
   select count(*) into n_no_expiry from public.scans where expires_at is null;
   select count(*) into n_due from public.scans where expires_at < now();
   select count(*) into n_held from public.scans s
-   where s.expires_at < now() and s.expires_at >= now() - make_interval(days => p_hold_days)
+   where s.expires_at < now()
      and exists (select 1 from public.signals g join public.removal_tasks r on r.signal_id = g.id
                   where g.scan_id = s.id and r.status in ('not_started', 'in_progress'));
 
   if not p_dry_run then
     delete from public.scans s
      where s.expires_at < now()
-       and (s.expires_at < now() - make_interval(days => p_hold_days)
-            or not exists (select 1 from public.signals g join public.removal_tasks r on r.signal_id = g.id
-                            where g.scan_id = s.id and r.status in ('not_started', 'in_progress')));
+       and not exists (select 1 from public.signals g join public.removal_tasks r on r.signal_id = g.id
+                        where g.scan_id = s.id and r.status in ('not_started', 'in_progress'));
     get diagnostics n_deleted = row_count;
   end if;
 
   return jsonb_build_object('dry_run', p_dry_run, 'due', n_due, 'held_for_open_removals', n_held,
                             'rows_without_expiry', n_no_expiry, 'deleted', n_deleted, 'ran_at', now());
 end $$;
-revoke all on function public.mpt_purge_expired_scans(boolean, integer) from public, anon, authenticated;
-grant execute on function public.mpt_purge_expired_scans(boolean, integer) to service_role;
-comment on function public.mpt_purge_expired_scans(boolean, integer) is 'MPC-8659. Deletes public.scans rows past expires_at (7 days for new rows), cascading to signals, hexagon_scores and removal_tasks. Skips scans with an open removal task until p_hold_days after expiry. Dry run by default. Returns counts only. Not scheduled: see the header of this file.';
+revoke all on function public.mpt_purge_expired_scans(boolean) from public, anon, authenticated;
+grant execute on function public.mpt_purge_expired_scans(boolean) to service_role;
+comment on function public.mpt_purge_expired_scans(boolean) is 'MPC-8659. Deletes public.scans rows past expires_at (7 days for new rows), cascading to signals, hexagon_scores and removal_tasks. NEVER deletes a scan that has an open removal task (not_started / in_progress); owner decision 2026-10-27. Dry run by default. Returns counts only. Not scheduled: see the header of this file.';

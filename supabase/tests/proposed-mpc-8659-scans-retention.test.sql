@@ -32,16 +32,17 @@ select pg_temp.assert(exists (select 1 from public.scans where id = '88590000-00
 select pg_temp.assert(exists (select 1 from public.scans where id = '88590000-0000-0000-0000-0000000000a1'), 'unexpired scan is kept');
 select pg_temp.assert((select coalesce(sum(scans_created), 0) from public.scan_hourly_counts) = (select n from before_counts), 'counter unchanged by the purge');
 
--- 3. the hold has a limit: past p_hold_days the scan goes even with an open removal task
-update public.scans set expires_at = now() - interval '31 days' where id = '88590000-0000-0000-0000-0000000000b2';
-select pg_temp.assert((public.mpt_purge_expired_scans(false)->>'deleted')::int >= 1, 'hold expires after p_hold_days');
+-- 3. an open removal task holds the scan with NO time limit (owner decision: never delete); completing the task releases it
+update public.scans set expires_at = now() - interval '400 days' where id = '88590000-0000-0000-0000-0000000000b2';
+select public.mpt_purge_expired_scans(false);
+select pg_temp.assert(exists (select 1 from public.scans where id = '88590000-0000-0000-0000-0000000000b2'), 'scan expired 400 days ago is still kept while its removal task is open');
+update public.removal_tasks set status = 'completed', completed_at = now() where signal_id = '88590000-0000-0000-0000-0000000000c2';
+select pg_temp.assert((public.mpt_purge_expired_scans(false)->>'deleted')::int >= 1, 'scan is purged once its removal task is completed');
+select pg_temp.assert(not exists (select 1 from public.scans where id = '88590000-0000-0000-0000-0000000000b2'), 'held scan gone after the task completed');
 select pg_temp.assert(not exists (select 1 from public.signals where id = '88590000-0000-0000-0000-0000000000c2'), 'signals cascade with the scan');
 select pg_temp.assert(not exists (select 1 from public.removal_tasks where signal_id = '88590000-0000-0000-0000-0000000000c2'), 'removal task cascades with the scan');
 
--- 4. bad input is refused
-do $$ begin begin perform public.mpt_purge_expired_scans(true, -1); raise exception 'FAIL: negative hold accepted'; exception when raise_exception then if sqlerrm like 'FAIL:%' then raise; end if; end; end $$;
-
--- 5. access: anon and authenticated can neither read the counter nor run the purge
+-- 4. access: anon and authenticated can neither read the counter nor run the purge
 set role anon;
 do $$ begin begin perform 1 from public.scan_hourly_counts; raise exception 'FAIL: anon read counter'; exception when insufficient_privilege then null; end; end $$;
 do $$ begin begin perform public.mpt_purge_expired_scans(true); raise exception 'FAIL: anon ran purge'; exception when insufficient_privilege then null; end; end $$;
