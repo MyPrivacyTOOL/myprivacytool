@@ -71,11 +71,11 @@ sessions=$(psql_ "$TEST_URL" -At -c "select count(*) from public.dashboard_sessi
 echo "   8 concurrent redemptions: 1 winner, 1 session"
 rm -rf "$race_dir"
 
-# MPC-8528: the PROPOSED AI-support schema (applied by the supabase/proposed loop above; not read by deploy-supabase.yml).
+# MPC-8528: the PROPOSED AI-support schema (applied by the migrations loop above; deploy-supabase.yml pushes it to the live project on merge).
 echo "== proposed schema: AI support cases (MPC-8528)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 
-# MPC-8529: the PROPOSED follow-up watchdog (supabase/proposed/mpc_8529_support_followup.sql, applied by the loop above after the 8528 schema).
+# MPC-8529: the PROPOSED follow-up watchdog (supabase/proposed/mpc_8529_support_followup.sql, applied by the proposed loop above, after the 8528 migration).
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 

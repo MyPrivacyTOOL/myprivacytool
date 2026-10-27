@@ -21,7 +21,7 @@ invents no policy: the shipped policy approves nothing, every action tool is dis
 | `service.ts` | `handleInbound()` ties it together. Duplicate event: no second model call, tool run or reply. Model/knowledge/tool/delivery failure: case stays open as `waiting_system` with a reason. A case is never auto-resolved here. |
 | `memory-store.ts` | In-memory store with fault injection. **Tests only.** |
 | `rest-store.ts` | `RestCaseStore`: the `CaseStore` over Supabase PostgREST (Workers have fetch, not a Postgres driver). Any non-2xx, timeout or malformed body throws, so intake answers "not recorded". Filter values are URL-encoded and only whitelisted case columns are patched. |
-| `supabase/proposed/mpc_8528_support_cases.sql` | Proposed Postgres schema (service_role only, RLS forced) plus two atomic functions, `support_create_case_from_event` and `support_append_inbound`, using a `(channel, provider_event_id)` primary key for race-safe dedupe. |
+| `supabase/migrations/20261027140000_mpc_8528_support_cases.sql` | Proposed Postgres schema (service_role only, RLS forced) plus two atomic functions, `support_create_case_from_event` and `support_append_inbound`, using a `(channel, provider_event_id)` primary key for race-safe dedupe. |
 
 ## Update 2026-10-26 (second PR): real store and evidence
 
@@ -48,7 +48,7 @@ Built to the recommended answers the task owner authorised as **build targets**.
 
 **Retention (proposed, not scheduled, not applied):** `support_purge_expired()` removes raw message text after 90 days, deletes cases inactive for 6 months in any state (unresolved cases do not keep personal data forever), expired proofs after a day and usage rows after 7 days. The periods are the task owner's recommended answer; they still need legal sign-off and the matching privacy-notice wording. The cron line is left commented.
 
-**To enable (all required):** approved MPC-8530 decisions; production approval to move `supabase/proposed/mpc_8528_support_cases.sql` into migrations; a rate-limiter binding; the secrets in `workers/support/EXPECTED_SECRETS.txt`; a listed provider if `MODEL_*` is set; an approved FAQ version; a route and a deploy workflow; the MPC-8531 review. None of these exists today.
+**To enable (all required):** approved MPC-8530 decisions; production approval to move `supabase/migrations/20261027140000_mpc_8528_support_cases.sql` into migrations; a rate-limiter binding; the secrets in `workers/support/EXPECTED_SECRETS.txt`; a listed provider if `MODEL_*` is set; an approved FAQ version; a route and a deploy workflow; the MPC-8531 review. None of these exists today.
 
 ## Routing and intake trace (from code; mailbox side is unverified)
 
@@ -89,7 +89,7 @@ Findings for the owners of those tasks (no change made here): the Contact page t
 ## Gates that remain open (nothing below is approved by this change)
 
 1. MPC-8530 outputs and decisions: approved knowledge, action policies, identity/verification flow, cost caps, retention and notices, the exceptional-decision route.
-2. Production migration: moving `supabase/proposed/mpc_8528_support_cases.sql` into `supabase/migrations/` is a production action, because `.github/workflows/deploy-supabase.yml` runs `supabase db push` on merge to main.
+2. Production migration: moving `supabase/migrations/20261027140000_mpc_8528_support_cases.sql` into `supabase/migrations/` is a production action, because `.github/workflows/deploy-supabase.yml` runs `supabase db push` on merge to main.
 3. A hosting Worker, plus a real `Model`, `Verifier`, `Notifier`, `KnowledgeSource` and `ReportStatusReader`, none of which exist yet. (`RestCaseStore` now exists but has only been tested with a fake fetch.)
 4. Each sensitive action (recovery, resend, entitlements, refunds, export, deletion, repair) needs approved policy, an identity check and a tool implementation. All stay disabled.
 5. Real-channel verification. Everything here is synthetic.
@@ -118,3 +118,12 @@ case `waiting_system` / `ai_unavailable`.
 - Still blocking enablement: D-5 provider terms, D-6 notice and legal sign-off, schema migration (production approval), identity-proof flow, MPC-8531 review.
 
 Tests: `npx vitest run shared/support` (7 new tests in "model spend guard (D-7)").
+
+## Update 2026-10-27: schema moved into migrations, purge scheduled (PR, not yet merged)
+
+On Chris's explicit approval of the schema migration and the purge schedule, the support schema moved from `supabase/proposed/` to
+`supabase/migrations/20261027140000_mpc_8528_support_cases.sql`, and `20261027140100_mpc_8528_support_purge_pg_cron.sql` schedules
+`support_purge_expired()` daily at 03:17 UTC (skipped where pg_cron is absent). Merging that PR runs `supabase db push` on the live project, which creates
+new, empty, service_role-only tables and functions and the cron job; no existing table is touched and nothing writes to them until the support Worker is enabled.
+The 8529 follow-up SQL stays in `supabase/proposed/`. Still unmet for enablement: the rate-limiter binding and secrets, an approved FAQ version, the Worker route and
+deploy workflow, a recorded D-5 (provider terms), MPC-8531 review, and a real-channel receipt.

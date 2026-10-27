@@ -15,7 +15,7 @@ export const isProofToken = (s: unknown): s is string => typeof s === "string" &
 export interface ProofStoreConfig { baseUrl: string; serviceKey: string; fetchImpl?: typeof fetch; restPrefix?: string; timeoutMs?: number }
 
 /**
- * Issues and redeems hashed, single-use proofs over PostgREST (SQL functions in supabase/proposed/mpc_8528_support_cases.sql).
+ * Issues and redeems hashed, single-use proofs over PostgREST (SQL functions in supabase/migrations/20261027140000_mpc_8528_support_cases.sql).
  * ISSUING IS NOT WIRED to any endpoint or email: looking up an account by email and sending a message is an approval-gated action.
  * Whoever wires it must answer identically whether or not the account exists (no account enumeration) and rate-limit per address.
  */

@@ -41,7 +41,7 @@ const CASE_COLS: Record<string, string> = {
 /**
  * CaseStore over Supabase PostgREST (Workers have fetch, not a Postgres driver). Fail-closed: any non-2xx, network error,
  * timeout or unexpected body THROWS, so intake answers "not recorded" and never returns a reference without a confirmed write.
- * Atomic intake and dedupe live in the SQL functions of supabase/proposed/mpc_8528_support_cases.sql.
+ * Atomic intake and dedupe live in the SQL functions of supabase/migrations/20261027140000_mpc_8528_support_cases.sql.
  */
 export class RestCaseStore implements CaseStore {
   private f: typeof fetch;
