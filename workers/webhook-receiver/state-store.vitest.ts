@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
+import { sessionKey, CONSENT_VERSION } from './pop.ts';
 import { getConversationState, saveConversationState, purgeExpiredState, STATE_TTL_MS } from './state-store.js';
 
 const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc' };
@@ -84,13 +85,15 @@ describe('purge', () => {
   it('a successful start-deep-dive purges expired rows off the response path; a refused one does not', async () => {
     const waits: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => waits.push(p) };
-    const env = { ...ENV, DEEP_DIVE_SECRET: 's' };
+    const env = { ...ENV, DEEP_DIVE_SECRET: 's', PHONE_SCAN_WEB_ENABLED: '1', POP_HMAC_SECRET: 'p'.repeat(40) };
+    const session_token = 'T'.repeat(43);
     const start = (headers: Record<string, string>) => worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: '{}', headers }), env, ctx);
     expect((await start({})).status).toBe(401);
     await Promise.all(waits);
     expect(reqs.some((r) => r.method === 'DELETE')).toBe(false);
-    seed['whatsapp:85212345678'] = { profileName: 'Alex', inbound_message_timestamp: 1760000000 };
-    const ok = await worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: JSON.stringify({ wa_id: '85212345678' }), headers: { 'X-Webhook-Secret': 's' } }), env, ctx);
+    seed['whatsapp:85212345678'] = { profileName: 'Alex' };
+    seed[(await sessionKey(env, session_token))] = { wa: '85212345678', bound_at: Date.now(), inbound_ts: 1760000000, consent: { v: CONSENT_VERSION, accepted: true } };
+    const ok = await worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: JSON.stringify({ wa_id: '85212345678', session_token }), headers: { 'X-Webhook-Secret': 's' } }), env, ctx);
     expect(ok.status).toBe(200);
     await Promise.all(waits);
     expect(reqs.filter((r) => r.method === 'DELETE')).toHaveLength(1);

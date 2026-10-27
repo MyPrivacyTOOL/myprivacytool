@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * WhatsApp deep dive: OSINT scan -> user confirms findings on the web -> user replies RESULTS on WhatsApp (pull model, no Meta templates).
- *   POST /api/scan/start-deep-dive       server-to-server (X-Webhook-Secret = DEEP_DIVE_SECRET). {wa_id} -> {scan_id, hexagons}
+ *   POST /api/scan/start-deep-dive       server-to-server (X-Webhook-Secret = DEEP_DIVE_SECRET). {wa_id, session_token} -> {scan_id, hexagons}
+ *                                        MPC-7902: 403 unless session_token is bound (pop.ts) to exactly this wa_id. Checked from durable state, here, before any provider call.
  *   GET  /api/scan/deep-dive             browser, ?scan_id= -> {hexagons, finalized}: what the "Is this you?" page shows (scan_id is the bearer, as for the routes below)
  *   POST /api/scan/hexagon-interaction   browser, scan_id is the bearer. {scan_id, hexagon_id, action: confirm|reject|dispute}; each accepted answer is persisted (persistInteraction)
  *   GET  /api/scan/final-risk-score      browser, ?scan_id= -> {verified_exposure_count, score, confirmed_hexagon_ids, not_checked_count}
@@ -12,6 +13,7 @@
 import { getConversationState, saveConversationState, stateStored } from './state-store.js';
 import { insertMptRow } from './supabase-client.js';
 import { corsFor, clip, timingSafeEqual, unauthorized } from './security.js';
+import { checkPossession } from './pop.ts';
 import { runOsintScan, verifiedExposureCount, verifiedExposureIds, ProofOfPossessionError, type OsintProviders, type ProviderCall } from '../../src/services/osintOrchestrator';
 import { confirmHexagon, disputeHexagon, type LearningSignal } from '../../src/lib/identityConfirmation';
 import type { Hexagon } from '../../src/types/hexagon';
@@ -126,10 +128,14 @@ export async function handleDeepDive(request: Request, env: Env): Promise<Respon
     if (!stored(env)) return jsonRes({ error: 'storage_not_configured' }, 503);
     const body: any = await request.json().catch(() => null);
     const wa_id = clip(body?.wa_id, 20);
+    // MPC-7902 gate: the proof is read from the durable store NOW. The caller's word, a timestamp it passes in, or a cached answer never count.
+    // Flag OFF, proof absent / revoked / mismatched, consent missing, or store unreadable: no provider is ever constructed or called.
+    const gate = await checkPossession(env, { token: body?.session_token, target: wa_id });
+    if (!gate.ok) return jsonRes({ error: gate.error, ...(gate.prompt ? { prompt: gate.prompt } : {}) }, gate.status);
     const conv: any = await getConversationState(env, `whatsapp:${wa_id}`);
     try {
       const { hexagons, diagnostics } = await runOsintScan(
-        { wa_id, profile_name: conv?.profileName, inbound_message_timestamp: conv?.inbound_message_timestamp }, providersFromEnv(env));
+        { wa_id: gate.wa_id, profile_name: conv?.profileName, inbound_message_timestamp: gate.inbound_ts }, providersFromEnv(env));
       const scanId = crypto.randomUUID();
       await saveScan(env, scanId, { wa_id, created_at: Date.now(), expires_at: Date.now() + SCAN_TTL_MS, finalized_at: 0 }, hexagons);
       await saveConversationState(env, `deepdive_latest:${wa_id}`, { scan_id: scanId });   // lets RESULTS find this person's newest scan; holds no findings
