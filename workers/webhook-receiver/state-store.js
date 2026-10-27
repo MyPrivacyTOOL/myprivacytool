@@ -97,3 +97,74 @@ export async function purgeExpiredState(env) {
     return -1;
   }
 }
+
+// ── Strict operations (MPC-7902). The fail-soft functions above hide errors, which is wrong for proof of possession: a proof that
+// could not be written or read must not be treated as "missing" quietly. These return { ok:false } on ANY failure so callers fail closed.
+
+/**
+ * Atomically create a row only if its key is free. { ok:true, inserted:false } = key already held (collision).
+ * @returns {Promise<{ok:boolean, inserted?:boolean}>}
+ */
+export async function insertStateIfAbsent(env, key, state, ttlMs) {
+  if (!stateStored(env)) return { ok: false };
+  const now = Date.now();
+  try {
+    const res = await fetch(`${base(env)}?on_conflict=key`, {
+      method: 'POST',
+      headers: headers(env, { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }),
+      body: JSON.stringify({ key, state, expires_at: new Date(now + ttlMs).toISOString(), updated_at: new Date(now).toISOString() }),
+    });
+    if (!res.ok) return { ok: false };
+    const rows = await res.json();
+    return { ok: true, inserted: Array.isArray(rows) && rows.length === 1 };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Upsert with an explicit lifetime (max 24 h, the table's promise). Resolves true only when the database confirmed the write. */
+export async function putStateStrict(env, key, state, ttlMs) {
+  if (!stateStored(env)) return false;
+  const now = Date.now();
+  try {
+    const res = await fetch(`${base(env)}?on_conflict=key`, {
+      method: 'POST',
+      headers: headers(env, { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ key, state, expires_at: new Date(now + Math.min(ttlMs, STATE_TTL_MS)).toISOString(), updated_at: new Date(now).toISOString() }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Read that tells "no such row" ({ok:true,state:null}) apart from "could not read" ({ok:false}). */
+export async function getStateStrict(env, key) {
+  if (!stateStored(env)) return { ok: false };
+  try {
+    const q = `key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=state&limit=1`;
+    const res = await fetch(`${base(env)}?${q}`, { headers: headers(env) });
+    if (!res.ok) return { ok: false };
+    const rows = await res.json();
+    return { ok: true, state: rows?.[0]?.state ?? null };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * Atomic take: one DELETE ... RETURNING. Of any number of concurrent callers exactly one receives the row; the rest get state:null.
+ * Never implement single-use as read-then-delete.
+ */
+export async function takeState(env, key) {
+  if (!stateStored(env)) return { ok: false };
+  try {
+    const q = `key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`;
+    const res = await fetch(`${base(env)}?${q}`, { method: 'DELETE', headers: headers(env, { Prefer: 'return=representation' }) });
+    if (!res.ok) return { ok: false };
+    const rows = await res.json();
+    return { ok: true, state: Array.isArray(rows) && rows.length ? rows[0].state ?? null : null };
+  } catch {
+    return { ok: false };
+  }
+}

@@ -64,6 +64,18 @@ export default {
       }
     }
 
+    // MPC-7902: proof-of-possession challenge + status (browser). Lazy import like the deep dive.
+    if (path.startsWith('/api/pop/')) {
+      try {
+        const { handlePop } = await import('./pop.ts');
+        const res = await handlePop(request, env);
+        if (res) return res;
+      } catch (err) {
+        console.error('PoP error:', err?.name);
+        return new Response(JSON.stringify({ error: 'proof_store_unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     // MPC-7915: visitors' answers about a tile. OFF unless LEARNING_EVENTS_ENABLED is "true" (404 otherwise). Lazy import like the deep dive.
     if (path === '/api/learning/event') {
       try {
@@ -192,6 +204,21 @@ async function handleWhatsApp(request, env) {
     // Proof of possession for the deep dive: Meta's contact record (name) and the time of the person's own message.
     const profileName = clip(body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name, 64);
     const inboundTs   = Number(msg.timestamp) || Math.floor(Date.now() / 1000);
+
+    // MPC-7902: STOP / DELETE revokes every proof of possession for this sender (restrictive only; consent handling proper is MPC-7904).
+    // A message carrying a challenge code binds the web session that asked for it. Both run only after verifyMeta above.
+    const word = text.trim().toUpperCase();
+    if (word === 'STOP' || word === 'DELETE') {
+      const { revokePossession } = await import('./pop.ts');
+      await revokePossession(env, from);
+    } else if (/\bMPT-[A-Z0-9]{4}-[A-Z0-9]{4}\b/i.test(text)) {
+      const { redeemFromInbound } = await import('./pop.ts');
+      const r = await redeemFromInbound(env, { from, text, msgId: msg.id, ts: inboundTs });
+      if (r.outcome !== 'ignored') {
+        if (r.reply) await sendWhatsApp(env, from, r.reply);
+        return ok();
+      }
+    }
 
     // Pull model: the person asks for their deep-dive result. Plain text reply, never a Meta template.
     const cmd = text.trim().toUpperCase();
