@@ -94,6 +94,39 @@ describe("gating", () => {
   });
 });
 
+describe("release scope (TELEGRAM_SCAN_SCOPE)", () => {
+  const stranger = { ...fromUser, id: OTHER };
+  it("is test-accounts-only by default, even with the wizard on", async () => {
+    const t = setup();
+    await t.post(cmd("/fix", 200, stranger));
+    await t.post(cb(`fw|${B8}|l`, 201, stranger));
+    expect(t.tg("sendMessage").concat(t.tg("editMessageText"))).toHaveLength(0);
+    expect(t.calls.some((c) => c.url.includes("sb.test"))).toBe(false);
+  });
+  it("ignores any value other than exactly \"all\"", async () => {
+    for (const v of ["ALL", "on", "true", "1", ""]) {
+      const t = setup({ TELEGRAM_SCAN_SCOPE: v });
+      await t.post(cmd("/fix", 202, stranger));
+      expect(t.tg("sendMessage")).toHaveLength(0);
+    }
+  });
+  it("opens /fix to a non-allow-listed private sender only when scope is all, and still reads only that sender's snapshot", async () => {
+    const t = setup({ TELEGRAM_SCAN_SCOPE: "all" });
+    await t.post(cmd("/fix", 203, stranger));
+    expect(t.tg("sendMessage")).toHaveLength(1);
+    expect(t.calls.find((c) => c.url.includes("profile_snapshots?"))!.url).toContain(`sender_id=eq.${OTHER}`);
+    const g = setup({ TELEGRAM_SCAN_SCOPE: "all" });
+    await g.post({ update_id: 204, message: { message_id: 1, date: 1, text: "/fix", from: stranger, chat: { id: -100, type: "group" } } });
+    expect(g.tg("sendMessage")).toHaveLength(0);
+  });
+  it("opens the baseline scan sender check the same way", async () => {
+    const { baselineSender } = await import("./src/baseline-scan");
+    const u = cmd("Y", 205, stranger);
+    expect(baselineSender({ PROBE_TELEGRAM_IDS: String(ID) } as unknown as Env, u)).toBeNull();
+    expect(baselineSender({ PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_SCAN_SCOPE: "all" } as unknown as Env, u)).toMatchObject({ id: String(OTHER) });
+  });
+});
+
 describe("journey", () => {
   it("lists issues with an inline keyboard, hides the unverifiable People Nearby, and says the user changes their own settings", async () => {
     const t = setup();
@@ -118,11 +151,21 @@ describe("journey", () => {
     expect(t2.shown()).toMatch(/Removing it means/);
     expect(t2.shown()).not.toMatch(/You can keep it/);
   });
-  it("labels every unreviewed guide as a draft", async () => {
+  it("shows the draft banner only for guides with no review evidence", async () => {
+    const reviewed = listedGuides();
+    expect(reviewed).toHaveLength(9);
+    for (const g of reviewed) expect(g.evidence).toMatchObject({ client: expect.any(String), platform: expect.any(String), version: expect.any(String), reviewedOn: "27th October 2026" });
     const t = setup();
     await t.post(cb(`fw|${B8}|qa|bi`, 13));
-    expect(t.shown()).toMatch(/Draft guide/);
-    expect(listedGuides().every((g) => g.evidence === null)).toBe(true);
+    expect(t.shown()).not.toMatch(/Draft guide/);
+    const bi = GUIDES.find((g) => g.code === "bi")!;
+    const saved = bi.evidence;
+    bi.evidence = null;
+    try {
+      const u = setup();
+      await u.post(cb(`fw|${B8}|qa|bi`, 14));
+      expect(u.shown()).toMatch(/Draft guide/);
+    } finally { bi.evidence = saved; }
   });
   it("skip and keep are recorded as intentions, never as completion or self-confirmation", async () => {
     const t = setup();
