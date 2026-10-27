@@ -106,7 +106,7 @@ describe("HELP panel", () => {
     renderAt("/report");
     await user.click(screen.getByRole("button", { name: "Help" }));
     const dialog = screen.getByRole("dialog", { name: "Help" });
-    expect(within(dialog).getByTestId("help-ai-status")).toHaveTextContent("not available yet");
+    expect(within(dialog).getByTestId("help-ai-status")).toHaveTextContent("We don't have an AI assistant");
     expect(within(dialog).queryByRole("textbox")).toBeNull();
     expect(within(dialog).queryByRole("form")).toBeNull();
     expect(dialog.textContent).toMatch(/does not open a support case/);
