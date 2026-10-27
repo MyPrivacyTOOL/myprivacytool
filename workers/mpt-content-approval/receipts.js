@@ -235,3 +235,47 @@ export function missingCycles(expectedIds, presentIds) {
   const have = new Set(presentIds);
   return expectedIds.filter((id) => !have.has(id));
 }
+
+const HKT_MS = 8 * 3600e3;
+/** Expected daily cycle ids: the last `days` HKT dates up to and including `now`'s date. */
+export function expectedCycleIds(now = new Date(), days = 3) {
+  const ids = [];
+  for (let i = 0; i < days; i++) ids.push(`daily-posts-${new Date(now.getTime() + HKT_MS - i * 86400e3).toISOString().slice(0, 10)}`);
+  return ids;
+}
+
+/**
+ * Daily-pipeline watchdog. Pure. `logs` = [{task_id,status}] from agent_execution_logs, `receipts` = publication_receipts rows.
+ * Stage per cycle (never conflated): missing | generated(drafted, awaiting approval) | rejected | handed_off | verified | failed.
+ * Awaiting approval is reported separately and is NOT a problem. A generation failure with no drafts IS (missing_cycle).
+ * `generationDueUtcHour`: a cycle is only "missing" once its producer cron (22:00Z the day before) plus grace has passed.
+ */
+export function watchdogReport({ ids, logs, receipts, now = new Date(), overdueMs = 6 * 3600e3, graceMs = 2 * 3600e3 }) {
+  const byId = new Map(ids.map((id) => [id, new Set()]));
+  for (const l of logs) if (byId.has(l.task_id)) byId.get(l.task_id).add(l.status);
+  const cycles = [];
+  const problems = [];
+  const awaiting = [];
+  for (const id of ids) {
+    const s = byId.get(id);
+    const date = id.replace('daily-posts-', '');
+    const dueAt = Date.parse(`${date}T06:00:00+08:00`) + graceMs;
+    const rows = receipts.filter((r) => r.content_id === id);
+    const cls = rows.length ? classifyCycle(rows, { now, overdueMs }) : null;
+    let stage;
+    if (!s.has('drafted')) {
+      stage = 'missing';
+      if (now.getTime() > dueAt) problems.push({ id, kind: 'missing_cycle' });
+    } else if (s.has('rejected')) stage = 'rejected';
+    else if (cls && cls.stages.verified_published === rows.length) stage = 'verified';
+    else if (cls && cls.stages.failed) stage = 'failed';
+    else if (s.has('handed_off') || s.has('published') || (cls && cls.stages.handed_off)) stage = 'handed_off';
+    else if (s.has('failed') && !s.has('approved')) { stage = 'failed'; problems.push({ id, kind: 'generation_failed' }); }
+    else if (s.has('approved')) stage = 'approved_not_sent';
+    else { stage = 'awaiting_approval'; awaiting.push(id); }
+    if (cls) for (const p of cls.problems) problems.push({ id, ...p });
+    if (stage === 'approved_not_sent' && !rows.length) problems.push({ id, kind: 'approved_not_sent' });
+    cycles.push({ id, stage, platforms: rows.length ? cls.stages : null });
+  }
+  return { healthy: problems.length === 0, problems, awaiting_approval: awaiting, cycles };
+}
