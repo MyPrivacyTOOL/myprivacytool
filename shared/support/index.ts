@@ -18,3 +18,5 @@ export * from "./proof";
 export * from "./followup-worker";
 export * from "./rest-followup-store";
 export * from "./engineering-intake";
+export * from "./github-issue-intake";
+export * from "./followup-metrics";

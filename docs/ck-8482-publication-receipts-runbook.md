@@ -58,3 +58,9 @@ After each platform step in MPC-6952, POST to `https://mpt-content-approval.mypr
 3. Signing test (no post is created): POST a signed `/receipt` for a made-up id such as `daily-posts-2099-01-01`; expect 404 "no hand-off for this content and platform". Wrong signature: expect 401.
 4. In Make scenario MPC-6952, after the LinkedIn step and after the Facebook step, add an HTTP "Make a request" POST to `/receipt` with the headers and JSON body in "Make receipt contract" above (`platform` = `linkedin` / `facebook`, `post_id`/`post_url` from the module output, `make_run_id` = the scenario execution id).
 5. After the next approved cycle: `GET /status?drafted_content_id=daily-posts-YYYY-MM-DD` (bearer token) must show linkedin, facebook and instagram `verified_published` with real ids, and the other three `not_routed`.
+
+## Receipt `post_url` is optional (added with the Make wiring)
+LinkedIn, Facebook and Instagram Make modules return only a Post ID. `post_url` may be omitted (stored as null); if sent it must be an https URL on the platform's host or the receipt is refused. Never fabricate a URL. `post_id` and `make_run_id` stay required.
+
+## Receipt authentication: token header (used by Make) or HMAC
+`POST /receipt` accepts EITHER header `x-receipt-token: <RECEIPT_SIGNING_SECRET>` OR the HMAC pair `x-receipt-timestamp` + `x-receipt-signature`. Make uses the token header (an HMAC over an exactly-matching timestamp and body cannot be tested without a live post). Replays are no-ops because each `receipt_id` (`<drafted_content_id>:<platform>`) is accepted once.

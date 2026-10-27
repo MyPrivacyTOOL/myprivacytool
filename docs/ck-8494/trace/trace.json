@@ -1,0 +1,100 @@
+{
+  "label": "SYNTHETIC -- scripted fake RTCPeerConnection, fresh browser profile, no backend, not production, not a real user",
+  "recordedAt": "2026-10-26T09:19:02.218Z",
+  "steps": [
+    {
+      "step": "1-2 observation shown with its explanation; first reading kept in this browser",
+      "evidence": {
+        "baseline": {
+          "state": "found",
+          "detectorVersion": "webrtc-state-1",
+          "browser": "chrome",
+          "observedAt": "2026-10-26T09:18:58.548Z"
+        },
+        "selfReport": null,
+        "consent": {
+          "analytics": true,
+          "at": "2026-10-26T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "step": "3 visitor says they did the step (self-report, not verified)",
+      "evidence": {
+        "selfReport": {
+          "at": "2026-10-26T09:18:59.717Z"
+        },
+        "baselineUnchanged": true
+      }
+    },
+    {
+      "step": "4a re-check where WebRTC gathered nothing at all: inconclusive, not improvement",
+      "evidence": {
+        "observation": {
+          "state": "blocked",
+          "detectorVersion": "webrtc-state-1",
+          "browser": "chrome",
+          "observedAt": "2026-10-26T09:19:00.461Z"
+        },
+        "comparison": {
+          "outcome": "inconclusive",
+          "reason": "The check could not finish or was blocked, which is not the same as finding nothing."
+        },
+        "at": "2026-10-26T09:19:00.461Z"
+      }
+    },
+    {
+      "step": "5 comparable re-check: observed improvement, scoped to one reading",
+      "evidence": {
+        "baseline": {
+          "state": "found",
+          "detectorVersion": "webrtc-state-1",
+          "browser": "chrome",
+          "observedAt": "2026-10-26T09:18:58.548Z"
+        },
+        "selfReport": {
+          "at": "2026-10-26T09:18:59.717Z"
+        },
+        "rechecks": [
+          {
+            "observation": {
+              "state": "blocked",
+              "detectorVersion": "webrtc-state-1",
+              "browser": "chrome",
+              "observedAt": "2026-10-26T09:19:00.461Z"
+            },
+            "comparison": {
+              "outcome": "inconclusive",
+              "reason": "The check could not finish or was blocked, which is not the same as finding nothing."
+            }
+          },
+          {
+            "observation": {
+              "state": "none_found",
+              "detectorVersion": "webrtc-state-1",
+              "browser": "chrome",
+              "observedAt": "2026-10-26T09:19:00.974Z"
+            },
+            "comparison": {
+              "outcome": "improvement",
+              "reason": "This time the page could not see a public address through WebRTC."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step": "6 network: no lead, database or learning request was made by this journey",
+      "evidence": {
+        "leads": 0,
+        "supabase": 0
+      }
+    },
+    {
+      "step": "7 consent withdrawn: saved journey deleted",
+      "evidence": {
+        "saved": null
+      }
+    }
+  ]
+}

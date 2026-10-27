@@ -41,10 +41,18 @@ export function isConsentConfirmation(brain: Decision | null): boolean {
   return !!brain && brain.intent === "verify" && brain.state === "awaiting_confirmation" && brain.next_state === "confirmed" && brain.state_source !== "fallback";
 }
 
-/** The sender when this update is a private message from an allow-listed test account; never a target taken from message text. */
+/**
+ * MPC-7894 staged release: TELEGRAM_SCAN_SCOPE="all" lets ANY private, non-bot sender use the baseline scan and the /fix wizard (real-user personal data).
+ * Anything else (default, unset) keeps both on the PROBE_TELEGRAM_IDS allow-list. Do not set it before the retention, wording and legal gates in
+ * docs/telegram-fix-wizard.md ("Real-user release gates") are recorded as done. DEEP and the dashboard link stay allow-list only.
+ */
+export const scanScopeAll = (env: Env): boolean => env.TELEGRAM_SCAN_SCOPE === "all";
+export const scanAllowed = (env: Env, senderId: string): boolean => scanScopeAll(env) || probeIds(env).has(senderId);
+
+/** The sender when this update is a private message from an allowed sender (test accounts, or anyone when TELEGRAM_SCAN_SCOPE=all); never a target taken from message text. */
 export function baselineSender(env: Env, update: unknown): { id: string; chatId: number | string } | null {
   const s = telegramSender(update);
-  return s && probeIds(env).has(s.id) ? s : null;
+  return s && scanAllowed(env, s.id) ? s : null;
 }
 
 /** Removes bot-specific file ids anywhere in a Telegram answer; file_unique_id is kept. */
