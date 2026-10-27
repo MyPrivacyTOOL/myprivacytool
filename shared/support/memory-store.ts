@@ -66,8 +66,9 @@ export class MemoryCaseStore implements CaseStore {
     const rec = { ...r, id: this.receipts.get(k)?.id ?? this.id("rcpt") }; this.receipts.set(k, rec); return rec;
   }
   async usageSince(key: string, sinceIso: string) {
+    this.chk("usageSince");
     const u = this.usage.filter((x) => x.key === key && x.at >= sinceIso);
     return { calls: u.length, costUnits: u.reduce((a, b) => a + b.costUnits, 0) };
   }
-  async recordUsage(key: string, costUnits: number, at: string) { this.usage.push({ key, costUnits, at }); }
+  async recordUsage(key: string, costUnits: number, at: string) { this.chk("recordUsage"); this.usage.push({ key, costUnits, at }); }
 }

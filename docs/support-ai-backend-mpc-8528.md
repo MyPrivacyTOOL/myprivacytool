@@ -99,3 +99,22 @@ Findings for the owners of those tasks (no change made here): the Contact page t
 `npx vitest run shared/support` runs 35 isolated tests (29 service, 6 `RestCaseStore` with a fake fetch) against the in-memory store (no network, no provider, no production
 backing). `supabase/tests/proposed-mpc-8528-support-cases.test.sql` runs inside `supabase/tests/run.sh` (`npm run test:db`) against the throwaway Postgres
 after the `supabase/proposed/` loop has applied the schema. Neither proves real channel delivery or live behaviour.
+
+## Update 2026-10-27: model-spend guard (MPC-8530 decision D-7)
+
+The tool gateway caps TOOL calls only. Nothing capped the model. `shared/support/model-budget.ts` now reserves spend before every model call
+(`reserveModelCall`) and the service refuses to call the model when a cap is hit, answering with the honest "AI unavailable" reply and leaving the
+case `waiting_system` / `ai_unavailable`.
+
+- Caps (approved by Chris 2026-10-27, `APPROVED_MODEL_BUDGET`, now part of `DEFAULT_POLICY.modelBudget`): 5 model calls per case, US$0.05 per case, US$5 per rolling 24 h.
+  Units are micro-USD. Each call reserves `estimatedMicroUsdPerCall` (US$0.01) because the true cost is only known afterwards; a response that reports a higher
+  `costMicroUsd` has the difference recorded. **These are placeholders until two weeks of measured data.**
+- Counters use the existing `support_usage` table (keys `model:case:<id>` and `model:day`), so no schema change and they survive restarts.
+- Fails closed: an invalid budget, a store error or an exceeded cap all mean no model call.
+- Known limitation: check-then-record is not atomic across concurrent requests, so a burst can overshoot by about one call per concurrent request. The edge rate
+  limiter bounds it; an atomic database-side reserve would remove it. Not built.
+- Not done: the cap is only as good as the estimate. If the real per-call cost is above US$0.01, the day cap is reached sooner than intended only once the provider
+  reports `costMicroUsd`; `ChatCompletionsModel` does not report it yet, so today the reserved estimate is the whole accounting.
+- Still blocking enablement: D-5 provider terms, D-6 notice and legal sign-off, schema migration (production approval), identity-proof flow, MPC-8531 review.
+
+Tests: `npx vitest run shared/support` (7 new tests in "model spend guard (D-7)").

@@ -116,7 +116,7 @@ export interface KnowledgeEntry {
 export interface KnowledgeSource { search(query: string, locale?: string): Promise<KnowledgeEntry[]> }
 
 export interface ModelRequest { system: string; caseText: string; knowledge: { id: string; version: string; body: string }[]; allowedTools: string[] }
-export interface ModelResponse { text: string; toolCalls?: { tool: string; args: Record<string, unknown> }[] }
+export interface ModelResponse { text: string; toolCalls?: { tool: string; args: Record<string, unknown> }[]; /** Actual cost of the call in micro-USD when the provider reports it; used only to record spend above the reserved estimate. */ costMicroUsd?: number }
 export interface Model { complete(req: ModelRequest): Promise<ModelResponse> }
 
 /** Throw on any failed or unconfirmed send: the service records the reply as undelivered. `to` is the address/handle that sent the inbound message, never one found in message text. */
