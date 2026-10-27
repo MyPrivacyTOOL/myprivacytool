@@ -127,3 +127,19 @@ On Chris's explicit approval of the schema migration and the purge schedule, the
 new, empty, service_role-only tables and functions and the cron job; no existing table is touched and nothing writes to them until the support Worker is enabled.
 The 8529 follow-up SQL stays in `supabase/proposed/`. Still unmet for enablement: the rate-limiter binding and secrets, an approved FAQ version, the Worker route and
 deploy workflow, a recorded D-5 (provider terms), MPC-8531 review, and a real-channel receipt.
+
+## Update 2026-10-27: identity-proof request flow (MPC-8530 decision D-3), dormant
+
+`shared/support/proof-request.ts` adds `requestProof()`: the customer gives the email of their account; if an account exists a single-use code (15 minutes) is emailed
+to that address. It is **not wired to any route and has no production account lookup**, so nothing can call it and no email can be sent.
+
+- **No enumeration:** the answer is `accepted` for a hit and a miss alike, and it is returned before the lookup, issue and send run (`defer`, e.g. `ctx.waitUntil`), so timing matches too. Errors after the answer are swallowed and reported as a reason code only.
+- **Limits (D-3):** 3 requests per address and 20 per IP per rolling hour, counted on every attempt whether or not the account exists. Counters use hashed keys in `support_usage`, so no address or IP is stored. A limiter read/write failure means no lookup and no mail.
+- **Mail:** `ResendProofMailer` (same contract as `ResendNotifier`) throws unless Resend confirms; the code is in the URL fragment, so it is not sent to any server or log. The email never asks for a password or a texted code.
+- **Tests:** 12 in `proof-request.vitest.ts`. Mutation-checked: awaiting the work before answering, a looser address limit, and a raw address in the usage key each fail a test.
+
+Not built, and needed before this can run:
+1. `AccountLookup` for production. It must resolve an email to the subject id the report-status reader expects (`public.users.id` is still an assumption, per the open identity decision).
+2. The route and the verify page that reads the fragment and passes the code as `proof`.
+3. A real run against Resend with an approved test address (sending is an approval-gated action), then MPC-8531 review.
+4. Known gap: `support_usage` rows are purged after 7 days, so a per-case model-call counter restarts for a case older than 7 days. Acceptable for now; fix before launch by keeping model counters longer.
