@@ -157,7 +157,17 @@ const Privacy = () => {
                   >
                     privacy@myprivacytool.io
                   </a>
-                  .
+                  . You can also do it yourself in the chat: send STOP, or tap
+                  &ldquo;Delete my scan data&rdquo; in the /fix list, and we delete
+                  your saved scan results, your fix-list progress and re-check
+                  records, any deeper scan results and your consent record, and we
+                  stop checking your profile. Our aim is that you wipe your
+                  footprints and keep your footsteps clean: we help you find what
+                  your Telegram profile shows to bots and guide you to remove it,
+                  then we delete our copy. We delete only what we hold; the
+                  Telegram settings stay yours to change and we never change them
+                  for you, and anything Telegram itself stores is outside our
+                  control.
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
