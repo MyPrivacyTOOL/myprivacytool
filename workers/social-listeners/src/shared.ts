@@ -43,6 +43,8 @@ export interface Env {
   TELEGRAM_BASELINE_SCAN?: string;
   /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
   PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
+  /** MPC-7894 staged release: "all" opens the baseline scan and /fix wizard to every private non-bot sender (real-user data); default/unset = PROBE_TELEGRAM_IDS only. */
+  TELEGRAM_SCAN_SCOPE?: string;
   /** MPC-7894 Telegram fix wizard: "on" enables /fix and its buttons for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
   TELEGRAM_FIX_WIZARD?: string;
   /** MPC-7893 one-time dashboard link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "dashboard"; anything else (default) is off. */

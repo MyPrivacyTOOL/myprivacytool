@@ -38,3 +38,13 @@ Max 5 re-checks per sender per hour. A replayed `update_id` is processed once (u
 
 ## Decisions recorded (Chris, 2026-10-26)
 Risk stays a count out of 30 (risk-count-1), no weights; before/after is a count, not the old 0-10 score. A wording and legal pass is approved and required before any real user. Every date shown to users is Hong Kong time in "29th October 2026" format. Task due date: 29th October 2026 (the Due Date property).
+
+## Real-user release gates (staged, default OFF)
+`TELEGRAM_SCAN_SCOPE=all` (exactly `all`; anything else, or unset, keeps test accounts only) lets any private, non-bot sender use the baseline scan (MPC-7891) and `/fix`. It is NOT set in `wrangler.toml` and must not be set until each gate below is recorded as done on the MPC-7891 / MPC-7894 Notion pages:
+1. Wording and legal pass on the scan report, consent text and wizard copy (all English drafts today), including a review of the 5 "cannot be checked yet" items.
+2. Retention (90 days) confirmed in the data-retention policy, and deletion on request (`mpt_delete_profile_snapshots`) tested against a real request.
+3. Plain Telegram ids replaced by an HMAC, or an explicit written decision to keep plain ids for real users (strategy 9.9).
+4. Guides reviewed on a real client (client, platform, app version, date recorded in `fix-guides.ts`) and the paid-plan copy approved.
+5. A consent-withdrawal path in core-brain (today only new, awaiting_confirmation, confirmed, declined exist).
+6. Language plan for non-English users (copy is English only).
+DEEP (MPC-7892) and the dashboard link (MPC-7893) stay allow-list only whatever this switch says. Turn on: add `TELEGRAM_SCAN_SCOPE = "all"` to `[vars]` in `workers/social-listeners/wrangler.toml` and deploy (the baseline switch `TELEGRAM_BASELINE_SCAN` and `TELEGRAM_FIX_WIZARD` must also be on). Turn off: delete the line and deploy.

@@ -2,11 +2,11 @@
 // snapshot; inline buttons walk one issue at a time (contextual question -> guide -> "I fixed it" / keep / skip / back). The USER changes their own settings.
 // Four things stay separate and are never merged into one score: the baseline (never overwritten), the user's intention, the self-report, and the re-check observation.
 // Skipping, keeping or closing a prompt is never completion. Sharing is a plain Telegram share link the user chooses to open: nothing personal is in it.
-import { RISK_VERSION, SCAN_VERSION } from "./baseline-scan";
+import { RISK_VERSION, SCAN_VERSION, scanAllowed } from "./baseline-scan";
 import { DRAFT_BANNER, type Guide, guideFor, listedGuides } from "./fix-guides";
 import { type BaselineRow, type Outcome, RECHECK_VERSION, type Recheck, type Summary, issueOutcome, recheckFrom, summarise, comparable } from "./fix-recheck";
 import type { Logger } from "./logger";
-import { call, probeIds } from "./probe-reader";
+import { call } from "./probe-reader";
 import type { Env } from "./shared";
 
 const TIMEOUT_MS = 5000;
@@ -39,7 +39,7 @@ export function parseFixUpdate(update: unknown): Parsed | null {
 export const isFixWizardUpdate = (env: Env, update: unknown): boolean => {
   if (!fixWizardEnabled(env)) return false;
   const p = parseFixUpdate(update);
-  return !!p && probeIds(env).has(p.kind === "list" ? p.fromId : p.cb.fromId);
+  return !!p && scanAllowed(env, p.kind === "list" ? p.fromId : p.cb.fromId);
 };
 
 async function rest(env: Env, method: string, path: string, body?: unknown, prefer?: string): Promise<{ ok: boolean; rows: Record<string, unknown>[] }> {
@@ -192,7 +192,7 @@ export async function handleFixWizard(env: Env, update: unknown, log: Logger): P
     const p = parseFixUpdate(update);
     if (!p || !env.TELEGRAM_BOT_TOKEN) return;
     const fromId = p.kind === "list" ? p.fromId : p.cb.fromId;
-    if (!probeIds(env).has(fromId)) return; // wrong user / not allow-listed: nothing is read or sent
+    if (!scanAllowed(env, fromId)) return; // not allowed (test-only scope unless TELEGRAM_SCAN_SCOPE=all): nothing is read or sent
     const chatId = p.kind === "list" ? p.chatId : p.cb.chatId;
     const messageId = p.kind === "cb" ? p.cb.messageId : null;
     if (p.kind === "cb") await call(env, "answerCallbackQuery", { callback_query_id: p.cb.id });
