@@ -22,7 +22,7 @@ Scan again shows `before of compared` vs `now of compared` for the same fields, 
 ## Guides: coverage matrix (reviewed by Chris, 27th October 2026)
 | Guide | Kind | Client / platform / app version / reviewed on |
 | --- | --- | --- |
-| Username, Bio, Birthday, Profile photo | api (re-checkable) | Telegram iPhone app / iOS, iPhone 14 / version not recorded / 27th October 2026 / all steps matched |
+| Username, Bio, Birthday, Profile photo | api (re-checkable) | Telegram iPhone app / iOS, iPhone 14 / version 11.2 / 27th October 2026 / all steps matched |
 | Phone number, Last seen, Forwarded messages, Groups, Auto-download | self | same review (iPhone only; no Android client reviewed) |
 | People Nearby | not published | specification conflict: existence in current clients unverified |
 A guide with no review evidence is shown with a "Draft guide" banner (currently only the unpublished People Nearby). No screenshots exist (none were invented); web guides depend on the website stack and MPC-7893.
