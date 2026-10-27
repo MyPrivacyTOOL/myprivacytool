@@ -48,3 +48,13 @@ Source config vs installed configuration are listed separately. Nothing here was
 
 ## Make receipt contract (to be added by the scenario owner, NOT applied)
 After each platform step in MPC-6952, POST to `https://mpt-content-approval.myprivacytool.workers.dev/receipt` with header `x-receipt-timestamp` (unix seconds) and `x-receipt-signature` = hex HMAC-SHA256(`RECEIPT_SIGNING_SECRET`, `"<timestamp>.<raw body>"`), body `{receipt_id, drafted_content_id, platform, status:"published"|"failed", make_run_id, post_id, post_url, published_at}`. The secret must be stored in a Make connection/variable, never in the blueprint text or logs.
+
+## Routed platforms (added after #577)
+`ROUTED_PLATFORMS` (wrangler var, currently `linkedin,facebook`) lists the platforms the live Make scenario can publish. Other drafted platforms are recorded as `not_routed`: never sent to Make, never reported as handed off, never verified, never a watchdog problem, and a receipt for them is refused (404). Add a platform to the list only after Make has a route for it. Removing the var restores the old behaviour (all drafted platforms sent).
+
+## Owner checklist
+1. `openssl rand -hex 32` -> `cd workers/mpt-content-approval && npx wrangler secret put RECEIPT_SIGNING_SECRET` (paste the value). Store the same value in Make (connection or variable, not blueprint text).
+2. GitHub repo secret `APPROVAL_API_TOKEN` = the same value as the worker's `APPROVAL_API_TOKEN` secret.
+3. Signing test (no post is created): POST a signed `/receipt` for a made-up id such as `daily-posts-2099-01-01`; expect 404 "no hand-off for this content and platform". Wrong signature: expect 401.
+4. In Make scenario MPC-6952, after the LinkedIn step and after the Facebook step, add an HTTP "Make a request" POST to `/receipt` with the headers and JSON body in "Make receipt contract" above (`platform` = `linkedin` / `facebook`, `post_id`/`post_url` from the module output, `make_run_id` = the scenario execution id).
+5. After the next approved cycle: `GET /status?drafted_content_id=daily-posts-YYYY-MM-DD` (bearer token) must show linkedin and facebook `verified_published` with real ids, and the other four `not_routed`.

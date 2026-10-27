@@ -8,7 +8,7 @@
 //                  A Make 2xx is HANDED OFF only. POST /receipt (HMAC-signed) is the only path to verified_published. GET /status reports stages.
 
 import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
-import { expectedCycleIds, watchdogReport, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
+import { expectedCycleIds, watchdogReport, recordNotRouted, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
@@ -231,10 +231,21 @@ export async function process(env, { action, taskId, timestamp, approver, target
   }
 
   // CK-8482: per-platform state. Tracking must never mask the real outcome, so a D1 failure here degrades to the legacy flow.
-  const platforms = payload.posts.map((p) => p.platform);
+  const allPlatforms = payload.posts.map((p) => p.platform);
+  // ROUTED_PLATFORMS: the platforms the Make scenario can actually publish. Unset = legacy behaviour (everything is sent).
+  const routedList = (env.ROUTED_PLATFORMS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const platforms = routedList.length ? allPlatforms.filter((p) => routedList.includes(p)) : allPlatforms;
+  const unrouted = allPlatforms.filter((p) => !platforms.includes(p));
+  if (!platforms.length) {
+    const error = `none of the drafted platforms are routed (ROUTED_PLATFORMS=${routedList.join(',')})`;
+    await log(env, taskId, 'failed', { error });
+    await reply(env, target, `Failed to post drafts. ${error}; nothing was sent to Make.com.`);
+    return { status: 422, message: error };
+  }
   let toSend = platforms;
   try {
-    await recordDrafted(env.AGENT_LOGS, taskId, platforms, approvedAt);
+    await recordDrafted(env.AGENT_LOGS, taskId, allPlatforms, approvedAt);
+    if (unrouted.length) await recordNotRouted(env.AGENT_LOGS, taskId, unrouted, approvedAt);
     await recordApproved(env.AGENT_LOGS, taskId, platforms, approvedAt);
     toSend = sendable(await rowsFor(env.AGENT_LOGS, taskId), platforms, approvedAt);
   } catch (e) {
@@ -246,7 +257,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
     succeeded = true;
     return { status: 200, message: 'nothing to send' };
   }
-  const outbound = toSend.length === platforms.length ? payload : { ...payload, posts: payload.posts.filter((p) => toSend.includes(p.platform)) };
+  const outbound = toSend.length === allPlatforms.length ? payload : { ...payload, posts: payload.posts.filter((p) => toSend.includes(p.platform)) };
 
   const meta = {};
   const sent = await postToMake(env, taskId, outbound, meta);
@@ -267,7 +278,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
   try { await recordHandedOff(env.AGENT_LOGS, taskId, toSend, { now: new Date() }); } catch (e) { console.error('publication_receipts tracking unavailable', e?.message); }
   await log(env, taskId, 'handed_off', { draft: { platforms: toSend, approved_by: approver } });
   const names = outbound.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ');
-  const done = `✅ *HANDED OFF*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${outbound.posts.length} posts: ${names}. Not yet verified as published: platform receipts will confirm each post.`;
+  const done = `✅ *HANDED OFF*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${outbound.posts.length} posts: ${names}. Not yet verified as published: platform receipts will confirm each post.${unrouted.length ? ` Not sent (no Make route yet): ${unrouted.map((p) => PLATFORM_NAMES[p]).join(', ')}.` : ''}`;
   await reply(env, target, done);
   await markDecided(env, target, done);
   succeeded = true;

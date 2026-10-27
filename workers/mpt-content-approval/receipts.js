@@ -7,7 +7,8 @@
 //   approved|handed_off -> failed -> approved (a bounded retry)      failed + dead_letter is terminal
 // A Make HTTP 2xx is `handed_off` ONLY. `verified_published` needs an authenticated receipt with a post id and URL.
 
-export const STATES = ['drafted', 'approved', 'handed_off', 'verified_published', 'failed'];
+export const STATES = ['drafted', 'approved', 'handed_off', 'verified_published', 'failed', 'not_routed'];
+// not_routed: the platform has no Make route yet. It is recorded, never sent, never verified, and never a watchdog problem.
 export const MAX_ATTEMPTS = 5;
 export const BACKOFF_BASE_S = 60;
 export const BACKOFF_CAP_S = 3600;
@@ -81,11 +82,20 @@ export function sendable(rows, platforms, now = new Date()) {
   return platforms.filter((p) => {
     const r = byPlatform.get(p);
     if (!r) return true;
-    if (r.state === 'handed_off' || r.state === 'verified_published') return false;
+    if (r.state === 'handed_off' || r.state === 'verified_published' || r.state === 'not_routed') return false;
     if (r.dead_letter || r.outcome_unknown) return false;
     if (r.next_attempt_at && Date.parse(r.next_attempt_at) > now.getTime()) return false;
     return true;
   });
+}
+
+/** Platforms the Make scenario cannot publish to. Never moves a row that already progressed. */
+export async function recordNotRouted(db, contentId, platforms, now = new Date()) {
+  for (const p of platforms) {
+    await upsertNew(db, contentId, p, 'drafted', now);
+    const cur = (await getRows(db, contentId)).find((r) => r.platform === p);
+    if (cur && (cur.state === 'drafted' || cur.state === 'approved')) await setRow(db, rowId(contentId, p), { state: 'not_routed', updated_at: iso(now) });
+  }
 }
 
 export async function recordApproved(db, contentId, platforms, now = new Date()) {
@@ -211,10 +221,11 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
  * overdueMs: how long after hand-off a receipt may take before the platform is flagged overdue.
  */
 export function classifyCycle(rows, { now = new Date(), overdueMs = 6 * 3600e3 } = {}) {
-  const stages = { generated: 0, awaiting_approval: 0, approved_not_sent: 0, handed_off: 0, verified_published: 0, failed: 0, unknown_outcome: 0, dead_letter: 0, overdue: 0 };
+  const stages = { not_routed: 0, generated: 0, awaiting_approval: 0, approved_not_sent: 0, handed_off: 0, verified_published: 0, failed: 0, unknown_outcome: 0, dead_letter: 0, overdue: 0 };
   const problems = [];
   for (const r of rows) {
-    if (r.state === 'drafted') stages.awaiting_approval++;
+    if (r.state === 'not_routed') stages.not_routed++;
+    else if (r.state === 'drafted') stages.awaiting_approval++;
     else if (r.state === 'approved') stages.approved_not_sent++;
     else if (r.state === 'verified_published') stages.verified_published++;
     else if (r.state === 'handed_off') {
@@ -267,7 +278,7 @@ export function watchdogReport({ ids, logs, receipts, now = new Date(), overdueM
       stage = 'missing';
       if (now.getTime() > dueAt) problems.push({ id, kind: 'missing_cycle' });
     } else if (s.has('rejected')) stage = 'rejected';
-    else if (cls && cls.stages.verified_published === rows.length) stage = 'verified';
+    else if (cls && rows.some((x) => x.state !== 'not_routed') && cls.stages.verified_published === rows.filter((x) => x.state !== 'not_routed').length) stage = 'verified';
     else if (cls && cls.stages.failed) stage = 'failed';
     else if (s.has('handed_off') || s.has('published') || (cls && cls.stages.handed_off)) stage = 'handed_off';
     else if (s.has('failed') && !s.has('approved')) { stage = 'failed'; problems.push({ id, kind: 'generation_failed' }); }
