@@ -14,13 +14,13 @@ export const CHECK_TIMEOUT_MS = 3000;
 export const EMAIL_HEXAGONS = {
   'email-name': { label: 'Name in your address', source: 'Analysed inside our Worker (nothing sent out)', services: [] },
   'email-provider': { label: 'Mail provider and domain', source: 'Cloudflare public DNS (1.1.1.1 over HTTPS)', services: ['Cloudflare DNS-over-HTTPS (receives the domain only, the part after the @)'] },
-  'email-profile': { label: 'Public profile or avatar', source: 'Gravatar', services: ['Gravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
+  'email-profile': { label: 'Public profile picture', source: 'Gravatar', services: ['Gravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
   // MPC-8452 (OSINT list, batch 1): both send a hash or the domain only, never the address.
-  'email-libravatar': { label: 'Second public avatar service', source: 'Libravatar', services: ['Libravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
-  'email-domain-record': { label: 'Public domain registration', source: 'RDAP (public domain registration data)', services: ['rdap.org and the domain registry it redirects to (receive the domain only, the part after the @)'] },
+  'email-libravatar': { label: 'Second public profile-picture service', source: 'Libravatar', services: ['Libravatar (receives a SHA-256 hash of the lower-cased address, not the address)'] },
+  'email-domain-record': { label: 'Website ownership record', source: 'RDAP (public domain registration data)', services: ['rdap.org and the domain registry it redirects to (receive the domain only, the part after the @)'] },
   // MPC-8452 Tier 2 (owner approved 2026-10-26): the ONE check that sends the plain address to a third party. OFF unless EMAIL_GITHUB_COMMITS_ENABLED is "true",
   // and that must only be set after the Privacy page names GitHub (docs/osint-list-mpc-8452.md).
-  'email-github-commits': { label: 'Public code commits', source: 'GitHub commit search', services: ['GitHub (receives the plain email address, in a search for public commits that name it as author)'] },
+  'email-github-commits': { label: 'Public code changes', source: 'GitHub commit search', services: ['GitHub (receives the plain email address, in a search for public commits that name it as author)'] },
 };
 
 // The checks that run for this deployment. The live view is "done" when this many have finished, so a switched-off check must not be counted.
@@ -72,7 +72,7 @@ export function checkNameInAddress(email) {
 }
 
 // ------------------------------------------------------------------ 3. provider and domain (public DNS only)
-const PERSONAL_DOMAINS = new Set(['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.com.hk', 'ymail.com', 'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net', 'zoho.com', 'fastmail.com', 'hey.com', 'qq.com', '163.com', '126.com', 'mail.com', 'yandex.com', 'netvigator.com']);
+export const PERSONAL_DOMAINS = new Set(['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.com.hk', 'ymail.com', 'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'gmx.com', 'gmx.net', 'zoho.com', 'fastmail.com', 'hey.com', 'qq.com', '163.com', '126.com', 'mail.com', 'yandex.com', 'netvigator.com']);
 const MX_PROVIDERS = [
   [/(^|\.)(google\.com|googlemail\.com)\.?$/, 'Google (Gmail or Google Workspace)'],
   [/(outlook\.com|protection\.outlook\.com|hotmail\.com)\.?$/, 'Microsoft (Outlook or Microsoft 365)'],
@@ -144,7 +144,7 @@ export async function checkPublicProfile(email, fetchImpl = fetch, { timeoutMs =
     const get = (url) => fetchImpl(url, { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal });
     const [avatar, profile] = await Promise.all([get(`${GRAVATAR_AVATAR}/${hash}?d=404&s=1`), get(`${GRAVATAR_PROFILE}/${hash}`)]);
     if (avatar.status === 200 || profile.status === 200) {
-      return result(id, 'found', { value: `A public ${profile.status === 200 ? 'Gravatar profile' : 'avatar'} is linked to this address. Anyone who knows the address can see it.` });
+      return result(id, 'found', { value: `A public ${profile.status === 200 ? 'Gravatar profile' : 'profile picture'} is linked to this address. Anyone who knows the address can see it.` });
     }
     if (avatar.status === 404 && profile.status === 404) return result(id, 'clear');
     return notChecked(id, `Gravatar HTTP ${avatar.status}/${profile.status}`);      // rate limited or erroring: not "clear"
@@ -166,7 +166,7 @@ export async function checkLibravatar(email, fetchImpl = fetch, { timeoutMs = CH
   try {
     const hash = await sha256Hex(`${parts.local}@${parts.domain}`);
     const res = await fetchImpl(`${LIBRAVATAR_AVATAR}/${hash}?d=404&s=1`, { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal });
-    if (res.status === 200) return result(id, 'found', { value: 'A public Libravatar avatar is linked to this address. Anyone who knows the address can see it.' });
+    if (res.status === 200) return result(id, 'found', { value: 'A public Libravatar profile picture is linked to this address. Anyone who knows the address can see it.' });
     if (res.status === 404) return result(id, 'clear');
     return notChecked(id, `Libravatar HTTP ${res.status}`);      // rate limited or erroring: not "clear"
   } catch (e) {
@@ -231,7 +231,7 @@ export async function checkGithubCommits(email, fetchImpl = fetch, { timeoutMs =
     if (!j || typeof j.total_count !== 'number') return notChecked(id, 'GitHub answered in an unexpected shape');
     if (j.total_count > 0) {
       const repo = String(j.items?.[0]?.repository?.full_name || '').replace(/[^\w./-]/g, '').slice(0, 100);
-      return result(id, 'found', { value: `This address is the author of at least ${j.total_count} public ${j.total_count === 1 ? 'commit' : 'commits'} on GitHub${repo ? `, for example in ${repo}` : ''}. Anyone can search for these.` });
+      return result(id, 'found', { value: `This address is the author of at least ${j.total_count} public code ${j.total_count === 1 ? 'change' : 'changes'} on GitHub${repo ? `, for example in ${repo}` : ''}. Anyone can search for these.` });
     }
     if (j.incomplete_results === true) return notChecked(id, 'GitHub search timed out on its side');
     return result(id, 'clear');

@@ -52,7 +52,9 @@ export async function insertMptRow(env, table, row) {
       body: JSON.stringify(row),
     });
     if (!res.ok) {
-      console.error(`Supabase ${table} insert failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+      // Learning events: Postgres error text can quote the row (person_key), so log only the status.
+      const detail = table === 'mpt_hexagon_events' ? '' : ` ${(await res.text()).slice(0, 200)}`;
+      console.error(`Supabase ${table} insert failed: ${res.status}${detail}`);
       return false;
     }
     return true;

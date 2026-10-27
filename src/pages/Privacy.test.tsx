@@ -30,11 +30,19 @@ describe("Privacy: saved scan", () => {
     expect(text).not.toMatch(/accepted the consent banner, we also save/i);
   });
 
-  it("keeps the email-check disclosure (Cloudflare: domain only; Gravatar: SHA-256 hash)", () => {
+  it("keeps the email-check disclosure (Cloudflare: only the part after the @; Gravatar and Libravatar: a scrambled code, a SHA-256 hash, not the address)", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("the domain part of your email address to Cloudflare");
-    expect(text).toContain("a SHA-256 hash of your email address to Gravatar");
+    expect(text).toContain("we send only the part of your email address after the @ to Cloudflare");
+    expect(text).toContain("a scrambled code made from your address (a SHA-256 hash), not the address itself, to Gravatar and to Libravatar");
+  });
+
+  // MPC-8452: the GitHub commit search sends the WHOLE address, and no breach check runs today. Both must stay stated plainly (wording check 2026-10-27).
+  it("says the whole address goes to GitHub, and that no breach check runs", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("your whole email address, not a scrambled code, goes to GitHub");
+    expect(text).toContain("We do not currently check data breaches");
   });
 });
 

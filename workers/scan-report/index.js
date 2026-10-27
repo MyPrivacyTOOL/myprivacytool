@@ -9,10 +9,11 @@ import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression, emailHash } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
+import { checkDeliverableDomain } from './lib/emailDomain.js';
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
-import { MAX_WEB_SCAN_BYTES, parseSaveRequest, readCappedJson, recordEvent, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
+import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
@@ -79,22 +80,32 @@ export default {
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
       // MPC-8430: bot check before anything is stored or sent (no-op until TURNSTILE_SECRET_KEY is set; blocks only when TURNSTILE_ENFORCE = "true").
       if (await turnstileBlocks(env, request, b['cf-turnstile-response'], origin)) return json({ error: 'Verification failed' }, 403);
+      // MPC-8453: refuse an address whose domain cannot receive mail (typo or made-up domain) before anything is stored or sent. Fails open; EMAIL_DOMAIN_CHECK = "false" turns it off.
+      if (String(env.EMAIL_DOMAIN_CHECK).toLowerCase() !== 'false') {
+        const dom = await checkDeliverableDomain(email);
+        if (!dom.ok) return json({ error: 'That email address does not look right', code: 'bad_email_domain', reason: dom.reason }, 400);
+      }
       // MPC-7470 (D12): saving the scan needs its own consent (save_consent === true), given at this contact step. Checked before anything is stored or sent.
       // Switch off: the save fields are ignored, the email request is handled as before.
       const save = webScanEnabled(env) ? parseSaveRequest(b) : { none: true };
       if (save.error) return json({ error: save.error }, 400);
+      // MPC-7471-F3: an optional per-submit key (a random UUID the popup keeps across retries). Lets a retry after a lost answer get the same outcome back
+      // instead of "already requested". Ignored (not even validated) until REPORT_REQUEST_ID_ENABLED is "true", i.e. after the scans.request_id migration is applied.
+      const rid = requestIdEnabled(env) ? parseRequestId(b) : { none: true };
+      if (rid.error) return json({ error: rid.error }, 400);
       const result = await handleScan(env, ctx, {
         email,
         consentSource: clip(b.consent_source || 'scan_page', 64).replace(/[^a-z0-9_-]/gi, '') || 'scan_page',
         ip: request.headers.get('CF-Connecting-IP') || null,
         ref: clip(b.ref, 16).toUpperCase(),   // MPC-7645: referral code from the share link, ignored unless REFERRALS_ENABLED
         utm: { source: clip(b.utm_source, 100), medium: clip(b.utm_medium, 100), campaign: clip(b.utm_campaign, 100), content: clip(b.utm_content, 100), referrer: clip(b.referrer, 500) },
+        save: save.hexagons ? save : null,
+        requestId: rid.requestId,
       });
-      // MPC-7470: save the scan and link it to this contact, with the consent record. Not for a repeat request within 24h (no new report,
-      // so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer to the email request.
-      const saved = save.hexagons && !result.duplicate && result.scanId
-        ? await saveWebScanForContact(env, db(env), { hexagons: save.hexagons, contactId: result.scanId, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
-        : { saved: false };
+      // MPC-7470: the scan is saved and linked to this contact, with the consent record, inside handleScan, BEFORE the first email goes out, so that email can carry the scan number.
+      // Not for a repeat request within 24h (no new report, so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer
+      // to the email request. A replay of the SAME request (same request_id) reports the original outcome instead.
+      const saved = result.saved ?? { saved: false };
       // MPC-8452: start the live view. The fast email checks run now (off the response path) and the page polls for them with this token.
       // A repeat request within 24h gets no live view (nothing new is checked).
       let live = null;
@@ -102,7 +113,7 @@ export default {
         live = await makeLiveToken(env, result.scanId);
         if (live) { const p = runLiveChecks(env, db(env), result.scanId, email); if (ctx?.waitUntil) ctx.waitUntil(p); }
       }
-      return json({ success: true, duplicate: result.duplicate, scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}), ...(live ? { live_token: live } : {}) });
+      return json({ success: true, duplicate: result.duplicate, ...(result.replay ? { replay: true } : {}), scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}), ...(live ? { live_token: live } : {}) });
     } catch (e) {
       console.error('scan submit failed:', String(e));
       return json({ error: 'Could not record your scan request' }, 500);
@@ -137,7 +148,7 @@ async function handleWebScanStep(env, request, origin, json) {
 export const runHkSpamJob = (env, fetchImpl = fetch, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
 
 // ------------------------------------------------------------------ submit path
-export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref }, fetchImpl = fetch) {
+export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId }, fetchImpl = fetch) {
   const sb = db(env, fetchImpl);
   const now = new Date();
   const retainUntil = new Date(now.getTime() + 3 * 365 * 24 * 3600 * 1000).toISOString();
@@ -159,15 +170,37 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref 
   if (ref && isNewUser && referralTester(env, email)) await attachReferral(sb, { ref, userId: user.id, email, isNewUser }).catch((e) => console.error('referral attach failed:', String(e).replace(/\S+@\S+/g, '[email]')));
 
   // One report per address per 24h: stops the form being used to mail-bomb someone.
+  // MPC-7471-F3: the same request arriving again (a timeout after the first answer was lost, a double click) is not "someone else": the visitor who holds the
+  // request_id gets the original outcome, including the scan number. Anyone else, including someone typing this address, only learns "duplicate".
+  const keyed = requestIdEnabled(env);
   const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
-  const recent = await sb.select(`scans?user_id=eq.${user.id}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`);
-  if (recent.length) return { duplicate: true, scanId: recent[0].id };
+  const recent = await sb.select(`scans?user_id=eq.${user.id}&created_at=gte.${encodeURIComponent(since)}&select=id${keyed ? ',request_id' : ''}&limit=1`);
+  if (recent.length) return keyed && requestId && recent[0].request_id === requestId ? replayOutcome(sb, recent[0].id) : { duplicate: true, scanId: recent[0].id };
 
-  const scan = await sb.insert('scans', { user_id: user.id, email_scanned: email, source: 'web_scan' });
-  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl), confirm(env, sb, scan.id, email, fetchImpl)];
+  let scan;
+  try { scan = await sb.insert('scans', { user_id: user.id, email_scanned: email, source: 'web_scan', ...(keyed && requestId ? { request_id: requestId } : {}) }); }
+  catch (e) {
+    if (e.status !== 409 || !(keyed && requestId)) throw e;
+    const prior = (await sb.select(`scans?request_id=eq.${requestId}&user_id=eq.${user.id}&select=id&limit=1`))[0];   // two copies of one request raced: the second gets the first's outcome
+    if (!prior) throw e;
+    return replayOutcome(sb, prior.id);
+  }
+  // MPC-7471-F3: save the scan BEFORE the first email, so the email can show its number. Never throws; a failed save only means no number.
+  const saved = save?.hexagons
+    ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
+    : { saved: false };
+  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl), confirm(env, sb, scan.id, email, fetchImpl, saved.scanNumber)];
   const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e)))));
   if (ctx?.waitUntil) ctx.waitUntil(all); else await all;
-  return { duplicate: false, scanId: scan.id };
+  return { duplicate: false, scanId: scan.id, saved };
+}
+
+// The outcome of an earlier request, rebuilt from what is stored (never from the request): the scan number only if the scan was really saved and linked.
+async function replayOutcome(sb, scanId) {
+  let scanNumber;
+  try { scanNumber = (await sb.select(`web_scan_contacts?channel=eq.email&contact_id=eq.${encodeURIComponent(scanId)}&select=web_scan_id&order=linked_at.desc&limit=1`))?.[0]?.web_scan_id; }
+  catch (e) { console.error('replay lookup failed:', e.status || 'error'); }
+  return { duplicate: true, replay: true, scanId, saved: scanNumber ? { saved: true, scanNumber } : { saved: false } };
 }
 
 async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
@@ -186,10 +219,10 @@ async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
 const unsubLinks = async (env, email) => (env.UNSUBSCRIBE_SECRET ? { page: await unsubscribePageUrl(env, email), oneClick: await unsubscribeUrl(env, email) } : null);
 const unsubHeaders = (links) => (links ? { 'List-Unsubscribe': `<${links.oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined);
 
-async function confirm(env, sb, scanId, email, fetchImpl) {
+async function confirm(env, sb, scanId, email, fetchImpl, scanNumber) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
   const links = await unsubLinks(env, email);
-  const m = buildConfirmationEmail({ unsubscribeLink: links?.page, liveLink: await makeLiveLink(env, scanId) });   // MPC-8452: opening it proves the reader owns the inbox
+  const m = buildConfirmationEmail({ unsubscribeLink: links?.page, liveLink: await makeLiveLink(env, scanId), scanNumber });   // MPC-8452: opening it proves the reader owns the inbox
   const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(links) }, fetchImpl);
   if (r.sent) await sb.patch(`scans?id=eq.${scanId}`, { confirmation_sent_at: new Date().toISOString() });
   else console.error('confirmation not sent:', r.reason);
@@ -251,6 +284,7 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
       console.log(`scan ${job.id}: processing (attempt ${job.report_attempts + 1}/${MAX_ATTEMPTS})`);
       const r = await processScan(env, sb, job, fetchImpl);
       if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
+      else if (r.cancelled) { console.warn(`scan ${job.id}: cancelled before sending`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_attempts: job.report_attempts, report_last_error: r.cancelled }); out.cancelled++; }
       else { out.sent++; console.log(`scan ${job.id}: sent`); }
     } catch (e) {
       out.failed++;
@@ -299,6 +333,9 @@ async function processScan(env, sb, job, fetchImpl) {
   const links = await unsubLinks(env, email);
   const webScan = await loadWebScan(sb, job.id);      // null when the visitor never ran/saved a web scan: Part 1 then says so honestly
   const referral = await referralFor(env, sb, job.user_id, email);
+  // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
+  const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
+  if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
   const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
