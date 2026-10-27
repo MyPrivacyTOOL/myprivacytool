@@ -467,22 +467,14 @@ const Privacy = () => {
                   <strong>AI Model Providers:</strong> When you send us a message
                   through a messaging channel, we may send the text of that message
                   to an AI language model run by a third-party provider, for
-                  example to work out what you are asking about, or to write a
-                  reply when you ask for help (through the HELP button, by email
-                  to our support address, or in a messaging channel). We remove
-                  email addresses and phone numbers from the text first, and we do
-                  not add your name, contact details or scan results to it. We
-                  cannot remove everything: if you type your name, address or
-                  other details into a help message, that text goes to the
-                  provider too, so please leave out anything you do not want
-                  shared. Support replies are written by an AI and we say so in
-                  each reply. The AI cannot change your account, give refunds or
-                  delete data. We choose
+                  example to work out what you are asking about. We remove email
+                  addresses and phone numbers from the text first, and we do not
+                  add your name, contact details or scan results to it. We choose
                   AI providers and models, open-source or closed-source and from
                   any country, to fit the business and technical need, and we change
                   them over time. The providers in use are always named in the
                   sub-processor list of our DPA. The free scan on our website and
-                  Alice's spoken guidance do not send anything to an AI provider.
+                  Alice's spoken guidance do not send anything to an AI provider
                 </li>
                 <li>
                   <strong>Email Checks for Your Report:</strong> To prepare your
@@ -551,14 +543,6 @@ const Privacy = () => {
                   <strong>Messaging Conversation State:</strong> Retained for 7
                   days of inactivity in our messaging system; the CRM record
                   remains until you ask us to delete it or unsubscribe
-                </li>
-                <li>
-                  <strong>Support Requests:</strong> The text of your help
-                  messages is kept for 90 days. A help case with no activity for
-                  6 months is deleted, whatever state it is in. One-time codes we
-                  send to confirm it is you expire within 15 minutes and are
-                  deleted the next day. To have a case deleted sooner, email
-                  privacy@myprivacytool.io
                 </li>
                 <li>
                   <strong>Newsletter, Waitlist & Lead Records:</strong> Retained
