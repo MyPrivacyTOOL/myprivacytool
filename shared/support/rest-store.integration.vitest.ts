@@ -4,7 +4,7 @@
 // Every assertion reads state back from the database through the API; nothing is satisfied by a canned response.
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { createHmac, randomUUID } from "node:crypto";
-import { RestCaseStore, RestProofStore, ProofVerifier, hashProof, handleInbound, buildTools, newCaseRef, type InboundEvent, type Notifier, type Model, type SupportDeps, type SupportPolicy } from "./index";
+import { RestCaseStore, RestProofStore, ProofVerifier, hashProof, handleInbound, buildTools, newCaseRef, type InboundEvent, type Notifier, type Model, type SupportDeps, type SupportPolicy, APPROVED_MODEL_BUDGET } from "./index";
 
 const URL_ = process.env.SUPPORT_REST_URL;
 const SECRET = process.env.SUPPORT_REST_JWT_SECRET ?? "";
@@ -126,7 +126,7 @@ run("RestCaseStore against PostgREST + Postgres", () => {
     const deps: SupportDeps = {
       store: s, notifier, model, tools: buildTools(s),
       knowledge: { search: async () => [{ id: "faq", version: "v1", status: "approved", approvedBy: "owner", title: "t", body: "b", scope: [] }] },
-      policy: { version: "it-policy", maxToolCallsPerTurn: 2, tools: { get_case_status: { approvedPolicyVersion: "it-only", requiredIdentity: "channel_asserted", maxCallsPerHour: 5, maxCostUnitsPerDay: 5, timeoutMs: 3000 } } },
+      policy: { version: "it-policy", maxToolCallsPerTurn: 2, modelBudget: APPROVED_MODEL_BUDGET, tools: { get_case_status: { approvedPolicyVersion: "it-only", requiredIdentity: "channel_asserted", maxCallsPerHour: 5, maxCostUnitsPerDay: 5, timeoutMs: 3000 } } },
     };
     const e = ev({ threadKey: `th-${randomUUID()}` });
     const r1 = await handleInbound(deps, e);
@@ -143,7 +143,7 @@ run("RestCaseStore against PostgREST + Postgres", () => {
   describe("identity proofs on real Postgres", () => {
     const pstore = () => new RestProofStore({ baseUrl: URL_ ?? "http://localhost:0", serviceKey: jwt("service_role"), restPrefix: "" });
     const verifiedPolicy: SupportPolicy = {
-      version: "it-proof-policy", maxToolCallsPerTurn: 1,
+      version: "it-proof-policy", maxToolCallsPerTurn: 1, modelBudget: APPROVED_MODEL_BUDGET,
       tools: { get_case_status: { approvedPolicyVersion: "it-only", requiredIdentity: "verified", maxCallsPerHour: 5, maxCostUnitsPerDay: 5, timeoutMs: 3000 } },
     };
     const mkDeps = (s: RestCaseStore): SupportDeps => ({

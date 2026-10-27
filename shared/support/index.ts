@@ -8,6 +8,7 @@ export * from "./knowledge";
 export * from "./intake";
 export * from "./reply";
 export * from "./service";
+export * from "./model-budget";
 export * from "./rest-store";
 export * from "./faq-knowledge";
 export * from "./report-status";

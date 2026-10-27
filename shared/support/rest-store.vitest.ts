@@ -2,7 +2,7 @@
 // MPC-8528: RestCaseStore request shape and fail-closed behaviour against a FAKE fetch. No network, no Supabase project.
 // SQL behaviour (atomic dedupe) is covered by supabase/proposed/mpc_8528_support_cases.test.sql on a throwaway Postgres.
 import { describe, it, expect, vi } from "vitest";
-import { RestCaseStore, handleInbound, buildTools, type SupportDeps, type Model, type Notifier, type InboundEvent } from "./index";
+import { RestCaseStore, handleInbound, buildTools, type SupportDeps, type Model, type Notifier, type InboundEvent, APPROVED_MODEL_BUDGET } from "./index";
 
 const row = { id: "c1", ref: "SUP-ABCDEFGH", channel: "web", thread_key: null, sender_handle: "v1", state: "new", state_reason: null, identity_level: "channel_asserted", linked_subject_id: null, tenant_id: null, policy_version: "p", knowledge_version: null, created_at: "2026-10-26T00:00:00Z", updated_at: "2026-10-26T00:00:00Z", reopen_count: 0 };
 type Call = { url: string; init: RequestInit };
@@ -66,7 +66,7 @@ describe("RestCaseStore", () => {
     const sent: string[] = [];
     const notifier: Notifier = { send: async (_r, _c, t) => { sent.push(t); return { providerMessageId: "p" }; } };
     const model: Model = { complete: vi.fn(async () => ({ text: "x" })) };
-    const deps: SupportDeps = { store, policy: { version: "p", maxToolCallsPerTurn: 1, tools: {} }, tools: buildTools(store), notifier, model };
+    const deps: SupportDeps = { store, policy: { version: "p", maxToolCallsPerTurn: 1, modelBudget: APPROVED_MODEL_BUDGET, tools: {} }, tools: buildTools(store), notifier, model };
     const r = await handleInbound(deps, ev);
     expect(r.caseRef).toBeUndefined(); expect(r.replyText).toContain("no case was created");
     expect(sent).toHaveLength(0); expect(model.complete).not.toHaveBeenCalled();
