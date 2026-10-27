@@ -50,3 +50,17 @@ class SlackNotifier:
 
     def notify(self, text: str) -> None:
         self.t("POST", self.webhook, {"Content-Type": "application/json"}, {"text": text})
+
+
+class QueuePublisher:
+    """MPC-8644: pushes one finished audit to the producer Worker (-> mpt-shadow-audit-queue -> Analytics Engine).
+    Sends only the Worker's allowlisted fields; never the agent id, evidence or passport."""
+
+    def __init__(self, endpoint: str, secret: str, transport: Transport = urllib_transport):
+        self.endpoint, self.t = endpoint, transport
+        self.h = {"Authorization": f"Bearer {secret}", "Content-Type": "application/json",
+                  "User-Agent": "shadow-audit-api/1.0"}
+
+    def publish(self, rec: Dict) -> None:
+        self.t("POST", self.endpoint, self.h, {k: rec[k] for k in
+               ("audit_id", "created_at", "outcome", "env", "pillar_scores")})
