@@ -321,3 +321,43 @@ describe('D: watchdog report and authenticated triggers', () => {
     expect(JSON.stringify(rep)).not.toMatch(/tok|hook\.eu1/);
   });
 });
+
+describe('routed platforms: only platforms Make can publish are sent, verified or monitored', () => {
+  const routedEnv = (db) => env(db, { ROUTED_PLATFORMS: 'linkedin,facebook' });
+  const go = (db) => processApproval(routedEnv(db), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
+  it('sends only routed platforms and records the rest as not_routed (never handed off)', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    expect((await go(db)).status).toBe(200);
+    expect(sentPlatforms(0)).toEqual(['linkedin', 'facebook']);
+    expect(states(db)).toEqual({ x: 'not_routed', linkedin: 'handed_off', instagram: 'not_routed', facebook: 'handed_off', pinterest: 'not_routed', youtube: 'not_routed' });
+  });
+  it('a receipt for a not_routed platform is refused; routed receipts verify and the cycle reads verified and healthy', async () => {
+    const db = fakeD1(); seedDrafts(db); await go(db);
+    expect((await submit(db, receipt('x'))).status).toBe(404);
+    await submit(db, receipt('linkedin')); await submit(db, receipt('facebook'));
+    const rows = await rowsFor(db, TASK);
+    const rep = watchdogReport({ ids: [TASK], logs: db.tables.agent_execution_logs.map((r) => ({ task_id: r[2], status: r[3] })), receipts: rows, now: new Date(NOW) });
+    expect(rep.cycles[0].stage).toBe('verified');
+    expect(rep.healthy).toBe(true);
+    expect(classifyCycle(rows).stages.not_routed).toBe(4);
+  });
+  it('recovery and duplicate approvals never send a not_routed platform', async () => {
+    makeImpl = async () => new Response('down', { status: 503 });
+    const db = fakeD1(); seedDrafts(db);
+    await go(db);
+    makeImpl = async () => new Response('Accepted', { status: 200 });
+    const rep = await recover(routedEnv(db), { now: new Date(Date.now() + 2 * 3600e3) });
+    expect(rep.resent).toEqual([{ id: TASK, platforms: ['linkedin', 'facebook'] }]);
+    expect(sentPlatforms(makeCalls().length - 1)).toEqual(['linkedin', 'facebook']);
+  });
+  it('fails closed when ROUTED_PLATFORMS names nothing that was drafted', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    const out = await processApproval(env(db, { ROUTED_PLATFORMS: 'tiktok' }), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
+    expect(out.status).toBe(422);
+    expect(makeCalls()).toHaveLength(0);
+  });
+  it('unset ROUTED_PLATFORMS keeps the legacy behaviour (all six sent)', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect(sentPlatforms(0)).toHaveLength(6);
+  });
+});
