@@ -64,6 +64,14 @@ test("production popup: one real submission, lost answer, retry returns the same
   // 3. ONE real submission, with a lost answer. The FIRST request is sent to the real Worker (so it saves and sends), but its answer is dropped before the page sees it,
   // like a timeout after a successful write. The popup then shows its failure message; pressing the button again sends the SAME request_id with a fresh Turnstile token,
   // and the Worker must answer with the original outcome (a replay) instead of creating anything twice. Turnstile is never bypassed: this needs a real browser that earns a token.
+  const turnstileFacts = () => page.evaluate(() => ({
+    api: typeof (window as unknown as { turnstile?: unknown }).turnstile,
+    iframes: document.querySelectorAll('iframe[src*="challenges.cloudflare.com"]').length,
+    tokenInputLengths: [...document.querySelectorAll('input[name="cf-turnstile-response"]')].map((i) => (i as HTMLInputElement).value.length),
+    userAgent: navigator.userAgent,
+    webdriver: (navigator as Navigator & { webdriver?: boolean }).webdriver ?? null,
+  }));
+  evidence.turnstile_before_send = await turnstileFacts();
   let lost: { status: number; answer: Record<string, unknown> | null } | null = null;
   let requestCount = 0;
   await page.route(/\/api\/scan$/, async (route) => {
@@ -71,6 +79,9 @@ test("production popup: one real submission, lost answer, retry returns the same
     if (req.method() !== "POST") return route.fallback();
     requestCount += 1;
     if (requestCount === 1) {
+      let sentBody: Record<string, unknown> = {};
+      try { sentBody = JSON.parse(req.postData() ?? "{}"); } catch { /* ignore */ }
+      evidence.first_request_token_length = typeof sentBody["cf-turnstile-response"] === "string" ? (sentBody["cf-turnstile-response"] as string).length : 0;   // the length only, never the token
       const real = await route.fetch();
       let answer: Record<string, unknown> | null = null;
       try { answer = await real.json(); } catch { /* not JSON */ }

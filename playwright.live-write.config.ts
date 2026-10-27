@@ -10,6 +10,8 @@ export default defineConfig({
   timeout: 300_000,
   reporter: "list",
   use: {
+    // LIVE_BROWSER_CHANNEL=chrome runs the test in the installed Google Chrome instead of the bundled Chromium (Cloudflare Turnstile is stricter with the latter).
+    ...(process.env.LIVE_BROWSER_CHANNEL ? { channel: process.env.LIVE_BROWSER_CHANNEL } : {}),
     baseURL: process.env.LIVE_SITE ?? "https://myprivacytool.io",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
