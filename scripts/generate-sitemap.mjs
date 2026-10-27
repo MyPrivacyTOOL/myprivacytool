@@ -28,6 +28,7 @@ const STATIC_ROUTES = [
   { path: "/developers", file: "src/pages/Developers.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/about", file: "src/pages/About.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/faq", file: "src/pages/Faq.tsx", priority: "0.5", changefreq: "monthly" },
+  { path: "/how-we-calculate-your-score", file: "src/pages/ScoreMethod.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/contact", file: "src/pages/Contact.tsx", priority: "0.4", changefreq: "yearly" },
   { path: "/privacy", file: "src/pages/Privacy.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/terms", file: "src/pages/Terms.tsx", priority: "0.3", changefreq: "yearly" },

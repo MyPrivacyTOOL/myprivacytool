@@ -37,12 +37,12 @@ test("completion opens exactly one dialog that stays open; score matches the pag
 
   // The score and label in the dialog are the page's.
   const result = (await page.getByTestId("scan-complete-result").textContent()) ?? "";
-  const label = /(High|Medium|Low) Risk/.exec(result)?.[0];
+  const label = /(High|Medium|Low) exposure/.exec(result)?.[0];
   const score = /(\d+)\/100/.exec(result)?.[1];
   expect(label && score).toBeTruthy();
   await expect(page.getByTestId("scan-complete-dialog")).toBeFocused();
   // The page's own risk card (behind the overlay, so read its text rather than click it) shows the same number and label.
-  const pageCard = page.getByText(`${score}%`, { exact: true }).first();
+  const pageCard = page.getByText(score!, { exact: true }).first();
   await expect(pageCard).toBeAttached();
   await expect(page.getByText(label!, { exact: true }).first()).toBeAttached();
 

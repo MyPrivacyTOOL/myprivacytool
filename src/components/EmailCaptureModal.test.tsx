@@ -22,11 +22,12 @@ afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(
 const hex = (): HexagonData[] =>
   [0, 1, 2].map((i) => ({ id: `hx-${i}`, label: `Hexagon ${i}`, value: `v${i}`, icon: "x", confidence: 80, risk: "low", confirmed: true, category: "device" }));
 const withSavedScanOffered = () => { vi.stubEnv("VITE_SAVE_WEB_SCANS", "true"); rememberCompletedScan(hex()); };
+import { percentHalfUp } from "../../shared/hexagon-registry/score.js";
 
 // MPC-7471-F1: the dialog fires confetti on open; jsdom has no canvas, so stub it everywhere in this file.
 vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
 
-const setup = (riskScore = 55) => {
+const setup = (riskScore: number | null = 55) => {
   const onClose = vi.fn(), onSubmit = vi.fn();
   render(<EmailCaptureModal riskScore={riskScore} categoryScores={{ fingerprint: 50 }} confirmedCount={23} onClose={onClose} onSubmit={onSubmit} />);
   return { onClose, onSubmit, user: userEvent.setup() };
@@ -45,10 +46,26 @@ async function fill(user: ReturnType<typeof userEvent.setup>, { save = false } =
 }
 
 describe("EmailCaptureModal: shows the score", () => {
-  it.each([[85, "High Risk"], [80, "High Risk"], [79, "Medium Risk"], [50, "Medium Risk"], [49, "Low Risk"], [10, "Low Risk"]])("labels risk %i as %s and shows exposure", (score, label) => {
+  it.each([[85, "High exposure"], [70, "High exposure"], [69, "Medium exposure"], [40, "Medium exposure"], [39, "Low exposure"], [10, "Low exposure"]])("labels exposure score %i as %s and shows coverage", (score, label) => {
     setup(score);
     expect(screen.getByText(label)).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`${Math.round((23 / HEXAGON_COUNT) * 100)}% exposure`))).toBeInTheDocument();
+    // MPC-7471-F4: coverage = checked / the true registry total, rounded half up (the old "exposure %" was the same ratio under a misleading name).
+    expect(screen.getByText(new RegExp(`${percentHalfUp(23, HEXAGON_COUNT)}% coverage`))).toBeInTheDocument();
+  });
+
+  it("links to how the score is calculated", () => {
+    setup(55);
+    const a = screen.getByTestId("score-method-link");
+    expect(a).toHaveAttribute("href", "/how-we-calculate-your-score");
+    expect(a).toHaveAttribute("target", "_blank");
+    expect(a.getAttribute("rel")).toContain("noopener");
+  });
+
+  it("with nothing checked there is no score and no band, never a Low label", () => {
+    setup(null);
+    expect(screen.getByText("Not enough checked to score")).toBeInTheDocument();
+    expect(screen.queryByText(/Low exposure/)).not.toBeInTheDocument();
+    expect(screen.getByText(/no score yet/)).toBeInTheDocument();
   });
 });
 

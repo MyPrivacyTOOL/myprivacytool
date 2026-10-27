@@ -13,8 +13,11 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { LanguagePrediction } from '@/lib/languagePredictor';
 import EmailCaptureModal from '@/components/EmailCaptureModal';
-import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
+import { SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
+import { exposureForPage, categoryExposure, byBand, BAND_LABEL } from '@/lib/exposureScore';
 import { HEXAGON_COUNT, HEXAGON_GROUP_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { scanCounts, scanCountsLine, totalLabel, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
+import { captureContext } from '@/lib/webScan';
 import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
 import { SUMMARY_LABELS } from '@/lib/scanCopy';
 import { signedReportEnabled } from '@/config/signedReport';
@@ -23,6 +26,8 @@ import { requestSignedJson, requestPdfSignature, downloadBlob, signedReportMessa
 interface FinalSummaryPanelProps {
   hexagons: HexagonData[];
   confirmedCount: number;
+  /** MPC-7471-F2: the scan's X, Y and Z from the grid, so the summary and the popup share one snapshot. Computed here from `hexagons` when absent or in tile mode. */
+  counts?: ScanCounts;
   /** Tile state (VITE_HEXAGON_TILES). When set, "confirmed" means verified by a check, not tapped, and no score, percentage or ratio is shown. */
   tiles?: Map<string, HexagonTile>;
   fingerprint?: CompositeFingerprint | null;
@@ -55,6 +60,7 @@ interface PrivacyConcern {
 export default function FinalSummaryPanel({
   hexagons: rawHexagons,
   confirmedCount: tappedCount,
+  counts: countsProp,
   tiles,
   fingerprint,
   languagePrediction,
@@ -73,6 +79,10 @@ export default function FinalSummaryPanel({
   );
   const board = useMemo(() => riskProfile(tiles ? [...tiles.values()] : []), [tiles]);
   const confirmedCount = tilesOn ? board.clear : tappedCount;
+  const counts = useMemo(
+    () => (!tilesOn && countsProp ? countsProp : scanCounts(hexagons, { ctx: captureContext(hexagons) })),
+    [tilesOn, countsProp, hexagons]
+  );
 
   // Calculate category stats for all 8 categories
   const categoryStats = useMemo((): CategoryStats[] => {
@@ -311,48 +321,13 @@ export default function FinalSummaryPanel({
     return [...new Set(positives)].slice(0, 5);
   }, [hexagons]);
 
-  // Calculate overall privacy risk score (FINAL FORMULA); also returns each category's 0-100 risk (MPC-7173 baseline)
-  const { categoryRisk } = useMemo(() => {
-    const weights = {
-      device: 0.05,      // 5%
-      privacy: 0.05,     // 5%
-      language: 0.05,    // 5%
-      orientation: 0.05, // 5%
-      fingerprint: 0.25, // 25%
-      storage: 0.10,     // 10%
-      social: 0.20,      // 20%
-      security: 0.15,    // 15%
-      behavior: 0.10,    // 10%
-    };
-
-    let totalRisk = 0;
-    const categoryRisk: Record<string, number> = {};
-    
-    categoryStats.forEach((cat) => {
-      const catWeight = weights[cat.key as keyof typeof weights] || 0.05;
-      const baseRisk = cat.total > 0 ? (cat.confirmed / cat.total) * 60 : 0;
-      const criticalBonus = cat.criticalIssues * 20;
-      const warningBonus = cat.warnings * 10;
-      const catRisk = Math.min(baseRisk + criticalBonus + warningBonus, 100);
-      categoryRisk[cat.key] = Math.round(catRisk);
-      totalRisk += catRisk * catWeight;
-    });
-
-    // Add fingerprint uniqueness bonus
-    if (fingerprint) {
-      const fpRiskMap = { high: 20, medium: 10, low: 0 };
-      totalRisk += fpRiskMap[fingerprint.totalRisk] || 0;
-    }
-
-    return { overall: Math.min(Math.round(totalRisk), 100), categoryRisk };
-  }, [categoryStats, fingerprint]);
-
-  // MPC-7471-F1: the headline score and label are the PAGE result (RiskScore.tsx, via src/lib/scanResult.ts), not a second calculation.
-  // The category scores above still feed the MPC-7173 baseline unchanged.
-  const overallRisk = useMemo(
-    () => computePageRisk({ confirmed: confirmedCount, total: hexagons.length, hexagons, fingerprint }).percentage,
-    [confirmedCount, hexagons, fingerprint],
-  );
+  // MPC-7471-F4: the score, band and coverage come from the one shared contract (exposure-v1), the same one the page card reads
+  // (RiskScore.tsx, via src/lib/scanResult.ts). Nothing here calculates its own; the old "FINAL FORMULA" and its fingerprint bonus are gone.
+  const exposure = useMemo(() => exposureForPage(rawHexagons, true, counts.total), [rawHexagons, counts.total]);
+  const categoryRisk = useMemo(() => categoryExposure(exposure), [exposure]);
+  const overallRisk = exposure.score;       // null when nothing could be checked: shown as "not enough checked", never as 0 or safe
+  const band = exposure.band;
+  const coveragePct = exposure.coverage.percent;
 
   // MPC-7120 / MPC-7471-F1: this panel only renders once the scan has genuinely completed, so the one scan-complete dialog opens
   // with it, with no timer. State lives here: closing it sets it false and nothing in this component opens it again.
@@ -361,21 +336,10 @@ export default function FinalSummaryPanel({
   // CK-7799: the "uniqueness 1 in N" figure that used to be here was 2^(confirmed / 4), an invented number, and the fingerprint's
   // "1 in X" came from a hard-coded entropy table. Neither is shown or exported any more.
 
-  const getRiskColor = (risk: number) => {
-    if (risk >= 80) return 'text-foreground';
-    if (risk >= 50) return 'text-foreground';
-    return 'text-risk-low';
-  };
-
-  const getRiskBgColor = (risk: number) => {
-    if (risk >= 80) return 'bg-risk-high';
-    if (risk >= 50) return 'bg-risk-mid';
-    return 'bg-risk-low';
-  };
-
-  const getRiskLabel = (risk: number) => {
-    return getPageRiskLabel(risk, true);
-  };
+  const getRiskColor = () => byBand(band, 'text-foreground', 'text-foreground', 'text-risk-low', 'text-muted-foreground');
+  const getRiskBgColor = () => byBand(band, 'bg-risk-high', 'bg-risk-mid', 'bg-risk-low', 'bg-muted');
+  const getRiskLabel = () => (band ? BAND_LABEL[band] : 'Not enough checked to score');
+  const scoreText = overallRisk === null ? '–' : String(overallRisk);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -443,7 +407,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted); // Gray
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`Complete Privacy Analysis - ${HEXAGON_COUNT} Data Points`, margin, 28);
+      pdf.text(`Complete Privacy Analysis - ${totalLabel(counts)} Data Points`, margin, 28);
       pdf.text(`Generated: ${new Date().toLocaleString()}`, margin, 35);
       
       yPos = 55;
@@ -461,18 +425,18 @@ export default function FinalSummaryPanel({
       
       // Data Points
       pdf.setTextColor(...PDF.brand);
-      pdf.text(String(HEXAGON_COUNT), margin + colWidth * 0 + 10, statsY);
+      pdf.text(totalLabel(counts), margin + colWidth * 0 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
       pdf.text('Data Points', margin + colWidth * 0 + 10, statsY + 8);
       
       // Risk Score
       pdf.setFontSize(18);
-      pdf.setTextColor(...(overallRisk >= 80 ? PDF.riskHigh : overallRisk >= 50 ? PDF.riskMid : PDF.brand));
-      pdf.text(String(overallRisk), margin + colWidth * 1 + 10, statsY);
+      pdf.setTextColor(...byBand(band, PDF.riskHigh, PDF.riskMid, PDF.brand, PDF.muted));
+      pdf.text(scoreText, margin + colWidth * 1 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
-      pdf.text('Risk Score', margin + colWidth * 1 + 10, statsY + 8);
+      pdf.text('Exposure score', margin + colWidth * 1 + 10, statsY + 8);
       
       // Categories (a true count; this slot used to show an invented "uniqueness" figure)
       pdf.setFontSize(14);
@@ -482,22 +446,25 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted);
       pdf.text('Categories', margin + colWidth * 2 + 10, statsY + 8);
       
-      // Exposure
+      // Coverage: checked / true registry total (not a measure of harm)
       pdf.setFontSize(18);
       pdf.setTextColor(...PDF.cyan);
-      pdf.text(`${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`, margin + colWidth * 3 + 10, statsY);
+      pdf.text(`${coveragePct}%`, margin + colWidth * 3 + 10, statsY);
       pdf.setFontSize(8);
       pdf.setTextColor(...PDF.muted);
-      pdf.text('Exposure', margin + colWidth * 3 + 10, statsY + 8);
+      pdf.text('Coverage', margin + colWidth * 3 + 10, statsY + 8);
       
       yPos += 45;
 
       // Risk Level Badge
-      pdf.setFillColor(...(overallRisk >= 80 ? PDF.riskHighSoft : overallRisk >= 50 ? PDF.riskMidSoft : PDF.brandSoft));
+      pdf.setFillColor(...byBand(band, PDF.riskHighSoft, PDF.riskMidSoft, PDF.brandSoft, PDF.brandSoft));
       pdf.roundedRect(margin, yPos, 60, 10, 2, 2, 'F');
       pdf.setFontSize(9);
-      pdf.setTextColor(...(overallRisk >= 80 ? PDF.riskHigh : overallRisk >= 50 ? PDF.riskMid : PDF.brand));
-      pdf.text(`${getRiskLabel(overallRisk)}`, margin + 5, yPos + 7);
+      pdf.setTextColor(...byBand(band, PDF.riskHigh, PDF.riskMid, PDF.brand, PDF.muted));
+      pdf.text(`${getRiskLabel()} · ${SCORE_VERSION}`, margin + 5, yPos + 7);
+      pdf.setFontSize(7);
+      pdf.setTextColor(...PDF.muted);
+      pdf.text('How we calculate your score: https://myprivacytool.io/how-we-calculate-your-score', margin + 65, yPos + 7);
       
       yPos += 20;
 
@@ -712,7 +679,7 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.muted);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`All ${HEXAGON_COUNT} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
+      pdf.text(`All ${totalLabel(counts)} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
       pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
 
       // Save the PDF. A signed export saves the same bytes plus a detached signature over them (MPC-8281).
@@ -744,13 +711,18 @@ export default function FinalSummaryPanel({
     const report = {
       generatedAt: new Date().toISOString(),
       summary: tilesOn
-        ? { totalDataPoints: HEXAGON_COUNT, clear: board.clear, youToldUs: board.youToldUs, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
+        ? { totalDataPoints: counts.total, clear: board.clear, youToldUs: board.youToldUs, needFixing: board.needsFixing, ourGuess: board.ourGuess, notCheckedYet: board.notChecked }
         : {
-        totalDataPoints: HEXAGON_COUNT,
+        totalDataPoints: counts.total,
+        checkedDataPoints: counts.checked,
         confirmedDataPoints: confirmedCount,
-        overallPrivacyRisk: overallRisk,
-        riskLevel: getRiskLabel(overallRisk),
-        trackingExposure: `${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%`,
+        scoreVersion: exposure.score_version,
+        exposureScore: overallRisk,
+        band,
+        provisional: exposure.provisional,
+        coveragePercent: coveragePct,
+        itemsChecked: exposure.coverage.checked,
+        itemsTotal: exposure.coverage.total,
       },
       categories: categoryStats.map((cat) => ({
         name: cat.name,
@@ -823,9 +795,8 @@ export default function FinalSummaryPanel({
 Test yours at: ${window.location.origin}`
       : `🎯 My Complete Digital Shadow - Final Report
 
-📊 ${HEXAGON_COUNT} data points analyzed
-🎯 ${confirmedCount} were accurate (${Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%)
-Privacy Risk: ${overallRisk}/100 (${getRiskLabel(overallRisk)})
+📊 ${scanCountsLine(counts)}
+Exposure score: ${scoreText}/100 (${getRiskLabel()}), coverage ${coveragePct}%
 🔍 ${HEXAGON_GROUP_COUNT} categories looked at
 
 Test yours at: ${window.location.origin}`;
@@ -859,8 +830,8 @@ Test yours at: ${window.location.origin}`;
             </CardTitle>
             <p className="text-sm text-muted-foreground font-normal">
               {tilesOn
-                ? `${HEXAGON_COUNT} hexagons looked at across ${HEXAGON_GROUP_COUNT} categories`
-                : `Complete analysis of ${HEXAGON_COUNT} data points across ${HEXAGON_GROUP_COUNT} categories`}
+                ? `${totalLabel(counts)} hexagons in this scan, across ${HEXAGON_GROUP_COUNT} categories`
+                : `Complete analysis of ${totalLabel(counts)} data points across ${HEXAGON_GROUP_COUNT} categories`}
             </p>
           </div>
         </div>
@@ -880,47 +851,47 @@ Test yours at: ${window.location.origin}`;
           <>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-risk-low">{HEXAGON_COUNT}</p>
+            <p className="text-2xl font-bold text-risk-low">{totalLabel(counts)}</p>
             <p className="text-xs text-muted-foreground">Data Points</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className={`text-2xl font-bold ${getRiskColor(overallRisk)}`}>{overallRisk}</p>
-            <p className="text-xs text-muted-foreground">Risk Score</p>
+            <p className={`text-2xl font-bold ${getRiskColor()}`}>{scoreText}</p>
+            <p className="text-xs text-muted-foreground">Exposure score</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
             <p className="text-lg font-bold text-foreground">{HEXAGON_GROUP_COUNT}</p>
             <p className="text-xs text-muted-foreground">Categories</p>
           </div>
           <div className="p-3 bg-secondary rounded-lg border border-risk-low/20 text-center">
-            <p className="text-2xl font-bold text-brand">{Math.round((confirmedCount / HEXAGON_COUNT) * 100)}%</p>
-            <p className="text-xs text-muted-foreground">Exposure</p>
+            <p className="text-2xl font-bold text-brand">{coveragePct}%</p>
+            <p className="text-xs text-muted-foreground">Coverage</p>
           </div>
         </div>
 
         {/* Overall Risk Score Circle */}
         <div className="text-center p-6 bg-secondary rounded-xl border border-risk-low/20">
-          <p className="text-muted-foreground text-sm mb-2">Overall Privacy Risk</p>
+          <p className="text-muted-foreground text-sm mb-2">Overall exposure score</p>
           <div className="relative inline-block">
             <svg className="w-32 h-32 -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="40" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
               <circle
                 cx="50" cy="50" r="40" fill="none"
-                stroke={overallRisk >= 80 ? 'hsl(var(--risk-high))' : overallRisk >= 50 ? 'hsl(var(--risk-mid))' : 'hsl(var(--risk-low))'}
+                stroke={byBand(band, 'hsl(var(--risk-high))', 'hsl(var(--risk-mid))', 'hsl(var(--risk-low))', 'hsl(var(--muted))')}
                 strokeWidth="8" strokeLinecap="round"
-                strokeDasharray={`${overallRisk * 2.51} 251`}
+                strokeDasharray={`${(overallRisk ?? 0) * 2.51} 251`}
                 className="transition-all duration-1000 ease-out"
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={`text-4xl font-bold ${getRiskColor(overallRisk)}`}>
-                {overallRisk}
+              <span className={`text-4xl font-bold ${getRiskColor()}`}>
+                {scoreText}
               </span>
               <span className="text-xs text-muted-foreground">/100</span>
             </div>
           </div>
-          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold mt-4 ${getRiskBgColor(overallRisk)}/20 ${getRiskColor(overallRisk)} border border-current/30`}>
-            {overallRisk >= 80 ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-            {getRiskLabel(overallRisk)}
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold mt-4 ${getRiskBgColor()}/20 ${getRiskColor()} border border-current/30`}>
+            {band === 'high' ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+            {getRiskLabel()}
           </div>
         </div>
           </>
@@ -1088,7 +1059,7 @@ Test yours at: ${window.location.origin}`;
             {tilesOn ? (
               <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
             ) : (
-              <><strong>100% Local:</strong> All {HEXAGON_COUNT} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
+              <><strong>100% Local:</strong> All {totalLabel(counts)} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
             )}
           </p>
         </div>
@@ -1097,7 +1068,10 @@ Test yours at: ${window.location.origin}`;
         <EmailCaptureModal
           riskScore={overallRisk}
           categoryScores={categoryRisk}
+          scoreVersion={exposure.score_version}
+          coveragePercent={coveragePct}
           confirmedCount={confirmedCount}
+          counts={counts}
           onClose={() => setShowEmailModal(false)}
           onSubmit={() => {}}
         />
