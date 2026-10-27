@@ -339,7 +339,7 @@ export default {
       if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
       const rawBody = await request.text();
       const out = await handleReceipt(env, rawBody, request.headers);
-      await logRejectedReceipt(env, out, rawBody);
+      await logRejectedReceipt(env, out, rawBody, Date.now(), request.headers);
       return Response.json({ ok: out.status < 400, message: out.message, state: out.state }, { status: out.status });
     }
     if (pathname === '/watchdog' || pathname === '/recover') {

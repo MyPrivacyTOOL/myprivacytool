@@ -15,6 +15,7 @@ export * from "./report-status";
 export * from "./email-notifier";
 export * from "./openai-compatible-model";
 export * from "./proof";
+export * from "./proof-request";
 export * from "./followup-worker";
 export * from "./rest-followup-store";
 export * from "./engineering-intake";
