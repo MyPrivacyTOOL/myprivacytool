@@ -2666,7 +2666,7 @@ export const EMAIL_HEXAGONS = [
   },
   {
     "id": "email-profile",
-    "label": "Public profile or avatar",
+    "label": "Public profile picture",
     "group": "Email address",
     "category": "email",
     "order": 4,
@@ -2701,7 +2701,7 @@ export const EMAIL_HEXAGONS = [
   },
   {
     "id": "email-libravatar",
-    "label": "Second public avatar service",
+    "label": "Second public profile-picture service",
     "group": "Email address",
     "category": "email",
     "order": 5,
@@ -2736,7 +2736,7 @@ export const EMAIL_HEXAGONS = [
   },
   {
     "id": "email-domain-record",
-    "label": "Public domain registration",
+    "label": "Website ownership record",
     "group": "Email address",
     "category": "email",
     "order": 6,
@@ -2771,7 +2771,7 @@ export const EMAIL_HEXAGONS = [
   },
   {
     "id": "email-github-commits",
-    "label": "Public code commits",
+    "label": "Public code changes",
     "group": "Email address",
     "category": "email",
     "order": 7,
