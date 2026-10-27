@@ -1,6 +1,6 @@
 # MPC-7471-F3: the post-scan popup uses the report pipeline
 
-Status: **LOCAL, then PUSHED / draft PR.** Not approved, not merged, not deployed, no live test. Wording and flow need Chris's approval before merge (task requirement, separate from his 2026-10-13 approval of option A).
+Status (2026-10-27): **MERGED** (#541, `217f036`); the `scan-report` Worker deploy run succeeded. Migration `20261026200000` **APPLIED to production** 2026-10-27 (checked after: column and unique partial index present, `scans` row count unchanged at 24, `anon` cannot read the column); `REPORT_REQUEST_ID_ENABLED` switched on in a follow-up PR. **NOT VERIFIED LIVE**: the live test with Chris's test address has not run. The requester approved the merge in the session; Chris's own wording/flow sign-off is not recorded here.
 
 ## What changed (option A: one route)
 
@@ -16,7 +16,7 @@ Now: the popup sends the **same request as `/scan`**: `POST /api/scan` on the `s
 | `workers/scan-report/lib/email.js` | First email shows `Your scan number: <n>. Quote this number if you want this scan deleted.` (same sentence as the report, MPC-7488) only when a scan was really saved. |
 | `workers/scan-report/lib/webScan.js` | `parseRequestId`, `requestIdEnabled`. |
 | `supabase/migrations/20261026200000_mpc_7471_f3_scans_request_id.sql` | `scans.request_id uuid` + partial unique index. **NOT APPLIED.** |
-| `workers/scan-report/wrangler.toml` | `REPORT_REQUEST_ID_ENABLED = "false"` (rollback value; flip only after the migration). |
+| `workers/scan-report/wrangler.toml` | `REPORT_REQUEST_ID_ENABLED`: `"false"` when merged, `"true"` after the migration was applied (2026-10-27). |
 
 Not touched: scan detection, `mpt-leads`, `/scan` page behaviour, report generation, unsubscribe and follow-up cancellation.
 
