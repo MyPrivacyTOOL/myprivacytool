@@ -55,6 +55,7 @@ const SecurityPanel = lazy(() => import('./SecurityPanel'));
 const BehaviorPanel = lazy(() => import('./BehaviorPanel'));
 const DNSLeakFixGuide = lazy(() => import('./DNSLeakFixGuide'));
 const FinalSummaryPanel = lazy(() => import('./FinalSummaryPanel'));
+const TilesCompleteDialog = lazy(() => import('./TilesCompleteDialog'));
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
@@ -961,6 +962,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <BehaviorPanel onClose={() => setShowBehaviorPanel(false)} />
           </Suspense>
         </div>
+      )}
+
+      {/* MPC-7471-F1 follow-up: with the honest tiles on the summary panel is not shown, but the visitor still gets the one scan-complete dialog (counts only). */}
+      {v2 && showFinalSummary && (
+        <Suspense fallback={null}>
+          <TilesCompleteDialog tiles={tiles} />
+        </Suspense>
       )}
 
       {/* Final Summary Panel - shown after all hexagons confirmed */}

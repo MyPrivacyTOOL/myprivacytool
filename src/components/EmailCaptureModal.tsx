@@ -27,6 +27,8 @@ interface EmailCaptureModalProps {
   confirmedCount: number;
   /** MPC-7471-F2: when given, the popup states confirmed / checked / total in the same words as the summary. */
   counts?: ScanCounts;
+  /** MPC-7916 honest tiles: when given, the result block shows these counts and NO score, percentage, "N of M" or Low/Medium/High, and no confetti. */
+  profileParts?: { key: string; text: string }[];
   onClose: () => void;
   onSubmit: (email: string) => void;
 }
@@ -46,6 +48,7 @@ export default function EmailCaptureModal({
   coveragePercent,
   confirmedCount,
   counts,
+  profileParts,
   onClose,
   onSubmit,
 }: EmailCaptureModalProps) {
@@ -89,6 +92,7 @@ export default function EmailCaptureModal({
   // MPC-7471-F1: confetti fires once when this dialog opens, briefly, behind the dialog layer so it cannot cover text or controls.
   // Not at all for visitors who ask for reduced motion; the message is the same either way.
   useEffect(() => {
+    if (profileParts) return;   // counts-only (honest tiles) mode: finishing the taps is not a result, so no celebration effect
     if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     confetti({
       particleCount: 70,
@@ -192,18 +196,31 @@ export default function EmailCaptureModal({
             </div>
           </div>
 
-          {/* Risk summary pill */}
-          <div className={`flex items-center gap-3 p-3 rounded-lg border ${riskBg}`} data-testid="scan-complete-result">
-            <AlertTriangle className={`w-5 h-5 ${riskColor} shrink-0`} aria-hidden="true" />
-            <div className="text-sm">
-              <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
-              <span className="text-muted-foreground"> — {riskScore === null ? 'no score yet' : `${riskScore}/100 exposure score`} · {coveragePct}% coverage</span>
-              {counts && <p className="mt-1 text-muted-foreground" data-testid="scan-counts-line">{scanCountsLine(counts)}</p>}
+          {profileParts ? (
+            /* MPC-7916 / MPC-7471-F1 follow-up: counts only. No score, percentage, "N of M" or Low/Medium/High. */
+            <div className="p-3 rounded-lg border bg-muted border-border" data-testid="scan-complete-result">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Your risk profile</p>
+              <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-mono text-foreground">
+                {profileParts.map((p) => (<span key={p.key} data-testid={`scan-complete-profile-${p.key}`}>{p.text}</span>))}
+              </p>
             </div>
-          </div>
-          <p className="-mt-2 text-xs text-muted-foreground">
-            <a href="/how-we-calculate-your-score" target="_blank" rel="noopener" className="underline" data-testid="score-method-link">How we calculate your score</a>
-          </p>
+          ) : (
+            <>
+              {/* Risk summary pill */}
+              <div className={`flex items-center gap-3 p-3 rounded-lg border ${riskBg}`} data-testid="scan-complete-result">
+                <AlertTriangle className={`w-5 h-5 ${riskColor} shrink-0`} aria-hidden="true" />
+                <div className="text-sm">
+                  <span className={`font-semibold ${riskColor}`}>{riskLabel}</span>
+                  <span className="text-muted-foreground"> — {riskScore === null ? 'no score yet' : `${riskScore}/100 exposure score`} · {coveragePct}% coverage</span>
+                  {counts && <p className="mt-1 text-muted-foreground" data-testid="scan-counts-line">{scanCountsLine(counts)}</p>}
+                </div>
+              </div>
+              <p className="-mt-2 text-xs text-muted-foreground">
+                <a href="/how-we-calculate-your-score" target="_blank" rel="noopener" className="underline" data-testid="score-method-link">How we calculate your score</a>
+              </p>
+
+            </>
+          )}
 
           <div>
             <h3 className="text-base font-semibold text-foreground leading-tight">Get your privacy report</h3>
