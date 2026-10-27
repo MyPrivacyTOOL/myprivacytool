@@ -129,6 +129,13 @@ describe("Privacy: Telegram bot (draft wording, unreviewed)", () => {
     expect(text).toContain("the public details of your profile that Telegram makes available to bots");
     expect(text).toContain("We keep it for up to 90 days, then it is deleted automatically.");
     expect(text).toContain("delete everything linked to your Telegram id at any time by writing to privacy@myprivacytool.io");
+    expect(text).toContain("send STOP, or tap");
+    expect(text).toContain("Delete my scan data");
+    expect(text).toContain("wipe your footprints and keep your footsteps clean");
+    expect(text).toContain("each hexagon is a footprint");
+    expect(text).toContain("each scan is a footstep");
+    expect(text).toContain("part of your shadow and not all of it");
+    expect(text).toContain("we never change them for you");
     expect(text).not.toContain("{contact}");
   });
 });
