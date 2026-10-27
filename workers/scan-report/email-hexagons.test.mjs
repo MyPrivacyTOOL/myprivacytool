@@ -56,7 +56,7 @@ check(seen.length === 3 && seen.every((u) => u.startsWith('https://cloudflare-dn
 // ---- 4. public profile
 const grav = (a, p) => async (url) => (String(url).includes('/avatar/') ? res(a) : res(p));
 r = await checkPublicProfile('testingnt69+a@gmail.com', grav(200, 404));
-check(r.status === 'found' && /avatar/.test(r.value), 'profile: avatar present => found');
+check(r.status === 'found' && /profile picture|Gravatar profile/.test(r.value), 'profile: picture present => found');
 r = await checkPublicProfile('testingnt69+a@gmail.com', grav(404, 200));
 check(r.status === 'found' && /profile/.test(r.value), 'profile: profile present => found');
 r = await checkPublicProfile('testingnt69+a@gmail.com', grav(404, 404));
@@ -121,7 +121,7 @@ check(rows.length === 5 && rows.every((x) => x.category === 'email' && ['found',
   const spy = (status, body) => async (u, o) => { seen.push(String(u)); heads.push(o?.headers || {}); return res(status, body); };
   const hit = { total_count: 3, incomplete_results: false, items: [{ repository: { full_name: 'jane-example/dotfiles' } }] };
   let x = await checkGithubCommits('Jane.Smith+tag@Example.com', spy(200, hit));
-  check(x.status === 'found' && /at least 3 public commits/.test(x.value) && /jane-example\/dotfiles/.test(x.value), 'github: results => found, with a count and one repository');
+  check(x.status === 'found' && /at least 3 public code changes/.test(x.value) && /jane-example\/dotfiles/.test(x.value), 'github: results => found, with a count and one repository');
   check(seen[0].startsWith('https://api.github.com/search/commits?q=author-email%3A') && decodeURIComponent(seen[0]).includes('author-email:jane.smith+tag@example.com') && seen.length === 1, 'github: exactly one search, with the lower-cased plain address (the disclosed exception)');
   check(!('authorization' in heads[0]), 'github: no token => no Authorization header');
   await checkGithubCommits('a@example.com', spy(200, hit), { token: 'tok123' });
