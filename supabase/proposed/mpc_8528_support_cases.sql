@@ -8,8 +8,8 @@
 --
 -- Access: RLS forced, no anon/authenticated grants, service_role only. Raw message text is restricted personal data.
 -- Retention/deletion periods are NOT set here: they need an approved decision (MPC-8530 / privacy notice).
--- Rollback: drop function if exists public.support_create_case_from_event, public.support_append_inbound;
---           drop table if exists support_inbound_events, support_usage, support_action_receipts, support_messages, support_cases cascade;
+-- Rollback: drop function if exists public.support_create_case_from_event, public.support_append_inbound, public.support_issue_proof, public.support_redeem_proof, public.support_purge_expired;
+--           drop table if exists support_proofs, support_inbound_events, support_usage, support_action_receipts, support_messages, support_cases cascade;
 
 create table if not exists public.support_cases (
   id               uuid primary key default gen_random_uuid(),
@@ -133,3 +133,68 @@ end $$;
 
 revoke all on function public.support_create_case_from_event(text,text,text,text,text,text,text), public.support_append_inbound(uuid,text,text) from public, anon, authenticated;
 grant execute on function public.support_create_case_from_event(text,text,text,text,text,text,text), public.support_append_inbound(uuid,text,text) to service_role;
+
+-- ---------------------------------------------------------------- identity proofs (emailed one-time proof)
+-- A proof is a random token emailed to the address on the account. Only its SHA-256 hash is stored. It is single-use and short-lived.
+-- Redeeming it is the ONLY way a caller becomes `verified`; a chat "yes", a platform sender id or a password never does.
+create table if not exists public.support_proofs (
+  id          uuid primary key default gen_random_uuid(),
+  token_hash  text not null unique check (token_hash ~ '^[0-9a-f]{64}$'),
+  subject_id  text not null check (char_length(subject_id) between 1 and 128),
+  tenant_id   text not null check (char_length(tenant_id) between 1 and 128),
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null,
+  consumed_at timestamptz,
+  check (expires_at > created_at)
+);
+create index if not exists support_proofs_expires_idx on public.support_proofs (expires_at);
+alter table public.support_proofs enable row level security; alter table public.support_proofs force row level security;
+revoke all on public.support_proofs from anon, authenticated;
+grant select, insert, update, delete on public.support_proofs to service_role;
+comment on table public.support_proofs is 'MPC-8528 proposed. Hashed single-use identity proofs. Never stores the token itself.';
+
+create or replace function public.support_issue_proof(p_token_hash text, p_subject text, p_tenant text, p_ttl_seconds integer)
+returns uuid language plpgsql set search_path = public as $$
+declare v_id uuid;
+begin
+  if p_ttl_seconds is null or p_ttl_seconds < 60 or p_ttl_seconds > 3600 then raise exception 'proof ttl must be 60..3600 seconds'; end if;
+  insert into public.support_proofs (token_hash, subject_id, tenant_id, expires_at)
+  values (p_token_hash, p_subject, p_tenant, now() + make_interval(secs => p_ttl_seconds)) returning id into v_id;
+  return v_id;
+end $$;
+
+-- Atomic single-use redeem. Returns {subject_id, tenant_id} once, then null for every later attempt, an expired proof, or an unknown one.
+create or replace function public.support_redeem_proof(p_token_hash text)
+returns jsonb language plpgsql set search_path = public as $$
+declare v record;
+begin
+  update public.support_proofs set consumed_at = now()
+   where token_hash = p_token_hash and consumed_at is null and expires_at > now()
+   returning subject_id, tenant_id into v;
+  if not found then return null; end if;
+  return jsonb_build_object('subject_id', v.subject_id, 'tenant_id', v.tenant_id);
+end $$;
+
+-- ---------------------------------------------------------------- retention (proposed periods: raw message text 90 days, case 6 months)
+-- NOT scheduled and NOT applied. The periods come from the task owner's recommended answer and still need legal sign-off and the
+-- privacy-notice wording. A case is purged by inactivity (updated_at) in any state: an unresolved case does not keep personal data forever.
+create or replace function public.support_purge_expired()
+returns jsonb language plpgsql set search_path = public as $$
+declare v_text integer; v_cases integer; v_proofs integer; v_usage integer;
+begin
+  update public.support_messages set body = '[removed after the 90-day retention period]'
+   where created_at < now() - interval '90 days' and body <> '[removed after the 90-day retention period]';
+  get diagnostics v_text = row_count;
+  delete from public.support_cases where updated_at < now() - interval '6 months';
+  get diagnostics v_cases = row_count;
+  delete from public.support_proofs where expires_at < now() - interval '1 day';
+  get diagnostics v_proofs = row_count;
+  delete from public.support_usage where at < now() - interval '7 days';
+  get diagnostics v_usage = row_count;
+  return jsonb_build_object('message_text_removed', v_text, 'cases_deleted', v_cases, 'proofs_deleted', v_proofs, 'usage_deleted', v_usage);
+end $$;
+-- Schedule (when approved), same pattern as the other purge jobs; left commented on purpose:
+--   select cron.schedule('support-purge-expired', '17 3 * * *', $$select public.support_purge_expired()$$);
+
+revoke all on function public.support_issue_proof(text,text,text,integer), public.support_redeem_proof(text), public.support_purge_expired() from public, anon, authenticated;
+grant execute on function public.support_issue_proof(text,text,text,integer), public.support_redeem_proof(text), public.support_purge_expired() to service_role;
