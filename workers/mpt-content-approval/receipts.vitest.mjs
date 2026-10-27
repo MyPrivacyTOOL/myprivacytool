@@ -3,7 +3,7 @@
 // in-memory fake. No test here can reach a live account: every fetch goes through the stubbed global.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import worker, { process as processApproval, recover } from './worker.js';
-import { watchdogReport, expectedCycleIds, hmacHex, handleReceipt, backoffSeconds, parseRetryAfter, classifyCycle, missingCycles, rowsFor, MAX_ATTEMPTS } from './receipts.js';
+import { watchdogReport, expectedCycleIds, hmacHex, handleReceipt, logRejectedReceipt, backoffSeconds, parseRetryAfter, classifyCycle, missingCycles, rowsFor, MAX_ATTEMPTS } from './receipts.js';
 import { PLATFORMS } from './schema.js';
 
 const TASK = 'daily-posts-2026-10-21';
@@ -396,5 +396,34 @@ describe('x-receipt-token authentication (what Make sends)', () => {
   it('the HMAC path still works', async () => {
     const db = fakeD1(); seedDrafts(db); await approve(db);
     expect((await submit(db, receipt('facebook'))).state).toBe('verified_published');
+  });
+});
+
+describe('rejected receipts are logged with a reason (never silent)', () => {
+  const rejected = (db) => db.tables.agent_execution_logs.filter((r) => r[3] === 'receipt_rejected');
+  it('logs a refused receipt under its cycle id, with status, reason and the body, but never the secret', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const body = JSON.stringify(receipt('linkedin', { make_run_id: '' }));
+    const out = await handleReceipt(env(db), body, new Headers({ 'x-receipt-token': SECRET }), NOW);
+    expect(out.status).toBe(400);
+    await logRejectedReceipt(env(db), out, body, NOW);
+    expect(rejected(db)).toHaveLength(1);
+    const [, , task, status, msg] = rejected(db)[0];
+    expect(task).toBe(TASK); expect(status).toBe('receipt_rejected');
+    expect(msg).toContain('HTTP 400'); expect(msg).toContain('needs make_run_id'); expect(msg).toContain('"make_run_id":""'); expect(msg).not.toContain(SECRET);
+  });
+  it('does not log successes, duplicates or 401s, and handles a non-JSON body', async () => {
+    const db = fakeD1();
+    await logRejectedReceipt(env(db), { status: 200, message: 'verified' }, '{}', NOW);
+    await logRejectedReceipt(env(db), { status: 401, message: 'bad token' }, '{}', NOW);
+    expect(rejected(db)).toHaveLength(0);
+    await logRejectedReceipt(env(db), { status: 400, message: 'bad json' }, 'not json', NOW);
+    expect(rejected(db)[0][2]).toBe('receipt-rejected');
+  });
+  it('POST /receipt records a rejection end to end', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const res = await worker.fetch(new Request('https://x/receipt', { method: 'POST', headers: { 'x-receipt-token': SECRET }, body: JSON.stringify(receipt('linkedin', { post_id: 5 })) }), env(db), {});
+    expect(res.status).toBe(400);
+    expect(rejected(db)).toHaveLength(1);
   });
 });

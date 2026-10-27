@@ -83,7 +83,12 @@ function parse(raw: string | null): RecheckRecord | null {
   if (!raw) return null;
   try {
     const r = JSON.parse(raw) as Partial<RecheckRecord> | null;
-    if (!r || r.v !== 1 || r.hexagonId !== HEXAGON_ID || !r.baseline || typeof r.expiresAt !== 'string' || !Array.isArray(r.rechecks)) return null;
+    if (!r || r.v !== 1 || r.hexagonId !== HEXAGON_ID || typeof r.expiresAt !== 'string' || !Array.isArray(r.rechecks)) return null;
+    // Every field later code reads must have the right shape, so a foreign or half-written value is rejected here, not read into.
+    const b = r.baseline as Partial<Observation> | undefined;
+    if (!b || typeof b.state !== 'string' || typeof b.detectorVersion !== 'string' || typeof b.browser !== 'string' || typeof b.observedAt !== 'string') return null;
+    if (!r.consent || typeof r.consent.at !== 'string') return null;
+    if (!r.rechecks.every((e) => e && e.observation && e.comparison && typeof e.at === 'string')) return null;
     return r as RecheckRecord;
   } catch { return null; }
 }
@@ -101,9 +106,10 @@ export function load(d: Deps = {}): RecheckRecord | null {
   try { raw = s.getItem(RECHECK_KEY); } catch { return null; }
   if (raw === null) return null;
   const rec = parse(raw);
+  if (!rec) { purge(d); return null; }   // damaged or not ours: delete it, never read into it
   // A record written under an earlier analytics choice is not revived by a later one: the choice it was written under must still be the current one.
   const sameChoice = d.consent !== undefined || getChoice()?.at === rec.consent.at;
-  if (!rec || !consented(d) || !sameChoice || Date.parse(rec.expiresAt) <= nowOf(d).getTime()) { purge(d); return null; }
+  if (!consented(d) || !sameChoice || Date.parse(rec.expiresAt) <= nowOf(d).getTime()) { purge(d); return null; }
   return rec;
 }
 

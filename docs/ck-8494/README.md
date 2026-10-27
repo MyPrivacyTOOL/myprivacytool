@@ -43,7 +43,7 @@ Reused, not rebuilt (note: there is no server ledger, but a small browser-side r
 - `none_found` means the gathering finished with at least one candidate and none was public. If the network blocks the STUN lookup, a leak could be missed; the copy does not claim protection.
 - Turning WebRTC off entirely usually gives `unsupported` or `blocked`, which is reported as inconclusive, not as improvement. This is deliberately conservative.
 - The tile itself is unchanged: the registry still treats "No Leak Detected" as not checked, so after an improvement the tile stays grey and only the panel carries the claim. Changing the registry's status rules is a separate approval.
-- The page never changes the visitor's account or settings. The visitor does the step; the copy says "you made the change".
+- The page never changes the visitor's account or settings. The visitor does the step; the copy says "You told us you made a change", never that a change was made.
 
 ## Tests (actual results, 2026-10-26, local container)
 - `vitest run src/lib/recheck src/components/hexagon/RecheckPanel.test.tsx`: 34 passed (22 + 12).
@@ -82,3 +82,6 @@ Status: PENDING real-people review under MPC-7725 and owner approval.
 - Any server-side outcome event, migration, flag activation, merge-to-deploy and the first live end-to-end run.
 - Independent reviewer acceptance of the artifact-to-acceptance mapping: PENDING, not self-certified.
 - Registry status change so the tile itself can show "clear" after a verified none_found (separate decision).
+
+## Follow-up fix 2 (independent re-review of #599)
+`load()` evaluated the saved record's consent date before checking the record existed, so damaged or foreign saved state threw under the real consent gate and would crash the panel (only reachable with the flag on). Fixed: a record that does not parse is deleted first; a test now uses the real gate (no injected consent) with six damaged or foreign shapes. Status of the other review points: the Later / closed-prompt response is still deliberately not stored (owner sign-off or a separate field is needed); a human reviewer is still required.
