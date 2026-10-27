@@ -159,6 +159,14 @@ describe('slackBlocks', () => {
     ]);
     expect(blocks.length).toBeLessThanOrEqual(50);
   });
+  it('adds a destination line with a link under each draft', () => {
+    const ctx = blocks.filter((b) => b.type === 'context').map((b) => b.elements[0].text);
+    expect(ctx).toHaveLength(6);
+    expect(ctx[0]).toBe('Not connected: copy and post by hand · <https://x.com/compose/post|Open X>');
+    expect(ctx[1]).toContain('Posts automatically on Approve All · <https://www.linkedin.com/company/88918654/|LinkedIn page>');
+    expect(ctx[5]).toContain('days 3, 6, 9 … 30');
+    expect(ctx[5]).toContain('<https://studio.youtube.com|YouTube Studio>');
+  });
   it('shows titles and clips very long copy', () => {
     const long = slackBlocks(TASK, 'T', [{ platform: 'youtube', title: 'Vid', copy: 'z'.repeat(5000) }]);
     const body = long.find((b) => b.text?.text.startsWith('*YouTube*')).text.text;
