@@ -40,6 +40,7 @@ import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
 import GuessCheckCard from './hexagon/GuessCheckCard';
 import { fixStepFor } from '@/lib/hexagonFix';
 import NextStepCard from './hexagon/NextStepCard';
+import RecheckPanel from './hexagon/RecheckPanel';
 import DetailLadder, { type DetailLevel } from './hexagon/DetailLadder';
 import HexagonHelp from './hexagon/HexagonHelp';
 import { captureContext, forgetPendingHexagon } from '@/lib/webScan';
@@ -854,6 +855,12 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
               </button>
             </div>
           )}
+
+          <RecheckPanel
+            observation={allHexagons.find((h) => h.id === 'webrtc-leak')?.observation}
+            explained={currentStep?.id === 'webrtc-leak'}
+            told={toldFixed.has('webrtc-leak')}
+          />
 
           {currentStep ? (
             <NextStepCard
