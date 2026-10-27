@@ -79,6 +79,10 @@ psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
+# MPC-8673: the PROPOSED Flip Point schema (supabase/proposed/20261028100000_mpc_8673_flip_point_consents.sql, applied by the proposed loop above).
+echo "== proposed schema: Flip Point consents (MPC-8673)"
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8673-flip-point.test.sql
+
 # MPC-7471-F4: the PROPOSED baseline score_version migration (supabase/proposed/, not in supabase/migrations/) on rows saved the old way, then its own rollback.
 echo "== proposed migration: baseline score_version (MPC-7471-F4)"
 PROPOSED=supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql
