@@ -8,7 +8,7 @@
 //                  A Make 2xx is HANDED OFF only. POST /receipt (HMAC-signed) is the only path to verified_published. GET /status reports stages.
 
 import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
-import { recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
+import { expectedCycleIds, watchdogReport, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
@@ -328,6 +328,19 @@ export default {
       if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
       const out = await handleReceipt(env, await request.text(), request.headers);
       return Response.json({ ok: out.status < 400, message: out.message, state: out.state }, { status: out.status });
+    }
+    if (pathname === '/watchdog' || pathname === '/recover') {
+      const auth = request.headers.get('authorization') ?? '';
+      if (!env.APPROVAL_API_TOKEN || !safeEqualReceipt(auth, `Bearer ${env.APPROVAL_API_TOKEN}`)) return new Response('Unauthorized', { status: 401 });
+      if (pathname === '/recover') {
+        if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
+        return Response.json({ ok: true, ...(await recover(env)) });
+      }
+      const days = Math.min(14, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 3));
+      const ids = expectedCycleIds(new Date(), days);
+      const { results: logs } = await env.AGENT_LOGS.prepare("SELECT task_id, status FROM agent_execution_logs WHERE task_id LIKE 'daily-posts-%' AND status IN ('drafted','approved','rejected','failed','handed_off','published')").bind().all();
+      const { results: receipts } = await env.AGENT_LOGS.prepare('SELECT * FROM publication_receipts WHERE content_id >= ?').bind(ids[ids.length - 1]).all();
+      return Response.json(watchdogReport({ ids, logs: logs ?? [], receipts: receipts ?? [] }));
     }
     if (pathname === '/status') {
       const auth = request.headers.get('authorization') ?? '';
