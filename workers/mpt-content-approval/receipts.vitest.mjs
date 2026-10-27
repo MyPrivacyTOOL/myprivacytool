@@ -3,7 +3,7 @@
 // in-memory fake. No test here can reach a live account: every fetch goes through the stubbed global.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import worker, { process as processApproval, recover } from './worker.js';
-import { hmacHex, handleReceipt, backoffSeconds, parseRetryAfter, classifyCycle, missingCycles, rowsFor, MAX_ATTEMPTS } from './receipts.js';
+import { watchdogReport, expectedCycleIds, hmacHex, handleReceipt, logRejectedReceipt, backoffSeconds, parseRetryAfter, classifyCycle, missingCycles, rowsFor, MAX_ATTEMPTS } from './receipts.js';
 import { PLATFORMS } from './schema.js';
 
 const TASK = 'daily-posts-2026-10-21';
@@ -44,6 +44,8 @@ function fakeD1() {
         return {};
       },
       all: async () => {
+        if (sql.startsWith('SELECT task_id, status')) return { results: t.agent_execution_logs.map((r) => ({ task_id: r[2], status: r[3] })) };
+        if (sql.startsWith('SELECT * FROM publication_receipts WHERE content_id >=')) return { results: t.publication_receipts.filter((r) => r.content_id >= a[0]).map((r) => ({ ...r })) };
         if (sql.startsWith('SELECT * FROM publication_receipts')) return { results: t.publication_receipts.filter((r) => r.content_id === a[0]).map((r) => ({ ...r })) };
         if (sql.startsWith('SELECT receipt_id')) return { results: t.receipt_callbacks.filter((r) => r[0] === a[0]).map((r) => ({ receipt_id: r[0] })) };
         const [task, status] = a;
@@ -109,6 +111,7 @@ describe('B: a Make HTTP 200 is a hand-off, never a publication', () => {
     expect((await submit(db, receipt('x', { post_url: 'https://evil.example.com/status/1' }))).message).toMatch(/does not belong/);
     expect((await submit(db, receipt('x', { post_url: 'http://x.com/a' }))).status).toBe(400);
     expect((await submit(db, receipt('x', { post_id: '' }))).status).toBe(400);
+    expect((await submit(db, receipt('x', { post_url: 'not a url' }))).status).toBe(400); // a present URL must be valid
     expect((await submit(db, receipt('nope'))).status).toBe(400);
     expect(states(db).x).toBe('handed_off');
   });
@@ -262,5 +265,186 @@ describe('D: stage reporting separates approval-wait from failure', () => {
     expect(body.platforms).toHaveLength(6);
     expect(body.stages.handed_off).toBe(6);
     expect(JSON.stringify(body)).not.toMatch(/tok|hook\.eu1/); // no secret material in status output
+  });
+});
+
+describe('D: watchdog report and authenticated triggers', () => {
+  const NOW_D = new Date('2026-10-27T03:00:00Z'); // 11:00 HKT on 2026-10-27
+  const log = (id, status) => ({ task_id: id, status });
+  it('expectedCycleIds lists HKT dates newest first', () => {
+    expect(expectedCycleIds(NOW_D, 3)).toEqual(['daily-posts-2026-10-27', 'daily-posts-2026-10-26', 'daily-posts-2026-10-25']);
+  });
+  it('awaiting approval is reported but healthy; a cycle past its generation window with no drafts is a missing_cycle', () => {
+    const ids = expectedCycleIds(NOW_D, 2);
+    const ok = watchdogReport({ ids, logs: [log(ids[0], 'drafted'), log(ids[0], 'notified'), log(ids[1], 'drafted'), log(ids[1], 'approved'), log(ids[1], 'handed_off')], receipts: [], now: NOW_D });
+    expect(ok.healthy).toBe(true);
+    expect(ok.awaiting_approval).toEqual([ids[0]]);
+    expect(ok.cycles.map((c) => c.stage)).toEqual(['awaiting_approval', 'handed_off']);
+    const missing = watchdogReport({ ids, logs: [log(ids[1], 'drafted')], receipts: [], now: NOW_D });
+    expect(missing.problems).toEqual([{ id: ids[0], kind: 'missing_cycle' }]);
+    // before today's producer window plus grace has passed it is NOT yet missing
+    expect(watchdogReport({ ids: [ids[0]], logs: [], receipts: [], now: new Date('2026-10-26T22:30:00Z') }).healthy).toBe(true);
+  });
+  it('flags generation failure, approved-but-never-sent, overdue receipts, unknown outcomes and dead letters', () => {
+    const [a, b, c] = ['daily-posts-2026-10-27', 'daily-posts-2026-10-26', 'daily-posts-2026-10-25'];
+    const r = watchdogReport({
+      ids: [a, b, c],
+      logs: [log(a, 'drafted'), log(a, 'failed'), log(b, 'drafted'), log(b, 'approved'), log(c, 'drafted'), log(c, 'approved'), log(c, 'handed_off')],
+      receipts: [
+        { content_id: c, platform: 'x', state: 'handed_off', handed_off_at: new Date(NOW_D - 8 * 3600e3).toISOString() },
+        { content_id: c, platform: 'linkedin', state: 'approved', outcome_unknown: 1 },
+        { content_id: c, platform: 'facebook', state: 'failed', dead_letter: 1 },
+      ],
+      now: NOW_D,
+    });
+    expect(r.healthy).toBe(false);
+    const kinds = r.problems.map((p) => `${p.id.slice(-2)}:${p.kind}`).sort();
+    expect(kinds).toEqual(['25:exhausted_recovery', '25:overdue_receipt', '25:unknown_outcome', '26:approved_not_sent', '27:generation_failed']);
+  });
+  it('a fully verified cycle is stage verified', () => {
+    const id = 'daily-posts-2026-10-26';
+    const r = watchdogReport({ ids: [id], logs: [log(id, 'drafted'), log(id, 'approved'), log(id, 'handed_off')], receipts: PLATFORMS.map((platform) => ({ content_id: id, platform, state: 'verified_published' })), now: NOW_D });
+    expect(r.cycles[0].stage).toBe('verified');
+    expect(r.healthy).toBe(true);
+  });
+  it('GET /watchdog and POST /recover require the bearer token; /recover is POST-only and sends nothing when nothing is due', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    expect((await worker.fetch(new Request('https://w/watchdog'), env(db), {})).status).toBe(401);
+    expect((await worker.fetch(new Request('https://w/recover', { method: 'POST' }), env(db), {})).status).toBe(401);
+    const h = { authorization: 'Bearer tok' };
+    expect((await worker.fetch(new Request('https://w/recover', { headers: h }), env(db), {})).status).toBe(405);
+    const rec = await (await worker.fetch(new Request('https://w/recover', { method: 'POST', headers: h }), env(db), {})).json();
+    expect(rec).toMatchObject({ ok: true, resent: [], deadLettered: [] });
+    expect(makeCalls()).toHaveLength(0);
+    const rep = await (await worker.fetch(new Request('https://w/watchdog?days=2', { headers: h }), env(db), {})).json();
+    expect(rep).toHaveProperty('healthy');
+    expect(rep.cycles).toHaveLength(2);
+    expect(JSON.stringify(rep)).not.toMatch(/tok|hook\.eu1/);
+  });
+});
+
+describe('routed platforms: only platforms Make can publish are sent, verified or monitored', () => {
+  const routedEnv = (db) => env(db, { ROUTED_PLATFORMS: 'linkedin,facebook' });
+  const go = (db) => processApproval(routedEnv(db), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
+  it('sends only routed platforms and records the rest as not_routed (never handed off)', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    expect((await go(db)).status).toBe(200);
+    expect(sentPlatforms(0)).toEqual(['linkedin', 'facebook']);
+    expect(states(db)).toEqual({ x: 'not_routed', linkedin: 'handed_off', instagram: 'not_routed', facebook: 'handed_off', pinterest: 'not_routed', youtube: 'not_routed' });
+  });
+  it('a receipt for a not_routed platform is refused; routed receipts verify and the cycle reads verified and healthy', async () => {
+    const db = fakeD1(); seedDrafts(db); await go(db);
+    expect((await submit(db, receipt('x'))).status).toBe(404);
+    await submit(db, receipt('linkedin')); await submit(db, receipt('facebook'));
+    const rows = await rowsFor(db, TASK);
+    const rep = watchdogReport({ ids: [TASK], logs: db.tables.agent_execution_logs.map((r) => ({ task_id: r[2], status: r[3] })), receipts: rows, now: new Date(NOW) });
+    expect(rep.cycles[0].stage).toBe('verified');
+    expect(rep.healthy).toBe(true);
+    expect(classifyCycle(rows).stages.not_routed).toBe(4);
+  });
+  it('recovery and duplicate approvals never send a not_routed platform', async () => {
+    makeImpl = async () => new Response('down', { status: 503 });
+    const db = fakeD1(); seedDrafts(db);
+    await go(db);
+    makeImpl = async () => new Response('Accepted', { status: 200 });
+    const rep = await recover(routedEnv(db), { now: new Date(Date.now() + 2 * 3600e3) });
+    expect(rep.resent).toEqual([{ id: TASK, platforms: ['linkedin', 'facebook'] }]);
+    expect(sentPlatforms(makeCalls().length - 1)).toEqual(['linkedin', 'facebook']);
+  });
+  it('fails closed when ROUTED_PLATFORMS names nothing that was drafted', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    const out = await processApproval(env(db, { ROUTED_PLATFORMS: 'tiktok' }), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
+    expect(out.status).toBe(422);
+    expect(makeCalls()).toHaveLength(0);
+  });
+  it('unset ROUTED_PLATFORMS keeps the legacy behaviour (all six sent)', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect(sentPlatforms(0)).toHaveLength(6);
+  });
+});
+
+describe('post_url is optional but never invented', () => {
+  it('a receipt without post_url verifies the platform and stores null; the post id and run id are still required', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const { post_url, ...noUrl } = receipt('instagram');
+    expect(post_url).toBeTruthy();
+    expect(await submit(db, noUrl)).toMatchObject({ status: 200, state: 'verified_published' });
+    const row = (await rowsFor(db, TASK)).find((r) => r.platform === 'instagram');
+    expect(row).toMatchObject({ state: 'verified_published', post_id: 'p-instagram', post_url: null });
+    expect((await submit(db, { ...noUrl, receipt_id: 'r9', post_id: '' })).status).toBe(400);
+    expect((await submit(db, { ...receipt('facebook'), post_url: '' })).state).toBe('verified_published');
+  });
+  it('a URL that is present must still match the platform host', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await submit(db, receipt('linkedin', { post_url: 'https://www.facebook.com/x/1' }))).status).toBe(400);
+    expect(states(db).linkedin).toBe('handed_off');
+  });
+});
+
+describe('x-receipt-token authentication (what Make sends)', () => {
+  const tokenSubmit = async (db, body, token) => handleReceipt(env(db), JSON.stringify(body), new Headers(token === undefined ? {} : { 'x-receipt-token': token }), NOW);
+  it('accepts the shared secret as a token, rejects a wrong, empty or missing one, and still refuses unrelated platforms', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await tokenSubmit(db, receipt('linkedin'), 'wrong')).status).toBe(401);
+    expect((await tokenSubmit(db, receipt('linkedin'), '')).status).toBe(401);
+    expect((await tokenSubmit(db, receipt('linkedin'))).message).toBe('missing signature');
+    expect(states(db).linkedin).toBe('handed_off');
+    expect(await tokenSubmit(db, receipt('linkedin'), SECRET)).toMatchObject({ status: 200, state: 'verified_published' });
+    expect((await tokenSubmit(db, receipt('linkedin'), SECRET)).message).toBe('duplicate receipt ignored'); // replay is a no-op
+    expect((await tokenSubmit(db, receipt('x', { post_url: 'https://evil.example.com/1' }), SECRET)).status).toBe(400);
+  });
+  it('the HMAC path still works', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await submit(db, receipt('facebook'))).state).toBe('verified_published');
+  });
+});
+
+describe('rejected receipts are logged with a reason (never silent)', () => {
+  const rejected = (db) => db.tables.agent_execution_logs.filter((r) => r[3] === 'receipt_rejected');
+  it('logs a refused receipt under its cycle id, with status, reason and the body, but never the secret', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const body = JSON.stringify(receipt('linkedin', { make_run_id: '' }));
+    const out = await handleReceipt(env(db), body, new Headers({ 'x-receipt-token': SECRET }), NOW);
+    expect(out.status).toBe(400);
+    await logRejectedReceipt(env(db), out, body, NOW);
+    expect(rejected(db)).toHaveLength(1);
+    const [, , task, status, msg] = rejected(db)[0];
+    expect(task).toBe(TASK); expect(status).toBe('receipt_rejected');
+    expect(msg).toContain('HTTP 400'); expect(msg).toContain('needs make_run_id'); expect(msg).toContain('"make_run_id":""'); expect(msg).not.toContain(SECRET);
+  });
+  it('does not log successes or duplicates, and handles a non-JSON body', async () => {
+    const db = fakeD1();
+    await logRejectedReceipt(env(db), { status: 200, message: 'verified' }, '{}', NOW);
+    expect(rejected(db)).toHaveLength(0);
+    await logRejectedReceipt(env(db), { status: 400, message: 'bad json' }, 'not json', NOW);
+    expect(rejected(db)[0][2]).toBe('receipt-rejected');
+  });
+  it('POST /receipt records a rejection end to end', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const res = await worker.fetch(new Request('https://x/receipt', { method: 'POST', headers: { 'x-receipt-token': SECRET }, body: JSON.stringify(receipt('linkedin', { post_id: 5 })) }), env(db), {});
+    expect(res.status).toBe(400);
+    expect(rejected(db)).toHaveLength(1);
+  });
+});
+
+describe('401s are logged too, once per hour, without the secret', () => {
+  const rejected = (db) => db.tables.agent_execution_logs.filter((r) => r[3] === 'receipt_rejected');
+  it('records why a call was unauthorised (token present/absent and lengths) but never the token, capped at one row an hour', async () => {
+    const db = fakeD1();
+    const headers = new Headers({ 'x-receipt-token': 'x'.repeat(10) });
+    for (let i = 0; i < 3; i++) await logRejectedReceipt(env(db), { status: 401, message: 'bad token' }, '{}', NOW + i * 1000, headers);
+    expect(rejected(db)).toHaveLength(1);
+    const msg = rejected(db)[0][4];
+    expect(msg).toContain('HTTP 401: bad token'); expect(msg).toContain('token=present len=10'); expect(msg).toContain(`secret len=${SECRET.length}`);
+    expect(msg).not.toContain(SECRET); expect(msg).not.toContain('x'.repeat(10));
+    await logRejectedReceipt(env(db), { status: 401, message: 'missing signature' }, '{}', NOW + 2 * 3600e3, new Headers());
+    expect(rejected(db)).toHaveLength(2);
+    expect(rejected(db)[1][4]).toContain('token=absent');
+  });
+  it('POST /receipt with a wrong token logs a 401 row', async () => {
+    const db = fakeD1();
+    const res = await worker.fetch(new Request('https://x/receipt', { method: 'POST', headers: { 'x-receipt-token': 'wrong' }, body: '{}' }), env(db), {});
+    expect(res.status).toBe(401);
+    expect(rejected(db)).toHaveLength(1);
   });
 });

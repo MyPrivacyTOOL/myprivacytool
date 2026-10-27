@@ -19,7 +19,8 @@ const STUB_HOSTS = ['api.resend.com', 'api.hubapi.com', 'cloudflare-dns.com', 'g
 const realFetch = globalThis.fetch;
 const sandbox = (F) => { globalThis.fetch = async (u, o) => { const h = new URL(String(u)).host; if (!STUB_HOSTS.some((s) => h === s || h.endsWith(`.${s}`))) throw new Error(`NON-TEST HOST ${h}`); return F.f(u, o); }; };
 const A = 'lifecycle+a@example.com', B = 'lifecycle+b@example.com';
-const env = { SUPABASE_URL: `https://${TEST_DB_HOST}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key', RESEND_API_KEY: 'test-resend', HIBP_API_KEY: 'test-hibp', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 'test-secret', RECIPIENT_ALLOWLIST: `${A},${B}` };
+// MPC-8453: this suite is about the scan lifecycle and its fake DNS answers "no records" for every domain, so the deliverable-domain check is off here.
+const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_URL: `https://${TEST_DB_HOST}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key', RESEND_API_KEY: 'test-resend', HIBP_API_KEY: 'test-hibp', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 'test-secret', RECIPIENT_ALLOWLIST: `${A},${B}` };
 {
   sandbox(fake());
   let blocked = ''; try { await fetch('https://xmdmkumwxpgahmlweuug.supabase.co/rest/v1/scans'); } catch (e) { blocked = String(e); }
@@ -100,6 +101,16 @@ class Killed extends Error { constructor() { super('worker killed'); } }
   check(F.db.scans.length === 1 && keysOf(F, 'confirm-').length === 1, 'duplicate: three simultaneous requests for one address create ONE scan and send ONE confirmation');
   await run(F);
   check(keysOf(F, 'report-').length === 1, 'duplicate: and one report');
+  // With MPC-7471-F3's request_id on: simultaneous copies of ONE request collapse into the original outcome, and simultaneous DIFFERENT requests still make one scan.
+  const kenv = { ...env, REPORT_REQUEST_ID_ENABLED: 'true' };
+  const RID1 = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f', RID2 = '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d', RID3 = '1b2c3d4e-5f60-4718-8293-a4b5c6d7e8f9';
+  const keyedReq = (F, rid) => post(F, { email: A, consent: true, consent_source: 'scan_page', request_id: rid }, kenv);
+  const K = harness({ onRequest: barrier(3, (url) => /rpc\/mpt_request_scan/.test(url)) });
+  const [r1, r2, r3] = await Promise.all([keyedReq(K, RID1), keyedReq(K, RID1), keyedReq(K, RID1)]);
+  check(K.db.scans.length === 1 && keysOf(K, 'confirm-').length === 1 && [r1, r2, r3].filter((r) => r.j.duplicate === false).length === 1 && [r1, r2, r3].filter((r) => r.j.replay === true).length === 2, 'duplicate: three simultaneous copies of ONE request (same request_id) make one scan; the other two get the original outcome as a replay');
+  const L = harness({ onRequest: barrier(3, (url) => /rpc\/mpt_request_scan/.test(url)) });
+  const out = await Promise.all([keyedReq(L, RID1), keyedReq(L, RID2), keyedReq(L, RID3)]);
+  check(L.db.scans.length === 1 && keysOf(L, 'confirm-').length === 1 && out.filter((r) => r.j.duplicate === false).length === 1 && out.every((r) => !('replay' in r.j) || r.j.replay === false || r.j.duplicate === false), 'duplicate: three simultaneous requests with three DIFFERENT request ids make one scan, and nobody else gets the winner\'s outcome as a replay');
   // Rollout window: while the migration is not applied (function missing, 404) the Worker falls back to check-then-insert. Everything still works; only the old race remains.
   const G = harness({ noDedupeRpc: true });
   await request(G); await run(G);

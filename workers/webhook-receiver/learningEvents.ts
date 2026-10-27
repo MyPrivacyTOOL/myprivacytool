@@ -75,8 +75,10 @@ export async function handleLearningEvent(request: Request, env: Env): Promise<R
   // Browser-origin only: a request with no Origin (a script) is refused, unlike the generic gate which lets it through.
   if (!cors.allowed || !request.headers.get('Origin')) return new Response(JSON.stringify({ error: 'Forbidden origin' }), { status: 403, headers });
   if (await limited(env, request)) return new Response(JSON.stringify({ error: 'rate_limited' }), { status: 429, headers: { ...headers, 'Retry-After': '60' } });
+  const declared = Number(request.headers.get('Content-Length'));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers });
   const text = await request.text();
-  if (text.length > MAX_BODY_BYTES) return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers });
+  if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return new Response(JSON.stringify({ error: 'too_large' }), { status: 413, headers });
   let body: unknown = null;
   try { body = JSON.parse(text); } catch { /* falls through to bad_request */ }
   const row = validateLearningEvent(body);

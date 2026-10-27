@@ -29,9 +29,10 @@ export function fake(opts = {}) {
       if (opts.noDedupeRpc) return res(404, { code: 'PGRST202', message: 'Could not find the function public.mpt_request_scan' });   // migration not applied yet
       const a = JSON.parse(o.body); const since = Date.now() - 24 * 3600 * 1000;
       const hit = db.scans.filter((x) => x.user_id === a.p_user_id && Date.parse(x.created_at) >= since).sort((x, y) => String(x.created_at).localeCompare(y.created_at) || String(x.id).localeCompare(y.id))[0];
-      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true }]);
-      const row = { id: crypto.randomUUID(), report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: 'web_scan' }; db.scans.push(row);
-      return res(200, [{ scan_id: row.id, duplicate: false }]);
+      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true, request_id: hit.request_id ?? null }]);
+      if (a.p_request_id && db.scans.some((x) => x.request_id === a.p_request_id)) return res(409, { code: '23505' });   // unique index scans_request_id_key (MPC-7471-F3)
+      const row = { id: crypto.randomUUID(), report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: 'web_scan', ...(a.p_request_id ? { request_id: a.p_request_id } : {}) }; db.scans.push(row);
+      return res(200, [{ scan_id: row.id, duplicate: false, request_id: a.p_request_id ?? null }]);
     }
     if (url.includes('/rpc/mpt_record_email_receipt')) {   // CK-8503: same ranking as the SQL function
       if (opts.noReceiptRpc) return res(404, { code: 'PGRST202', message: 'Could not find the function public.mpt_record_email_receipt' });
@@ -49,6 +50,7 @@ export function fake(opts = {}) {
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }
       if (t === 'hexagon_scores' && rows.some((x) => db.hexagon_scores.some((h) => h.scan_id === x.scan_id && h.category === x.category))) return res(409, { code: '23505' });   // unique (scan_id, category)
+      if (t === 'scans' && rows[0].request_id && db.scans.some((x) => x.request_id === rows[0].request_id)) return res(409, { code: '23505' });   // MPC-7471-F3: unique partial index on scans.request_id
       if (t === 'users' && db.users.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'leads' && db.leads.some((u) => u.email === rows[0].email)) return res(409, 'dup');
       if (t === 'email_suppressions' && db.email_suppressions.some((u) => u.email_hash === rows[0].email_hash)) return res(409, 'dup');
@@ -67,6 +69,8 @@ export function fake(opts = {}) {
     if (q.get('email')?.startsWith('ilike.')) { const v = decodeURIComponent(q.get('email').slice(6)).replace(/\\(.)/g, '$1').toLowerCase(); rows = rows.filter((x) => String(x.email).toLowerCase() === v); }
     const eh = q.get('email_hash'); if (eh?.startsWith('eq.')) rows = rows.filter((x) => x.email_hash === eh.slice(3));
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
+    const rq = q.get('request_id')?.replace('eq.', ''); if (rq) rows = rows.filter((x) => x.request_id === rq);   // MPC-7471-F3
+    const cid = q.get('contact_id')?.replace('eq.', ''); if (cid) rows = rows.filter((x) => x.contact_id === decodeURIComponent(cid));   // MPC-7471-F3
     const sc = q.get('scan_id')?.replace('eq.', ''); if (sc) rows = rows.filter((x) => x.scan_id === sc);   // like PostgREST: a read by scan_id returns that scan's rows only
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));

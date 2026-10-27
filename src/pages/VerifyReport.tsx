@@ -38,10 +38,10 @@ const VerifyReport = () => {
           <Button onClick={check} disabled={busy || files.length === 0} data-testid="check-report">{busy ? "Checking..." : "Check report"}</Button>
           <div role="status" aria-live="polite" className="mt-6" data-testid="verdict">
             {verdict?.kind === "verified" && (
-              <p className="text-foreground">
-                ✓ Verified. Created by MyPrivacyTOOL{verdict.signedAt ? ` on ${verdict.signedAt.slice(0, 10)}` : ""}, and not changed since.
-                {verdict.timestamped ? " It also carries an outside time stamp." : ""}
-              </p>
+              <div className="text-foreground">
+                <p>✓ Verified. This file was signed by MyPrivacyTOOL{verdict.signedAt ? ` on ${verdict.signedAt.slice(0, 10)}` : ""}, and has not been changed since.</p>
+                <p className="mt-2 text-sm text-muted-foreground">This confirms the file is exactly what we signed. It does not, on its own, prove the scan results in it are true.</p>
+              </div>
             )}
             {verdict?.kind === "not_verified" && (
               <div className="text-foreground">

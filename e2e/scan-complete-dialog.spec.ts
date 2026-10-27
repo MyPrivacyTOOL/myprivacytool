@@ -50,9 +50,10 @@ test("completion opens exactly one dialog that stays open; score matches the pag
   const overflow = await page.evaluate(() => ({ page: document.documentElement.scrollWidth - window.innerWidth }));
   expect(overflow.page).toBeLessThanOrEqual(0);
   await page.getByPlaceholder("your@email.com").scrollIntoViewIfNeeded();
-  await expect(page.getByRole("button", { name: /send my privacy check/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /send my report/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /no thanks/i })).toBeVisible();
-  await expect(page.getByRole("checkbox")).not.toBeChecked();
+  // MPC-7471-F3: two separate boxes (report, and the optional save box), both unticked.
+  for (const box of await page.getByRole("checkbox").all()) await expect(box).not.toBeChecked();
 
   const shotAt = async (ms: number) => {
     await page.waitForFunction(([start, wait]) => performance.now() - (start as number) >= (wait as number), [t0, ms] as const);

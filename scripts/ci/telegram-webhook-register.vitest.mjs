@@ -34,6 +34,8 @@ describe("telegram webhook register script", () => {
     expect(out).toContain("PASS");
     const set = f.mock.calls.find(([u]) => String(u).endsWith("/setWebhook"));
     expect(JSON.parse(set[1].body)).toMatchObject({ url: WEBHOOK_URL, secret_token: SECRET, drop_pending_updates: true });
+    // MPC-7894: button taps (callback_query) must be delivered or the /fix wizard buttons only pulse.
+    expect(JSON.parse(set[1].body).allowed_updates).toEqual(["message", "callback_query"]);
   });
   it("never prints the token or the secret", async () => {
     const { out } = await go(baseEnv, fakeFetch({ setOk: false }));

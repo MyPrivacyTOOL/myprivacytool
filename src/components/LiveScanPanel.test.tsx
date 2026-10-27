@@ -31,9 +31,9 @@ describe("LiveScanPanel", () => {
     expect(screen.getByText("Found something")).toBeTruthy();
     expect(screen.getByRole("status").textContent).toMatch(/found something/i);
     await advance(3000);
-    expect(screen.getByText("Nothing found")).toBeTruthy();
+    expect(screen.getByText("Nothing seen in the places we looked")).toBeTruthy();
     expect(screen.getByText("Could not check this one")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toMatch(/full picture is on its way/);
+    expect(screen.getByRole("status").textContent).toMatch(/fuller report is on its way/);
     const n = calls.length;
     await advance(30000);
     expect(calls.length).toBe(n);

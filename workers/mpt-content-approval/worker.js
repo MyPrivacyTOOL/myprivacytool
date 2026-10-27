@@ -8,7 +8,7 @@
 //                  A Make 2xx is HANDED OFF only. POST /receipt (HMAC-signed) is the only path to verified_published. GET /status reports stages.
 
 import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
-import { recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
+import { expectedCycleIds, watchdogReport, recordNotRouted, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, logRejectedReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
@@ -65,13 +65,14 @@ const contentTypeOf = (url) => (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(url ?? '') 
  * The Make.com hand-off: one envelope carrying a post per platform (X, LinkedIn, IG, FB, Pinterest, YouTube; Reddit while
  * the consumer still drafts it). Must pass validateMakePayload() before it is sent.
  */
-export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp, defaultAssetUrl = '' }) {
+export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp, defaultAssetUrl = '', defaultImageKey = '' }) {
   const date = taskId.replace('daily-posts-', '');
   const order = [...PLATFORMS, ...LEGACY_PLATFORMS];
   const posts = [...drafts]
     .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
     .map((d) => {
       const assetUrl = d.asset_url || defaultAssetUrl || null;
+      const imageKey = d.platform === 'linkedin' ? d.image_key || defaultImageKey : '';
       return {
         platform: d.platform,
         title: d.title || d.topic || 'MyPrivacyTOOL',
@@ -83,6 +84,7 @@ export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp
         link_url: `${SITE}?utm_source=${d.platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
         publish_timestamp: scheduledTime(date, d.platform, new Date(approvalTimestamp)),
         ...(d.platform === 'reddit' ? { subreddit: d.subreddit || 'r/privacy' } : {}),
+        ...(imageKey ? { image_key: imageKey } : {}),
         ...(d.slides ? { slides: d.slides } : {}),
         ...(d.script ? { script: d.script } : {}),
         ...(Array.isArray(d.asset_tags) && d.asset_tags.length ? { asset_tags: d.asset_tags } : {}),
@@ -219,7 +221,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
   async function approve() {
   await log(env, taskId, 'approved', { draft: { by: approver } });
 
-  const payload = buildMakePayload(drafts, { taskId, approvedBy: approver, approvalTimestamp: approvedAt.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL });
+  const payload = buildMakePayload(drafts, { taskId, approvedBy: approver, approvalTimestamp: approvedAt.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL, defaultImageKey: env.DEFAULT_IMAGE_KEY });
   const check = validateMakePayload(payload);
   if (!check.ok) {
     const error = `schema validation failed: ${check.errors.join('; ')}`;
@@ -229,10 +231,21 @@ export async function process(env, { action, taskId, timestamp, approver, target
   }
 
   // CK-8482: per-platform state. Tracking must never mask the real outcome, so a D1 failure here degrades to the legacy flow.
-  const platforms = payload.posts.map((p) => p.platform);
+  const allPlatforms = payload.posts.map((p) => p.platform);
+  // ROUTED_PLATFORMS: the platforms the Make scenario can actually publish. Unset = legacy behaviour (everything is sent).
+  const routedList = (env.ROUTED_PLATFORMS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const platforms = routedList.length ? allPlatforms.filter((p) => routedList.includes(p)) : allPlatforms;
+  const unrouted = allPlatforms.filter((p) => !platforms.includes(p));
+  if (!platforms.length) {
+    const error = `none of the drafted platforms are routed (ROUTED_PLATFORMS=${routedList.join(',')})`;
+    await log(env, taskId, 'failed', { error });
+    await reply(env, target, `Failed to post drafts. ${error}; nothing was sent to Make.com.`);
+    return { status: 422, message: error };
+  }
   let toSend = platforms;
   try {
-    await recordDrafted(env.AGENT_LOGS, taskId, platforms, approvedAt);
+    await recordDrafted(env.AGENT_LOGS, taskId, allPlatforms, approvedAt);
+    if (unrouted.length) await recordNotRouted(env.AGENT_LOGS, taskId, unrouted, approvedAt);
     await recordApproved(env.AGENT_LOGS, taskId, platforms, approvedAt);
     toSend = sendable(await rowsFor(env.AGENT_LOGS, taskId), platforms, approvedAt);
   } catch (e) {
@@ -244,7 +257,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
     succeeded = true;
     return { status: 200, message: 'nothing to send' };
   }
-  const outbound = toSend.length === platforms.length ? payload : { ...payload, posts: payload.posts.filter((p) => toSend.includes(p.platform)) };
+  const outbound = toSend.length === allPlatforms.length ? payload : { ...payload, posts: payload.posts.filter((p) => toSend.includes(p.platform)) };
 
   const meta = {};
   const sent = await postToMake(env, taskId, outbound, meta);
@@ -265,7 +278,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
   try { await recordHandedOff(env.AGENT_LOGS, taskId, toSend, { now: new Date() }); } catch (e) { console.error('publication_receipts tracking unavailable', e?.message); }
   await log(env, taskId, 'handed_off', { draft: { platforms: toSend, approved_by: approver } });
   const names = outbound.posts.map((p) => PLATFORM_NAMES[p.platform]).join(', ');
-  const done = `✅ *HANDED OFF*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${outbound.posts.length} posts: ${names}. Not yet verified as published: platform receipts will confirm each post.`;
+  const done = `✅ *HANDED OFF*: approved by ${approver} at ${hktClock(approvedAt)} HKT. Make.com accepted the hand-off (HTTP ${sent.statusCode}) for ${outbound.posts.length} posts: ${names}. Not yet verified as published: platform receipts will confirm each post.${unrouted.length ? ` Not sent (no Make route yet): ${unrouted.map((p) => PLATFORM_NAMES[p]).join(', ')}.` : ''}`;
   await reply(env, target, done);
   await markDecided(env, target, done);
   succeeded = true;
@@ -324,8 +337,23 @@ export default {
     const { pathname } = new URL(request.url);
     if (pathname === '/receipt') {
       if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
-      const out = await handleReceipt(env, await request.text(), request.headers);
+      const rawBody = await request.text();
+      const out = await handleReceipt(env, rawBody, request.headers);
+      await logRejectedReceipt(env, out, rawBody, Date.now(), request.headers);
       return Response.json({ ok: out.status < 400, message: out.message, state: out.state }, { status: out.status });
+    }
+    if (pathname === '/watchdog' || pathname === '/recover') {
+      const auth = request.headers.get('authorization') ?? '';
+      if (!env.APPROVAL_API_TOKEN || !safeEqualReceipt(auth, `Bearer ${env.APPROVAL_API_TOKEN}`)) return new Response('Unauthorized', { status: 401 });
+      if (pathname === '/recover') {
+        if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
+        return Response.json({ ok: true, ...(await recover(env)) });
+      }
+      const days = Math.min(14, Math.max(1, Number(new URL(request.url).searchParams.get('days')) || 3));
+      const ids = expectedCycleIds(new Date(), days);
+      const { results: logs } = await env.AGENT_LOGS.prepare("SELECT task_id, status FROM agent_execution_logs WHERE task_id LIKE 'daily-posts-%' AND status IN ('drafted','approved','rejected','failed','handed_off','published')").bind().all();
+      const { results: receipts } = await env.AGENT_LOGS.prepare('SELECT * FROM publication_receipts WHERE content_id >= ?').bind(ids[ids.length - 1]).all();
+      return Response.json(watchdogReport({ ids, logs: logs ?? [], receipts: receipts ?? [] }));
     }
     if (pathname === '/status') {
       const auth = request.headers.get('authorization') ?? '';

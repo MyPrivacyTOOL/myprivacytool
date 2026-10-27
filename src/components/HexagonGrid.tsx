@@ -40,6 +40,8 @@ import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
 import GuessCheckCard from './hexagon/GuessCheckCard';
 import { fixStepFor } from '@/lib/hexagonFix';
 import NextStepCard from './hexagon/NextStepCard';
+import RecheckPanel from './hexagon/RecheckPanel';
+import { recheckJourneyEnabled } from '@/config/recheckJourney';
 import DetailLadder, { type DetailLevel } from './hexagon/DetailLadder';
 import HexagonHelp from './hexagon/HexagonHelp';
 import { captureContext, forgetPendingHexagon } from '@/lib/webScan';
@@ -55,6 +57,7 @@ const SecurityPanel = lazy(() => import('./SecurityPanel'));
 const BehaviorPanel = lazy(() => import('./BehaviorPanel'));
 const DNSLeakFixGuide = lazy(() => import('./DNSLeakFixGuide'));
 const FinalSummaryPanel = lazy(() => import('./FinalSummaryPanel'));
+const TilesCompleteDialog = lazy(() => import('./TilesCompleteDialog'));
 
 interface HexagonGridProps {
   hexagons: HexagonData[];
@@ -854,6 +857,14 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             </div>
           )}
 
+          {recheckJourneyEnabled() && (
+            <RecheckPanel
+              observation={allHexagons.find((h) => h.id === 'webrtc-leak')?.observation}
+              explained={currentStep?.id === 'webrtc-leak'}
+              told={toldFixed.has('webrtc-leak')}
+            />
+          )}
+
           {currentStep ? (
             <NextStepCard
               key={currentStep.id}
@@ -961,6 +972,13 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <BehaviorPanel onClose={() => setShowBehaviorPanel(false)} />
           </Suspense>
         </div>
+      )}
+
+      {/* MPC-7471-F1 follow-up: with the honest tiles on the summary panel is not shown, but the visitor still gets the one scan-complete dialog (counts only). */}
+      {v2 && showFinalSummary && (
+        <Suspense fallback={null}>
+          <TilesCompleteDialog tiles={tiles} />
+        </Suspense>
       )}
 
       {/* Final Summary Panel - shown after all hexagons confirmed */}

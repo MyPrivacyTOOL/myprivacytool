@@ -25,3 +25,7 @@ Consequences to know about: the summary/PDF headline number now equals the page 
 
 ## Coordination with F3 (MPC-7471-F3)
 F1 owns the shell, header, open/close, confetti, a11y and the score contract. F3 owns the form/submit block, save tick box, scan reference and report pipeline. Props kept: `riskScore, categoryScores, confirmedCount, onClose, onSubmit`.
+
+## Follow-up: honest-tiles mode (hex_v2)
+With `hex_v2` on, the summary panel is not shown, so the dialog never opened. `TilesCompleteDialog` (lazy-loaded from `HexagonGrid`) now opens the same dialog when the scan completes in that mode: same header and form, and the result block is the counts-only risk profile ("N clear, N need fixing, N our guess, ..."). No score, percentage, "N of M", Low/Medium/High, coverage or score link, and **no confetti** (MPC-7916: finishing the taps is not a result; this is a choice Chris can reverse). Opens once, no timer, no auto-dismiss, not reopened after dismissal. Screenshots (synthetic, local production build with `?hex_v2=1`, dialog open / +2 s / +10 s, desktop and mobile): `docs/mpc-7471-f1/hex-v2/`.
+New wording: only the "Your risk profile" label (already used on the page). Counts text is `riskProfileParts`, unchanged. Not changed: detection, scoring, consent, the form, report emails.

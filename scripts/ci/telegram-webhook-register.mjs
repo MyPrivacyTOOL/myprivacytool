@@ -39,7 +39,8 @@ export async function run({ env = process.env, fetchImpl = fetch, log = console.
     if (!me.json.ok) return fail(`Telegram rejected the bot token (getMe status ${me.status}). Revoke and re-copy it in BotFather.`);
     log(`bot: @${me.json.result.username}`);
 
-    const set = await tg("setWebhook", { url, secret_token: secret, drop_pending_updates: drop, allowed_updates: ["message"] });
+    // MPC-7894: callback_query is the tap on an inline button (the /fix wizard). Without it Telegram never delivers button taps and the buttons just pulse.
+    const set = await tg("setWebhook", { url, secret_token: secret, drop_pending_updates: drop, allowed_updates: ["message", "callback_query"] });
     if (!set.json.ok) return fail(`setWebhook failed (status ${set.status}): ${redact(set.json.description ?? "no description")}`);
     log(`setWebhook: ok (drop_pending_updates=${drop})`);
 

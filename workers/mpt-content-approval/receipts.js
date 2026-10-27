@@ -7,7 +7,8 @@
 //   approved|handed_off -> failed -> approved (a bounded retry)      failed + dead_letter is terminal
 // A Make HTTP 2xx is `handed_off` ONLY. `verified_published` needs an authenticated receipt with a post id and URL.
 
-export const STATES = ['drafted', 'approved', 'handed_off', 'verified_published', 'failed'];
+export const STATES = ['drafted', 'approved', 'handed_off', 'verified_published', 'failed', 'not_routed'];
+// not_routed: the platform has no Make route yet. It is recorded, never sent, never verified, and never a watchdog problem.
 export const MAX_ATTEMPTS = 5;
 export const BACKOFF_BASE_S = 60;
 export const BACKOFF_CAP_S = 3600;
@@ -81,11 +82,20 @@ export function sendable(rows, platforms, now = new Date()) {
   return platforms.filter((p) => {
     const r = byPlatform.get(p);
     if (!r) return true;
-    if (r.state === 'handed_off' || r.state === 'verified_published') return false;
+    if (r.state === 'handed_off' || r.state === 'verified_published' || r.state === 'not_routed') return false;
     if (r.dead_letter || r.outcome_unknown) return false;
     if (r.next_attempt_at && Date.parse(r.next_attempt_at) > now.getTime()) return false;
     return true;
   });
+}
+
+/** Platforms the Make scenario cannot publish to. Never moves a row that already progressed. */
+export async function recordNotRouted(db, contentId, platforms, now = new Date()) {
+  for (const p of platforms) {
+    await upsertNew(db, contentId, p, 'drafted', now);
+    const cur = (await getRows(db, contentId)).find((r) => r.platform === p);
+    if (cur && (cur.state === 'drafted' || cur.state === 'approved')) await setRow(db, rowId(contentId, p), { state: 'not_routed', updated_at: iso(now) });
+  }
 }
 
 export async function recordApproved(db, contentId, platforms, now = new Date()) {
@@ -152,11 +162,18 @@ export async function applyReconciliation(db, contentId, platform, verdict, { so
  */
 export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
   if (!env.RECEIPT_SIGNING_SECRET) return { status: 503, message: 'receipts not configured' };
-  const ts = headers.get('x-receipt-timestamp');
-  const sig = headers.get('x-receipt-signature');
-  if (!ts || !sig || !/^\d+$/.test(ts)) return { status: 401, message: 'missing signature' };
-  if (Math.abs(nowMs / 1000 - Number(ts)) > RECEIPT_TOLERANCE_S) return { status: 401, message: 'stale timestamp' };
-  if (!safeEqual(await hmacHex(env.RECEIPT_SIGNING_SECRET, `${ts}.${rawBody}`), sig)) return { status: 401, message: 'bad signature' };
+  // Two ways to authenticate, both need the shared secret: (a) x-receipt-token = the secret itself (what Make can do reliably;
+  // TLS protects it, and a receipt id is accepted only once so a replay is a no-op), or (b) the HMAC-SHA256 timestamp signature.
+  const token = headers.get('x-receipt-token');
+  if (token !== null) {
+    if (!safeEqual(token, env.RECEIPT_SIGNING_SECRET)) return { status: 401, message: 'bad token' };
+  } else {
+    const ts = headers.get('x-receipt-timestamp');
+    const sig = headers.get('x-receipt-signature');
+    if (!ts || !sig || !/^\d+$/.test(ts)) return { status: 401, message: 'missing signature' };
+    if (Math.abs(nowMs / 1000 - Number(ts)) > RECEIPT_TOLERANCE_S) return { status: 401, message: 'stale timestamp' };
+    if (!safeEqual(await hmacHex(env.RECEIPT_SIGNING_SECRET, `${ts}.${rawBody}`), sig)) return { status: 401, message: 'bad signature' };
+  }
 
   let b;
   try { b = JSON.parse(rawBody); } catch { return { status: 400, message: 'bad json' }; }
@@ -183,13 +200,18 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
     return { status: 200, message: 'failure recorded', state: 'failed' };
   }
 
-  if (!text(b.make_run_id) || !text(b.post_id) || !text(b.post_url) || Number.isNaN(Date.parse(b.published_at))) {
-    return { status: 400, message: 'a published receipt needs make_run_id, post_id, post_url, published_at' };
+  if (!text(b.make_run_id) || !text(b.post_id) || Number.isNaN(Date.parse(b.published_at))) {
+    return { status: 400, message: 'a published receipt needs make_run_id, post_id, published_at' };
   }
-  let host;
-  try { const u = new URL(b.post_url); host = u.protocol === 'https:' ? u.hostname.toLowerCase() : null; } catch { host = null; }
-  if (!host || !PLATFORM_HOSTS[b.platform].some((h) => host === h || host.endsWith(`.${h}`))) {
-    return { status: 400, message: 'post_url does not belong to the platform' };
+  // post_url is OPTIONAL: some platform modules return only an id and a URL must never be invented. When present it must
+  // belong to the platform; when absent it is stored as null (the post id is still platform-issued proof of publication).
+  const hasUrl = b.post_url !== undefined && b.post_url !== null && b.post_url !== '';
+  if (hasUrl) {
+    let host;
+    try { const u = new URL(b.post_url); host = u.protocol === 'https:' && text(b.post_url) ? u.hostname.toLowerCase() : null; } catch { host = null; }
+    if (!host || !PLATFORM_HOSTS[b.platform].some((h) => host === h || host.endsWith(`.${h}`))) {
+      return { status: 400, message: 'post_url does not belong to the platform' };
+    }
   }
   if (row.state === 'verified_published') {
     // A different post for an already-verified platform is a conflict to investigate, never an overwrite.
@@ -197,13 +219,37 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
   }
   await env.AGENT_LOGS.prepare('INSERT INTO receipt_callbacks (receipt_id, content_id, platform, received_at, result) VALUES (?, ?, ?, ?, ?)').bind(b.receipt_id, b.drafted_content_id, b.platform, iso(now), 'published').run();
   await setRow(env.AGENT_LOGS, id, {
-    state: 'verified_published', make_run_id: b.make_run_id, post_id: b.post_id, post_url: b.post_url,
+    state: 'verified_published', make_run_id: b.make_run_id, post_id: b.post_id, post_url: hasUrl ? b.post_url : null,
     published_at: new Date(b.published_at).toISOString(), provenance: `callback:${b.receipt_id}`, outcome_unknown: 0, last_error: null, next_attempt_at: null, updated_at: iso(now),
   });
   // The metrics seed row exists only once a post is verified, with the real id and URL (was written at hand-off before CK-8482).
   await env.AGENT_LOGS.prepare('INSERT INTO social_metrics (id, timestamp, platform, post_id, url, impressions, engagement) VALUES (?, ?, ?, ?, ?, 0, 0)')
-    .bind(crypto.randomUUID(), iso(now), b.platform, b.post_id, b.post_url).run().catch((e) => console.error('social_metrics insert failed', e?.message));
+    .bind(crypto.randomUUID(), iso(now), b.platform, b.post_id, hasUrl ? b.post_url : null).run().catch((e) => console.error('social_metrics insert failed', e?.message));
   return { status: 200, message: 'verified', state: 'verified_published' };
+}
+
+/**
+ * Record a refused receipt so it is never silent (CK-8482): Make's error handler ignores a failed receipt call, so without this a
+ * rejection (bad field, no hand-off, conflict, bad token) leaves only a platform stuck at handed_off and no reason why.
+ * The shared secret is never logged: only whether auth headers were present and the token's length next to the secret's.
+ * A 401 is unauthenticated traffic, so it is capped at one row per hour (the row id is the hour) so it cannot fill the table.
+ */
+export async function logRejectedReceipt(env, out, rawBody, nowMs = Date.now(), headers = null) {
+  if (!out || out.status < 400) return;
+  try {
+    let id = null;
+    try { id = JSON.parse(rawBody)?.drafted_content_id; } catch { /* not JSON: logged under the generic task id */ }
+    const taskId = /^daily-posts-\d{4}-\d{2}-\d{2}$/.test(id ?? '') ? id : 'receipt-rejected';
+    const token = headers?.get('x-receipt-token') ?? null;
+    const auth = headers
+      ? ` | auth: token=${token === null ? 'absent' : `present len=${token.length}`} (secret len=${String(env.RECEIPT_SIGNING_SECRET ?? '').length}) signature=${headers.get('x-receipt-signature') ? 'present' : 'absent'}`
+      : '';
+    const when = iso(new Date(nowMs));
+    await env.AGENT_LOGS.prepare('INSERT INTO agent_execution_logs (id, timestamp, task_id, status, error_message) VALUES (?, ?, ?, ?, ?)')
+      .bind(out.status === 401 ? `receipt-401-${when.slice(0, 13)}` : crypto.randomUUID(), when, taskId, 'receipt_rejected', `HTTP ${out.status}: ${out.message}${auth} | body: ${String(rawBody).slice(0, 400)}`).run();
+  } catch (e) {
+    console.error('receipt rejection log failed', e?.message);
+  }
 }
 
 /**
@@ -211,10 +257,11 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
  * overdueMs: how long after hand-off a receipt may take before the platform is flagged overdue.
  */
 export function classifyCycle(rows, { now = new Date(), overdueMs = 6 * 3600e3 } = {}) {
-  const stages = { generated: 0, awaiting_approval: 0, approved_not_sent: 0, handed_off: 0, verified_published: 0, failed: 0, unknown_outcome: 0, dead_letter: 0, overdue: 0 };
+  const stages = { not_routed: 0, generated: 0, awaiting_approval: 0, approved_not_sent: 0, handed_off: 0, verified_published: 0, failed: 0, unknown_outcome: 0, dead_letter: 0, overdue: 0 };
   const problems = [];
   for (const r of rows) {
-    if (r.state === 'drafted') stages.awaiting_approval++;
+    if (r.state === 'not_routed') stages.not_routed++;
+    else if (r.state === 'drafted') stages.awaiting_approval++;
     else if (r.state === 'approved') stages.approved_not_sent++;
     else if (r.state === 'verified_published') stages.verified_published++;
     else if (r.state === 'handed_off') {
@@ -234,4 +281,48 @@ export function classifyCycle(rows, { now = new Date(), overdueMs = 6 * 3600e3 }
 export function missingCycles(expectedIds, presentIds) {
   const have = new Set(presentIds);
   return expectedIds.filter((id) => !have.has(id));
+}
+
+const HKT_MS = 8 * 3600e3;
+/** Expected daily cycle ids: the last `days` HKT dates up to and including `now`'s date. */
+export function expectedCycleIds(now = new Date(), days = 3) {
+  const ids = [];
+  for (let i = 0; i < days; i++) ids.push(`daily-posts-${new Date(now.getTime() + HKT_MS - i * 86400e3).toISOString().slice(0, 10)}`);
+  return ids;
+}
+
+/**
+ * Daily-pipeline watchdog. Pure. `logs` = [{task_id,status}] from agent_execution_logs, `receipts` = publication_receipts rows.
+ * Stage per cycle (never conflated): missing | generated(drafted, awaiting approval) | rejected | handed_off | verified | failed.
+ * Awaiting approval is reported separately and is NOT a problem. A generation failure with no drafts IS (missing_cycle).
+ * `generationDueUtcHour`: a cycle is only "missing" once its producer cron (22:00Z the day before) plus grace has passed.
+ */
+export function watchdogReport({ ids, logs, receipts, now = new Date(), overdueMs = 6 * 3600e3, graceMs = 2 * 3600e3 }) {
+  const byId = new Map(ids.map((id) => [id, new Set()]));
+  for (const l of logs) if (byId.has(l.task_id)) byId.get(l.task_id).add(l.status);
+  const cycles = [];
+  const problems = [];
+  const awaiting = [];
+  for (const id of ids) {
+    const s = byId.get(id);
+    const date = id.replace('daily-posts-', '');
+    const dueAt = Date.parse(`${date}T06:00:00+08:00`) + graceMs;
+    const rows = receipts.filter((r) => r.content_id === id);
+    const cls = rows.length ? classifyCycle(rows, { now, overdueMs }) : null;
+    let stage;
+    if (!s.has('drafted')) {
+      stage = 'missing';
+      if (now.getTime() > dueAt) problems.push({ id, kind: 'missing_cycle' });
+    } else if (s.has('rejected')) stage = 'rejected';
+    else if (cls && rows.some((x) => x.state !== 'not_routed') && cls.stages.verified_published === rows.filter((x) => x.state !== 'not_routed').length) stage = 'verified';
+    else if (cls && cls.stages.failed) stage = 'failed';
+    else if (s.has('handed_off') || s.has('published') || (cls && cls.stages.handed_off)) stage = 'handed_off';
+    else if (s.has('failed') && !s.has('approved')) { stage = 'failed'; problems.push({ id, kind: 'generation_failed' }); }
+    else if (s.has('approved')) stage = 'approved_not_sent';
+    else { stage = 'awaiting_approval'; awaiting.push(id); }
+    if (cls) for (const p of cls.problems) problems.push({ id, ...p });
+    if (stage === 'approved_not_sent' && !rows.length) problems.push({ id, kind: 'approved_not_sent' });
+    cycles.push({ id, stage, platforms: rows.length ? cls.stages : null });
+  }
+  return { healthy: problems.length === 0, problems, awaiting_approval: awaiting, cycles };
 }

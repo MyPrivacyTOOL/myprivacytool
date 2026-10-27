@@ -11,7 +11,7 @@
 -- Access: service_role only (the scan-report Worker). anon/authenticated/public cannot execute either function.
 --
 -- ROLLBACK (leaves scans exactly as before):
---   drop function if exists public.mpt_request_scan(uuid, text, interval);
+--   drop function if exists public.mpt_request_scan(uuid, text, uuid, interval);
 --   drop function if exists public.mpt_record_email_receipt(text, text, timestamptz);
 --   drop index if exists public.scans_resend_message_id_idx;
 --   alter table public.scans drop column if exists delivery_status_at, drop column if exists delivery_status;
@@ -44,26 +44,34 @@ begin
   return n;
 end $$;
 
--- One scan per user per window. Returns the existing scan (duplicate = true) or the new one (duplicate = false).
-create or replace function public.mpt_request_scan(p_user_id uuid, p_email text, p_window interval default interval '24 hours')
-returns table (scan_id uuid, duplicate boolean)
+-- One scan per user per window. Returns the existing scan (duplicate = true) or the new one (duplicate = false), plus that scan's request_id
+-- (MPC-7471-F3: lets the Worker tell a visitor's own retry from someone else). request_id is read through to_jsonb() and written with dynamic SQL
+-- only when one is supplied, so this function also works while scans.request_id (F3's migration) does not exist yet.
+create or replace function public.mpt_request_scan(p_user_id uuid, p_email text, p_request_id uuid default null, p_window interval default interval '24 hours')
+returns table (scan_id uuid, duplicate boolean, request_id text)
 language plpgsql security invoker set search_path = public as $$
 declare
   existing uuid;
+  existing_request text;
   created uuid;
 begin
   if p_window < interval '1 minute' or p_window > interval '7 days' then raise exception 'window out of range' using errcode = '22023'; end if;
   perform pg_advisory_xact_lock(hashtextextended('mpt_request_scan:' || p_user_id::text, 0));   -- concurrent requests for one user queue here; the next one sees the first insert
-  select s.id into existing from public.scans s where s.user_id = p_user_id and s.created_at >= now() - p_window order by s.created_at asc, s.id asc limit 1;
+  select s.id, to_jsonb(s) ->> 'request_id' into existing, existing_request
+    from public.scans s where s.user_id = p_user_id and s.created_at >= now() - p_window order by s.created_at asc, s.id asc limit 1;
   if existing is not null then
-    return query select existing, true;
+    return query select existing, true, existing_request;
     return;
   end if;
-  insert into public.scans (user_id, email_scanned, source) values (p_user_id, p_email, 'web_scan') returning id into created;
-  return query select created, false;
+  if p_request_id is null then
+    insert into public.scans (user_id, email_scanned, source) values (p_user_id, p_email, 'web_scan') returning id into created;
+  else
+    execute 'insert into public.scans (user_id, email_scanned, source, request_id) values ($1, $2, ''web_scan'', $3) returning id' into created using p_user_id, p_email, p_request_id;
+  end if;
+  return query select created, false, p_request_id::text;
 end $$;
 
 revoke all on function public.mpt_record_email_receipt(text, text, timestamptz) from public, anon, authenticated;
-revoke all on function public.mpt_request_scan(uuid, text, interval) from public, anon, authenticated;
+revoke all on function public.mpt_request_scan(uuid, text, uuid, interval) from public, anon, authenticated;
 grant execute on function public.mpt_record_email_receipt(text, text, timestamptz) to service_role;
-grant execute on function public.mpt_request_scan(uuid, text, interval) to service_role;
+grant execute on function public.mpt_request_scan(uuid, text, uuid, interval) to service_role;

@@ -43,6 +43,16 @@ export interface Env {
   TELEGRAM_BASELINE_SCAN?: string;
   /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
   PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
+  /** MPC-7894 gate 3: secret (32+ characters). When set, scan tables store an HMAC of the Telegram id instead of the id. Unset = plain ids (test accounts). See src/sender-key.ts. */
+  TELEGRAM_ID_HMAC_KEY?: string;
+  /** MPC-7894 staged release: "all" opens the baseline scan and /fix wizard to every private non-bot sender (real-user data); default/unset = PROBE_TELEGRAM_IDS only. */
+  TELEGRAM_SCAN_SCOPE?: string;
+  /** MPC-7894 Telegram fix wizard: "on" enables /fix and its buttons for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
+  TELEGRAM_FIX_WIZARD?: string;
+  /** MPC-7893 one-time dashboard link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "dashboard"; anything else (default) is off. */
+  TELEGRAM_DASHBOARD_LINKS?: string;
+  /** Base URL of the dashboard site (https only). Default https://www.myprivacytool.io. */
+  DASHBOARD_BASE_URL?: string;
   /** MPC-7892 Telegram DEEP username check: "on" enables it for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
   TELEGRAM_DEEP_SCAN?: string;
   /** Days until deep_jobs rows expire (default 90, clamped 1-365). */

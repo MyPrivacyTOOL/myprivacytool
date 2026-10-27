@@ -6,6 +6,7 @@ import { retrieve } from "./knowledge";
 import { ToolGateway, type ToolDef } from "./gateway";
 import type { SupportPolicy } from "./policy";
 import { T, guardModelText, AI_DISCLOSURE } from "./reply";
+import { reserveModelCall, recordModelOverage } from "./model-budget";
 
 export interface SupportDeps {
   store: CaseStore; policy: SupportPolicy; tools: Record<string, ToolDef>;
@@ -62,7 +63,11 @@ export async function handleInbound(d: SupportDeps, ev: InboundEvent, proof?: st
   if (!d.model) unresolvedReason = "ai_unavailable";
   else {
     try {
+      // D-7: reserve spend BEFORE the model is called. Any refusal or store error means no model call and an honest "AI unavailable".
+      const reservation = await reserveModelCall(d.store, d.policy.modelBudget, c.id, now());
+      if (!reservation.ok) throw new Error(`model_budget:${reservation.reason}`);
       const out = await d.model.complete({ system: SYSTEM, caseText: ev.text, knowledge: kn.entries.map((e) => ({ id: e.id, version: e.version, body: e.body })), allowedTools: allowed });
+      await recordModelOverage(d.store, d.policy.modelBudget, c.id, out.costMicroUsd, now());
       for (const call of (out.toolCalls ?? []).slice(0, d.policy.maxToolCallsPerTurn)) {
         // Whatever the model asks for goes through the gateway, which re-checks policy, identity, caps and idempotency.
         const { receipt } = await gw.execute(c, identity, call.tool, call.args ?? {});
@@ -91,7 +96,7 @@ export async function handleInbound(d: SupportDeps, ev: InboundEvent, proof?: st
   const msg = await d.store.addOutbound(c.id, text, "ai", at());
   let delivered = false;
   try {
-    await d.notifier.send(c.ref, ev.channel, text, ev.threadKey);
+    await d.notifier.send(c.ref, ev.channel, text, ev.threadKey, ev.senderHandle);
     delivered = true;
     await d.store.setDelivery(msg.id, "sent", at());
   } catch {

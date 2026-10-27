@@ -31,9 +31,11 @@ echo "== bootstrap + repo SQL"
 psql_ "$TEST_URL" -f supabase/tests/bootstrap.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-operational-rls.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
-psql_ "$TEST_URL" -f supabase/sql/mpc-8529-support-followup.sql   # MPC-8529: provisional, hand-applied SQL (not a migration)
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 for f in $(ls supabase/migrations/*.sql | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+# CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
+# MPC-7471-F4 is excluded here: it drops mpt_score_baselines_email_hash_key, which schema.test.sql still needs, and it has its own stage further down.
+for f in $(ls supabase/proposed/*.sql 2>/dev/null | grep -v mpc_7471_f4_baseline_score_version | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 
 echo "== RLS isolation test (supabase/sql/mpt-operational-rls.test.sql)"
 out=$(psql_ "$TEST_URL" -At -F '|' -f supabase/sql/mpt-operational-rls.test.sql | grep '|' || true)
@@ -51,8 +53,31 @@ done <<< "$out"
 echo "== schema assertions"
 psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 
-echo "== support follow-up assertions (MPC-8529)"
-psql_ "$TEST_URL" -At -f supabase/tests/support-followup.test.sql
+
+echo "== dashboard links and sessions (MPC-7893)"
+psql_ "$TEST_URL" -At -f supabase/tests/dashboard-links.test.sql
+# Real concurrency: 8 separate connections try to redeem ONE link at the same moment. Exactly one may win.
+psql_ "$TEST_URL" -c "insert into public.profile_snapshots (id, sender_id, update_id, status, scan_version, risk_version, consent, get_chat, photos, expires_at) values ('00000000-0000-0000-0000-0000000000c1', '333', 1, 'complete', 'telegram-baseline-1', 'risk-count-1', '{}', '{}', '{}', now() + interval '90 days')" \
+  -c "insert into public.dashboard_links (token_hash, sender_id, snapshot_id, expires_at) values (repeat('e',64), '333', '00000000-0000-0000-0000-0000000000c1', now() + interval '15 minutes')"
+race_dir=$(mktemp -d)
+for i in 1 2 3 4 5 6 7 8; do
+  ( psql_ "$TEST_URL" -At -c "select public.mpt_redeem_dashboard_link(repeat('e',64), repeat('$i',64), 30)" > "$race_dir/$i" ) &
+done
+wait
+wins=$(cat "$race_dir"/* | grep -c '^t$' || true)
+[ "$wins" -eq 1 ] || { echo "::error::concurrent redemption: expected exactly 1 winner, got $wins"; exit 1; }
+sessions=$(psql_ "$TEST_URL" -At -c "select count(*) from public.dashboard_sessions where sender_id = '333'")
+[ "$sessions" -eq 1 ] || { echo "::error::concurrent redemption created $sessions sessions"; exit 1; }
+echo "   8 concurrent redemptions: 1 winner, 1 session"
+rm -rf "$race_dir"
+
+# MPC-8528: the PROPOSED AI-support schema (applied by the migrations loop above; deploy-supabase.yml pushes it to the live project on merge).
+echo "== proposed schema: AI support cases (MPC-8528)"
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
+
+# MPC-8529: the PROPOSED follow-up watchdog (supabase/proposed/mpc_8529_support_followup.sql, applied by the proposed loop above, after the 8528 migration).
+echo "== proposed schema: support follow-up watchdog (MPC-8529)"
+psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
 # MPC-7471-F4: the PROPOSED baseline score_version migration (supabase/proposed/, not in supabase/migrations/) on rows saved the old way, then its own rollback.
 echo "== proposed migration: baseline score_version (MPC-7471-F4)"
@@ -82,6 +107,15 @@ created=$(grep -c '^f$' "${TMPDIR:-/tmp}/ck8503-race.$$" || true); dups=$(grep -
 total=$(psql_ "$TEST_URL" -At -c "select count(*) from public.scans where user_id = '00000000-0000-4000-8000-0000000000c1'")
 [ "$created" = 1 ] && [ "$dups" = 7 ] && [ "$total" = 1 ] || { echo "::error::concurrent mpt_request_scan: created=$created duplicates=$dups rows=$total (want 1, 7, 1)"; exit 1; }
 echo "   PASS 8 simultaneous requests -> 1 scan created, 7 told duplicate, 1 row"
+psql_ "$TEST_URL" -c "insert into public.users (id, email) values ('00000000-0000-4000-8000-0000000000c2', 'ck8503-race2@example.com')"
+for i in 1 2 3 4 5 6 7 8; do
+  psql_ "$TEST_URL" -At -c "select duplicate from public.mpt_request_scan('00000000-0000-4000-8000-0000000000c2', 'ck8503-race2@example.com', gen_random_uuid())" >> "${TMPDIR:-/tmp}/ck8503-race2.$$" &
+done
+wait
+created=$(grep -c '^f$' "${TMPDIR:-/tmp}/ck8503-race2.$$" || true); rm -f "${TMPDIR:-/tmp}/ck8503-race2.$$"
+total=$(psql_ "$TEST_URL" -At -c "select count(*) from public.scans where user_id = '00000000-0000-4000-8000-0000000000c2'")
+[ "$created" = 1 ] && [ "$total" = 1 ] || { echo "::error::concurrent mpt_request_scan with distinct request ids: created=$created rows=$total (want 1, 1)"; exit 1; }
+echo "   PASS 8 simultaneous requests with 8 DIFFERENT request ids -> still 1 scan"
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

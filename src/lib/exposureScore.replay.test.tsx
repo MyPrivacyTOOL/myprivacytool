@@ -128,17 +128,12 @@ describe('exposure-v1 replay across every consumer', () => {
     expect(json.summary).not.toHaveProperty('trackingExposure');
   });
 
-  it('baseline: the modal posts the same score with its version and the Worker stores exactly that, tagged', async () => {
-    const posts: Record<string, unknown>[] = [];
-    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => { posts.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ success: true }), { status: 200 }); }));
-    const Real = (await import('@/components/EmailCaptureModal') as unknown as { __real: typeof EmailCaptureModal }).__real;
+  // MPC-7471-F3: the popup no longer posts a baseline to mpt-leads (it asks the report pipeline for the report instead; docs/post-scan-popup-report-mpc-7471-f3.md,
+  // open decision 3). So this checks the Worker half only: given the payload the popup USED to send, mpt-leads stores exactly that score, tagged with its version.
+  // The modal's own request is covered in EmailCaptureModal.test.tsx (one POST, to the scan-report Worker, no score fields).
+  it('baseline: the mpt-leads Worker stores exactly the posted exposure score, tagged with its version', async () => {
     const r = exposureForPage(SCAN, true);
-    const user = userEvent.setup();
-    render(<Real riskScore={r.score} scoreVersion={r.score_version} coveragePercent={r.coverage.percent} categoryScores={{ device: 100, fingerprint: 100, storage: 0, security: 0 }} confirmedCount={SCAN.length} onClose={() => {}} onSubmit={() => {}} />);
-    await user.type(screen.getByPlaceholderText('your@email.com'), 'replay@example.com');
-    await user.click(screen.getByRole('checkbox'));
-    await user.click(screen.getByRole('button', { name: /send my privacy check/i }));
-    await waitFor(() => expect(posts.length).toBe(1));
+    const posts: Record<string, unknown>[] = [{ email: 'replay@example.com', riskScore: r.score, scoreVersion: r.score_version, categoryScores: { device: 100, fingerprint: 100, storage: 0, security: 0 }, confirmedCount: SCAN.length, source: 'web_scan_summary', consent: true, consent_source: 'web_scan_summary' }];
     expect(posts[0]).toMatchObject({ riskScore: EXPECTED.score, scoreVersion: SCORE_VERSION });
 
     // now the Worker, with the unapplied migration flag ON, against a stubbed store

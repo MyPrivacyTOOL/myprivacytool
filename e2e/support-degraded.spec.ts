@@ -16,7 +16,7 @@ for (const route of ROUTES) {
 
     const panel = page.getByRole("dialog");
     await expect(panel).toBeVisible();
-    await expect(panel.getByTestId("help-ai-status")).toContainText("not available");
+    await expect(panel.getByTestId("help-ai-status")).toContainText(/don.t have an AI assistant/i);
 
     const text = (await panel.innerText()).toLowerCase();
     expect(text).not.toMatch(/case (reference|number|id)|ticket|we.?ve saved|your request (is|has been) saved|a (human|person|agent) will|within \d+ ?(hours?|minutes?|days?)/);

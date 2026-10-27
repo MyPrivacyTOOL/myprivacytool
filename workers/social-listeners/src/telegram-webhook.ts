@@ -1,6 +1,10 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
+import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
+import { handleDashboardCommand, isDashboardCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
+import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
+import { handleFixWizard, isFixWizardUpdate } from "./fix-wizard";
 import { createEventLog } from "./event-log";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
@@ -37,7 +41,24 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const run = (p: Promise<void>) => (ctx?.waitUntil ? (ctx.waitUntil(p), undefined) : p);
     if (mode === "on" && isProbeIdRequest(payload)) { await run(replyProbeId(env, payload, log, events)); return done(new Response("OK")); }
     if (mode === "on" && isScanStatusRequest(payload)) { await run(replyScanStatus(env, payload, log)); return done(new Response("OK")); }
+    if (mode === "on" && isPhotoExifRequest(payload)) { await run(replyPhotoExif(env, payload, log)); return done(new Response("OK")); }
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
+  }
+
+  // MPC-7894 STOP / delete my data (exact messages, senders the scan is open to): withdraws consent and deletes stored scan data; core-brain never sees it.
+  if (isDeleteMyDataRequest(env, payload)) {
+    const del = handleDeleteMyData(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(del);
+    else await del;
+    return done(new Response("OK"));
+  }
+
+  // MPC-7893 dashboard link (default off, allow-listed test accounts): exact "dashboard" command only; core-brain never sees it.
+  if (isDashboardCommand(env, payload)) {
+    const dash = handleDashboardCommand(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(dash);
+    else await dash;
+    return done(new Response("OK"));
   }
 
   // MPC-7892 DEEP (default off, allow-listed test accounts): exact commands only; handled here so core-brain never sees them.
@@ -45,6 +66,14 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const deep = handleDeepCommand(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(deep);
     else await deep;
+    return done(new Response("OK"));
+  }
+
+  // MPC-7894 fix wizard (default off, allow-listed test accounts): "/fix" and its callback buttons; handled here so core-brain never sees them.
+  if (isFixWizardUpdate(env, payload)) {
+    const wiz = handleFixWizard(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(wiz);
+    else await wiz;
     return done(new Response("OK"));
   }
 
