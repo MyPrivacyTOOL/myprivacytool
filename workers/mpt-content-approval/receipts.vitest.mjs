@@ -111,6 +111,7 @@ describe('B: a Make HTTP 200 is a hand-off, never a publication', () => {
     expect((await submit(db, receipt('x', { post_url: 'https://evil.example.com/status/1' }))).message).toMatch(/does not belong/);
     expect((await submit(db, receipt('x', { post_url: 'http://x.com/a' }))).status).toBe(400);
     expect((await submit(db, receipt('x', { post_id: '' }))).status).toBe(400);
+    expect((await submit(db, receipt('x', { post_url: 'not a url' }))).status).toBe(400); // a present URL must be valid
     expect((await submit(db, receipt('nope'))).status).toBe(400);
     expect(states(db).x).toBe('handed_off');
   });
@@ -359,5 +360,41 @@ describe('routed platforms: only platforms Make can publish are sent, verified o
   it('unset ROUTED_PLATFORMS keeps the legacy behaviour (all six sent)', async () => {
     const db = fakeD1(); seedDrafts(db); await approve(db);
     expect(sentPlatforms(0)).toHaveLength(6);
+  });
+});
+
+describe('post_url is optional but never invented', () => {
+  it('a receipt without post_url verifies the platform and stores null; the post id and run id are still required', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const { post_url, ...noUrl } = receipt('instagram');
+    expect(post_url).toBeTruthy();
+    expect(await submit(db, noUrl)).toMatchObject({ status: 200, state: 'verified_published' });
+    const row = (await rowsFor(db, TASK)).find((r) => r.platform === 'instagram');
+    expect(row).toMatchObject({ state: 'verified_published', post_id: 'p-instagram', post_url: null });
+    expect((await submit(db, { ...noUrl, receipt_id: 'r9', post_id: '' })).status).toBe(400);
+    expect((await submit(db, { ...receipt('facebook'), post_url: '' })).state).toBe('verified_published');
+  });
+  it('a URL that is present must still match the platform host', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await submit(db, receipt('linkedin', { post_url: 'https://www.facebook.com/x/1' }))).status).toBe(400);
+    expect(states(db).linkedin).toBe('handed_off');
+  });
+});
+
+describe('x-receipt-token authentication (what Make sends)', () => {
+  const tokenSubmit = async (db, body, token) => handleReceipt(env(db), JSON.stringify(body), new Headers(token === undefined ? {} : { 'x-receipt-token': token }), NOW);
+  it('accepts the shared secret as a token, rejects a wrong, empty or missing one, and still refuses unrelated platforms', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await tokenSubmit(db, receipt('linkedin'), 'wrong')).status).toBe(401);
+    expect((await tokenSubmit(db, receipt('linkedin'), '')).status).toBe(401);
+    expect((await tokenSubmit(db, receipt('linkedin'))).message).toBe('missing signature');
+    expect(states(db).linkedin).toBe('handed_off');
+    expect(await tokenSubmit(db, receipt('linkedin'), SECRET)).toMatchObject({ status: 200, state: 'verified_published' });
+    expect((await tokenSubmit(db, receipt('linkedin'), SECRET)).message).toBe('duplicate receipt ignored'); // replay is a no-op
+    expect((await tokenSubmit(db, receipt('x', { post_url: 'https://evil.example.com/1' }), SECRET)).status).toBe(400);
+  });
+  it('the HMAC path still works', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await submit(db, receipt('facebook'))).state).toBe('verified_published');
   });
 });
