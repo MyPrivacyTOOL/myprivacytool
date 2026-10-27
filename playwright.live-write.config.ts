@@ -7,7 +7,7 @@ export default defineConfig({
   testDir: "./e2e-live-write",
   retries: 0,                 // a retry would be a second real submission
   workers: 1,
-  timeout: 300_000,
+  timeout: 600_000,
   reporter: "list",
   use: {
     // LIVE_BROWSER_CHANNEL=chrome runs the test in the installed Google Chrome instead of the bundled Chromium (Cloudflare Turnstile is stricter with the latter).

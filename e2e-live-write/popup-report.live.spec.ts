@@ -37,19 +37,35 @@ test("production popup: one real submission, lost answer, retry returns the same
     posts.push({ body: { ...body, scan: body.scan ? `[${(body.scan as unknown[]).length} hexagons]` : undefined, "cf-turnstile-response": body["cf-turnstile-response"] ? "[token]" : undefined }, status: res.status(), answer });
   });
 
-  // 1. finish a real scan
+  // 1. finish a real scan. Tap every tile that is not yet confirmed (not only those labelled "Tap to confirm": tiles whose check could not finish have other labels),
+  // and stop early with a full report if the scan stalls, instead of waiting out the test timeout.
   await page.goto("/?view=grid");
   const counter = page.getByTestId("confirmation-counter");
   await expect(counter).toBeVisible({ timeout: 60_000 });
-  const pending = page.locator('[role="button"][aria-label$="Tap to confirm"]');
-  for (let i = 0; i < 600; i++) {
-    const [done, total] = ((await counter.textContent()) ?? "0/0").split("/").map(Number);
-    if (done >= total && total >= 46) break;
-    if (await pending.count()) await pending.first().click({ force: true });
-    else await page.waitForTimeout(300);
-  }
+  const unconfirmed = page.locator('[role="listitem"] [role="button"][aria-label]:not([aria-label$="Confirmed"])');
   const email = page.getByPlaceholder("your@email.com");
-  await expect(email).toBeVisible({ timeout: 60_000 });
+  let lastDone = -1, idle = 0;
+  for (let i = 0; i < 900; i++) {
+    if (await email.isVisible().catch(() => false)) break;                       // the popup is open: the scan is complete
+    const [done, total] = ((await counter.textContent()) ?? "0/0").split("/").map(Number);
+    if (done !== lastDone) { lastDone = done; idle = 0; } else idle++;
+    if (await unconfirmed.count()) { await unconfirmed.first().click({ force: true }).catch(() => undefined); await page.waitForTimeout(120); }
+    else await page.waitForTimeout(400);
+    if (idle > 60) {                                                              // about 30 s with no progress: report and stop
+      evidence.scan_stalled = {
+        counter: `${done}/${total}`,
+        unconfirmed_tiles: await unconfirmed.evaluateAll((els) => els.slice(0, 40).map((e) => e.getAttribute("aria-label"))),
+        text_near_top: (await page.locator("body").innerText()).slice(0, 600),
+      };
+      break;
+    }
+  }
+  if (evidence.scan_stalled) {
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
+    fs.writeFileSync(OUT, JSON.stringify(evidence, null, 2));
+    await page.screenshot({ path: "test-results/live-0-scan-stalled.png", fullPage: true });
+  }
+  await expect(email, "the popup must open once the scan completes (see scan_stalled in the evidence file)").toBeVisible({ timeout: 30_000 });
 
   // 2. the popup, as a visitor sees it
   await email.fill(EMAIL);
