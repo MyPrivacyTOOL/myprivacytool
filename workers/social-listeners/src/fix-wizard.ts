@@ -15,7 +15,7 @@ const MAX_RECHECKS_PER_HOUR = 5;
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=fix_wizard";
 const PLANS_URL = "https://myprivacytool.io/pricing?utm_source=telegram&utm_medium=channel_osint&utm_campaign=fix_wizard";
 const SHARE_TEXT = "I checked what my Telegram profile shows to bots with MyPrivacyTOOL.";
-const HELP_LINE = "Send /fix any time to see this list again. You change your own Telegram settings; I cannot change them for you.";
+const HELP_LINE = "Send /fix any time to see this list again. You change your own Telegram settings; I cannot change them for you. Send STOP to delete your saved scan data.";
 
 export const fixWizardEnabled = (env: Env): boolean => env.TELEGRAM_FIX_WIZARD === "on";
 
