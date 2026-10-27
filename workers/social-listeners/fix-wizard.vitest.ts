@@ -151,11 +151,21 @@ describe("journey", () => {
     expect(t2.shown()).toMatch(/Removing it means/);
     expect(t2.shown()).not.toMatch(/You can keep it/);
   });
-  it("labels every unreviewed guide as a draft", async () => {
+  it("shows the draft banner only for guides with no review evidence", async () => {
+    const reviewed = listedGuides();
+    expect(reviewed).toHaveLength(9);
+    for (const g of reviewed) expect(g.evidence).toMatchObject({ client: expect.any(String), platform: expect.any(String), version: expect.any(String), reviewedOn: "27th October 2026" });
     const t = setup();
     await t.post(cb(`fw|${B8}|qa|bi`, 13));
-    expect(t.shown()).toMatch(/Draft guide/);
-    expect(listedGuides().every((g) => g.evidence === null)).toBe(true);
+    expect(t.shown()).not.toMatch(/Draft guide/);
+    const bi = GUIDES.find((g) => g.code === "bi")!;
+    const saved = bi.evidence;
+    bi.evidence = null;
+    try {
+      const u = setup();
+      await u.post(cb(`fw|${B8}|qa|bi`, 14));
+      expect(u.shown()).toMatch(/Draft guide/);
+    } finally { bi.evidence = saved; }
   });
   it("skip and keep are recorded as intentions, never as completion or self-confirmation", async () => {
     const t = setup();

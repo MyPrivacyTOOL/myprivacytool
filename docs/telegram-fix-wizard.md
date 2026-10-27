@@ -19,13 +19,13 @@ Callback data is `fw|<first 8 hex of baseline id>|<action>|<issue>` (under 64 by
 **VERIFIED** is only used for username, bio, birthday and current photo, and only means "this bot no longer receives it". Not returned is **not** proof of privacy to everyone. Phone, last seen, forwarded messages, groups and auto-download are **SELF-CONFIRMED** only, never call the API, and never change a count. Message-derived hexagons (language, text, time, update counter) are never compared.
 Scan again shows `before of compared` vs `now of compared` for the same fields, then the self-confirmed count on a separate line. No combined score and no weights.
 
-## Guides: coverage matrix (all DRAFT, `evidence: null`)
+## Guides: coverage matrix (reviewed by Chris, 27th October 2026)
 | Guide | Kind | Client / platform / app version / reviewed on |
 | --- | --- | --- |
-| Username, Bio, Birthday, Profile photo | api (re-checkable) | PENDING |
-| Phone number, Last seen, Forwarded messages, Groups, Auto-download | self | PENDING |
+| Username, Bio, Birthday, Profile photo | api (re-checkable) | Telegram iPhone app / iOS, iPhone 14 / version not recorded / 27th October 2026 / all steps matched |
+| Phone number, Last seen, Forwarded messages, Groups, Auto-download | self | same review (iPhone only; no Android client reviewed) |
 | People Nearby | not published | specification conflict: existence in current clients unverified |
-Every unreviewed guide is shown with a "Draft guide" banner. No screenshots exist (none were invented); web guides depend on the website stack and MPC-7893.
+A guide with no review evidence is shown with a "Draft guide" banner (currently only the unpublished People Nearby). No screenshots exist (none were invented); web guides depend on the website stack and MPC-7893.
 
 ## Sharing
 `Share (optional)` is a plain `t.me/share/url` button: Telegram opens its own picker, the text is generic, and it carries no ids, findings, links to private pages, tokens or before/after. Nothing is posted or sent by the bot. Personalised sharing is not built.
