@@ -51,6 +51,7 @@ Secret names per Worker are in `workers/<name>/EXPECTED_SECRETS.txt`. Non-secret
 | Turnstile | Enforcing on the scan email form (`TURNSTILE_ENFORCE`, `workers/mpt-leads/README.md`). Rollback: set it to `"false"` and merge. |
 | Turnstile on `/scan` (MPC-8430) | Widget for `mpt-scan-report` (`POST /api/scan`), secret `TURNSTILE_SECRET_KEY` on that Worker. `TURNSTILE_ENFORCE` in `workers/scan-report/wrangler.toml`: `"true"` = 403 on a failed check (enforcing since 2026-10-23), `"false"` = log only (search Workers Logs for `TURNSTILE_FAILED`). Rollback: set `"false"` and merge. The stuck-scan alert will message Telegram if enforcement breaks real submissions. |
 | Live results on `/scan` (MPC-8452) | After a request the thank-you screen shows the fast email checks as they finish (`GET /api/scan/live`, key from `POST /api/scan`). Low-sensitivity only (what was checked, found or not; no values) until the reader opens the signed link in their confirmation/report email (`/scan/live#v=...`, 7 days), which proves inbox ownership and shows the values. Off if `UNSUBSCRIBE_SECRET` is unset. Rollback: revert the PR. See `workers/scan-report/README.md`. |
+| Bad-address check on `/scan` (MPC-8453) | `POST /api/scan` answers 400 `bad_email_domain` when the address's domain does not exist or accepts no mail (public DNS, domain only, fails open). Rollback: `EMAIL_DOMAIN_CHECK = "false"` in `workers/scan-report/wrangler.toml`. See `workers/scan-report/README.md`. |
 
 ## 3. Deployment procedures
 

@@ -66,7 +66,7 @@ async function wireWorker(page: Page, opts: { loseFirstAnswer?: boolean; refuseF
     globalThis.fetch = be.fetchImpl as unknown as typeof fetch;
     try {
       const workerReq = new Request("https://mpt-scan-report.example.workers.dev/api/scan", { method: "POST", headers: { "Content-Type": "application/json", Origin: ORIGIN }, body: req.postData() ?? "" });
-      const env = { SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HUBSPOT_TOKEN: "stub", UNSUBSCRIBE_SECRET: "stub-secret", WEB_SCAN_SAVE_ENABLED: "true", REPORT_REQUEST_ID_ENABLED: "true", RECIPIENT_ALLOWLIST: "" };
+      const env = { SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HUBSPOT_TOKEN: "stub", UNSUBSCRIBE_SECRET: "stub-secret", WEB_SCAN_SAVE_ENABLED: "true", REPORT_REQUEST_ID_ENABLED: "true", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false" };
       const out = await worker.fetch(workerReq, env, { waitUntil: (p: Promise<unknown>) => { pending.push(p); } });
       await Promise.all(pending);
       const text = await out.text();

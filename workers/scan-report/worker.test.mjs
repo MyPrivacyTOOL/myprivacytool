@@ -50,7 +50,8 @@ check(/Partial score/.test(rep2.text) && rep2.subject.includes('(partial)'), 'wi
 check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includes('/email/alice/alice-peek.gif') && /AI guide/.test(rep.html), 'report email: Alice hero, tagline and image');
 
 import { fake } from './test-support/fake-backend.mjs';
-const env = { SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HUBSPOT_TOKEN: 'h', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', RECIPIENT_ALLOWLIST: EMAIL };
+// MPC-8453: these tests are about other behaviour and their fake DNS answers "no records" for every domain, so the deliverable-domain check is off here (email-domain.test.mjs covers it).
+const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HUBSPOT_TOKEN: 'h', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', RECIPIENT_ALLOWLIST: EMAIL };
 const input = { email: EMAIL, consentSource: 'scan_page', ip: '1.2.3.4', utm: { source: 'x', medium: '', campaign: '', content: '', referrer: '' } };
 
 check(recipientAllowed(env, 'Testing.NT69+abc@gmail.com') && !recipientAllowed(env, 'real@person.com') && recipientAllowed({}, 'any@x.com'), 'allowlist: gmail +tag/dots ignored; others blocked; empty = open');

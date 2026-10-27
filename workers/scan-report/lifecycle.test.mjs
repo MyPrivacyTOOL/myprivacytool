@@ -18,7 +18,8 @@ const STUB_HOSTS = ['api.resend.com', 'api.hubapi.com', 'cloudflare-dns.com', 'g
 const realFetch = globalThis.fetch;
 const sandbox = (F) => { globalThis.fetch = async (u, o) => { const h = new URL(String(u)).host; if (!STUB_HOSTS.some((s) => h === s || h.endsWith(`.${s}`))) throw new Error(`NON-TEST HOST ${h}`); return F.f(u, o); }; };
 const A = 'lifecycle+a@example.com', B = 'lifecycle+b@example.com';
-const env = { SUPABASE_URL: `https://${TEST_DB_HOST}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key', RESEND_API_KEY: 'test-resend', HIBP_API_KEY: 'test-hibp', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 'test-secret', RECIPIENT_ALLOWLIST: `${A},${B}` };
+// MPC-8453: this suite is about the scan lifecycle and its fake DNS answers "no records" for every domain, so the deliverable-domain check is off here.
+const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_URL: `https://${TEST_DB_HOST}`, SUPABASE_SERVICE_ROLE_KEY: 'test-key', RESEND_API_KEY: 'test-resend', HIBP_API_KEY: 'test-hibp', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 'test-secret', RECIPIENT_ALLOWLIST: `${A},${B}` };
 {
   sandbox(fake());
   let blocked = ''; try { await fetch('https://xmdmkumwxpgahmlweuug.supabase.co/rest/v1/scans'); } catch (e) { blocked = String(e); }
