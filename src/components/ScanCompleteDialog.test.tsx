@@ -65,10 +65,11 @@ describe('scan-complete dialog (EmailCaptureModal)', () => {
     expect(screen.getByTestId('scan-complete-result')).toHaveTextContent('High exposure — 78/100');
   });
 
-  it('keeps the consent controls: unticked box, same wording, No thanks, unsubscribe line', () => {
+  // MPC-7471-F3: the box now carries the /scan report wording (one report route, option A); the old fix-guide/newsletter sentence is gone. Wording awaits Chris's approval.
+  it('keeps the consent controls: unticked box, report wording, No thanks, unsubscribe line', () => {
     open();
     expect(screen.getByRole('checkbox')).not.toBeChecked();
-    expect(screen.getByText('Email me my fix guide and Privacy Check, the monthly newsletter. I can unsubscribe at any time.')).toBeInTheDocument();
+    expect(screen.getByText('Email me my results and occasional privacy tips. I can unsubscribe at any time.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /no thanks/i })).toBeInTheDocument();
     expect(screen.getByText(/Unsubscribe in one click/)).toBeInTheDocument();
   });

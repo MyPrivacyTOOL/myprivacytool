@@ -37,11 +37,12 @@ export function handleLanding(request: Request, env: DashboardEnv): Response {
 
 const cookieHeader = (value: string, maxAgeSeconds: number): string => `${SESSION_COOKIE}=${value}; Max-Age=${maxAgeSeconds}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 
+/** The page sends Referrer-Policy: no-referrer, and browsers then send "Origin: null" on its own form POST, so null (or absent) falls back to Sec-Fetch-Site,
+ *  which a page cannot forge. A real Origin must match ours exactly. Anything else (cross-site, no header at all) is refused. */
 function sameOrigin(request: Request): boolean {
   const origin = request.headers.get("origin");
-  if (origin) return origin === new URL(request.url).origin;
-  const site = request.headers.get("sec-fetch-site");
-  return site === null ? false : site === "same-origin";
+  if (origin && origin !== "null") return origin === new URL(request.url).origin;
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 export async function handleRedeem(request: Request, env: DashboardEnv, token: string, deps: Deps = {}): Promise<Response> {

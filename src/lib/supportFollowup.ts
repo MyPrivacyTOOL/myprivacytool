@@ -1,34 +1,40 @@
 // MPC-8529: pure helpers for the support follow-up watchdog and for honest outage wording.
-// PROVISIONAL: the case schema (MPC-8528) and the approved retry/cost numbers (MPC-8530) are not delivered. The backoff and
-// bound below mirror supabase/sql/mpc-8529-support-followup.sql; supportFollowup.test.ts fails if they drift apart.
+// Built on the MPC-8528 case states (shared/support/states.ts). The retry/cost numbers are still PROPOSALS pending MPC-8530.
+// The backoff, bound and transition table below mirror supabase/proposed/mpc_8529_support_followup.sql;
+// supportFollowup.test.ts fails if they drift apart.
 
 export const BACKOFF_MINUTES = [15, 60, 360] as const; // 15 min, 1 h, 6 h
 export const MAX_ATTEMPTS = 3;
 
 export type AttemptOutcome = "attempted" | "delivered" | "failed";
-export type FollowupState =
-  | "open" | "waiting_customer" | "waiting_system" | "update_scheduled" | "resolution_proposed"
-  | "resolved_verified" | "unresolved_exhausted" | "delivery_failed" | "engineering_handoff" | "reopened";
+/** MPC-8528 case state. This module never invents a state of its own. */
+export type CaseState =
+  | "new" | "triage" | "diagnosing" | "action_running" | "waiting_customer" | "waiting_system" | "resolved" | "closed" | "reopened" | "blocked";
+export type FollowupReason = "reply_delivery_failed" | "followup_exhausted" | null;
 
-export const TERMINAL_STATES: readonly FollowupState[] = ["resolved_verified", "unresolved_exhausted"];
+/** States in which follow-up never acts: finished, or exhausted and honestly reported as unresolved. */
+export const TERMINAL_STATES: readonly CaseState[] = ["resolved", "closed", "blocked"];
 
 export function backoffMinutes(failures: number): number {
   const i = Math.min(Math.max(failures, 1), BACKOFF_MINUTES.length) - 1;
   return BACKOFF_MINUTES[i];
 }
 
-/** What happens after an outbound attempt. Only `delivered` counts as delivered; `attempted` (no receipt) and `failed` use up the bound. */
+/**
+ * What happens to the case after an outbound attempt. Only `delivered` counts as delivered; `attempted` (no receipt) and `failed`
+ * use up the bound. Exhaustion is `blocked` with reason `followup_exhausted`: MPC-8528 has no separate "exhausted" state.
+ */
 export function nextAfterAttempt(failuresSoFar: number, outcome: AttemptOutcome):
-  { state: FollowupState; failures: number; retryInMinutes: number | null; delivered: boolean } {
-  if (outcome === "delivered") return { state: "waiting_customer", failures: 0, retryInMinutes: null, delivered: true };
+  { state: CaseState; reason: FollowupReason; failures: number; retryInMinutes: number | null; delivered: boolean } {
+  if (outcome === "delivered") return { state: "waiting_customer", reason: null, failures: 0, retryInMinutes: null, delivered: true };
   const failures = failuresSoFar + 1;
-  if (failures >= MAX_ATTEMPTS) return { state: "unresolved_exhausted", failures, retryInMinutes: null, delivered: false };
-  return { state: "delivery_failed", failures, retryInMinutes: backoffMinutes(failures), delivered: false };
+  if (failures >= MAX_ATTEMPTS) return { state: "blocked", reason: "followup_exhausted", failures, retryInMinutes: null, delivered: false };
+  return { state: "waiting_system", reason: "reply_delivery_failed", failures, retryInMinutes: backoffMinutes(failures), delivered: false };
 }
 
-/** Customer silence never closes a case; only a verified outcome resolves it. */
-export function canResolve(state: FollowupState, outcomeVerified: boolean): boolean {
-  return state === "resolution_proposed" && outcomeVerified;
+/** Customer silence never closes a case; only a proposed resolution with a verified outcome resolves it. */
+export function canResolve(state: CaseState, proposed: boolean, outcomeVerified: boolean): boolean {
+  return !TERMINAL_STATES.includes(state) && proposed && outcomeVerified;
 }
 
 // ---- Honest outage wording -------------------------------------------------------------------------------------------

@@ -78,8 +78,10 @@ const CONFIRMATION_PARTS = [
   { key: 'device', label: 'Your browser findings' },
   { key: 'email', label: 'What your email address reveals' },
 ];
-export function buildConfirmationEmail({ unsubscribeLink, liveLink } = {}) {
+export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber } = {}) {
   const subject = 'Your privacy scan is starting';
+  // MPC-7471-F3: the same number, wording and deletion guidance as the report (MPC-7488), only when a scan was really saved with this request.
+  const scanNumberLine = scanNumber ? `Your scan number: ${scanNumber}. Quote this number if you want this scan deleted.` : '';
   const text = [
     ALICE_TAGLINE,
     '',
@@ -94,6 +96,7 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink } = {}) {
     'My job is to show you what you look like from the outside: what’s exposed, what it means for you, and what to change first.',
     '',
     ...(liveLink ? ['Watch it live: open your results page and I’ll show each result as I find it. Only you can open this link, because it came to your inbox:', liveLink, ''] : []),
+    ...(scanNumberLine ? [scanNumberLine, ''] : []),
     'Here’s what happens next.',
     '',
     'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
@@ -123,6 +126,7 @@ ${para('You asked us to look at your privacy exposure, so we&rsquo;re starting r
 ${para('MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We&rsquo;re starting with two things: your browser and your email address. More channels will follow over time.')}
 ${para('My job is to show you what you look like from the outside: what&rsquo;s exposed, what it means for you, and what to change first.')}
 ${liveLink ? para('<strong>Watch it live.</strong> Open your results page and I&rsquo;ll show each result as I find it. Only you can open this link, because it came to your inbox.') + button(liveLink, 'Watch my results live') : ''}
+${scanNumberLine ? para(esc(scanNumberLine)) : ''}
 ${h2('Here&rsquo;s what happens next.')}
 ${para('Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
 <ol style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">

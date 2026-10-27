@@ -21,7 +21,24 @@ export const REPORT_FAILED_MESSAGE =
 export const BAD_EMAIL_MESSAGE = "That email address does not look right, so we have not sent anything. Please check it for typos and try again.";
 export const REPORT_WAIT_MESSAGE = "You have tried a few times in a row. Please wait a minute, then press the button again.";
 
-export async function requestScanReport(email: string, saveScan: boolean, recognise: boolean, turnstileToken = ""): Promise<{ liveToken?: string }> {
+// MPC-7471-F3: the post-scan popup uses this same request (one route, one contract). `consentSource` names the form the visitor used ("scan_page" by default);
+// `requestId` is a random UUID the popup keeps for the whole form, so a retry of the SAME submit (the answer was lost after the Worker had already saved) is
+// recognised and gets the original outcome back instead of "already requested". The answer says what really happened: `scanSaved` and `scanNumber` only when the
+// Worker saved the scan, `duplicate` when an earlier request for this address within 24h was answered instead of creating a new one.
+export interface ReportOutcome {
+  liveToken?: string;
+  scanNumber?: string;
+  scanSaved?: boolean;
+  duplicate?: boolean;
+}
+
+export async function requestScanReport(
+  email: string,
+  saveScan: boolean,
+  recognise: boolean,
+  turnstileToken = "",
+  opts: { consentSource?: string; requestId?: string } = {},
+): Promise<ReportOutcome> {
   const base = resolveScanApiUrl();
   if (!base) return {}; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
   const q = new URLSearchParams(window.location.search);
@@ -34,7 +51,8 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
       body: JSON.stringify({
         email,
         consent: true, // only called after the consent checkbox is ticked
-        consent_source: "scan_page",
+        consent_source: opts.consentSource ?? "scan_page",
+        ...(opts.requestId ? { request_id: opts.requestId } : {}),
         ...(turnstileToken ? { "cf-turnstile-response": turnstileToken } : {}), // MPC-8430
         ...(saveScan ? scanSaveFields({ recognise }) : {}),
         ...(ref ? { ref } : {}),
@@ -55,9 +73,14 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
     }
     throw new ReportRequestError(res.status === 429 ? "rate_limited" : res.status >= 500 ? "server" : "rejected", res.status);
   }
-  const data = (await res.json().catch(() => null)) as { live_token?: unknown } | null;
-  if (saveScan) noteSaveResult(data);
+  const data = (await res.json().catch(() => null)) as { live_token?: unknown; scan_saved?: unknown; duplicate?: unknown } | null;
+  const scanNumber = saveScan ? noteSaveResult(data) : null;
   // MPC-8452: a short-lived key for the live view on the thank-you screen (absent for a repeat request or when the feature is off)
-  return typeof data?.live_token === "string" ? { liveToken: data.live_token } : {};
+  return {
+    ...(typeof data?.live_token === "string" ? { liveToken: data.live_token } : {}),
+    ...(scanNumber ? { scanNumber } : {}),
+    scanSaved: scanNumber !== null,
+    duplicate: data?.duplicate === true,
+  };
 }
 

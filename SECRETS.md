@@ -107,8 +107,8 @@ Revoke and reissue at the provider, then update **both** the Worker (`wrangler s
   - `SUPABASE_SERVICE_ROLE_KEY` is used by github-channel, mpt-leads, mpt-metrics-collector, mpt-cairn-blackboard,
     oauth-poc, partner-api, scan-report and webhook-receiver (core-brain and social-listeners hold it as
     `SUPABASE_KEY`). Use the manual workflow `rotate-supabase-key.yml` (see "Supabase key rotation" below).
-    **It does not list `mpt-cairn-blackboard` or `partner-api`**: set those two by hand with `wrangler secret put`
-    (or add them to the workflow) and check they were not missed in the 2026-10-14 rotation.
+    The workflow now includes `mpt-cairn-blackboard` and `partner-api` (added 2026-10-26; before that they were not
+    covered, so the 2026-10-14 rotation may have missed them).
   - `HUBSPOT_API_KEY` / `HUBSPOT_TOKEN`, `RESEND_API_KEY`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_KEY`,
     `TELEGRAM_WEBHOOK_SECRET`, `META_APP_SECRET`, `TWILIO_AUTH_TOKEN` appear in several Workers. Confirm each
     pair of near-identical names (`TELEGRAM_BOT_TOKEN`/`TELEGRAM_BOT_KEY`, `HUBSPOT_API_KEY`/`HUBSPOT_TOKEN`)

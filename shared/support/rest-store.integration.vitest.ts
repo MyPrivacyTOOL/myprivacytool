@@ -4,7 +4,7 @@
 // Every assertion reads state back from the database through the API; nothing is satisfied by a canned response.
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { createHmac, randomUUID } from "node:crypto";
-import { RestCaseStore, handleInbound, buildTools, newCaseRef, type InboundEvent, type Notifier, type Model, type SupportDeps } from "./index";
+import { RestCaseStore, RestProofStore, ProofVerifier, hashProof, handleInbound, buildTools, newCaseRef, type InboundEvent, type Notifier, type Model, type SupportDeps, type SupportPolicy } from "./index";
 
 const URL_ = process.env.SUPPORT_REST_URL;
 const SECRET = process.env.SUPPORT_REST_JWT_SECRET ?? "";
@@ -139,4 +139,65 @@ run("RestCaseStore against PostgREST + Postgres", () => {
     const r2 = await handleInbound(deps, e); // a repeated provider event
     expect(r2.duplicate).toBe(true); expect(sent).toHaveLength(1); expect(model.complete).toHaveBeenCalledTimes(1);
   });
+
+  describe("identity proofs on real Postgres", () => {
+    const pstore = () => new RestProofStore({ baseUrl: URL_ ?? "http://localhost:0", serviceKey: jwt("service_role"), restPrefix: "" });
+    const verifiedPolicy: SupportPolicy = {
+      version: "it-proof-policy", maxToolCallsPerTurn: 1,
+      tools: { get_case_status: { approvedPolicyVersion: "it-only", requiredIdentity: "verified", maxCallsPerHour: 5, maxCostUnitsPerDay: 5, timeoutMs: 3000 } },
+    };
+    const mkDeps = (s: RestCaseStore): SupportDeps => ({
+      store: s, policy: verifiedPolicy, tools: buildTools(s), notifier: { send: async () => ({ providerMessageId: "p" }) } as Notifier,
+      model: { complete: async () => ({ text: "", toolCalls: [{ tool: "get_case_status", args: {} }] }) } as Model,
+      verifier: new ProofVerifier(pstore()),
+    });
+    const receipts = async (caseId: string) => (await (await fetch(`${URL_}/support_action_receipts?case_id=eq.${caseId}&select=outcome&order=created_at`, { headers: { Authorization: `Bearer ${jwt("service_role")}` } })).json()) as { outcome: string }[];
+
+    it("a proof redeems exactly once; replay, unknown and malformed tokens give nothing", async () => {
+      const p = pstore(); const { token } = await p.issue(`user-${randomUUID()}`, "t1", 600);
+      expect(await p.redeem(token)).toMatchObject({ tenantId: "t1" });
+      expect(await p.redeem(token)).toBeNull(); // single use
+      expect(await p.redeem("A".repeat(43))).toBeNull(); // well-formed but unknown
+      expect(await p.redeem("junk")).toBeNull();
+    });
+    it("8 parallel redemptions of one proof: exactly one winner", async () => {
+      const p = pstore(); const { token } = await p.issue(`user-${randomUUID()}`, "t1", 600);
+      const results = await Promise.all(Array.from({ length: 8 }, () => p.redeem(token)));
+      expect(results.filter(Boolean)).toHaveLength(1);
+    });
+    it("an expired proof cannot be redeemed", async () => {
+      const p = pstore(); const { token } = await p.issue(`user-${randomUUID()}`, "t1", 600);
+      const h = await hashProof(token);
+      const r = await fetch(`${URL_}/support_proofs?token_hash=eq.${h}`, { method: "PATCH", headers: { Authorization: `Bearer ${jwt("service_role")}`, "Content-Type": "application/json" }, body: JSON.stringify({ created_at: new Date(Date.now() - 7_200_000).toISOString(), expires_at: new Date(Date.now() - 1000).toISOString() }) });
+      expect(r.ok).toBe(true);
+      expect(await p.redeem(token)).toBeNull();
+    });
+    it("the database refuses out-of-range lifetimes", async () => {
+      await expect(pstore().issue("u", "t", 30)).rejects.toThrow(); await expect(pstore().issue("u", "t", 7200)).rejects.toThrow();
+    });
+    it("end to end: a redeemed proof links the case and lets the verified tool run once; no proof, a replayed proof and a different user are all refused", async () => {
+      const s = store(); const p = pstore(); const subject = `user-${randomUUID()}`; const thread = `th-${randomUUID()}`;
+      const deps = mkDeps(s);
+      const { token } = await p.issue(subject, "t1", 600);
+      const r1 = await handleInbound(deps, ev({ threadKey: thread }), token);
+      const c = (await s.getCaseByRef(r1.caseRef!))!;
+      expect(c.identityLevel).toBe("verified"); expect(c.linkedSubjectId).toBe(subject); expect(c.tenantId).toBe("t1");
+      expect(await receipts(c.id)).toEqual([{ outcome: "success" }]);
+      // same thread, no proof: back to channel_asserted, the verified tool is denied
+      await handleInbound(deps, ev({ threadKey: thread, text: "and now?" }));
+      // same thread, the SAME proof again: already consumed, so denied
+      await handleInbound(deps, ev({ threadKey: thread, text: "again" }), token);
+      // same thread, a valid proof for a DIFFERENT user: the link is not replaced and the call is denied
+      const other = await p.issue(`user-${randomUUID()}`, "t1", 600);
+      await handleInbound(deps, ev({ threadKey: thread, text: "hi" }), other.token);
+      expect((await s.getCase(c.id))?.linkedSubjectId).toBe(subject);
+      const outcomes = (await receipts(c.id)).map((x) => x.outcome);
+      // 1 success; the no-proof attempt and the other-user attempt are both downgraded to channel_asserted and share one idempotency key, so the
+      // second is a replay of the first stored denial (no new row); the replayed-proof attempt is anonymous and has its own denied row.
+      expect(outcomes.filter((o) => o === "success")).toHaveLength(1);
+      expect(outcomes.filter((o) => o === "denied")).toHaveLength(2);
+      expect(outcomes).toHaveLength(3); // nothing else ran: no second success for any of the three refused attempts
+    });
+  });
 });
+

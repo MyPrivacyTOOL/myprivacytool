@@ -125,44 +125,42 @@ Aggregate counts only in shared logs and artifacts; no email, token or free text
 | Scheduled | No |
 | Verified | No |
 
-## 9. Provisional build and test receipts (added after the owner chose to build on provisional contracts)
+## 9. Build and test receipts
 
-Built on the section 3 design **without** MPC-8528 / MPC-8530. Treat as provisional: re-point `case_ref` and re-run the tests
-when MPC-8528 lands a real case schema, and replace the proposed backoff and bound when MPC-8530 approves numbers.
+Status: **built and isolated-tested; NOT applied to production, NOT scheduled, NOT wired to a worker, no live messages.** The follow-up
+engine now sits on the MPC-8528 case table (`support_cases`, merged as a proposed schema in #548/#556/#563). The retry numbers are still
+**proposals pending MPC-8530 approval** (backoff 15 min, 1 h, 6 h; max 3 attempts).
 
 | Piece | File | State |
 |---|---|---|
-| Follow-up engine (tables, lease claim, idempotent attempts, bounded backoff, exhaustion, verify, reopen, sweep, metrics view) | `supabase/sql/mpc-8529-support-followup.sql` | Tested on a throwaway Postgres 16. **Not applied to production.** Deliberately not in `supabase/migrations/`, which auto-deploys. |
-| Sweep schedule (`mpt-support-followup-sweep`, every 5 min) | same file, commented out | **Not scheduled.** Needs approval. |
-| Honest outage wording and bound helpers | `src/lib/supportFollowup.ts` (+ test) | Unit-tested; **not wired into any UI or worker yet**. |
-| HELP-under-outage browser checks (11 routes incl. 404, desktop + mobile, keyboard, focus return, no token/email in requests) | `e2e/support-degraded.spec.ts` | Run on a production build with all non-local traffic blocked. |
+| Follow-up engine on `support_cases`: scheduling side table, attempt history, lease claim (`SKIP LOCKED`), idempotent attempts, bounded backoff, verify-before-resolve, reopen, orphan and stale-lease sweep, PII-free metrics view | `supabase/proposed/mpc_8529_support_followup.sql` | Tested on throwaway Postgres 16 against the real 8528 schema. **Proposed, not a migration, not applied.** |
+| How outcomes map onto MPC-8528 states | same file header | send failed or unconfirmed: `waiting_system` / `reply_delivery_failed`; confirmed delivery: `waiting_customer`; retries exhausted: `blocked` / `followup_exhausted`; verified outcome: `resolved`; customer reply on resolved/closed/blocked: `reopened`. MPC-8528 has no separate "exhausted" state, so `blocked` + reason is the honest "unresolved". |
+| `support_messages.delivery` kept in step | same file | failed: `failed`; sent without receipt: `unknown`; receipt: `sent`. MPC-8528 has no receipt-confirmed value, so the receipt itself is kept in `support_followup_attempt`. |
+| Bound, backoff, transition parity with the SQL and with `shared/support/states.ts`; honest outage wording | `src/lib/supportFollowup.ts` (+ test) | Unit-tested; **not wired into any UI or worker.** |
+| Sanitised defect-handoff builder | `src/lib/supportDefectHandoff.ts` (+ test) | Builds a payload only; **nothing sends it.** |
+| Versioned test receipts (expected vs actual, evidence class, refuses PII/tokens; live only with a passing real-channel check) | `src/lib/supportReceipts.ts` (+ test) | Unit-tested; not yet emitted by CI. |
+| Follow-up worker: claims due cases, sends ONE fixed honest message through the MPC-8528 `Notifier` to the original sender only, records `attempted` (never `delivered`), re-checks without re-sending, never touches resolved/closed/blocked | `shared/support/followup-worker.ts` (+ `rest-followup-store.ts`, PostgREST over the SQL functions) | Tested with fakes (16 tests incl. a mutation check). **Not scheduled, not deployed, not run against a real notifier.** |
+| Engineering handoff port: sanitises first, never throws into the support flow, never reaches a person, no automatic fix | `shared/support/engineering-intake.ts` | Tested with a fake intake. **No real intake exists or is approved yet.** |
+| Limited-mode help page (static, no scripts/forms/requests; states it cannot save a request or issue a case reference) | `fallback/help/index.html`, `fallback/README.md` | **Prepared, not deployed, not independent** until an approved host serves it. Deliberately outside `public/`. |
+| Full lifecycle journey (promise, failed send, retry, receipt, silence, failed then passed verification, reopen, exhaustion) | `supabase/tests/proposed-mpc-8529-support-followup.test.sql` | 72 assertion calls, pass. |
+| HELP under outage (11 routes incl. 404, desktop + mobile, keyboard, focus, no token/email in requests) | `e2e/support-degraded.spec.ts` | Production build, all non-local traffic blocked. |
 
-Run command: `npm run test:support` (needs `DATABASE_URL` of a disposable Postgres and a built `dist/`; see `docs/ci-cd-testing.md`).
-Disable: `select cron.unschedule('mpt-support-followup-sweep');` (nothing to undo while it is unscheduled). Remove: drop the objects in the SQL file.
-
-Receipts (run 2026-10-26 on this branch; expected = pass):
-
-| Check | Expected | Actual |
-|---|---|---|
-| `supabase/tests/run.sh` incl. `support-followup.test.sql` | all assertions pass | pass (10 RLS rows, schema assertions, 58 follow-up assertion calls) |
-| `vitest` supportFollowup + HelpButton | pass | 63 / 63 |
-| eslint (changed files), `tsc --noEmit -p tsconfig.app.json` | clean | clean |
-| Playwright `support-degraded.spec.ts` | pass | 24 / 24 |
-
-Evidence class: **mocked / isolated integration only.** No real channel, no production database, no live message.
+Run: `npm run test:support` (needs `DATABASE_URL` of a disposable Postgres and a built `dist/`; see `docs/ci-cd-testing.md`).
+Disable: nothing is scheduled. If ever applied: `select cron.unschedule('mpt-support-followup-sweep');`. Remove: drop the objects in the SQL file.
+Evidence class: **mocked / isolated integration only.** Receipts are structured by `src/lib/supportReceipts.ts`.
 
 ### Acceptance criteria against this build
 
 | Criterion | Status |
 |---|---|
-| Persistent next-action / next-update scheduling, bounded retries, backoff, idempotency, lease against duplicate workers | Met in isolated DB tests (provisional schema) |
-| Orphan and stalled-lease detection; explicit waiting / unresolved / exhausted states; no close-on-silence; verification; reopen | Met in isolated DB tests |
-| Sanitised defect handoff to the engineering workflow | **Unmet.** Only the `engineering_handoff` state exists; no sender. |
-| Failed acknowledgement / reply detection from a real transport | **Unmet.** Needs MPC-8528 delivery receipts and a worker. |
-| Independently reachable help/status/intake fallback | **Unmet.** Needs an approved host other than Cloudflare Pages. `describeAvailability` only labels shared-host fallbacks as not independent. |
-| HELP across routes, desktop/mobile, keyboard, honest copy | Met for the current HELP (11 routes in browser, all route patterns in HELP's own unit test) |
-| Full main journey (diagnosis, action, case reference, delivered follow-up, verified outcome, reopen) | **Unmet.** Needs MPC-8528 backend; only the follow-up state transitions are tested. |
-| Wrong-user access, broken login, disputed finding, billing boundary, malicious prompts, cost exhaustion | **Unmet.** Belong to the MPC-8528 gateway and MPC-8530 policy. |
-| Production schedule, live tests, load test | **Not done; approval required.** |
+| Persistent next-action / next-update scheduling, bounded retries, backoff, idempotency, lease against duplicate workers | Met in isolated DB tests on the real 8528 schema |
+| Orphan and stalled-lease detection; explicit waiting / unresolved states; no close-on-silence; verification; reopen | Met in isolated DB tests |
+| Honest HELP under outage; fallbacks that share a failed dependency are not called independent | Met (browser + unit) |
+| Sanitised defect handoff to the engineering workflow | **Partly met.** Sanitising builder and sender port are built and tested; **no real intake** is named or approved. |
+| Failed ack/reply detection from a real transport | **Partly met.** The DB path and the worker are tested with fakes; nothing runs the worker and no channel `Notifier` is enabled (MPC-8532). Open finding: a channel with no delivery receipts (e.g. plain email) can only reach `attempted`, so by design it ends `blocked` / `followup_exhausted` after the bound; MPC-8532 must define what counts as a delivery receipt per channel. |
+| Independently reachable help/status/intake fallback | **Prepared only.** The static page exists in `fallback/`; it is not served anywhere. Needs an approved host other than Cloudflare Pages (new infrastructure) before it can be called independent. |
+| Full main journey (diagnosis, action, case reference, delivered follow-up, verified outcome, reopen) | **Partly met.** Follow-up half tested end to end; AI diagnosis and permitted action need the 8528 service wired to a model, verifier and policy (MPC-8530). |
+| Wrong-user, broken login, disputed finding, billing/rights boundary, malicious prompts, cost exhaustion | **Unmet** here. The MPC-8528 gateway has its own isolated tests; end-to-end versions need MPC-8530 policy and a hosted service. |
+| Metrics surfaced anywhere; production schedule; live and real-channel tests | **Not done; approval required.** |
 
-So acceptance is **not** met overall. The task cannot honestly be marked Done until MPC-8528 / MPC-8530 land and the unmet rows are re-tested.
+So acceptance is **not** met overall. The task cannot honestly be marked Done until the unmet rows are closed.

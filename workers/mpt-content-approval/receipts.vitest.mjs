@@ -3,7 +3,7 @@
 // in-memory fake. No test here can reach a live account: every fetch goes through the stubbed global.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import worker, { process as processApproval, recover } from './worker.js';
-import { hmacHex, handleReceipt, backoffSeconds, parseRetryAfter, classifyCycle, missingCycles, rowsFor, MAX_ATTEMPTS } from './receipts.js';
+import { watchdogReport, expectedCycleIds, hmacHex, handleReceipt, backoffSeconds, parseRetryAfter, classifyCycle, missingCycles, rowsFor, MAX_ATTEMPTS } from './receipts.js';
 import { PLATFORMS } from './schema.js';
 
 const TASK = 'daily-posts-2026-10-21';
@@ -44,6 +44,8 @@ function fakeD1() {
         return {};
       },
       all: async () => {
+        if (sql.startsWith('SELECT task_id, status')) return { results: t.agent_execution_logs.map((r) => ({ task_id: r[2], status: r[3] })) };
+        if (sql.startsWith('SELECT * FROM publication_receipts WHERE content_id >=')) return { results: t.publication_receipts.filter((r) => r.content_id >= a[0]).map((r) => ({ ...r })) };
         if (sql.startsWith('SELECT * FROM publication_receipts')) return { results: t.publication_receipts.filter((r) => r.content_id === a[0]).map((r) => ({ ...r })) };
         if (sql.startsWith('SELECT receipt_id')) return { results: t.receipt_callbacks.filter((r) => r[0] === a[0]).map((r) => ({ receipt_id: r[0] })) };
         const [task, status] = a;
@@ -262,5 +264,100 @@ describe('D: stage reporting separates approval-wait from failure', () => {
     expect(body.platforms).toHaveLength(6);
     expect(body.stages.handed_off).toBe(6);
     expect(JSON.stringify(body)).not.toMatch(/tok|hook\.eu1/); // no secret material in status output
+  });
+});
+
+describe('D: watchdog report and authenticated triggers', () => {
+  const NOW_D = new Date('2026-10-27T03:00:00Z'); // 11:00 HKT on 2026-10-27
+  const log = (id, status) => ({ task_id: id, status });
+  it('expectedCycleIds lists HKT dates newest first', () => {
+    expect(expectedCycleIds(NOW_D, 3)).toEqual(['daily-posts-2026-10-27', 'daily-posts-2026-10-26', 'daily-posts-2026-10-25']);
+  });
+  it('awaiting approval is reported but healthy; a cycle past its generation window with no drafts is a missing_cycle', () => {
+    const ids = expectedCycleIds(NOW_D, 2);
+    const ok = watchdogReport({ ids, logs: [log(ids[0], 'drafted'), log(ids[0], 'notified'), log(ids[1], 'drafted'), log(ids[1], 'approved'), log(ids[1], 'handed_off')], receipts: [], now: NOW_D });
+    expect(ok.healthy).toBe(true);
+    expect(ok.awaiting_approval).toEqual([ids[0]]);
+    expect(ok.cycles.map((c) => c.stage)).toEqual(['awaiting_approval', 'handed_off']);
+    const missing = watchdogReport({ ids, logs: [log(ids[1], 'drafted')], receipts: [], now: NOW_D });
+    expect(missing.problems).toEqual([{ id: ids[0], kind: 'missing_cycle' }]);
+    // before today's producer window plus grace has passed it is NOT yet missing
+    expect(watchdogReport({ ids: [ids[0]], logs: [], receipts: [], now: new Date('2026-10-26T22:30:00Z') }).healthy).toBe(true);
+  });
+  it('flags generation failure, approved-but-never-sent, overdue receipts, unknown outcomes and dead letters', () => {
+    const [a, b, c] = ['daily-posts-2026-10-27', 'daily-posts-2026-10-26', 'daily-posts-2026-10-25'];
+    const r = watchdogReport({
+      ids: [a, b, c],
+      logs: [log(a, 'drafted'), log(a, 'failed'), log(b, 'drafted'), log(b, 'approved'), log(c, 'drafted'), log(c, 'approved'), log(c, 'handed_off')],
+      receipts: [
+        { content_id: c, platform: 'x', state: 'handed_off', handed_off_at: new Date(NOW_D - 8 * 3600e3).toISOString() },
+        { content_id: c, platform: 'linkedin', state: 'approved', outcome_unknown: 1 },
+        { content_id: c, platform: 'facebook', state: 'failed', dead_letter: 1 },
+      ],
+      now: NOW_D,
+    });
+    expect(r.healthy).toBe(false);
+    const kinds = r.problems.map((p) => `${p.id.slice(-2)}:${p.kind}`).sort();
+    expect(kinds).toEqual(['25:exhausted_recovery', '25:overdue_receipt', '25:unknown_outcome', '26:approved_not_sent', '27:generation_failed']);
+  });
+  it('a fully verified cycle is stage verified', () => {
+    const id = 'daily-posts-2026-10-26';
+    const r = watchdogReport({ ids: [id], logs: [log(id, 'drafted'), log(id, 'approved'), log(id, 'handed_off')], receipts: PLATFORMS.map((platform) => ({ content_id: id, platform, state: 'verified_published' })), now: NOW_D });
+    expect(r.cycles[0].stage).toBe('verified');
+    expect(r.healthy).toBe(true);
+  });
+  it('GET /watchdog and POST /recover require the bearer token; /recover is POST-only and sends nothing when nothing is due', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    expect((await worker.fetch(new Request('https://w/watchdog'), env(db), {})).status).toBe(401);
+    expect((await worker.fetch(new Request('https://w/recover', { method: 'POST' }), env(db), {})).status).toBe(401);
+    const h = { authorization: 'Bearer tok' };
+    expect((await worker.fetch(new Request('https://w/recover', { headers: h }), env(db), {})).status).toBe(405);
+    const rec = await (await worker.fetch(new Request('https://w/recover', { method: 'POST', headers: h }), env(db), {})).json();
+    expect(rec).toMatchObject({ ok: true, resent: [], deadLettered: [] });
+    expect(makeCalls()).toHaveLength(0);
+    const rep = await (await worker.fetch(new Request('https://w/watchdog?days=2', { headers: h }), env(db), {})).json();
+    expect(rep).toHaveProperty('healthy');
+    expect(rep.cycles).toHaveLength(2);
+    expect(JSON.stringify(rep)).not.toMatch(/tok|hook\.eu1/);
+  });
+});
+
+describe('routed platforms: only platforms Make can publish are sent, verified or monitored', () => {
+  const routedEnv = (db) => env(db, { ROUTED_PLATFORMS: 'linkedin,facebook' });
+  const go = (db) => processApproval(routedEnv(db), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
+  it('sends only routed platforms and records the rest as not_routed (never handed off)', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    expect((await go(db)).status).toBe(200);
+    expect(sentPlatforms(0)).toEqual(['linkedin', 'facebook']);
+    expect(states(db)).toEqual({ x: 'not_routed', linkedin: 'handed_off', instagram: 'not_routed', facebook: 'handed_off', pinterest: 'not_routed', youtube: 'not_routed' });
+  });
+  it('a receipt for a not_routed platform is refused; routed receipts verify and the cycle reads verified and healthy', async () => {
+    const db = fakeD1(); seedDrafts(db); await go(db);
+    expect((await submit(db, receipt('x'))).status).toBe(404);
+    await submit(db, receipt('linkedin')); await submit(db, receipt('facebook'));
+    const rows = await rowsFor(db, TASK);
+    const rep = watchdogReport({ ids: [TASK], logs: db.tables.agent_execution_logs.map((r) => ({ task_id: r[2], status: r[3] })), receipts: rows, now: new Date(NOW) });
+    expect(rep.cycles[0].stage).toBe('verified');
+    expect(rep.healthy).toBe(true);
+    expect(classifyCycle(rows).stages.not_routed).toBe(4);
+  });
+  it('recovery and duplicate approvals never send a not_routed platform', async () => {
+    makeImpl = async () => new Response('down', { status: 503 });
+    const db = fakeD1(); seedDrafts(db);
+    await go(db);
+    makeImpl = async () => new Response('Accepted', { status: 200 });
+    const rep = await recover(routedEnv(db), { now: new Date(Date.now() + 2 * 3600e3) });
+    expect(rep.resent).toEqual([{ id: TASK, platforms: ['linkedin', 'facebook'] }]);
+    expect(sentPlatforms(makeCalls().length - 1)).toEqual(['linkedin', 'facebook']);
+  });
+  it('fails closed when ROUTED_PLATFORMS names nothing that was drafted', async () => {
+    const db = fakeD1(); seedDrafts(db);
+    const out = await processApproval(env(db, { ROUTED_PLATFORMS: 'tiktok' }), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
+    expect(out.status).toBe(422);
+    expect(makeCalls()).toHaveLength(0);
+  });
+  it('unset ROUTED_PLATFORMS keeps the legacy behaviour (all six sent)', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect(sentPlatforms(0)).toHaveLength(6);
   });
 });

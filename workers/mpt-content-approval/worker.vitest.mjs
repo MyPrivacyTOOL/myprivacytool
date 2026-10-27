@@ -146,6 +146,20 @@ describe('payload helpers', () => {
     expect(p.posts[3].subreddit).toBe('r/cybersecurity');
     expect(p.approval_timestamp).toBe('2026-10-21T07:00:00+08:00');
   });
+  it('image_key: set on LinkedIn only (draft value wins over the default), validated, absent when unset', () => {
+    const args = { taskId: TASK, approvedBy: 'chris', approvalTimestamp: APPROVED_AT, defaultAssetUrl: ASSET };
+    const withDefault = buildMakePayload(sixDrafts(), { ...args, defaultImageKey: 'social/end-card.png' });
+    expect(withDefault.posts.filter((x) => x.image_key).map((x) => [x.platform, x.image_key])).toEqual([['linkedin', 'social/end-card.png']]);
+    expect(validateMakePayload(withDefault).ok).toBe(true);
+    const own = buildMakePayload([draftFor('linkedin', { image_key: 'social/own.png' })], { ...args, defaultImageKey: 'social/end-card.png' });
+    expect(own.posts[0].image_key).toBe('social/own.png');
+    expect(buildMakePayload(sixDrafts(), args).posts.some((x) => 'image_key' in x)).toBe(false);
+    for (const bad of ['/abs.png', '../x.png', 'a b.png', 'https://x.io/a.png']) {
+      const p = buildMakePayload(sixDrafts(), args);
+      p.posts[1].image_key = bad;
+      expect(validateMakePayload(p).errors.join()).toMatch(/image_key/);
+    }
+  });
   it('maskUrl hides the token path', () => {
     expect(maskUrl(MAKE_URL)).toBe('https://hook.eu1.make.com/…abcd');
     expect(maskUrl('garbage')).toBe('invalid-url');

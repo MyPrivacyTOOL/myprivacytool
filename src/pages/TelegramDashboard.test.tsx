@@ -9,9 +9,10 @@ import TelegramDashboard from "./TelegramDashboard";
 afterEach(() => vi.unstubAllGlobals());
 
 const hexagons = [
-  { id: "tg.username", label: "@username", arrival_label: "Sent with every message", state: "returned" },
-  { id: "tg.bio", label: "Bio", arrival_label: "Public profile lookup", state: "not_returned" },
-  { id: "tg.premium", label: "Premium status", arrival_label: "Public profile lookup", state: "not_checked" },
+  { id: "tg.username", label: "@username", arrival_label: "Sent with every message", state: "returned", value: "@synthetic_user", value_note: null },
+  { id: "tg.language", label: "Language setting", arrival_label: "Sent with every message", state: "returned", value: null, value_note: "Received when you confirmed, but not kept in the stored scan." },
+  { id: "tg.bio", label: "Bio", arrival_label: "Public profile lookup", state: "not_returned", value: null, value_note: null, explain: "Good news: Telegram did not send this to the bot, so nothing was exposed through this check. Either your privacy settings are blocking it, or it is not set on your profile. The bot cannot tell which." },
+  { id: "tg.premium", label: "Premium status", arrival_label: "Public profile lookup", state: "not_checked", value: null, value_note: null, explain: "This scan does not look this up yet, so we cannot say whether it is exposed. A check for it has not been built." },
 ];
 const base = {
   generated_at: "2026-10-26T15:00:00Z",
@@ -29,7 +30,15 @@ describe("TelegramDashboard", () => {
     renderPage(<TelegramDashboard />, "/dashboard");
     expect(await screen.findByText(/1 of 30/)).toBeTruthy();
     expect(screen.getByText(/risk risk-count-1/)).toBeTruthy();
-    expect(screen.getByText("Received by the bot")).toBeTruthy();
+    expect(screen.getAllByText("Received by the bot").length).toBe(2);
+    expect(screen.getByTestId("value-tg.username").textContent).toBe("@synthetic_user"); // the person's own data is shown, not just a label
+    expect(screen.getByText(/not kept in the stored scan/)).toBeTruthy();
+    expect(screen.queryByTestId("value-tg.bio")).toBeNull(); // not returned: no value
+    // every "not returned" and "not checked" item says why, in plain words, and the good news is not stated as a fact about the person's settings
+    expect(screen.getByTestId("explain-tg.bio").textContent).toMatch(/Good news: Telegram did not send this to the bot/);
+    expect(screen.getByTestId("explain-tg.bio").textContent).toMatch(/Either your privacy settings are blocking it, or it is not set on your profile/);
+    expect(screen.getByText("Not returned: good")).toBeTruthy();
+    expect(screen.getByTestId("explain-tg.premium").textContent).toMatch(/does not look this up yet/);
     expect(screen.getByText("Not checked")).toBeTruthy();
     expect(screen.getByText(/Never sent to bots by Telegram: last seen/)).toBeTruthy();
     expect(screen.getByText("Not proof of privacy.")).toBeTruthy();
