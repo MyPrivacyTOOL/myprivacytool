@@ -412,10 +412,9 @@ describe('rejected receipts are logged with a reason (never silent)', () => {
     expect(task).toBe(TASK); expect(status).toBe('receipt_rejected');
     expect(msg).toContain('HTTP 400'); expect(msg).toContain('needs make_run_id'); expect(msg).toContain('"make_run_id":""'); expect(msg).not.toContain(SECRET);
   });
-  it('does not log successes, duplicates or 401s, and handles a non-JSON body', async () => {
+  it('does not log successes or duplicates, and handles a non-JSON body', async () => {
     const db = fakeD1();
     await logRejectedReceipt(env(db), { status: 200, message: 'verified' }, '{}', NOW);
-    await logRejectedReceipt(env(db), { status: 401, message: 'bad token' }, '{}', NOW);
     expect(rejected(db)).toHaveLength(0);
     await logRejectedReceipt(env(db), { status: 400, message: 'bad json' }, 'not json', NOW);
     expect(rejected(db)[0][2]).toBe('receipt-rejected');
@@ -424,6 +423,28 @@ describe('rejected receipts are logged with a reason (never silent)', () => {
     const db = fakeD1(); seedDrafts(db); await approve(db);
     const res = await worker.fetch(new Request('https://x/receipt', { method: 'POST', headers: { 'x-receipt-token': SECRET }, body: JSON.stringify(receipt('linkedin', { post_id: 5 })) }), env(db), {});
     expect(res.status).toBe(400);
+    expect(rejected(db)).toHaveLength(1);
+  });
+});
+
+describe('401s are logged too, once per hour, without the secret', () => {
+  const rejected = (db) => db.tables.agent_execution_logs.filter((r) => r[3] === 'receipt_rejected');
+  it('records why a call was unauthorised (token present/absent and lengths) but never the token, capped at one row an hour', async () => {
+    const db = fakeD1();
+    const headers = new Headers({ 'x-receipt-token': 'x'.repeat(10) });
+    for (let i = 0; i < 3; i++) await logRejectedReceipt(env(db), { status: 401, message: 'bad token' }, '{}', NOW + i * 1000, headers);
+    expect(rejected(db)).toHaveLength(1);
+    const msg = rejected(db)[0][4];
+    expect(msg).toContain('HTTP 401: bad token'); expect(msg).toContain('token=present len=10'); expect(msg).toContain(`secret len=${SECRET.length}`);
+    expect(msg).not.toContain(SECRET); expect(msg).not.toContain('x'.repeat(10));
+    await logRejectedReceipt(env(db), { status: 401, message: 'missing signature' }, '{}', NOW + 2 * 3600e3, new Headers());
+    expect(rejected(db)).toHaveLength(2);
+    expect(rejected(db)[1][4]).toContain('token=absent');
+  });
+  it('POST /receipt with a wrong token logs a 401 row', async () => {
+    const db = fakeD1();
+    const res = await worker.fetch(new Request('https://x/receipt', { method: 'POST', headers: { 'x-receipt-token': 'wrong' }, body: '{}' }), env(db), {});
+    expect(res.status).toBe(401);
     expect(rejected(db)).toHaveLength(1);
   });
 });

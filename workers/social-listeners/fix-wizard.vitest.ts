@@ -22,7 +22,7 @@ const PHOTOS = { total_count: 1, photos: [[{ file_unique_id: "u1", width: 1, hei
 const baselineHexagons = () => hexagonStates({ update_id: 1, message: { from: fromUser, date: 1, text: "Y" } }, BASE_CHAT, PHOTOS.photos);
 const baselineRow = (over: Record<string, unknown> = {}) => ({ id: BASE_ID, created_at: "2026-10-26T14:24:10Z", scan_version: SCAN_VERSION, risk_version: RISK_VERSION, report: { channel: "TG", hexagons: baselineHexagons() }, ...over });
 
-interface Opts { baseline?: any | null; items?: any[]; chat?: any; chatStatus?: number; photos?: any; photosStatus?: number; sbFail?: boolean; recentRechecks?: number; dupe?: boolean; editFails?: boolean; consent?: string | null; consentFail?: boolean }
+interface Opts { baseline?: any | null; items?: any[]; chat?: any; chatStatus?: number; photos?: any; photosStatus?: number; sbFail?: boolean; recentRechecks?: number; dupe?: boolean; editFails?: boolean; consent?: string | null; consentFail?: boolean; rpcFail?: boolean }
 function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
   const calls: { url: string; method: string; body: any }[] = [];
   const logs: string[] = [];
@@ -41,6 +41,7 @@ function setup(envOver: Record<string, unknown> = {}, o: Opts = {}) {
       return Response.json({ ok: true, result: {} });
     }
     if (url.includes("/rest/v1/conversation_states")) return o.consentFail ? new Response("", { status: 500 }) : Response.json(o.consent === null ? [] : [{ state: o.consent ?? "confirmed" }]);
+    if (url.includes("/rest/v1/rpc/")) return o.rpcFail ? new Response("", { status: 500 }) : Response.json(1);
     if (o.sbFail) return new Response("", { status: 500 });
     if (url.includes("/rest/v1/profile_snapshots")) {
       if (method === "GET") {
@@ -182,6 +183,41 @@ describe("journey", () => {
     await t.post(cmd("/fix", 30));
     expect(t.shown()).toMatch(/Profile photo: skipped/);
     expect(t.shown()).toMatch(/Phone number: SELF-CONFIRMED \(not checked\)/);
+  });
+});
+
+describe("Delete my scan data button", () => {
+  const rpcs = (t: ReturnType<typeof setup>) => t.calls.filter((c) => c.url.includes("/rpc/")).map((c) => c.url.split("/rpc/")[1]);
+  it("is on the list and asks for confirmation first, deleting nothing", async () => {
+    const t = setup();
+    await t.post(cmd("/fix"));
+    const list = JSON.stringify(t.tg("sendMessage")[0].body.reply_markup);
+    expect(list).toContain(`fw|${B8}|dd`);
+    await t.post(cb(`fw|${B8}|dd`, 60));
+    expect(t.shown()).toMatch(/cannot be undone/);
+    expect(JSON.stringify(t.tg("editMessageText")[0].body.reply_markup)).toContain(`fw|${B8}|dy`);
+    expect(rpcs(t)).toHaveLength(0);
+  });
+  it("on confirm erases consent, scan data and DEEP data for the tapping user only, then says Done", async () => {
+    const t = setup();
+    await t.post(cb(`fw|${B8}|dy`, 61));
+    expect(rpcs(t)).toEqual(["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_deep_data"]);
+    expect(t.calls.filter((c) => c.url.includes("/rpc/")).every((c) => Object.values(c.body).some((v) => v === String(ID) || v === "telegram"))).toBe(true);
+    expect(t.shown()).toMatch(/Done\. I deleted/);
+  });
+  it("still deletes when the scan is already gone, and never says Done on a failure", async () => {
+    const gone = setup({}, { baseline: null });
+    await gone.post(cb("fw|zzzzzzzz|dy", 62));
+    expect(rpcs(gone)).toHaveLength(3);
+    const bad = setup({}, { rpcFail: true });
+    await bad.post(cb(`fw|${B8}|dy`, 63));
+    expect(bad.shown()).toMatch(/could not finish deleting/);
+    expect(bad.shown()).not.toMatch(/Done\./);
+  });
+  it("is not offered to or run for a non-allow-listed sender", async () => {
+    const t = setup({}, {});
+    await t.post(cb(`fw|${B8}|dy`, 64, { id: OTHER, is_bot: false }));
+    expect(rpcs(t)).toHaveLength(0);
   });
 });
 
