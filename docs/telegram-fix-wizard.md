@@ -58,3 +58,10 @@ Exact whole messages `STOP`, `/stop`, `delete my data`, `/deletemydata` or `/del
 - **Turn on, in this order:** (1) apply `supabase/migrations/20261027100000_mpc_7894_hashed_sender_ids.sql` by hand (it only widens four CHECKs; without it hashed writes are rejected, never stored plain); (2) `wrangler secret put TELEGRAM_ID_HMAC_KEY` for `social-listeners` with a new random value (for example `openssl rand -hex 32`); (3) keep a copy of the key in your password manager. **If the key is lost or changed, every hashed row becomes unreachable** (its owner must scan again; old rows expire after 90 days or are removed by STOP only under the key in use). Rotating the key therefore needs a re-hash migration first: not built.
 - **Turn off / roll back:** delete the secret; new rows are plain again, hashed rows stay until they expire. To remove hashed rows first: `select public.mpt_delete_profile_snapshots('h1:...')`.
 - **What it does not hide:** the stored getChat answer still holds the username, names and bio that the scan analyses, and core-brain's `conversation_states` keeps the plain id. DEEP and the dashboard stay allow-list only; the dashboard's DEEP panel only shows DEEP for older plain-id scans (DEEP rows are keyed by the plain id).
+
+## Delete my scan data button (end of the journey)
+
+The fix list and the Scan again summary carry a "Delete my scan data" button. It asks for confirmation ("Yes, delete everything" / "No, keep it"), then runs the same erase as STOP
+(`eraseSender` in `delete-my-data.ts`): consent record, baseline and re-check snapshots (cascading to fix-list progress and dashboard links), and DEEP data. It works even if the scan
+is already gone, and it reports failure instead of "Done" if any step fails. It deletes our copy only: the user's Telegram settings are theirs and are not changed. Opt-in, not automatic:
+a re-check needs the baseline, so nothing is deleted until the user chooses. Automatic expiry (90 days) is separate.
