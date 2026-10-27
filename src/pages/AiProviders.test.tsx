@@ -21,7 +21,7 @@ describe("AI model providers disclosure", () => {
     renderPage(<DPA />);
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("AI model providers (any provider; currently Alibaba Cloud, Qwen models)");
-    expect(text).toContain("message text and short approved help-article excerpts, with email addresses and phone numbers removed first");
+    expect(text).toContain("message text only, with email addresses and phone numbers removed first");
     expect(text).toContain("any country where one of our AI model providers runs its service");
   });
 });
