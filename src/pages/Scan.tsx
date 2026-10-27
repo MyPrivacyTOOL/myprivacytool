@@ -12,6 +12,7 @@ import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
 import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import LiveScanPanel from "@/components/LiveScanPanel";
+import ShareButtons from "@/components/ShareButtons";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
@@ -188,6 +189,8 @@ const Scan = () => {
         {!submitted ? renderForm("top") : thanks}
         {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
+
+        <ShareButtons where={submitted ? "thank_you" : "scan_page"} />
 
         <p className="text-muted-foreground text-xs mt-4">
           We never sell your data. Unsubscribe any time.
