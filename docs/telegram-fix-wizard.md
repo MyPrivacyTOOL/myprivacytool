@@ -45,6 +45,9 @@ Risk stays a count out of 30 (risk-count-1), no weights; before/after is a count
 2. Retention (90 days) confirmed in the data-retention policy, and deletion on request (`mpt_delete_profile_snapshots`) tested against a real request.
 3. Plain Telegram ids replaced by an HMAC, or an explicit written decision to keep plain ids for real users (strategy 9.9).
 4. Guides reviewed on a real client (client, platform, app version, date recorded in `fix-guides.ts`) and the paid-plan copy approved.
-5. A consent-withdrawal path in core-brain (today only new, awaiting_confirmation, confirmed, declined exist).
+5. ~~A consent-withdrawal path~~ BUILT (this PR): see "STOP / delete my data" below. Open: confirm `PROBE_MODE` is not `all` at launch (the probe logs `channel_probe_captures` and `telegram_event_log` are not covered by STOP).
 6. Language plan for non-English users (copy is English only).
 DEEP (MPC-7892) and the dashboard link (MPC-7893) stay allow-list only whatever this switch says. Turn on: add `TELEGRAM_SCAN_SCOPE = "all"` to `[vars]` in `workers/social-listeners/wrangler.toml` and deploy (the baseline switch `TELEGRAM_BASELINE_SCAN` and `TELEGRAM_FIX_WIZARD` must also be on). Turn off: delete the line and deploy.
+
+## STOP / delete my data
+Exact whole messages `STOP`, `/stop`, `delete my data`, `/deletemydata` or `/delete` (case-insensitive) from a sender the scan is open to. It works whatever the feature switches say. In this order it calls the existing database functions: `mpt_erase_chat_sender` (consent state and routing log rows; the next "Y" must be given again, and the wizard stops re-checking at once), `mpt_delete_profile_snapshots` (baseline and re-check snapshots; cascades to fix-list progress and dashboard links/sessions), `mpt_delete_deep_data` (DEEP jobs and results). No migration. The reply says what was deleted; if any step fails it says so and never claims success (send STOP again). Repeating it is safe. Not covered: the bot-wide probe logs (`PROBE_MODE`) and anything already sent to Telegram. Rollback: revert the PR.

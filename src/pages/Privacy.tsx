@@ -486,17 +486,18 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Email Checks for Your Report:</strong> To prepare your
-                  report we send the domain part of your email address to
-                  Cloudflare (a public DNS lookup) and to rdap.org and the
-                  domain registry it points to (the public domain-registration
-                  record), and a SHA-256 hash of your email address to Gravatar
-                  and to Libravatar to see whether a public profile or avatar
-                  exists. Where we check whether your address appears in a data
-                  breach, we name that provider here when the check is switched on.
-                  We also search public code commits on GitHub: your email address
-                  itself (not a hash) goes to GitHub, in a search for public
-                  commits that name it as the author, so we can tell you if your
-                  address is published in public code
+                  report we send only the part of your email address after the @
+                  to Cloudflare and to the public domain-registration service
+                  (rdap.org and the registry it points to). We send a scrambled
+                  code made from your address (a SHA-256 hash), not the address
+                  itself, to Gravatar and to Libravatar, to see whether a public
+                  profile picture exists. We do not currently check data
+                  breaches. If we start, we will name the company here and say
+                  what we send to it. We also search public code changes
+                  (commits) on GitHub: your whole email address, not a scrambled
+                  code, goes to GitHub, in a search for public code changes that
+                  name it as the author, so we can tell you if your address is
+                  published in public code
                 </li>
                 <li>
                   <strong>Legal Authorities:</strong> When required by law or to
