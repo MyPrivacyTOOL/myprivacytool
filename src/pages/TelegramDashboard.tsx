@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // redirects here with no token in the address. Everything shown comes from /api/dashboard; nothing is invented here, and opening this page never runs a
 // scan, a DEEP check, a message or a signup. No analytics events are sent from this page.
 
-interface Hex { id: string; label: string; arrival_label: string; state: string }
+interface Hex { id: string; label: string; arrival_label: string; state: string; value?: string | null; value_note?: string | null; explain?: string | null }
 interface Risk { returned: number; possible: number; notChecked: number; percent: number; label: string }
 interface DeepResult { source: string; site_name: string; status: string; observed_at: string; limitation: string }
 interface Change { id: string; label: string; before: string; after: string; kind: string }
@@ -17,7 +17,7 @@ interface Change { id: string; label: string; before: string; after: string; kin
 interface Data { generated_at: string; baseline: any; enhanced: any; final: any; cta: { href: string; label: string }; deep_reminder: string }
 
 const STATE_LABEL: Record<string, string> = {
-  returned: "Received by the bot", not_returned: "Not returned", not_checked: "Not checked", check_failed: "Check failed", user_provided: "Provided by you", missing: "Missing",
+  returned: "Received by the bot", not_returned: "Not returned: good", not_checked: "Not checked", check_failed: "Check failed", user_provided: "Provided by you", missing: "Missing",
 };
 const DEEP_STATUS: Record<string, string> = { found: "Username found", not_found: "Not found (not an all-clear)", unavailable: "Site unavailable", blocked: "Blocked by the site", error: "Check failed" };
 const when = (iso?: string | null): string => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "");
@@ -48,12 +48,18 @@ function Baseline({ b }: { b: any }) {
   return (
     <div>
       <p className="text-2xl font-bold">{risk.returned} of {risk.possible} <span className="text-base font-normal text-muted-foreground">fields received by the bot ({risk.percent}%, {risk.label})</span></p>
-      <p className="mt-1 text-sm text-muted-foreground">{risk.notChecked} fields were not checked in this scan. Scan taken {when(b.taken_at)}. Versions: scan {b.scan_version}, risk {b.risk_version}, schema {b.schema_version}.</p>
-      <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+      <p className="mt-1 text-sm text-muted-foreground">{risk.notChecked} {risk.notChecked === 1 ? "field was" : "fields were"} not checked in this scan. Scan taken {when(b.taken_at)}. Versions: scan {b.scan_version}, risk {b.risk_version}, schema {b.schema_version}.</p>
+      <p className="mt-4 text-sm">Here is what Telegram handed to the bot, shown as it was received. Only you can see this page.</p>
+      <ul className="mt-2 grid gap-2 sm:grid-cols-2">
         {(b.hexagons as Hex[]).map((h) => (
-          <li key={h.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-            <span>{h.label}<span className="block text-xs text-muted-foreground">{h.arrival_label}</span></span>
-            <Badge variant={h.state === "returned" ? "destructive" : "secondary"}>{STATE_LABEL[h.state] ?? h.state}</Badge>
+          <li key={h.id} className="flex items-start justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+            <span className="min-w-0">
+              {h.label}<span className="block text-xs text-muted-foreground">{h.arrival_label}</span>
+              {h.value ? <span className="mt-1 block break-words font-medium" data-testid={`value-${h.id}`}>{h.value}</span> : null}
+              {h.value_note ? <span className="mt-1 block text-xs text-muted-foreground">{h.value_note}</span> : null}
+              {h.explain ? <span className="mt-1 block text-xs text-muted-foreground" data-testid={`explain-${h.id}`}>{h.explain}</span> : null}
+            </span>
+            <Badge className={`shrink-0 ${h.state === "not_returned" ? "bg-emerald-700 text-white hover:bg-emerald-700" : ""}`} variant={h.state === "returned" ? "destructive" : "secondary"}>{STATE_LABEL[h.state] ?? h.state}</Badge>
           </li>
         ))}
       </ul>

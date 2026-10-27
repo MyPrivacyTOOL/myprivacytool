@@ -5,7 +5,7 @@ import { supabaseStore } from "./store";
 import { handleData, handleLanding, handleRedeem } from "./handlers";
 import { sha256Hex, SESSION_COOKIE } from "./crypto";
 import type { DashboardStore, DeepJobRow, DeepResultRow, Read, SessionRow, SnapshotRow } from "./store";
-import { baselineView, enhancedView, finalView } from "./view";
+import { baselineView, enhancedView, finalView, valuesOf, NOT_KEPT, NOT_RETURNED_EXPLAIN, NOT_CHECKED_DEFAULT } from "./view";
 
 const ENV = { DASHBOARD_ENABLED: "1", SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "svc" };
 const TOKEN = "3f6c9f0e-5d0a-4c1e-9b0e-0a1b2c3d4e5f";
@@ -273,5 +273,76 @@ describe("storage configuration", () => {
     expect(supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_ROLE_KEY: "b" })).not.toBeNull();
     expect(supabaseStore({ SUPABASE_URL: "https://x.test" })).toBeNull();
     expect(supabaseStore({ SUPABASE_SERVICE_KEY: "a" })).toBeNull();
+  });
+});
+
+describe("the person's own values (synthetic account)", () => {
+  const full = snap({
+    id: "sv", sender_id: "111",
+    consent: { confirming_update_id: 4242 }, consent_at: "2026-10-26T14:24:10Z",
+    get_chat: { status: 200, response: { ok: true, result: {
+      id: 111, first_name: "Test", last_name: "Person", username: "test_person", active_usernames: ["test_person", "second_one"], bio: "Synthetic bio line",
+      birthdate: { day: 27, month: 10, year: 1990 }, accent_color_id: 3, is_premium: true, has_private_forwards: true, accepted_gift_types: { unlimited_gifts: true, premium_subscription: false },
+      secret_extra_field: "MUST NOT APPEAR", photo: { small_file_id: "SECRET-FILE-ID" },
+    } } },
+    photos: { status: 200, response: { ok: true, result: { total_count: 2, photos: [
+      [{ file_unique_id: "AQAD-new-small", width: 160, height: 160 }, { file_unique_id: "AQAD-new-big", width: 640, height: 640 }],
+      [{ file_unique_id: "AQAD-old", width: 320, height: 320 }],
+    ] } } },
+    report: { risk: risk(9), hexagons: hex({ "tg.numeric_id": "returned", "tg.first_name": "returned", "tg.username": "returned", "tg.bio": "returned", "tg.birthday": "returned", "tg.photo_current": "returned", "tg.photo_history": "returned", "tg.photo_fingerprint": "returned", "tg.language": "returned", "tg.message_text": "returned", "tg.update_counter": "returned", "tg.last_name": "not_returned" }), insights: [], never_sent: [], disabled: {} },
+  });
+  it("extracts readable values from a fixed list of fields", () => {
+    const v = valuesOf(full);
+    expect(v).toMatchObject({
+      "tg.numeric_id": "111", "tg.first_name": "Test", "tg.last_name": "Person", "tg.username": "@test_person", "tg.extra_usernames": "@test_person, @second_one",
+      "tg.bio": "Synthetic bio line", "tg.birthday": "27 October 1990", "tg.premium": "Yes", "tg.profile_colour": "Name colour 3",
+      "tg.photo_fingerprint": "AQAD-new-big, AQAD-old", "tg.update_counter": "4242", "tg.message_time": "2026-10-26T14:24:10Z",
+      "tg.forward_privacy": "Forwarding of your messages is restricted", "tg.gift_settings": "unlimited gifts: yes; premium subscription: no",
+    });
+    expect(v["tg.photo_current"]).toMatch(/^2 profile photos received; newest 640×640 px/);
+    expect(v["tg.photo_history"]).toBe("1 older photo");
+  });
+  it("baseline shows a value only for returned fields, notes what was not kept, and never carries the raw payload, file ids or unlisted fields", () => {
+    const b = baselineView(full) as { hexagons: { id: string; state: string; value: string | null; value_note: string | null }[] };
+    const byId = Object.fromEntries(b.hexagons.map((h) => [h.id, h]));
+    expect(byId["tg.bio"].value).toBe("Synthetic bio line");
+    expect(byId["tg.last_name"]).toMatchObject({ state: "not_returned", value: null, value_note: null }); // not returned: nothing to show, even though the value exists in the payload
+    expect(byId["tg.language"]).toMatchObject({ value: null, value_note: NOT_KEPT });
+    expect(byId["tg.message_text"]).toMatchObject({ value: null, value_note: NOT_KEPT });
+    const text = JSON.stringify(b);
+    expect(text).not.toMatch(/MUST NOT APPEAR|SECRET-FILE-ID|small_file_id|get_chat|secret_extra_field/);
+  });
+  it("hostile or odd stored values cannot break the view", () => {
+    const odd = snap({ id: "so", sender_id: "1", get_chat: { response: { result: { id: 1, first_name: "A\u0000B\nC", bio: "x".repeat(2000), birthdate: { day: 5, month: 99 }, active_usernames: [1, null], accepted_gift_types: "no" } } }, photos: { response: { result: { photos: "nope" } } } });
+    const v = valuesOf(odd);
+    expect(v["tg.first_name"]).toBe("A B C");
+    expect(v["tg.bio"]).toHaveLength(500);
+    expect(v["tg.birthday"]).toBeUndefined();
+    expect(v["tg.photo_current"]).toBeUndefined();
+    expect(valuesOf(snap({ id: "sn", sender_id: "1" }))).toEqual({});
+  });
+  it("the API never returns the raw columns", async () => {
+    const mem = memoryStore({ snaps: [full], links: await seedLink(TOKEN, "111", "sv") });
+    const c = cookieOf(await handleRedeem(post(), ENV, TOKEN, { store: mem.store }));
+    const text = await (await handleData(dataReq(c), ENV, { store: mem.store })).text();
+    expect(text).toContain("Synthetic bio line");
+    expect(text).not.toMatch(/MUST NOT APPEAR|SECRET-FILE-ID|"get_chat"|"photos"|"consent"/);
+  });
+});
+
+describe("explanations for not returned / not checked", () => {
+  const b = baselineView(snap({ id: "se", sender_id: "1", report: { risk: risk(0), hexagons: hex({ "tg.bio": "not_returned", "tg.message_counter": "not_checked", "tg.channel_posts": "not_checked", "tg.username": "returned" }), insights: [], never_sent: [], disabled: {} } })) as { hexagons: { id: string; explain: string | null }[] };
+  const ex = Object.fromEntries(b.hexagons.map((h) => [h.id, h.explain]));
+  it("not returned: good news, without claiming the cause", () => {
+    expect(ex["tg.bio"]).toBe(NOT_RETURNED_EXPLAIN);
+    expect(NOT_RETURNED_EXPLAIN).toMatch(/Either your privacy settings are blocking it, or it is not set on your profile/);
+    expect(NOT_RETURNED_EXPLAIN).toMatch(/cannot tell which/);
+  });
+  it("not checked: the technical reason from the registry, or an honest default", () => {
+    expect(ex["tg.message_counter"]).toMatch(/message_id is not a verified volume counter/);
+    expect(ex["tg.channel_posts"]).toBe(NOT_CHECKED_DEFAULT);
+  });
+  it("returned fields have no explanation", () => {
+    expect(ex["tg.username"]).toBeNull();
   });
 });

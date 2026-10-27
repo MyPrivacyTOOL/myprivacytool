@@ -6,6 +6,10 @@ export interface SnapshotRow {
   id: string; created_at: string; sender_id: string; status: string; scan_version: string; risk_version: string; schema_version: number; expires_at: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   report: any;
+  // Only read for the baseline snapshot, and only to pull a fixed list of values for the owner (view.ts valuesOf); never returned as is.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  get_chat?: any; photos?: any; consent?: any; consent_at?: string | null;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 export interface DeepJobRow { id: string; created_at: string; status: string; detector_version: string; finished_at: string | null; expires_at: string }
 export interface DeepResultRow { source: string; site_name: string; status: string; observed_at: string; detector_version: string; limitation: string }
@@ -32,6 +36,7 @@ export interface DashboardEnv {
 }
 
 const SNAPSHOT_COLUMNS = "id,created_at,sender_id,status,scan_version,risk_version,schema_version,expires_at,report";
+const BASELINE_COLUMNS = `${SNAPSHOT_COLUMNS},get_chat,photos,consent,consent_at`;
 const TIMEOUT_MS = 5000;
 const enc = encodeURIComponent;
 
@@ -69,7 +74,7 @@ export function supabaseStore(env: DashboardEnv, fetchImpl: typeof fetch = fetch
     },
     session: (h) => first<SessionRow>(`dashboard_sessions?select=sender_id,snapshot_id&session_hash=eq.${enc(h)}&revoked_at=is.null&expires_at=gt.${enc(nowIso())}&limit=1`),
     // The sender filter is the access check: a session for one sender can never read another sender's row, whatever id is asked for.
-    snapshot: (id, sender) => first<SnapshotRow>(`profile_snapshots?select=${SNAPSHOT_COLUMNS}&id=eq.${enc(id)}&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&limit=1`),
+    snapshot: (id, sender) => first<SnapshotRow>(`profile_snapshots?select=${BASELINE_COLUMNS}&id=eq.${enc(id)}&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&limit=1`),
     laterSnapshot: (sender, after) => first<SnapshotRow>(`profile_snapshots?select=${SNAPSHOT_COLUMNS}&sender_id=eq.${enc(sender)}&status=eq.complete&created_at=gt.${enc(after)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`),
     latestDeepJob: (sender) => first<DeepJobRow>(`deep_jobs?select=id,created_at,status,detector_version,finished_at,expires_at&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`),
     deepResults: (jobId) => get<DeepResultRow>(`deep_osint_results?select=source,site_name,status,observed_at,detector_version,limitation&job_id=eq.${enc(jobId)}&order=site_name.asc`),
