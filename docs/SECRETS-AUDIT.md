@@ -31,8 +31,8 @@ STANDING_OBJECTIVES, O2). Status as recorded there:
   **Update 2026-10-26:** superseded. The rotation was completed on 2026-10-14 (Notion MPC-7821, closed 2026-10-19): the
   new key is live on the Workers, Cloudflare Pages and the droplet, the legacy JWT keys are disabled in the dashboard, and
   the unused `default` secret key was deleted. A key-authenticated 401 check of the old key was not completed; the owner
-  accepted the dashboard state. The paragraph below is kept for history. `mpt-cairn-blackboard` and `partner-api` are not in
-  `rotate-supabase-key.yml`; confirm they hold the new key.
+  accepted the dashboard state. The paragraph below is kept for history. `mpt-cairn-blackboard` and `partner-api` were not in
+  `rotate-supabase-key.yml` during that rotation; they were added on 2026-10-26.
 
   **Deferred (MPC-7614, 2026-10-12):** the rest of this rotation is deferred to the fleet-wide security audit. Still open
   when it resumes: create the new key and set GitHub secret `NEW_SUPABASE_SECRET_KEY`, run `rotate-supabase-key.yml`,

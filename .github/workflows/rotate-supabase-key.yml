@@ -46,7 +46,7 @@ jobs:
           NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         run: |
           failed=0
-          for entry in scan-report:SUPABASE_SERVICE_ROLE_KEY mpt-leads:SUPABASE_SERVICE_ROLE_KEY mpt-metrics-collector:SUPABASE_SERVICE_ROLE_KEY github-channel:SUPABASE_SERVICE_ROLE_KEY oauth-poc:SUPABASE_SERVICE_ROLE_KEY webhook-receiver:SUPABASE_SERVICE_ROLE_KEY core-brain:SUPABASE_KEY social-listeners:SUPABASE_KEY; do
+          for entry in scan-report:SUPABASE_SERVICE_ROLE_KEY mpt-leads:SUPABASE_SERVICE_ROLE_KEY mpt-metrics-collector:SUPABASE_SERVICE_ROLE_KEY github-channel:SUPABASE_SERVICE_ROLE_KEY oauth-poc:SUPABASE_SERVICE_ROLE_KEY webhook-receiver:SUPABASE_SERVICE_ROLE_KEY mpt-cairn-blackboard:SUPABASE_SERVICE_ROLE_KEY partner-api:SUPABASE_SERVICE_ROLE_KEY core-brain:SUPABASE_KEY social-listeners:SUPABASE_KEY; do
             dir="${entry%%:*}"; secret="${entry##*:}"
             cd "workers/$dir"
             names=$(npx --yes wrangler@3 secret list --format json 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).map(x=>x.name).join(" "))}catch{console.log("")}})')
