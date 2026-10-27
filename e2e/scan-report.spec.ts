@@ -15,6 +15,17 @@ function fakeBackends() {
   const res = (status: number, body?: unknown) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? "" : JSON.stringify(body)), json: async () => body });
   const fetchImpl = async (input: unknown, init: RequestInit = {}) => {
     const url = String(input);
+    const rpc = url.match(/rest\/v1\/rpc\/(\w+)/);
+    if (rpc) {   // CK-8503: the Worker asks the database to create the report request atomically (public.mpt_request_scan); same rules as the SQL function
+      if (rpc[1] !== "mpt_request_scan") return res(404, { code: "PGRST202" });   // any other function: like PostgREST, "not found"
+      const a = JSON.parse(String(init.body)) as { p_user_id: string; p_email: string; p_request_id?: string | null };
+      const since = Date.now() - 24 * 3600 * 1000;
+      const hit = (tables.scans ?? []).find((r) => r.user_id === a.p_user_id && Date.parse(String(r.created_at)) >= since);
+      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true, request_id: hit.request_id ?? null }]);
+      const row: Row = { id: `id${++n}`, created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: "web_scan", report_status: "pending", report_attempts: 0, ...(a.p_request_id ? { request_id: a.p_request_id } : {}) };
+      tables.scans.push(row);
+      return res(200, [{ scan_id: row.id, duplicate: false, request_id: a.p_request_id ?? null }]);
+    }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/);
     if (!m) return res(200, {});   // Resend, HubSpot, DNS, Gravatar...
     const [, table, qs] = m;

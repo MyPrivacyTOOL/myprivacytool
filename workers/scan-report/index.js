@@ -12,6 +12,7 @@ import { turnstileBlocks } from './lib/turnstile.js';
 import { checkDeliverableDomain } from './lib/emailDomain.js';
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
+import { handleResendWebhook } from './lib/receipts.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
@@ -65,6 +66,8 @@ export default {
     if (request.method === 'POST' && url.pathname === '/api/referral/invite') return handleReferralInvite(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
+    // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
+    if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env) });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -173,18 +176,9 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
   // MPC-7471-F3: the same request arriving again (a timeout after the first answer was lost, a double click) is not "someone else": the visitor who holds the
   // request_id gets the original outcome, including the scan number. Anyone else, including someone typing this address, only learns "duplicate".
   const keyed = requestIdEnabled(env);
-  const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
-  const recent = await sb.select(`scans?user_id=eq.${user.id}&created_at=gte.${encodeURIComponent(since)}&select=id${keyed ? ',request_id' : ''}&limit=1`);
-  if (recent.length) return keyed && requestId && recent[0].request_id === requestId ? replayOutcome(sb, recent[0].id) : { duplicate: true, scanId: recent[0].id };
-
-  let scan;
-  try { scan = await sb.insert('scans', { user_id: user.id, email_scanned: email, source: 'web_scan', ...(keyed && requestId ? { request_id: requestId } : {}) }); }
-  catch (e) {
-    if (e.status !== 409 || !(keyed && requestId)) throw e;
-    const prior = (await sb.select(`scans?request_id=eq.${requestId}&user_id=eq.${user.id}&select=id&limit=1`))[0];   // two copies of one request raced: the second gets the first's outcome
-    if (!prior) throw e;
-    return replayOutcome(sb, prior.id);
-  }
+  const created = await requestScan(sb, user.id, email, now, keyed && requestId ? requestId : null, keyed);
+  if (created.duplicate) return keyed && requestId && String(created.requestId || '').toLowerCase() === String(requestId).toLowerCase() ? replayOutcome(sb, created.scanId) : { duplicate: true, scanId: created.scanId };
+  const scan = { id: created.scanId };
   // MPC-7471-F3: save the scan BEFORE the first email, so the email can show its number. Never throws; a failed save only means no number.
   const saved = save?.hexagons
     ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
@@ -193,6 +187,32 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
   const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e)))));
   if (ctx?.waitUntil) ctx.waitUntil(all); else await all;
   return { duplicate: false, scanId: scan.id, saved };
+}
+
+// CK-8503 (G5): the one-scan-per-24h rule is decided inside the database (public.mpt_request_scan takes a per-user advisory lock, then checks and
+// inserts), so simultaneous requests, with or without the same request_id, cannot all pass the check. It returns the existing scan's request_id so the
+// MPC-7471-F3 replay rule above still decides "your own retry" from "someone else". While the function does not exist (migration not applied yet:
+// HTTP 404 / PGRST202) this falls back to the previous check-then-insert, so Worker and migration can ship in either order. Any other error is real.
+async function requestScan(sb, userId, email, now, requestId, keyed) {
+  try {
+    const row = (await sb.rpc('mpt_request_scan', { p_user_id: userId, p_email: email, p_request_id: requestId }))?.[0];
+    if (!row?.scan_id) throw new Error('mpt_request_scan returned no scan');
+    return { scanId: row.scan_id, duplicate: Boolean(row.duplicate), requestId: row.request_id ?? null };
+  } catch (e) {
+    if (e.status !== 404) throw e;
+  }
+  const since = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+  const recent = await sb.select(`scans?user_id=eq.${userId}&created_at=gte.${encodeURIComponent(since)}&select=id${keyed ? ',request_id' : ''}&limit=1`);
+  if (recent.length) return { scanId: recent[0].id, duplicate: true, requestId: recent[0].request_id ?? null };
+  try {
+    const scan = await sb.insert('scans', { user_id: userId, email_scanned: email, source: 'web_scan', ...(requestId ? { request_id: requestId } : {}) });
+    return { scanId: scan.id, duplicate: false, requestId };
+  } catch (e) {
+    if (e.status !== 409 || !requestId) throw e;
+    const prior = (await sb.select(`scans?request_id=eq.${requestId}&user_id=eq.${userId}&select=id&limit=1`))[0];   // two copies of one request raced: the second gets the first's outcome
+    if (!prior) throw e;
+    return { scanId: prior.id, duplicate: true, requestId };
+  }
 }
 
 // The outcome of an earlier request, rebuilt from what is stored (never from the request): the scan number only if the scan was really saved and linked.

@@ -22,6 +22,19 @@ function backends() {
     const host = new URL(url).host;
     if (!KNOWN_HOSTS.some((h) => host.endsWith(h))) { stray.push(host); return res(500, "blocked"); }
     if (host === "api.resend.com") { mails.push(JSON.parse(String(init.body))); return res(200, { id: `msg_${++n}` }); }
+    const rpc = url.match(/rest\/v1\/rpc\/(\w+)/);
+    if (rpc) {   // CK-8503: the Worker asks the database to create the report request atomically (public.mpt_request_scan); same rules as the SQL function
+      if (rpc[1] !== "mpt_request_scan") return res(404, { code: "PGRST202" });   // any other function: like PostgREST, "not found"
+      const a = JSON.parse(String(init.body)) as { p_user_id: string; p_email: string; p_request_id?: string | null };
+      const scans = (tables.scans ??= []);
+      const since = Date.now() - 24 * 3600 * 1000;
+      const hit = scans.find((r) => r.user_id === a.p_user_id && Date.parse(String(r.created_at)) >= since);
+      if (hit) return res(200, [{ scan_id: hit.id, duplicate: true, request_id: hit.request_id ?? null }]);
+      if (a.p_request_id && scans.some((r) => r.request_id === a.p_request_id)) return res(409, { code: "23505" });   // unique index scans_request_id_key (MPC-7471-F3)
+      const row: Row = { id: crypto.randomUUID(), created_at: new Date().toISOString(), user_id: a.p_user_id, email_scanned: a.p_email, source: "web_scan", report_status: "pending", report_attempts: 0, ...(a.p_request_id ? { request_id: a.p_request_id } : {}) };
+      scans.push(row);
+      return res(200, [{ scan_id: row.id, duplicate: false, request_id: a.p_request_id ?? null }]);
+    }
     const m = url.match(/rest\/v1\/(\w+)(\?.*)?$/);
     if (!m) return res(200, host.includes("cloudflare-dns") ? { Status: 0, Answer: [] } : {});
     const [, table, qs] = m;
