@@ -28,9 +28,9 @@ database_id = "b9dc1a03-74be-45a0-85db-fb61d80825ac"
 SLACK_APPROVER = "chris"
 # Default asset: the brand OG image, until the per-post asset pipeline (MPC-8366) exists. asset_url is required by the Make.com schema, so approvals fail without it.
 DEFAULT_ASSET_URL = "https://www.myprivacytool.io/og-image.jpg"
-# CK-8482: platforms the live Make scenario (MPC-6952) can publish. Others are recorded as not_routed and are NOT sent or reported as handed off.
+# CK-8482: platforms the live Make scenario (MPC-6952) can publish (LinkedIn Page, Facebook Page, Instagram photo; checked against the live blueprint 2026-10-27). Others are recorded as not_routed and are NOT sent or reported as handed off.
 # Add a platform here only once Make has a route for it. Remove this line to send every drafted platform (legacy behaviour).
-ROUTED_PLATFORMS = "linkedin,facebook"
+ROUTED_PLATFORMS = "linkedin,facebook,instagram"
 # LinkedIn thumbnail (MPC-8366 image route): R2 key in mpt-brand-assets, e.g. "social/mpt-yt-still06-brand-end-card.png".
 # Unset on purpose until that object is confirmed to exist in R2: Make fetches it for every LinkedIn post, so a wrong key fails the post.
 # DEFAULT_IMAGE_KEY = "social/mpt-yt-still06-brand-end-card.png"
