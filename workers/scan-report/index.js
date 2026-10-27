@@ -9,6 +9,7 @@ import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
 import { addSuppression, emailHash } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
+import { checkDeliverableDomain } from './lib/emailDomain.js';
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { reportAttachment } from './lib/reportHex.js';
@@ -79,6 +80,11 @@ export default {
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
       // MPC-8430: bot check before anything is stored or sent (no-op until TURNSTILE_SECRET_KEY is set; blocks only when TURNSTILE_ENFORCE = "true").
       if (await turnstileBlocks(env, request, b['cf-turnstile-response'], origin)) return json({ error: 'Verification failed' }, 403);
+      // MPC-8453: refuse an address whose domain cannot receive mail (typo or made-up domain) before anything is stored or sent. Fails open; EMAIL_DOMAIN_CHECK = "false" turns it off.
+      if (String(env.EMAIL_DOMAIN_CHECK).toLowerCase() !== 'false') {
+        const dom = await checkDeliverableDomain(email);
+        if (!dom.ok) return json({ error: 'That email address does not look right', code: 'bad_email_domain', reason: dom.reason }, 400);
+      }
       // MPC-7470 (D12): saving the scan needs its own consent (save_consent === true), given at this contact step. Checked before anything is stored or sent.
       // Switch off: the save fields are ignored, the email request is handled as before.
       const save = webScanEnabled(env) ? parseSaveRequest(b) : { none: true };

@@ -16,7 +16,8 @@ import ScanNumberNotice from "@/components/ScanNumberNotice";
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
-import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
+import { ReportRequestError, BAD_EMAIL_MESSAGE, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
+import { suggestEmail } from "@/lib/emailTypo";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -45,6 +46,8 @@ const Scan = () => {
   const [tsToken, setTsToken] = useState("");
   const [tsReset, setTsReset] = useState(0);
   const tsWidgets = useRef(0);
+  // MPC-8453: the address we already asked "did you mean ...?" about; pressing the button again with the same address sends it.
+  const typoAsked = useRef("");
   // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
   const [waitingForToken, setWaitingForToken] = useState(false);
   // MPC-8452: key for the live results shown under the thank-you (memory only: a refresh starts again)
@@ -62,6 +65,12 @@ const Scan = () => {
     e.preventDefault();
     // The save box is optional: unticked = the report is still requested, the scan is just not saved.
     if (!email.trim() || !consent || submitting || waitingForToken) return;
+    const suggestion = suggestEmail(email);
+    if (suggestion && typoAsked.current !== email.trim().toLowerCase()) {
+      typoAsked.current = email.trim().toLowerCase();
+      setErrorMsg(`Did you mean ${suggestion}? If ${email.trim()} is right, press the button again.`);
+      return;
+    }
     if (tsWidgets.current > 0 && !tsToken) {
       setErrorMsg("");
       setWaitingForToken(true);
@@ -90,7 +99,7 @@ const Scan = () => {
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
         console.error("Scan report request failed", kind, status);
         trackReportFailed("scan_page", kind, status);
-        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
         setTsToken(""); // a Turnstile token is single use: get a fresh one for the retry
         setTsReset((n) => n + 1);
         return;

@@ -11,12 +11,14 @@ import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan
 // MPC-7535: the Worker's answer is never swallowed. A refusal or a network failure throws a ReportRequestError, and the page then shows an honest
 // message instead of the thank-you screen (the visitor must not be promised a report that was never requested).
 export class ReportRequestError extends Error {
-  constructor(readonly kind: "rate_limited" | "rejected" | "server" | "network", readonly status: number) {
+  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network", readonly status: number) {
     super(`scan-report ${status || "no response"}`);
   }
 }
 export const REPORT_FAILED_MESSAGE =
   "We could not request your report just now, so nothing has been sent yet. Your email is still filled in: please press the button to try again.";
+// MPC-8453: the Worker refused the address because its domain does not exist or accepts no mail. First-draft wording, needs Chris's approval.
+export const BAD_EMAIL_MESSAGE = "That email address does not look right, so we have not sent anything. Please check it for typos and try again.";
 export const REPORT_WAIT_MESSAGE = "You have tried a few times in a row. Please wait a minute, then press the button again.";
 
 export async function requestScanReport(email: string, saveScan: boolean, recognise: boolean, turnstileToken = ""): Promise<{ liveToken?: string }> {
@@ -46,7 +48,13 @@ export async function requestScanReport(email: string, saveScan: boolean, recogn
   } catch {
     throw new ReportRequestError("network", 0);
   }
-  if (!res.ok) throw new ReportRequestError(res.status === 429 ? "rate_limited" : res.status >= 500 ? "server" : "rejected", res.status);
+  if (!res.ok) {
+    if (res.status === 400) {
+      const refused = (await res.json().catch(() => null)) as { code?: unknown } | null;
+      if (refused?.code === "bad_email_domain") throw new ReportRequestError("bad_email", 400);
+    }
+    throw new ReportRequestError(res.status === 429 ? "rate_limited" : res.status >= 500 ? "server" : "rejected", res.status);
+  }
   const data = (await res.json().catch(() => null)) as { live_token?: unknown } | null;
   if (saveScan) noteSaveResult(data);
   // MPC-8452: a short-lived key for the live view on the thank-you screen (absent for a repeat request or when the feature is off)

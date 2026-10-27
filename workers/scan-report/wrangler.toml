@@ -67,6 +67,9 @@ REFERRAL_AB_INVITE_SUBJECT = "false"
 # "true" = a failed check answers 403 and nothing is stored or sent. Rollback: set back to "false" and redeploy.
 TURNSTILE_ENFORCE = "true"
 
+# MPC-8453: refuse an address whose domain does not exist or accepts no mail (DNS check, domain only, fails open). "false" = rollback.
+EMAIL_DOMAIN_CHECK = "true"
+
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
 [observability]
 enabled = true

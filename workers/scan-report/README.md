@@ -119,3 +119,14 @@ The Scan page shows a Cloudflare Turnstile widget (`interaction-only`, cookieles
 The confirmation email (and the report email) carry a button to `https://www.myprivacytool.io/scan/live#v=<token>`. The token (`scanId.expiry.HMAC`, message `verify:<scanId>:<expiry>`, 7 days, same `UNSUBSCRIBE_SECRET`) is in the URL **fragment**, which browsers never send to a server; the page reads it into memory, removes it from the address bar, and sends it to `GET /api/scan/live` as `Authorization: Bearer <token>` (never in a URL, so never in a request log). Only someone who can read the inbox has the link, so this is the proof of ownership: a verified request also reads `details`, and a found check carries its `value`. A stream token (`?t=`) can never unlock the detail, and the database `details` column is not even selected for it.
 
 The `/scan/live` page keeps watching after the first results (every 30 seconds, up to an hour) so new or changed findings appear. `noindex` and `Disallow: /scan/live` in robots.txt. A refresh forgets the key: press the button in the email again.
+
+## Refusing addresses that cannot receive mail (MPC-8453)
+
+`POST /api/scan` used to check only that an address looks like an address, so a typo or made-up domain (`wqefsda@1.com`, `x@gmial.com`) was accepted, stored, mailed a confirmation and a report that bounced, hurting the sender reputation while the real person never got theirs. Turnstile proves a human, not an inbox.
+
+`lib/emailDomain.js` now asks public DNS (Cloudflare DNS-over-HTTPS, **the domain only**) after the Turnstile check and before anything is stored or sent: the domain must exist and publish a mail route, an MX record or (RFC 5321 implicit MX) an A/AAAA record. NXDOMAIN, a domain with no mail route, or a null MX (`0 .`, RFC 7505) answers **400** `{ code: "bad_email_domain", reason: "no_such_domain" | "no_mail" }`; the page shows a specific message and keeps the address in the box.
+
+- **Fails open.** A slow, failing or odd DNS answer (1.5 s timeout) never blocks a visitor. Shared webmail domains (`PERSONAL_DOMAINS`) are trusted without a lookup.
+- Rollback: `EMAIL_DOMAIN_CHECK = "false"` in `wrangler.toml`, then merge.
+- The page also asks once "Did you mean jane@gmail.com?" for common slips on the big providers (`src/lib/emailTypo.ts`); a suggestion, never a block.
+- Known limits: this proves the domain can receive mail, not that the mailbox exists (that needs a confirmation click, a later option); and the HubSpot lead is still sent before the Worker answers (MPC-7535 keeps the lead whatever happens to the report), so a refused address can still reach HubSpot. Hard-bounce handling (Resend webhook / suppression list) was not audited here.
