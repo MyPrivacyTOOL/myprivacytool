@@ -10,7 +10,7 @@ export const CONTENT_TYPES = ['image', 'video', 'text'];
 export const PLATFORM_LIMITS = { x: 280, linkedin: 3000, instagram: 2200, facebook: 4000, pinterest: 500, youtube: 5000, reddit: 40000 };
 
 const ENVELOPE_KEYS = ['schema_version', 'campaign', 'drafted_content_id', 'approved_by', 'approval_timestamp', 'posts'];
-const POST_KEYS = ['platform', 'title', 'body', 'hashtags', 'cta', 'content_type', 'asset_url', 'link_url', 'publish_timestamp', 'subreddit', 'slides', 'script', 'asset_tags'];
+const POST_KEYS = ['platform', 'title', 'body', 'hashtags', 'cta', 'content_type', 'asset_url', 'link_url', 'publish_timestamp', 'subreddit', 'slides', 'script', 'asset_tags', 'image_key'];
 const REQUIRED_POST_KEYS = ['platform', 'title', 'body', 'hashtags', 'cta', 'content_type', 'asset_url', 'link_url', 'publish_timestamp'];
 
 // ISO 8601 date-time that must carry the HKT (+08:00) offset.
@@ -64,6 +64,8 @@ function validatePost(post, i, errors) {
   if (post.subreddit !== undefined && !(typeof post.subreddit === 'string' && /^(r\/)?\w{2,21}$/.test(post.subreddit))) errors.push(`${at}.subreddit: invalid`);
   if (post.slides !== undefined && !(Array.isArray(post.slides) && post.slides.length > 0 && post.slides.every(isText))) errors.push(`${at}.slides: must be a non-empty array of strings`);
 
+  // R2 object key under assets.myprivacytool.io (MPC-8366); the Make LinkedIn image route fetches it through Image Transformations.
+  if (post.image_key !== undefined && !(typeof post.image_key === 'string' && /^[\w.-]+(\/[\w.-]+)*$/.test(post.image_key) && !post.image_key.includes('..'))) errors.push(`${at}.image_key: must be a relative R2 object key`);
   if (post.script !== undefined && !isText(post.script)) errors.push(`${at}.script: must be a non-empty string`);
   if (post.asset_tags !== undefined && !(Array.isArray(post.asset_tags) && post.asset_tags.every(isText))) errors.push(`${at}.asset_tags: must be an array of strings`);
 
