@@ -122,6 +122,17 @@ describe("redeem (POST)", () => {
     expect((await handleRedeem(post(TOKEN, { "sec-fetch-site": "same-origin" }), ENV, TOKEN, { store: mem.store })).status).toBe(303);
     expect(mem.calls.redeem).toBe(1);
   });
+  it("accepts the button press a real browser sends under Referrer-Policy: no-referrer (Origin: null + Sec-Fetch-Site: same-origin), and still refuses forged or cross-site ones", async () => {
+    const mem = memoryStore({ snaps: [snap({ id: "s1", sender_id: "111" })], links: await seedLink() });
+    // the exact refusal seen in the first live test: Origin "null" must not be treated as a mismatch
+    expect((await handleRedeem(post(TOKEN, { origin: "null", "sec-fetch-site": "cross-site" }), ENV, TOKEN, { store: mem.store })).status).toBe(403);
+    expect((await handleRedeem(post(TOKEN, { origin: "null", "sec-fetch-site": "same-site" }), ENV, TOKEN, { store: mem.store })).status).toBe(403);
+    expect((await handleRedeem(post(TOKEN, { origin: "null" }), ENV, TOKEN, { store: mem.store })).status).toBe(403);
+    expect((await handleRedeem(post(TOKEN, { origin: "https://www.myprivacytool.io.evil.example", "sec-fetch-site": "same-origin" }), ENV, TOKEN, { store: mem.store })).status).toBe(403);
+    expect(mem.calls.redeem).toBe(0);
+    expect((await handleRedeem(post(TOKEN, { origin: "null", "sec-fetch-site": "same-origin" }), ENV, TOKEN, { store: mem.store })).status).toBe(303);
+    expect(mem.calls.redeem).toBe(1);
+  });
   it("database failure answers 503 and does not claim the link was used", async () => {
     const mem = memoryStore({ snaps: [snap({ id: "s1", sender_id: "111" })], links: await seedLink(), fail: new Set(["redeem"]) });
     const res = await handleRedeem(post(), ENV, TOKEN, { store: mem.store });
