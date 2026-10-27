@@ -45,8 +45,10 @@ export function scanHint(): string {
 }
 
 // Hero copy (home page) with tiles on: no "found N data points without asking", no "click the ones that are correct".
-export const HERO_TILES_LINE1 = 'See what your browser tells every website, and how we know each thing.';
-export const HERO_TILES_LINE2 = 'Tap a hexagon to see what we found.';
+// Footprints framing (owner direction, 2026-10-27): each hexagon is a risk; the footprints your browser leaves on the web are what it shows;
+// the scan is where you stand right now. Still says how we know each thing, and still claims nothing beyond what the browser tells every website.
+export const HERO_TILES_LINE1 = 'Each hexagon is a risk. See the footprints your browser leaves on the web, and how we know each one.';
+export const HERO_TILES_LINE2 = 'Tap a hexagon to see the footprint we found, as of right now.';
 // CK-8323: hero copy for the default honeycomb dashboard (owner-approved wording, 2026-10-19). "up to N": the 54 registry hexagons are 41
 // always checked plus up to 13 that depend on the browser, so the claim is "up to". N comes from the registry, never typed by hand.
 // Line 1 follows the brand name, which the page sets in its own colour.
