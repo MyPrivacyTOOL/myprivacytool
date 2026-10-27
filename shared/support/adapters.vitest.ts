@@ -1,7 +1,7 @@
 // @vitest-environment node
 // MPC-8528: adapters (FAQ knowledge, report status, email notifier, chat model). Fake fetch only: no network, no provider, no database.
 import { describe, it, expect } from "vitest";
-import { redactForModel, FaqKnowledgeSource, ScansReportStatusReader, ResendNotifier, InBandNotifier, ChannelNotifier, ChatCompletionsModel, retrieve, handleInbound, buildTools, type SupportDeps, type SupportPolicy } from "./index";
+import { redactForModel, FaqKnowledgeSource, ScansReportStatusReader, ResendNotifier, InBandNotifier, ChannelNotifier, ChatCompletionsModel, retrieve, APPROVED_MODEL_BUDGET, handleInbound, buildTools, type SupportDeps, type SupportPolicy } from "./index";
 import { MemoryCaseStore } from "./memory-store";
 
 const FAQS = [
@@ -86,7 +86,7 @@ describe("email and in-band notifiers", () => {
   });
   it("service integration: the inbound sender address is what the notifier receives, and a failed send is stored as undelivered", async () => {
     const store = new MemoryCaseStore(); const to: (string | undefined)[] = [];
-    const policy: SupportPolicy = { version: "p", maxToolCallsPerTurn: 1, tools: {} };
+    const policy: SupportPolicy = { version: "p", maxToolCallsPerTurn: 1, modelBudget: APPROVED_MODEL_BUDGET, tools: {} };
     const deps: SupportDeps = { store, policy, tools: buildTools(store), notifier: { send: async (_r, _c, _t, _k, t) => { to.push(t); throw new Error("down"); } } };
     const r = await handleInbound(deps, { channel: "email", providerEventId: "m1", text: "hi", senderHandle: "cust@example.test", receivedAt: new Date().toISOString() });
     expect(to).toEqual(["cust@example.test"]); expect(r.delivered).toBe(false);

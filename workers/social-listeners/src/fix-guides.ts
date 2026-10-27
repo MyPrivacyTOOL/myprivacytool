@@ -1,5 +1,5 @@
 // MPC-7894 fix wizard guides. A guide with `evidence: null` has not been checked against a real Telegram client and is shown with DRAFT_BANNER. Chris reviewed the
-// 9 published guides on 27th October 2026 on an iPhone 14 (all steps matched); the app version number was not given, so it is recorded as not recorded. The user changes their own
+// 9 published guides on 27th October 2026 on an iPhone 14 (all steps matched); app version 11.2. The user changes their own
 // settings; nothing here changes an account. "api" issues can be re-checked through getChat/getUserProfilePhotos; "self" issues can only be self-confirmed.
 export interface GuideEvidence { client: string; platform: string; version: string; reviewedOn: string }
 export interface Option { label: string; advice: string }
@@ -12,8 +12,8 @@ export interface Guide {
   available: boolean; conflict?: string;
 }
 
-/** Review of the 9 published guides by Chris (owner). Version number not supplied: add it here when known. No Android client was reviewed. */
-const REVIEW: GuideEvidence = { client: "Telegram iPhone app", platform: "iOS, iPhone 14", version: "not recorded", reviewedOn: "27th October 2026" };
+/** Review of the 9 published guides by Chris (owner). Version 11.2 as given by Chris. No Android client was reviewed. */
+const REVIEW: GuideEvidence = { client: "Telegram iPhone app", platform: "iOS, iPhone 14", version: "11.2", reviewedOn: "27th October 2026" };
 
 export const DRAFT_BANNER = "Draft guide: these steps have not been checked against the current Telegram app yet, and menu names differ by app version. If something looks different, skip it.";
 

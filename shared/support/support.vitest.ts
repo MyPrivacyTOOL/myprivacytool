@@ -7,6 +7,8 @@ import {
   type SupportPolicy, type Model, type Notifier, type Verifier, type InboundEvent, type KnowledgeSource, type KnowledgeEntry, type SupportDeps,
 } from "./index";
 import { MemoryCaseStore } from "./memory-store";
+import { APPROVED_MODEL_BUDGET } from "./policy";
+import { reserveModelCall } from "./model-budget";
 
 const T0 = new Date("2026-10-26T00:00:00Z");
 let seq = 0;
@@ -14,7 +16,7 @@ const ev = (o: Partial<InboundEvent> = {}): InboundEvent => ({ channel: "web", p
 
 // TEST-ONLY policy. It is synthetic and NOT an approved MPC-8530 policy; shipped DEFAULT_POLICY approves nothing.
 const TEST_POLICY: SupportPolicy = {
-  version: "test-only-policy", maxToolCallsPerTurn: 3,
+  version: "test-only-policy", maxToolCallsPerTurn: 3, modelBudget: { maxCallsPerCase: 1000, maxMicroUsdPerCase: 1_000_000_000, maxMicroUsdPerDay: 1_000_000_000, estimatedMicroUsdPerCall: 1 },
   tools: {
     get_case_status: { approvedPolicyVersion: "test-only", requiredIdentity: "channel_asserted", maxCallsPerHour: 5, maxCostUnitsPerDay: 10, timeoutMs: 200 },
     diagnose_report_status: { approvedPolicyVersion: "test-only", requiredIdentity: "verified", maxCallsPerHour: 2, maxCostUnitsPerDay: 2, timeoutMs: 200 },
@@ -285,5 +287,66 @@ describe("no routine founder escalation or invented human", () => {
     expect(t.sent.every((s) => s.channel === "email" && s.threadKey === "th-7")).toBe(true);
     expect(Object.keys(t.deps)).not.toContain("escalate");
     expect(canTransition("waiting_system", "closed")).toBe(false);
+  });
+});
+
+// MPC-8530 D-7: model-spend guard. Assertions read the stored usage counters and whether the model was actually called.
+describe("model spend guard (D-7)", () => {
+  const budgeted = (modelBudget: SupportPolicy["modelBudget"]) => ({ ...TEST_POLICY, modelBudget });
+  const calls = (t: ReturnType<typeof mk>) => (t.model.complete as ReturnType<typeof vi.fn>).mock.calls.length;
+
+  it("ships the approved D-7 numbers in the default policy", () => {
+    expect(DEFAULT_POLICY.modelBudget).toEqual(APPROVED_MODEL_BUDGET);
+    expect(APPROVED_MODEL_BUDGET).toMatchObject({ maxCallsPerCase: 5, maxMicroUsdPerCase: 50_000, maxMicroUsdPerDay: 5_000_000 });
+  });
+  it("stops after 5 model calls on one case: no 6th call, honest unavailable, case stays open and visible", async () => {
+    const t = mk({ policy: budgeted({ ...APPROVED_MODEL_BUDGET, estimatedMicroUsdPerCall: 1_000 }) });
+    for (let i = 0; i < 5; i++) await handleInbound(t.deps, ev({ threadKey: "cap-1", text: `msg ${i}` }));
+    expect(calls(t)).toBe(5);
+    const r = await handleInbound(t.deps, ev({ threadKey: "cap-1", text: "msg 6" }));
+    expect(calls(t)).toBe(5);
+    const c = [...t.store.cases.values()][0];
+    expect(c.state).toBe("waiting_system");
+    expect(c.stateReason).toBe("ai_unavailable");
+    expect(r.replyText).not.toMatch(/team|staff|human|we'll/i);
+  });
+  it("enforces the per-case spend cap using the reserved estimate (5 x 10,000 > 50,000 is refused at call 6, 5 calls fit exactly)", async () => {
+    const t = mk({ policy: budgeted({ ...APPROVED_MODEL_BUDGET, maxCallsPerCase: 100 }) });
+    for (let i = 0; i < 6; i++) await handleInbound(t.deps, ev({ threadKey: "cap-2", text: `m${i}` }));
+    expect(calls(t)).toBe(5);
+    const id = [...t.store.cases.values()][0].id;
+    expect((await t.store.usageSince(`model:case:${id}`, new Date(0).toISOString())).costUnits).toBe(50_000);
+  });
+  it("enforces the daily cap across different cases, and the window rolls forward", async () => {
+    const budget = { ...APPROVED_MODEL_BUDGET, maxMicroUsdPerDay: 20_000 };
+    const t = mk({ policy: budgeted(budget) });
+    await handleInbound(t.deps, ev({ senderHandle: "a" }));
+    await handleInbound(t.deps, ev({ senderHandle: "b" }));
+    await handleInbound(t.deps, ev({ senderHandle: "c" }));
+    expect(calls(t)).toBe(2);
+    const later = new Date(T0.getTime() + 86_400_001);
+    const t2 = { ...t.deps, now: () => later };
+    await handleInbound(t2, ev({ senderHandle: "d" }));
+    expect(calls(t)).toBe(3);
+  });
+  it("fails closed when the usage store errors: no model call, case still recorded", async () => {
+    const t = mk();
+    t.store.failBefore.add("usageSince");
+    const r = await handleInbound(t.deps, ev());
+    expect(calls(t)).toBe(0);
+    expect([...t.store.cases.values()][0].stateReason).toBe("ai_unavailable");
+    expect(r.caseRef).toBeDefined();
+  });
+  it("refuses an invalid budget instead of treating it as unlimited", async () => {
+    const t = mk();
+    for (const bad of [{ ...APPROVED_MODEL_BUDGET, maxCallsPerCase: 0 }, { ...APPROVED_MODEL_BUDGET, maxMicroUsdPerDay: NaN }, { ...APPROVED_MODEL_BUDGET, estimatedMicroUsdPerCall: -1 }])
+      expect(await reserveModelCall(t.store, bad, "c1", T0)).toEqual({ ok: false, reason: "invalid_budget" });
+  });
+  it("records spend above the estimate when the provider reports a higher cost", async () => {
+    const t = mk({ model: { complete: vi.fn(async () => ({ text: "Reports are emailed after a scan.", costMicroUsd: 30_000 })) } });
+    await handleInbound(t.deps, ev({ threadKey: "cap-3" }));
+    const id = [...t.store.cases.values()][0].id;
+    expect((await t.store.usageSince(`model:case:${id}`, new Date(0).toISOString())).costUnits).toBe(30_000);
+    expect((await t.store.usageSince("model:day", new Date(0).toISOString())).costUnits).toBe(30_000);
   });
 });

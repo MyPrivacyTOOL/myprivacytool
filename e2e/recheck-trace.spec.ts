@@ -5,6 +5,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 // SYNTHETIC: a scripted fake RTCPeerConnection stands in for a real browser's network behaviour, the synthetic visitor is a fresh browser
 // profile, and every network request leaving localhost is blocked by the fixtures. It is NOT a live run, NOT a real user and NOT production.
 // What it does show: the real built UI, the real detector state rule, and the real persisted browser state at each step.
+// The journey is build-only (VITE_RECHECK_JOURNEY=true); CI's build job sets it, locally build with it first.
 // Run:  npx playwright test e2e/recheck-trace.spec.ts --project=desktop   (writes docs/ck-8494/trace/*)
 const OUT = "docs/ck-8494/trace";
 
@@ -13,6 +14,9 @@ test("SYNTHETIC trace: observation, explanation, own action, comparable re-check
   test.setTimeout(180_000);
   mkdirSync(OUT, { recursive: true });
   const trace: { step: string; evidence: unknown }[] = [];
+  // every request this page makes to any learning / lead / database endpoint, whatever the fixtures answer
+  const outbound: string[] = [];
+  page.on("request", (r) => { if (/\/api\/learning|\/api\/scan|mpt-leads|supabase\.co/.test(r.url())) outbound.push(r.url()); });
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem("mpt_recheck_v1") ?? "null"));
   const log = async (step: string, evidence: unknown) => { trace.push({ step, evidence }); };
 
@@ -70,6 +74,7 @@ test("SYNTHETIC trace: observation, explanation, own action, comparable re-check
   await page.evaluate(() => localStorage.setItem("trace_rtc", "none"));
   await page.getByTestId("recheck-run").click();
   await expect(page.getByTestId("recheck-outcome")).toHaveAttribute("data-outcome", "inconclusive");
+  await page.waitForTimeout(3200);   // a second press inside 3 s counts as a replay
   await log("4a re-check where WebRTC gathered nothing at all: inconclusive, not improvement", (await saved()).rechecks.at(-1));
   await page.screenshot({ path: `${OUT}/3-inconclusive.png`, fullPage: true });
 
@@ -87,7 +92,8 @@ test("SYNTHETIC trace: observation, explanation, own action, comparable re-check
   // 6. NO LEAK OF THE FINDING: nothing was sent anywhere
   expect(net.captured.leads).toHaveLength(0);
   expect(net.captured.supabase).toHaveLength(0);
-  await log("6 network: no lead, database or learning request was made by this journey", { leads: net.captured.leads.length, supabase: net.captured.supabase.length });
+  expect(outbound.filter((u) => /\/api\/learning/.test(u))).toHaveLength(0);
+  await log("6 network: no lead, database or learning request was made by this journey", { leads: net.captured.leads.length, supabase: net.captured.supabase.length, learningRequests: outbound.filter((u) => /\/api\/learning/.test(u)).length });
 
   // 7. WITHDRAWAL: the visitor withdraws the analytics choice -> the saved journey is deleted
   await page.evaluate(() => {

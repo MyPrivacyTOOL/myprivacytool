@@ -7,6 +7,7 @@ import { DRAFT_BANNER, type Guide, guideFor, listedGuides } from "./fix-guides";
 import { type BaselineRow, type Outcome, RECHECK_VERSION, type Recheck, type Summary, issueOutcome, recheckFrom, summarise, comparable } from "./fix-recheck";
 import type { Logger } from "./logger";
 import { call } from "./probe-reader";
+import { type SenderIds, senderFilter, senderIds } from "./sender-key";
 import type { Env } from "./shared";
 
 const TIMEOUT_MS = 5000;
@@ -15,7 +16,7 @@ const MAX_RECHECKS_PER_HOUR = 5;
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=fix_wizard";
 const PLANS_URL = "https://myprivacytool.io/pricing?utm_source=telegram&utm_medium=channel_osint&utm_campaign=fix_wizard";
 const SHARE_TEXT = "I checked what my Telegram profile shows to bots with MyPrivacyTOOL.";
-const HELP_LINE = "Send /fix any time to see this list again. You change your own Telegram settings; I cannot change them for you.";
+const HELP_LINE = "Send /fix any time to see this list again. You change your own Telegram settings; I cannot change them for you. Send STOP to delete your saved scan data.";
 
 export const fixWizardEnabled = (env: Env): boolean => env.TELEGRAM_FIX_WIZARD === "on";
 
@@ -68,17 +69,17 @@ export const day = (iso: string): string => {
   return `${ordinal(hk.getUTCDate())} ${MONTHS[hk.getUTCMonth()]} ${hk.getUTCFullYear()}`;
 };
 
-async function loadBaseline(env: Env, senderId: string): Promise<BaselineRow | "error" | null> {
-  const r = await rest(env, "GET", `profile_snapshots?sender_id=eq.${senderId}&scan_version=eq.${SCAN_VERSION}&status=eq.complete&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc&limit=1&select=id,created_at,scan_version,risk_version,report`);
+async function loadBaseline(env: Env, ids: SenderIds): Promise<BaselineRow | "error" | null> {
+  const r = await rest(env, "GET", `profile_snapshots?${senderFilter(ids.read)}&scan_version=eq.${SCAN_VERSION}&status=eq.complete&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc&limit=1&select=id,created_at,scan_version,risk_version,report`);
   if (!r.ok) return "error";
   return (r.rows[0] as unknown as BaselineRow | undefined) ?? null;
 }
-async function loadItems(env: Env, senderId: string, base: BaselineRow): Promise<Map<string, Item> | "error"> {
-  const r = await rest(env, "GET", `fix_wizard_items?sender_id=eq.${senderId}&baseline_snapshot_id=eq.${base.id}&select=issue_id,intention,context_answer,self_confirmed_at,recheck_outcome`);
+async function loadItems(env: Env, ids: SenderIds, base: BaselineRow): Promise<Map<string, Item> | "error"> {
+  const r = await rest(env, "GET", `fix_wizard_items?${senderFilter(ids.read)}&baseline_snapshot_id=eq.${base.id}&select=issue_id,intention,context_answer,self_confirmed_at,recheck_outcome`);
   return r.ok ? new Map(r.rows.map((x) => [String(x.issue_id), x as unknown as Item])) : "error";
 }
-async function saveItem(env: Env, senderId: string, base: BaselineRow, issue: string, fields: Record<string, unknown>): Promise<boolean> {
-  const row = { sender_id: senderId, baseline_snapshot_id: base.id, issue_id: issue, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 90 * DAY_MS).toISOString(), ...fields };
+async function saveItem(env: Env, ids: SenderIds, base: BaselineRow, issue: string, fields: Record<string, unknown>): Promise<boolean> {
+  const row = { sender_id: ids.key, baseline_snapshot_id: base.id, issue_id: issue, updated_at: new Date().toISOString(), expires_at: new Date(Date.now() + 90 * DAY_MS).toISOString(), ...fields };
   return (await rest(env, "POST", "fix_wizard_items?on_conflict=sender_id,baseline_snapshot_id,issue_id", row, "resolution=merge-duplicates,return=minimal")).ok;
 }
 
@@ -132,16 +133,16 @@ async function consentState(env: Env, senderId: string): Promise<"confirmed" | "
   return r.rows[0] ? (r.rows[0].state === "confirmed" ? "confirmed" : "withdrawn") : "withdrawn";
 }
 
-async function runRecheck(env: Env, base: BaselineRow, senderId: string, from: unknown, updateId: number): Promise<Run> {
-  const consent = await consentState(env, senderId);
+async function runRecheck(env: Env, base: BaselineRow, ids: SenderIds, from: unknown, updateId: number): Promise<Run> {
+  const consent = await consentState(env, ids.plain);   // core-brain keeps the plain id
   if (consent !== "confirmed") return { ...NO_RUN, consent };
   const since = encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString());
-  const recent = await rest(env, "GET", `profile_snapshots?sender_id=eq.${senderId}&scan_version=eq.${RECHECK_VERSION}&created_at=gte.${since}&select=id`);
+  const recent = await rest(env, "GET", `profile_snapshots?${senderFilter([ids.key])}&scan_version=eq.${RECHECK_VERSION}&created_at=gte.${since}&select=id`);
   if (recent.ok && recent.rows.length >= MAX_RECHECKS_PER_HOUR) return { r: { completeness: "failed", hexagons: [], notes: ["rate limited"] }, saved: false, duplicate: false, rateLimited: true, snapshotId: null };
-  const [chat, photos] = await Promise.all([call(env, "getChat", { chat_id: senderId }), call(env, "getUserProfilePhotos", { user_id: Number(senderId), limit: 5 })]);
+  const [chat, photos] = await Promise.all([call(env, "getChat", { chat_id: ids.plain }), call(env, "getUserProfilePhotos", { user_id: Number(ids.plain), limit: 5 })]);
   const r = recheckFrom(from, updateId, chat, photos);
   const row = {
-    platform: "telegram", sender_id: senderId, update_id: updateId, status: r.completeness === "failed" ? "failed" : "complete", scan_version: RECHECK_VERSION, risk_version: RISK_VERSION, schema_version: 1, score: null,
+    platform: "telegram", sender_id: ids.key, update_id: updateId, status: r.completeness === "failed" ? "failed" : "complete", scan_version: RECHECK_VERSION, risk_version: RISK_VERSION, schema_version: 1, score: null,
     consent: { basis: "explicit I-fixed-it / Scan-again tap", baseline_snapshot_id: base.id, confirming_update_id: updateId },
     consent_at: new Date().toISOString(), get_chat: { redacted: true }, photos: { redacted: true },
     report: { kind: "recheck", baseline_snapshot_id: base.id, completeness: r.completeness, notes: r.notes, hexagons: r.hexagons },
@@ -198,10 +199,11 @@ export async function handleFixWizard(env: Env, update: unknown, log: Logger): P
     if (p.kind === "cb") await call(env, "answerCallbackQuery", { callback_query_id: p.cb.id });
     const reply = (v: View) => send(env, chatId, messageId, v);
 
-    const base = await loadBaseline(env, fromId);
+    const ids = await senderIds(env, fromId);   // gate 3: plain id, or its HMAC when TELEGRAM_ID_HMAC_KEY is set
+    const base = await loadBaseline(env, ids);
     if (base === "error") return reply(STORAGE_ERROR);
     if (!base) return reply(NO_BASELINE);
-    const items = await loadItems(env, fromId, base);
+    const items = await loadItems(env, ids, base);
     if (items === "error") return reply(STORAGE_ERROR);
     if (p.kind === "list") return reply(listView(base, items));
 
@@ -209,45 +211,45 @@ export async function handleFixWizard(env: Env, update: unknown, log: Logger): P
     if (snap !== b8(base.id)) return reply(STALE);
     const g = code ? guideFor(code) : undefined;
     if (act === "l") return reply(listView(base, items));
-    if (act === "r") return reply(await rescan(env, base, fromId, update, items, log));
+    if (act === "r") return reply(await rescan(env, base, ids, update, items, log));
     if (!g || !g.available) return reply(STALE);
     if (act === "o") return reply(questionView(base, g));
     if (act === "qa" || act === "qb") {
-      const ok = await saveItem(env, fromId, base, g.code, { context_answer: act === "qa" ? "a" : "b" });
+      const ok = await saveItem(env, ids, base, g.code, { context_answer: act === "qa" ? "a" : "b" });
       return reply(ok ? guideView(base, g, act === "qa" ? "a" : "b") : STORAGE_ERROR);
     }
     if (act === "k" || act === "s") {
-      const ok = await saveItem(env, fromId, base, g.code, { intention: act === "k" ? "keep" : "skip" });
-      const fresh = await loadItems(env, fromId, base);
+      const ok = await saveItem(env, ids, base, g.code, { intention: act === "k" ? "keep" : "skip" });
+      const fresh = await loadItems(env, ids, base);
       return reply(ok && fresh !== "error" ? listView(base, fresh) : STORAGE_ERROR);
     }
-    if (act === "f") return reply(await fixed(env, base, fromId, (update as { callback_query: { from: unknown } }).callback_query.from, (update as { update_id: number }).update_id, g, items, log));
+    if (act === "f") return reply(await fixed(env, base, ids, (update as { callback_query: { from: unknown } }).callback_query.from, (update as { update_id: number }).update_id, g, items, log));
     return reply(STALE);
   } catch (err) {
     log.warn("fix_wizard_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
 }
 
-async function fixed(env: Env, base: BaselineRow, senderId: string, from: unknown, updateId: number, g: Guide, items: Map<string, Item>, log: Logger): Promise<View> {
+async function fixed(env: Env, base: BaselineRow, ids: SenderIds, from: unknown, updateId: number, g: Guide, items: Map<string, Item>, log: Logger): Promise<View> {
   const already = items.get(g.code)?.self_confirmed_at;
   const stamp = already ?? new Date().toISOString();
-  if (!(await saveItem(env, senderId, base, g.code, { intention: "change", self_confirmed_at: stamp }))) return STORAGE_ERROR;
+  if (!(await saveItem(env, ids, base, g.code, { intention: "change", self_confirmed_at: stamp }))) return STORAGE_ERROR;
   const back: Button[][] = [[{ text: "Back to list", callback_data: data(base, "l") }]];
   if (g.kind === "self") return { text: `${g.label}: recorded as SELF-CONFIRMED. I cannot check this setting, so it is not verified and it does not change any score.\n\n${HELP_LINE}`, keyboard: back };
   if (!g.hexagon) return STALE;
-  const run = await runRecheck(env, base, senderId, from, updateId);
+  const run = await runRecheck(env, base, ids, from, updateId);
   if (run.consent) return { text: `${g.label}: your 'I fixed it' is recorded as SELF-CONFIRMED, but I did not re-check. ${CONSENT_TEXT[run.consent]}\n\n${HELP_LINE}`, keyboard: back };
   if (run.rateLimited) return { text: "You have asked for several re-checks in the last hour. Your 'I fixed it' is recorded as SELF-CONFIRMED; try the re-check again later.\n\n" + HELP_LINE, keyboard: back };
   if (run.duplicate) return { text: `${g.label}: this request was already processed.\n\n${HELP_LINE}`, keyboard: back };
   const outcome = issueOutcome(base, run.r, g.hexagon);
-  await saveItem(env, senderId, base, g.code, { recheck_outcome: outcome, recheck_snapshot_id: run.snapshotId, recheck_at: new Date().toISOString() });
+  await saveItem(env, ids, base, g.code, { recheck_outcome: outcome, recheck_snapshot_id: run.snapshotId, recheck_at: new Date().toISOString() });
   log.info("fix_wizard_recheck", { issue: g.code, outcome, saved: run.saved });
   return { text: `${g.label}\nYou said: fixed (self-reported).\nRe-check (${day(new Date().toISOString())}, compared with your scan of ${day(base.created_at)}):\n${OUTCOME_TEXT[outcome]}\n\n${HELP_LINE}`, keyboard: back };
 }
 
-async function rescan(env: Env, base: BaselineRow, senderId: string, update: unknown, items: Map<string, Item>, log: Logger): Promise<View> {
+async function rescan(env: Env, base: BaselineRow, ids: SenderIds, update: unknown, items: Map<string, Item>, log: Logger): Promise<View> {
   const q = (update as { update_id: number; callback_query: { from: unknown } });
-  const run = await runRecheck(env, base, senderId, q.callback_query.from, q.update_id);
+  const run = await runRecheck(env, base, ids, q.callback_query.from, q.update_id);
   if (run.consent) return plain("I did not re-check. " + CONSENT_TEXT[run.consent]);
   if (run.rateLimited) return plain("You have asked for several re-checks in the last hour. Please try again later.");
   if (run.duplicate) return plain("That request was already processed. Send /fix to continue.");

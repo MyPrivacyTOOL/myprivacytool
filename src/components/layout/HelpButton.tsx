@@ -58,7 +58,7 @@ const HelpButton = () => {
             <p className="mt-1 text-muted-foreground">The AI assistant is available.</p>
           ) : (
             <p className="mt-1 text-muted-foreground">
-              Our AI assistant is not available yet. Nothing here is a live chat, and no message is sent from this panel.
+              We don't have an AI assistant. Nothing here is a live chat, and no message is sent from this panel.
             </p>
           )}
         </section>
@@ -85,7 +85,7 @@ const HelpButton = () => {
             </Button>
           </SheetClose>
           <p className="text-xs text-muted-foreground">
-            The contact page is a written form. We do not promise a reply time, and this panel does not open a support case.
+            The contact page is a written form; we can't say how quickly it will be answered. This panel does not open a support case.
           </p>
         </div>
       </SheetContent>

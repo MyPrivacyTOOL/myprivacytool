@@ -92,21 +92,27 @@ describe('RecheckPanel journey', () => {
     await waitFor(() => expect(screen.getByTestId('recheck-outcome')).toHaveAttribute('data-outcome', 'error'));
   });
 
-  it('a different detector version on the later page load is incomparable', async () => {
+  it('a reload records nothing by itself; the visitor presses Check again and it is compared with the saved first reading', async () => {
     const first = render(<RecheckPanel observation={obsFound} explained told />);
     await waitFor(() => expect(saved().selfReport).toBeTruthy());
     first.unmount();
-    // next visit (reload): the page's fresh reading is the re-check
-    render(<RecheckPanel observation={{ state: 'none_found', detectorVersion: 'webrtc-state-9' }} explained={false} told={false} />);
-    await waitFor(() => expect(screen.getByTestId('recheck-outcome')).toHaveAttribute('data-outcome', 'incomparable'));
+    // next visit: the page's own fresh reading must NOT become a re-check without a press
+    render(<RecheckPanel observation={{ state: 'none_found', detectorVersion: WEBRTC_DETECTOR_VERSION }} explained={false} told={false} />);
+    expect(screen.queryByTestId('recheck-outcome')).toBeNull();
+    expect(saved().rechecks).toHaveLength(0);
+    vi.stubGlobal('RTCPeerConnection', fakeRTC({ candidates: [MDNS], end: true }));
+    fireEvent.click(screen.getByTestId('recheck-run'));
+    await waitFor(() => expect(screen.getByTestId('recheck-outcome')).toHaveAttribute('data-outcome', 'improvement'));
+    expect(saved().rechecks).toHaveLength(1);
   });
 
-  it('after a reload the page reading is compared once, only if the visitor had said they did the step', async () => {
-    const first = render(<RecheckPanel observation={obsFound} explained told={false} />);
-    first.unmount();
-    render(<RecheckPanel observation={{ state: 'none_found', detectorVersion: WEBRTC_DETECTOR_VERSION }} explained={false} told={false} />);
-    expect(screen.queryByTestId('recheck-outcome')).toBeNull();     // no own word -> no re-check recorded
-    expect(saved().rechecks).toHaveLength(0);
+  it('a closed prompt (explained, never told) stores no response and offers no re-check', async () => {
+    const view = render(<RecheckPanel observation={obsFound} explained told={false} />);
+    await waitFor(() => expect(saved().baseline.state).toBe('found'));
+    expect(saved().selfReport).toBeUndefined();
+    expect(screen.queryByTestId('recheck-run')).toBeNull();
+    view.unmount();
+    expect(saved().selfReport).toBeUndefined();
   });
 
   it('missing consent: nothing is stored and the panel says it cannot compare', () => {

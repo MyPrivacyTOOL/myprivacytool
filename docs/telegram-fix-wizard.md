@@ -22,7 +22,7 @@ Scan again shows `before of compared` vs `now of compared` for the same fields, 
 ## Guides: coverage matrix (reviewed by Chris, 27th October 2026)
 | Guide | Kind | Client / platform / app version / reviewed on |
 | --- | --- | --- |
-| Username, Bio, Birthday, Profile photo | api (re-checkable) | Telegram iPhone app / iOS, iPhone 14 / version not recorded / 27th October 2026 / all steps matched |
+| Username, Bio, Birthday, Profile photo | api (re-checkable) | Telegram iPhone app / iOS, iPhone 14 / version 11.2 / 27th October 2026 / all steps matched |
 | Phone number, Last seen, Forwarded messages, Groups, Auto-download | self | same review (iPhone only; no Android client reviewed) |
 | People Nearby | not published | specification conflict: existence in current clients unverified |
 A guide with no review evidence is shown with a "Draft guide" banner (currently only the unpublished People Nearby). No screenshots exist (none were invented); web guides depend on the website stack and MPC-7893.
@@ -43,8 +43,18 @@ Risk stays a count out of 30 (risk-count-1), no weights; before/after is a count
 `TELEGRAM_SCAN_SCOPE=all` (exactly `all`; anything else, or unset, keeps test accounts only) lets any private, non-bot sender use the baseline scan (MPC-7891) and `/fix`. It is NOT set in `wrangler.toml` and must not be set until each gate below is recorded as done on the MPC-7891 / MPC-7894 Notion pages:
 1. Wording and legal pass on the scan report, consent text and wizard copy (all English drafts today), including a review of the 5 "cannot be checked yet" items.
 2. Retention (90 days) confirmed in the data-retention policy, and deletion on request (`mpt_delete_profile_snapshots`) tested against a real request.
-3. Plain Telegram ids replaced by an HMAC, or an explicit written decision to keep plain ids for real users (strategy 9.9).
+3. ~~Plain Telegram ids replaced by an HMAC~~ BUILT (this PR, default off): see "Hashed sender ids (gate 3)" below. To do before real users: apply the migration, set the secret, back the secret up.
 4. Guides reviewed on a real client (client, platform, app version, date recorded in `fix-guides.ts`) and the paid-plan copy approved.
-5. A consent-withdrawal path in core-brain (today only new, awaiting_confirmation, confirmed, declined exist).
+5. ~~A consent-withdrawal path~~ BUILT (this PR): see "STOP / delete my data" below. Open: confirm `PROBE_MODE` is not `all` at launch (the probe logs `channel_probe_captures` and `telegram_event_log` are not covered by STOP).
 6. Language plan for non-English users (copy is English only).
 DEEP (MPC-7892) and the dashboard link (MPC-7893) stay allow-list only whatever this switch says. Turn on: add `TELEGRAM_SCAN_SCOPE = "all"` to `[vars]` in `workers/social-listeners/wrangler.toml` and deploy (the baseline switch `TELEGRAM_BASELINE_SCAN` and `TELEGRAM_FIX_WIZARD` must also be on). Turn off: delete the line and deploy.
+
+## STOP / delete my data
+Exact whole messages `STOP`, `/stop`, `delete my data`, `/deletemydata` or `/delete` (case-insensitive) from a sender the scan is open to. It works whatever the feature switches say. In this order it calls the existing database functions: `mpt_erase_chat_sender` (consent state and routing log rows; the next "Y" must be given again, and the wizard stops re-checking at once), `mpt_delete_profile_snapshots` (baseline and re-check snapshots; cascades to fix-list progress and dashboard links/sessions), `mpt_delete_deep_data` (DEEP jobs and results). No migration. The reply says what was deleted; if any step fails it says so and never claims success (send STOP again). Repeating it is safe. Not covered: the bot-wide probe logs (`PROBE_MODE`) and anything already sent to Telegram. Rollback: revert the PR.
+
+## Hashed sender ids (gate 3)
+`TELEGRAM_ID_HMAC_KEY` (Worker secret, at least 32 random characters). Unset (default): scan tables store the plain numeric id, exactly as before. Set: `profile_snapshots`, `fix_wizard_items` and `dashboard_links/sessions` store `sender_id = "h1:" + hex(HMAC-SHA256(key, "telegram:<id>"))`, and the numeric `id` is dropped from the stored raw getChat answer. A set but too-short key throws: nothing is stored under the plain id instead, the scan is not saved and the wizard does not answer (see the Worker log).
+- **Reads accept both** the hash and the plain id, so a test account's older rows stay reachable; **writes use the hash only**. Telegram API calls, core-brain's `conversation_states` and DEEP use the plain id (STOP deletes under every form).
+- **Turn on, in this order:** (1) apply `supabase/migrations/20261027100000_mpc_7894_hashed_sender_ids.sql` by hand (it only widens four CHECKs; without it hashed writes are rejected, never stored plain); (2) `wrangler secret put TELEGRAM_ID_HMAC_KEY` for `social-listeners` with a new random value (for example `openssl rand -hex 32`); (3) keep a copy of the key in your password manager. **If the key is lost or changed, every hashed row becomes unreachable** (its owner must scan again; old rows expire after 90 days or are removed by STOP only under the key in use). Rotating the key therefore needs a re-hash migration first: not built.
+- **Turn off / roll back:** delete the secret; new rows are plain again, hashed rows stay until they expire. To remove hashed rows first: `select public.mpt_delete_profile_snapshots('h1:...')`.
+- **What it does not hide:** the stored getChat answer still holds the username, names and bio that the scan analyses, and core-brain's `conversation_states` keeps the plain id. DEEP and the dashboard stay allow-list only; the dashboard's DEEP panel only shows DEEP for older plain-id scans (DEEP rows are keyed by the plain id).

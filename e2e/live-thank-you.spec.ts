@@ -14,6 +14,7 @@ const ORIGIN = "https://myprivacytool.io";   // the Worker only accepts the prod
 const ENV = {
   SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "",
   UNSUBSCRIBE_SECRET: "e2e-secret", EMAIL_GITHUB_COMMITS_ENABLED: "true",
+  EMAIL_DOMAIN_CHECK: "false",   // MPC-8453: the stubbed DNS answers nothing, so the new domain check would refuse the test address; popup-report.spec.ts switches it off the same way
 };
 
 type Row = Record<string, unknown>;
@@ -103,8 +104,8 @@ for (const motion of ["no-preference", "reduce"] as const) {
       await expect(live.getByRole("status")).toContainText(/that is what i can see from the outside/i, { timeout: 20_000 });
       // what each check says, in words (colour is never the only clue)
       const text = await live.innerText();
-      expect(text).toMatch(/Public code commits\s*Found something/);
-      expect(text).toMatch(/Nothing found|Could not check this one/);
+      expect(text).toMatch(/Public code changes\s*Found something/);
+      expect(text).toMatch(/Nothing seen in the places we looked|Could not check this one/);
       expect(text).not.toMatch(/%|score/i);                                                    // no score or percentage, ever
       // the first view never shows a value or a repository name
       expect(text).not.toContain("jane-example");
