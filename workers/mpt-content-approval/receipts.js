@@ -162,11 +162,18 @@ export async function applyReconciliation(db, contentId, platform, verdict, { so
  */
 export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
   if (!env.RECEIPT_SIGNING_SECRET) return { status: 503, message: 'receipts not configured' };
-  const ts = headers.get('x-receipt-timestamp');
-  const sig = headers.get('x-receipt-signature');
-  if (!ts || !sig || !/^\d+$/.test(ts)) return { status: 401, message: 'missing signature' };
-  if (Math.abs(nowMs / 1000 - Number(ts)) > RECEIPT_TOLERANCE_S) return { status: 401, message: 'stale timestamp' };
-  if (!safeEqual(await hmacHex(env.RECEIPT_SIGNING_SECRET, `${ts}.${rawBody}`), sig)) return { status: 401, message: 'bad signature' };
+  // Two ways to authenticate, both need the shared secret: (a) x-receipt-token = the secret itself (what Make can do reliably;
+  // TLS protects it, and a receipt id is accepted only once so a replay is a no-op), or (b) the HMAC-SHA256 timestamp signature.
+  const token = headers.get('x-receipt-token');
+  if (token !== null) {
+    if (!safeEqual(token, env.RECEIPT_SIGNING_SECRET)) return { status: 401, message: 'bad token' };
+  } else {
+    const ts = headers.get('x-receipt-timestamp');
+    const sig = headers.get('x-receipt-signature');
+    if (!ts || !sig || !/^\d+$/.test(ts)) return { status: 401, message: 'missing signature' };
+    if (Math.abs(nowMs / 1000 - Number(ts)) > RECEIPT_TOLERANCE_S) return { status: 401, message: 'stale timestamp' };
+    if (!safeEqual(await hmacHex(env.RECEIPT_SIGNING_SECRET, `${ts}.${rawBody}`), sig)) return { status: 401, message: 'bad signature' };
+  }
 
   let b;
   try { b = JSON.parse(rawBody); } catch { return { status: 400, message: 'bad json' }; }

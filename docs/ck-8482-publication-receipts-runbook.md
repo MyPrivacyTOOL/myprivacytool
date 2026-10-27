@@ -61,3 +61,6 @@ After each platform step in MPC-6952, POST to `https://mpt-content-approval.mypr
 
 ## Receipt `post_url` is optional (added with the Make wiring)
 LinkedIn, Facebook and Instagram Make modules return only a Post ID. `post_url` may be omitted (stored as null); if sent it must be an https URL on the platform's host or the receipt is refused. Never fabricate a URL. `post_id` and `make_run_id` stay required.
+
+## Receipt authentication: token header (used by Make) or HMAC
+`POST /receipt` accepts EITHER header `x-receipt-token: <RECEIPT_SIGNING_SECRET>` OR the HMAC pair `x-receipt-timestamp` + `x-receipt-signature`. Make uses the token header (an HMAC over an exactly-matching timestamp and body cannot be tested without a live post). Replays are no-ops because each `receipt_id` (`<drafted_content_id>:<platform>`) is accepted once.

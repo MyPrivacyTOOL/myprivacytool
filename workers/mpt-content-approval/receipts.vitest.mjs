@@ -380,3 +380,21 @@ describe('post_url is optional but never invented', () => {
     expect(states(db).linkedin).toBe('handed_off');
   });
 });
+
+describe('x-receipt-token authentication (what Make sends)', () => {
+  const tokenSubmit = async (db, body, token) => handleReceipt(env(db), JSON.stringify(body), new Headers(token === undefined ? {} : { 'x-receipt-token': token }), NOW);
+  it('accepts the shared secret as a token, rejects a wrong, empty or missing one, and still refuses unrelated platforms', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await tokenSubmit(db, receipt('linkedin'), 'wrong')).status).toBe(401);
+    expect((await tokenSubmit(db, receipt('linkedin'), '')).status).toBe(401);
+    expect((await tokenSubmit(db, receipt('linkedin'))).message).toBe('missing signature');
+    expect(states(db).linkedin).toBe('handed_off');
+    expect(await tokenSubmit(db, receipt('linkedin'), SECRET)).toMatchObject({ status: 200, state: 'verified_published' });
+    expect((await tokenSubmit(db, receipt('linkedin'), SECRET)).message).toBe('duplicate receipt ignored'); // replay is a no-op
+    expect((await tokenSubmit(db, receipt('x', { post_url: 'https://evil.example.com/1' }), SECRET)).status).toBe(400);
+  });
+  it('the HMAC path still works', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await submit(db, receipt('facebook'))).state).toBe('verified_published');
+  });
+});
