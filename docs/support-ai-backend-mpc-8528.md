@@ -21,7 +21,7 @@ invents no policy: the shipped policy approves nothing, every action tool is dis
 | `service.ts` | `handleInbound()` ties it together. Duplicate event: no second model call, tool run or reply. Model/knowledge/tool/delivery failure: case stays open as `waiting_system` with a reason. A case is never auto-resolved here. |
 | `memory-store.ts` | In-memory store with fault injection. **Tests only.** |
 | `rest-store.ts` | `RestCaseStore`: the `CaseStore` over Supabase PostgREST (Workers have fetch, not a Postgres driver). Any non-2xx, timeout or malformed body throws, so intake answers "not recorded". Filter values are URL-encoded and only whitelisted case columns are patched. |
-| `supabase/proposed/mpc_8528_support_cases.sql` | Proposed Postgres schema (service_role only, RLS forced) plus two atomic functions, `support_create_case_from_event` and `support_append_inbound`, using a `(channel, provider_event_id)` primary key for race-safe dedupe. |
+| `supabase/migrations/20261027140000_mpc_8528_support_cases.sql` | Proposed Postgres schema (service_role only, RLS forced) plus two atomic functions, `support_create_case_from_event` and `support_append_inbound`, using a `(channel, provider_event_id)` primary key for race-safe dedupe. |
 
 ## Update 2026-10-26 (second PR): real store and evidence
 
@@ -48,7 +48,7 @@ Built to the recommended answers the task owner authorised as **build targets**.
 
 **Retention (proposed, not scheduled, not applied):** `support_purge_expired()` removes raw message text after 90 days, deletes cases inactive for 6 months in any state (unresolved cases do not keep personal data forever), expired proofs after a day and usage rows after 7 days. The periods are the task owner's recommended answer; they still need legal sign-off and the matching privacy-notice wording. The cron line is left commented.
 
-**To enable (all required):** approved MPC-8530 decisions; production approval to move `supabase/proposed/mpc_8528_support_cases.sql` into migrations; a rate-limiter binding; the secrets in `workers/support/EXPECTED_SECRETS.txt`; a listed provider if `MODEL_*` is set; an approved FAQ version; a route and a deploy workflow; the MPC-8531 review. None of these exists today.
+**To enable (all required):** approved MPC-8530 decisions; production approval to move `supabase/migrations/20261027140000_mpc_8528_support_cases.sql` into migrations; a rate-limiter binding; the secrets in `workers/support/EXPECTED_SECRETS.txt`; a listed provider if `MODEL_*` is set; an approved FAQ version; a route and a deploy workflow; the MPC-8531 review. None of these exists today.
 
 ## Routing and intake trace (from code; mailbox side is unverified)
 
@@ -89,7 +89,7 @@ Findings for the owners of those tasks (no change made here): the Contact page t
 ## Gates that remain open (nothing below is approved by this change)
 
 1. MPC-8530 outputs and decisions: approved knowledge, action policies, identity/verification flow, cost caps, retention and notices, the exceptional-decision route.
-2. Production migration: moving `supabase/proposed/mpc_8528_support_cases.sql` into `supabase/migrations/` is a production action, because `.github/workflows/deploy-supabase.yml` runs `supabase db push` on merge to main.
+2. Production migration: moving `supabase/migrations/20261027140000_mpc_8528_support_cases.sql` into `supabase/migrations/` is a production action, because `.github/workflows/deploy-supabase.yml` runs `supabase db push` on merge to main.
 3. A hosting Worker, plus a real `Model`, `Verifier`, `Notifier`, `KnowledgeSource` and `ReportStatusReader`, none of which exist yet. (`RestCaseStore` now exists but has only been tested with a fake fetch.)
 4. Each sensitive action (recovery, resend, entitlements, refunds, export, deletion, repair) needs approved policy, an identity check and a tool implementation. All stay disabled.
 5. Real-channel verification. Everything here is synthetic.
@@ -118,3 +118,28 @@ case `waiting_system` / `ai_unavailable`.
 - Still blocking enablement: D-5 provider terms, D-6 notice and legal sign-off, schema migration (production approval), identity-proof flow, MPC-8531 review.
 
 Tests: `npx vitest run shared/support` (7 new tests in "model spend guard (D-7)").
+
+## Update 2026-10-27: schema moved into migrations, purge scheduled (PR, not yet merged)
+
+On Chris's explicit approval of the schema migration and the purge schedule, the support schema moved from `supabase/proposed/` to
+`supabase/migrations/20261027140000_mpc_8528_support_cases.sql`, and `20261027140100_mpc_8528_support_purge_pg_cron.sql` schedules
+`support_purge_expired()` daily at 03:17 UTC (skipped where pg_cron is absent). Merging that PR runs `supabase db push` on the live project, which creates
+new, empty, service_role-only tables and functions and the cron job; no existing table is touched and nothing writes to them until the support Worker is enabled.
+The 8529 follow-up SQL stays in `supabase/proposed/`. Still unmet for enablement: the rate-limiter binding and secrets, an approved FAQ version, the Worker route and
+deploy workflow, a recorded D-5 (provider terms), MPC-8531 review, and a real-channel receipt.
+
+## Update 2026-10-27: identity-proof request flow (MPC-8530 decision D-3), dormant
+
+`shared/support/proof-request.ts` adds `requestProof()`: the customer gives the email of their account; if an account exists a single-use code (15 minutes) is emailed
+to that address. It is **not wired to any route and has no production account lookup**, so nothing can call it and no email can be sent.
+
+- **No enumeration:** the answer is `accepted` for a hit and a miss alike, and it is returned before the lookup, issue and send run (`defer`, e.g. `ctx.waitUntil`), so timing matches too. Errors after the answer are swallowed and reported as a reason code only.
+- **Limits (D-3):** 3 requests per address and 20 per IP per rolling hour, counted on every attempt whether or not the account exists. Counters use hashed keys in `support_usage`, so no address or IP is stored. A limiter read/write failure means no lookup and no mail.
+- **Mail:** `ResendProofMailer` (same contract as `ResendNotifier`) throws unless Resend confirms; the code is in the URL fragment, so it is not sent to any server or log. The email never asks for a password or a texted code.
+- **Tests:** 12 in `proof-request.vitest.ts`. Mutation-checked: awaiting the work before answering, a looser address limit, and a raw address in the usage key each fail a test.
+
+Not built, and needed before this can run:
+1. `AccountLookup` for production. It must resolve an email to the subject id the report-status reader expects (`public.users.id` is still an assumption, per the open identity decision).
+2. The route and the verify page that reads the fragment and passes the code as `proof`.
+3. A real run against Resend with an approved test address (sending is an approval-gated action), then MPC-8531 review.
+4. Known gap: `support_usage` rows are purged after 7 days, so a per-case model-call counter restarts for a case older than 7 days. Acceptable for now; fix before launch by keeping model counters longer.

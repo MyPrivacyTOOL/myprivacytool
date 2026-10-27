@@ -229,6 +229,30 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
 }
 
 /**
+ * Record a refused receipt so it is never silent (CK-8482): Make's error handler ignores a failed receipt call, so without this a
+ * rejection (bad field, no hand-off, conflict, bad token) leaves only a platform stuck at handed_off and no reason why.
+ * The shared secret is never logged: only whether auth headers were present and the token's length next to the secret's.
+ * A 401 is unauthenticated traffic, so it is capped at one row per hour (the row id is the hour) so it cannot fill the table.
+ */
+export async function logRejectedReceipt(env, out, rawBody, nowMs = Date.now(), headers = null) {
+  if (!out || out.status < 400) return;
+  try {
+    let id = null;
+    try { id = JSON.parse(rawBody)?.drafted_content_id; } catch { /* not JSON: logged under the generic task id */ }
+    const taskId = /^daily-posts-\d{4}-\d{2}-\d{2}$/.test(id ?? '') ? id : 'receipt-rejected';
+    const token = headers?.get('x-receipt-token') ?? null;
+    const auth = headers
+      ? ` | auth: token=${token === null ? 'absent' : `present len=${token.length}`} (secret len=${String(env.RECEIPT_SIGNING_SECRET ?? '').length}) signature=${headers.get('x-receipt-signature') ? 'present' : 'absent'}`
+      : '';
+    const when = iso(new Date(nowMs));
+    await env.AGENT_LOGS.prepare('INSERT INTO agent_execution_logs (id, timestamp, task_id, status, error_message) VALUES (?, ?, ?, ?, ?)')
+      .bind(out.status === 401 ? `receipt-401-${when.slice(0, 13)}` : crypto.randomUUID(), when, taskId, 'receipt_rejected', `HTTP ${out.status}: ${out.message}${auth} | body: ${String(rawBody).slice(0, 400)}`).run();
+  } catch (e) {
+    console.error('receipt rejection log failed', e?.message);
+  }
+}
+
+/**
  * Stage report for one cycle. "Waiting for approval" is NOT a failure.
  * overdueMs: how long after hand-off a receipt may take before the platform is flagged overdue.
  */

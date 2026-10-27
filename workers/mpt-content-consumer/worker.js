@@ -7,6 +7,15 @@
 
 export const PLATFORMS = ['x', 'linkedin', 'instagram', 'facebook', 'pinterest', 'youtube'];
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', pinterest: 'Pinterest', youtube: 'YouTube' };
+// Where each draft goes once approved, shown under the draft so the reviewer sees the destination and can open it.
+const PLATFORM_DESTINATIONS = {
+  x: { note: 'Not connected: copy and post by hand', url: 'https://x.com/compose/post', label: 'Open X' },
+  linkedin: { note: 'Posts automatically on Approve All', url: 'https://www.linkedin.com/company/88918654/', label: 'LinkedIn page' },
+  instagram: { note: 'Posts automatically on Approve All (image posts)', url: 'https://www.instagram.com/myprivacytool/', label: 'Instagram' },
+  facebook: { note: 'Posts automatically on Approve All', url: 'https://www.facebook.com/105634291085696', label: 'Facebook page' },
+  pinterest: { note: 'Not connected: copy and post by hand', url: 'https://www.pinterest.com/pin-builder/', label: 'Open Pinterest' },
+  youtube: { note: 'Uploads the queued Drive video on days 3, 6, 9 … 30', url: 'https://studio.youtube.com', label: 'YouTube Studio' },
+};
 const PLATFORM_RULES = {
   x: 'A thread of 3-5 posts. Each post at most 280 characters. Separate posts with a line containing only ---.',
   linkedin: 'Professional thought-leadership post, 2-3 short paragraphs, at most 3000 characters.',
@@ -113,6 +122,7 @@ export function slackBlocks(taskId, topic, drafts) {
     ...drafts.flatMap((d) => [
       { type: 'divider' },
       { type: 'section', text: { type: 'mrkdwn', text: `*${PLATFORM_NAMES[d.platform]}*\n${clip(body(d), 2600)}` } },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: `${PLATFORM_DESTINATIONS[d.platform].note} · <${PLATFORM_DESTINATIONS[d.platform].url}|${PLATFORM_DESTINATIONS[d.platform].label}>` }] },
     ]),
     { type: 'actions', block_id: 'approval', elements: [button('Approve All', 'approve_all', 'primary'), button('Reject', 'reject', 'danger'), button('Edit & Resubmit', 'edit_resubmit')] },
   ];

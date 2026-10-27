@@ -8,7 +8,7 @@
 //                  A Make 2xx is HANDED OFF only. POST /receipt (HMAC-signed) is the only path to verified_published. GET /status reports stages.
 
 import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
-import { expectedCycleIds, watchdogReport, recordNotRouted, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
+import { expectedCycleIds, watchdogReport, recordNotRouted, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, logRejectedReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
 
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook: 'FB', pinterest: 'Pinterest', youtube: 'YouTube', reddit: 'Reddit' };
 // HKT publish windows from MPC-8332 acceptance criteria / daily platform specs.
@@ -337,7 +337,9 @@ export default {
     const { pathname } = new URL(request.url);
     if (pathname === '/receipt') {
       if (request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { allow: 'POST' } });
-      const out = await handleReceipt(env, await request.text(), request.headers);
+      const rawBody = await request.text();
+      const out = await handleReceipt(env, rawBody, request.headers);
+      await logRejectedReceipt(env, out, rawBody, Date.now(), request.headers);
       return Response.json({ ok: out.status < 400, message: out.message, state: out.state }, { status: out.status });
     }
     if (pathname === '/watchdog' || pathname === '/recover') {

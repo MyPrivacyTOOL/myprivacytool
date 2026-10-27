@@ -184,6 +184,24 @@ describe('consent, withdrawal, expiry, deletion, failure', () => {
     }
   });
 
+  it('damaged or foreign saved state never throws under the REAL consent gate (no injected consent), and is deleted', () => {
+    const storage = mem();
+    storage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics: true, at: '2026-10-26T09:00:00.000Z' }));
+    const real = (globalThis as unknown as { localStorage?: unknown }).localStorage;
+    Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
+    try {
+      const d: Deps = { storage, now: at(0) };
+      for (const bad of ['{not json', 'null', '42', '{}', JSON.stringify({ v: 1, hexagonId: 'canvas-fingerprint', baseline: {}, rechecks: [], expiresAt: '2999-01-01' }), JSON.stringify({ v: 1, hexagonId: 'webrtc-leak', baseline: {}, rechecks: [], expiresAt: '2999-01-01' })]) {
+        storage.raw.set(RECHECK_KEY, bad);
+        expect(() => load(d)).not.toThrow();
+        expect(load(d)).toBeNull();
+        expect(storage.raw.has(RECHECK_KEY)).toBe(false);
+      }
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', { value: real, configurable: true });
+    }
+  });
+
   it('withdrawal: a saved journey is deleted the next time it is read', () => {
     const { storage, d } = journey();
     saveBaseline(obs('found'), d());

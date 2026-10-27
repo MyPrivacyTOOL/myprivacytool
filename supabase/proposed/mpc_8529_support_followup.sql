@@ -1,4 +1,4 @@
--- MPC-8529: bounded support follow-up watchdog, built on the MPC-8528 case table (supabase/proposed/mpc_8528_support_cases.sql).
+-- MPC-8529: bounded support follow-up watchdog, built on the MPC-8528 case table (supabase/migrations/20261027140000_mpc_8528_support_cases.sql).
 --
 -- PROPOSED, NOT APPLIED TO PRODUCTION. Lives in supabase/proposed/ (not read by deploy-supabase.yml); tested on a throwaway
 -- database by supabase/tests/run.sh. Moving it to supabase/migrations/, and scheduling the sweep (bottom of file), are

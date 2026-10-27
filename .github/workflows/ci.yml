@@ -128,7 +128,7 @@ jobs:
       - name: Apply bootstrap + the proposed support schema
         run: |
           psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/tests/bootstrap.sql
-          psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/proposed/mpc_8528_support_cases.sql
+          psql -X -v ON_ERROR_STOP=1 "$PGURL" -f supabase/migrations/20261027140000_mpc_8528_support_cases.sql
           psql -X -v ON_ERROR_STOP=1 "$PGURL" -c "create role authenticator login noinherit password 'ci-auth'" -c "grant anon, authenticated, service_role to authenticator"
       - name: Start PostgREST
         run: |

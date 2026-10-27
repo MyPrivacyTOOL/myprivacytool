@@ -1,13 +1,14 @@
--- MPC-8528 PROPOSED schema for the AI support service. NOT in supabase/migrations/ on purpose:
--- .github/workflows/deploy-supabase.yml runs `supabase db push` on every merge to main, so a file there is a production
--- migration. Moving this file into supabase/migrations/ is the production-migration approval step (see
--- docs/support-ai-backend-mpc-8528.md). Verified only on a throwaway local Postgres, never on the live project.
+-- MPC-8528: schema for the AI support service (cases, messages, receipts, usage, inbound events, single-use proofs, atomic intake functions).
+-- PRODUCTION MIGRATION: .github/workflows/deploy-supabase.yml runs `supabase db push` on merge to main. Moved here from supabase/proposed/
+-- on Chris's explicit approval of the schema migration (2026-10-27). Verified on throwaway local Postgres and in CI (support-rest job), not yet on the live project.
+-- Creates new tables and functions only; touches no existing table. The support Worker stays disabled, unrouted and has no model, so nothing writes to these tables yet.
 --
 -- Why new tables: core-brain's interaction_log / mpt_conversation_state are best-effort by design (docs/core-brain.md) and
 -- its `trust_level` is raised by a yes/no reply, so neither can be a durable case record or an authentication source.
 --
 -- Access: RLS forced, no anon/authenticated grants, service_role only. Raw message text is restricted personal data.
--- Retention/deletion periods are NOT set here: they need an approved decision (MPC-8530 / privacy notice).
+-- Retention (approved 2026-10-27, D-6): raw message text 90 days, cases inactive for 6 months, proofs 1 day; the Privacy Policy section 6 wording is live (PR #598).
+-- support_purge_expired() is scheduled by the next migration (pg_cron).
 -- Rollback: drop function if exists public.support_create_case_from_event, public.support_append_inbound, public.support_issue_proof, public.support_redeem_proof, public.support_purge_expired;
 --           drop table if exists support_proofs, support_inbound_events, support_usage, support_action_receipts, support_messages, support_cases cascade;
 
@@ -176,8 +177,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- retention (proposed periods: raw message text 90 days, case 6 months)
--- NOT scheduled and NOT applied. The periods come from the task owner's recommended answer and still need legal sign-off and the
--- privacy-notice wording. A case is purged by inactivity (updated_at) in any state: an unresolved case does not keep personal data forever.
+-- Periods approved by Chris 2026-10-27 (D-6); notice wording live in Privacy section 6. A case is purged by inactivity (updated_at) in any state: an unresolved case does not keep personal data forever.
 create or replace function public.support_purge_expired()
 returns jsonb language plpgsql set search_path = public as $$
 declare v_text integer; v_cases integer; v_proofs integer; v_usage integer;
@@ -193,8 +193,7 @@ begin
   get diagnostics v_usage = row_count;
   return jsonb_build_object('message_text_removed', v_text, 'cases_deleted', v_cases, 'proofs_deleted', v_proofs, 'usage_deleted', v_usage);
 end $$;
--- Schedule (when approved), same pattern as the other purge jobs; left commented on purpose:
---   select cron.schedule('support-purge-expired', '17 3 * * *', $$select public.support_purge_expired()$$);
+-- Scheduled by 20261027140100_mpc_8528_support_purge_pg_cron.sql.
 
 revoke all on function public.support_issue_proof(text,text,text,integer), public.support_redeem_proof(text), public.support_purge_expired() from public, anon, authenticated;
 grant execute on function public.support_issue_proof(text,text,text,integer), public.support_redeem_proof(text), public.support_purge_expired() to service_role;

@@ -1,6 +1,6 @@
 // @vitest-environment node
 // MPC-8528: RestCaseStore request shape and fail-closed behaviour against a FAKE fetch. No network, no Supabase project.
-// SQL behaviour (atomic dedupe) is covered by supabase/proposed/mpc_8528_support_cases.test.sql on a throwaway Postgres.
+// SQL behaviour (atomic dedupe) is covered by supabase/tests/proposed-mpc-8528-support-cases.test.sql on a throwaway Postgres.
 import { describe, it, expect, vi } from "vitest";
 import { RestCaseStore, handleInbound, buildTools, type SupportDeps, type Model, type Notifier, type InboundEvent, APPROVED_MODEL_BUDGET } from "./index";
 
