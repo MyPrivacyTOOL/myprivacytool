@@ -65,13 +65,14 @@ const contentTypeOf = (url) => (/\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(url ?? '') 
  * The Make.com hand-off: one envelope carrying a post per platform (X, LinkedIn, IG, FB, Pinterest, YouTube; Reddit while
  * the consumer still drafts it). Must pass validateMakePayload() before it is sent.
  */
-export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp, defaultAssetUrl = '' }) {
+export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp, defaultAssetUrl = '', defaultImageKey = '' }) {
   const date = taskId.replace('daily-posts-', '');
   const order = [...PLATFORMS, ...LEGACY_PLATFORMS];
   const posts = [...drafts]
     .sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform))
     .map((d) => {
       const assetUrl = d.asset_url || defaultAssetUrl || null;
+      const imageKey = d.platform === 'linkedin' ? d.image_key || defaultImageKey : '';
       return {
         platform: d.platform,
         title: d.title || d.topic || 'MyPrivacyTOOL',
@@ -83,6 +84,7 @@ export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp
         link_url: `${SITE}?utm_source=${d.platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
         publish_timestamp: scheduledTime(date, d.platform, new Date(approvalTimestamp)),
         ...(d.platform === 'reddit' ? { subreddit: d.subreddit || 'r/privacy' } : {}),
+        ...(imageKey ? { image_key: imageKey } : {}),
         ...(d.slides ? { slides: d.slides } : {}),
         ...(d.script ? { script: d.script } : {}),
         ...(Array.isArray(d.asset_tags) && d.asset_tags.length ? { asset_tags: d.asset_tags } : {}),
@@ -219,7 +221,7 @@ export async function process(env, { action, taskId, timestamp, approver, target
   async function approve() {
   await log(env, taskId, 'approved', { draft: { by: approver } });
 
-  const payload = buildMakePayload(drafts, { taskId, approvedBy: approver, approvalTimestamp: approvedAt.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL });
+  const payload = buildMakePayload(drafts, { taskId, approvedBy: approver, approvalTimestamp: approvedAt.toISOString(), defaultAssetUrl: env.DEFAULT_ASSET_URL, defaultImageKey: env.DEFAULT_IMAGE_KEY });
   const check = validateMakePayload(payload);
   if (!check.ok) {
     const error = `schema validation failed: ${check.errors.join('; ')}`;
