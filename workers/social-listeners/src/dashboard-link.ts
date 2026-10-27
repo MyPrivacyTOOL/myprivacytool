@@ -4,6 +4,7 @@
 // Asking for a link never runs a scan, a DEEP check or anything else. Never logs the link, the UUID or the sender's data.
 import { LINK_MINUTES, sha256Hex } from "../../../shared/dashboard/crypto";
 import type { Logger } from "./logger";
+import { senderFilter, senderIds } from "./sender-key";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import type { Env } from "./shared";
 
@@ -45,20 +46,22 @@ export async function handleDashboardCommand(env: Env, update: unknown, log: Log
   const say = (text: string) => call(env, "sendMessage", { chat_id: s.chatId, text, link_preview_options: { is_disabled: true } });
   try {
     if (!env.SUPABASE_URL || !env.SUPABASE_KEY) { log.warn("dashboard_link_storage_unconfigured"); await say("The dashboard is not available right now."); return; }
-    const sender = encodeURIComponent(s.id);
+    const ids = await senderIds(env, s.id);   // gate 3: scans of this person may be stored under the plain id (older) or its HMAC (TELEGRAM_ID_HMAC_KEY set)
     const nowIso = encodeURIComponent(new Date().toISOString());
     const hourAgo = encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString());
-    const recent = await rest(env, "GET", `dashboard_links?select=token_hash&sender_id=eq.${sender}&created_at=gt.${hourAgo}&limit=${MAX_LINKS_PER_HOUR}`);
+    const recent = await rest(env, "GET", `dashboard_links?select=token_hash&${senderFilter(ids.read)}&created_at=gt.${hourAgo}&limit=${MAX_LINKS_PER_HOUR}`);
     if (!recent.ok) { await say("The dashboard is not available right now."); return; }
     if (recent.rows.length >= MAX_LINKS_PER_HOUR) { await say("You have asked for several dashboard links in the last hour. Please use the last one, or try again later."); return; }
-    const snap = await rest(env, "GET", `profile_snapshots?select=id&sender_id=eq.${sender}&status=eq.complete&expires_at=gt.${nowIso}&order=created_at.desc&limit=1`);
+    const snap = await rest(env, "GET", `profile_snapshots?select=id,sender_id&${senderFilter(ids.read)}&status=eq.complete&expires_at=gt.${nowIso}&order=created_at.desc&limit=1`);
     if (!snap.ok) { await say("The dashboard is not available right now."); return; }
     const snapshotId = snap.rows[0]?.id;
+    const rowSender = snap.rows[0]?.sender_id;
+    const linkSender = typeof rowSender === "string" ? rowSender : ids.key;   // the link carries the snapshot's own sender key, so the page finds the same rows
     if (typeof snapshotId !== "string") { await say("There is no completed scan to show yet. Say \"scan me\" first."); return; }
     const token = crypto.randomUUID(); // v4, from the runtime CSPRNG; the only identifying value in the link
     const created = new Date();
     const saved = await rest(env, "POST", "dashboard_links", {
-      token_hash: await sha256Hex(token), sender_id: s.id, snapshot_id: snapshotId,
+      token_hash: await sha256Hex(token), sender_id: linkSender, snapshot_id: snapshotId,
       created_at: created.toISOString(), expires_at: new Date(created.getTime() + LINK_MINUTES * 60_000).toISOString(),
     }, "return=minimal");
     if (!saved.ok) { log.warn("dashboard_link_save_failed"); await say("The dashboard is not available right now."); return; }

@@ -7,6 +7,7 @@
 // Not covered here (stated honestly in the reply): the bot-wide probe logs (PROBE_MODE) and anything already sent to Telegram.
 import { scanAllowed } from "./baseline-scan";
 import type { Logger } from "./logger";
+import { senderIds } from "./sender-key";
 import { call, telegramSender } from "./probe-reader";
 import type { Env } from "./shared";
 
@@ -49,12 +50,18 @@ export async function handleDeleteMyData(env: Env, update: unknown, log: Logger)
   const s = telegramSender(update);
   if (!s || !env.TELEGRAM_BOT_TOKEN) return;
   try {
-    const state = await rpc(env, "mpt_erase_chat_sender", { p_channel: "telegram", p_sender_id: s.id });
-    const snaps = await rpc(env, "mpt_delete_profile_snapshots", { p_sender_id: s.id });
-    const deep = await rpc(env, "mpt_delete_deep_data", { p_sender_id: s.id });
-    const failed = state === null || snaps === null || deep === null;
-    log.info("delete_my_data", { failed, state: state ?? -1, snapshots: snaps ?? -1, deep: deep ?? -1 });
-    const total = (state ?? 0) + (snaps ?? 0) + (deep ?? 0);
+    // Gate 3: scan rows may sit under the plain id (older) and/or the HMAC key. Delete under every key; a misconfigured key still deletes the plain id but reports failure.
+    let keys = [s.id];
+    let keyOk = true;
+    try { keys = (await senderIds(env, s.id)).read; } catch { keyOk = false; }
+    const state = await rpc(env, "mpt_erase_chat_sender", { p_channel: "telegram", p_sender_id: s.id });   // core-brain's table keeps the plain id
+    const snapCounts: (number | null)[] = [];
+    for (const k of keys) snapCounts.push(await rpc(env, "mpt_delete_profile_snapshots", { p_sender_id: k }));
+    const deep = await rpc(env, "mpt_delete_deep_data", { p_sender_id: s.id });                          // DEEP stays plain-id keyed
+    const failed = !keyOk || state === null || deep === null || snapCounts.some((n) => n === null);
+    const snaps = snapCounts.reduce<number>((a, n) => a + (n ?? 0), 0);
+    log.info("delete_my_data", { failed, state: state ?? -1, snapshots: snaps, deep: deep ?? -1 });
+    const total = (state ?? 0) + snaps + (deep ?? 0);
     await call(env, "sendMessage", { chat_id: s.chatId, text: failed ? FAILED : DONE(total) });
   } catch (err) {
     log.warn("delete_my_data_failed", { error: err instanceof Error ? err.name : "unknown" });

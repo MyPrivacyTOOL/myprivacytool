@@ -43,6 +43,8 @@ export interface Env {
   TELEGRAM_BASELINE_SCAN?: string;
   /** Days until a profile_snapshots row expires (default 90, clamped 1-365). */
   PROFILE_SNAPSHOT_RETENTION_DAYS?: string;
+  /** MPC-7894 gate 3: secret (32+ characters). When set, scan tables store an HMAC of the Telegram id instead of the id. Unset = plain ids (test accounts). See src/sender-key.ts. */
+  TELEGRAM_ID_HMAC_KEY?: string;
   /** MPC-7894 staged release: "all" opens the baseline scan and /fix wizard to every private non-bot sender (real-user data); default/unset = PROBE_TELEGRAM_IDS only. */
   TELEGRAM_SCAN_SCOPE?: string;
   /** MPC-7894 Telegram fix wizard: "on" enables /fix and its buttons for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
