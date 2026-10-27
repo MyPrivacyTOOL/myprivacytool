@@ -10,6 +10,8 @@ import type { WebRTCState } from '@/lib/fingerprintDetection';
 export const RECHECK_KEY = 'mpt_recheck_v1';
 export const RECHECK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_RECHECKS = 5;
+/** Two re-checks closer together than this are one press, replayed or double-clicked. */
+export const MIN_RECHECK_GAP_MS = 3000;
 export const HEXAGON_ID = 'webrtc-leak';
 
 export interface Observation {
@@ -99,7 +101,9 @@ export function load(d: Deps = {}): RecheckRecord | null {
   try { raw = s.getItem(RECHECK_KEY); } catch { return null; }
   if (raw === null) return null;
   const rec = parse(raw);
-  if (!rec || !consented(d) || Date.parse(rec.expiresAt) <= nowOf(d).getTime()) { purge(d); return null; }
+  // A record written under an earlier analytics choice is not revived by a later one: the choice it was written under must still be the current one.
+  const sameChoice = d.consent !== undefined || getChoice()?.at === rec.consent.at;
+  if (!rec || !consented(d) || !sameChoice || Date.parse(rec.expiresAt) <= nowOf(d).getTime()) { purge(d); return null; }
   return rec;
 }
 
@@ -135,10 +139,12 @@ export function recordSelfReport(d: Deps = {}): RecheckRecord | null {
 export function recordRecheck(o: Observation, d: Deps = {}): { record: RecheckRecord | null; entry: RecheckEntry | null } {
   const rec = load(d);
   if (!rec || !rec.selfReport) return { record: rec, entry: null };
-  const dup = rec.rechecks.find((r) => r.observation.observedAt === o.observedAt);
-  if (dup) return { record: rec, entry: dup };
+  const now = nowOf(d);
+  // A replay: the same reading again, or a press that follows the last one too closely to be a new look.
+  const prev = rec.rechecks[rec.rechecks.length - 1];
+  if (prev && (prev.observation.observedAt === o.observedAt || now.getTime() - Date.parse(prev.at) < MIN_RECHECK_GAP_MS)) return { record: rec, entry: prev };
   if (rec.rechecks.length >= MAX_RECHECKS) return { record: rec, entry: null };
-  const entry: RecheckEntry = { observation: o, comparison: compare(rec.baseline, o), at: nowOf(d).toISOString() };
+  const entry: RecheckEntry = { observation: o, comparison: compare(rec.baseline, o), at: now.toISOString() };
   const next = { ...rec, rechecks: [...rec.rechecks, entry] };
   return { record: write(next, d) ? next : rec, entry };
 }
@@ -147,7 +153,7 @@ export function recordRecheck(o: Observation, d: Deps = {}): { record: RecheckRe
 export const OUTCOME_COPY: Record<RecheckOutcome, { headline: string; text: string }> = {
   improvement: {
     headline: 'This time, no public address was visible',
-    text: 'You made the change, and when we looked again this page could not see a public address through WebRTC. That is one reading, in this browser, on this network, right now. It does not show your address is hidden everywhere, and a VPN or network change can alter it.',
+    text: 'You told us you made a change, and when we looked again this page could not see a public address through WebRTC. That is one reading, in this browser, on this network, right now. It does not show your address is hidden everywhere, and a VPN or network change can alter it.',
   },
   no_change: {
     headline: 'No change that we can see',

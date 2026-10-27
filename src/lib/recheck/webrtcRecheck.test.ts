@@ -55,8 +55,13 @@ describe('compare: honest outcomes', () => {
     expect(compare(base, obs('error')).outcome).toBe('error');
     expect(compare(null, obs('error')).outcome).toBe('error');
   });
-  it('no outcome copy claims protection, safety or that we changed anything', () => {
-    for (const c of Object.values(OUTCOME_COPY)) expect(`${c.headline} ${c.text}`).not.toMatch(/\bsafe\b|protected|we (fixed|changed|turned)|score|%/i);
+  it('no outcome copy claims protection, privacy, safety, a score, or states that a change was made as fact', () => {
+    for (const c of Object.values(OUTCOME_COPY)) {
+      const t = `${c.headline} ${c.text}`;
+      expect(t).not.toMatch(/\bsafe\b|\bsecure\b|\bprivate\b|protected|we (fixed|changed|turned)|score|%/i);
+      expect(t).not.toMatch(/You made the change/);
+    }
+    expect(OUTCOME_COPY.improvement.text).toMatch(/You told us you made a change/);
   });
 });
 
@@ -89,9 +94,9 @@ describe('the journey in one visitor browser', () => {
     const { d } = journey();
     saveBaseline(obs('found'), d());
     recordSelfReport(d(1));
-    recordRecheck(obs('found', { observedAt: 'a1' }), d(2));
-    recordRecheck(obs('timed_out', { observedAt: 'a2' }), d(3));
-    expect(load(d(4))!.rechecks.map((r) => r.comparison.outcome)).toEqual(['no_change', 'inconclusive']);
+    recordRecheck(obs('found', { observedAt: 'a1' }), d(4000));
+    recordRecheck(obs('timed_out', { observedAt: 'a2' }), d(8000));
+    expect(load(d(9000))!.rechecks.map((r) => r.comparison.outcome)).toEqual(['no_change', 'inconclusive']);
   });
 
   it('a re-check is refused until the visitor has said they did the step', () => {
@@ -102,7 +107,7 @@ describe('the journey in one visitor browser', () => {
     expect(load(d(2))!.rechecks).toHaveLength(0);
   });
 
-  it('closed prompt or Later: nothing is recorded as a response', () => {
+  it('a prompt that is closed (nobody calls recordSelfReport) leaves no response in the saved record; the panel test covers the UI side', () => {
     const { storage, d } = journey();
     saveBaseline(obs('found'), d());
     // the prompt is closed: recordSelfReport is never called
@@ -119,16 +124,30 @@ describe('the journey in one visitor browser', () => {
     expect(b.selfReport!.at).toBe(a.selfReport!.at);
     const o = obs('none_found', { observedAt: 'same' });
     recordRecheck(o, d(2000));
-    recordRecheck(o, d(3000));
-    expect(load(d(4000))!.rechecks).toHaveLength(1);
+    recordRecheck(o, d(9000));
+    expect(load(d(10000))!.rechecks).toHaveLength(1);
+  });
+
+  it('a real replay (new reading time, too soon after the last press) is one re-check, a later press is a second', () => {
+    const { d } = journey();
+    saveBaseline(obs('found'), d());
+    recordSelfReport(d(1));
+    // observedAt comes from the clock on every call, as in production
+    const press = (ms: number) => recordRecheck(observationFrom({ state: 'none_found', detectorVersion: WEBRTC_DETECTOR_VERSION }, { ...d(ms), browser: 'chrome' }), d(ms));
+    press(5000);
+    press(5400);
+    press(6900);
+    expect(load(d(7000))!.rechecks).toHaveLength(1);
+    press(9000);
+    expect(load(d(9500))!.rechecks).toHaveLength(2);
   });
 
   it('re-checks are capped', () => {
     const { d } = journey();
     saveBaseline(obs('found'), d());
     recordSelfReport(d(1));
-    for (let i = 0; i < MAX_RECHECKS + 3; i++) recordRecheck(obs('found', { observedAt: `r${i}` }), d(10 + i));
-    expect(load(d(100))!.rechecks).toHaveLength(MAX_RECHECKS);
+    for (let i = 0; i < MAX_RECHECKS + 3; i++) recordRecheck(obs('found', { observedAt: `r${i}` }), d(4000 * (i + 1)));
+    expect(load(d(100000))!.rechecks).toHaveLength(MAX_RECHECKS);
   });
 
   it('only a found reading becomes a baseline', () => {
@@ -145,6 +164,24 @@ describe('consent, withdrawal, expiry, deletion, failure', () => {
     expect(storage.raw.size).toBe(0);
     expect(recordSelfReport(d(1, false))).toBeNull();
     expect(recordRecheck(obs('none_found'), d(2, false)).entry).toBeNull();
+  });
+
+  it('a record written under an earlier analytics choice is not revived by a later one', () => {
+    const storage = mem();
+    storage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics: true, at: '2026-10-26T09:00:00.000Z' }));
+    const g = globalThis as unknown as { localStorage?: unknown };
+    const real = g.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', { value: storage, configurable: true });
+    try {
+      const d: Deps = { storage, now: at(0) };           // no injected consent: the real gate and choice date are used
+      expect(saveBaseline(obs('found'), d)).not.toBeNull();
+      expect(load(d)).not.toBeNull();
+      storage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics: true, at: '2026-10-26T12:00:00.000Z' }));   // withdrew, then accepted again
+      expect(load(d)).toBeNull();
+      expect(storage.raw.has(RECHECK_KEY)).toBe(false);
+    } finally {
+      Object.defineProperty(globalThis, 'localStorage', { value: real, configurable: true });
+    }
   });
 
   it('withdrawal: a saved journey is deleted the next time it is read', () => {
