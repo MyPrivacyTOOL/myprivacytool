@@ -1,14 +1,14 @@
 # CK-8494: one verified customer action and re-check (WebRTC Leak, web scan)
 
-Status: LOCAL -> pushed on branch `claude/ck-8494-customer-action-recheck-9ogd7b`. SYNTHETICALLY VERIFIED only. **Production: UNVERIFIED / PENDING.**
-Nothing here is switched on: the journey sits behind the existing `?hex_v2=2` screen flag, which is off by default.
+Status: MERGED (PR #543, `574554e`) and deployed with the site; follow-up fixes in PR #599 after the independent review. SYNTHETICALLY VERIFIED only. **Production: UNVERIFIED / PENDING.**
+Exposure: PR #543 put the journey behind the existing `?hex_v2=2` URL parameter, which any visitor can add on production, so it was dark-launched, not inert. The follow-up gates it behind a **build-only** flag `VITE_RECHECK_JOURNEY` (default off, no URL parameter). CI's build job sets it so the trace spec can run; the Cloudflare Pages production build does not. Turn it on only after the copy review, the MPC-7725 real-people check and CK-8492 evidence.
 
 ## Selected finding and why
 `webrtc-leak` is the only hexagon that can turn red, that the visitor can act on themselves in their browser, and that the same in-page detector can read again.
 The other three red-capable hexagons (canvas, WebGL, audio fingerprints) have no stable "clear" state: a protective browser randomises them, so two readings differ for reasons that say nothing about exposure. They were not chosen.
 WhatsApp settings are API-blind and were not considered.
 
-**Choice approval:** the registry says WebRTC cannot tell "nothing visible" from "could not look" (`detection_change_to_make_checkable`). Making it checkable needs a detector change, which this task forbids inventing without approval. Approval to add distinct, versioned WebRTC states was given by the task owner in this session (recorded as the answer "Approve WebRTC detector change"; no separate Notion decision record has been written yet).
+**Choice approval:** the registry says WebRTC cannot tell "nothing visible" from "could not look" (`detection_change_to_make_checkable`). Making it checkable needs a detector change, which this task forbids inventing without approval. Approval to add distinct, versioned WebRTC states was given by the task owner in this session (recorded as the answer "Approve WebRTC detector change"; a dated Notion decision record is to be added in the Strategic Decisions Index).
 
 ## What was added (only the missing links)
 | Piece | File | Notes |
@@ -16,9 +16,9 @@ WhatsApp settings are API-blind and were not considered.
 | Distinct outcome + detector version | `src/lib/fingerprintDetection.ts` | additive `state` / `detectorVersion`; all old fields unchanged. Version `webrtc-state-1`. |
 | Comparison + saved journey | `src/lib/recheck/webrtcRecheck.ts` | pure `compare`; browser-only storage, 7-day expiry, analytics-choice gated, purged on withdrawal. |
 | Panel | `src/components/hexagon/RecheckPanel.tsx` | shown under the existing next-step card. |
-| Wiring | `src/components/HexagonGrid.tsx`, `src/lib/deviceDetection.ts` | one component, one optional field. |
+| Wiring | `src/components/HexagonGrid.tsx`, `src/lib/deviceDetection.ts`, `src/config/recheckJourney.ts` | one component, one optional field, one build-only flag. |
 
-Reused, not rebuilt: hexagon registry, honest tiles (`hexagonTile.ts`), next-step card and fix step (`hexagonFix.ts`), the analytics cookie gate (`cookieConsent.ts`). **No** new ledger, identity, server route, migration, event type or retention.
+Reused, not rebuilt (note: there is no server ledger, but a small browser-side record store, `mpt_recheck_v1`, is new): hexagon registry, honest tiles (`hexagonTile.ts`), next-step card and fix step (`hexagonFix.ts`), the analytics cookie gate (`cookieConsent.ts`). **No** new ledger, identity, server route, migration, event type or retention.
 
 ## Evidence kept separate
 | What | Where in the saved record |
@@ -26,7 +26,7 @@ Reused, not rebuilt: hexagon registry, honest tiles (`hexagonTile.ts`), next-ste
 | Original observation | `baseline` (state, detectorVersion, browser family, time). Written once, never replaced. No address is stored. |
 | Detector and version | `baseline.detectorVersion`, `rechecks[].observation.detectorVersion` |
 | Consent and scope | `consent` (analytics choice date). Record is deleted when the choice is withdrawn. |
-| User response | none stored for Later or a closed prompt |
+| User response | Later or a closed prompt is deliberately not stored (the existing next-step card says Later is not a "no"); the only response kept is the self-report. The independent review flagged this as only partly meeting "preserve user response separately". |
 | Self-reported completion | `selfReport.at` (their word, labelled as such) |
 | Re-check observation | `rechecks[].observation` |
 | Comparability + outcome | `rechecks[].comparison` (`outcome`, `reason`) |
@@ -52,9 +52,9 @@ Reused, not rebuilt: hexagon registry, honest tiles (`hexagonTile.ts`), next-ste
 - `tsc -p tsconfig.app.json --noEmit`: clean.
 - `playwright test e2e/recheck-trace.spec.ts --project=desktop`: 1 passed.
 
-Cases covered: improvement, no change, inconclusive (blocked, timed out, unsupported), incomparable (version, browser, no or non-found baseline), re-check error, missing consent, withdrawal, duplicate/replayed self-report and re-check, re-check refused without the visitor's word, re-check cap, Later / closed prompt records nothing, expired and damaged and deleted state, storage failures, and "no address or identifier in stored data".
+Cases covered: improvement, no change, inconclusive (blocked, timed out, unsupported), incomparable (version, browser, no or non-found baseline), re-check error, missing consent, withdrawal (a later re-grant does not revive an old record), duplicate/replayed self-report, replayed re-check (a press within 3 s of the last counts once, using clock-built reading times), re-check refused without the visitor's word, re-check cap, a closed prompt stores no response and offers no re-check, a reload records nothing by itself (the visitor presses Check again), expired and damaged and deleted state, storage failures, and "no address or identifier in stored data".
 Persisted state is read back from the real (jsdom / Chromium) `localStorage`, not from returned objects.
-Isolation: no backend is involved at all. The e2e blocks every non-localhost request, and a test asserts zero lead, database or learning requests. There is nothing to be backed by production.
+Isolation: no backend is involved at all. The e2e blocks every non-localhost request, and the trace asserts zero lead, database and `/api/learning` requests by watching every request the page makes. Limits: the independent reviewer could not re-run the Playwright trace (no browser in its sandbox) and shares a model family with the author; a human must still re-run `e2e/recheck-trace.spec.ts`. There is nothing to be backed by production.
 
 ## Synthetic browser trace
 `docs/ck-8494/trace/trace.json` plus `trace/*.png`. Regenerate with `npx playwright test e2e/recheck-trace.spec.ts --project=desktop`.
