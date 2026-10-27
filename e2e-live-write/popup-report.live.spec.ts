@@ -7,7 +7,8 @@
 // Guards: it does nothing unless both variables are set; the address must be a "+tag" address (a synthetic test inbox, never a bare real address); retries are off.
 // The page is driven like a visitor. Nothing is stubbed. What the browser saw is written to LIVE_TEST_OUT (default test-results/live-write-evidence.json) as evidence:
 // the address, the request_id it sent, the Worker's answer, the scan number shown. The STORED rows and the emails are checked separately (database read, mailbox).
-// After the submit it re-sends the SAME request (same request_id) once from the page, to prove the replay returns the same scan number without a second email.
+// The first answer is dropped on purpose (a lost answer after a successful save); the popup's own retry sends the SAME request_id and must get the original scan number back, with no second email.
+// Turnstile is NOT bypassed: run it in a real, headed browser (npm run test:e2e:live-write -- --headed).
 import { test, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
@@ -20,7 +21,7 @@ const SCAN_NUMBER_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]
 test.skip(!CONFIRMED || !EMAIL, "live write test: set LIVE_TEST_EMAIL and LIVE_TEST_CONFIRM=I_APPROVE_ONE_REAL_SUBMISSION to run");
 test.skip(!/^[^@+\s]+\+[^@\s]+@[^@\s]+\.[^@\s]+$/.test(EMAIL), "live write test: the address must be a +tag test address");
 
-test("production popup: one real submission, saved scan, same scan number, replay returns it again", async ({ page }) => {
+test("production popup: one real submission, lost answer, retry returns the same scan number", async ({ page }) => {
   const evidence: Record<string, unknown> = { started_at: new Date().toISOString(), site: process.env.LIVE_SITE ?? "https://myprivacytool.io", email: EMAIL };
   const posts: { body: Record<string, unknown>; status: number; answer: Record<string, unknown> | null }[] = [];
 
@@ -60,50 +61,73 @@ test("production popup: one real submission, saved scan, same scan number, repla
   evidence.popup_text_before = (await page.getByTestId("scan-complete-dialog").innerText()).slice(0, 1500);
   await page.screenshot({ path: "test-results/live-1-popup-before.png" });
 
-  // 3. ONE real submit. Turnstile may need a moment: the popup says so and asks again, so wait for the button and try a bounded number of times.
+  // 3. ONE real submission, with a lost answer. The FIRST request is sent to the real Worker (so it saves and sends), but its answer is dropped before the page sees it,
+  // like a timeout after a successful write. The popup then shows its failure message; pressing the button again sends the SAME request_id with a fresh Turnstile token,
+  // and the Worker must answer with the original outcome (a replay) instead of creating anything twice. Turnstile is never bypassed: this needs a real browser that earns a token.
+  let lost: { status: number; answer: Record<string, unknown> | null } | null = null;
+  let requestCount = 0;
+  await page.route(/\/api\/scan$/, async (route) => {
+    const req = route.request();
+    if (req.method() !== "POST") return route.fallback();
+    requestCount += 1;
+    if (requestCount === 1) {
+      const real = await route.fetch();
+      let answer: Record<string, unknown> | null = null;
+      try { answer = await real.json(); } catch { /* not JSON */ }
+      lost = { status: real.status(), answer };
+      return route.abort("timedout");
+    }
+    return route.continue();
+  });
+
   const send = page.getByRole("button", { name: /send my report/i });
-  let sent = false;
-  for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
+  // press until the first request has really gone out (Turnstile may need a moment: the popup says so and nothing is sent yet)
+  for (let attempt = 1; attempt <= 6 && requestCount < 1; attempt++) {
+    await send.click();
+    await page.waitForTimeout(8_000);
+    if (requestCount < 1) evidence[`wait_${attempt}`] = (await page.getByRole("alert").first().textContent().catch(() => null)) ?? "no alert";
+  }
+  expect(requestCount, "a first request must reach the Worker (Turnstile token needed; see evidence)").toBe(1);
+  evidence.first_request_answer_lost = lost;
+  await expect(page.getByRole("alert")).toContainText(/could not request your report/i, { timeout: 30_000 });
+  await expect(page.getByText(/your report is on its way/i)).toHaveCount(0);   // no false success after a lost answer
+  await page.screenshot({ path: "test-results/live-2-popup-failure.png" });
+
+  // the retry: same request_id, fresh token
+  let replayed = false;
+  for (let attempt = 1; attempt <= 6 && !replayed; attempt++) {
     await send.click();
     const outcome = await Promise.race([
-      page.getByText(/your report is on its way|already have a report request/i).waitFor({ timeout: 45_000 }).then(() => "ok" as const),
-      page.getByRole("alert").waitFor({ timeout: 45_000 }).then(() => "alert" as const),
+      page.getByText(/already have a report request/i).waitFor({ timeout: 40_000 }).then(() => "ok" as const),
+      page.getByText(/verifying you are human/i).waitFor({ timeout: 40_000 }).then(() => "wait" as const),
     ]).catch(() => "none" as const);
-    if (outcome === "ok") sent = true;
-    else {
-      evidence[`attempt_${attempt}_alert`] = (await page.getByRole("alert").first().textContent().catch(() => null)) ?? outcome;
-      if (posts.length > 0) break;           // the Worker was reached: never send a second submission blindly
-      await page.waitForTimeout(5_000);       // only "Verifying you are human": nothing was sent yet, try again
-    }
+    if (outcome === "ok") replayed = true;
+    else if (requestCount > 1) break;           // a second request went out and the page did not show the replay: stop, never send a third
+    else await page.waitForTimeout(6_000);
   }
+  evidence.requests_sent = requestCount;
   evidence.confirmation_text = (await page.getByRole("status").first().innerText().catch(() => "")).slice(0, 800);
-  await page.screenshot({ path: "test-results/live-2-popup-after.png" });
+  await page.screenshot({ path: "test-results/live-3-popup-after-retry.png" });
   evidence.posts = posts;
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(evidence, null, 2));
-  expect(sent, "the popup must reach its success screen (see the evidence file for the alert text)").toBe(true);
+  expect(replayed, "the retry must end on the replay confirmation (see the evidence file)").toBe(true);
 
-  // 4. what the visitor was told
-  expect(posts, "exactly one request to /api/scan so far").toHaveLength(1);
-  const first = posts[0];
+  // 4. what the Worker really did, and what the visitor was then told
+  expect(requestCount).toBe(2);
+  const first = lost as unknown as { status: number; answer: Record<string, unknown> | null };
   expect(first.status).toBe(200);
   expect(first.answer).toMatchObject({ success: true, duplicate: false, scan_saved: true });
   const scanNumber = String(first.answer?.scan_number ?? "");
   expect(scanNumber).toMatch(SCAN_NUMBER_RE);
+  expect(posts).toHaveLength(1);                // only the retry produced a response the page saw
+  expect(posts[0].status).toBe(200);
+  expect(posts[0].answer).toMatchObject({ success: true, duplicate: true, replay: true, scan_saved: true, scan_number: scanNumber });
+  expect(String(posts[0].body.request_id ?? "")).toMatch(/^[0-9a-f-]{36}$/i);
   const shown = (await page.getByTestId("scan-number").first().textContent())?.trim();
   expect(shown).toBe(scanNumber);
   await expect(page.getByTestId("scan-number-notice").first()).toContainText(/quote this number if you want this scan deleted/i);
-  expect(String(first.body.request_id ?? "")).toMatch(/^[0-9a-f-]{36}$/i);
   evidence.scan_number = scanNumber;
-  evidence.request_id = first.body.request_id;
-
-  // 5. replay: the SAME request again (same request_id, no scan attached, no second email expected); it must hand back the same scan number
-  const replay = await page.evaluate(async ({ email: addr, requestId }) => {
-    const res = await fetch("https://mpt-scan-report.myprivacytool.workers.dev/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: addr, consent: true, consent_source: "web_scan_summary", request_id: requestId }) });
-    return { status: res.status, answer: await res.json().catch(() => null) };
-  }, { email: EMAIL, requestId: String(first.body.request_id) });
-  evidence.replay = replay;
+  evidence.request_id = posts[0].body.request_id;
   fs.writeFileSync(OUT, JSON.stringify(evidence, null, 2));
-  expect(replay.status).toBe(200);
-  expect(replay.answer).toMatchObject({ success: true, duplicate: true, replay: true, scan_saved: true, scan_number: scanNumber });
 });
