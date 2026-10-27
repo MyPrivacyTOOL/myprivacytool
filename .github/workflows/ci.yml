@@ -167,6 +167,8 @@ jobs:
           VITE_HUBSPOT_CONTACT_FORM_ID: e2e-contact-form
           # MPC-7471-F3: production builds with saving on (MPC-7470), and e2e/popup-report.spec.ts needs the save tick box the popup then offers.
           VITE_SAVE_WEB_SCANS: "true"
+          # CK-8494: the re-check journey is build-only and OFF in production; this CI build turns it on so e2e/recheck-trace.spec.ts can exercise it.
+          VITE_RECHECK_JOURNEY: "true"
         run: npm run build
       - name: Verify build output
         run: |

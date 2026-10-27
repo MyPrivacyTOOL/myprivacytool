@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { detectWebRTCLeak } from '@/lib/fingerprintDetection';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
 import {
@@ -21,17 +21,10 @@ export default function RecheckPanel({ observation, explained, told }: RecheckPa
   const [record, setRecord] = useState<RecheckRecord | null>(() => load());
   const [busy, setBusy] = useState(false);
   const [consent, setConsent] = useState(() => hasConsent());
-  const resumed = useRef(false);
 
   useEffect(() => onConsentChange(() => { setConsent(hasConsent()); setRecord(load()); }), []);
 
-  // A saved journey from an earlier visit where the visitor said they did the step: this page load's reading is the re-check.
-  useEffect(() => {
-    if (resumed.current || !observation) return;
-    resumed.current = true;
-    const saved = load();
-    if (saved?.selfReport) setRecord(recordRecheck(observationFrom(observation)).record);
-  }, [observation]);
+  // A reload never records a re-check by itself: the visitor presses "Check again", so every re-check is one they asked for.
 
   // The explanation is on screen for a found reading: keep that first reading (once).
   useEffect(() => {
