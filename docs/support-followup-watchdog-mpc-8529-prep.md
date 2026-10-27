@@ -139,6 +139,9 @@ engine now sits on the MPC-8528 case table (`support_cases`, merged as a propose
 | Bound, backoff, transition parity with the SQL and with `shared/support/states.ts`; honest outage wording | `src/lib/supportFollowup.ts` (+ test) | Unit-tested; **not wired into any UI or worker.** |
 | Sanitised defect-handoff builder | `src/lib/supportDefectHandoff.ts` (+ test) | Builds a payload only; **nothing sends it.** |
 | Versioned test receipts (expected vs actual, evidence class, refuses PII/tokens; live only with a passing real-channel check) | `src/lib/supportReceipts.ts` (+ test) | Unit-tested; not yet emitted by CI. |
+| Follow-up worker: claims due cases, sends ONE fixed honest message through the MPC-8528 `Notifier` to the original sender only, records `attempted` (never `delivered`), re-checks without re-sending, never touches resolved/closed/blocked | `shared/support/followup-worker.ts` (+ `rest-followup-store.ts`, PostgREST over the SQL functions) | Tested with fakes (16 tests incl. a mutation check). **Not scheduled, not deployed, not run against a real notifier.** |
+| Engineering handoff port: sanitises first, never throws into the support flow, never reaches a person, no automatic fix | `shared/support/engineering-intake.ts` | Tested with a fake intake. **No real intake exists or is approved yet.** |
+| Limited-mode help page (static, no scripts/forms/requests; states it cannot save a request or issue a case reference) | `fallback/help/index.html`, `fallback/README.md` | **Prepared, not deployed, not independent** until an approved host serves it. Deliberately outside `public/`. |
 | Full lifecycle journey (promise, failed send, retry, receipt, silence, failed then passed verification, reopen, exhaustion) | `supabase/tests/proposed-mpc-8529-support-followup.test.sql` | 72 assertion calls, pass. |
 | HELP under outage (11 routes incl. 404, desktop + mobile, keyboard, focus, no token/email in requests) | `e2e/support-degraded.spec.ts` | Production build, all non-local traffic blocked. |
 
@@ -153,9 +156,9 @@ Evidence class: **mocked / isolated integration only.** Receipts are structured 
 | Persistent next-action / next-update scheduling, bounded retries, backoff, idempotency, lease against duplicate workers | Met in isolated DB tests on the real 8528 schema |
 | Orphan and stalled-lease detection; explicit waiting / unresolved states; no close-on-silence; verification; reopen | Met in isolated DB tests |
 | Honest HELP under outage; fallbacks that share a failed dependency are not called independent | Met (browser + unit) |
-| Sanitised defect handoff to the engineering workflow | **Partly met.** Builder only; no sender (needs that workflow's intake and approval). |
-| Failed ack/reply detection from a real transport | **Partly met.** The DB path is tested; no real `Notifier` or worker yet (MPC-8532). |
-| Independently reachable help/status/intake fallback | **Unmet.** Needs an approved host other than Cloudflare Pages (new infrastructure). |
+| Sanitised defect handoff to the engineering workflow | **Partly met.** Sanitising builder and sender port are built and tested; **no real intake** is named or approved. |
+| Failed ack/reply detection from a real transport | **Partly met.** The DB path and the worker are tested with fakes; nothing runs the worker and no channel `Notifier` is enabled (MPC-8532). Open finding: a channel with no delivery receipts (e.g. plain email) can only reach `attempted`, so by design it ends `blocked` / `followup_exhausted` after the bound; MPC-8532 must define what counts as a delivery receipt per channel. |
+| Independently reachable help/status/intake fallback | **Prepared only.** The static page exists in `fallback/`; it is not served anywhere. Needs an approved host other than Cloudflare Pages (new infrastructure) before it can be called independent. |
 | Full main journey (diagnosis, action, case reference, delivered follow-up, verified outcome, reopen) | **Partly met.** Follow-up half tested end to end; AI diagnosis and permitted action need the 8528 service wired to a model, verifier and policy (MPC-8530). |
 | Wrong-user, broken login, disputed finding, billing/rights boundary, malicious prompts, cost exhaustion | **Unmet** here. The MPC-8528 gateway has its own isolated tests; end-to-end versions need MPC-8530 policy and a hosted service. |
 | Metrics surfaced anywhere; production schedule; live and real-channel tests | **Not done; approval required.** |
