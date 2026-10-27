@@ -111,6 +111,7 @@ describe('B: a Make HTTP 200 is a hand-off, never a publication', () => {
     expect((await submit(db, receipt('x', { post_url: 'https://evil.example.com/status/1' }))).message).toMatch(/does not belong/);
     expect((await submit(db, receipt('x', { post_url: 'http://x.com/a' }))).status).toBe(400);
     expect((await submit(db, receipt('x', { post_id: '' }))).status).toBe(400);
+    expect((await submit(db, receipt('x', { post_url: 'not a url' }))).status).toBe(400); // a present URL must be valid
     expect((await submit(db, receipt('nope'))).status).toBe(400);
     expect(states(db).x).toBe('handed_off');
   });
@@ -359,5 +360,23 @@ describe('routed platforms: only platforms Make can publish are sent, verified o
   it('unset ROUTED_PLATFORMS keeps the legacy behaviour (all six sent)', async () => {
     const db = fakeD1(); seedDrafts(db); await approve(db);
     expect(sentPlatforms(0)).toHaveLength(6);
+  });
+});
+
+describe('post_url is optional but never invented', () => {
+  it('a receipt without post_url verifies the platform and stores null; the post id and run id are still required', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    const { post_url, ...noUrl } = receipt('instagram');
+    expect(post_url).toBeTruthy();
+    expect(await submit(db, noUrl)).toMatchObject({ status: 200, state: 'verified_published' });
+    const row = (await rowsFor(db, TASK)).find((r) => r.platform === 'instagram');
+    expect(row).toMatchObject({ state: 'verified_published', post_id: 'p-instagram', post_url: null });
+    expect((await submit(db, { ...noUrl, receipt_id: 'r9', post_id: '' })).status).toBe(400);
+    expect((await submit(db, { ...receipt('facebook'), post_url: '' })).state).toBe('verified_published');
+  });
+  it('a URL that is present must still match the platform host', async () => {
+    const db = fakeD1(); seedDrafts(db); await approve(db);
+    expect((await submit(db, receipt('linkedin', { post_url: 'https://www.facebook.com/x/1' }))).status).toBe(400);
+    expect(states(db).linkedin).toBe('handed_off');
   });
 });

@@ -193,13 +193,18 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
     return { status: 200, message: 'failure recorded', state: 'failed' };
   }
 
-  if (!text(b.make_run_id) || !text(b.post_id) || !text(b.post_url) || Number.isNaN(Date.parse(b.published_at))) {
-    return { status: 400, message: 'a published receipt needs make_run_id, post_id, post_url, published_at' };
+  if (!text(b.make_run_id) || !text(b.post_id) || Number.isNaN(Date.parse(b.published_at))) {
+    return { status: 400, message: 'a published receipt needs make_run_id, post_id, published_at' };
   }
-  let host;
-  try { const u = new URL(b.post_url); host = u.protocol === 'https:' ? u.hostname.toLowerCase() : null; } catch { host = null; }
-  if (!host || !PLATFORM_HOSTS[b.platform].some((h) => host === h || host.endsWith(`.${h}`))) {
-    return { status: 400, message: 'post_url does not belong to the platform' };
+  // post_url is OPTIONAL: some platform modules return only an id and a URL must never be invented. When present it must
+  // belong to the platform; when absent it is stored as null (the post id is still platform-issued proof of publication).
+  const hasUrl = b.post_url !== undefined && b.post_url !== null && b.post_url !== '';
+  if (hasUrl) {
+    let host;
+    try { const u = new URL(b.post_url); host = u.protocol === 'https:' && text(b.post_url) ? u.hostname.toLowerCase() : null; } catch { host = null; }
+    if (!host || !PLATFORM_HOSTS[b.platform].some((h) => host === h || host.endsWith(`.${h}`))) {
+      return { status: 400, message: 'post_url does not belong to the platform' };
+    }
   }
   if (row.state === 'verified_published') {
     // A different post for an already-verified platform is a conflict to investigate, never an overwrite.
@@ -207,12 +212,12 @@ export async function handleReceipt(env, rawBody, headers, nowMs = Date.now()) {
   }
   await env.AGENT_LOGS.prepare('INSERT INTO receipt_callbacks (receipt_id, content_id, platform, received_at, result) VALUES (?, ?, ?, ?, ?)').bind(b.receipt_id, b.drafted_content_id, b.platform, iso(now), 'published').run();
   await setRow(env.AGENT_LOGS, id, {
-    state: 'verified_published', make_run_id: b.make_run_id, post_id: b.post_id, post_url: b.post_url,
+    state: 'verified_published', make_run_id: b.make_run_id, post_id: b.post_id, post_url: hasUrl ? b.post_url : null,
     published_at: new Date(b.published_at).toISOString(), provenance: `callback:${b.receipt_id}`, outcome_unknown: 0, last_error: null, next_attempt_at: null, updated_at: iso(now),
   });
   // The metrics seed row exists only once a post is verified, with the real id and URL (was written at hand-off before CK-8482).
   await env.AGENT_LOGS.prepare('INSERT INTO social_metrics (id, timestamp, platform, post_id, url, impressions, engagement) VALUES (?, ?, ?, ?, ?, 0, 0)')
-    .bind(crypto.randomUUID(), iso(now), b.platform, b.post_id, b.post_url).run().catch((e) => console.error('social_metrics insert failed', e?.message));
+    .bind(crypto.randomUUID(), iso(now), b.platform, b.post_id, hasUrl ? b.post_url : null).run().catch((e) => console.error('social_metrics insert failed', e?.message));
   return { status: 200, message: 'verified', state: 'verified_published' };
 }
 
