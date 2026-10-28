@@ -52,6 +52,10 @@ TELEGRAM_DASHBOARD_LINKS = "on"
 # MPC-7894: /fix wizard, kept here so a deploy does not wipe it (the flags workflow value was dropped by the next deploy, so /fix fell through to the normal bot).
 # Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) whose stored consent is confirmed; needs the fix_wizard_items table. Rollback: set "off" (or delete this line) and deploy.
 TELEGRAM_FIX_WIZARD = "on"
+# CK-8502 (owner decision D1, 2026-10-28; legal/wording/retention approved by the owner; migration 20261028110000 applied): records the Telegram hexagon values of every
+# private, non-bot message (name, @username, language, time, message text) as one social_events row, adds the approved disclosure sentence to replies, and lets STOP erase
+# for ANY private sender. Kept here so a deploy does not wipe it. Rollback: set "off" (or delete this line) and deploy; stored rows go with the contact (STOP, or mpt_erase_social_contact).
+TELEGRAM_CAPTURE_HEXAGONS = "on"
 
 # MPC-7628: Mirror bot limits (every scan spends X API credits). Same syntax as core-brain/mpt-leads: the deploy action's wrangler 3.90.0
 # ignores the newer [[ratelimits]] table, so this must be [[unsafe.bindings]] type = "ratelimit" (a test pins it). Per sender: 3
