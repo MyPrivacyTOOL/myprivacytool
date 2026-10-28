@@ -59,3 +59,16 @@ own `identity.link_confirmation` point confirms a link. Unmerging clears one poi
 ## Open rulings (not decided here; defaults are the design page's, all reversible)
 
 See the PR description and the task row; the list is kept there so it cannot go stale in two places.
+
+## Risk axis, education before acceptance, 366 registry (MPC-8753)
+
+Design: MPC-7898 Amendment A3 + A3.9 (approved by Chris 2026-10-28). Migration: `supabase/migrations/20261028200000_mpc_8753_ledger_risk_axis.sql`, applied AFTER the v1 migration. Additive; the v1 guard functions keep their exact return types.
+
+- **Two axes.** Identity/confidence is unchanged. Risk is a second axis, stored in two append-only tables (`risk_education_event`, `risk_decision_event`) and DERIVED by `ledger._risk_eval`: unknown (no row) -> educated -> accepted | removed.
+- **Per claim and per scan.** The key is (person, type, subject, `scan_key`). A new scan starts at unknown; there is no reopen (A3.9 D7). A changed value, or a changed consequence-text version, voids earlier education and decisions.
+- **Applies only to what was found.** Not checked, failed, stale and clear are `not_applicable`; a claim the person marked `not_me` is `not_me` and takes no decision (H17).
+- **Education before acceptance (H12/H13).** An `accepted` decision needs an education event for the same claim, scan and value, shown earlier, backed by a `consequence` render in `render_log`. A type with no APPROVED consequence text (`public.localization`, status approved) cannot be educated, so it cannot be accepted. All 366 types start with no text: nothing is acceptable until texts are written and approved.
+- **Writers/guard.** `render_consequence`, `record_risk_education`, `record_risk_decision`, `render_claim_risk`, `render_progress_risk` (service_role EXECUTE only). Score = `unaddressed_risk` = unknown + educated, a whole number; the risk buckets partition the profile. Identity confirm taps never move it.
+- **366 registry (H18).** `data_point_type` holds the 366 hexagons of `public.hexagon_catalogue` (hexagon_id, channel, arrival, risk_tier, build_state, access_class). Un-dotted web/email ids map to `web.<id>` / `email.<id>` with `-` as `_`, the same convention the v1 backfill uses, so a backfilled row is promoted in place. `report_profile_item` accepts only built, access-ok hexagons.
+- **Erase parity.** `ledger.erase_person` now also erases the two risk tables.
+- **Tests.** `supabase/tests/mpc-8753-risk-axis.test.sql` (run by `supabase/tests/run.sh`, incl. tested rollback restoring schema `ledger` byte-for-byte) and `shared/ledger-render-guard/risk.vitest.ts`.
