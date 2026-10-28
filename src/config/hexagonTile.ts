@@ -30,3 +30,15 @@ export function hexScreenV2Enabled(search?: string): boolean {
   }
   return parseHexTileV2(import.meta.env.VITE_HEX_SCREEN_V2);
 }
+
+// MPC-8745: show the typed fix blocks (src/lib/hexagonFix.ts, MPC-8733) on the next-step card and the dashboard fix panel.
+// OFF by default, so visitors see no change until it is switched on. VITE_FIX_BLOCKS_V2="true", or ?fix_v2=1 in one tab (never stored).
+export function fixBlocksV2Enabled(search?: string): boolean {
+  try {
+    const q = search ?? (typeof window !== 'undefined' ? window.location.search : '');
+    if (/[?&]fix_v2=1(&|$)/.test(q)) return true;
+  } catch {
+    /* no window or blocked: use the build setting */
+  }
+  return parseHexTileV2(import.meta.env.VITE_FIX_BLOCKS_V2);
+}

@@ -122,8 +122,9 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (!html) { html = built.html; text = built.text; }
       const problems = checkReport({ html, text, json: JSON.parse(JSON.stringify(built.report)) }, { scanNumber: ctx.scanNumber, fixture });
       if (source === 'provider') {
-        const found = (s) => (s.match(/>FOUND</g) || []).length + (s.match(/FOUND · ESTIMATE/g) || []).length;
-        if (found(html) !== found(built.html)) problems.push('sent report and rebuilt report disagree on the number of FOUND hexagons');
+        const found = (s) => (s.match(/>\s*FOUND\s*</g) || []).length + (s.match(/FOUND\s*·\s*ESTIMATE/g) || []).length;
+        const [sentN, builtN] = [found(html), found(built.html)];
+        if (sentN !== builtN) problems.push(`sent report and rebuilt report disagree on the number of FOUND hexagons (sent ${sentN}, rebuilt ${builtN}; fixture ${fixture.filter((f) => f.status === 'found').length})`);
       }
       result.facts.report_source = source; result.facts.html_bytes = new TextEncoder().encode(html).length; ctx.html = html;
       if (problems.length) throw new Error(problems.slice(0, 5).join('; '));
