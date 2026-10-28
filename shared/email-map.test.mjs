@@ -47,6 +47,9 @@ check(/export async function optOutEverywhere/.test(suppression) && /addSuppress
 check(/optOutEverywhere\(sb, email, 'unsubscribe'\)/.test(read('workers/scan-report/index.js')), 'the signed unsubscribe link calls optOutEverywhere');
 check(/insert into public\.email_suppressions/.test(read('supabase/migrations/20261028120000_mpc_7555_one_opt_out.sql')) && /after insert or update of email_opt_out_at/.test(read('supabase/migrations/20261028120000_mpc_7555_one_opt_out.sql')), 'the users-column path is covered by a database trigger and a backfill');
 check(/email_suppressions/.test(read('workers/mpt-metrics-collector/collectors/hubspot-optout.js')), 'the HubSpot path is covered by the daily sync');
+check(/optOutEverywhere\(db\(env\), addr, source\)/.test(read('workers/scan-report/index.js')) && /endsEmail = bounce === 'permanent' \|\| status === 'complained'/.test(read('workers/scan-report/lib/receipts.js')), 'the hard-bounce / complaint path writes THE opt-out (and a soft bounce does not)');
+const keyTypes = read('workers/scan-report/lib/emailSends.js');
+for (const x of SENDERS.filter((y) => y.idempotencyPrefix)) check(keyTypes.includes(`'${x.idempotencyPrefix}'`), `delivery tracking knows the email type of "${x.idempotencyPrefix}" (lib/emailSends.js)`);
 for (const p of OPT_OUT_PATHS) check(Boolean(p.pending) || Boolean(read(p.file)), `opt-out path "${p.id}" points at real code (${p.pending ? 'pending ' + p.pending : p.file})`);
 
 // 5. no email says "reply to unsubscribe" (it is not an unsubscribe path: a reply goes to a person's inbox)
