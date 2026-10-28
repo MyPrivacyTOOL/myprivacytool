@@ -2,6 +2,8 @@ import type { Logger } from "./logger";
 
 export interface Env {
   X_CONSUMER_SECRET?: string;
+  /** CK-8502 owner decision D1: "on" stores the hexagon values an X event carries (profile fields, post/DM text) with the event. Default off. Needs legal sign-off and the wording change first. */
+  X_CAPTURE_HEXAGONS?: string;
   /** MPC-7628 Mirror bot: app bearer token (public profile lookup) and user-context token with dm.write (DM replies). */
   X_BEARER_TOKEN?: string;
   X_USER_ACCESS_TOKEN?: string;

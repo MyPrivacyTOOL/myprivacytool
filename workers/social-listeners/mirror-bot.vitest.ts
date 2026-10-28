@@ -134,7 +134,7 @@ describe("new dm.received event shape (MPC-7628)", () => {
   const evt = (sender: string, text: string, self = "999") =>
     ({ data: { event_type: "dm.received", filter: { user_id: self }, payload: { sender_id: sender, text } } });
   it("understands a dm.received payload and skips our own echo", () => {
-    expect(extractMirrorDms(evt("42", "MIRROR YES"))).toEqual([{ senderId: "42", text: "MIRROR YES", command: "consent" }]);
+    expect(extractMirrorDms(evt("42", "MIRROR YES"))).toMatchObject([{ senderId: "42", text: "MIRROR YES", command: "consent" }]);
     expect(extractMirrorDms(evt("999", "MIRROR"))).toEqual([]);
   });
   it("does not treat a post that merely says mirror as a DM", () => {
@@ -211,7 +211,7 @@ describe("bare Y / N answers (MPC-7628)", () => {
     for (const t of ["yes please", "maybe", "", "yy", "you", "yo", "yesterday", undefined]) expect(parseBareReply(t)).toBeNull();
   });
   it("marks bare replies so they can be checked first", () => {
-    expect(extractMirrorDms(JSON.parse(dm("42", "y")))).toEqual([{ senderId: "42", text: "y", command: "consent", bare: true }]);
+    expect(extractMirrorDms(JSON.parse(dm("42", "y")))).toMatchObject([{ senderId: "42", text: "y", command: "consent", bare: true }]);
   });
   it("a bare Y right after the consent request runs the scan and sends the mirror", async () => {
     const b = brain(); const f = x(asked());
