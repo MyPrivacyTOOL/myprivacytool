@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { footprintSummary, footprintLine, footprintChannelsLine, FOOTPRINT_TOTAL } from './footprint.js';
 import { HEXAGONS } from './registry.js';
-import { TELEGRAM_HEXAGONS, TELEGRAM_EXTRA_IDS, EMAIL_EXTRA_IDS } from './channels.js';
+import { TELEGRAM_HEXAGONS, TELEGRAM_EXTRA_IDS, EMAIL_EXTRA_IDS, EXTRA_HEXAGON_IDS } from './channels.js';
 import { HEXAGON_CATALOGUE } from './catalogue.js';
 import { scanCounts } from './counts.js';
 
@@ -20,7 +20,7 @@ assert.equal(footprintChannelsLine(both), 'Web scan 54 of 83, Telegram 30 of 47'
 assert.equal(footprintSummary(TELEGRAM_HEXAGONS.map((h) => h.id)).toReview, 336);
 
 // A hexagon that is only documented ("new"), an unknown id and a duplicate never count as checked.
-const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new').id;
+const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new' && !EXTRA_HEXAGON_IDS.includes(h.id)).id;
 const odd = footprintSummary([newId, 'not-a-hexagon', 'location', 'location']);
 assert.deepEqual([odd.checked, odd.toReview], [1, 365]);
 

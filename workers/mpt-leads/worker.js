@@ -83,6 +83,28 @@ function whoami(request, cors, rlState) {
   });
 }
 
+// MPC-8689 pilot: the extra web hexagons that come from Cloudflare's request data. A separate route so /whoami (and the 54 web hexagons that use it) stay exactly as
+// they are. Returns what the connection itself reveals to any site (no IP is returned, nothing is stored, no outbound request): postcode and metro area, the IP's
+// timezone, network distance, network owner, TLS handshake fingerprint (hashes), HTTP version, EU flag, and the server time so the browser can compare clocks.
+function whoamiExtra(request, cors, rlState) {
+  const cf = request.cf || {};
+  const str = (v) => (v === undefined || v === null ? '' : String(v)).slice(0, 120);
+  const num = (v) => (Number.isFinite(Number(v)) && v !== '' && v !== null && v !== undefined ? Number(v) : null);
+  const body = {
+    postal_code: str(cf.postalCode), metro_code: str(cf.metroCode), timezone: str(cf.timezone),
+    tcp_rtt_ms: num(cf.clientTcpRtt), quic_rtt_ms: num(cf.clientQuicRtt), colo: str(cf.colo),
+    asn: num(cf.asn), org: str(cf.asOrganization),
+    tls_ciphers_sha1: str(cf.tlsClientCiphersSha1), tls_extensions_sha1: str(cf.tlsClientExtensionsSha1), tls_hello_length: num(cf.tlsClientHelloLength),
+    http_protocol: str(cf.httpProtocol),
+    is_eu: cf.isEUCountry === '1' || cf.isEUCountry === 1 || cf.isEUCountry === true ? true : cf.isEUCountry === undefined ? null : false,
+    continent: str(cf.continent), region_code: str(cf.regionCode),
+    now: Date.now(),
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-RateLimit-State': rlState },
+  });
+}
+
 // CK-7721 fix 4: retention for the Notion leads database. The Privacy Policy keeps lead records for 24 months after last engagement; every
 // submission creates its own Notion page, so a page's created time is its last engagement. Older pages are ARCHIVED (Notion keeps archived
 // pages in its trash for 30 days, then deletes them). Counts only are logged: never a name or an email. Fail-soft; at most LEAD_PURGE_LIMIT per run.
@@ -142,6 +164,12 @@ export default {
       const rl = await rateLimitState(env, request);
       if (rl === 'limited') return reject(429, 'Too many requests');
       return whoami(request, cors, rl);
+    }
+    if (request.method === 'GET' && new URL(request.url).pathname === '/whoami-extra') {   // MPC-8689 pilot, see whoamiExtra
+      if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
+      const rl = await rateLimitState(env, request);
+      if (rl === 'limited') return reject(429, 'Too many requests');
+      return whoamiExtra(request, cors, rl);
     }
     if (request.method !== 'POST') {
       return new Response('Not found', { status: 404 });

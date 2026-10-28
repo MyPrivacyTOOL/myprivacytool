@@ -83,7 +83,9 @@ export const TELEGRAM_EXTRA_HEXAGONS = [
 export const TELEGRAM_EXTRA_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
 // Email extras live in workers/scan-report/lib/emailExtras.js (EMAIL_EXTRA_HEXAGONS); their catalogue ids are listed here so the footprint count knows they are built.
 export const EMAIL_EXTRA_IDS = ['email.alias', 'email.address_type', 'email.saas_records', 'email.mail_protection'];
-export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS];
+// Web extras live in src/lib/webExtras.ts (edge data from the mpt-leads Worker /whoami-extra, plus two browser checks). Outside the 54, the exposure score and scanCounts.
+export const WEB_EXTRA_IDS = ['web.postal_area', 'web.ip_timezone', 'web.network_distance', 'web.network_owner', 'web.tls_fingerprint', 'web.http_protocol', 'web.eu_region', 'web.device_model', 'web.clock_skew'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS];
 
 export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS };
 export const TELEGRAM_HEXAGON_COUNT = TELEGRAM_HEXAGONS.length;
