@@ -38,7 +38,8 @@ import { hexTileV2Enabled, hexScreenV2Enabled } from '@/config/hexagonTile';
 import { toTile, riskProfile, riskProfileParts, withUserStatement, withGuessAnswer, cannotCheckLast, HexagonTile, type GuessOutcome } from '@/lib/hexagonTile';
 import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
 import GuessCheckCard from './hexagon/GuessCheckCard';
-import { fixStepFor } from '@/lib/hexagonFix';
+import { fixStepFor, fixBlockFor, canShowFix } from '@/lib/hexagonFix';
+import { fixBlocksV2Enabled } from '@/config/hexagonTile';
 import NextStepCard from './hexagon/NextStepCard';
 import RecheckPanel from './hexagon/RecheckPanel';
 import { recheckJourneyEnabled } from '@/config/recheckJourney';
@@ -870,6 +871,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
               key={currentStep.id}
               label={currentStep.label}
               step={fixStepFor(currentStep.id)}
+              block={fixBlocksV2Enabled() && canShowFix(currentStep.id, 'needs_fixing') ? fixBlockFor(currentStep.id) : undefined}
               position={1}
               total={stepsLeft.length}
               onDone={() => setToldFixed((prev) => new Set(prev).add(currentStep.id))}
