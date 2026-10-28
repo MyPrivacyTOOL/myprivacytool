@@ -690,6 +690,21 @@ select pg_temp.assert((select hubspot_synced_at is null from public.social_conta
 reset role;
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_touch('x','1','a','nonsense')$$) = '22023', 'mpt_social_touch: unknown event types are refused');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_touch('X!','1','a','dm')$$) = '23514', 'social_contacts: platform must be a lower-case slug');
+-- CK-8502: mpt_social_record is idempotent per platform event, order-safe, and keeps the same erase path
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_social_record('x','1','a','dm')$$) = '42501', 'mpt_social_record: anon cannot call it');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_record('x','1','a','nonsense')$$) = '22023', 'mpt_social_record: unknown event types are refused');
+set local role service_role;
+select public.mpt_social_record('x', '777100', 'carol', 'follow', true, 'follow:777100:1000', now() - interval '1 hour', null);
+select pg_temp.assert((select (public.mpt_social_record('x', '777100', 'carol', 'follow', true, 'follow:777100:1000', now() - interval '1 hour', null))->>'duplicate' = 'true'), 'mpt_social_record: the same platform event twice reports duplicate');
+select pg_temp.assert((select event_count = 1 and follows_us from public.social_contacts where platform_user_id = '777100') and (select count(*) from public.social_events e join public.social_contacts c on c.id = e.contact_id where c.platform_user_id = '777100') = 1, 'mpt_social_record: a redelivery adds no event row and no count');
+select public.mpt_social_record('x', '777100', null, 'mention', null, 'mention:t1', now() - interval '3 hours', 't1');
+select pg_temp.assert((select event_count = 2 and handle = 'carol' and last_seen_at > now() - interval '90 minutes' from public.social_contacts where platform_user_id = '777100'), 'mpt_social_record: a late (older) event is counted but never moves last_seen_at back; the handle is kept');
+select pg_temp.assert((select source_ref = 't1' and occurred_at is not null from public.social_events where event_key = 'mention:t1'), 'mpt_social_record: stores the platform timestamp and the post id it relates to');
+select pg_temp.assert((select (public.mpt_social_record('x', '777101', 'dave', 'follow', true, 'follow:777101:1000', null, null))->>'duplicate' = 'false'), 'mpt_social_record: the same key for a different person is a different event');
+select pg_temp.assert(public.mpt_social_record('x', '777100', null, 'dm') ->> 'duplicate' = 'false' and public.mpt_social_record('x', '777100', null, 'dm') ->> 'duplicate' = 'false', 'mpt_social_record: with no event key it behaves like mpt_social_touch (nothing to deduplicate on)');
+select pg_temp.assert(public.mpt_erase_social_contact('x', '777100') = 1 and public.mpt_erase_social_contact('x', '777101') = 1, 'mpt_social_record: erase removes the contact; events cascade');
+select pg_temp.assert((select count(*) from public.social_events where event_key in ('follow:777100:1000','mention:t1','follow:777101:1000')) = 0, 'mpt_social_record: no event survives an erase');
+reset role;
 set local role service_role;
 select pg_temp.assert(public.mpt_erase_social_contact('x', '777001') = 1, 'mpt_erase_social_contact: returns the number of contacts removed');
 select pg_temp.assert((select count(*) from public.social_contacts where platform_user_id = '777001') = 0 and (select count(*) from public.social_events) = 1, 'mpt_erase_social_contact: removes the contact and its events, others stay');
