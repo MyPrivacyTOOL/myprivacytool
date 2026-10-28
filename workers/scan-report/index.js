@@ -68,7 +68,7 @@ export default {
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
-    if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env) });
+    if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env), optOut: (addr, source) => optOutEverywhere(db(env), addr, source), pushHubspot: (addr) => pushEmailOptOut(env, { email: addr }) });   // MPC-7556: hard bounce / complaint -> THE opt-out
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
