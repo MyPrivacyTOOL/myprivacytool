@@ -87,6 +87,7 @@ export function fake(opts = {}) {
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     const rq = q.get('request_id')?.replace('eq.', ''); if (rq) rows = rows.filter((x) => x.request_id === rq);   // MPC-7471-F3
     const cid = q.get('contact_id')?.replace('eq.', ''); if (cid) rows = rows.filter((x) => x.contact_id === decodeURIComponent(cid));   // MPC-7471-F3
+    const cs = q.get('check_status')?.replace('eq.', ''); if (cs) rows = rows.filter((x) => x.check_status === cs);   // MPC-7554
     const sc = q.get('scan_id')?.replace('eq.', ''); if (sc) rows = rows.filter((x) => x.scan_id === sc);   // like PostgREST: a read by scan_id returns that scan's rows only
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
