@@ -3,7 +3,8 @@
 --   scope 'footprint': only GET /api/footprint, which returns the ids of the Telegram hexagons whose check ran (no values). It cannot read /api/dashboard.
 -- The redemption function gains p_scope (default 'dashboard', so the existing 3-argument calls behave exactly as before). A link only redeems under its own scope:
 -- a dashboard link at /f/<uuid>, or a footprint link at /d/<uuid>, redeems nothing.
--- NOT applied to production by the PR that adds it: apply after approval and before enabling TELEGRAM_FOOTPRINT_LINKS and FOOTPRINT_HANDOFF.
+-- Applied to the live project by .github/workflows/deploy-supabase.yml (supabase db push) when the PR merges to main; it only adds columns with defaults and replaces the redeem function, and the
+-- feature stays off until TELEGRAM_FOOTPRINT_LINKS and FOOTPRINT_HANDOFF are set. Tested on a throwaway Postgres in CI (supabase/tests/footprint-handoff.test.sql).
 -- Rollback: drop function public.mpt_redeem_dashboard_link(text, text, integer, text); recreate the 3-argument function from 20261026220000;
 --           alter table public.dashboard_sessions drop column scope; alter table public.dashboard_links drop column scope;
 alter table public.dashboard_links add column if not exists scope text not null default 'dashboard' check (scope in ('dashboard', 'footprint'));
