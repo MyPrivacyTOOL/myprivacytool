@@ -3,6 +3,7 @@
 // replies with a risk report (hexagons returned out of 30) and saves a snapshot to public.profile_snapshots. Wording is DRAFT pending Chris's approval (strategy 9.9, 11).
 import { ARRIVAL, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
 import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
+import { footprintSummary, footprintLine } from "../../../shared/hexagon-registry/footprint.js";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import { redactStoredId, senderKey } from "./sender-key";
@@ -155,6 +156,9 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
     `That is how many of the ${risk.possible} pieces of information Telegram could send this bot actually reached it in this check (${risk.notChecked} cannot be checked yet). Higher = more exposed. Not returned only means this bot did not receive it: it does not verify your privacy settings.`,
     ...hexagonLines(hexagons),
     "",
+    // MPC-8689: Telegram is one channel of the whole footprint. Only hexagons whose check ran here (returned or not returned) count as checked; the rest, including the web scan, are still to review.
+    `Your whole footprint: ${footprintLine(footprintSummary(hexagons.filter((x) => x.state === "returned" || x.state === "not_returned").map((x) => x.id)))}. Telegram is one channel of ${footprintSummary().byChannel.length}. To check the web side too: ${SCAN_URL}`,
+    "",
     `✅ Never sent to bots by Telegram: ${NEVER_SENT.join(", ")}.`,
     "This is how Telegram's bot system works for every account. It is not a check of your own privacy settings.",
     ...(insights.length ? ["", "What this shows:", ...insights.map((i) => `- ${i}`)] : []),
@@ -191,6 +195,7 @@ async function saveSnapshot(env: Env, row: Record<string, unknown>, log: Logger)
   }
 }
 
+const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=baseline_report";
 const FAILED_TEXT = "I couldn't complete the Telegram check just now, so I have no result to show. Nothing was scored. You can say \"scan me\" to try again later.";
 
 /** Runs after the Y reply. Never throws, never logs payloads or the token. Does nothing for senders outside the allow-list. */
