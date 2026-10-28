@@ -34,7 +34,7 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 # MPC-8671 is applied below, after the KPI view chain it replaces (supabase/sql/*, which production got through the SQL editor/MCP, not through migrations).
 # MPC-8737: the ledger migration has its own stage further down (fingerprint before / after, rollback, re-apply), so it is excluded here too.
-for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 echo "   KPI view chain (supabase/sql), in the order production received it"
 for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
 echo "   migration 20261028120000_mpc_8671_kpi_views_hourly_counter.sql"
@@ -220,6 +220,22 @@ diff -q "${TMPDIR:-/tmp}/risk-before.sql" "${TMPDIR:-/tmp}/risk-rolled-back.sql"
 echo "   rollback restored schema ledger byte-for-byte (pg_dump -s identical to the pre-migration dump, incl. erase_person and the render_log CHECK)"
 psql_ "$TEST_URL" -f "$RISK"
 psql_ "$TEST_URL" -At -c "select 'risk axis re-applied after rollback: ' || count(*) || ' hexagon types' from ledger.data_point_type where hexagon_id is not null"
+
+# MPC-8737 M3: erase parity. The live erase functions also erase the ledger record. Tested, then rolled back to the exact pre-M3 functions, then re-applied.
+echo "== erase parity: mpt_dsar_erase / mpt_erase_chat_sender / mpt_erase_social_contact erase the ledger too (MPC-8737 M3)"
+M3=supabase/migrations/20261028210000_mpc_8737_m3_ledger_erase_parity.sql
+fnfp() { psql_ "$TEST_URL" -At -c "select md5(string_agg(pg_get_functiondef(p.oid), '|' order by p.proname)) from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname in ('mpt_dsar_erase','mpt_erase_chat_sender','mpt_erase_social_contact')"; }
+m3_before=$(fnfp)
+psql_ "$TEST_URL" -f "$M3"
+psql_ "$TEST_URL" -f "$M3"   # idempotent
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-m3-erase.test.sql
+echo "   rollback (text taken from the migration header)"
+sed -n '/^-- ROLLBACK/,/^$/p' "$M3" | sed -n 's/^--   //p' > "${TMPDIR:-/tmp}/m3-rollback.sql"
+test -s "${TMPDIR:-/tmp}/m3-rollback.sql" || { echo "::error::no rollback text found in $M3"; exit 1; }
+psql_ "$TEST_URL" -f "${TMPDIR:-/tmp}/m3-rollback.sql"
+psql_ "$TEST_URL" -At -c "select count(*) from pg_proc where proname = 'mpt_dsar_erase' and pronamespace = 'public'::regnamespace and prosrc ilike '%ledger.erase_person%'" | grep -qx 0 || { echo "::error::M3 rollback left ledger.erase_person in mpt_dsar_erase"; exit 1; }
+echo "   rollback restored the legacy erase functions (no ledger call); re-applying"
+psql_ "$TEST_URL" -f "$M3"
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"
