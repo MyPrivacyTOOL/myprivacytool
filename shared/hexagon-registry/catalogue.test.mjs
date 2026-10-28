@@ -25,9 +25,10 @@ assert.deepEqual([...defined].filter((id) => !code.has(id)), []);
 assert.deepEqual([...code].filter((id) => !defined.has(id)), []);
 // Built extras (pilot) are catalogue items still marked "new": they are not among the 91 defined and not in the 30, so no approved count moves.
 assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 5);
+assert.equal(EXTRA_HEXAGON_IDS.length, 9); // 5 Telegram + 4 email
 for (const id of EXTRA_HEXAGON_IDS) {
   const item = HEXAGON_CATALOGUE.find((i) => i.id === id);
-  assert.ok(item && item.status === 'new' && item.channel === 'telegram', `extra ${id} is a new Telegram catalogue item`);
+  assert.ok(item && item.status === 'new' && ['telegram', 'email'].includes(item.channel), `extra ${id} is a new Telegram or email catalogue item`);
   assert.ok(!code.has(id), `extra ${id} is not in the 54 + 7 + 30`);
 }
 assert.equal(HEXAGON_COUNT, 54, 'web scan total stays 54');
