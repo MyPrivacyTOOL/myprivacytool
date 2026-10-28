@@ -78,6 +78,8 @@ export interface DeviceData {
   };
   privacy: {
     doNotTrack: boolean;
+    /** False when the browser does not offer the setting at all (navigator.doNotTrack is null), which is not the same as the setting being off. */
+    doNotTrackSupported: boolean;
     cookiesEnabled: boolean;
   };
   // Language analysis fields
@@ -259,7 +261,7 @@ function getConnectionDisplay(): string {
   if (effectiveType === '4g') return 'Fast (4G/5G)';
   if (effectiveType === '3g') return 'Moderate (3G)';
   if (effectiveType === '2g') return 'Slow (2G)';
-  return 'WiFi'; // Default assumption for desktop
+  return 'Not available'; // MPC-7558: no Network Information API means no reading; never assume WiFi
 }
 
 // Get battery info (async)
@@ -365,6 +367,7 @@ export async function captureDeviceData(): Promise<DeviceData> {
     },
     privacy: {
       doNotTrack: navigator.doNotTrack === '1',
+      doNotTrackSupported: navigator.doNotTrack !== null && navigator.doNotTrack !== undefined,
       cookiesEnabled: navigator.cookieEnabled,
     },
     language: analyzeLanguageSettings(timezone),
@@ -459,7 +462,8 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
     {
       id: 'privacy',
       label: 'Privacy Settings',
-      value: data.privacy.doNotTrack ? 'DNT Enabled' : 'DNT Disabled',
+      // MPC-7558: a browser without the setting is NOT CHECKED, not 'disabled'.
+      value: data.privacy.doNotTrackSupported === false ? 'Not available' : data.privacy.doNotTrack ? 'DNT Enabled' : 'DNT Disabled',
       icon: data.privacy.doNotTrack ? '🛡️' : '⚠️',
       confidence: 100,
       risk: data.privacy.doNotTrack 
@@ -490,7 +494,7 @@ export function generateHexagons(data: DeviceData): HexagonData[] {
         : data.session.referrer.includes('linkedin')
         ? 'LinkedIn'
         : data.session.referrer === 'Direct'
-        ? 'Direct Visit'
+        ? 'Direct or hidden'
         : 'External Link',
       icon: '🔍',
       confidence: 100,
@@ -665,25 +669,23 @@ const scanFingerprints = () =>
 export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonData[]> {
   const baseHexagons = generateHexagons(data);
   
-  // Try to get battery info
+  // Try to get battery info. MPC-7558: without the battery API the hexagon used to be silently absent; it is now present and says
+  // 'Not available' (NOT CHECKED).
   const batteryInfo = await getBatteryInfo();
-  if (batteryInfo) {
-    // Insert battery hexagon after connection
-    const connectionIndex = baseHexagons.findIndex(h => h.id === 'connection');
-    baseHexagons.splice(connectionIndex + 1, 0, {
-      id: 'battery',
-      label: 'Device Status',
-      value: batteryInfo.charging 
-        ? `Charging ${batteryInfo.level}%` 
-        : `Battery ${batteryInfo.level}%`,
-      icon: batteryInfo.charging ? '🔌' : '🔋',
-      confidence: 90,
-      risk: 'Battery level patterns reveal your daily routine and when you might be vulnerable.',
-      confirmed: false,
-      category: 'device',
-    });
-  }
-  
+  const connectionIndex = baseHexagons.findIndex(h => h.id === 'connection');
+  baseHexagons.splice(connectionIndex + 1, 0, {
+    id: 'battery',
+    label: 'Device Status',
+    value: !batteryInfo ? 'Not available' : batteryInfo.charging ? `Charging ${batteryInfo.level}%` : `Battery ${batteryInfo.level}%`,
+    icon: batteryInfo?.charging ? '🔌' : '🔋',
+    confidence: 90,
+    risk: batteryInfo
+      ? 'Battery level patterns reveal your daily routine and when you might be vulnerable.'
+      : 'This browser does not offer the battery API, so we could not check it.',
+    confirmed: false,
+    category: 'device',
+  });
+
   // Add user profile hexagon based on language analysis
   const userProfile = determineUserProfile(data);
   const profileEmoji = userProfile.profile === 'expatriate' ? '🌍' :
