@@ -13,6 +13,7 @@ import ar from "../../../locales/ar/main.json";
 import type { EventLog } from "./event-log";
 import type { Logger } from "./logger";
 import type { Env } from "./shared";
+import { telegramCaptureEnabled } from "./telegram-capture";
 
 // MPC-7641: tagged so GA4 and leads can attribute clicks, scans and sign-ups to this channel (utm_medium=channel_osint, utm_source = platform).
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=bot_reply";
@@ -61,6 +62,9 @@ export function replyTarget(update: unknown): number | string | null {
   return typeof id === "number" || (typeof id === "string" && id !== "") ? id : null;
 }
 
+/** CK-8502: owner-approved disclosure (2026-10-28), appended to every reply while TELEGRAM_CAPTURE_HEXAGONS is on. English only until the 10 locale files carry a reviewed translation. */
+export const CAPTURE_DISCLOSURE = "To reply, I keep the details Telegram sends me with your messages (your name, @username, language and what you write). Send STOP any time and I'll delete them.";
+
 /** Reads core-brain's answer and, if it carries message keys, sends the reply. Never throws: a failed send is logged only. */
 export async function sendTelegramReply(env: Env, update: unknown, brain: Response, log: Logger, events?: EventLog | null): Promise<void> {
   try {
@@ -68,7 +72,8 @@ export async function sendTelegramReply(env: Env, update: unknown, brain: Respon
     if (chatId === null) return;
     const body = (await brain.json()) as { ignored?: boolean; message_keys?: unknown; locale?: unknown };
     if (body.ignored) return;
-    const reply = composeReply(body.message_keys, body.locale);
+    const composed = composeReply(body.message_keys, body.locale);
+    const reply = composed && telegramCaptureEnabled(env) ? `${composed}\n\n${CAPTURE_DISCLOSURE}` : composed;
     if (!reply) return log.warn("reply_empty");
     if (!env.TELEGRAM_BOT_TOKEN) return log.warn("bot_token_unset");
     const ctl = new AbortController();

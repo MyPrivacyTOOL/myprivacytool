@@ -94,3 +94,20 @@ describe("Telegram reply flow", () => {
     expect(tg).toHaveBeenCalledOnce();
   });
 });
+
+describe("CK-8502 capture disclosure", () => {
+  it("is appended only while TELEGRAM_CAPTURE_HEXAGONS is on, and never to an empty reply", async () => {
+    const { CAPTURE_DISCLOSURE } = await import("./src/reply");
+    const sent: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_u: unknown, init?: RequestInit) => { sent.push(JSON.parse(String(init?.body)).text); return new Response("{}"); });
+    const brain = () => Response.json({ message_keys: ["bot.unknown.title"], locale: "en" });
+    const { sendTelegramReply } = await import("./src/reply");
+    const log = { info() {}, warn() {}, error() {} };
+    const upd = { message: { chat: { id: 1 } } };
+    await sendTelegramReply({ TELEGRAM_BOT_TOKEN: "1:a" } as never, upd, brain(), log);
+    await sendTelegramReply({ TELEGRAM_BOT_TOKEN: "1:a", TELEGRAM_CAPTURE_HEXAGONS: "on" } as never, upd, brain(), log);
+    expect(sent[0]).not.toContain(CAPTURE_DISCLOSURE);
+    expect(sent[1]).toContain(CAPTURE_DISCLOSURE.replace(/_/g, "\\_"));
+    vi.restoreAllMocks();
+  });
+});
