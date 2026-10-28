@@ -514,6 +514,7 @@ describe("X activity feed for the CRM (MPC-7628)", () => {
     const sent: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown, init?: RequestInit) => {
       const url = String(u);
+      if (url.includes("/rpc/mpt_social_record")) return new Response("{}", { status: 404 }); // CK-8502 migration not applied: PostgREST answers 404 for an unknown function, the Worker falls back
       if (url.includes("/rpc/mpt_social_touch")) { touch.push(JSON.parse(init!.body as string)); return new Response("{}"); }
       if (url.includes("/rpc/mpt_erase_social_contact")) { erase.push(JSON.parse(init!.body as string)); return new Response("1"); }
       if (url.includes("/rpc/")) return new Response("{}");
