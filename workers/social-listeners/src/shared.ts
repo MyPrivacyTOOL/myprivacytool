@@ -35,6 +35,10 @@ export interface Env {
   DISCORD_PROBE_IDS?: string;
   /** Optional bot token: lets the check read the public profile banner and colour (GET /users/{id}). Unset = that one hexagon says not checked. */
   DISCORD_BOT_TOKEN?: string;
+  /** MPC-8689 pilot extras, each default off ("on" enables), allow-listed test accounts only (empty list = nobody). */
+  SMS_EXTRAS?: string; SMS_PROBE_NUMBERS?: string; TWILIO_AUTH_TOKEN?: string; TWILIO_WEBHOOK_URL?: string;
+  VIBER_EXTRAS?: string; VIBER_PROBE_IDS?: string; VIBER_AUTH_TOKEN?: string;
+  LINE_EXTRAS?: string; LINE_PROBE_IDS?: string; LINE_CHANNEL_SECRET?: string; LINE_CHANNEL_ACCESS_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;
