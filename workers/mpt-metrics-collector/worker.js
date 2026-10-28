@@ -10,6 +10,7 @@ import learningLoop from './collectors/learning-loop.js';
 import scanGap from './collectors/scan-gap.js';
 import nightlyChain from './collectors/nightly-chain.js';
 import hubspotOptout from './collectors/hubspot-optout.js';
+import emailDelivery from './collectors/email-delivery.js';
 import edgeMachines from './collectors/edge-machines.js';
 import channelOsint from './collectors/channel-osint.js';
 import { hkDayStart } from './lib/hk.js';
@@ -21,7 +22,7 @@ import { KPI_CRON, publishKpiDashboard } from './publishers/kpi-dashboard.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, nightlyChain, hubspotOptout, channelOsint, ...ga4Reports];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint, ...ga4Reports];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');

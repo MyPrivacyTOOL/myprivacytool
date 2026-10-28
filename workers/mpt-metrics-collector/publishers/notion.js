@@ -4,6 +4,7 @@
 // Rows this publisher did not create (no MARKER in Notes / Agent Insights) are left untouched.
 import { hkDate, hkDayStartOf } from '../lib/hk.js';
 import { learningLoopConfigured, publishLearningLoop } from './learning-loop.js';
+import { notesLine as emailNotesLine } from '../collectors/email-delivery.js';
 
 export const NOTION_VERSION = '2025-09-03';
 export const DEFAULT_DAILY_DS = '5bf43eae-1da1-438e-859d-56b241b5b1ac'; // Management & Data Analytics MPT Hub
@@ -74,11 +75,12 @@ async function upsert(env, ds, { key, keyProperty, markerProperty, titleProperty
   return { action: 'created', page: created };
 }
 
-export function dailyProperties(day, v, totalLeads, readAt) {
+export function dailyProperties(day, v, totalLeads, readAt, emailDelivery) {
   const lines = [
     `${MARKER} ${day} (Hong Kong day, 00:00-24:00 HKT). Read ${readAt} from Supabase mpt_daily_metrics unless noted.`,
     `GA4 Sessions: ga4 daily_overview (activeUsers also -> Website Visitors). Supabase Signups: public.users created that day. Newsletter Signups: public.subscribers created that day.`,
     `Total Leads: supabase table_counts count of public.leads, latest pull that day. Blank = not collected or source error; nothing is estimated.`,
+    ...(emailDelivery === undefined ? [] : [emailDelivery === null ? 'Email delivery: not collected for this day (source missing or errored); nothing is estimated.' : emailNotesLine(emailDelivery)]),   // MPC-7556: counts only
   ];
   return {
     Date: { date: { start: day } },
@@ -95,7 +97,9 @@ export async function publishDaily(env, day, now = new Date()) {
   const readAt = now.toISOString();
   const [view] = await supa(env, `mpt_daily_metrics?day=eq.${day}&select=*`);
   const [raw] = await supa(env, `mpt_raw_metrics?source=eq.supabase&report=eq.table_counts&captured_at=gte.${hkDayStartOf(day).toISOString()}&captured_at=lt.${hkDayStartOf(addDays(day, 1)).toISOString()}&order=captured_at.desc&limit=1&select=payload`);
-  const properties = dailyProperties(day, view, raw?.payload?.counts?.leads, readAt);
+  // MPC-7556: the per-type email delivery counts for this HKT day (the collector's row whose period starts at this day). Null = not collected, never estimated.
+  const [mail] = await supa(env, `mpt_raw_metrics?source=eq.supabase&report=eq.email_delivery_daily&status=eq.ok&period_start=eq.${encodeURIComponent(hkDayStartOf(day).toISOString())}&order=captured_at.desc&limit=1&select=payload`).catch(() => []);
+  const properties = dailyProperties(day, view, raw?.payload?.counts?.leads, readAt, mail?.payload ?? null);
   const r = await upsert(env, cfg(env).daily, { key: day, keyProperty: 'Date', markerProperty: 'Notes', titleProperty: 'Name', title: day, properties });
   return { kind: 'daily', day, action: r.action, url: r.page.url };
 }
