@@ -104,3 +104,14 @@ Decision: capture everything the platform sends with an event, one hexagon per d
 - **Includes message text** (DMs and posts that mention/share us) when the flag is on. Third-party data is not collected.
 - **Before the flag is turned on for real people:** legal sign-off recorded, the Mirror/visitor wording changed (it still says "keeps none of the profile data or messages"), retention period agreed for the wider data, and the migration applied.
 - Telegram: its 30 hexagons exist but the core-brain path does not store them; wiring is a separate step.
+
+## 10. Part 3: Telegram capture, LinkedIn and Meta, live test
+
+**Telegram (built, OFF by default).** `TELEGRAM_CAPTURE_HEXAGONS=on` records one `social_events` row (platform `telegram`, event `dm`) per private message from a non-bot sender, through the same idempotent `mpt_social_record`: key `tg:<update_id>` (a Telegram retry adds nothing), the message time, and the Telegram hexagon values the update carries (`tg.first_name`, `tg.last_name`, `tg.username`, `tg.language`, `tg.message_time`, `tg.message_text`, `tg.update_counter`). No `getChat`, no photo lookups (those stay in the consented baseline scan). With `TELEGRAM_ID_HMAC_KEY` set the stored id is the hash. Groups, bots and non-message updates are ignored. Code: `workers/social-listeners/src/telegram-capture.ts`; tests: `telegram-capture.vitest.ts`.
+**STOP now works for any private sender when capture is on:** it erases the capture (under the hash and the plain id) and core-brain's conversation row, is never itself recorded, never reaches core-brain, and non-allowed senders get a "Done" reply. This closes the Telegram half of D5. Requires the same migration as X (`20261028110000`, not yet applied): until it is applied the capture call returns 404 and is only logged.
+
+**LinkedIn: NOT built.** Messaging is partner-gated and the delivered event shape is still an assumption in `parseLinkedInEnvelope`. Hexagons written against a guessed shape would be wrong data. Needed first: the approved product and one real (or documented) delivery sample.
+
+**Meta (WhatsApp / Messenger / Instagram): NOT built.** Those webhooks run in `workers/webhook-receiver` with their own pipeline and gates (MPC-7902/7904), outside the Workers this task covers. Needed first: the owner of that pipeline, a documented payload per product, and the 24-hour window rules.
+
+**Live test: NOT run.** Needs legal sign-off, the wording change, the migration, the flag set on, and an approved test account (for Telegram: a test account, no X paid tier needed). Procedure once approved: set `TELEGRAM_CAPTURE_HEXAGONS=on`; from the test account send "hello"; expect one row with `data`; resend the same update (Telegram retries) and see no second row; send STOP and expect the row gone and the "Done" reply; set the flag back to off.
