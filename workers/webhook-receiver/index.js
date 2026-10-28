@@ -11,6 +11,7 @@
 import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState, purgeExpiredState } from './state-store.js';
 import { createHubSpotContact } from './hubspot-client.js';
+import { sendJson } from './send.js';
 import { recordEngagement } from './supabase-client.js';
 import {
   verifyTelegram, verifyMeta, verifyTwilio, verifySharedSecret, escapeHtml, escapeXml, clip,
@@ -60,6 +61,18 @@ export default {
       } catch (err) {
         console.error('Deep dive error:', err);
         return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // MPC-7902: proof-of-possession challenge + status (browser). Lazy import like the deep dive.
+    if (path.startsWith('/api/pop/')) {
+      try {
+        const { handlePop } = await import('./pop.ts');
+        const res = await handlePop(request, env);
+        if (res) return res;
+      } catch (err) {
+        console.error('PoP error:', err?.name);
+        return new Response(JSON.stringify({ error: 'proof_store_unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
       }
     }
 
@@ -120,11 +133,7 @@ async function handleTelegram(request, env) {
 
 async function sendTelegram(env, chatId, text) {
   const key = env.TELEGRAM_BOT_KEY;
-  await fetch(`https://api.telegram.org/bot${key}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-  });
+  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' });
 }
 
 // ─── FACEBOOK MESSENGER ──────────────────────────────────────────────────────
@@ -166,11 +175,7 @@ async function sendMessenger(env, recipientId, text) {
   // Requires META_PAGE_ACCESS_KEY — stub until Meta App is approved
   if (!env.META_PAGE_ACCESS_KEY) return;
   // MPC-7350: bearer header, not a query string (URLs end up in logs and proxies).
-  await fetch('https://graph.facebook.com/v19.0/me/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` },
-    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
-  });
+  return sendJson('messenger', 'https://graph.facebook.com/v19.0/me/messages', { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, message: { text } });
 }
 
 // ─── INSTAGRAM DM ────────────────────────────────────────────────────────────
@@ -199,6 +204,21 @@ async function handleWhatsApp(request, env) {
     // Proof of possession for the deep dive: Meta's contact record (name) and the time of the person's own message.
     const profileName = clip(body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name, 64);
     const inboundTs   = Number(msg.timestamp) || Math.floor(Date.now() / 1000);
+
+    // MPC-7902: STOP / DELETE revokes every proof of possession for this sender (restrictive only; consent handling proper is MPC-7904).
+    // A message carrying a challenge code binds the web session that asked for it. Both run only after verifyMeta above.
+    const word = text.trim().toUpperCase();
+    if (word === 'STOP' || word === 'DELETE') {
+      const { revokePossession } = await import('./pop.ts');
+      await revokePossession(env, from);
+    } else if (/\bMPT-[A-Z0-9]{4}-[A-Z0-9]{4}\b/i.test(text)) {
+      const { redeemFromInbound } = await import('./pop.ts');
+      const r = await redeemFromInbound(env, { from, text, msgId: msg.id, ts: inboundTs });
+      if (r.outcome !== 'ignored') {
+        if (r.reply) await sendWhatsApp(env, from, r.reply);
+        return ok();
+      }
+    }
 
     // Pull model: the person asks for their deep-dive result. Plain text reply, never a Meta template.
     const cmd = text.trim().toUpperCase();
@@ -233,11 +253,7 @@ async function handleWhatsApp(request, env) {
 async function sendWhatsApp(env, to, text) {
   // Requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_KEY
   if (!env.META_WHATSAPP_KEY || !env.WHATSAPP_PHONE_NUMBER_ID) return;
-  await fetch(`https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
-  });
+  return sendJson('whatsapp', `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } });
 }
 
 // ─── SMS / TWILIO ─────────────────────────────────────────────────────────────

@@ -41,7 +41,7 @@ jobs:
         run: node workers/scan-report/scripts/sync-hk-email-copy.mjs
 
       - name: Test Worker (stubbed fetch)
-        run: node workers/scan-report/worker.test.mjs && node workers/scan-report/hk-spam.test.mjs && node workers/scan-report/recognise.test.mjs
+        run: node workers/scan-report/worker.test.mjs && node workers/scan-report/lifecycle.test.mjs && node workers/scan-report/hk-spam.test.mjs && node workers/scan-report/recognise.test.mjs
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
         # The action runs `npm i wrangler@3.90.0` from the repo's npm workspace; a peer-dependency conflict from the
@@ -65,8 +65,10 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
           HUBSPOT_TOKEN: ${{ secrets.SCAN_REPORT_HUBSPOT_TOKEN }}
           HIBP_API_KEY: ${{ secrets.SCAN_REPORT_HIBP_API_KEY }}
+          # CK-8503: signing secret of the Resend webhook (delivery receipts). Skipped when the GitHub secret does not exist; the endpoint then stays off (404).
+          RESEND_WEBHOOK_SECRET: ${{ secrets.SCAN_REPORT_RESEND_WEBHOOK_SECRET }}
         run: |
-          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY HUBSPOT_TOKEN HIBP_API_KEY; do
+          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY HUBSPOT_TOKEN HIBP_API_KEY RESEND_WEBHOOK_SECRET; do
             value="${!name}"
             if [ -n "$value" ]; then
               printf '%s' "$value" | npx --yes wrangler@3 secret put "$name" >/dev/null && echo "set $name"
