@@ -40,7 +40,7 @@ const CHANGE = {
   behavior: 'Behaviour tracking is hard to avoid; block trackers and scripts.', email: 'Use a separate email alias for sign-ups.',
 };
 const CHANGE_BY_ID = { 'email-breaches': 'Change the password on each breached service and anywhere you reused it; turn on two-factor sign-in.' };
-const changeFor = (h) => CHANGE_BY_ID[h.id] || CHANGE[h.category] || CHANGE.device;
+export const changeFor = (h) => CHANGE_BY_ID[h.id] || CHANGE[h.category] || CHANGE.device;
 const GUIDES = { email: '/blog/remove-personal-information-from-internet' };
 
 // ---- adapter: saved scan / email checks + definitions -> uniform hexagon objects -----------------------------------------------------
@@ -93,9 +93,9 @@ export const tally = (hexes) => ({ found: hexes.filter((h) => h.status === STATU
 const PILL = {
   found: ['FOUND', '#92400e', '#fef3c7'], clear: ['CHECKED AND CLEAR', '#14532d', '#dcfce7'], not_checked: ['NOT CHECKED', '#4b5563', '#f3f4f6'],
 };
-export const guideUrl = (h, { html = false } = {}) => {
+export const guideUrl = (h, { html = false, campaign = 'scan-report' } = {}) => {
   const amp = html ? '&amp;' : '&';
-  return `${SITE}${GUIDES[h.category] || GUIDE}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=scan-report${amp}utm_content=${encodeURIComponent(h.id)}`;
+  return `${SITE}${GUIDES[h.category] || GUIDE}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=${campaign}${amp}utm_content=${encodeURIComponent(h.id)}`;
 };
 // An IP address is the most identifying value in a scan and an email can be forwarded or screenshotted, so it never appears in the body:
 // it stays in the attached JSON (the user's own file). Matches IPv4 and IPv6 (including ::1 and IPv4-mapped forms).

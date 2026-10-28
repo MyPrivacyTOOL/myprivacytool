@@ -72,6 +72,10 @@ REFERRAL_AB_INVITE_SUBJECT = "false"
 # "true" = a failed check answers 403 and nothing is stored or sent. Rollback: set back to "false" and redeploy.
 TURNSTILE_ENFORCE = "true"
 
+# MPC-7554: follow-ups chosen by what was found for each report, for every user (not only the first 100), and the "I have fixed this" link. OFF until Chris approves the copy and
+# migration 20261028150000_mpc_7554_followup_state.sql (scans.fixed_at, scans.followup_ended) is applied. Anything but "true" keeps the earlier calendar follow-ups. Rollback: "false".
+FOLLOWUP_STATE_ENABLED = "false"
+
 # MPC-8453: refuse an address whose domain does not exist or accepts no mail (DNS check, domain only, fails open). "false" = rollback.
 EMAIL_DOMAIN_CHECK = "true"
 

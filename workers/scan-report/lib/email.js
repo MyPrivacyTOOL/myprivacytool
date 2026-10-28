@@ -188,7 +188,7 @@ const MAX_BREACH_ROWS = 10;
 const brokersRelevant = (emailHexes, breaches) => emailHexes.some((h) => h.id === 'email-name' && h.status === 'found')
   || breaches.some((b) => (b.DataClasses || []).some((c) => /^(names|phone numbers|physical addresses)$/i.test(String(c))));
 
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null }) {
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -221,7 +221,9 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
     'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
     ...(liveLink ? ['', `Keep an eye on your results: open this page and new findings appear as we find them. Keep this link private: anyone who has it can see your results: ${liveLink}`] : []),
     ...(referral ? ['', referral.text] : []),
-    ...(unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
+    // MPC-7554: with the follow-up state on, "I have fixed this" stops the follow-ups for this report only; unsubscribing stops everything non-transactional.
+    ...(unsubscribeLink && fixedLink ? ['', 'Fixed what is in this report? Press "I have fixed this" and we will stop the follow-up emails about it:', fixedLink, `Or unsubscribe from all our emails: ${unsubscribeLink}`]
+      : unsubscribeLink ? ['', 'Fixed what is in this report? Then you do not need to hear from us again.', `Unsubscribe and we will send you no more follow-up or marketing emails: ${unsubscribeLink}`] : []),
   ].join('\n');
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
   const box = (t) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${t}</td></tr></table>`;
@@ -245,7 +247,8 @@ ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>
 ${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
 ${liveLink ? para('<strong>Keep an eye on your results.</strong> Open your results page and new findings appear as we find them. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
 ${referral ? referral.html : ''}
-${unsubscribeLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Then you do not need to hear from us again. <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">Unsubscribe</a> and we will send you no more follow-up or marketing emails.</td></tr></table>` : ''}`, unsubscribeLink);
+${unsubscribeLink && fixedLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Press <a href="${esc(fixedLink)}" style="color:${BRAND};font-weight:600">I have fixed this</a> and we will stop the follow-up emails about it. Or <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">unsubscribe from all our emails</a>.</td></tr></table>`
+  : unsubscribeLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Then you do not need to hear from us again. <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">Unsubscribe</a> and we will send you no more follow-up or marketing emails.</td></tr></table>` : ''}`, unsubscribeLink);
   return { ...tagged('scan-report', { subject, text, html }), report };
 }
 
