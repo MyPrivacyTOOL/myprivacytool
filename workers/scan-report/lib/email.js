@@ -1,3 +1,4 @@
+import { recordSend } from './emailSends.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, emailItems, tally, tallyLine, hexGroups, hexText, buildReportJson } from './reportHex.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -257,5 +258,6 @@ export async function sendEmail(env, { to, subject, html, text, idempotencyKey, 
   });
   if (!res.ok) return { sent: false, reason: `Resend HTTP ${res.status}: ${(await res.text()).slice(0, 150)}` };
   const j = await res.json().catch(() => ({}));
+  await recordSend(env, { messageId: j.id, idempotencyKey, to }, fetchImpl);   // MPC-7556: best effort, never throws
   return { sent: true, id: j.id || null };
 }

@@ -906,6 +906,33 @@ select pg_temp.assert(exists (select 1 from public.email_suppressions where emai
 update public.users set email_opt_out_at = now() where email = 'optout-update@example.com';
 select pg_temp.assert((select count(*) from public.email_suppressions where email_hash = encode(sha256(convert_to('optout-update@example.com', 'UTF8')), 'hex')) = 1, 'one opt-out: a repeat opt-out keeps exactly one record');
 
+-- ===== MPC-7556: email_sends, events and per-type counts =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.email_sends$$) = '42501', 'email_sends: anon must not read');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_record_email_event('x', 'delivered')$$) = '42501', 'email_sends: authenticated must not call the event function');
+insert into public.email_sends (provider_message_id, email_type) values ('m_report', 'report'), ('m_follow', 'followup'), ('m_conf', 'confirm'), ('m_hard', 'followup'), ('m_soft', 'followup'), ('m_test', 'report');
+update public.email_sends set is_test = true where provider_message_id = 'm_test';
+select pg_temp.assert(public.mpt_record_email_event('m_report', 'delivered') = 1, 'event: delivered recorded');
+select pg_temp.assert(public.mpt_record_email_event('m_report', 'sent') = 0, 'event: a late "sent" cannot move delivered backwards');
+select pg_temp.assert(public.mpt_record_email_event('m_report', 'delivered') = 0, 'event: a repeated event changes nothing');
+select pg_temp.assert(public.mpt_record_email_event('m_hard', 'bounced', now(), 'permanent') = 1, 'event: a permanent bounce is recorded');
+select pg_temp.assert((select bounce_type from public.email_sends where provider_message_id = 'm_hard') = 'permanent', 'event: ...with its bounce type');
+select pg_temp.assert(public.mpt_record_email_event('m_hard', 'delivered') = 0, 'event: a delivered event after a bounce cannot undo it');
+select pg_temp.assert(public.mpt_record_email_event('m_soft', 'bounced', now(), 'transient') = 1, 'event: a transient bounce is recorded');
+select pg_temp.assert(public.mpt_record_email_event('m_follow', 'delivered') = 1 and public.mpt_record_email_event('m_follow', 'complained') = 1 and public.mpt_record_email_event('m_follow', 'bounced', now(), 'permanent') = 0, 'event: a complaint beats delivered and cannot be overwritten by a bounce');
+select pg_temp.assert(public.mpt_record_email_event('m_conf', 'clicked') = 1 and public.mpt_record_email_event('m_conf', 'clicked') = 1, 'event: two clicks are recorded');
+select pg_temp.assert((select click_count from public.email_sends where provider_message_id = 'm_conf') = 2 and (select status from public.email_sends where provider_message_id = 'm_conf') is null, 'event: clicks are counted and never change the status');
+select pg_temp.assert(public.mpt_record_email_event('nobody', 'delivered') = 0, 'event: an unknown message id changes nothing');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_record_email_event('m_conf', 'opened')$$) = '22023', 'event: an unknown status (opened: we use no pixels) is refused');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_record_email_event('m_conf', 'bounced', now(), 'weird')$$) = '22023', 'event: an unknown bounce type is refused');
+select pg_temp.assert((select sent from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'followup') = 3
+  and (select delivered from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'followup') = 1
+  and (select bounced from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'followup') = 2
+  and (select bounced_hard from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'followup') = 1
+  and (select complained from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'followup') = 1, 'counts: followup 3 sent, 1 delivered (the complaint), 2 bounced (1 hard), 1 complained');
+select pg_temp.assert((select clicked from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'confirm') = 1, 'counts: a clicked email is counted once, however many clicks');
+select pg_temp.assert((select sent from public.mpt_email_delivery_counts(now() - interval '1 hour', now() + interval '1 hour') where email_type = 'report') = 1, 'counts: test sends never count');
+select pg_temp.assert(not exists (select 1 from public.mpt_email_delivery_counts(now() + interval '1 day', now() + interval '2 days')), 'counts: a window with no sends returns no rows');
+
 reset role;
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

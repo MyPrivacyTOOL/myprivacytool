@@ -11,6 +11,7 @@ on:
     paths:
       - 'workers/scan-report/**'
       - 'shared/hexagon-registry/**'
+      - 'shared/test-records.js'
       - 'src/data/optOutGuides.json'
       - '.github/workflows/deploy-scan-report-synthetic.yml'
   workflow_dispatch:
