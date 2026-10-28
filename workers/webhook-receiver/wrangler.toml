@@ -28,10 +28,9 @@ type = "ratelimit"
 namespace_id = "7915"
 simple = { limit = 30, period = 60 }
 
-# ─── LEARNING EVENTS (MPC-7915, switched on by MPC-8731) ──────────────────────
-# Plain-text variable, kept here because `wrangler deploy` replaces dashboard variables with what this file declares.
-# Set to anything but "true" (or remove the block) and POST /api/learning/event answers 404 again after the next deploy.
-# The site has its own switch, VITE_LEARNING_EVENTS in .env.production. Pinned by workers/learning-events-switch.vitest.mjs.
+# ─── LEARNING LOOP SWITCH ────────────────────────────────────────────────────
+# MPC-7915: ON. Top level on purpose (the deploy runs `wrangler deploy` with no --env, so [env.*] vars would not apply).
+# To switch off: set to "false" (or remove) and merge; the route then answers 404 again.
 [vars]
 LEARNING_EVENTS_ENABLED = "true"
 
