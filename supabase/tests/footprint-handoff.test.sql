@@ -1,4 +1,4 @@
--- MPC-8689: assertions for hexagon_catalogue (migration 20261028120000) and the footprint handoff scope (20261028130000). Throwaway database only.
+-- MPC-8689: assertions for hexagon_catalogue (migration 20261028140000) and the footprint handoff scope (20261028150000). Throwaway database only.
 -- Every check RAISES on failure (psql runs with ON_ERROR_STOP=1) and the file rolls back.
 begin;
 create or replace function pg_temp.assert(cond boolean, msg text) returns void language plpgsql as

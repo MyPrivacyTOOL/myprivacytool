@@ -68,7 +68,7 @@ to `dashboard_links` and `dashboard_sessions` with values `dashboard | footprint
 3. Keep it allow-list only until MPC-8652 (the real-product audit of the Find, Delete, Forget rules) is done?
 
 ## Status: built, off by default
-- Migration `20261028130000_mpc_8689_footprint_handoff_scope.sql` (scope column, 4-argument redeem function). **Merging to main applies it to the live project** (deploy-supabase.yml runs `supabase db push`); it is tested on a throwaway Postgres in CI (`supabase/tests/footprint-handoff.test.sql`).
+- Migration `20261028150000_mpc_8689_footprint_handoff_scope.sql` (scope column, 4-argument redeem function). **Merging to main applies it to the live project** (deploy-supabase.yml runs `supabase db push`); it is tested on a throwaway Postgres in CI (`supabase/tests/footprint-handoff.test.sql`).
 - Server: `shared/dashboard/handlers.ts` (`handleFootprintLanding`, `handleFootprintRedeem`, `handleFootprintData`, scope refusal in `handleData`), `functions/f/[token].ts`, `functions/api/footprint.ts`, own cookie `__Host-mpt_fp`.
 - Bot: `footprint` / `/footprint` command (`workers/social-listeners/src/dashboard-link.ts`), a hint line in the baseline report.
 - Web: `src/lib/telegramHandoff.ts` and `RiskScore` (reads `/api/footprint` only when the page is opened with `?handoff=1`).

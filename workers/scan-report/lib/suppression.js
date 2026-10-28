@@ -29,3 +29,23 @@ export async function suppressedAmong(sb, emails) {
   for (const r of rows) if (hashes.has(r.email_hash)) out.add(hashes.get(r.email_hash));
   return out;
 }
+
+/** True when this one address must not receive non-transactional email: users.email_opt_out_at set, or an email_suppressions row. */
+export async function isOptedOut(sb, email) {
+  return (await suppressedAmong(sb, [email])).has(norm(email));
+}
+
+/**
+ * MPC-7555: THE opt-out. Every path that ends a person's non-transactional email calls this one function, so there is one record per address
+ * (email_suppressions, keyed by SHA-256 of the lower-cased address) and every sender checks it with isOptedOut / suppressedAmong.
+ * It also mirrors the opt-out onto users.email_opt_out_at (the report job reads that column), and deletes the address from the newsletter list.
+ * Order matters: the newsletter row goes BEFORE the suppression row, so a failure leaves nothing half-done and the person can retry the link.
+ * Returns true the first time an address is recorded, false on a repeat (so a confirmation email is sent once).
+ */
+export async function optOutEverywhere(sb, email, source = 'unsubscribe', now = new Date()) {
+  const e = norm(email);
+  await sb.patch(`users?email=eq.${encodeURIComponent(e)}`, { email_opt_out_at: now.toISOString() });
+  const star = /\*/.test(e);   // a PostgREST wildcard in the address is matched exactly instead
+  await sb.remove(`subscribers?email=${star ? 'eq.' : 'ilike.'}${encodeURIComponent(star ? e : e.replace(/[\\%_]/g, '\\$&'))}`);
+  return addSuppression(sb, e, source);
+}

@@ -38,7 +38,7 @@ const footprint = items.map((i) => ({
 }));
 writeFileSync(path.join(ROOT, 'public/footprint/hexagons-366.json'), JSON.stringify(footprint));
 
-const mig = path.join(ROOT, 'supabase/migrations/20261028120000_mpc_8689_hexagon_catalogue.sql');
+const mig = path.join(ROOT, 'supabase/migrations/20261028140000_mpc_8689_hexagon_catalogue.sql');
 if (!existsSync(mig)) {
   const q = (s) => `'${String(s ?? '').replace(/'/g, "''")}'`;
   const vals = items.map((i) => `(${[i.id, i.channel, i.group, CODES[i.channel], i.arrival, i.risk, i.label, i.reveals, i.field, i.status, i.access, i.source, i.slug].map(q).join(', ')})`).join(',\n');
