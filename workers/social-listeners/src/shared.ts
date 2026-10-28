@@ -24,6 +24,13 @@ export interface Env {
   RATE_LIMITER_GLOBAL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
   /** LinkedIn app Client Secret (MPC-7640): signs webhook challenges and deliveries. Unset = LinkedIn webhook fails closed. */
   LINKEDIN_CLIENT_SECRET?: string;
+  /** MPC-8689 pilot Discord interactions endpoint: "on" answers /webhook/discord; anything else (default) is off. Needs DISCORD_PUBLIC_KEY (hex, from the Developer Portal). */
+  DISCORD_SCAN?: string;
+  DISCORD_PUBLIC_KEY?: string;
+  /** Comma-separated Discord user ids allowed to use it (our own test accounts); empty = nobody gets a result (the endpoint still answers Discord's PING). */
+  DISCORD_PROBE_IDS?: string;
+  /** Optional bot token: lets the check read the public profile banner and colour (GET /users/{id}). Unset = that one hexagon says not checked. */
+  DISCORD_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;
