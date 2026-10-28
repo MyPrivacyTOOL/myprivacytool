@@ -28,6 +28,13 @@ type = "ratelimit"
 namespace_id = "7915"
 simple = { limit = 30, period = 60 }
 
+# ─── LEARNING EVENTS SWITCH ──────────────────────────────────────────────────
+# MPC-8731: POST /api/learning/event (MPC-7915) is ON. Top-level [vars] on purpose: CI runs `wrangler deploy` with no --env, and
+# [env.*] vars are not inherited. Rollback: set "false" (or remove) and redeploy: the route answers 404 again. The site's own
+# switch is VITE_LEARNING_EVENTS in .env.production.
+[vars]
+LEARNING_EVENTS_ENABLED = "true"
+
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
 enabled = true
