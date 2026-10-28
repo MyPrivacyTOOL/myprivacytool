@@ -143,3 +143,16 @@ Not built, and needed before this can run:
 2. The route and the verify page that reads the fragment and passes the code as `proof`.
 3. A real run against Resend with an approved test address (sending is an approval-gated action), then MPC-8531 review.
 4. Known gap: `support_usage` rows are purged after 7 days, so a per-case model-call counter restarts for a case older than 7 days. Acceptable for now; fix before launch by keeping model counters longer.
+
+## Update 2026-10-27: account lookup for the proof flow (MPC-8530 D-3), dormant
+
+`shared/support/account-lookup.ts` adds `RestAccountLookup`, the production `AccountLookup` for `requestProof()`. It resolves an email to `public.users.id`
+(uuid, unique on `lower(email)`, `supabase/migrations/20261005120000_scan_report_pipeline.sql`), which is the same id `ScansReportStatusReader` filters `scans.user_id` on,
+so a verified support identity and the report-status read agree on who the customer is. MPT is single-tenant, so the tenant is the constant `"mpt"`.
+
+- Read-only, `select=id,email&limit=2`, service_role key; returns only ids, never the address.
+- PostgREST cannot filter on `lower(email)`, so it uses `ilike` with the `_` wildcard escaped, then requires **exactly one** row whose lowercased address equals the request. Zero or two rows mean "no account": it never picks between accounts. An address containing `*`, `%`, `\` or whitespace is treated as no account without a database call.
+- A non-2xx response or a non-array body throws; `requestProof` swallows it, so a database failure is indistinguishable from "no account" to the customer (tested end to end).
+- 8 tests in `account-lookup.vitest.ts`; mutation-checked (no `_` escape, no exact-match filter, accepting the first of several matches each fail a test).
+
+Still not built: the route and the verify page that reads the code from the URL fragment, one real send to an approved test address, and MPC-8531 review. Nothing calls `requestProof` yet, so this changes no behaviour.
