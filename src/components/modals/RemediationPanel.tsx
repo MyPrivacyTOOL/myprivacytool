@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import type { Hexagon } from '@/types/hexagon';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { fixBlockFor, canShowFix, noActionReason } from '@/lib/hexagonFix';
+import { fixBlocksV2Enabled } from '@/config/hexagonTile';
+import FixBlockView from '@/components/hexagon/FixBlockView';
+import type { TileKind } from '@/lib/hexagonTile';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Props {
@@ -25,6 +29,12 @@ const safeUrl = (url: string | null | undefined): string | null => {
 export const RemediationPanel = ({ hexagon, isOpen, onClose, onMarkFixed }: Props) => {
   const [done, setDone] = useState(false);
   const url = safeUrl(hexagon.remediation_url);
+  // MPC-8745: with the fix-blocks switch on, a hexagon with a typed block shows it (red, or a guess the visitor said yes to);
+  // a hexagon with no fix step says why instead of a generic line. Off: the text below is unchanged.
+  const fixOn = fixBlocksV2Enabled();
+  const tileKind: TileKind | undefined = hexagon.status === 'confirmed' && hexagon.tile === 'our_guess' ? 'you_confirmed' : hexagon.tile;
+  const block = fixOn && tileKind && canShowFix(hexagon.id, tileKind) ? fixBlockFor(hexagon.id) : undefined;
+  const reason = fixOn && !block ? noActionReason(hexagon.id) : undefined;
 
   useEffect(() => {
     if (isOpen) setDone(false);
@@ -39,9 +49,10 @@ export const RemediationPanel = ({ hexagon, isOpen, onClose, onMarkFixed }: Prop
           </span>
           <DialogTitle>{hexagon.label}</DialogTitle>
           <DialogDescription className="text-base text-gray-700">
-            {hexagon.remediation ?? 'Review this item and take the recommended step.'}
+            {block ? 'Here is what you can do.' : (reason ?? hexagon.remediation ?? 'Review this item and take the recommended step.')}
           </DialogDescription>
         </DialogHeader>
+        {block && <FixBlockView block={block} />}
         {url && (
           <Button asChild className="bg-blue-600 text-white hover:bg-blue-700">
             <a href={url} target="_blank" rel="noopener noreferrer">

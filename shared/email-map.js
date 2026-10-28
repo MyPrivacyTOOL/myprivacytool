@@ -49,5 +49,5 @@ export const OPT_OUT_PATHS = [
   { id: 'unsubscribe-page', how: 'the /unsubscribe page, address typed -> confirmation email -> the signed link', writes: 'optOutEverywhere() (via the signed link)', file: 'workers/scan-report/index.js' },
   { id: 'users-column', how: 'any writer that sets users.email_opt_out_at (SQL editor, future path)', writes: 'database trigger mpt_users_opt_out_to_suppression', file: 'supabase/migrations/20261028120000_mpc_7555_one_opt_out.sql' },
   { id: 'hubspot', how: "the unsubscribe link in a HubSpot-sent email (hs_email_optout=true)", writes: 'daily collector hubspot-optout.js -> email_suppressions', file: 'workers/mpt-metrics-collector/collectors/hubspot-optout.js' },
-  { id: 'hard-bounce-complaint', how: 'a hard bounce or spam complaint reported by the provider (MPC-7556)', writes: 'optOutEverywhere() (added with MPC-7556)', file: 'workers/scan-report/lib/receipts.js', pending: 'MPC-7556' },
+  { id: 'hard-bounce-complaint', how: 'a permanent bounce or a spam complaint reported by the provider (signed webhook, MPC-7556)', writes: 'optOutEverywhere() via lib/receipts.js handleResendWebhook', file: 'workers/scan-report/lib/receipts.js' },
 ];

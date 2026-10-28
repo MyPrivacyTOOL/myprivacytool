@@ -1,0 +1,749 @@
+{
+ "types": {
+  "g.plain": {
+   "base": "plain",
+   "clean": false,
+   "maxAgeSec": null
+  },
+  "g.cleanable": {
+   "base": "cleanable",
+   "clean": true,
+   "maxAgeSec": 2592000
+  }
+ },
+ "cases": [
+  {
+   "name": "no rows",
+   "type": "g.cleanable",
+   "rows": [],
+   "expect": {
+    "class": "unknown",
+    "variant": "not_checked",
+    "action": null
+   }
+  },
+  {
+   "name": "not_checked",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "not_checked",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "not_checked",
+    "action": null
+   }
+  },
+  {
+   "name": "check_failed",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "check_failed",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "unavailable",
+    "action": "retry"
+   }
+  },
+  {
+   "name": "clear exact on a clean-allowed type",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "clear",
+     "confidence": 100,
+     "value": {
+      "in_breach": false
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "clean",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "clear exact on a type that disallows clean",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "clear",
+     "confidence": 100,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "clear_in_source",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "found at 80 is verified",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 80,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "found",
+    "action": null,
+    "bar": 4
+   }
+  },
+  {
+   "name": "found at 79 is a guess",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 79,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 3
+   }
+  },
+  {
+   "name": "clear at 79 is a guess, never clean",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "clear",
+     "confidence": 79,
+     "value": {
+      "in_breach": false
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 3
+   }
+  },
+  {
+   "name": "found at 39 bar 1",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 39,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 1
+   }
+  },
+  {
+   "name": "found at 40 bar 2",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 40,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 2
+   }
+  },
+  {
+   "name": "found at 60 bar 3",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 60,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 3
+   }
+  },
+  {
+   "name": "found at 94 bar 4",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 94,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "found",
+    "action": null,
+    "bar": 4
+   }
+  },
+  {
+   "name": "found at 95 bar 5",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "found",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "expired by expires_at",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 90,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -7200,
+     "expiresOffsetSec": -3600
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "stale",
+    "action": "recheck"
+   }
+  },
+  {
+   "name": "older than the type max_age",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "clear",
+     "confidence": 100,
+     "value": {
+      "in_breach": false
+     },
+     "observedOffsetSec": -2592001,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "stale",
+    "action": "recheck"
+   }
+  },
+  {
+   "name": "a newer failed check beats an older clean one",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "clear",
+     "confidence": 100,
+     "value": {
+      "in_breach": false
+     },
+     "observedOffsetSec": -600,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "checked",
+     "status": "check_failed",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "unavailable",
+    "action": "retry"
+   }
+  },
+  {
+   "name": "a newer not_checked beats an older clean one",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "clear",
+     "confidence": 100,
+     "value": {
+      "in_breach": false
+     },
+     "observedOffsetSec": -600,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "checked",
+     "status": "not_checked",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "not_checked",
+    "action": null
+   }
+  },
+  {
+   "name": "taken at 99 is verified, labelled observed",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "taken",
+     "status": "found",
+     "confidence": 99,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "observed",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "taken at 70 is a guess",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "taken",
+     "status": "found",
+     "confidence": 70,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 3
+   }
+  },
+  {
+   "name": "a user's Y at 95 is self-attested, never verified",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "answer": "confirmed"
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "not me",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "answer": "not_me"
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told_not_me",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "disputed",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "answer": "disputed"
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told_disputed",
+    "action": null,
+    "bar": 5
+   }
+  },
+  {
+   "name": "given at 60 is a guess",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 60,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "inferred",
+    "variant": "guess",
+    "action": "confirm",
+    "bar": 3
+   }
+  },
+  {
+   "name": "given and checked agree: verified wins",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -120,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 90,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "found",
+    "action": null,
+    "bar": 4
+   }
+  },
+  {
+   "name": "checked disagrees with an OLDER given: check wins, mismatch",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "public": false
+     },
+     "observedOffsetSec": -120,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 90,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "verified",
+    "variant": "mismatch",
+    "action": null
+   }
+  },
+  {
+   "name": "given NEWER than the check (I fixed it): self-attested, not re-checked",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 90,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -120,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "public": false
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told_stale_check",
+    "action": "recheck"
+   }
+  },
+  {
+   "name": "a dispute newer than the check: self-attested, not re-checked",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 90,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -120,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "answer": "disputed"
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told_stale_check",
+    "action": "recheck"
+   }
+  },
+  {
+   "name": "a guess that the user disagrees with: their word stands",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "found",
+     "confidence": 60,
+     "value": {
+      "public": true
+     },
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "public": false
+     },
+     "observedOffsetSec": -120,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told_stale_check",
+    "action": "recheck"
+   }
+  },
+  {
+   "name": "given only, check failed: the user's word is not wiped",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "check_failed",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -60,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "answer": "confirmed"
+     },
+     "observedOffsetSec": -120,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "self_attested",
+    "variant": "told",
+    "action": null
+   }
+  },
+  {
+   "name": "given expired, nothing else",
+   "type": "g.plain",
+   "rows": [
+    {
+     "source": "given",
+     "status": "found",
+     "confidence": 95,
+     "value": {
+      "answer": "confirmed"
+     },
+     "observedOffsetSec": -7200,
+     "expiresOffsetSec": -3600
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "stale",
+    "action": "recheck"
+   }
+  },
+  {
+   "name": "only a failed check and a skipped one",
+   "type": "g.cleanable",
+   "rows": [
+    {
+     "source": "checked",
+     "status": "not_checked",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -100,
+     "expiresOffsetSec": null
+    },
+    {
+     "source": "checked",
+     "status": "check_failed",
+     "confidence": null,
+     "value": null,
+     "observedOffsetSec": -50,
+     "expiresOffsetSec": null
+    }
+   ],
+   "expect": {
+    "class": "unknown",
+    "variant": "unavailable",
+    "action": "retry"
+   }
+  }
+ ]
+}

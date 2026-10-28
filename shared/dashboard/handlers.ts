@@ -4,7 +4,7 @@
 //   GET  /api/dashboard   returns the three views for the session in the cookie. Every read is filtered by the session's sender.
 import { isUuidV4, randomSessionValue, sha256Hex, FOOTPRINT_COOKIE, SESSION_COOKIE, SESSION_MINUTES } from "./crypto";
 import { HEXAGON_CATALOGUE } from "../hexagon-registry/catalogue.js";
-import { EXTRA_HEXAGON_IDS } from "../hexagon-registry/channels.js";
+import { TELEGRAM_EXTRA_IDS } from "../hexagon-registry/channels.js";
 import { supabaseStore, type DashboardEnv, type DashboardStore } from "./store";
 import { baselineView, enhancedView, finalView } from "./view";
 
@@ -118,7 +118,7 @@ export async function handleData(request: Request, env: DashboardEnv, deps: Deps
 }
 
 // ---- MPC-8689: GET /api/footprint. Which Telegram hexagons had their check run, as ids only (never a value), for the web scan to add to its own count.
-const TELEGRAM_DEFINED = new Set(HEXAGON_CATALOGUE.filter((h: { channel: string; status: string }) => h.channel === "telegram" && h.status === "defined").map((h: { id: string }) => h.id).concat(EXTRA_HEXAGON_IDS));
+const TELEGRAM_DEFINED = new Set(HEXAGON_CATALOGUE.filter((h: { channel: string; status: string }) => h.channel === "telegram" && h.status === "defined").map((h: { id: string }) => h.id).concat(TELEGRAM_EXTRA_IDS));
 const RAN = new Set(["returned", "not_returned"]); // "not_checked" never counts as checked
 
 export async function handleFootprintData(request: Request, env: DashboardEnv, deps: Deps = {}): Promise<Response> {

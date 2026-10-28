@@ -80,7 +80,10 @@ export const TELEGRAM_EXTRA_HEXAGONS = [
   h('via_bot', 'Other bots used', 'A', 'message.via_bot', 'direct'),
   h('profile_audio', 'Profile music', 'B', 'getChat.first_profile_audio', 'direct'),
 ];
-export const EXTRA_HEXAGON_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
+export const TELEGRAM_EXTRA_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
+// Email extras live in workers/scan-report/lib/emailExtras.js (EMAIL_EXTRA_HEXAGONS); their catalogue ids are listed here so the footprint count knows they are built.
+export const EMAIL_EXTRA_IDS = ['email.alias', 'email.address_type', 'email.saas_records', 'email.mail_protection'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS];
 
 export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS };
 export const TELEGRAM_HEXAGON_COUNT = TELEGRAM_HEXAGONS.length;

@@ -42,7 +42,7 @@ export function splitEmail(email) {
 const FIRST_NAMES = new Set(('james john robert michael william david richard joseph thomas charles chris christopher daniel matthew anthony mark donald steven paul andrew joshua kenneth kevin brian george edward ronald timothy jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon benjamin samuel frank gregory raymond alexander patrick jack dennis jerry tyler aaron henry adam douglas nathan peter zachary kyle walter harold carl arthur gerald roger keith jeremy lawrence sean ethan harry oliver noah liam lucas mason logan' +
   ' mary patricia jennifer linda elizabeth barbara susan jessica sarah karen lisa nancy betty margaret sandra ashley kimberly emily donna michelle carol amanda melissa deborah stephanie rebecca sharon laura cynthia kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel carolyn janet maria olivia heather diane julie joyce victoria kelly christina lauren joan evelyn judith megan cheryl andrea hannah jacqueline martha gloria teresa sara janice marie julia grace sophia alice charlotte amelia isabella chloe lucy ruby ella' +
   ' wei li wang zhang chen liu yang huang chan wong lee lam cheung ahmed mohammed muhammad ali omar priya raj amit rahul anil sanjay sunita pooja ravi kumar carlos jose juan luis miguel pedro pablo diego sofia lucia elena marco luca giulia anna hans peter jan pierre jean marie claire sophie yuki hiroshi kenji takeshi sakura').split(' '));
-const ROLE_WORDS = new Set(['info', 'admin', 'support', 'sales', 'contact', 'hello', 'hi', 'office', 'team', 'help', 'billing', 'accounts', 'marketing', 'noreply', 'no-reply', 'postmaster', 'webmaster', 'enquiries', 'enquiry', 'service', 'mail', 'email', 'jobs', 'careers', 'press', 'media', 'privacy', 'security', 'abuse', 'test', 'testing', 'user', 'me', 'hk']);
+export const ROLE_WORDS = new Set(['info', 'admin', 'support', 'sales', 'contact', 'hello', 'hi', 'office', 'team', 'help', 'billing', 'accounts', 'marketing', 'noreply', 'no-reply', 'postmaster', 'webmaster', 'enquiries', 'enquiry', 'service', 'mail', 'email', 'jobs', 'careers', 'press', 'media', 'privacy', 'security', 'abuse', 'test', 'testing', 'user', 'me', 'hk']);
 
 // Conservative: reports only patterns that are strongly suggestive, and always as "may" / "looks like", never as fact.
 export function checkNameInAddress(email) {
@@ -86,7 +86,7 @@ const MX_PROVIDERS = [
   [/(mailgun\.org|sendgrid\.net)\.?$/, 'a bulk-mail service'],
 ];
 
-function dohQuery(name, type, fetchImpl, signal) {
+export function dohQuery(name, type, fetchImpl, signal) {
   return fetchImpl(`${DOH}?name=${encodeURIComponent(name)}&type=${type}`, { headers: { accept: 'application/dns-json' }, signal })
     .then(async (res) => {
       if (!res.ok) throw new Error(`DNS HTTP ${res.status}`);
