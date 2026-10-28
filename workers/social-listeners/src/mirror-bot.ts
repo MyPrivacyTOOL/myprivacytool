@@ -7,7 +7,8 @@ import { type Env, pick } from "./shared";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
 import { classifyTheme, recordXDm } from "./funnel";
-import { eraseContact, touchContact } from "./social";
+import { type EventOrigin, eraseContact, touchContact } from "./social";
+import { cleanData, eventTime, userFields } from "./x-hexagons";
 
 // Tagging convention for channel bots (MPC-7641): utm_source=<platform>&utm_medium=channel_osint&utm_campaign=bot_reply.
 // Short link (public/x.html): clean in the DM, shows a preview card, then forwards to /scan with the same utm tracking.
@@ -47,6 +48,8 @@ export interface MirrorDm {
   command: Exclude<MirrorCommand, null>;
   /** True for a bare Y/N: not yet known to answer our consent request, check with isConsentPending before acting. */
   bare?: true;
+  /** Platform event id, time and hexagon values for the record (CK-8502). */
+  origin?: EventOrigin;
 }
 
 const MAX_DEPTH = 8;
@@ -72,32 +75,41 @@ function dmFields(o: unknown): { sender: string; text: string } | null {
  */
 export function extractMirrorDms(payload: unknown): MirrorDm[] {
   const out: MirrorDm[] = [];
-  for (const { senderId, text } of extractDms(payload)) {
+  for (const { senderId, text, origin } of extractDms(payload)) {
     const command = parseMirrorCommand(text);
     const bare = command ? null : parseBareReply(text);
-    if (command) out.push({ senderId, text, command });
-    else if (bare) out.push({ senderId, text, command: bare, bare: true });
+    if (command) out.push({ senderId, text, command, origin });
+    else if (bare) out.push({ senderId, text, command: bare, bare: true, origin });
   }
   return out;
 }
 
 /** Every inbound DM (any text) in an X webhook payload, own echoes excluded, duplicates collapsed. */
-export function extractDms(payload: unknown): { senderId: string; text: string }[] {
+export function extractDms(payload: unknown): { senderId: string; text: string; origin?: EventOrigin }[] {
   const self = selfId(payload);
-  const out: { senderId: string; text: string }[] = [];
+  const out: { senderId: string; text: string; origin?: EventOrigin }[] = [];
   const seen = new Set<string>();
-  const walk = (node: unknown, depth: number) => {
+  const walk = (node: unknown, depth: number, parent?: unknown) => {
     if (!node || typeof node !== "object" || depth > MAX_DEPTH) return;
-    if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1));
+    if (Array.isArray(node)) return node.forEach((n) => walk(n, depth + 1, parent));
     const f = dmFields(node);
     if (f && f.sender !== self && f.text.trim()) {
       const key = `${f.sender}|${f.text}`;
       if (!seen.has(key)) {
         seen.add(key);
-        out.push({ senderId: f.sender, text: f.text });
+        const ev = pick(parent, "type") === "message_create" ? parent : undefined;
+        const id = pick(ev, "id"), created = Number(pick(ev, "created_timestamp"));
+        const at = Number.isFinite(created) && created > 0 ? created : undefined;
+        out.push({
+          senderId: f.sender, text: f.text,
+          origin: {
+            eventKey: typeof id === "string" || typeof id === "number" ? `dm:${id}` : undefined, occurredAt: at,
+            data: cleanData({ ...userFields(pick(payload, "users", f.sender)), ...eventTime(at), "x.message_text": f.text }),
+          },
+        });
       }
     }
-    for (const v of Object.values(node)) walk(v, depth + 1);
+    for (const v of Object.values(node)) walk(v, depth + 1, node);
   };
   walk(payload, 0);
   return out;
@@ -279,9 +291,9 @@ export async function fetchFollowsUs(env: Env, userId: string, log: Logger): Pro
 }
 
 /** Notes the activity in the CRM feed after the reply is out (so it never delays the reply). */
-async function noteContact(env: Env, senderId: string, handle: string | undefined, event: "dm" | "mirror_consent", log: Logger): Promise<void> {
+async function noteContact(env: Env, senderId: string, handle: string | undefined, event: "dm" | "mirror_consent", log: Logger, origin?: EventOrigin): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return;
-  await touchContact(env, senderId, handle, event, log, await fetchFollowsUs(env, senderId, log));
+  await touchContact(env, senderId, handle, event, log, await fetchFollowsUs(env, senderId, log), origin);
 }
 
 /**
@@ -353,7 +365,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       await recordXDm(env, "help", "x.mirror.request", log);
       const handle = await fetchUsername(env, dm.senderId);
       await sendXDm(env, dm.senderId, branded(handle, CONSENT_MESSAGE), log);
-      await noteContact(env, dm.senderId, handle, "dm", log);
+      await noteContact(env, dm.senderId, handle, "dm", log, dm.origin);
       return;
     }
     if (dm.command === "decline") {
@@ -361,7 +373,7 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
       await recordXDm(env, "help", "x.mirror.decline", log);
       const handle = await fetchUsername(env, dm.senderId);
       await sendXDm(env, dm.senderId, branded(handle, DECLINE_MESSAGE), log);
-      await noteContact(env, dm.senderId, handle, "dm", log);
+      await noteContact(env, dm.senderId, handle, "dm", log, dm.origin);
       return;
     }
     log.info("mirror_consent_granted");
@@ -375,14 +387,14 @@ export async function handleMirrorDm(env: Env, dm: MirrorDm, log: Logger): Promi
     log.info("mirror_scan_complete");
     const sent = await sendXDm(env, dm.senderId, branded(profile.username, "Thank you for saying yes.\n\n" + buildMirrorMessage(profile) + `\n\n${FOLLOW_LINE}`), log, { video: true });
     log.info(sent ? "mirror_delivered" : "mirror_delivery_failed");
-    await noteContact(env, dm.senderId, profile.username, "mirror_consent", log);
+    await noteContact(env, dm.senderId, profile.username, "mirror_consent", log, dm.origin);
   } catch (err) {
     log.error("mirror_failed", { error: err instanceof Error ? err.name : "unknown" });
   }
 }
 
 /** Replies to a DM that is not a Mirror command. Same per-sender / global limits as Mirror, so it cannot be used to flood. */
-export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: string }, log: Logger): Promise<void> {
+export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: string; origin?: EventOrigin }, log: Logger): Promise<void> {
   if (!(await allowed(env, dm.senderId, log))) return;
   const choice = dm.text?.trim().replace(/[.!)]$/, "");
   const reply = choice && /^[123]$/.test(choice) ? INTENT_REPLIES[choice] : undefined;
@@ -391,7 +403,7 @@ export async function handleOrdinaryDm(env: Env, dm: { senderId: string; text?: 
   const username = await fetchUsername(env, dm.senderId);
   const sent = await sendXDm(env, dm.senderId, reply ? branded(username, reply) : branded(username, WELCOME_BODY), log, { video: true });
   log.info(sent ? "welcome_sent" : "welcome_failed");
-  await noteContact(env, dm.senderId, username, "dm", log);
+  await noteContact(env, dm.senderId, username, "dm", log, dm.origin);
 }
 
 /** "Delete my data": removes the person from the CRM feed and says so. Rate limited like every DM we answer. */

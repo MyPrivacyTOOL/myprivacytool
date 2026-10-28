@@ -702,8 +702,12 @@ select pg_temp.assert((select event_count = 2 and handle = 'carol' and last_seen
 select pg_temp.assert((select source_ref = 't1' and occurred_at is not null from public.social_events where event_key = 'mention:t1'), 'mpt_social_record: stores the platform timestamp and the post id it relates to');
 select pg_temp.assert((select (public.mpt_social_record('x', '777101', 'dave', 'follow', true, 'follow:777101:1000', null, null))->>'duplicate' = 'false'), 'mpt_social_record: the same key for a different person is a different event');
 select pg_temp.assert(public.mpt_social_record('x', '777100', null, 'dm') ->> 'duplicate' = 'false' and public.mpt_social_record('x', '777100', null, 'dm') ->> 'duplicate' = 'false', 'mpt_social_record: with no event key it behaves like mpt_social_touch (nothing to deduplicate on)');
+select public.mpt_social_record('x', '777100', null, 'dm', null, 'dm:1', null, null, '{"x.message_text":"hi","x.screen_name":"carol"}'::jsonb);
+select pg_temp.assert((select data->>'x.message_text' = 'hi' from public.social_events where event_key = 'dm:1'), 'mpt_social_record: stores the hexagon values sent with the event');
+select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_record('x','777100',null,'dm',null,'dm:2',null,null,'[1]'::jsonb)$$) = '23514', 'mpt_social_record: data must be a JSON object');
+select pg_temp.assert(pg_temp.try_as('service_role', format($f$select public.mpt_social_record('x','777100',null,'dm',null,'dm:3',null,null,jsonb_build_object('k', %L))$f$, repeat('a', 5000))) = '23514', 'mpt_social_record: data is capped at 4 kB');
 select pg_temp.assert(public.mpt_erase_social_contact('x', '777100') = 1 and public.mpt_erase_social_contact('x', '777101') = 1, 'mpt_social_record: erase removes the contact; events cascade');
-select pg_temp.assert((select count(*) from public.social_events where event_key in ('follow:777100:1000','mention:t1','follow:777101:1000')) = 0, 'mpt_social_record: no event survives an erase');
+select pg_temp.assert((select count(*) from public.social_events where event_key in ('follow:777100:1000','mention:t1','follow:777101:1000','dm:1')) = 0, 'mpt_social_record: no event survives an erase');
 reset role;
 set local role service_role;
 select pg_temp.assert(public.mpt_erase_social_contact('x', '777001') = 1, 'mpt_erase_social_contact: returns the number of contacts removed');
