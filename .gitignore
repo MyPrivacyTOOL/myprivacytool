@@ -32,6 +32,8 @@ test-results
 .env
 .env.*
 !.env.example
+# MPC-8731: committed, public build-time switches only (VITE_*). Vite reads this file for production builds; a Pages dashboard variable of the same name still wins.
+!.env.production
 .dev.vars
 .dev.vars.*
 
