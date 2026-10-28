@@ -3,7 +3,7 @@
  * MPC-8737 — the PoP gate's window onto the data-point ledger.
  *
  * The ledger schema is not exposed to the REST API (design H7), so the Worker reaches it through three service_role-only public RPCs
- * (supabase/migrations/20261028120000_mpc_8737_data_point_ledger_v1.sql):
+ * (supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql):
  *   mpt_ledger_pop_bind    writes the proof: person + proven wa_id identifier + a phone.possession_proof data point (taken / webhook / 100)
  *   mpt_ledger_pop_check   reads the proof for a session and the newest unexpired revocation for the same person
  *   mpt_ledger_pop_revoke  writes a phone.possession_revoked data point

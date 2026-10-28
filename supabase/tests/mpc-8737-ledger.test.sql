@@ -1,8 +1,8 @@
--- MPC-8737: assertions for the data-point ledger (supabase/migrations/20261028120000_mpc_8737_data_point_ledger_v1.sql).
+-- MPC-8737: assertions for the data-point ledger (supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql).
 -- supabase/tests/run.sh has already applied the migration to the THROWAWAY database; this re-applies it once (idempotency) and then tries to break every rule.
 -- Any failed assertion aborts the run.
 \set ON_ERROR_STOP on
-\i supabase/migrations/20261028120000_mpc_8737_data_point_ledger_v1.sql
+\i supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql
 
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'FAIL: %', msg; end if; end $$;
 -- run a statement that MUST be rejected; passes only when it raises (optionally with a given SQLSTATE)

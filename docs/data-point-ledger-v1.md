@@ -9,7 +9,7 @@ from any channel, is one append-only row: *what we think is true, how sure we ar
 
 | Piece | Where |
 |---|---|
-| New schema `ledger` (11 tables, 2 views, guard + writer functions) and 3 public RPCs for the PoP gate | `supabase/migrations/20261028120000_mpc_8737_data_point_ledger_v1.sql` (rollback in its header) |
+| New schema `ledger` (11 tables, 2 views, guard + writer functions) and 3 public RPCs for the PoP gate | `supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql` (rollback in its header) |
 | Render guard, application side (pure functions, fail closed) | `shared/ledger-render-guard/index.ts` |
 | Render guard, database side (`ledger.render_claim`, `ledger.render_progress`) | same migration |
 | Golden cases run through **both** guards | `shared/ledger-render-guard/golden.json` |

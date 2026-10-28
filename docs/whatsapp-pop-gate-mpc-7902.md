@@ -78,7 +78,7 @@ still apply and are not bypassed.
 * Secrets: `POP_HMAC_SECRET` (≥32 chars, random). Optional var `WHATSAPP_BOT_NUMBER` (digits only). Existing: `META_APP_SECRET`, `DEEP_DIVE_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
 * **Behaviour change on deploy:** `start-deep-dive` now returns 403 unless a bound session is supplied, and 403 `phone_scan_disabled` while the flag is OFF. Any existing caller that posts only `{wa_id}` stops working by design.
 * Rollback: set the flag to anything but `"1"` (instant, fail closed) or revert the PR. Neither restores an unverified scan.
-* MPC-8737 adds the ledger migration (`supabase/migrations/20261028120000_mpc_8737_data_point_ledger_v1.sql`); with it applied the gate works, without it every proof write fails closed (the person is told verification could not be completed).
+* MPC-8737 adds the ledger migration (`supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql`); with it applied the gate works, without it every proof write fails closed (the person is told verification could not be completed).
 
 ## Tests
 

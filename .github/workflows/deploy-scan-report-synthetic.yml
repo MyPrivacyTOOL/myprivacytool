@@ -1,0 +1,63 @@
+name: Deploy scan-report synthetic Worker
+
+# MPC-7557: deploys the SYNTHETIC-TEST copy of the scan-report Worker (workers/scan-report/wrangler.synthetic.toml). See that file for why it exists and what keeps it safe.
+# Same repo secrets as deploy-scan-report. The production Worker is not touched by this workflow.
+# Worker secrets copied from GitHub secrets (write-only in Cloudflare): RESEND_API_KEY and SUPABASE_SERVICE_ROLE_KEY (the same values production uses), and,
+# when the GitHub secret SCAN_REPORT_UNSUBSCRIBE_SECRET exists, UNSUBSCRIBE_SECRET (so the first email carries the same signed links production would). HUBSPOT_TOKEN is deliberately never set.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers/scan-report/**'
+      - 'shared/hexagon-registry/**'
+      - 'src/data/optOutGuides.json'
+      - '.github/workflows/deploy-scan-report-synthetic.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-scan-report-synthetic
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pre-deployment checks (secrets present)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID
+      - name: Generate guides and HK email modules (same as production)
+        run: node workers/scan-report/scripts/sync-guides.mjs && node workers/scan-report/scripts/sync-hk-email-copy.mjs
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/scan-report
+          command: deploy --config wrangler.synthetic.toml
+      - name: Sync Worker secrets from GitHub secrets
+        working-directory: workers/scan-report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          UNSUBSCRIBE_SECRET: ${{ secrets.SCAN_REPORT_UNSUBSCRIBE_SECRET }}
+        run: |
+          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY UNSUBSCRIBE_SECRET; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --yes wrangler@3 secret put "$name" --config wrangler.synthetic.toml >/dev/null && echo "set $name"
+            else
+              echo "skipped $name (no GitHub secret)"
+            fi
+          done

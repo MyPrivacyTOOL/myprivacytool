@@ -18,7 +18,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     const url = String(input); calls.push(url);
     const rpc = /\/rest\/v1\/rpc\/(mpt_ledger_pop_\w+)/.exec(url)?.[1];
-    if (rpc) {   // the ledger's three PoP RPCs, same contract as the SQL (supabase/migrations/20261028120000_mpc_8737_data_point_ledger_v1.sql)
+    if (rpc) {   // the ledger's three PoP RPCs, same contract as the SQL (supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql)
       const a = JSON.parse(init.body);
       if (rpc === 'mpt_ledger_pop_bind') { ledgerProofs.set(a.p_sid, { wa: a.p_wa, bound_at_ms: a.p_bound_at_ms, inbound_ts: a.p_inbound_ts, consent_v: a.p_consent_v, consent_accepted: a.p_consent_accepted, exp: a.p_bound_at_ms + a.p_ttl_seconds * 1000 }); return new Response('true'); }
       if (rpc === 'mpt_ledger_pop_revoke') { ledgerRevs.set(a.p_wa, a.p_at_ms); return new Response('true'); }
