@@ -1,8 +1,8 @@
-export type ChannelCode = 'TG' | 'WA';
+export type ChannelCode = string;
 export type ArrivalId = 'A' | 'B' | 'C' | 'D';
 export type ObservationState = 'returned' | 'not_returned' | 'not_checked' | 'check_failed' | 'user_provided';
 
-export const CHANNELS: Record<'telegram' | 'whatsapp', { code: ChannelCode; label: string }>;
+export const CHANNELS: Record<string, { code: ChannelCode; label: string }>;
 export const ARRIVAL: Record<ArrivalId, { id: ArrivalId; label: string; colour: string; ring: 'solid-thick' | 'solid' | 'dashed' | 'dotted'; note: string }>;
 export const OBSERVATION_STATES: ObservationState[];
 

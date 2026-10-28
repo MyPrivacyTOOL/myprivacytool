@@ -7,10 +7,13 @@
 //   ARRIVAL colour (this file): HOW the information reached MPT. A blue family on purpose: green already means "safe" and must never mean "was sent to us".
 // Colour is never the only clue: each arrival class also has a letter and a ring style (same rule as the tiles' glyphs).
 
-export const CHANNELS = {
-  telegram: { code: 'TG', label: 'Telegram' },
-  whatsapp: { code: 'WA', label: 'WhatsApp' }, // reserved: no hexagons defined yet
-};
+import { CATALOGUE_CHANNELS } from './catalogue.js';
+
+// MPC-8689: all 26 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
+// their short labels; every other channel keeps the label from the discovery. Only Telegram has channel hexagons built (TELEGRAM_HEXAGONS below).
+export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
+CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
+CHANNELS.whatsapp = { code: 'WA', label: 'WhatsApp' }; // reserved: no hexagons defined yet
 
 export const ARRIVAL = {
   A: { id: 'A', label: 'Sent with every message', colour: '#1e3a8a', ring: 'solid-thick', note: 'Always arrives; nothing the person can switch off.' },
