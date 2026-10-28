@@ -93,7 +93,9 @@ export const DISCORD_EXTRA_IDS = ['dc.user_id', 'dc.names', 'dc.avatar', 'dc.ser
 export const SMS_EXTRA_IDS = ['sms.number', 'sms.number_area', 'sms.message_time', 'sms.message_text'];
 export const VIBER_EXTRA_IDS = ['vb.user_id', 'vb.name_photo', 'vb.country', 'vb.language', 'vb.api_version', 'vb.message', 'vb.deeplink', 'vb.location', 'vb.contact'];
 export const LINE_EXTRA_IDS = ['line.user_id', 'line.message', 'line.follow_state', 'line.group', 'line.location'];
-export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...SMS_EXTRA_IDS, ...VIBER_EXTRA_IDS, ...LINE_EXTRA_IDS];
+export const GITHUB_EXTRA_IDS = ['gh.sender', 'gh.content', 'gh.profile', 'gh.account_age', 'gh.public_email', 'gh.activity_times'];
+export const YOUTUBE_EXTRA_IDS = ['yt.comment', 'yt.channel_age', 'yt.country', 'yt.channel_about', 'yt.stats', 'yt.topics'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...SMS_EXTRA_IDS, ...VIBER_EXTRA_IDS, ...LINE_EXTRA_IDS, ...GITHUB_EXTRA_IDS, ...YOUTUBE_EXTRA_IDS];
 
 // CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
 // user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is

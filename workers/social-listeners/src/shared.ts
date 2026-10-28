@@ -39,6 +39,8 @@ export interface Env {
   SMS_EXTRAS?: string; SMS_PROBE_NUMBERS?: string; TWILIO_AUTH_TOKEN?: string; TWILIO_WEBHOOK_URL?: string;
   VIBER_EXTRAS?: string; VIBER_PROBE_IDS?: string; VIBER_AUTH_TOKEN?: string;
   LINE_EXTRAS?: string; LINE_PROBE_IDS?: string; LINE_CHANNEL_SECRET?: string; LINE_CHANNEL_ACCESS_TOKEN?: string;
+  GITHUB_EXTRAS?: string; GITHUB_WEBHOOK_SECRET?: string; GITHUB_PROBE_LOGINS?: string;
+  YOUTUBE_EXTRAS?: string; YOUTUBE_EXTRAS_SECRET?: string; YOUTUBE_API_KEY?: string; YOUTUBE_PROBE_CHANNEL_IDS?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */
   TELEGRAM_BOT_TOKEN?: string;

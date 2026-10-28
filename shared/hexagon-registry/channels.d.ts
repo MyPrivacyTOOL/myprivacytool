@@ -28,6 +28,8 @@ export const DISCORD_EXTRA_IDS: string[];
 export const SMS_EXTRA_IDS: string[];
 export const VIBER_EXTRA_IDS: string[];
 export const LINE_EXTRA_IDS: string[];
+export const GITHUB_EXTRA_IDS: string[];
+export const YOUTUBE_EXTRA_IDS: string[];
 export const EXTRA_HEXAGON_IDS: string[];
 export const X_HEXAGONS: ChannelHexagon[];
 export const X_HEXAGON_COUNT: number;

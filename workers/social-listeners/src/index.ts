@@ -1,9 +1,11 @@
 // social-listeners entry point (MPC-8301): routes inbound platform webhooks to their handlers.
 import { type Env } from "./shared";
 import { handleDiscordInteraction } from "./discord-interactions";
+import { handleGithubExtras } from "./github-extras";
 import { handleLineExtras } from "./line-extras";
 import { handleSmsExtras } from "./sms-extras";
 import { handleViberExtras } from "./viber-extras";
+import { handleYoutubeExtras } from "./youtube-extras";
 import { handleLinkedInWebhook } from "./linkedin-webhook";
 import { handleTelegramWebhook } from "./telegram-webhook";
 import { handleXWebhook } from "./x-webhook";
@@ -16,6 +18,8 @@ export default {
     if (pathname === "/webhook/sms-extras") return handleSmsExtras(request, env);
     if (pathname === "/webhook/viber") return handleViberExtras(request, env);
     if (pathname === "/webhook/line") return handleLineExtras(request, env);
+    if (pathname === "/webhook/github-extras") return handleGithubExtras(request, env);
+    if (pathname === "/youtube/check") return handleYoutubeExtras(request, env);
     if (pathname === "/webhook/linkedin") return handleLinkedInWebhook(request, env);
     if (pathname === "/webhook/telegram") return handleTelegramWebhook(request, env, ctx);
     if (pathname === "/") return Response.json({ worker: "social-listeners", ok: true });
