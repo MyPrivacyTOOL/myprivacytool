@@ -92,3 +92,15 @@ SQL: `supabase/tests/schema.test.sql` (duplicate is a no-op, order-safe, same er
 3. Stages and correlation: TESTED for X.
 4. Ledger/CRM mapping, duplicates, reorder, unsupported, retry, deletion: TESTED for X. Consent withdrawal on non-X channels: PENDING (D5). Policy reconciliation: OPEN (D1).
 5. Response/handoff staging with stop and anti-loop controls: existing DM replies reused; synthetic signed inbound -> persisted record shown; "queued permitted response" for DMs is the existing immediate reply, not a queue. Live: not run.
+
+## 9. Part 2: record every data point (owner decision D1, 2026-10-28)
+
+Decision: capture everything the platform sends with an event, one hexagon per data point. Built, **OFF by default**.
+
+- **Hexagons:** `X_HEXAGONS` in `shared/hexagon-registry/channels.js` (16 enabled "arrives with the event" hexagons, plus a disabled public lookup and a disabled timeline lookup). Field names are the ones X's Account Activity documentation shows in its payload examples (read 2026-10-28). That user-object list is an example, not a specification, so any field may be absent.
+- **Deprecation warning:** the same docs page says the Account Activity API is being deprecated in favour of the X Activity API. Re-map the sources before relying on this long term.
+- **Storage:** `social_events.data` (jsonb, object, 4 kB cap) keyed by hexagon id, written by `mpt_social_record` only when the Worker flag `X_CAPTURE_HEXAGONS` is `on`. It lives with the event, so DELETE and the 2 year expiry remove it. Migration `20261028110000_ck_8502_social_event_hexagon_data.sql` (rollback in header; the Worker already deployed keeps working).
+- **What is never done:** no lookup, no scraping, no matching across accounts. Only fields X sent in that event are kept; ids outside the registry and over-long values are dropped (`cleanData`).
+- **Includes message text** (DMs and posts that mention/share us) when the flag is on. Third-party data is not collected.
+- **Before the flag is turned on for real people:** legal sign-off recorded, the Mirror/visitor wording changed (it still says "keeps none of the profile data or messages"), retention period agreed for the wider data, and the migration applied.
+- Telegram: its 30 hexagons exist but the core-brain path does not store them; wiring is a separate step.
