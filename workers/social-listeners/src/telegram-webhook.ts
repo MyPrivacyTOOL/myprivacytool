@@ -1,7 +1,7 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
 import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
-import { handleDashboardCommand, isDashboardCommand } from "./dashboard-link";
+import { handleDashboardCommand, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
 import { handleFixWizard, isFixWizardUpdate } from "./fix-wizard";
@@ -58,6 +58,14 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const dash = handleDashboardCommand(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(dash);
     else await dash;
+    return done(new Response("OK"));
+  }
+
+  // MPC-8689 footprint handoff link (default off, allow-listed test accounts): exact "footprint" command only; core-brain never sees it.
+  if (isFootprintCommand(env, payload)) {
+    const fp = handleFootprintCommand(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(fp);
+    else await fp;
     return done(new Response("OK"));
   }
 

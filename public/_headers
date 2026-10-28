@@ -50,6 +50,14 @@
 /api/dashboard
   Cache-Control: no-store, private
   X-Robots-Tag: noindex, nofollow, noarchive
+# MPC-8689: the Telegram to Web footprint handoff link and its data.
+/f/*
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/api/footprint
+  Cache-Control: no-store, private
+  X-Robots-Tag: noindex, nofollow, noarchive
 
 # MPC-7350: security response headers for Cloudflare Pages (served on every route).
 # CSP is intentionally NOT enforced here: the site loads GTM (after the visitor accepts analytics in our own cookie banner, MPC-8450), and index.html

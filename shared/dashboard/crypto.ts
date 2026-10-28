@@ -17,5 +17,7 @@ export function randomSessionValue(): string {
 }
 
 export const SESSION_COOKIE = "__Host-mpt_dash";
+/** MPC-8689: the footprint handoff session has its own cookie, so it can never overwrite or be mistaken for a dashboard session. */
+export const FOOTPRINT_COOKIE = "__Host-mpt_fp";
 export const LINK_MINUTES = 15;
 export const SESSION_MINUTES = 30;

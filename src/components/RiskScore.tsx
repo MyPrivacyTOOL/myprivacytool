@@ -5,6 +5,7 @@ import { HexagonData } from '@/lib/deviceDetection';
 import { CompositeFingerprint } from '@/lib/fingerprintDetection';
 import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { footprintSummary, footprintLine, footprintChannelsLine } from '../../shared/hexagon-registry/footprint.js';
+import { useTelegramHandoff } from '@/lib/telegramHandoff';
 import { computePageRisk, getPageRiskLabel } from '@/lib/scanResult';
 import { byBand } from '@/lib/exposureScore';
 
@@ -19,7 +20,8 @@ interface RiskScoreProps {
 }
 
 export default function RiskScore({ confirmed, total, counts, hexagons, fingerprint }: RiskScoreProps) {
-  const footprint = useMemo(() => footprintSummary(counts.checkedIds), [counts.checkedIds]);
+  const handoff = useTelegramHandoff(); // MPC-8689: Telegram's checked ids when the page was opened from the one-time link, else none
+  const footprint = useMemo(() => footprintSummary([...counts.checkedIds, ...handoff.ids]), [counts.checkedIds, handoff.ids]);
   // MPC-7471-F4: the score and band come from the shared exposure contract via computePageRisk; provisional until every point is confirmed.
   const riskData = useMemo(
     () => computePageRisk({ confirmed, total, hexagons, fingerprint, scanTotal: counts.total }),
@@ -106,6 +108,7 @@ export default function RiskScore({ confirmed, total, counts, hexagons, fingerpr
           <div className="text-muted-foreground text-xs sm:text-sm mt-1" data-testid="footprint-line">
             {footprintLine(footprint)}
             {footprintChannelsLine(footprint) && ` (${footprintChannelsLine(footprint)})`}
+            {handoff.ids.length > 0 && ` Telegram part from your Telegram scan${handoff.scanAt ? ` on ${new Date(handoff.scanAt).toLocaleDateString()}` : ''}.`}
             {' '}<a href="/hexagon/" className="underline">See all {footprint.total}</a>
           </div>
 
