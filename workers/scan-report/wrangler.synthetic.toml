@@ -1,0 +1,54 @@
+# MPC-7557: the SYNTHETIC-TEST deployment of the scan-report Worker. Same code as production (main = index.js), a different Worker name.
+#
+# WHY IT EXISTS: production's POST /api/scan enforces Cloudflare Turnstile (MPC-8430) and must never be bypassed. The nightly chain test therefore sends its scan
+# request here. This Worker holds Cloudflare's public TEST secret, so the test token "XXXX.DUMMY.TOKEN.XXXX" passes; it holds NO real secret for the production widget.
+# It writes to the SAME production database, so the production cron (the real one, every 5 minutes) picks up the scan and sends the real report through the real
+# provider. Only the Turnstile widget is substituted.
+#
+# WHAT KEEPS IT SAFE:
+#  - no [triggers]: it never runs the report, follow-up or HK jobs, so it cannot send to anyone on its own schedule;
+#  - RECIPIENT_ALLOWLIST is the test mailbox: even if someone found the URL, it could email only that inbox (the allowlist ignores the +alias);
+#  - no HUBSPOT_TOKEN is ever set on it (the deploy workflow does not sync one): no HubSpot contact is created, so test runs never reach the CRM or its KPIs;
+#  - every feature switch other than saving the scan is off;
+#  - the Origin check, rate limit and consent rules are the production code, unchanged.
+# Deploy: .github/workflows/deploy-scan-report-synthetic.yml. Remove: Actions -> "Deploy scan-report synthetic Worker" is the only thing that creates it; delete the Worker in
+# the Cloudflare dashboard (Workers & Pages -> mpt-scan-report-synthetic -> Settings -> Delete), then the nightly run reports the step "scan_request" as failed.
+name = "mpt-scan-report-synthetic"
+main = "index.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+[vars]
+SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
+HUBSPOT_LEAD_SOURCE = "synthetic_test"
+RECIPIENT_ALLOWLIST = "testingnt69@gmail.com"
+ALLOW_PARTIAL_REPORT = "true"
+HK_SPAM_ENABLED = "false"
+HK_SPAM_EMAILS_LIVE = "false"
+EMAIL_GITHUB_COMMITS_ENABLED = "false"
+WEB_SCAN_SAVE_ENABLED = "true"
+REPORT_REQUEST_ID_ENABLED = "true"
+RECOGNITION_ENABLED = "false"
+REFERRALS_ENABLED = "false"
+REFERRAL_AB_REPORT_BLOCK = "false"
+REFERRAL_AB_INVITE_SUBJECT = "false"
+EMAIL_DOMAIN_CHECK = "true"
+# Cloudflare's public always-passes TEST secret (documented at developers.cloudflare.com/turnstile/troubleshooting/testing). Public by design; it is not a credential.
+TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA"
+TURNSTILE_ENFORCE = "true"
+
+[observability]
+enabled = true
+
+# Separate rate-limit namespaces from production (7351 / 7352), same limits.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "7353"
+simple = { limit = 5, period = 60 }
+
+[[unsafe.bindings]]
+name = "LIVE_LIMITER"
+type = "ratelimit"
+namespace_id = "7354"
+simple = { limit = 40, period = 60 }

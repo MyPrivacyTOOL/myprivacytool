@@ -1,0 +1,45 @@
+name: Nightly chain test
+
+# MPC-7557: every night, scan -> saved scan -> linked contact with consent -> report request -> first email accepted -> report sent -> report checked -> links resolve.
+# Weekly (Sunday): unsubscribe and delete-by-scan-number on a test record, then clean up. Design, limits and rollback: docs/nightly-chain-mpc-7557.md.
+#
+# 23:30 HKT (15:30 UTC): ahead of the metrics collector's 00:15 HKT run, which reads this job's result row and raises the usual Slack alert naming the failed step
+# (and raises one if no result arrives at all). Does not duplicate e2e-live-drift (03:17 HKT, read-only contract and render checks); this one is the only job that writes.
+# Needs repo secrets NEW_SUPABASE_SECRET_KEY (or SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY) and SUPABASE_URL; optional SCAN_REPORT_RESEND_API_KEY (read the sent report back) and,
+# for the weekly run, SCAN_REPORT_UNSUBSCRIBE_SECRET. A missing one is reported as "not configured" (exit 2), never as a pass.
+
+on:
+  schedule:
+    - cron: '30 15 * * *'    # nightly 23:30 HKT
+    - cron: '45 15 * * 0'    # weekly, Sunday 23:45 HKT (after the nightly run)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'nightly or weekly'
+        default: 'nightly'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-chain
+  cancel-in-progress: false
+
+jobs:
+  chain:
+    name: Chain test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.schedule == '45 15 * * 0' && 'weekly' || 'nightly') }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+      UNSUBSCRIBE_SECRET: ${{ secrets.SCAN_REPORT_UNSUBSCRIBE_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run the chain
+        run: node scripts/nightly-chain/run.mjs
