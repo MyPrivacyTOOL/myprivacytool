@@ -65,9 +65,15 @@ export function fake(opts = {}) {
     let rows = db[t]; const uid = q.get('id')?.replace('eq.', ''); if (uid) rows = rows.filter((x) => x.id === uid);
     if (t === 'scans' && q.get('report_status') === 'eq.sent') rows = rows.filter((x) => x.report_status === 'sent' && (x.followup_stage ?? 0) < 2 && x.report_sent_at && new Date(x.report_sent_at) < new Date(decodeURIComponent(q.get('report_sent_at').replace('lt.', ''))));
     const rc = q.get('referral_code'); if (rc?.startsWith('eq.')) rows = rows.filter((x) => x.referral_code === rc.slice(3));
-    const e = q.get('email')?.replace('eq.', ''); if (e && !e.startsWith('ilike.')) rows = rows.filter((x) => x.email === decodeURIComponent(e));
+    const e = q.get('email')?.replace('eq.', ''); if (e && !e.startsWith('ilike.') && !e.startsWith('in.(')) rows = rows.filter((x) => x.email === decodeURIComponent(e));
     if (q.get('email')?.startsWith('ilike.')) { const v = decodeURIComponent(q.get('email').slice(6)).replace(/\\(.)/g, '$1').toLowerCase(); rows = rows.filter((x) => String(x.email).toLowerCase() === v); }
     const eh = q.get('email_hash'); if (eh?.startsWith('eq.')) rows = rows.filter((x) => x.email_hash === eh.slice(3));
+    // MPC-7555: the lists suppressedAmong() reads: email=in.("a","b"), email_opt_out_at=not.is.null, email_hash=in.(h1,h2) (same semantics as PostgREST)
+    const inList = (v) => [...v.slice(4, -1).matchAll(/"((?:[^"\\]|\\.)*)"|([^,]+)/g)].map((m) => m[1] ?? m[2]);
+    if (q.get('email')?.startsWith('in.(')) { const l = inList(decodeURIComponent(q.get('email'))); rows = rows.filter((x) => l.includes(String(x.email))); }
+    if (q.get('email_opt_out_at') === 'not.is.null') rows = rows.filter((x) => x.email_opt_out_at != null);
+    if (eh?.startsWith('in.(')) { const l = inList(eh); rows = rows.filter((x) => l.includes(x.email_hash)); }
+
     const u = q.get('user_id')?.replace('eq.', ''); if (u) rows = rows.filter((x) => x.user_id === u);
     const rq = q.get('request_id')?.replace('eq.', ''); if (rq) rows = rows.filter((x) => x.request_id === rq);   // MPC-7471-F3
     const cid = q.get('contact_id')?.replace('eq.', ''); if (cid) rows = rows.filter((x) => x.contact_id === decodeURIComponent(cid));   // MPC-7471-F3
