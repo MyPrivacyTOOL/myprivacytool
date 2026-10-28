@@ -896,6 +896,16 @@ select pg_temp.assert((select delivery_status from public.scans where resend_mes
 select pg_temp.assert(public.mpt_record_email_receipt('msg_unknown', 'delivered', now()) = 0, 'receipt: an unknown message id changes nothing');
 select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_record_email_receipt('msg_ck8503_a', 'opened')$$) = '22023', 'receipt: an unknown status is refused');
 select pg_temp.assert(pg_temp.try_as('service_role', $$update public.scans set delivery_status = 'nonsense' where resend_message_id = 'msg_ck8503_a'$$) = '23514', 'receipt: the table itself rejects a status outside the list');
+-- ===== MPC-7555: one opt-out record. Setting users.email_opt_out_at records the suppression hash, whoever writes it =====
+insert into public.users (email) values ('optout-trigger@example.com'), ('optout-update@example.com');
+select pg_temp.assert(not exists (select 1 from public.email_suppressions where email_hash = encode(sha256(convert_to('optout-trigger@example.com', 'UTF8')), 'hex')), 'one opt-out: no suppression while the user has not opted out');
+update public.users set email_opt_out_at = now() where email = 'optout-update@example.com';
+select pg_temp.assert(exists (select 1 from public.email_suppressions where email_hash = encode(sha256(convert_to('optout-update@example.com', 'UTF8')), 'hex')), 'one opt-out: users.email_opt_out_at update records the suppression hash');
+insert into public.users (email, email_opt_out_at) values ('Optout-Insert@Example.com ', now());
+select pg_temp.assert(exists (select 1 from public.email_suppressions where email_hash = encode(sha256(convert_to('optout-insert@example.com', 'UTF8')), 'hex') and source = 'users_opt_out'), 'one opt-out: insert with an opt-out records the hash of the lower-cased, trimmed address');
+update public.users set email_opt_out_at = now() where email = 'optout-update@example.com';
+select pg_temp.assert((select count(*) from public.email_suppressions where email_hash = encode(sha256(convert_to('optout-update@example.com', 'UTF8')), 'hex')) = 1, 'one opt-out: a repeat opt-out keeps exactly one record');
+
 reset role;
 rollback;
 select 'schema.test.sql: all assertions passed' as result;

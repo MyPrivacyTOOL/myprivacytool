@@ -6,7 +6,7 @@ import { checkBrokers } from './lib/brokers.js';
 import { computeScore, breachRisk, CATEGORIES } from './lib/score.js';
 import { buildConfirmationEmail, buildReportEmail, buildUnsubscribedEmail, buildUnsubscribeRequestEmail, sendEmail } from './lib/email.js';
 import { runHkSpamReminderJob, isHkSpamSlot } from './lib/hkSpam.js';
-import { addSuppression, emailHash } from './lib/suppression.js';
+import { addSuppression, emailHash, optOutEverywhere, suppressedAmong } from './lib/suppression.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
 import { checkDeliverableDomain } from './lib/emailDomain.js';
@@ -409,7 +409,8 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
       if (!stage || !recipientAllowed(env, job.email_scanned)) { out.skipped++; continue; }
       const user = (await sb.select(`users?id=eq.${job.user_id}&select=id,cohort_number,email_opt_out_at&limit=1`))[0];
       // Cohort members only; in allowlist test mode the test inboxes stand in for the cohort.
-      if (!user || user.email_opt_out_at || (!user.cohort_number && !testMode)) { out.skipped++; continue; }
+      // MPC-7555: follow-ups are not transactional; they honour THE opt-out (users flag OR email_suppressions), not only the users column.
+      if (!user || user.email_opt_out_at || (!user.cohort_number && !testMode) || (await suppressedAmong(sb, [job.email_scanned])).has(String(job.email_scanned).trim().toLowerCase())) { out.skipped++; continue; }
       const claimed = await sb.patch(`scans?id=eq.${job.id}&followup_stage=eq.${job.followup_stage ?? 0}`, { followup_stage: stage, followup_last_sent_at: new Date().toISOString() });
       if (!claimed.length) continue;
       const links = await unsubLinks(env, job.email_scanned);
@@ -441,7 +442,7 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
     : view(status, heading, body, extra));
   const email = (url.searchParams.get('e') || '').trim().toLowerCase();
   if (!(await verifyUnsubscribe(env.UNSUBSCRIBE_SECRET, email, url.searchParams.get('t')))) {
-    return reply(400, 'This link is not valid', 'The unsubscribe link may be incomplete or out of date. Reply to any of our emails and we will remove you by hand.');
+    return reply(400, 'This link is not valid', 'The unsubscribe link may be incomplete or out of date. Go to https://myprivacytool.io/unsubscribe, type your address, and we will email you a fresh link.');
   }
   if (!confirmed) {
     const action = `/api/unsubscribe?e=${encodeURIComponent(email)}&amp;t=${encodeURIComponent(url.searchParams.get('t'))}`;
@@ -450,12 +451,8 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
   }
   try {
     const sb = db(env);
-    await sb.patch(`users?email=eq.${encodeURIComponent(email)}`, { email_opt_out_at: new Date().toISOString() });
-    // CK-7721 fix 3: also delete the address from the newsletter list (public.subscribers), so the stored email goes too, not just the mail.
-    // Case-insensitive, with LIKE wildcards escaped; an address containing * (a PostgREST wildcard) is matched exactly instead. Done BEFORE the
-    // suppression row so a failure leaves nothing half-done: the person can simply retry the link.
-    await sb.remove(`subscribers?email=${/\*/.test(email) ? 'eq.' : 'ilike.'}${encodeURIComponent(/\*/.test(email) ? email : email.replace(/[\\%_]/g, '\\$&'))}`);
-    const firstTime = await addSuppression(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
+    // MPC-7555: one function records the opt-out for every sender (users flag, newsletter row, email_suppressions). CK-7721 fix 3 (newsletter row removed too) lives inside it.
+    const firstTime = await optOutEverywhere(sb, email, 'unsubscribe');   // MPC-7448: also covers people with no users row (HK Spam registrants) and the newsletter list
     const hs = await pushEmailOptOut(env, { email });   // best effort: HubSpot must not mail them either; a failure never blocks the unsubscribe
     if (hs.failed) console.error('HubSpot opt-out failed:', hs.failed);
     // MPC-7491: one plain confirmation email, only the first time (a repeat click sends nothing). Never blocks or fails the unsubscribe.
@@ -466,7 +463,7 @@ async function handleUnsubscribe(env, url, confirmed, request, cors) {
       } catch (e) { console.error('unsubscribe confirmation email failed', String(e).replace(/\S+@\S+/g, '[email]')); }
     }
     return reply(200, 'You are unsubscribed', 'We will not send you any more follow-up or marketing emails, and we have removed you from our newsletter list.');
-  } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Reply to any of our emails and we will remove you by hand.'); }
+  } catch (e) { console.error('unsubscribe failed', String(e)); return reply(500, 'Something went wrong', 'Nothing was changed. Try the link again in a minute, or go to https://myprivacytool.io/unsubscribe, type your address, and we will email you a fresh link.'); }
 }
 
 // POST /api/unsubscribe-request {email}: the website's "unsubscribe me" form. Emails a signed confirmation link to that address only,

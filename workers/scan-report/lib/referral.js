@@ -84,7 +84,7 @@ export async function completeReferral(env, sb, refereeUserId, fetchImpl = fetch
     if (!row) return { completed: false };
     if (row.rewarded && env.UNSUBSCRIBE_SECRET) {
       const u = (await sb.select(`users?id=eq.${row.referrer_user_id}&select=email,email_opt_out_at,referral_code&limit=1`))[0];
-      if (u && !u.email_opt_out_at && allowed(env, u.email) && referralTester(env, u.email)) {
+      if (u && !u.email_opt_out_at && !(await suppressedAmong(sb, [u.email])).has(String(u.email).trim().toLowerCase()) && allowed(env, u.email) && referralTester(env, u.email)) {   // MPC-7555: the reward email is not transactional; it honours THE opt-out
         const mail = buildRewardEmail({ months: row.pro_months_earned, manageLink: u.referral_code ? await manageUrl(env, u.referral_code) : null, unsubscribeLink: await unsubscribePageUrl(env, u.email) });
         const r = await sendEmail(env, { to: u.email, ...mail, idempotencyKey: `referral-reward-${refereeUserId}` }, fetchImpl);
         if (!r.sent) console.error('referral reward email not sent:', r.reason);
