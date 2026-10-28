@@ -1,6 +1,6 @@
 // MPC-8430: Turnstile on POST /api/scan. Stubbed fetch, no network. Run: node workers/scan-report/turnstile.test.mjs
 import worker from './index.js';
-import { maskIp, turnstileState, turnstileBlocks } from './lib/turnstile.js';
+import { maskIp, turnstileState, turnstileBlocks, TURNSTILE_TEST_SECRET } from './lib/turnstile.js';
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const req = (ip = '203.0.113.77') => new Request('https://x/api/scan', { method: 'POST', headers: { 'CF-Connecting-IP': ip } });
@@ -19,6 +19,10 @@ info = {};
 check(await turnstileState(env, req(), 'tok', info, siteverify({ success: false, 'error-codes': ['timeout-or-duplicate'] })) === 'failed' && /timeout-or-duplicate/.test(info.reason), 'reused/invalid token => failed with reason');
 info = {};
 check(await turnstileState(env, req(), 'tok', info, siteverify({ success: true, hostname: 'evil.example' })) === 'failed' && /hostname_mismatch/.test(info.reason), 'token from another hostname => failed');
+// MPC-7557: the public Cloudflare TEST secret (synthetic-test Worker only) skips the hostname check; the real secret still enforces it.
+check(await turnstileState({ TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET }, req(), 'XXXX.DUMMY.TOKEN.XXXX', {}, siteverify({ success: true, hostname: 'example.com' })) === 'ok', 'test secret: placeholder hostname accepted');
+check(await turnstileState({ TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET }, req(), 'tok', {}, siteverify({ success: false, 'error-codes': ['invalid-input-response'] })) === 'failed', 'test secret: a rejected token still fails');
+check(await turnstileState(env, req(), 'tok', {}, siteverify({ success: true, hostname: 'example.com' })) === 'failed', 'real secret: the same placeholder hostname is still refused');
 check(await turnstileState(env, req(), 'tok', {}, siteverify({}, 500)) === 'error', 'siteverify http 500 => error (fails open)');
 check(await turnstileState(env, req(), 'tok', {}, async () => { throw new Error('down'); }) === 'error', 'siteverify unreachable => error (fails open)');
 

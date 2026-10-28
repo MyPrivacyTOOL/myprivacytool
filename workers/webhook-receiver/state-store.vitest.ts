@@ -2,17 +2,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
-import { sessionKey, CONSENT_VERSION } from './pop.ts';
+import { proofSid, CONSENT_VERSION } from './pop.ts';
 import { getConversationState, saveConversationState, purgeExpiredState, STATE_TTL_MS } from './state-store.js';
 
 const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc' };
 let reqs: { url: string; method: string; body: any; headers: any }[]; let status: number; let contentRange: string; let seed: Record<string, any>;
+let ledgerProof: any;   // MPC-8737: the PoP proof is a ledger row, read through the mpt_ledger_pop_check RPC
 
 beforeEach(() => {
-  reqs = []; status = 200; contentRange = '*/0'; seed = {};
+  reqs = []; status = 200; contentRange = '*/0'; seed = {}; ledgerProof = null;
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     reqs.push({ url: String(input), method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : undefined, headers: init.headers });
     if (String(input).includes('firestore.googleapis.com')) return new Response('', { status: 404 });
+    if (String(input).includes('/rest/v1/rpc/mpt_ledger_pop_check')) return new Response(JSON.stringify({ proof: ledgerProof && ledgerProof.sid === JSON.parse(init.body).p_sid ? ledgerProof.proof : null, revoked_at_ms: null }));
     const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(String(input))?.[1] ?? '');
     const body = init.method === 'DELETE' ? '' : seed[key] ? JSON.stringify([{ state: seed[key] }]) : '[]';
     return new Response(body, { status, headers: { 'Content-Range': contentRange } });
@@ -92,7 +94,7 @@ describe('purge', () => {
     await Promise.all(waits);
     expect(reqs.some((r) => r.method === 'DELETE')).toBe(false);
     seed['whatsapp:85212345678'] = { profileName: 'Alex' };
-    seed[(await sessionKey(env, session_token))] = { wa: '85212345678', bound_at: Date.now(), inbound_ts: 1760000000, consent: { v: CONSENT_VERSION, accepted: true } };
+    ledgerProof = { sid: await proofSid(env, session_token), proof: { wa: '85212345678', bound_at_ms: Date.now(), inbound_ts: 1760000000, consent_v: CONSENT_VERSION, consent_accepted: true } };
     const ok = await worker.fetch(new Request('https://x/api/scan/start-deep-dive', { method: 'POST', body: JSON.stringify({ wa_id: '85212345678', session_token }), headers: { 'X-Webhook-Secret': 's' } }), env, ctx);
     expect(ok.status).toBe(200);
     await Promise.all(waits);

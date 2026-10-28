@@ -12,19 +12,21 @@
  *   checkPossession()         the gate. Called at the execution boundary (start-deep-dive) immediately before any provider call.
  *   revokePossession()        STOP / DELETE: kills every proof for that wa_id.
  *
- * State lives in the existing mpt_conversation_state store (no new table, no competing identity store). Every key is HMAC-hashed with
- * POP_HMAC_SECRET, so a database read does not reveal a live code or a usable session token. Keys:
+ * MPC-8737: the PROOF and its revocation now live in the data-point ledger (ledger-store.ts): a phone.possession_proof data point
+ * (taken / webhook / confidence 100, bound to the HMAC of the session token, expires after 60 min) on a person whose wa_id identifier is
+ * thereby 'proven', and a phone.possession_revoked data point for STOP / DELETE. checkPossession() is the one function that reads them.
+ * The short-lived handshake bookkeeping is not a claim about a person, so it stays in the existing mpt_conversation_state store
+ * (no new table). Every key is HMAC-hashed with POP_HMAC_SECRET, so a database read does not reveal a live code or a usable session token:
  *   pop_ch:<h(code)>      challenge          10 min, deleted on redemption (atomic DELETE ... RETURNING = single use)
- *   pop_sess:<h(token)>   proof / binding    60 min {wa, bound_at, inbound_ts, consent}
- *   pop_rev:<h(wa)>       revocation         24 h  {at}      (a proof bound at or before `at` is dead)
  *   pop_try:<h(wa)>       wrong-code counter 15 min
  *   pop_msg:<h(msg id)>   inbound dedup      1 h
- * INTERIM: when the MPC-7898 ledger is built these become ledger rows (person-key + data_point). See docs/whatsapp-pop-gate-mpc-7902.md.
+ * Ledger rows (not mpt_conversation_state keys): proof subject_ref = h(token) for 60 min; revocation 24 h (a proof bound at or before it is dead).
  *
  * Everything FAILS CLOSED: a missing secret, an unreadable store or a failed write means no proof, never a default.
  * Possession proof is not consent to anything else and does not bypass any provider, budget or release gate.
  */
 import { getStateStrict, insertStateIfAbsent, putStateStrict, takeState } from './state-store.js';
+import { bindProof, readProof, revokeProof } from './ledger-store.ts';
 import { corsFor, clip } from './security.js';
 
 type Env = Record<string, any>;
@@ -51,8 +53,8 @@ export const CODE_RE = /\bMPT-([A-HJKMNP-TV-Z2-9]{4})-([A-HJKMNP-TV-Z2-9]{4})\b/
 const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 const enc = new TextEncoder();
 
-/** Storage key a session token's proof lives under. Exported so tests can read the persisted state. */
-export const sessionKey = async (env: Env, token: string) => `pop_sess:${await h(env, 'sess', token)}`;
+/** The ledger subject a session token's proof is stored under (an HMAC, never the token). Exported so tests can read the persisted proof. */
+export const proofSid = (env: Env, token: string) => h(env, 'sess', token);
 
 export const popEnabled = (env: Env) => env.PHONE_SCAN_WEB_ENABLED === '1';
 const secretOk = (env: Env) => typeof env.POP_HMAC_SECRET === 'string' && env.POP_HMAC_SECRET.length >= 32;
@@ -105,14 +107,13 @@ export async function checkPossession(env: Env, input: { token: unknown; target?
     target = normaliseTarget(input.target);
     if (!target) return deny('target_invalid');
   }
-  const sess = await getStateStrict(env, `pop_sess:${await h(env, 'sess', input.token)}`);
-  if (!sess.ok) return unavailable('proof_store_unavailable');
-  const p = sess.state;
-  if (!p || typeof p.wa !== 'string' || typeof p.bound_at !== 'number' || typeof p.inbound_ts !== 'number') return deny('verification_required', true);
-  const rev = await getStateStrict(env, `pop_rev:${await h(env, 'wa', p.wa)}`);
-  if (!rev.ok) return unavailable('proof_store_unavailable');
-  if (rev.state && typeof rev.state.at === 'number' && rev.state.at >= p.bound_at) return deny('proof_revoked', true);
-  if (p.consent?.v !== CONSENT_VERSION || p.consent?.accepted !== true) return deny('consent_required');
+  const read = await readProof(env, await h(env, 'sess', input.token));   // proof + newest revocation, one read from the ledger
+  if (!read.ok) return unavailable('proof_store_unavailable');
+  const p = read.proof;
+  if (!p) return deny('verification_required', true);
+  if (Date.now() >= p.bound_at_ms + PROOF_TTL_MS) return deny('verification_required', true);   // the ledger row expires too; this does not trust one clock
+  if (read.revoked_at_ms !== null && read.revoked_at_ms >= p.bound_at_ms) return deny('proof_revoked', true);
+  if (p.consent_v !== CONSENT_VERSION || p.consent_accepted !== true) return deny('consent_required');
   if (target !== null && target !== p.wa) return deny('target_mismatch');        // never substitute another target
   return { ok: true, wa_id: p.wa, inbound_ts: p.inbound_ts };
 }
@@ -120,7 +121,7 @@ export async function checkPossession(env: Env, input: { token: unknown; target?
 /** STOP / DELETE: every proof bound to this wa_id stops working at once. Returns false if the tombstone could not be stored. */
 export async function revokePossession(env: Env, waId: string): Promise<boolean> {
   if (!secretOk(env)) return false;
-  return putStateStrict(env, `pop_rev:${await h(env, 'wa', waId)}`, { at: Date.now() }, REVOKE_TTL_MS);
+  return revokeProof(env, waId, Date.now(), REVOKE_TTL_MS);
 }
 
 // ── Inbound redemption (Meta-signed webhook only) ───────────────────────────────────────────────────────────────────────────────
@@ -166,11 +167,11 @@ export async function redeemFromInbound(env: Env, m: InboundMessage): Promise<Re
   // 4. The sender must be the number the visitor said they wanted checked. The code is spent either way; we do not say which number was expected.
   if (ch.target && ch.target !== m.from) return { outcome: 'mismatch', reply: REPLY_BAD_CODE };
 
-  // 5. Durably record the proof BEFORE telling anyone it worked. No write, no proof.
-  const ok = await putStateStrict(env, `pop_sess:${ch.sid}`, {
-    wa: m.from, bound_at: now, inbound_ts: m.ts, msg: m.msgId ? await h(env, 'msg', m.msgId) : null,
-    consent: { v: ch.consent?.v, accepted: ch.consent?.accepted === true },
-  }, PROOF_TTL_MS);
+  // 5. Durably record the proof in the ledger BEFORE telling anyone it worked. No write, no proof.
+  const ok = await bindProof(env, {
+    sid: ch.sid, wa: m.from, boundAtMs: now, inboundTs: m.ts, consentV: ch.consent?.v, consentAccepted: ch.consent?.accepted === true,
+    msgHash: m.msgId ? await h(env, 'msg', m.msgId) : null, ttlMs: PROOF_TTL_MS,
+  });
   if (!ok) return { outcome: 'error', reply: REPLY_FAILED };
   return { outcome: 'bound', reply: REPLY_OK };
 }
