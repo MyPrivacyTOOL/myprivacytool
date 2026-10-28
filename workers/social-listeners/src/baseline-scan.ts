@@ -114,12 +114,17 @@ export function hexagonStates(update: unknown, chat: Record<string, unknown>, ph
  * (out of 30), the dashboard views and every score are unchanged. "returned" = the field is in this message or chat; "not_returned" = it is not (the
  * sender did not forward, reply to a story, use an inline bot and so on). Pure.
  */
-export function extraStates(update: unknown, chat: Record<string, unknown>): HexagonState[] {
+export function extraStates(update: unknown, chat: Record<string, unknown>, personalPosts: Answer | null = null): HexagonState[] {
   const msg = ((update as { message?: Record<string, unknown> }).message ?? {}) as Record<string, unknown>;
   const returned: Record<string, boolean> = {
     "tg.forward_origin": has(msg, "forward_origin"), "tg.offline_send": msg.is_from_offline === true, "tg.story_reply": has(msg, "reply_to_story"),
     "tg.via_bot": has(msg, "via_bot"), "tg.profile_audio": has(chat, "first_profile_audio"),
   };
+  // Personal channel latest posts: only read when getChat returned a personal channel. A failed read is "not_checked", never "not_returned". Only the fact that posts came back is kept, never their text.
+  const posts = personalPosts?.response as { ok?: unknown; result?: unknown } | null | undefined;
+  const postsRead = personalPosts?.status === 200 && posts?.ok === true && Array.isArray(posts.result);
+  if (!has(chat, "personal_chat")) returned["tg.personal_messages"] = false;
+  else if (postsRead) returned["tg.personal_messages"] = (posts!.result as unknown[]).length > 0;
   return TELEGRAM_EXTRA_HEXAGONS.map((x) => ({ id: x.id, channel: "TG" as const, arrival: x.arrival, state: !x.enabled || !(x.id in returned) ? "not_checked" : returned[x.id] ? "returned" : "not_returned" }));
 }
 
@@ -147,13 +152,13 @@ function extraLines(extras: HexagonState[]): string[] {
 }
 
 /** Pure: builds the report from successful answers. Returns null if a required call failed (no score is ever invented). */
-export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer): Report | null {
+export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer, personalPosts: Answer | null = null): Report | null {
   const chat = result(chatAnswer), photos = result(photosAnswer);
   if (!chat || !photos) return null;
   const m = (update as { update_id?: unknown; message?: { from?: { id?: number; first_name?: string; last_name?: string; language_code?: string } } }).message?.from ?? {};
   const photoSets = Array.isArray(photos.photos) ? photos.photos : [];
   const hexagons = hexagonStates(update, chat, photoSets);
-  const extras = extraStates(update, chat);
+  const extras = extraStates(update, chat, personalPosts);
   const got = (id: string) => hexagons.find((x) => x.id === id)?.state === "returned";
   const idNum = typeof chat.id === "number" ? chat.id : null;
   const accent = typeof chat.accent_color_id === "number" ? chat.accent_color_id : null;
@@ -237,7 +242,9 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
       call(env, "getChat", { chat_id: sender.id }),
       call(env, "getUserProfilePhotos", { user_id: Number(sender.id), limit: 5 }),
     ]);
-    const report = buildReport(update, chat, photos);
+    // Personal channel latest posts (extra hexagon): only asked for when the profile has a personal channel; the posts themselves are never stored or logged.
+    const personal = result(chat)?.personal_chat ? await call(env, "getUserPersonalChatMessages", { user_id: Number(sender.id), limit: 20 }) : null;
+    const report = buildReport(update, chat, photos, personal);
     const date = (update as { message?: { date?: unknown } }).message?.date;
     const saved = await saveSnapshot(env, {
       platform: "telegram", sender_id: storedId, update_id: updateId, status: report ? "complete" : "failed",
