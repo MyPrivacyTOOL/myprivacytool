@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { footprintSummary, footprintLine, footprintChannelsLine, FOOTPRINT_TOTAL } from './footprint.js';
 import { HEXAGONS } from './registry.js';
-import { TELEGRAM_HEXAGONS, EXTRA_HEXAGON_IDS } from './channels.js';
+import { TELEGRAM_HEXAGONS, TELEGRAM_EXTRA_IDS, EMAIL_EXTRA_IDS, EXTRA_HEXAGON_IDS } from './channels.js';
 import { HEXAGON_CATALOGUE } from './catalogue.js';
 import { scanCounts } from './counts.js';
 
@@ -20,14 +20,17 @@ assert.equal(footprintChannelsLine(both), 'Web scan 54 of 83, Telegram 30 of 47'
 assert.equal(footprintSummary(TELEGRAM_HEXAGONS.map((h) => h.id)).toReview, 336);
 
 // A hexagon that is only documented ("new"), an unknown id and a duplicate never count as checked.
-const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new').id;
+const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new' && !EXTRA_HEXAGON_IDS.includes(h.id)).id;
 const odd = footprintSummary([newId, 'not-a-hexagon', 'location', 'location']);
 assert.deepEqual([odd.checked, odd.toReview], [1, 365]);
 
 // The five built Telegram extras (MPC-8689 pilot) count as checked: Telegram 35 of 47, still outside the 30 and every score.
-const withExtras = footprintSummary([...TELEGRAM_HEXAGONS.map((h) => h.id), ...EXTRA_HEXAGON_IDS]);
+const withExtras = footprintSummary([...TELEGRAM_HEXAGONS.map((h) => h.id), ...TELEGRAM_EXTRA_IDS]);
 assert.deepEqual([withExtras.checked, withExtras.toReview], [35, 331]);
 assert.equal(footprintChannelsLine(withExtras), 'Telegram 35 of 47');
+// The four built email extras count as checked too (email 7 + 4 of 21), still outside every score.
+const emailBuilt = footprintSummary(EMAIL_EXTRA_IDS);
+assert.deepEqual([emailBuilt.checked, emailBuilt.byChannel.find((c) => c.key === 'email').checked], [4, 4]);
 
 // scanCounts exposes which hexagons were checked, without changing X, Y or Z.
 const c = scanCounts([{ id: 'location', value: 'Springfield', confirmed: true }]);

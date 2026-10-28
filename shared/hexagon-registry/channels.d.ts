@@ -21,6 +21,10 @@ export interface ChannelHexagon {
 export const TELEGRAM_HEXAGONS: ChannelHexagon[];
 /** MPC-8689 pilot: built and checked, but outside the 30, the risk number and every score. */
 export const TELEGRAM_EXTRA_HEXAGONS: ChannelHexagon[];
+export const TELEGRAM_EXTRA_IDS: string[];
+export const EMAIL_EXTRA_IDS: string[];
+export const WEB_EXTRA_IDS: string[];
+export const DISCORD_EXTRA_IDS: string[];
 export const EXTRA_HEXAGON_IDS: string[];
 export const X_HEXAGONS: ChannelHexagon[];
 export const X_HEXAGON_COUNT: number;

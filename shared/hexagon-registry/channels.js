@@ -81,7 +81,14 @@ export const TELEGRAM_EXTRA_HEXAGONS = [
   h('via_bot', 'Other bots used', 'A', 'message.via_bot', 'direct'),
   h('profile_audio', 'Profile music', 'B', 'getChat.first_profile_audio', 'direct'),
 ];
-export const EXTRA_HEXAGON_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
+export const TELEGRAM_EXTRA_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
+// Email extras live in workers/scan-report/lib/emailExtras.js (EMAIL_EXTRA_HEXAGONS); their catalogue ids are listed here so the footprint count knows they are built.
+export const EMAIL_EXTRA_IDS = ['email.alias', 'email.address_type', 'email.saas_records', 'email.mail_protection'];
+// Web extras live in src/lib/webExtras.ts (edge data from the mpt-leads Worker /whoami-extra, plus two browser checks). Outside the 54, the exposure score and scanCounts.
+export const WEB_EXTRA_IDS = ['web.postal_area', 'web.ip_timezone', 'web.network_distance', 'web.network_owner', 'web.tls_fingerprint', 'web.http_protocol', 'web.eu_region', 'web.device_model', 'web.clock_skew'];
+// Discord extras live in workers/social-listeners/src/discord-interactions.ts (DISCORD_EXTRA_HEXAGONS). The four "Their sign-in" Discord candidates (email, linked accounts, servers, Nitro and 2FA) are not built.
+export const DISCORD_EXTRA_IDS = ['dc.user_id', 'dc.names', 'dc.avatar', 'dc.server_tag', 'dc.badges', 'dc.language', 'dc.context', 'dc.member', 'dc.purchases', 'dc.command_input', 'dc.banner'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS];
 
 // CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
 // user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is

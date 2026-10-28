@@ -264,6 +264,39 @@ describe('consent', () => {
   });
 });
 
+// MPC-8689 pilot: GET /whoami-extra, the edge data behind the extra web hexagons.
+describe('GET /whoami-extra', () => {
+  const get = (path, { origin = ORIGIN, cf, ip = '203.0.113.7', e = env } = {}) => {
+    const headers = { 'CF-Connecting-IP': ip };
+    if (origin) headers.Origin = origin;
+    const req = new Request(`https://x${path}`, { method: 'GET', headers });
+    if (cf) Object.defineProperty(req, 'cf', { value: cf });
+    return worker.fetch(req, e, {});
+  };
+  const cf = { postalCode: 'SW1A', metroCode: '826', timezone: 'Europe/London', clientTcpRtt: 12, colo: 'LHR', asn: 64500, asOrganization: 'Example ISP', tlsClientCiphersSha1: 'abc', tlsClientExtensionsSha1: 'def', tlsClientHelloLength: '508', httpProtocol: 'HTTP/2', isEUCountry: '1', continent: 'EU', regionCode: 'ENG' };
+
+  it('returns the edge fields, never the IP, and the server time', async () => {
+    const res = await get('/whoami-extra', { cf });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    const body = await res.json();
+    expect(body).toMatchObject({ postal_code: 'SW1A', metro_code: '826', timezone: 'Europe/London', tcp_rtt_ms: 12, colo: 'LHR', asn: 64500, org: 'Example ISP', tls_ciphers_sha1: 'abc', tls_hello_length: 508, http_protocol: 'HTTP/2', is_eu: true, continent: 'EU', region_code: 'ENG' });
+    expect(typeof body.now).toBe('number');
+    expect(JSON.stringify(body)).not.toContain('203.0.113.7');
+  });
+  it('returns empty values (never invented ones) when Cloudflare supplies nothing, and makes no outbound request', async () => {
+    const body = await (await get('/whoami-extra')).json();
+    expect(body).toMatchObject({ postal_code: '', timezone: '', tcp_rtt_ms: null, asn: null, org: '', is_eu: null, http_protocol: '' });
+    expect(calls).toEqual([]);
+  });
+  it('refuses a foreign browser origin and is rate limited like /whoami; /whoami is unchanged', async () => {
+    expect((await get('/whoami-extra', { origin: 'https://evil.example', cf })).status).toBe(403);
+    const limited = { ...env, RATE_LIMITER: { limit: async () => ({ success: false }) } };
+    expect((await get('/whoami-extra', { e: limited })).status).toBe(429);
+    expect(Object.keys(await (await get('/whoami', { cf })).json()).sort()).toEqual(['city', 'country_name', 'ip', 'latitude', 'longitude', 'org', 'region']);
+  });
+});
+
 // MPC-7350: GET /whoami returns the visitor's IP and approximate location from Cloudflare request data,
 // so the browser does not need third-party lookup services (ipify, ipapi.co).
 describe('GET /whoami', () => {

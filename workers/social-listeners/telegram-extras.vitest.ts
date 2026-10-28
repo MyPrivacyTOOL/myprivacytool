@@ -2,7 +2,7 @@
 // MPC-8689 pilot: the five extra Telegram hexagons are checked but stay outside the 30, the risk number and every score.
 import { describe, expect, it } from "vitest";
 import { buildReport, extraStates, hexagonStates, riskFrom } from "./src/baseline-scan";
-import { EXTRA_HEXAGON_IDS, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS } from "../../shared/hexagon-registry/channels.js";
+import { TELEGRAM_EXTRA_IDS, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS } from "../../shared/hexagon-registry/channels.js";
 
 const ok = (result: unknown) => ({ status: 200, response: { ok: true, result } });
 const update = (message: Record<string, unknown>) => ({ update_id: 1, message: { message_id: 1, date: 1, text: "hi", from: { id: 6000000001, first_name: "T", language_code: "en" }, chat: { id: 6000000001, type: "private" }, ...message } });
@@ -13,11 +13,11 @@ describe("extra Telegram hexagons", () => {
   it("are five, outside the 30, with ids that match the catalogue", () => {
     expect(TELEGRAM_EXTRA_HEXAGONS).toHaveLength(5);
     expect(TELEGRAM_HEXAGONS).toHaveLength(30);
-    expect(EXTRA_HEXAGON_IDS.filter((id) => TELEGRAM_HEXAGONS.some((x) => x.id === id))).toEqual([]);
+    expect(TELEGRAM_EXTRA_IDS.filter((id) => TELEGRAM_HEXAGONS.some((x) => x.id === id))).toEqual([]);
   });
   it("are 'returned' only when the field is really there, and 'not_returned' otherwise (never invented)", () => {
     const plain = update({});
-    for (const id of EXTRA_HEXAGON_IDS) expect(state(plain, chat(), id)).toBe("not_returned");
+    for (const id of TELEGRAM_EXTRA_IDS) expect(state(plain, chat(), id)).toBe("not_returned");
     expect(state(update({ forward_origin: { type: "user" } }), chat(), "tg.forward_origin")).toBe("returned");
     expect(state(update({ is_from_offline: true }), chat(), "tg.offline_send")).toBe("returned");
     expect(state(update({ is_from_offline: false }), chat(), "tg.offline_send")).toBe("not_returned");
@@ -36,7 +36,7 @@ describe("extra Telegram hexagons", () => {
     expect(withExtras.risk.returned).toBe(plain.risk.returned); // extras never raise or lower the count out of 30
     expect(riskFrom(withExtras.hexagons).possible).toBe(30);
     expect(withExtras.extras).toHaveLength(5);
-    expect(withExtras.hexagons.some((x) => EXTRA_HEXAGON_IDS.includes(x.id))).toBe(false);
+    expect(withExtras.hexagons.some((x) => TELEGRAM_EXTRA_IDS.includes(x.id))).toBe(false);
   });
   it("show in the report as extra checks outside the number, listing only what was seen as seen", () => {
     const r = buildReport(update({ via_bot: { id: 1 } }), ok(chat()), ok({ photos: [] }))!;
