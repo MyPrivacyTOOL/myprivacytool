@@ -33,7 +33,8 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-operational-rls.sql
 psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 # mpt-purge-expired-scan-results.sql needs pg_cron (not available in plain Postgres); it is documentation of the live job.
 # MPC-8671 is applied below, after the KPI view chain it replaces (supabase/sql/*, which production got through the SQL editor/MCP, not through migrations).
-for f in $(ls supabase/migrations/*.sql | grep -v mpc_8671_kpi_views_hourly_counter | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
+# MPC-8737: the ledger migration has its own stage further down (fingerprint before / after, rollback, re-apply), so it is excluded here too.
+for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 echo "   KPI view chain (supabase/sql), in the order production received it"
 for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
 echo "   migration 20261028120000_mpc_8671_kpi_views_hourly_counter.sql"
@@ -129,6 +130,66 @@ created=$(grep -c '^f$' "${TMPDIR:-/tmp}/ck8503-race2.$$" || true); rm -f "${TMP
 total=$(psql_ "$TEST_URL" -At -c "select count(*) from public.scans where user_id = '00000000-0000-4000-8000-0000000000c2'")
 [ "$created" = 1 ] && [ "$total" = 1 ] || { echo "::error::concurrent mpt_request_scan with distinct request ids: created=$created rows=$total (want 1, 1)"; exit 1; }
 echo "   PASS 8 simultaneous requests with 8 DIFFERENT request ids -> still 1 scan"
+
+# MPC-8737: data-point ledger v1. Additive proof, constraint / guard assertions, tested rollback, re-apply.
+echo "== data-point ledger v1 (MPC-8737)"
+LEDGER=supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql
+fp() { pg_dump -s --no-comments -n public "$TEST_URL" | grep -v -E '^.(un)?restrict '; }
+fp > "${TMPDIR:-/tmp}/ledger-before.sql"
+psql_ "$TEST_URL" -f "$LEDGER"
+fp > "${TMPDIR:-/tmp}/ledger-after.sql"
+removed=$(diff "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-after.sql" | grep -c '^<' || true)
+added_objects=$(diff "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-after.sql" | grep '^>' | grep -c -E 'CREATE (TABLE|VIEW|TRIGGER|INDEX)|ALTER TABLE' || true)
+[ "$removed" -eq 0 ] || { echo "::error::the ledger migration changed or removed $removed existing line(s) in schema public"; exit 1; }
+[ "$added_objects" -eq 0 ] || { echo "::error::the ledger migration added tables / constraints to schema public ($added_objects); it may only add the three mpt_ledger_pop_* functions"; exit 1; }
+echo "   additive: 0 existing public lines changed; public gained only functions"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-ledger.test.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-golden.test.sql
+echo "   rollback (text taken from the migration header)"
+sed -n '/^-- ROLLBACK/,/^$/p' "$LEDGER" | sed -n 's/^--   //p' > "${TMPDIR:-/tmp}/ledger-rollback.sql"
+test -s "${TMPDIR:-/tmp}/ledger-rollback.sql" || { echo "::error::no rollback text found in $LEDGER"; exit 1; }
+psql_ "$TEST_URL" -f "${TMPDIR:-/tmp}/ledger-rollback.sql"
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_namespace where nspname = 'ledger'")" = 0 ] || { echo "::error::rollback left the ledger schema behind"; exit 1; }
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from pg_proc where proname like 'mpt_ledger_pop_%'")" = 0 ] || { echo "::error::rollback left mpt_ledger_pop_* functions behind"; exit 1; }
+fp > "${TMPDIR:-/tmp}/ledger-rolled-back.sql"
+diff -q "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-rolled-back.sql" >/dev/null || { echo "::error::schema public after rollback differs from before the migration"; diff "${TMPDIR:-/tmp}/ledger-before.sql" "${TMPDIR:-/tmp}/ledger-rolled-back.sql" | head -20; exit 1; }
+echo "   rollback restored schema public byte-for-byte (pg_dump -s identical to the pre-migration dump)"
+psql_ "$TEST_URL" -f "$LEDGER"
+psql_ "$TEST_URL" -At -c "select 'ledger re-applied after rollback: ' || count(*) || ' tables' from information_schema.tables where table_schema = 'ledger' and table_type = 'BASE TABLE'"
+echo "   backfill (fresh ledger): dry run, apply, idempotent re-apply, hold release, exact reversal"
+legacy_counts() { psql_ "$TEST_URL" -At -c "select (select count(*) from public.signals) || ',' || (select count(*) from public.web_scans) || ',' || (select count(*) from public.users) || ',' || (select count(*) from public.leads) || ',' || (select count(*) from public.scans) || ',' || (select count(*) from public.mpt_score_baselines) || ',' || (select count(*) from public.conversation_states)"; }
+psql_ "$TEST_URL" -f supabase/tests/mpc-8737-backfill-fixtures.sql
+legacy_before=$(legacy_counts)
+psql_ "$TEST_URL" -At -F '|' -f supabase/backfill/mpc-8737-ledger-backfill-dryrun.sql > "${TMPDIR:-/tmp}/ledger-dry.txt"
+echo "   dry run (fixtures):"; sed 's/^/     /' "${TMPDIR:-/tmp}/ledger-dry.txt" | grep -E 'TOTAL|persons:' || true
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point where backfill_batch_id is not null")" = 0 ] || { echo "::error::the dry run wrote data"; exit 1; }
+psql_ "$TEST_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql | tail -1
+DRYFILE="${TMPDIR:-/tmp}/ledger-dry.txt" psql_ "$TEST_URL" -At -f supabase/tests/mpc-8737-backfill.test.sql
+n1=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point")
+psql_ "$TEST_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql | tail -1
+n2=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point")
+[ "$n1" = "$n2" ] || { echo "::error::apply is not idempotent ($n1 then $n2 data points)"; exit 1; }
+echo "   idempotent: second apply added nothing ($n1 data points)"
+# approving a registry default releases exactly the held rows, and nothing else
+psql_ "$TEST_URL" -c "update ledger.data_point_type set default_check_confidence = 70 where code like 'signal.%' or code = 'score.baseline.overall'"
+psql_ "$TEST_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql | tail -1
+held_released=$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point where status in ('found','clear') and confidence = 70 and provenance_extra->>'confidence_basis' = 'registry_default' and (legacy_ref like 'signals:87370000-%' or (legacy_ref like 'mpt_score_baselines:%' and value->>'score' = '61'))")
+[ "$held_released" = 3 ] || { echo "::error::releasing a default should add exactly the 2 held signals + 1 baseline, got $held_released"; exit 1; }
+echo "   releasing defaults for signals + baselines added exactly the 3 held rows"
+batches=$(psql_ "$TEST_URL" -At -c "select string_agg(backfill_batch_id::text, ',') from ledger.backfill_batch")
+for b in $(echo "$batches" | tr ',' ' '); do psql_ "$TEST_URL" -At -c "select ledger.rollback_backfill_batch('$b')" >/dev/null; done
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.data_point where backfill_batch_id is not null")" = 0 ] || { echo "::error::batch rollback left backfilled data points"; exit 1; }
+echo "   every backfilled data point reversed by batch id; legacy tables untouched"
+# the apply script refuses to run against a database that is not the throwaway one while M3 (erase parity) is missing
+psql_ "$ADMIN_URL" -c "alter database $TEST_DB rename to mpt_gate_check" >/dev/null
+GATE_URL="${base%/*}/mpt_gate_check${query}"
+if out=$(psql_ "$GATE_URL" -At -f supabase/backfill/mpc-8737-ledger-backfill-apply.sql 2>&1); then gate=ran; else gate=refused; fi
+psql_ "$ADMIN_URL" -c "alter database mpt_gate_check rename to $TEST_DB" >/dev/null
+[ "$gate" = refused ] && echo "$out" | grep -q 'M3 (erase parity) is not in place' || { echo "::error::the backfill apply script ran (or failed for another reason) on a database that is not the throwaway one, with M3 missing: $out"; exit 1; }
+[ "$(psql_ "$TEST_URL" -At -c "select count(*) from ledger.backfill_batch where created_at > now() - interval '1 minute'")" = 1 ] || true
+echo "   gate: the apply script refuses any database but the throwaway one while M3 (erase parity) is missing"
+[ "$(legacy_counts)" = "$legacy_before" ] || { echo "::error::the backfill changed a legacy table"; exit 1; }
+echo "   legacy tables unchanged by dry run, apply, re-apply and reversal ($legacy_before)"
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

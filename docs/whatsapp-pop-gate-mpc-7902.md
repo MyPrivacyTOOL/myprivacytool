@@ -9,13 +9,27 @@ No external / OSINT lookup runs on a phone number unless a web session is bound,
 inbound WhatsApp message containing a one-time code that session asked for. Flag OFF means *no phone-number scan on web*; it never
 restores a direct scan.
 
-## Interim storage (read this first)
+## Where the proof lives (MPC-8737: repointed to the data-point ledger)
 
-MPC-7898 (ledger) is a design only; MPC-7899 (handshake writer) is not accepted. The ledger tables do not exist. Per the decision to build
-on an interim proof source, proofs live in the **existing** `mpt_conversation_state` table (RLS forced, service_role only, 24 h hard life).
-No new table, no "User Engagement" table. When the ledger ships, `pop_sess:*` becomes a ledger row (person-key + `data_point`,
-source `taken`, provenance whatsapp/inbound, confidence 100) and `pop_rev:*` becomes the revocation state. `checkPossession()` is the single
-function to repoint.
+**Update 2026-10-28.** The proof and its revocation are no longer rows in `mpt_conversation_state`. They are ledger rows (design MPC-7898, built by
+MPC-8737; see `docs/data-point-ledger-v1.md`):
+
+| What | Ledger form |
+|---|---|
+| Proof (was `pop_sess:<h(token)>`) | a `phone.possession_proof` data point: source `taken`, method `webhook`, channel `whatsapp`, confidence 100, `subject_ref` = HMAC of the session token, `expires_at` = bound time + 60 min. The sender's `wa_id` is attached to a person as an identifier and becomes `proven` (proof method `inbound_code`). Value: `{inbound_ts, consent_v, consent_accepted}` |
+| Revocation (was `pop_rev:<h(wa)>`) | a `phone.possession_revoked` data point on that person, expires after 24 h. A proof bound at or before it is dead |
+
+The Worker reaches the ledger through three `service_role`-only RPCs (the `ledger` schema is not exposed to the REST API): `mpt_ledger_pop_bind`,
+`mpt_ledger_pop_check` (proof + newest revocation in one read) and `mpt_ledger_pop_revoke`. `workers/webhook-receiver/ledger-store.ts` calls them and, like
+the strict state-store functions, reports any failure as an outage (a malformed answer is an outage, not "no proof"). **`checkPossession()` is still the single
+gate and still makes every decision** (flag, consent version, target, revocation order, 60 min); the ledger only stores and returns the proof.
+
+Still in `mpt_conversation_state` (short-lived handshake bookkeeping, not claims about a person): `pop_ch:` challenge, `pop_try:` wrong-code counter,
+`pop_msg:` inbound dedup.
+
+`PHONE_SCAN_WEB_ENABLED` is unchanged and stays OFF. No go-live gate below is closed by this change.
+
+> The rest of this document describes the gate as built in MPC-7902. Where it says `pop_sess:` / `pop_rev:` read the ledger rows above.
 
 ## Lifecycle
 
@@ -64,12 +78,12 @@ still apply and are not bypassed.
 * Secrets: `POP_HMAC_SECRET` (≥32 chars, random). Optional var `WHATSAPP_BOT_NUMBER` (digits only). Existing: `META_APP_SECRET`, `DEEP_DIVE_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
 * **Behaviour change on deploy:** `start-deep-dive` now returns 403 unless a bound session is supplied, and 403 `phone_scan_disabled` while the flag is OFF. Any existing caller that posts only `{wa_id}` stops working by design.
 * Rollback: set the flag to anything but `"1"` (instant, fail closed) or revert the PR. Neither restores an unverified scan.
-* No migration. No schema change.
+* MPC-8737 adds the ledger migration (`supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql`); with it applied the gate works, without it every proof write fails closed (the person is told verification could not be completed).
 
 ## Tests
 
 `npx vitest run workers/webhook-receiver src/lib/possessionApi.test.ts` — security suite `workers/webhook-receiver/pop.vitest.ts`
-(33 cases). Every provider and the store are mocked; any unrecognised URL throws. The store fake implements expiry, ignore-duplicates
+(the original 33 cases, unchanged in intent, plus 8 ledger-contract cases from MPC-8737). Every provider and the store are mocked; any unrecognised URL throws. The store fake implements expiry, ignore-duplicates
 inserts and `DELETE … RETURNING` and yields between operations so a read-then-delete implementation would fail the concurrency test.
 Mutation checks (remove target check, revocation check, consent check, flag check, make redemption non-atomic) each fail the suite.
 
@@ -77,7 +91,7 @@ Mutation checks (remove target check, revocation check, consent check, flag chec
 
 1. Decision on the social-engineering residual above.
 2. Approved copy for the challenge page, consent text and bot replies; the real bot number set via `WHATSAPP_BOT_NUMBER`.
-3. MPC-7898 ledger build + MPC-7899 acceptance, then repoint `checkPossession` to the ledger.
+3. ~~MPC-7898 ledger build, then repoint `checkPossession` to the ledger~~ (done in MPC-8737); MPC-7899 acceptance (the first dual-writer) is still open.
 4. MPC-7904 consent / STOP / DELETE contract; MPC-7906 kill switches.
 5. Security review of this change.
 6. Live check with an explicitly authorised test number; deploy/merge approval (merging may auto-deploy — treat as a production action).

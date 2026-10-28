@@ -9,12 +9,22 @@ const ENV = { PHONE_SCAN_WEB_ENABLED: '1', POP_HMAC_SECRET: 'p'.repeat(40), DEEP
   WHATSAPP_PHONE_NUMBER_ID: '999', META_WHATSAPP_KEY: 'tok', RAPIDAPI_KEY: 'rk', RAPIDAPI_WHATSAPP_HOST: 'wa.example', SPAM_API_URL: 'https://spam.example/v1', SPAM_API_KEY: 'sk' };
 
 let msgSeq = 0;
+let ledgerProofs: Map<string, any>; let ledgerRevs: Map<string, number>;   // MPC-8737: the PoP proof lives in the ledger (RPC stand-in below)
 let metaBodies: any[]; let docs: Record<string, any>; let calls: string[]; let metaStatus: number; let spamMode: 'ok' | 'hang'; let engagement: any[]; let interactions: any[]; let tuning: any[];
 
 beforeEach(() => {
+  ledgerProofs = new Map(); ledgerRevs = new Map();
   docs = { [`whatsapp:${WA}`]: { profileName: 'Alex' } }; msgSeq = 0; calls = []; metaBodies = []; metaStatus = 200; spamMode = 'ok'; engagement = []; interactions = []; tuning = [];
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
     const url = String(input); calls.push(url);
+    const rpc = /\/rest\/v1\/rpc\/(mpt_ledger_pop_\w+)/.exec(url)?.[1];
+    if (rpc) {   // the ledger's three PoP RPCs, same contract as the SQL (supabase/migrations/20261028130000_mpc_8737_data_point_ledger_v1.sql)
+      const a = JSON.parse(init.body);
+      if (rpc === 'mpt_ledger_pop_bind') { ledgerProofs.set(a.p_sid, { wa: a.p_wa, bound_at_ms: a.p_bound_at_ms, inbound_ts: a.p_inbound_ts, consent_v: a.p_consent_v, consent_accepted: a.p_consent_accepted, exp: a.p_bound_at_ms + a.p_ttl_seconds * 1000 }); return new Response('true'); }
+      if (rpc === 'mpt_ledger_pop_revoke') { ledgerRevs.set(a.p_wa, a.p_at_ms); return new Response('true'); }
+      const p = ledgerProofs.get(a.p_sid); const live = p && p.exp > Date.now() ? p : null;
+      return new Response(JSON.stringify({ proof: live ? { wa: live.wa, bound_at_ms: live.bound_at_ms, inbound_ts: live.inbound_ts, consent_v: live.consent_v, consent_accepted: live.consent_accepted } : null, revoked_at_ms: live ? ledgerRevs.get(live.wa) ?? null : null }));
+    }
     if (url.includes('/rest/v1/mpt_conversation_state')) {   // scan / conversation state (Supabase)
       if (init.method === 'POST') {
         const row = JSON.parse(init.body);
