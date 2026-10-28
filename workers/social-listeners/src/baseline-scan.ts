@@ -1,7 +1,7 @@
 // MPC-7891 Telegram baseline scan v1 (allow-listed test accounts only, default off). After core-brain moves the sender from
 // awaiting_confirmation to confirmed (the Y to the consent question), runs getChat + getUserProfilePhotos for THE SENDER ONLY,
 // replies with a risk report (hexagons returned out of 30) and saves a snapshot to public.profile_snapshots. Wording is DRAFT pending Chris's approval (strategy 9.9, 11).
-import { ARRIVAL, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
+import { ARRIVAL, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
 import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
 import { footprintSummary, footprintLine } from "../../../shared/hexagon-registry/footprint.js";
 import { footprintLinksEnabled } from "./dashboard-link";
@@ -76,7 +76,7 @@ const result = (a: Answer): Record<string, unknown> | null => {
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
 
 export interface HexagonState { id: string; channel: "TG"; arrival: ArrivalId; state: ObservationState }
-export interface Report { risk: Risk; insights: string[]; hexagons: HexagonState[]; text: string }
+export interface Report { risk: Risk; insights: string[]; hexagons: HexagonState[]; extras: HexagonState[]; text: string }
 
 const has = (o: Record<string, unknown>, k: string): boolean => o[k] !== undefined && o[k] !== null && o[k] !== "";
 
@@ -109,6 +109,20 @@ export function hexagonStates(update: unknown, chat: Record<string, unknown>, ph
   }));
 }
 
+/**
+ * MPC-8689 pilot: the extra Telegram hexagons (channels.js TELEGRAM_EXTRA_HEXAGONS). Same states as the 30, but kept in their own list so the risk number
+ * (out of 30), the dashboard views and every score are unchanged. "returned" = the field is in this message or chat; "not_returned" = it is not (the
+ * sender did not forward, reply to a story, use an inline bot and so on). Pure.
+ */
+export function extraStates(update: unknown, chat: Record<string, unknown>): HexagonState[] {
+  const msg = ((update as { message?: Record<string, unknown> }).message ?? {}) as Record<string, unknown>;
+  const returned: Record<string, boolean> = {
+    "tg.forward_origin": has(msg, "forward_origin"), "tg.offline_send": msg.is_from_offline === true, "tg.story_reply": has(msg, "reply_to_story"),
+    "tg.via_bot": has(msg, "via_bot"), "tg.profile_audio": has(chat, "first_profile_audio"),
+  };
+  return TELEGRAM_EXTRA_HEXAGONS.map((x) => ({ id: x.id, channel: "TG" as const, arrival: x.arrival, state: !x.enabled || !(x.id in returned) ? "not_checked" : returned[x.id] ? "returned" : "not_returned" }));
+}
+
 /** One block per arrival class: "[A] Sent with every message: 7 of 8", then what came back and what did not. Not-checked hexagons are left out of the counts. */
 function hexagonLines(hexagons: HexagonState[]): string[] {
   const label = (id: string) => TELEGRAM_HEXAGONS.find((x) => x.id === id)?.label ?? id;
@@ -123,6 +137,15 @@ function hexagonLines(hexagons: HexagonState[]): string[] {
   return out;
 }
 
+/** The extra checks, in plain words and clearly outside the risk number. Only what was actually seen is listed as seen. */
+function extraLines(extras: HexagonState[]): string[] {
+  const label = (id: string) => TELEGRAM_EXTRA_HEXAGONS.find((x) => x.id === id)?.label ?? id;
+  const seen = extras.filter((x) => x.state === "returned").map((x) => label(x.id));
+  const notSeen = extras.filter((x) => x.state === "not_returned").map((x) => label(x.id));
+  if (!seen.length && !notSeen.length) return [];
+  return ["", `Extra checks (not part of your number): ${extras.filter((x) => x.state !== "not_checked").length} looked at.`, `  Seen: ${seen.join(", ") || "none"}`, ...(notSeen.length ? [`  Not in this message: ${notSeen.join(", ")}`] : [])];
+}
+
 /** Pure: builds the report from successful answers. Returns null if a required call failed (no score is ever invented). */
 export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: Answer): Report | null {
   const chat = result(chatAnswer), photos = result(photosAnswer);
@@ -130,6 +153,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
   const m = (update as { update_id?: unknown; message?: { from?: { id?: number; first_name?: string; last_name?: string; language_code?: string } } }).message?.from ?? {};
   const photoSets = Array.isArray(photos.photos) ? photos.photos : [];
   const hexagons = hexagonStates(update, chat, photoSets);
+  const extras = extraStates(update, chat);
   const got = (id: string) => hexagons.find((x) => x.id === id)?.state === "returned";
   const idNum = typeof chat.id === "number" ? chat.id : null;
   const accent = typeof chat.accent_color_id === "number" ? chat.accent_color_id : null;
@@ -156,6 +180,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
     `Telegram risk (draft test report): ${risk.returned} / ${risk.possible} - ${risk.label}`,
     `That is how many of the ${risk.possible} pieces of information Telegram could send this bot actually reached it in this check (${risk.notChecked} cannot be checked yet). Higher = more exposed. Not returned only means this bot did not receive it: it does not verify your privacy settings.`,
     ...hexagonLines(hexagons),
+    ...extraLines(extras),
     "",
     // MPC-8689: Telegram is one channel of the whole footprint. Only hexagons whose check ran here (returned or not returned) count as checked; the rest, including the web scan, are still to review.
     `Your whole footprint: ${footprintLine(footprintSummary(hexagons.filter((x) => x.state === "returned" || x.state === "not_returned").map((x) => x.id)))}. Telegram is one channel of ${footprintSummary().byChannel.length}. To check the web side too: ${SCAN_URL}`,
@@ -166,7 +191,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
     "",
     "Next: change settings yourself in Telegram > Settings > Privacy, then ask for a re-check. Risk version " + RISK_VERSION + ".",
   ].join("\n");
-  return { risk, insights, hexagons, text };
+  return { risk, insights, hexagons, extras, text };
 }
 
 async function post(env: Env, path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
@@ -220,7 +245,7 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
       consent: { state_before: "awaiting_confirmation", state_after: "confirmed", confirming_update_id: updateId, consent_text_key: "bot.first_hexagon.question" },
       consent_at: typeof date === "number" ? new Date(date * 1000).toISOString() : null,
       get_chat: redactStoredId(stripFileIds(chat), env), photos: stripFileIds(photos),
-      report: report ? { channel: "TG", risk: report.risk, never_sent: NEVER_SENT, hexagons: report.hexagons, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
+      report: report ? { channel: "TG", risk: report.risk, never_sent: NEVER_SENT, hexagons: report.hexagons, extras: report.extras, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
       expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString(),
     }, log);
     const text = report ? report.text + (footprintLinksEnabled(env) && probeIds(env).has(sender.id) ? FOOTPRINT_HINT : "") : FAILED_TEXT;

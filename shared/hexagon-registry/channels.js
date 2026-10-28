@@ -68,6 +68,20 @@ export const TELEGRAM_HEXAGONS = [
   h('group_role', 'Group membership and role', 'D', 'getChatMember (only when the bot shares a group)', 'direct', { enabled: false, disabledReason: 'Not part of the baseline scan' }),
 ];
 
+// MPC-8689 pilot: Telegram "extra" hexagons. Built and checked by the baseline scan, but NOT part of the 30 above: they stay out of the Telegram risk
+// number (risk-count-1, out of 30), the web 54 and the exposure score until the owner approves a new score version. Fields were checked against the
+// current Bot API (10.3, 2026-08-24). Each is something that only appears when the person does it (forwards, sends while away, replies to a story, uses an
+// inline bot) or sets it up (profile music), so "not returned" means "not in this message", never "protected". Not built from the discovery list:
+// edits and reactions arrive as separate updates the baseline does not read; getUserProfileAudios and ChatJoinRequest.bio could not be confirmed in the docs.
+export const TELEGRAM_EXTRA_HEXAGONS = [
+  h('forward_origin', 'Where forwards come from', 'A', 'message.forward_origin', 'direct'),
+  h('offline_send', 'Sent while away', 'A', 'message.is_from_offline', 'direct'),
+  h('story_reply', 'Story replies', 'A', 'message.reply_to_story', 'direct'),
+  h('via_bot', 'Other bots used', 'A', 'message.via_bot', 'direct'),
+  h('profile_audio', 'Profile music', 'B', 'getChat.first_profile_audio', 'direct'),
+];
+export const EXTRA_HEXAGON_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
+
 export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS };
 export const TELEGRAM_HEXAGON_COUNT = TELEGRAM_HEXAGONS.length;
 

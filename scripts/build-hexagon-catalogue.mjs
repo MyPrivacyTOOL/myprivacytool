@@ -27,12 +27,14 @@ export const CATALOGUE_VERSION = ${JSON.stringify(data.risk_tiers_approved ?? '2
 export const HEXAGON_CATALOGUE = ${JSON.stringify(rows, null, 1)};
 `;
 writeFileSync(path.join(ROOT, 'shared/hexagon-registry/catalogue.js'), js);
+const { EXTRA_HEXAGON_IDS } = await import('../shared/hexagon-registry/channels.js'); // built extras are checked, so they are not labelled "not checked yet"
+const extras = new Set(EXTRA_HEXAGON_IDS);
 
 // /footprint/ dataset: merged into the built-in web items by id (the built-in ones keep their emoji, example and confidence; this file supplies the approved risk tier).
 const shortChannel = (i) => (i.channel === 'web' ? 'Web' : i.channel_label.replace(/\s*\(.*\)$/, ''));
 const footprint = items.map((i) => ({
   id: i.id, label: i.label, group: i.group, box: shortChannel(i), channel: shortChannel(i), sens: i.risk, cap: i.reveals ?? '',
-  val: i.status === 'new' ? 'Not checked by MPT yet. Found in the platform documentation.' : '', arrival: i.arrival, status: i.status, slug: i.slug,
+  val: i.status === 'new' && !extras.has(i.id) ? 'Not checked by MPT yet. Found in the platform documentation.' : '', arrival: i.arrival, status: i.status, slug: i.slug,
 }));
 writeFileSync(path.join(ROOT, 'public/footprint/hexagons-366.json'), JSON.stringify(footprint));
 

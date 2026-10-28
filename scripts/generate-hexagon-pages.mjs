@@ -6,6 +6,9 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { HEXAGON_CATALOGUE as ITEMS, CATALOGUE_CHANNELS as CHANNELS } from '../shared/hexagon-registry/catalogue.js';
+import { EXTRA_HEXAGON_IDS } from '../shared/hexagon-registry/channels.js';
+
+const EXTRA = new Set(EXTRA_HEXAGON_IDS); // built and checked, but outside every score (MPC-8689 pilot)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BASE = '/hexagon';
@@ -101,7 +104,8 @@ ${ld ? `<script type="application/ld+json">${jsonLd(ld)}</script>` : ''}${CSS}</
 
 export function hexagonPage(i) {
   const { heads, uses } = misuse(i);
-  const checked = i.status === 'defined';
+  const extra = EXTRA.has(i.id);
+  const checked = i.status === 'defined' || extra;
   const rel = ITEMS.filter((x) => x !== i && x.channel === i.channel && x.risk === i.risk).slice(0, 8);
   const url = `${SITE_URL}${BASE}/${i.slug}/`;
   const desc = `${i.label} on ${chLabel[i.channel]} is a ${RN[i.risk].toLowerCase()}-risk fact. ${revealsText(i)}`.trim().slice(0, 240);
@@ -111,13 +115,13 @@ export function hexagonPage(i) {
     ld: { '@context': 'https://schema.org', '@type': 'Article', headline: title, description: desc, url, publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL' } },
     body: `<nav><a href="${BASE}/">All hexagons</a> › ${esc(chLabel[i.channel])}</nav>
 <div class="eyebrow">MyPrivacyTOOL · Hexagon risk page</div><h1>${esc(i.label)}</h1>
-<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span><span class="tag">${checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
+<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span><span class="tag">${extra ? 'Checked by MPT (extra check)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
 <div class="risk"><div class="hexb ${i.risk}" aria-hidden="true">${RL[i.risk]}</div><div><b>${RN[i.risk]} risk</b><p>${RDEF[i.risk]}</p></div></div>
 <h2>What it reveals</h2><p>${esc(revealsText(i))}</p>
 <h2>How easily it can be obtained</h2><p><b>${i.arrival} · ${AR[i.arrival]}.</b> ${ARX[i.arrival]}</p>
 <h2>What it could be used for</h2>${heads.length ? `<p>${esc(heads.join(' · '))}.</p>` : ''}<ul>${uses.map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
 <h2>What you can do</h2><ul>${DO[i.risk].map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
-<div class="box"><dl><dt>Hexagon id</dt><dd><code>${esc(i.id)}</code></dd><dt>Field</dt><dd>${esc(i.field || 'Not recorded yet')}</dd><dt>Access</dt><dd>${esc(i.access)}. ${esc(ACC[i.access] || '')}</dd><dt>Status</dt><dd>${checked ? 'Checked by MPT today.' : 'Found in the platform documentation. Not checked by MPT yet, and not part of any score.'}</dd>${i.source ? `<dt>Source</dt><dd><a href="${esc(i.source)}" target="_blank" rel="noopener">${esc(i.source)}</a></dd>` : ''}</dl></div>
+<div class="box"><dl><dt>Hexagon id</dt><dd><code>${esc(i.id)}</code></dd><dt>Field</dt><dd>${esc(i.field || 'Not recorded yet')}</dd><dt>Access</dt><dd>${esc(i.access)}. ${esc(ACC[i.access] || '')}</dd><dt>Status</dt><dd>${extra ? 'Checked by MPT today as an extra check. It is shown to you but is not part of your risk number or any score yet.' : checked ? 'Checked by MPT today.' : 'Found in the platform documentation. Not checked by MPT yet, and not part of any score.'}</dd>${i.source ? `<dt>Source</dt><dd><a href="${esc(i.source)}" target="_blank" rel="noopener">${esc(i.source)}</a></dd>` : ''}</dl></div>
 ${rel.length ? `<h2>Other ${RN[i.risk].toLowerCase()}-risk hexagons on ${esc(chLabel[i.channel])}</h2><div class="rel">${rel.map((x) => `<a href="${BASE}/${x.slug}/">${esc(x.label)}</a>`).join('')}</div>` : ''}
 <p style="margin-top:24px"><a href="/footprint/">See the full footprint map</a> · <a href="${BASE}/">All ${ITEMS.length} hexagons</a></p>
 <p class="note">One hexagon is one fact a channel can reveal about a person. Risk tiers were approved by the owner on 28 Oct 2026. The explanation on this page is general guidance on how this kind of information is commonly misused. It is not a statement that any specific person has been targeted.</p>`,

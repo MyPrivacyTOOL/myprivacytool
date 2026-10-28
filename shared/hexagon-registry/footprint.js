@@ -5,9 +5,11 @@
 //   toReview  = total - checked. Includes channels the person has not scanned yet.
 // Unchecked stays unchecked: this module only counts ids it is given and never guesses a result (no "clear", no "found").
 import { HEXAGON_CATALOGUE, CATALOGUE_CHANNELS } from './catalogue.js';
+import { EXTRA_HEXAGON_IDS } from './channels.js';
 
 export const FOOTPRINT_TOTAL = HEXAGON_CATALOGUE.length;
-const DEFINED = new Set(HEXAGON_CATALOGUE.filter((h) => h.status === 'defined').map((h) => h.id));
+// Checkable = defined in the code, plus the built extras (MPC-8689 pilot: checked, but outside every score). Everything else found in the discovery is never checked.
+const DEFINED = new Set([...HEXAGON_CATALOGUE.filter((h) => h.status === 'defined').map((h) => h.id), ...EXTRA_HEXAGON_IDS]);
 
 /** @param {Iterable<string>} [checkedIds] ids whose check ran (found, clear, or on Telegram returned / not returned). Unknown and not-built ids are ignored. */
 export function footprintSummary(checkedIds = []) {
