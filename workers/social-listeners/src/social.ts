@@ -4,6 +4,7 @@
 import type { Logger } from "./logger";
 import { type Env, pick } from "./shared";
 import { deleteFromHubSpot, syncToHubSpot } from "./hubspot-sync";
+import { type HexagonData, cleanData, eventTime, userFields } from "./x-hexagons";
 
 export type SocialEvent = "dm" | "follow" | "like" | "share" | "mention" | "mirror_consent";
 
@@ -25,7 +26,11 @@ export interface EventOrigin {
   occurredAt?: number;
   /** Id of the public post the event relates to (a tweet id), never text. */
   sourceRef?: string;
+  /** Hexagon values the event carried (x-hexagons.ts). Stored only when env.X_CAPTURE_HEXAGONS is "on". */
+  data?: HexagonData;
 }
+
+export const captureHexagons = (env: Env): boolean => env.X_CAPTURE_HEXAGONS === "on";
 
 /** Events older than this are not recorded: a platform replay (or an attacker's replay of a captured delivery) cannot resurrect a person who has since asked to be erased. */
 export const EVENT_MAX_AGE_MS = 72 * 3600_000;
@@ -40,7 +45,7 @@ export async function touchContact(
   try {
     const base = { p_platform: "x", p_user_id: userId, p_handle: handle ?? null, p_event: event, p_follows_us: followsUs ?? null };
     let res = await rpc(env, "mpt_social_record", {
-      ...base, p_event_key: origin.eventKey ?? null, p_source_ref: origin.sourceRef ?? null,
+      ...base, p_event_key: origin.eventKey ?? null, p_source_ref: origin.sourceRef ?? null, p_data: captureHexagons(env) ? origin.data ?? null : null,
       p_occurred_at: origin.occurredAt !== undefined && Number.isFinite(origin.occurredAt) ? new Date(origin.occurredAt).toISOString() : null,
     });
     let duplicate = false;
@@ -89,6 +94,9 @@ const str = (v: unknown): string | undefined => (typeof v === "string" || typeof
  * Follows, likes, shares and mentions aimed at the account, from the legacy Account Activity shapes (follow_events, favorite_events,
  * tweet_create_events). Our own actions are ignored. Shapes we do not recognise yield nothing (they are logged by describeShape).
  */
+const postData = (t: unknown, at: number | undefined): HexagonData | undefined =>
+  cleanData({ ...userFields(pick(t, "user")), ...eventTime(at), "x.post_text": pick(t, "text"), "x.post_language": pick(t, "lang") });
+
 export function extractEngagement(payload: unknown, self: string): Engagement[] {
   const out: Engagement[] = [];
   const list = (key: string): unknown[] => {
@@ -102,20 +110,20 @@ export function extractEngagement(payload: unknown, self: string): Engagement[] 
   for (const e of list("follow_events")) {
     if (pick(e, "type") === "follow" && str(pick(e, "target", "id")) === self) {
       const who = str(pick(e, "source", "id")), at = str(pick(e, "created_timestamp"));
-      add(who, pick(e, "source", "screen_name"), "follow", { eventKey: at ? `follow:${who}:${at}` : undefined, occurredAt: ms(at) });
+      add(who, pick(e, "source", "screen_name"), "follow", { eventKey: at ? `follow:${who}:${at}` : undefined, occurredAt: ms(at), data: cleanData({ ...userFields(pick(e, "source")), ...eventTime(ms(at)) }) });
     }
   }
   for (const e of list("favorite_events")) {
     const who = str(pick(e, "user", "id")), post = str(pick(e, "favorited_status", "id_str")), id = str(pick(e, "id"));
-    add(who, pick(e, "user", "screen_name"), "like", { eventKey: id ? `like:${id}` : post ? `like:${who}:${post}` : undefined, occurredAt: ms(pick(e, "timestamp_ms")), sourceRef: post });
+    add(who, pick(e, "user", "screen_name"), "like", { eventKey: id ? `like:${id}` : post ? `like:${who}:${post}` : undefined, occurredAt: ms(pick(e, "timestamp_ms")), sourceRef: post, data: cleanData({ ...userFields(pick(e, "user")), ...eventTime(ms(pick(e, "timestamp_ms"))) }) });
   }
   for (const t of list("tweet_create_events")) {
     const uid = str(pick(t, "user", "id")), tid = str(pick(t, "id_str"));
     const rt = pick(t, "retweeted_status", "user", "id") ?? pick(t, "quoted_status", "user", "id");
     const mentions = pick(t, "entities", "user_mentions");
     const at = ms(pick(t, "timestamp_ms"));
-    if (str(rt) === self) add(uid, pick(t, "user", "screen_name"), "share", { eventKey: tid ? `share:${tid}` : undefined, occurredAt: at, sourceRef: str(pick(t, "retweeted_status", "id_str")) ?? str(pick(t, "quoted_status", "id_str")) });
-    else if (Array.isArray(mentions) && mentions.some((m: unknown) => str(pick(m, "id")) === self)) add(uid, pick(t, "user", "screen_name"), "mention", { eventKey: tid ? `mention:${tid}` : undefined, occurredAt: at, sourceRef: str(pick(t, "in_reply_to_status_id_str")) ?? tid });
+    if (str(rt) === self) add(uid, pick(t, "user", "screen_name"), "share", { eventKey: tid ? `share:${tid}` : undefined, occurredAt: at, sourceRef: str(pick(t, "retweeted_status", "id_str")) ?? str(pick(t, "quoted_status", "id_str")), data: postData(t, at) });
+    else if (Array.isArray(mentions) && mentions.some((m: unknown) => str(pick(m, "id")) === self)) add(uid, pick(t, "user", "screen_name"), "mention", { eventKey: tid ? `mention:${tid}` : undefined, occurredAt: at, sourceRef: str(pick(t, "in_reply_to_status_id_str")) ?? tid, data: postData(t, at) });
   }
   return out;
 }

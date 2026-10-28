@@ -124,7 +124,8 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (source === 'provider') {
         const found = (s) => (s.match(/>\s*FOUND\s*</g) || []).length + (s.match(/FOUND\s*·\s*ESTIMATE/g) || []).length;
         const [sentN, builtN] = [found(html), found(built.html)];
-        if (sentN !== builtN) problems.push(`sent report and rebuilt report disagree on the number of FOUND hexagons (sent ${sentN}, rebuilt ${builtN}; fixture ${fixture.filter((f) => f.status === 'found').length})`);
+        // The sent report also carries the email-breach part, which the rebuilt copy (no breach data) cannot reproduce, so it may legitimately show MORE FOUND tags. Every web hexagon is already checked by id and value in checkReport; fewer than rebuilt means something the scan found went missing.
+        if (sentN < builtN) problems.push(`sent report shows fewer FOUND hexagons than the rebuilt one (sent ${sentN}, rebuilt ${builtN}; fixture ${fixture.filter((f) => f.status === 'found').length})`);
       }
       result.facts.report_source = source; result.facts.html_bytes = new TextEncoder().encode(html).length; ctx.html = html;
       if (problems.length) throw new Error(problems.slice(0, 5).join('; '));

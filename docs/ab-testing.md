@@ -15,12 +15,12 @@ It ships **off**: everyone sees `control` until `VITE_AB_START_CTA_ENABLED=true`
 Four independent tests on `/pricing`, all **off** until their flag is `true` on Cloudflare Pages (then redeploy). Copy needs Chris's approval first. Bucketing is per experiment, so analyse each on its own.
 | Experiment (flag) | Variants |
 |---|---|
-| `pricing_headline` (`VITE_AB_PRICING_HEADLINE_ENABLED`) | `control` "Pricing" / `free_first` "Know your exposure for free. Removal is planned." |
-| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` solid "Join the waitlist" / `outline` outline button / `notify_text` "Notify me when plans open" (paid tiers only) |
+| `pricing_headline` (`VITE_AB_PRICING_HEADLINE_ENABLED`) | `control` "Pricing" / `free_first` "Know your exposure for free. Wipe your footprints with a plan." |
+| `pricing_cta` (`VITE_AB_PRICING_CTA_ENABLED`) | `control` solid "Choose plan" / `outline` outline button / `notify_text` "Get this plan" (paid tiers only) |
 | `pricing_tiers` (`VITE_AB_PRICING_TIERS_ENABLED`) | `control` equal cards / `highlight_pro` Pro card emphasised |
 | `pricing_social_proof` (`VITE_AB_PRICING_SOCIAL_PROOF_ENABLED`) | `control` none / `above_plans` / `below_plans` trust line |
 
-- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the on-page waitlist form, MPC-7626), split by the `ab_pricing_*` dimension for the test (those events carry `ab_<experiment_id>`, not `variant_id`), divided by `experiment_exposure` for the same `experiment_id` and `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
+- Primary conversion = `pricing_waitlist_signup` / `generate_lead` (the notification sign-up in the "Paid plans are in design" pop-up, MPC-7626), split by the `ab_pricing_*` dimension for the test (those events carry `ab_<experiment_id>`, not `variant_id`), divided by `experiment_exposure` for the same `experiment_id` and `variant_id`. Both events and `pricing_plan_click` carry `ab_<experiment_id>` params for cross-test cuts. `experiment_cta_click` (plan button click) is the secondary signal. HubSpot stays the source of truth for signups.
 - Time on page and bounce rate: GA4 engagement time and engaged-session rate, broken down by the same `variant_id`.
 - Preview: `/pricing?ab_pricing_cta=outline` (forced views are never counted).
 - Social proof: no real testimonial or customer count exists, so the trust line only repeats what the Free plan states. Do not add numbers or quotes without a verified source.

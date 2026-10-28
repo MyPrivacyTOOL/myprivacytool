@@ -14,6 +14,7 @@ import { CATALOGUE_CHANNELS } from './catalogue.js';
 export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
 CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
 CHANNELS.whatsapp = { code: 'WA', label: 'WhatsApp' }; // reserved: no hexagons defined yet
+CHANNELS.x = { code: 'X', label: 'X' }; // CK-8502 (main): X keeps its short label
 
 export const ARRIVAL = {
   A: { id: 'A', label: 'Sent with every message', colour: '#1e3a8a', ring: 'solid-thick', note: 'Always arrives; nothing the person can switch off.' },
@@ -89,11 +90,43 @@ export const WEB_EXTRA_IDS = ['web.postal_area', 'web.ip_timezone', 'web.network
 export const DISCORD_EXTRA_IDS = ['dc.user_id', 'dc.names', 'dc.avatar', 'dc.server_tag', 'dc.badges', 'dc.language', 'dc.context', 'dc.member', 'dc.purchases', 'dc.command_input', 'dc.banner'];
 export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS];
 
-export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS };
+// CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
+// user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is
+// being deprecated in favour of the X Activity API; re-map the sources when we move. Same arrival classes as Telegram. Stored only when the
+// Worker flag X_CAPTURE_HEXAGONS is "on" (owner decision D1, 2026-10-28: record every data point; legal sign-off and wording change still required).
+const hx = (key, label, arrival, source, observation, extra = {}) => ({
+  id: `x.${key}`, channel: 'X', label, arrival, source, observation, enabled: true, ...extra,
+});
+export const X_HEXAGONS = [
+  // A: arrives with the event
+  hx('numeric_id', 'Numeric X id', 'A', 'user.id / source.id / sender_id', 'direct'),
+  hx('name', 'Display name', 'A', 'user.name', 'direct'),
+  hx('screen_name', '@handle', 'A', 'user.screen_name', 'direct'),
+  hx('location', 'Profile location', 'A', 'user.location', 'direct'),
+  hx('description', 'Bio', 'A', 'user.description', 'direct'),
+  hx('url', 'Profile link', 'A', 'user.url', 'direct'),
+  hx('protected', 'Protected account', 'A', 'user.protected', 'direct'),
+  hx('verified', 'Verified', 'A', 'user.verified', 'direct'),
+  hx('followers_count', 'Followers', 'A', 'user.followers_count', 'direct'),
+  hx('friends_count', 'Following', 'A', 'user.friends_count', 'direct'),
+  hx('statuses_count', 'Posts', 'A', 'user.statuses_count', 'direct'),
+  hx('profile_image', 'Profile photo address', 'A', 'user.profile_image_url_https', 'direct'),
+  hx('event_time', 'Event time', 'A', 'created_timestamp / timestamp_ms', 'direct'),
+  hx('post_text', 'Text of the post that mentions or shares us', 'A', 'tweet_create_events[].text', 'direct'),
+  hx('post_language', 'Post language', 'A', 'tweet_create_events[].lang', 'direct', { note: 'Tweet field, not shown in the docs example; absent is normal.' }),
+  hx('message_text', 'What you typed (DM)', 'A', 'message_create.message_data.text', 'direct'),
+  // B: public profile lookup (needs the bearer token and spends API credits; used today only by the Mirror, not by capture)
+  hx('lookup_profile', 'Public profile lookup', 'B', 'GET /2/users/:id', 'direct', { enabled: false, disabledReason: 'Spends API credits; not part of capture' }),
+  // D: wider lookups
+  hx('timeline', 'Recent public posts', 'D', 'GET /2/users/:id/tweets', 'direct', { enabled: false, disabledReason: 'Needs a separate decision' }),
+];
+export const X_HEXAGON_COUNT = X_HEXAGONS.length;
+
+export const CHANNEL_HEXAGONS = { TG: TELEGRAM_HEXAGONS, X: X_HEXAGONS };
 export const TELEGRAM_HEXAGON_COUNT = TELEGRAM_HEXAGONS.length;
 
 export function getChannelHexagon(id) {
-  return TELEGRAM_HEXAGONS.find((x) => x.id === id) ?? null;
+  return [...TELEGRAM_HEXAGONS, ...X_HEXAGONS].find((x) => x.id === id) ?? null;
 }
 
 /** Channel code of a hexagon id ("tg.username" -> "TG"), or null when the id is not a channel hexagon. */

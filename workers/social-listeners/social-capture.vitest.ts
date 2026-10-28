@@ -5,12 +5,13 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import { EVENT_MAX_AGE_MS, extractEngagement, stageOf } from "./src/social";
+import { cleanData } from "./src/x-hexagons";
 
 const SELF = "9000";
 const sign = (body: string) => "sha256=" + createHmac("sha256", "xs").update(body).digest("base64");
 const NOW = Date.now();
 
-interface Row { key: string | null; type: string; at: number | null; ref: string | null }
+interface Row { key: string | null; type: string; at: number | null; ref: string | null; data: Record<string, unknown> | null }
 function backend(opts: { noRecord?: boolean } = {}) {
   const contacts = new Map<string, { handle?: string; follows?: boolean; count: number; last: number; events: Row[] }>();
   const hubspot = new Map<string, Record<string, string>>();
@@ -27,7 +28,7 @@ function backend(opts: { noRecord?: boolean } = {}) {
       const key: string | null = record ? a.p_event_key ?? null : null;
       if (key && c.events.some((e) => e.key === key)) return Response.json({ duplicate: true });
       const at = record && a.p_occurred_at ? Date.parse(a.p_occurred_at) : Date.now();
-      c.events.push({ key, type: a.p_event, at: record && a.p_occurred_at ? at : null, ref: record ? a.p_source_ref ?? null : null });
+      c.events.push({ key, type: a.p_event, at: record && a.p_occurred_at ? at : null, ref: record ? a.p_source_ref ?? null : null, data: record ? a.p_data ?? null : null });
       c.count++; c.last = Math.max(c.last, at); c.handle = a.p_handle ?? c.handle; c.follows = a.p_follows_us ?? c.follows;
       contacts.set(a.p_user_id, c);
       return Response.json({ duplicate: false });
@@ -60,7 +61,7 @@ const post = (payload: object, e: object, over: Partial<{ body: string; sig: str
 };
 
 const follow = (who: string, at = NOW) => ({ type: "follow", created_timestamp: String(at), target: { id: SELF }, source: { id: who, screen_name: `u${who}` } });
-const mention = (who: string, tid: string, at = NOW) => ({ id_str: tid, timestamp_ms: String(at), text: "SECRET-MESSAGE-TEXT @MyPrivacyTOOL", user: { id: who, screen_name: `u${who}` }, entities: { user_mentions: [{ id: SELF }] }, in_reply_to_status_id_str: "5555" });
+const mention = (who: string, tid: string, at = NOW) => ({ id_str: tid, timestamp_ms: String(at), text: "SECRET-MESSAGE-TEXT @MyPrivacyTOOL", lang: "en", user: { id: who, screen_name: `u${who}`, name: "Pat", description: "bio text", followers_count: 12, verified: false, location: "Leeds" }, entities: { user_mentions: [{ id: SELF }] }, in_reply_to_status_id_str: "5555" });
 const like = (who: string, id: string, at = NOW) => ({ id, timestamp_ms: String(at), favorited_status: { id_str: "5555" }, user: { id: who, screen_name: `u${who}` } });
 
 let be: ReturnType<typeof backend>;
@@ -92,7 +93,29 @@ describe("CK-8502 signed synthetic inbound X events", () => {
     const c = be.contacts.get("113")!;
     expect(c.events.find((e) => e.type === "mention")!.ref).toBe("5555");
     expect(c.events.find((e) => e.type === "like")!.ref).toBe("5555");
-    expect(be.calls.every((x) => !x.body.includes("SECRET-MESSAGE-TEXT"))).toBe(true);
+    expect(be.calls.every((x) => !x.body.includes("SECRET-MESSAGE-TEXT"))).toBe(true);   // flag off (default): no text, no profile fields
+    expect(be.contacts.get("113")!.events.every((e) => e.data === null)).toBe(true);
+  });
+
+  it("owner decision D1, flag X_CAPTURE_HEXAGONS=on: stores the hexagon values the event carried, keyed by hexagon id; nothing is looked up", async () => {
+    await post({ for_user_id: SELF, tweet_create_events: [mention("130", "t30")], follow_events: [follow("131")] }, { ...env(), X_CAPTURE_HEXAGONS: "on" });
+    const m = be.contacts.get("130")!.events[0].data!;
+    expect(m).toMatchObject({ "x.screen_name": "u130", "x.name": "Pat", "x.description": "bio text", "x.followers_count": 12, "x.verified": false, "x.location": "Leeds", "x.post_text": "SECRET-MESSAGE-TEXT @MyPrivacyTOOL", "x.post_language": "en" });
+    expect(m["x.event_time"]).toBe(new Date(NOW).toISOString());
+    expect(Object.keys(m).every((k) => k.startsWith("x."))).toBe(true);
+    expect(be.contacts.get("131")!.events[0].data).toMatchObject({ "x.screen_name": "u131" });
+    expect(be.calls.filter((c) => /api\.(x|twitter)\.com/.test(c.url))).toEqual([]);   // no profile lookup, no scraping
+  });
+
+  it("a DM is recorded once with its platform id, and stores its text only with the flag on", async () => {
+    const dmBody = { for_user_id: SELF, users: { "140": { id: "140", name: "Sam", screen_name: "sam140" } }, direct_message_events: [{ type: "message_create", id: "dm-1", created_timestamp: String(NOW), message_create: { sender_id: "140", target: { recipient_id: SELF }, message_data: { text: "hello there" } } }] };
+    await post(dmBody, env());
+    expect(be.contacts.get("140")!.events[0]).toMatchObject({ key: "dm:dm-1", data: null });
+    await post(dmBody, { ...env(), X_CAPTURE_HEXAGONS: "on" });
+    expect(be.contacts.get("140")!.events.length).toBe(1);   // same DM id: redelivery adds nothing
+    be = backend(); vi.stubGlobal("fetch", be.fetchStub);
+    await post(dmBody, { ...env(), X_CAPTURE_HEXAGONS: "on" });
+    expect(be.contacts.get("140")!.events[0].data).toMatchObject({ "x.message_text": "hello there", "x.screen_name": "sam140", "x.name": "Sam" });
   });
 
   it("reordered delivery: an older event arriving later is counted but does not move last-seen back", async () => {
@@ -159,5 +182,14 @@ describe("CK-8502 stages and extraction", () => {
   it("builds a stable key from the platform id, so two different tweets by one person are two events", () => {
     const e = extractEngagement({ tweet_create_events: [mention("5", "a"), mention("5", "b")] }, SELF);
     expect(e.map((x) => x.eventKey)).toEqual(["mention:a", "mention:b"]);
+  });
+});
+
+describe("hexagon data is bounded and registry-only", () => {
+  it("drops unknown ids, disabled hexagons, empty values and objects; truncates long strings", () => {
+    const d = cleanData({ "x.name": "a".repeat(5000), "x.bogus": "no", "x.lookup_profile": "disabled", "x.url": "", "x.location": { nested: true }, "x.verified": true })!;
+    expect(Object.keys(d).sort()).toEqual(["x.name", "x.verified"]);
+    expect((d["x.name"] as string).length).toBe(1000);
+    expect(cleanData({ "x.bogus": 1 })).toBeUndefined();
   });
 });

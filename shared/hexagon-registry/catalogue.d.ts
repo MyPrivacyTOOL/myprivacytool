@@ -12,6 +12,9 @@ export interface CatalogueHexagon {
   status: 'defined' | 'new';
   access: string;
   source: string;
+  /** Ids in the code that build this hexagon when they differ from `id` (the CK-8502 X hexagons). */
+  code_ids?: string[];
+  note?: string;
 }
 export const CATALOGUE_CHANNELS: CatalogueChannel[];
 export const CATALOGUE_VERSION: string;
