@@ -218,6 +218,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
     ...(showBrokers ? ['PEOPLE-SEARCH SITES', 'A finding above makes these relevant. We have not searched these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.', '', ...brokerLines.flatMap((l) => [l, ''])]
       : [`US people-search removal guides (we have not searched these sites for you): ${SITE}/opt-out`, '']),
     `More removal guides: ${SITE}/opt-out`, '',
+    `Questions about this report? Read the FAQ: ${SITE}/faq`, '',
     'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
     ...(liveLink ? ['', `Keep an eye on your results: open this page and new findings appear as we find them. Keep this link private: anyone who has it can see your results: ${liveLink}`] : []),
     ...(referral ? ['', referral.text] : []),
@@ -244,6 +245,7 @@ ${para('<strong>The full data is attached.</strong> The JSON file holds every he
 ${showBrokers ? `${h2('People-search sites')}${para('A finding above makes these relevant. We have <strong>not searched</strong> these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.')}${brokerCards}`
     : para(`US people-search removal guides: <a href="${SITE}/opt-out" style="color:${BRAND}">see them on the site</a>. We have not searched these sites for you.`)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
+${para(`Questions about this report? <a href="${SITE}/faq" style="color:${BRAND}">Read the FAQ</a>.`)}
 ${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
 ${liveLink ? para('<strong>Keep an eye on your results.</strong> Open your results page and new findings appear as we find them. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
 ${referral ? referral.html : ''}

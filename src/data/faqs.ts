@@ -62,4 +62,57 @@ export const FAQS: { q: string; a: string }[] = [
     q: "What happens if I save my scan?",
     a: "If you ask for your report and tick the box to save your scan with your email, we keep it for 12 months, then delete it automatically. To have it deleted earlier, write to privacy@myprivacytool.io.",
   },
+  // MPC-7561 (MPC-7560 approved by Chris 2026-10-28): the report-email questions. Wording is the approved text; do not edit without a new approval.
+  {
+    q: "What is in my privacy report?",
+    a: "Two parts: what we found about your email address, and what your browser showed websites when you ran the scan. Each hexagon is marked FOUND, CHECKED AND CLEAR or NOT CHECKED, with the real value only where we found one. Your scan number is in it, and the full results are attached as a JSON file. Your IP address is not written in the email body; it is only in the attachment.",
+  },
+  {
+    q: "Why are some hexagons marked \"not checked\"?",
+    a: "NOT CHECKED means we make no claim. The check may have failed or been blocked, your browser may not offer that setting, or a website simply cannot see it, such as whether you are signed in to Google. We never show a placeholder as a finding and never count it as clear. It means we could not tell, not that you are safe.",
+  },
+  {
+    q: "What does \"estimate\" mean?",
+    a: "An estimate is our best guess, not something read from your device. For example, a place worked out from your IP address is often your provider's hub city, not your street. The report labels these \"our estimate, not measured\" so you can tell them apart from measured findings.",
+  },
+  {
+    q: "What do you check about my email address?",
+    a: "Seven things, only for the address you give us: known data breaches, whether your address contains your name, your mail provider and domain, public profile pictures (two services), a website ownership record for your domain, and public code changes. Only checks that ran are reported; everything else says NOT CHECKED.",
+  },
+  {
+    q: "What is my scan number?",
+    a: "When you save a scan, we give it a number. It is in your report email. If you ask us to delete a saved scan, quote it so we can find the right one without guessing.",
+  },
+  {
+    q: "How do I delete my scan?",
+    a: "Write to privacy@myprivacytool.io with your scan number or the email address you used, or reply to your report email. There is no self-service delete button yet, and we say so rather than promise one.",
+  },
+  {
+    q: "Do you sell or share my data?",
+    a: "We do not sell your personal data. We share it only with the service providers that run the product, such as hosting (Cloudflare), databases (Supabase), email (Resend, HubSpot) and analytics, as listed in the Privacy Policy. If you use help or messaging, message text may go to an AI model provider after we remove email addresses and phone numbers.",
+  },
+  {
+    q: "What is the JSON file?",
+    a: "It is attached to your report. It holds every hexagon with its full value and the technical detail that did not fit in the email, so you can open it, search it and analyse it yourself. It is your own data.",
+  },
+  {
+    q: "Why did I get this email, and how do I stop them?",
+    a: "You asked for your report. Later emails about your report come from the same request. Every email has an Unsubscribe link in the footer; using it stops further emails from us to that address. You can also reply or write to privacy@myprivacytool.io.",
+  },
+  {
+    q: "Is MyPrivacyTOOL tracking me?",
+    a: "The scan runs in your browser and does not save anything unless you ask for your report. We use Google Analytics 4 and HubSpot only if you accept them in the cookie banner. We do not recognise your device in the background, and we count visits without personal data otherwise.",
+  },
+  {
+    q: "What does \"mirror, not tracker\" mean?",
+    a: "A tracker watches you without telling you. A mirror shows you what trackers can already see. Anything we compare or recognise happens in the open, only with your consent, and is shown to you with how it was done.",
+  },
+  {
+    q: "What do you record about bots and AI crawlers?",
+    a: "When anyone loads a page we keep a log entry: time, page, the program name the visitor reported, IP address, country and network, and a few technical headers. We sort visits into person, other bot, AI crawler or unknown. For bots and AI crawlers we keep the full entry. If you were wrongly sorted as a bot, contact us and we will delete it.",
+  },
+  {
+    q: "What happens to my IP address?",
+    a: "For ordinary visits, the IP address is removed from the log after 30 days; the rest of the entry stays without it. If you save a scan, the IP address is part of the saved result for 12 months. It is never written into your report email body.",
+  },
 ];
