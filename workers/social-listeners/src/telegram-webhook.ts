@@ -6,6 +6,8 @@ import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
 import { handleFixWizard, isFixWizardUpdate } from "./fix-wizard";
 import { createEventLog } from "./event-log";
+import { captureTelegram, eraseTelegramCapture, isCaptureDelete, replyCaptureErased, telegramCaptureEnabled } from "./telegram-capture";
+import { scanAllowed } from "./baseline-scan";
 import { createLogger } from "./logger";
 import { isProbeIdRequest, isProbeSender, probeMode, replyProbeId, runTelegramProbe } from "./probe-reader";
 import { sendTelegramReply } from "./reply";
@@ -43,6 +45,20 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     if (mode === "on" && isScanStatusRequest(payload)) { await run(replyScanStatus(env, payload, log)); return done(new Response("OK")); }
     if (mode === "on" && isPhotoExifRequest(payload)) { await run(replyPhotoExif(env, payload, log)); return done(new Response("OK")); }
     if (isProbeSender(env, payload)) await run(runTelegramProbe(env, payload, log, events));
+  }
+
+  // CK-8502 (owner decision D1, default off): STOP erases what was captured for ANY private sender; capture itself records one row per message (never a STOP).
+  if (isCaptureDelete(env, payload)) {
+    const sender = (payload as { message?: { from?: { id?: unknown } } }).message?.from?.id;
+    const run = (async () => {
+      const ok = await eraseTelegramCapture(env, payload, log);
+      if (!scanAllowed(env, String(sender))) await replyCaptureErased(env, payload, ok, log); // allowed senders get the fuller reply below
+    })();
+    if (ctx?.waitUntil) ctx.waitUntil(run); else await run;
+    if (!scanAllowed(env, String(sender))) return done(new Response("OK"));
+  } else if (telegramCaptureEnabled(env)) {
+    const cap = captureTelegram(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(cap); else await cap;
   }
 
   // MPC-7894 STOP / delete my data (exact messages, senders the scan is open to): withdraws consent and deletes stored scan data; core-brain never sees it.

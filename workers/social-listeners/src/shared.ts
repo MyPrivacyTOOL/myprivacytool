@@ -4,6 +4,8 @@ export interface Env {
   X_CONSUMER_SECRET?: string;
   /** CK-8502 owner decision D1: "on" stores the hexagon values an X event carries (profile fields, post/DM text) with the event. Default off. Needs legal sign-off and the wording change first. */
   X_CAPTURE_HEXAGONS?: string;
+  /** CK-8502 owner decision D1: "on" stores the Telegram hexagon values an update carries (name, @username, language, time, message text) for private non-bot senders. Default off. Same preconditions as X_CAPTURE_HEXAGONS. */
+  TELEGRAM_CAPTURE_HEXAGONS?: string;
   /** MPC-7628 Mirror bot: app bearer token (public profile lookup) and user-context token with dm.write (DM replies). */
   X_BEARER_TOKEN?: string;
   X_USER_ACCESS_TOKEN?: string;

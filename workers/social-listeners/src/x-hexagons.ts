@@ -1,9 +1,9 @@
-// CK-8502: turns the data an X event carries into hexagon values (shared/hexagon-registry/channels.js, X_HEXAGONS). Pure: no network, no lookups.
+// CK-8502: also the shared allow-list for Telegram values (telegram-capture.ts). Turns the data an X event carries into hexagon values (shared/hexagon-registry/channels.js, X_HEXAGONS). Pure: no network, no lookups.
 // Only fields X sent in THIS event are used (nothing is fetched, nothing is scraped, nothing is matched to another account). Values are bounded.
-import { X_HEXAGONS } from "../../../shared/hexagon-registry/channels.js";
+import { TELEGRAM_HEXAGONS, X_HEXAGONS } from "../../../shared/hexagon-registry/channels.js";
 import { pick } from "./shared";
 
-const ENABLED = new Set(X_HEXAGONS.filter((h) => h.enabled).map((h) => h.id));
+const ENABLED = new Set([...X_HEXAGONS, ...TELEGRAM_HEXAGONS].filter((h) => h.enabled).map((h) => h.id));
 const MAX_STRING = 1000;
 const MAX_KEYS = 40;
 

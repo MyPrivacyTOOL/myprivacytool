@@ -8,7 +8,7 @@ import { type HexagonData, cleanData, eventTime, userFields } from "./x-hexagons
 
 export type SocialEvent = "dm" | "follow" | "like" | "share" | "mention" | "mirror_consent";
 
-const rpc = async (env: Env, fn: string, body: Record<string, unknown>): Promise<Response | null> => {
+export const rpc = async (env: Env, fn: string, body: Record<string, unknown>): Promise<Response | null> => {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return null;
   return fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {
     method: "POST",
