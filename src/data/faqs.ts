@@ -48,7 +48,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What is a data broker?",
-    a: "A data broker is a company that collects personal information about people, buys and sells it, and often publishes it in people-search sites. Our planned paid plans would ask data brokers to remove you; they are not open yet.",
+    a: "A data broker is a company that collects personal information about people, buys and sells it, and often publishes it in people-search sites. Our paid plans ask data brokers to remove you.",
   },
   {
     q: "How can I check the scan stays in my browser?",

@@ -46,7 +46,7 @@ export const EXPERIMENTS = {
     enabled: import.meta.env.VITE_AB_PRICING_HEADLINE_ENABLED === "true",
     variants: [
       { id: "control", weight: 50 }, // "Pricing"
-      { id: "free_first", weight: 50 }, // "Know your exposure for free. Removal is planned."
+      { id: "free_first", weight: 50 }, // "Know your exposure for free. Wipe your footprints with a plan."
     ],
   },
   pricing_cta: {
