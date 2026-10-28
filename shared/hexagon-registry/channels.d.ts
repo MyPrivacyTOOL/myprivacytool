@@ -23,6 +23,7 @@ export const TELEGRAM_HEXAGONS: ChannelHexagon[];
 export const TELEGRAM_EXTRA_HEXAGONS: ChannelHexagon[];
 export const TELEGRAM_EXTRA_IDS: string[];
 export const EMAIL_EXTRA_IDS: string[];
+export const WEB_EXTRA_IDS: string[];
 export const EXTRA_HEXAGON_IDS: string[];
 export const CHANNEL_HEXAGONS: Record<string, ChannelHexagon[]>;
 export const TELEGRAM_HEXAGON_COUNT: number;
