@@ -2805,9 +2805,12 @@ export const HEXAGON_CATALOGUE = [
   "label": "Account ID",
   "reveals": "Numeric ID of the sender",
   "field": "dm_event sender_id",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.numeric_id"
+  ]
  },
  {
   "id": "x.dm_text",
@@ -2819,9 +2822,13 @@ export const HEXAGON_CATALOGUE = [
   "label": "What you typed",
   "reveals": "DM text, links and quoted posts",
   "field": "text, entities, referenced_tweets",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.message_text"
+  ],
+  "note": "Partial: the message text is captured; entities and referenced posts are not."
  },
  {
   "id": "x.dm_time",
@@ -2833,9 +2840,12 @@ export const HEXAGON_CATALOGUE = [
   "label": "Message time",
   "reveals": "When the DM was sent",
   "field": "created_at",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.event_time"
+  ]
  },
  {
   "id": "x.dm_media",
@@ -2889,9 +2899,13 @@ export const HEXAGON_CATALOGUE = [
   "label": "Name and @handle",
   "reveals": "Display name and handle",
   "field": "name, username",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.name",
+   "x.screen_name"
+  ]
  },
  {
   "id": "x.account_age",
@@ -2917,9 +2931,13 @@ export const HEXAGON_CATALOGUE = [
   "label": "Bio and links",
   "reveals": "Bio text, links, hashtags, mentions",
   "field": "description, entities, url",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.description",
+   "x.url"
+  ]
  },
  {
   "id": "x.location",
@@ -2931,9 +2949,12 @@ export const HEXAGON_CATALOGUE = [
   "label": "Stated location",
   "reveals": "Free-text location",
   "field": "location",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.location"
+  ]
  },
  {
   "id": "x.photos",
@@ -2945,9 +2966,13 @@ export const HEXAGON_CATALOGUE = [
   "label": "Profile and banner image",
   "reveals": "Avatar and banner",
   "field": "profile_image_url, profile_banner_url",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.profile_image"
+  ],
+  "note": "Partial: the profile photo address is captured; the banner image is not."
  },
  {
   "id": "x.audience",
@@ -2959,9 +2984,14 @@ export const HEXAGON_CATALOGUE = [
   "label": "Audience size",
   "reveals": "Followers, following, posts, lists",
   "field": "public_metrics",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.followers_count",
+   "x.friends_count",
+   "x.statuses_count"
+  ]
  },
  {
   "id": "x.verification",
@@ -2973,9 +3003,13 @@ export const HEXAGON_CATALOGUE = [
   "label": "Verification and ID check",
   "reveals": "Verified type, ID-verified, affiliation, parody label",
   "field": "verified_type, is_identity_verified, affiliation, parody",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.verified"
+  ],
+  "note": "Partial: verified is captured; verified type, ID check, affiliation and parody are not."
  },
  {
   "id": "x.protected",
@@ -2987,9 +3021,12 @@ export const HEXAGON_CATALOGUE = [
   "label": "Private account",
   "reveals": "Whether posts are protected",
   "field": "protected",
-  "status": "new",
+  "status": "defined",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "code_ids": [
+   "x.protected"
+  ]
  },
  {
   "id": "x.recent_posts",

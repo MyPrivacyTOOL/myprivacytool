@@ -17,7 +17,8 @@ begin
   perform pg_temp.assert((select count(*) from public.hexagon_catalogue where risk = 'high') = 90, '90 high');
   perform pg_temp.assert((select count(*) from public.hexagon_catalogue where risk = 'medium') = 208, '208 medium');
   perform pg_temp.assert((select count(*) from public.hexagon_catalogue where risk = 'low') = 68, '68 low');
-  perform pg_temp.assert((select count(*) from public.hexagon_catalogue where status = 'defined') = 91, '91 defined');
+  perform pg_temp.assert((select count(*) from public.hexagon_catalogue where status = 'defined') = 101, '101 defined');
+  perform pg_temp.assert((select count(*) from public.hexagon_catalogue where code_ids <> '{}') = 10, '10 X rows map to code ids');
   perform pg_temp.assert((select count(distinct channel) from public.hexagon_catalogue) = 26, '26 channels');
   perform pg_temp.assert((select count(distinct slug) from public.hexagon_catalogue) = 366, 'slugs unique');
   perform pg_temp.assert((select relrowsecurity from pg_class where oid = 'public.hexagon_catalogue'::regclass), 'RLS enabled');
