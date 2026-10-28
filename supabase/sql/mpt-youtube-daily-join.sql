@@ -5,14 +5,14 @@
 create or replace view public.mpt_daily_metrics with (security_invoker = true) as
 with bounds as (
   select least(
-           coalesce((select min(created_at)::date from public.scans), current_date),
+           coalesce((select min(hour)::date from public.scan_hourly_counts), current_date),
            coalesce((select min(period_start)::date from public.mpt_raw_metrics), current_date)
          ) as first_day
 ),
 days as (
   select d::date as day from bounds, generate_series(bounds.first_day::timestamp, current_date::timestamp, interval '1 day') d
 ),
-scan_n as (select created_at::date as day, count(*) n from public.scans group by 1),
+scan_n as (select hour::date as day, sum(scans_created) n from public.scan_hourly_counts group by 1),
 eng_n as (
   select created_at::date as day, count(*) sessions, count(*) filter (where full_scan_completed) full_scans
   from public.mpt_user_engagement group by 1
@@ -41,7 +41,7 @@ ga_events as (
 )
 select
   days.day,
-  (select count(*) from public.scans s where s.created_at < days.day + 1)::bigint as cumulative_scans,
+  (select coalesce(sum(h.scans_created), 0) from public.scan_hourly_counts h where h.hour < days.day + 1)::bigint as cumulative_scans,
   coalesce(scan_n.n, 0)::bigint as new_scans,
   coalesce(eng_n.sessions, 0)::bigint as engagement_sessions,
   coalesce(eng_n.full_scans, 0)::bigint as engagement_full_scans,
