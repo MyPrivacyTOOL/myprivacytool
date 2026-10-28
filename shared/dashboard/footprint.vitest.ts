@@ -127,6 +127,16 @@ describe("GET /api/footprint", () => {
   });
 });
 
+describe("GET /api/footprint with the pilot extras", () => {
+  it("counts a built extra as checked, but never an unbuilt candidate or a not-checked extra", async () => {
+    const report = { hexagons: hexes, extras: [{ id: "tg.via_bot", state: "returned" }, { id: "tg.forward_origin", state: "not_returned" }, { id: "tg.story_reply", state: "not_checked" }, { id: "tg.miniapp_photo", state: "returned" }], insights: [] };
+    const mem = memoryStore(await link("footprint"), [snap({ report })]);
+    const cookie = cookieOf(await handleFootprintRedeem(post(), ENV, TOKEN, { store: mem.store }), FOOTPRINT_COOKIE);
+    const body = await (await handleFootprintData(footprintReq(cookie), ENV, { store: mem.store })).json();
+    expect(body.channels[0].checked_ids).toEqual(["tg.username", "tg.bio", "tg.via_bot", "tg.forward_origin"]);
+  });
+});
+
 describe("Supabase store", () => {
   it("passes p_scope only for a footprint link, so dashboard calls are unchanged before the migration", async () => {
     const bodies: string[] = [];

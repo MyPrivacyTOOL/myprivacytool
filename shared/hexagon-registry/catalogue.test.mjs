@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { HEXAGON_CATALOGUE, CATALOGUE_CHANNELS } from './catalogue.js';
 import { HEXAGONS, EMAIL_HEXAGONS, HEXAGON_COUNT } from './registry.js';
-import { TELEGRAM_HEXAGONS, CHANNELS, channelOfHexagon } from './channels.js';
+import { TELEGRAM_HEXAGONS, TELEGRAM_EXTRA_HEXAGONS, EXTRA_HEXAGON_IDS, CHANNELS, channelOfHexagon } from './channels.js';
 
 const count = (f, k) => HEXAGON_CATALOGUE.filter(f).reduce((m, i) => ((m[i[k]] = (m[i[k]] || 0) + 1), m), {});
 assert.equal(HEXAGON_CATALOGUE.length, 366);
@@ -23,6 +23,13 @@ const code = new Set([...HEXAGONS.map((h) => h.id), ...EMAIL_HEXAGONS.map((h) =>
 const defined = new Set(HEXAGON_CATALOGUE.filter((i) => i.status === 'defined').map((i) => i.id));
 assert.deepEqual([...defined].filter((id) => !code.has(id)), []);
 assert.deepEqual([...code].filter((id) => !defined.has(id)), []);
+// Built extras (pilot) are catalogue items still marked "new": they are not among the 91 defined and not in the 30, so no approved count moves.
+assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 5);
+for (const id of EXTRA_HEXAGON_IDS) {
+  const item = HEXAGON_CATALOGUE.find((i) => i.id === id);
+  assert.ok(item && item.status === 'new' && item.channel === 'telegram', `extra ${id} is a new Telegram catalogue item`);
+  assert.ok(!code.has(id), `extra ${id} is not in the 54 + 7 + 30`);
+}
 assert.equal(HEXAGON_COUNT, 54, 'web scan total stays 54');
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');

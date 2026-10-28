@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { footprintSummary, footprintLine, footprintChannelsLine, FOOTPRINT_TOTAL } from './footprint.js';
 import { HEXAGONS } from './registry.js';
-import { TELEGRAM_HEXAGONS } from './channels.js';
+import { TELEGRAM_HEXAGONS, EXTRA_HEXAGON_IDS } from './channels.js';
 import { HEXAGON_CATALOGUE } from './catalogue.js';
 import { scanCounts } from './counts.js';
 
@@ -23,6 +23,11 @@ assert.equal(footprintSummary(TELEGRAM_HEXAGONS.map((h) => h.id)).toReview, 336)
 const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new').id;
 const odd = footprintSummary([newId, 'not-a-hexagon', 'location', 'location']);
 assert.deepEqual([odd.checked, odd.toReview], [1, 365]);
+
+// The five built Telegram extras (MPC-8689 pilot) count as checked: Telegram 35 of 47, still outside the 30 and every score.
+const withExtras = footprintSummary([...TELEGRAM_HEXAGONS.map((h) => h.id), ...EXTRA_HEXAGON_IDS]);
+assert.deepEqual([withExtras.checked, withExtras.toReview], [35, 331]);
+assert.equal(footprintChannelsLine(withExtras), 'Telegram 35 of 47');
 
 // scanCounts exposes which hexagons were checked, without changing X, Y or Z.
 const c = scanCounts([{ id: 'location', value: 'Springfield', confirmed: true }]);
