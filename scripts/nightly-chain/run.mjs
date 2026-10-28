@@ -57,7 +57,7 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
   const synth = (env.SYNTHETIC_SCAN_URL || DEFAULTS.SYNTHETIC_SCAN_URL).replace(/\/$/, '');
   const prod = (env.PROD_SCAN_URL || DEFAULTS.PROD_SCAN_URL).replace(/\/$/, '');
   const sb = new Supabase(env, fetchImpl);
-  const email = testAddress(mode, result.day);
+  const email = testAddress(mode, /^\d{1,9}$/.test(env.MANUAL_RUN_NUMBER ?? '') ? `${result.day}m${env.MANUAL_RUN_NUMBER}` : result.day);
   if (!isTestAddress(email)) { result.notConfigured = 'refusing to run: address is not a test address'; return result; }   // belt and braces: nothing below may ever touch a real person
   const fixture = fixtureScan();
   const ctx = { email, scanNumber: null, scanId: null };
@@ -69,7 +69,7 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       const out = await res.json().catch(() => ({}));
       if (res.status === 404) throw new Error('synthetic Worker not deployed (HTTP 404)');
       if (!res.ok) throw new Error(`POST /api/scan HTTP ${res.status}${out.error ? ': ' + out.error : ''}`);
-      if (out.duplicate) throw new Error('scan answered "duplicate": a request for today\'s test address already exists (rerun tomorrow or clean up first)');
+      if (out.duplicate) throw new Error('scan answered "duplicate": a request for today\'s test address already exists (rerun tomorrow, or run it manually, which uses its own alias)');
       if (!out.success || !out.scan_saved || !out.scan_number) throw new Error('answer lacks success / scan_saved / scan_number');
       ctx.scanNumber = out.scan_number;
       return 'accepted, scan saved, scan number returned';

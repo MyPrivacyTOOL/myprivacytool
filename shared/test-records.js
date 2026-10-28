@@ -9,9 +9,9 @@ const TEST_RE = new RegExp(`^${TEST_MAILBOX}(\\+[a-z0-9._-]{1,60})?@${TEST_DOMAI
 /** True for the test mailbox and any of its plus-aliases. Case-insensitive. Never true for another address. */
 export const isTestAddress = (email) => TEST_RE.test(String(email ?? '').trim());
 
-/** The alias a given run uses. `kind` is 'nightly' or 'weekly'; `day` is YYYYMMDD in Hong Kong time. One alias per day so the 24h one-scan-per-address rule never blocks a run. */
+/** The alias a given run uses. `kind` is 'nightly' or 'weekly'; `day` is YYYYMMDD in Hong Kong time. One alias per day so the 24h one-scan-per-address rule never blocks a run; a manual (workflow_dispatch) run adds `m<run number>` so it cannot collide with the scheduled one. */
 export const testAddress = (kind, day) => {
-  if (!/^(nightly|weekly)$/.test(kind) || !/^\d{8}$/.test(day)) throw new Error('testAddress: kind must be nightly|weekly and day YYYYMMDD');
+  if (!/^(nightly|weekly)$/.test(kind) || !/^\d{8}(m\d{1,9})?$/.test(day)) throw new Error('testAddress: kind must be nightly|weekly and day YYYYMMDD (manual runs add m<run number>)');
   return `${TEST_MAILBOX}+${kind}-${day}@${TEST_DOMAIN}`;
 };
 
