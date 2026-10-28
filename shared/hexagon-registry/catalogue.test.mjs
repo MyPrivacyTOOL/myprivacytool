@@ -1,18 +1,19 @@
-// MPC-8689: the 366-hexagon catalogue matches the approved discovery and the code, and changes no existing count.
+// MPC-8689: the 368-hexagon catalogue (the 366 approved discovery items plus the 2 records-about-a-person items, owner decision 2026-10-29) matches the approved discovery and the code, and changes no existing count.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { HEXAGON_CATALOGUE, CATALOGUE_CHANNELS } from './catalogue.js';
 import { HEXAGONS, EMAIL_HEXAGONS, HEXAGON_COUNT } from './registry.js';
-import { TELEGRAM_HEXAGONS, X_HEXAGONS, TELEGRAM_EXTRA_HEXAGONS, EXTRA_HEXAGON_IDS, CHANNELS, channelOfHexagon } from './channels.js';
+import { TELEGRAM_HEXAGONS, X_HEXAGONS, TELEGRAM_EXTRA_HEXAGONS, EXTRA_HEXAGON_IDS, RECORDS_EXTRA_IDS, CHANNELS, channelOfHexagon } from './channels.js';
 
 const count = (f, k) => HEXAGON_CATALOGUE.filter(f).reduce((m, i) => ((m[i[k]] = (m[i[k]] || 0) + 1), m), {});
-assert.equal(HEXAGON_CATALOGUE.length, 366);
-assert.equal(CATALOGUE_CHANNELS.length, 26);
-assert.deepEqual(count(() => true, 'risk'), { high: 90, medium: 208, low: 68 });
-assert.deepEqual(count(() => true, 'arrival'), { A: 201, B: 92, C: 64, D: 9 });
-assert.deepEqual(count(() => true, 'group'), { Core: 188, 'Global social': 75, Asian: 74, Offline: 29 });
-assert.deepEqual(count(() => true, 'status'), { defined: 101, new: 265 });
-assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.id)).size, 366, 'ids are unique');
-assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.slug)).size, 366, 'slugs are unique');
+assert.equal(HEXAGON_CATALOGUE.length, 368);
+assert.equal(CATALOGUE_CHANNELS.length, 27);
+assert.deepEqual(count(() => true, 'risk'), { high: 92, medium: 208, low: 68 });
+assert.deepEqual(count(() => true, 'arrival'), { A: 201, B: 94, C: 64, D: 9 });
+assert.deepEqual(count(() => true, 'group'), { Core: 190, 'Global social': 75, Asian: 74, Offline: 29 });
+assert.deepEqual(count(() => true, 'status'), { defined: 101, new: 267 });
+assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.id)).size, 368, 'ids are unique');
+assert.equal(new Set(HEXAGON_CATALOGUE.map((i) => i.slug)).size, 368, 'slugs are unique');
 assert.ok(HEXAGON_CATALOGUE.every((i) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(i.slug)), 'slugs are url-safe');
 for (const c of CATALOGUE_CHANNELS) assert.ok(CHANNELS[c.key], `channel ${c.key} is in CHANNELS`);
 const perChannel = count((i) => i.channel, 'channel');
@@ -35,12 +36,23 @@ assert.deepEqual([...code].filter((id) => !covered.has(id)).sort(), ['x.lookup_p
 assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => i.channel === 'x' && i.status === 'new').map((i) => i.id).sort(), ['x.account_age', 'x.activity', 'x.dm_media', 'x.email', 'x.recent_posts', 'x.typing_read']);
 // Built extras (pilot) are catalogue items still marked "new": they are not among the 101 defined and not in the 30, so no approved count moves.
 assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 6);
-assert.equal(EXTRA_HEXAGON_IDS.length, 30); // 6 Telegram + 4 email + 9 web + 11 Discord
+assert.equal(EXTRA_HEXAGON_IDS.length, 32); // 6 Telegram + 4 email + 9 web + 11 Discord + 2 records
 for (const id of EXTRA_HEXAGON_IDS) {
   const item = HEXAGON_CATALOGUE.find((i) => i.id === id);
-  assert.ok(item && item.status === 'new' && ['telegram', 'email', 'web', 'discord'].includes(item.channel), `extra ${id} is a new Telegram, email, web or Discord catalogue item`);
+  assert.ok(item && item.status === 'new' && ['telegram', 'email', 'web', 'discord', 'brokers'].includes(item.channel), `extra ${id} is a new Telegram, email, web, Discord or records catalogue item`);
   assert.ok(!code.has(id), `extra ${id} is not in the 54 + 7 + 30`);
 }
 assert.equal(HEXAGON_COUNT, 54, 'web scan total stays 54');
+// Records about a person (owner decisions 2026-10-29): channel "Data brokers and news archives", code DB, class B, access Verify, risk high, status new.
+const brokers = HEXAGON_CATALOGUE.filter((i) => i.channel === 'brokers');
+assert.deepEqual(brokers.map((i) => i.id), ['brokers.people_search_listing', 'brokers.news_archive_mention']);
+assert.ok(brokers.every((i) => i.arrival === 'B' && i.access === 'Verify' && i.risk === 'high' && i.status === 'new'));
+assert.deepEqual(CATALOGUE_CHANNELS.find((c) => c.key === 'brokers'), { key: 'brokers', code: 'DB', label: 'Data brokers and news archives', group: 'Core' });
+assert.deepEqual([...RECORDS_EXTRA_IDS].sort(), brokers.map((i) => i.id).sort());
+// Drops and holds (2026-10-29) stay in the file with their reason; nothing is deleted. The inbound sender and mail app items are approved, built later.
+const raw = JSON.parse(readFileSync(new URL('./hexagons-366.json', import.meta.url), 'utf8')).items;
+const decided = Object.fromEntries(raw.filter((i) => i.decision).map((i) => [i.id, i.decision]));
+assert.deepEqual(decided, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped', 'tg.reactions_polls': 'dropped', 'email.inbound_signature': 'dropped', 'email.subdomains': 'held', 'tg.join_request_bio': 'held' });
+assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.decided === '2026-10-29' && i.status === 'new'));
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');

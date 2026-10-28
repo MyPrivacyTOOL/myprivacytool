@@ -1,5 +1,6 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
+import { handleRecordsCheck, isRecordsCommand } from "./records-check";
 import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
 import { handleDashboardCommand, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
@@ -59,6 +60,14 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
   } else if (telegramCaptureEnabled(env)) {
     const cap = captureTelegram(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(cap); else await cap;
+  }
+
+  // MPC-8689 records check (default off, allow-listed test accounts): "/listing <url> <term>" and "/archive <url> <term>". Fetches that one address; core-brain never sees it.
+  if (isRecordsCommand(env, payload)) {
+    const rc = handleRecordsCheck(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(rc);
+    else await rc;
+    return done(new Response("OK"));
   }
 
   // MPC-7894 STOP / delete my data (exact messages, senders the scan is open to): withdraws consent and deletes stored scan data; core-brain never sees it.

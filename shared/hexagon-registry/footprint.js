@@ -1,5 +1,5 @@
 // MPC-8689: the whole-footprint numbers, derived from the 366-hexagon catalogue. One place, so the website, the Telegram report and the PDF say the same thing.
-//   total     = every hexagon in the catalogue (366 across 26 channels). Never typed.
+//   total     = every hexagon in the catalogue (368 across 27 channels). Never typed.
 //   checked   = hexagons whose check really ran in this scan. Only "defined" catalogue items can be checked: a hexagon found in the documentation but not built
 //               ("new") is never counted as checked, so "still to review" can never be understated.
 //   toReview  = total - checked. Includes channels the person has not scanned yet.

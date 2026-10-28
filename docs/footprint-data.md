@@ -16,5 +16,5 @@ At the end of the slider (all of a channel shown), the other channels decode out
 ## Trying it
 `/footprint/?test=1` adds clearly-labelled synthetic channels (118 total) for testing. Nothing synthetic ships by default.
 
-## The 366-hexagon dataset (MPC-8689)
-`curtain.json` `"dataset": "hexagons-366.json"` loads all 366 hexagons (26 channels). Items whose `id` is already a built-in web item keep their built-in emoji, example and confidence and take only the approved risk tier (`sens`); the rest are added. Each item carries `slug`, and the panel links to `/hexagon/<slug>/`. Items with `status: "new"` are labelled "Not checked by MPT yet". Regenerate with `node scripts/build-hexagon-catalogue.mjs`.
+## The 368-hexagon dataset (MPC-8689)
+`curtain.json` `"dataset": "hexagons-366.json"` loads all 368 hexagons (27 channels: the 366 discovery items plus the 2 records-about-a-person items, owner decision 2026-10-29). Items whose `id` is already a built-in web item keep their built-in emoji, example and confidence and take only the approved risk tier (`sens`); the rest are added. Each item carries `slug`, and the panel links to `/hexagon/<slug>/`. Items with `status: "new"` are labelled "Not checked by MPT yet". Regenerate with `node scripts/build-hexagon-catalogue.mjs`.

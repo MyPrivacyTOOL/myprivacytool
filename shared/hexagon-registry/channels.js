@@ -9,7 +9,7 @@
 
 import { CATALOGUE_CHANNELS } from './catalogue.js';
 
-// MPC-8689: all 26 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
+// MPC-8689: all 27 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
 // their short labels; every other channel keeps the label from the discovery. Only Telegram has channel hexagons built (TELEGRAM_HEXAGONS below).
 export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
 CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
@@ -89,7 +89,9 @@ export const EMAIL_EXTRA_IDS = ['email.alias', 'email.address_type', 'email.saas
 export const WEB_EXTRA_IDS = ['web.postal_area', 'web.ip_timezone', 'web.network_distance', 'web.network_owner', 'web.tls_fingerprint', 'web.http_protocol', 'web.eu_region', 'web.device_model', 'web.clock_skew'];
 // Discord extras live in workers/social-listeners/src/discord-interactions.ts (DISCORD_EXTRA_HEXAGONS). The four "Their sign-in" Discord candidates (email, linked accounts, servers, Nitro and 2FA) are not built.
 export const DISCORD_EXTRA_IDS = ['dc.user_id', 'dc.names', 'dc.avatar', 'dc.server_tag', 'dc.badges', 'dc.language', 'dc.context', 'dc.member', 'dc.purchases', 'dc.command_input', 'dc.banner'];
-export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS];
+// Records about a person (MPC-8689, owner decisions 2026-10-29): the two "Data brokers and news archives" hexagons, checked from a page address the person supplies. Code: workers/social-listeners/src/records-check.ts.
+export const RECORDS_EXTRA_IDS = ['brokers.people_search_listing', 'brokers.news_archive_mention'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...RECORDS_EXTRA_IDS];
 
 // CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
 // user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is

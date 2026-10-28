@@ -11,7 +11,7 @@ const data = JSON.parse(readFileSync(path.join(ROOT, 'shared/hexagon-registry/he
 const items = data.items;
 
 // Channel code = the prefix used in the hexagon ids (tg.username -> TG). Web and email ids have no dotted prefix.
-const CODES = { web: 'WEB', email: 'EM', sms: 'SMS', whatsapp: 'WA', telegram: 'TG', x: 'X', instagram: 'IG', messenger: 'FB', linkedin: 'LI', discord: 'DC', reddit: 'RD', youtube: 'YT', github: 'GH', tiktok: 'TT', line: 'LINE', kakaotalk: 'KK', wechat: 'WC', qq: 'QQ', zalo: 'ZL', viber: 'VB', weibo: 'WB', douyin: 'DY', naver: 'NV', phone: 'CALL', fax: 'FAX', letter: 'POST' };
+const CODES = { web: 'WEB', email: 'EM', sms: 'SMS', whatsapp: 'WA', telegram: 'TG', x: 'X', instagram: 'IG', messenger: 'FB', linkedin: 'LI', discord: 'DC', reddit: 'RD', youtube: 'YT', github: 'GH', tiktok: 'TT', line: 'LINE', kakaotalk: 'KK', wechat: 'WC', qq: 'QQ', zalo: 'ZL', viber: 'VB', weibo: 'WB', douyin: 'DY', naver: 'NV', phone: 'CALL', fax: 'FAX', letter: 'POST', brokers: 'DB' };
 const channels = [];
 for (const i of items) if (!channels.find((c) => c.key === i.channel)) channels.push({ key: i.channel, code: CODES[i.channel], label: i.channel_label, group: i.group });
 if (channels.some((c) => !c.code)) throw new Error('channel without a code');

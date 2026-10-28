@@ -1,9 +1,9 @@
 # Telegram to Web handoff: one footprint count (MPC-8689, built, default off)
 
 ## Problem
-In Telegram a person sees their 30 hexagons. On the web scan they see only the 54 web ones. The whole footprint is 366 hexagons across 26 channels, so the web
+In Telegram a person sees their 30 hexagons. On the web scan they see only the 54 web ones. The whole footprint is 368 hexagons across 27 channels, so the web
 page should show what they already checked in Telegram plus the web checks, and say plainly how many are still to review.
-Example: Telegram 30 + Web 54 = **84 of 366 checked, 282 still to review**. Before the web scan finishes: 30 of 366.
+Example: Telegram 30 + Web 54 = **84 of 368 checked, 284 still to review**. Before the web scan finishes: 30 of 368.
 
 ## Rule that shapes the design
 The web page must never take the Telegram result from the address bar. A number or id list in a URL can be edited, so it would claim checks that never ran,
@@ -53,11 +53,11 @@ to `dashboard_links` and `dashboard_sessions` with values `dashboard | footprint
 2. `shared/dashboard`: `handleFootprint`, scope check in `handleData`, redirect target by scope. `functions/api/footprint.ts`. (M)
 3. Bot: `footprintLinkCommand` (issue a `footprint` link for the newest complete snapshot, rate limit like `/dashboard`), button and copy in the baseline report. (M)
 4. Web: `/scan` reads `?handoff=1`, fetches `/api/footprint`, merges into `RiskScore` and the summary card, shows the "from Telegram" label. (M)
-5. Tests: vitest for the handlers (scope refusal, one-time use, ids only, expired snapshot), footprint merge, e2e with a mocked `/api/footprint` (84 of 366 shows). (S)
+5. Tests: vitest for the handlers (scope refusal, one-time use, ids only, expired snapshot), footprint merge, e2e with a mocked `/api/footprint` (84 of 368 shows). (S)
 6. Docs: update `docs/telegram-dashboard.md` and the registry README. (S)
 
 ## Acceptance
-- A person with a Telegram scan opens the link, finishes the web scan, and sees **84 of 366 checked, 282 still to review** with Telegram 30 of 47 and Web 54 of 83.
+- A person with a Telegram scan opens the link, finishes the web scan, and sees **84 of 368 checked, 284 still to review** with Telegram 30 of 47 and Web 54 of 83.
 - The same person without a valid session sees the web-only count and no Telegram claim.
 - A `footprint` session cannot read `/api/dashboard`; the URL never contains a count or id.
 - Existing dashboard tests pass unchanged.
