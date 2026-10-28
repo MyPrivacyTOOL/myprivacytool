@@ -60,7 +60,7 @@ export async function handleXWebhook(request: Request, env: Env, ctx?: Execution
   // Follows, likes, shares and mentions go into the CRM feed. They still flow on to core-brain below.
   const engagement = me ? extractEngagement(payload, me) : [];
   if (engagement.length > 0) {
-    const noted = Promise.all(engagement.map((e) => touchContact(env, e.userId, e.handle, e.event, log, e.event === "follow" ? true : undefined)));
+    const noted = Promise.all(engagement.map((e) => touchContact(env, e.userId, e.handle, e.event, log, e.event === "follow" ? true : undefined, e)));
     if (ctx?.waitUntil) ctx.waitUntil(noted);
     else await noted;
   }
