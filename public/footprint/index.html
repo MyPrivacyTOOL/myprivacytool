@@ -340,7 +340,7 @@ function clean(raw,o){
   const s=v=>v==null?'':String(v);
   return {id:s(raw.id)||('hx-'+o),label:s(raw.label||raw.id||('Item '+(o+1))),group:s(raw.group||'Other'),box:s(raw.box||BOX_OF[raw.id]||raw.group||'Other'),cat:s(raw.cat),
     emoji:s(raw.emoji)||'⬡',ex:s(raw.ex),conf:Number(raw.conf)||0,risk:s(raw.risk),sens:['high','medium','low'].includes(raw.sens)?raw.sens:'low',
-    ch:s(raw.channel||'Web'),cap:s(raw.cap),val:s(raw.val),exposure:!!raw.exposure,state:s(raw.state),_o:o}}
+    ch:s(raw.channel||'Web'),cap:s(raw.cap),val:s(raw.val),exposure:!!raw.exposure,state:s(raw.state),slug:s(raw.slug),_o:o}}
 const cmp=(a,b)=>{for(let i=0;i<a.length;i++)if(a[i]!==b[i])return a[i]-b[i];return 0};
 function rankKey(it){const demo=START_ORDER.indexOf(it.id);if(demo>=0)return [0,demo,0,0,0];
   return [1,(it.state==='risk'||it.state==='ask')?0:1,isExposure(it)?0:1,{high:0,medium:1,low:2}[it.sens],it._o]}
@@ -535,7 +535,7 @@ function showPanel(){
     else if(s==='false'){body='You said this is not you. It is greyed out and will not come back.'}
     body=`<p>${body}</p>${ex}`;
   }
-  panel.innerHTML=`<div class="badge">${mini(s,68,it.emoji)}</div><div><div class="tag">${tag}</div><h2>${esc(title)}</h2>${s==='none'?`<p>${body}</p>`:body}<div class="acts" style="margin-top:10px">${acts}</div>${extra}</div>`;
+  panel.innerHTML=`<div class="badge">${mini(s,68,it.emoji)}</div><div><div class="tag">${tag}</div><h2>${esc(title)}</h2>${s==='none'?`<p>${body}</p>`:body}<div class="acts" style="margin-top:10px">${acts}</div>${it.slug?`<p style="margin-top:10px"><a href="/hexagon/${esc(it.slug)}/">Full risk page: what this reveals and how it could be misused</a></p>`:''}${extra}</div>`;
   panel.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>act(b.dataset.a));
 }
 function act(a){
@@ -629,8 +629,12 @@ function applyCurtain(c){
   else{vidEl.removeAttribute('src');vidEl.load()}
   openBtn.textContent=CUR.buttonLabel||'Open the curtain';
   if(CUR.dataset&&!datasetLoaded){datasetLoaded=true;
-    fetch(CUR.dataset,{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d)&&d.length&&d.length<=5000){build(d);reset()}}).catch(()=>{})}
+    fetch(CUR.dataset,{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d)&&d.length&&d.length<=5000){build(mergeDataset(d));reset()}}).catch(()=>{})}
 }
+/* MPC-8689: a dataset item with the same id as a built-in item keeps the built-in emoji, example and confidence and only supplies the fields it carries (the approved risk tier);
+   every other item is added. So the 54 web hexagons stay as they are and the other channels join them. */
+function mergeDataset(d){const byId=new Map(REG.map(r=>[r.id,r]));const out=REG.map(r=>{const x=d.find(y=>y.id===r.id);return x?{...r,sens:x.sens||r.sens,slug:x.slug}:r});
+  d.forEach(x=>{if(!byId.has(x.id))out.push(x)});return out}
 let opening=false,datasetLoaded=false;
 function openCurtain(){
   if(curtainOpen||opening)return;

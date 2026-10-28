@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { HEXAGON_CATALOGUE } from "../shared/hexagon-registry/catalogue.js";
 import { hkSpamSitemapEntry, patchRobots, readHkSpamConfig } from "./hkSpamFlag.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -104,6 +105,11 @@ function generateSitemap() {
       }),
     );
   }
+
+  // MPC-8689: the master hexagon risk page and one page per hexagon (built into dist/hexagon by generate-hexagon-pages.mjs).
+  const hexLastmod = gitLastmod("shared/hexagon-registry/hexagons-366.json");
+  entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/`, priority: "0.7", changefreq: "monthly", lastmod: hexLastmod }));
+  for (const h of HEXAGON_CATALOGUE) entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/${h.slug}/`, priority: h.risk === "high" ? "0.6" : "0.4", changefreq: "monthly", lastmod: hexLastmod }));
 
   // MPC-7446: /HongKongSpam is listed (and robots.txt un-blocked) only when the single flag in
   // src/data/hkSpam.json is true; until then it stays out of the sitemap and is disallowed.

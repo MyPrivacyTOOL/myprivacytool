@@ -19,6 +19,10 @@
   Cache-Control: public, max-age=0, must-revalidate
 /footprint/curtain.json
   Cache-Control: public, max-age=0, must-revalidate
+/footprint/hexagons-366.json
+  Cache-Control: public, max-age=0, must-revalidate
+/hexagon/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 /blog/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /media/*
@@ -44,6 +48,14 @@
   Referrer-Policy: no-referrer
   X-Robots-Tag: noindex, nofollow, noarchive
 /api/dashboard
+  Cache-Control: no-store, private
+  X-Robots-Tag: noindex, nofollow, noarchive
+# MPC-8689: the Telegram to Web footprint handoff link and its data.
+/f/*
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/api/footprint
   Cache-Control: no-store, private
   X-Robots-Tag: noindex, nofollow, noarchive
 

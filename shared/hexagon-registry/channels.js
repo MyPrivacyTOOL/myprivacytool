@@ -7,11 +7,14 @@
 //   ARRIVAL colour (this file): HOW the information reached MPT. A blue family on purpose: green already means "safe" and must never mean "was sent to us".
 // Colour is never the only clue: each arrival class also has a letter and a ring style (same rule as the tiles' glyphs).
 
-export const CHANNELS = {
-  telegram: { code: 'TG', label: 'Telegram' },
-  whatsapp: { code: 'WA', label: 'WhatsApp' }, // reserved: no hexagons defined yet
-  x: { code: 'X', label: 'X' }, // CK-8502
-};
+import { CATALOGUE_CHANNELS } from './catalogue.js';
+
+// MPC-8689: all 26 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
+// their short labels; every other channel keeps the label from the discovery. Only Telegram has channel hexagons built (TELEGRAM_HEXAGONS below).
+export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
+CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
+CHANNELS.whatsapp = { code: 'WA', label: 'WhatsApp' }; // reserved: no hexagons defined yet
+CHANNELS.x = { code: 'X', label: 'X' }; // CK-8502 (main): X keeps its short label
 
 export const ARRIVAL = {
   A: { id: 'A', label: 'Sent with every message', colour: '#1e3a8a', ring: 'solid-thick', note: 'Always arrives; nothing the person can switch off.' },
@@ -65,6 +68,20 @@ export const TELEGRAM_HEXAGONS = [
   // D: wider lookups
   h('group_role', 'Group membership and role', 'D', 'getChatMember (only when the bot shares a group)', 'direct', { enabled: false, disabledReason: 'Not part of the baseline scan' }),
 ];
+
+// MPC-8689 pilot: Telegram "extra" hexagons. Built and checked by the baseline scan, but NOT part of the 30 above: they stay out of the Telegram risk
+// number (risk-count-1, out of 30), the web 54 and the exposure score until the owner approves a new score version. Fields were checked against the
+// current Bot API (10.3, 2026-08-24). Each is something that only appears when the person does it (forwards, sends while away, replies to a story, uses an
+// inline bot) or sets it up (profile music), so "not returned" means "not in this message", never "protected". Not built from the discovery list:
+// edits and reactions arrive as separate updates the baseline does not read; getUserProfileAudios and ChatJoinRequest.bio could not be confirmed in the docs.
+export const TELEGRAM_EXTRA_HEXAGONS = [
+  h('forward_origin', 'Where forwards come from', 'A', 'message.forward_origin', 'direct'),
+  h('offline_send', 'Sent while away', 'A', 'message.is_from_offline', 'direct'),
+  h('story_reply', 'Story replies', 'A', 'message.reply_to_story', 'direct'),
+  h('via_bot', 'Other bots used', 'A', 'message.via_bot', 'direct'),
+  h('profile_audio', 'Profile music', 'B', 'getChat.first_profile_audio', 'direct'),
+];
+export const EXTRA_HEXAGON_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
 
 // CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
 // user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is

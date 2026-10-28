@@ -53,6 +53,8 @@ export interface Env {
   TELEGRAM_FIX_WIZARD?: string;
   /** MPC-7893 one-time dashboard link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "dashboard"; anything else (default) is off. */
   TELEGRAM_DASHBOARD_LINKS?: string;
+  /** MPC-8689 one-time footprint handoff link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "footprint"; anything else (default) is off. */
+  TELEGRAM_FOOTPRINT_LINKS?: string;
   /** Base URL of the dashboard site (https only). Default https://www.myprivacytool.io. */
   DASHBOARD_BASE_URL?: string;
   /** MPC-7892 Telegram DEEP username check: "on" enables it for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */
