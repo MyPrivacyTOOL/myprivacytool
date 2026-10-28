@@ -54,7 +54,7 @@ describe('hexagon registry', () => {
       network: { isp: 'Unknown ISP', connectionType: 'Unknown' },
       screen: { resolution: '1920×1080', colorDepth: 24 },
       session: { timezone: 'UTC', language: 'en-GB', referrer: 'Direct', timestamp: '2026-01-01T00:00:00Z' },
-      privacy: { doNotTrack: false, cookiesEnabled: true },
+      privacy: { doNotTrack: false, doNotTrackSupported: true, cookiesEnabled: true },
       language: { primaryLanguage: 'en-GB', languages: ['en-GB'], fallbackLanguages: [], hasLocationMismatch: false },
       orientation: { isPortrait: false, angle: 0 },
       motion: null,
