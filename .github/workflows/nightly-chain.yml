@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 30
     env:
       MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (github.event.schedule == '45 15 * * 0' && 'weekly' || 'nightly') }}
+      MANUAL_RUN_NUMBER: ${{ github.event_name == 'workflow_dispatch' && github.run_number || '' }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
       RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}

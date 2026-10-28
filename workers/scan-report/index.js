@@ -19,6 +19,7 @@ import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
 import { abOn, abVariant } from './lib/referralAb.js';
+import { followupStateEnabled, reportState, loadFindings, buildFollowUpEmailV2, handleFixed, fixedUrl } from './lib/followup.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -67,7 +68,9 @@ export default {
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
-    if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env) });
+    // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
+    if (url.pathname === '/api/fixed') return handleFixed(env, request, url, { sb: db(env) });
+    if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env), optOut: (addr, source) => optOutEverywhere(db(env), addr, source), pushHubspot: (addr) => pushEmailOptOut(env, { email: addr }) });   // MPC-7556: hard bounce / complaint -> THE opt-out
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -356,7 +359,7 @@ async function processScan(env, sb, job, fetchImpl) {
   // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
   const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
   if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
-  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
@@ -398,6 +401,7 @@ async function claimCohort(env, sb, userId) {
 // marketing-style mail without a working unsubscribe link. Stage is claimed before sending (at most once per stage).
 export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY || !env.UNSUBSCRIBE_SECRET) return { skipped: 'follow-ups need SUPABASE_SERVICE_ROLE_KEY and UNSUBSCRIBE_SECRET' };
+  if (followupStateEnabled(env)) return runFollowUpJobV2(env, fetchImpl, limit);   // MPC-7554: state-driven, every user
   const sb = db(env, fetchImpl);
   const testMode = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
   const cutoff = new Date(Date.now() - FOLLOWUP_DELAYS_MS[0]).toISOString();
@@ -423,6 +427,46 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
       out.sent++;
     } catch (e) { out.failed++; console.error(`follow-up failed for scan ${job.id}:`, String(e)); }
   }
+  return out;
+}
+
+// MPC-7554: follow-ups chosen by what was found for THIS address, for every user (no first-100 cohort gate). See lib/followup.js for the four states.
+// A report whose follow-ups can never be sent (unsubscribed, or "I have fixed this") is ended on the row (followup_stage = 2, followup_ended) so it leaves the queue
+// instead of being re-read every run. Each stage is still claimed before sending (at most once), with a Resend idempotency key.
+export async function runFollowUpJobV2(env, fetchImpl = fetch, limit = 20) {
+  const sb = db(env, fetchImpl);
+  const testMode = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
+  const cutoff = new Date(Date.now() - FOLLOWUP_DELAYS_MS[0]).toISOString();
+  const queue = await sb.select(`scans?select=id,user_id,email_scanned,report_sent_at,followup_stage,fixed_at&report_status=eq.sent&followup_stage=lt.2&report_sent_at=lt.${encodeURIComponent(cutoff)}&order=report_sent_at.asc&limit=${limit}`);
+  const out = { sent: 0, skipped: 0, failed: 0, ended: 0, states: { findings: 0, nothing_found: 0, fixed: 0, unsubscribed: 0 } };
+  for (const job of queue) {
+    try {
+      const stage = nextFollowUp(job);
+      if (!stage || !recipientAllowed(env, job.email_scanned)) { out.skipped++; continue; }
+      const user = (await sb.select(`users?id=eq.${job.user_id}&select=id,cohort_number,email_opt_out_at&limit=1`))[0];
+      if (!user) { out.skipped++; continue; }
+      const optedOut = Boolean(user.email_opt_out_at) || (await suppressedAmong(sb, [job.email_scanned])).has(String(job.email_scanned).trim().toLowerCase());
+      let findings = [];
+      if (!optedOut && !job.fixed_at) findings = await loadFindings(sb, job.id);
+      const state = reportState({ optedOut, fixedAt: job.fixed_at, foundCount: findings.length });
+      out.states[state]++;
+      if (state === 'unsubscribed' || state === 'fixed') {   // permanent: leave the queue
+        await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: 2, followup_ended: state });
+        out.ended++; continue;
+      }
+      const claimed = await sb.patch(`scans?id=eq.${job.id}&followup_stage=eq.${job.followup_stage ?? 0}`, { followup_stage: stage, followup_last_sent_at: new Date().toISOString() });
+      if (!claimed.length) continue;
+      const links = await unsubLinks(env, job.email_scanned);
+      const mail = buildFollowUpEmailV2({ stage, state, findings, fixedLink: await fixedUrl(env, job.id), unsubscribeLink: links.page, cohortNumber: user.cohort_number });
+      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(links) }, fetchImpl);
+      if (!r.sent) {                                   // release the stage so the next run retries (Resend key keeps it single-send)
+        await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: job.followup_stage ?? 0 });
+        throw new Error(`follow-up email not sent: ${r.reason}`);
+      }
+      out.sent++;
+    } catch (e) { out.failed++; console.error(`follow-up failed for scan ${job.id}:`, String(e)); }
+  }
+  console.log(`follow-ups (state-driven): ${JSON.stringify(out)}`);   // counts only
   return out;
 }
 
