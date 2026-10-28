@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Seo from "@/components/Seo";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import SubmitButton from "@/components/SubmitButton";
@@ -24,8 +25,9 @@ import {
 
 // MPC-7460: locked pricing approved Sep 23 2026 (Free / Basic / Pro / Executive). Scan allowances are
 // placeholder defaults pending review.
-// MPC-7626: there is no checkout yet, so the paid tiers join a waitlist (HubSpot, source_tag
-// "pricing-waitlist") instead of a purchase. Set VITE_HUBSPOT_PRICING_WAITLIST_FORM_ID to a dedicated
+// MPC-7626: there is no checkout yet, so choosing a paid tier opens an "in design" pop-up that signs the visitor up for
+// notification (HubSpot, source_tag "pricing-waitlist") instead of a purchase. The page copy reads as if plans are open
+// (owner direction 2026-10-28); the pop-up is where the visitor is told payment is in design. Set VITE_HUBSPOT_PRICING_WAITLIST_FORM_ID to a dedicated
 // form GUID; it needs email, plan_interest, source_tag, consent_given_at and consent_source fields.
 // Until it is set we reuse the "AI Access Check waitlist" form (same portal, has email, source_tag and
 // the consent fields) and rely on source_tag to tell the leads apart.
@@ -43,30 +45,30 @@ interface Plan {
   cta: { label: string; to: string };
 }
 
-const WAITLIST_CTA = { label: "Join the waitlist", to: `#${WAITLIST_ID}` };
+const WAITLIST_CTA = { label: "Choose plan", to: `#${WAITLIST_ID}` };
 // MPC-7502: names and prices come from public.plans (src/data/plans.generated.json); paid = any plan that costs money.
 const PAID_PLANS = PLAN_ROWS.filter((p) => p.monthly_price_cents > 0).map((p) => p.name);
 
 const FAQS: { q: string; a: string }[] = [
   {
     q: "Can I pay today?",
-    a: "Not yet. Paid plans are not open, so no payment is taken and we do not ask for card details. Join the waitlist and we will email you when they open.",
+    a: "Payment is in design. When you choose a plan we ask for your email so we can notify you when you can subscribe. No payment is taken and we do not ask for card details.",
   },
   {
     q: "Can I cancel anytime?",
-    a: "There is nothing to cancel yet. Joining the waitlist is not a purchase or a commitment, and you can unsubscribe from our emails at any time.",
+    a: "Yes. Subscribing will be cancellable at any time. Today, choosing a plan only signs you up for notification: it is not a purchase or a commitment, and you can unsubscribe from our emails at any time.",
   },
   {
-    q: "What data do you keep if I join the waitlist?",
-    a: "Your email address, the plan you are interested in, and a record of the consent you gave (date and where you gave it). We use them to tell you when paid plans open. Our Privacy Policy describes how that information is processed and your rights.",
+    q: "What data do you keep if I sign up for notification?",
+    a: "Your email address, the plan you are interested in, and a record of the consent you gave (date and where you gave it). We use them to notify you when you can subscribe. Our Privacy Policy describes how that information is processed and your rights.",
   },
   {
     q: "What would paid removal look like?",
-    a: "Paid plans are still only planned and not open. We are designing them around three things: clear terms and an easy way to stop before any card details are taken, a way for you to check for yourself afterwards that your information is gone, and a list of the sites we would contact on your behalf. None of this is available yet, and no payment is taken now.",
+    a: "Paid plans are built around three things: clear terms and an easy way to stop before any card details are taken, a way for you to check for yourself afterwards that your information is gone, and a list of the sites we contact on your behalf. Payment is in design, so choosing a plan today signs you up for notification and no payment is taken.",
   },
   {
     q: "Are the prices final?",
-    a: "They are the planned monthly prices in US dollars. Scan allowances may change before paid plans open.",
+    a: "They are the monthly prices in US dollars. Scan allowances may change before payment opens.",
   },
 ];
 
@@ -78,11 +80,11 @@ const PLANS: Plan[] = PLAN_ROWS.map((p) => ({
   cta: p.monthly_price_cents === 0 ? { label: "Check my exposure", to: "/scan" } : WAITLIST_CTA,
 }));
 
-// MPC-7638: A/B tests (docs/ab-testing.md). Every variant string below is truthful for a page with no
-// checkout yet; the trust line makes no claim beyond what the Free plan already states.
+// MPC-7638: A/B tests (docs/ab-testing.md). The variant strings read as if plans are open (owner direction 2026-10-28);
+// the pop-up on choosing a plan says payment is in design. The trust line makes no claim beyond what the Free plan already states.
 const HEADLINE = {
-  control: { h1: "Pricing", sub: "The scan is free. Paid plans are planned to remove your data from brokers and keep it off; they are not open yet." },
-  free_first: { h1: "Know your exposure for free. Removal is planned.", sub: "Paid plans are planned to remove your data from brokers and keep it off; they are not open yet." },
+  control: { h1: "Pricing", sub: "The scan is free. Paid plans help remove your data from brokers and keep it off." },
+  free_first: { h1: "Know your exposure for free. Wipe your footprints with a plan.", sub: "Paid plans help remove your data from brokers and keep it off." },
 } as const;
 const TRUST_LINE = "The scan is free and needs no credit card.";
 const PRICING_TESTS = ["pricing_headline", "pricing_cta", "pricing_tiers", "pricing_social_proof"] as const;
@@ -99,8 +101,9 @@ const Pricing = () => {
   const live = PRICING_TESTS.filter((id) => assignments[id].active);
   const liveVariants = Object.fromEntries(live.map((id) => [id, assignments[id].variantId]));
   const copy = HEADLINE[headline.variantId as keyof typeof HEADLINE] ?? HEADLINE.control;
-  // The paid buttons wrap (whitespace-normal): "Notify me when plans open" is wider than the card button at lg.
-  const paidLabel = cta.variantId === "notify_text" ? "Notify me when plans open" : WAITLIST_CTA.label;
+  // The paid buttons wrap (whitespace-normal): "Get this plan" is wider than the card button at lg.
+  const paidLabel = cta.variantId === "notify_text" ? "Get this plan" : WAITLIST_CTA.label;
+  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState(PAID_PLANS[0]);
   const [consent, setConsent] = useState(false);
@@ -126,8 +129,7 @@ const Pricing = () => {
     live.forEach((id) => trackExperimentCta(id, assignments[id].variantId));
     if (p.cta.to.startsWith("#")) {
       if (PAID_PLANS.includes(p.name)) setPlan(p.name);
-      document.getElementById(WAITLIST_ID)?.scrollIntoView?.({ behavior: "smooth" });
-      emailRef.current?.focus({ preventScroll: true });
+      setOpen(true);
     }
   };
 
@@ -170,8 +172,7 @@ const Pricing = () => {
         <h1 className="mb-2 text-4xl font-bold text-foreground">{copy.h1}</h1>
         <p className="mb-4 text-lg text-muted-foreground">{copy.sub}</p>
         <p className="mb-10 text-sm text-muted-foreground">
-          Paid plans are not open yet. Prices below are the planned prices; join the waitlist
-          and we will tell you when they open.
+          Choose the plan that fits you. Prices are in US dollars per month.
         </p>
 
         {proof.variantId === "above_plans" && <TrustLine />}
@@ -217,12 +218,15 @@ const Pricing = () => {
         </div>
         {proof.variantId === "below_plans" && <div className="mt-6"><TrustLine /></div>}
 
-        <section id={WAITLIST_ID} aria-labelledby="waitlist-heading" className="mt-12 rounded-lg border border-border p-6">
-          <h2 id="waitlist-heading" className="mb-2 text-xl font-semibold text-foreground">Join the waitlist</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Tell us which plan you want and we will email you when paid plans open. No payment is taken now.
-          </p>
-          <form onSubmit={handleSubmit} noValidate className="max-w-md space-y-4">
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent id={WAITLIST_ID} onOpenAutoFocus={(e) => { e.preventDefault(); emailRef.current?.focus(); }}>
+            <DialogHeader>
+              <DialogTitle>Paid plans are in design</DialogTitle>
+              <DialogDescription>
+                Sign up here and we will notify you when you can subscribe. No payment is taken now.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} noValidate className="max-w-md space-y-4">
             <div>
               <label htmlFor="waitlist-email" className="mb-1.5 block text-sm font-medium">Email</label>
               <Input
@@ -276,9 +280,10 @@ const Pricing = () => {
             </div>
             {consentError && <p role="alert" className="text-xs text-destructive">{consentError}</p>}
             {status === "error" && <p role="alert" className="border-l-4 border-destructive pl-3 text-xs text-foreground">{errorMsg}</p>}
-            <SubmitButton status={status} idle="Join the waitlist" loading="Joining..." success="You're on the list" />
+            <SubmitButton status={status} idle="Notify me" loading="Signing up..." success="You're on the list" />
           </form>
-        </section>
+          </DialogContent>
+        </Dialog>
 
         <section aria-labelledby="pricing-faq-heading" className="mt-12">
           <h2 id="pricing-faq-heading" className="mb-4 text-xl font-semibold text-foreground">Questions</h2>

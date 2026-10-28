@@ -23,16 +23,17 @@ describe("Pricing analytics (MPC-7376)", () => {
 
   it("fires pricing_plan_click with the plan and destination", () => {
     renderPage(<Pricing />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Join the waitlist" })[1]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Choose plan" })[1]);
     expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", {
       plan: "pro",
       cta_location: "pricing_card",
       destination: "#waitlist",
     });
+    expect(screen.getByRole("dialog", { name: "Paid plans are in design" })).toBeInTheDocument();
     expect(screen.getByLabelText("Plan")).toHaveValue("Pro");
   });
 
-  // CK-7721 C: real plan interest, the only valid price evidence while paid plans are not open. No personal data in the event.
+  // CK-7721 C: real plan interest, the only valid price evidence while payment is in design. No personal data in the event.
   it("fires pricing_plan_click for the business quote link", () => {
     renderPage(<Pricing />);
     fireEvent.click(screen.getByRole("link", { name: "Talk to us about business plans" }));
@@ -42,8 +43,8 @@ describe("Pricing analytics (MPC-7376)", () => {
   it("sends nothing and does not throw when analytics consent was not given (no gtag)", () => {
     delete window.gtag;
     renderPage(<Pricing />);
-    expect(() => fireEvent.click(screen.getAllByRole("button", { name: "Join the waitlist" })[1])).not.toThrow();
     expect(() => fireEvent.click(screen.getByRole("link", { name: "Talk to us about business plans" }))).not.toThrow();
+    expect(() => fireEvent.click(screen.getAllByRole("button", { name: "Choose plan" })[1])).not.toThrow();
     expect(gtag).not.toHaveBeenCalled();
   });
 });
@@ -56,10 +57,11 @@ describe("Pricing waitlist (MPC-7626)", () => {
     vi.stubGlobal("fetch", f);
     const user = userEvent.setup();
     renderPage(<Pricing />);
+    await user.click(screen.getAllByRole("button", { name: "Choose plan" })[2]);
     await user.type(screen.getByLabelText("Email"), "ada@example.com");
     await user.selectOptions(screen.getByLabelText("Plan"), "Executive");
     await user.click(screen.getByRole("checkbox"));
-    await user.click(screen.getAllByRole("button", { name: "Join the waitlist" }).at(-1)!);
+    await user.click(screen.getByRole("button", { name: "Notify me" }));
     await waitFor(() => expect(eventNames()).toContain("pricing_waitlist_signup"));
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toContain("/submit/246502821/");
@@ -75,8 +77,9 @@ describe("Pricing waitlist (MPC-7626)", () => {
     vi.stubGlobal("fetch", f);
     const user = userEvent.setup();
     renderPage(<Pricing />);
+    await user.click(screen.getAllByRole("button", { name: "Choose plan" })[2]);
     await user.type(screen.getByLabelText("Email"), "ada@example.com");
-    await user.click(screen.getAllByRole("button", { name: "Join the waitlist" }).at(-1)!);
+    await user.click(screen.getByRole("button", { name: "Notify me" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Tick the box");
     expect(f).not.toHaveBeenCalled();
     expect(eventNames()).not.toContain("pricing_waitlist_signup");
@@ -85,13 +88,13 @@ describe("Pricing waitlist (MPC-7626)", () => {
   it("shows the FAQ block", () => {
     renderPage(<Pricing />);
     expect(screen.getByText("Can I cancel anytime?")).toBeInTheDocument();
-    expect(screen.getByText("What data do you keep if I join the waitlist?")).toBeInTheDocument();
+    expect(screen.getByText("What data do you keep if I sign up for notification?")).toBeInTheDocument();
   });
 
-  it("explains what paid removal is planned to look like, without promising it is available", () => {
+  it("explains what paid removal looks like and says payment is in design", () => {
     renderPage(<Pricing />);
     expect(screen.getByText("What would paid removal look like?")).toBeInTheDocument();
-    expect(screen.getByText(/still only planned and not open/)).toBeInTheDocument();
+    expect(screen.getByText(/Payment is in design, so choosing a plan today/)).toBeInTheDocument();
   });
 });
 
@@ -110,10 +113,10 @@ describe("Pricing A/B tests (MPC-7638)", () => {
     // The hook reads window.location.search, not the router, so set the real URL.
     window.history.replaceState({}, "", "/pricing?ab_pricing_headline=free_first&ab_pricing_cta=notify_text&ab_pricing_social_proof=above_plans");
     renderPage(<Pricing />);
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Know your exposure for free. Removal is planned.");
-    expect(screen.getAllByRole("button", { name: "Notify me when plans open" })).toHaveLength(3);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Know your exposure for free. Wipe your footprints with a plan.");
+    expect(screen.getAllByRole("button", { name: "Get this plan" })).toHaveLength(3);
     expect(screen.getByText("The scan is free and needs no credit card.")).toBeTruthy();
-    fireEvent.click(screen.getAllByRole("button", { name: "Notify me when plans open" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Get this plan" })[0]);
     expect(eventNames()).toEqual(["pricing_view", "pricing_plan_click"]);
     expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", expect.not.objectContaining({ ab_pricing_cta: expect.anything() }));
   });
