@@ -1,5 +1,5 @@
 // @vitest-environment node
-// MPC-8689 pilot: the six extra Telegram hexagons are checked but stay outside the 30, the risk number and every score.
+// MPC-8689 pilot: the eight extra Telegram hexagons are checked but stay outside the 30, the risk number and every score.
 import { describe, expect, it } from "vitest";
 import { buildReport, extraStates, hexagonStates, riskFrom } from "./src/baseline-scan";
 import { TELEGRAM_EXTRA_IDS, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS } from "../../shared/hexagon-registry/channels.js";
@@ -10,14 +10,16 @@ const chat = (over: Record<string, unknown> = {}) => ({ id: 6000000001, first_na
 const state = (u: unknown, c: Record<string, unknown>, id: string) => extraStates(u, c).find((x) => x.id === id)?.state;
 
 describe("extra Telegram hexagons", () => {
-  it("are six, outside the 30, with ids that match the catalogue", () => {
-    expect(TELEGRAM_EXTRA_HEXAGONS).toHaveLength(6);
+  it("are eight, outside the 30, with ids that match the catalogue", () => {
+    expect(TELEGRAM_EXTRA_HEXAGONS).toHaveLength(8);
     expect(TELEGRAM_HEXAGONS).toHaveLength(30);
     expect(TELEGRAM_EXTRA_IDS.filter((id) => TELEGRAM_HEXAGONS.some((x) => x.id === id))).toEqual([]);
   });
   it("are 'returned' only when the field is really there, and 'not_returned' otherwise (never invented)", () => {
     const plain = update({});
-    for (const id of TELEGRAM_EXTRA_IDS) expect(state(plain, chat(), id)).toBe("not_returned");
+    const EVENT_DRIVEN = ["tg.edits", "tg.blocked_bot"]; // separate updates: the baseline can never see them, so it must say "not checked", never "not returned"
+    for (const id of TELEGRAM_EXTRA_IDS.filter((x) => !EVENT_DRIVEN.includes(x))) expect(state(plain, chat(), id)).toBe("not_returned");
+    for (const id of EVENT_DRIVEN) expect(state(plain, chat(), id)).toBe("not_checked");
     expect(state(update({ forward_origin: { type: "user" } }), chat(), "tg.forward_origin")).toBe("returned");
     expect(state(update({ is_from_offline: true }), chat(), "tg.offline_send")).toBe("returned");
     expect(state(update({ is_from_offline: false }), chat(), "tg.offline_send")).toBe("not_returned");
@@ -50,7 +52,7 @@ describe("extra Telegram hexagons", () => {
     expect(withExtras.hexagons.map((x) => x.id)).toEqual(hexagonStates(u, c, []).map((x) => x.id));
     expect(withExtras.risk.returned).toBe(plain.risk.returned); // extras never raise or lower the count out of 30
     expect(riskFrom(withExtras.hexagons).possible).toBe(30);
-    expect(withExtras.extras).toHaveLength(6);
+    expect(withExtras.extras).toHaveLength(8);
     expect(withExtras.hexagons.some((x) => TELEGRAM_EXTRA_IDS.includes(x.id))).toBe(false);
   });
   it("show in the report as extra checks outside the number, listing only what was seen as seen", () => {

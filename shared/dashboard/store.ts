@@ -27,6 +27,8 @@ export interface DashboardStore {
   laterSnapshot(senderId: string, afterIso: string): Promise<Read<SnapshotRow | null>>;
   latestDeepJob(senderId: string): Promise<Read<DeepJobRow | null>>;
   deepResults(jobId: string): Promise<Read<DeepResultRow[]>>;
+  /** MPC-8689: ids of the event-driven extra hexagons (tg.edits, tg.blocked_bot) that happened for this sender, unexpired. Optional so older stores keep working. */
+  eventFlags?(senderId: string): Promise<Read<string[]>>;
 }
 
 export interface DashboardEnv {
@@ -82,6 +84,10 @@ export function supabaseStore(env: DashboardEnv, fetchImpl: typeof fetch = fetch
     snapshot: (id, sender) => first<SnapshotRow>(`profile_snapshots?select=${BASELINE_COLUMNS}&id=eq.${enc(id)}&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&limit=1`),
     laterSnapshot: (sender, after) => first<SnapshotRow>(`profile_snapshots?select=${SNAPSHOT_COLUMNS}&sender_id=eq.${enc(sender)}&status=eq.complete&created_at=gt.${enc(after)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`),
     latestDeepJob: (sender) => first<DeepJobRow>(`deep_jobs?select=id,created_at,status,detector_version,finished_at,expires_at&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`),
+    eventFlags: async (sender) => {
+      const r = await get<{ flag: string }>(`telegram_event_flags?select=flag&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}`);
+      return r.ok ? { ok: true, value: r.value.map((x) => x.flag) } : r;
+    },
     deepResults: (jobId) => get<DeepResultRow>(`deep_osint_results?select=source,site_name,status,observed_at,detector_version,limitation&job_id=eq.${enc(jobId)}&order=site_name.asc`),
   };
 }
