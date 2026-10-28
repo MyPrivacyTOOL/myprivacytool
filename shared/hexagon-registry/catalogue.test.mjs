@@ -34,8 +34,8 @@ assert.deepEqual([...code].filter((id) => !covered.has(id)).sort(), ['x.lookup_p
 // Unmapped X candidates stay unbuilt (attachment, follows and likes, typing and read receipts, account age, recent posts, confirmed email).
 assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => i.channel === 'x' && i.status === 'new').map((i) => i.id).sort(), ['x.account_age', 'x.activity', 'x.dm_media', 'x.email', 'x.recent_posts', 'x.typing_read']);
 // Built extras (pilot) are catalogue items still marked "new": they are not among the 101 defined and not in the 30, so no approved count moves.
-assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 5);
-assert.equal(EXTRA_HEXAGON_IDS.length, 29); // 5 Telegram + 4 email + 9 web + 11 Discord
+assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 6);
+assert.equal(EXTRA_HEXAGON_IDS.length, 30); // 6 Telegram + 4 email + 9 web + 11 Discord
 for (const id of EXTRA_HEXAGON_IDS) {
   const item = HEXAGON_CATALOGUE.find((i) => i.id === id);
   assert.ok(item && item.status === 'new' && ['telegram', 'email', 'web', 'discord'].includes(item.channel), `extra ${id} is a new Telegram, email, web or Discord catalogue item`);
