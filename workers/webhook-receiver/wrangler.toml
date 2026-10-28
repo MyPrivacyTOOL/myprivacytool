@@ -32,7 +32,7 @@ simple = { limit = 30, period = 60 }
 # MPC-7915: ON. Top level on purpose (the deploy runs `wrangler deploy` with no --env, so [env.*] vars would not apply).
 # To switch off: set to "false" (or remove) and merge; the route then answers 404 again.
 [vars]
-LEARNING_EVENTS_ENABLED = "true"
+LEARNING_EVENTS_ENABLED = "false"
 
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
