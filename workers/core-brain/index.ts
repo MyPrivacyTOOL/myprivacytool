@@ -52,7 +52,11 @@ const WORKER = "core-brain";
 const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_KEY", "WEBHOOK_SECRET"];
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TEXT_CHARS = 500;
-const QWEN_TIMEOUT_MS = 5000;
+// Cap on the Qwen call. A slower call is abandoned and the rules classifier answers instead (intent_source "rules"), so a
+// slow outside service never makes a person wait. Measured 2026-10-29: 95% of requests finish in about 2.5 ms, but the slowest
+// 1% took 2.7 to 4.2 s waiting on external calls; the old 5 s cap let those through. Trade-off: a Qwen call that would have
+// taken 2 to 5 s now gets the rules answer.
+const QWEN_TIMEOUT_MS = 2000;
 const SUPABASE_TIMEOUT_MS = 3000;
 const DEFAULT_QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1";
 const DEFAULT_QWEN_MODEL = "qwen-plus";
