@@ -1035,7 +1035,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Sec-GPC header / navigator.globalPrivacyControl",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.device_model",
@@ -1063,7 +1066,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "CSS prefers-* media queries",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.colour_gamut",
@@ -1077,7 +1083,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "CSS color-gamut, dynamic-range",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.touch_input",
@@ -1091,7 +1100,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "navigator.maxTouchPoints, pointer/hover queries",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.private_mode",
@@ -1105,7 +1117,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "navigator.storage.estimate()",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.automation",
@@ -1119,7 +1134,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "navigator.webdriver",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.prior_permissions",
@@ -1133,7 +1151,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Permissions API query()",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.voices",
@@ -1147,7 +1168,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "speechSynthesis.getVoices()",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.media_codecs",
@@ -1161,7 +1185,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "MediaCapabilities, EME",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.gpu_adapter",
@@ -1175,7 +1202,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "navigator.gpu adapter info",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.keyboard_layout",
@@ -1189,7 +1219,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "navigator.keyboard.getLayoutMap()",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.installed_app",
@@ -1203,7 +1236,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "display-mode media query",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.multi_screen",
@@ -1217,7 +1253,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "screen.availWidth, innerWidth, screen.isExtended",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.clock_skew",
@@ -1245,7 +1284,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "isUserVerifyingPlatformAuthenticatorAvailable()",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.reverse_dns",
@@ -1273,7 +1315,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Public Tor exit list; network owner type",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "web.gps",
@@ -1287,7 +1332,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Geolocation API prompt",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 8,
+  "plan_reason": "Needs a new permission prompt; not built"
  },
  {
   "id": "web.device_names",
@@ -1301,7 +1349,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "enumerateDevices() after permission",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 8,
+  "plan_reason": "Needs a new permission prompt; not built"
  },
  {
   "id": "web.notifications",
@@ -1315,7 +1366,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Notification permission prompt",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 8,
+  "plan_reason": "Needs a new permission prompt; not built"
  },
  {
   "id": "web.contacts_clipboard",
@@ -1329,7 +1383,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Contact Picker, Clipboard, file input",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 8,
+  "plan_reason": "Needs a new permission prompt; not built"
  },
  {
   "id": "email-name",
@@ -1385,7 +1442,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Email Worker message.from, headers",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/"
+  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
+  "plan": "later",
+  "plan_decision": 9,
+  "plan_reason": "Approved for a later inbound Email Worker (docs/email-inbound-worker-plan-mpc-8689.md); not built now"
  },
  {
   "id": "email.inbound_client",
@@ -1399,7 +1459,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Email Worker headers",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/"
+  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
+  "plan": "later",
+  "plan_decision": 9,
+  "plan_reason": "Approved for a later inbound Email Worker (docs/email-inbound-worker-plan-mpc-8689.md); not built now"
  },
  {
   "id": "email.inbound_route",
@@ -1413,7 +1476,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Email Worker headers / raw",
   "status": "new",
   "access": "Verify",
-  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/"
+  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "email.inbound_signature",
@@ -1497,7 +1563,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Hashed address to Gravatar profile",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "email.saas_records",
@@ -1567,7 +1636,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Email Worker raw MIME",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/"
+  "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
+  "plan": "not_planned",
+  "plan_decision": 9,
+  "plan_reason": "Needs an inbound Email Worker or a queued domain job; not built now"
  },
  {
   "id": "email-github-commits",
@@ -1609,7 +1681,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Plain address to key server (held)",
   "status": "new",
   "access": "Owner decision",
-  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md"
+  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
+  "plan": "not_planned",
+  "plan_decision": 11,
+  "plan_reason": "Held for an owner decision"
  },
  {
   "id": "email.web_archive",
@@ -1623,7 +1698,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Plain address to archive (held)",
   "status": "new",
   "access": "Owner decision",
-  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md"
+  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
+  "plan": "not_planned",
+  "plan_decision": 11,
+  "plan_reason": "Held for an owner decision"
  },
  {
   "id": "sms.number",
@@ -1693,7 +1771,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Twilio NumMedia, MediaUrl{N}, MediaContentType{N}",
   "status": "new",
   "access": "Verify",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "sms.number_type",
@@ -1707,7 +1788,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber getNumberType",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 7,
+  "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
  },
  {
   "id": "sms.original_carrier",
@@ -1721,7 +1805,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber PhoneNumberToCarrierMapper",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 7,
+  "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
  },
  {
   "id": "sms.number_timezone",
@@ -1735,7 +1822,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber PhoneNumberToTimeZonesMapper",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 7,
+  "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
  },
  {
   "id": "sms.number_region",
@@ -1749,7 +1839,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber PhoneNumberOfflineGeocoder",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 7,
+  "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
  },
  {
   "id": "sms.line_type_live",
@@ -1763,7 +1856,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Twilio Lookup line_type_intelligence",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "sms.caller_name",
@@ -1777,7 +1873,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Twilio Lookup caller_name (CNAM)",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "sms.sim_swap",
@@ -1791,7 +1890,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Twilio Lookup sim_swap",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "sms.call_forwarding",
@@ -1805,7 +1907,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Twilio Lookup call_forwarding",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "sms.line_status",
@@ -1819,7 +1924,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Twilio Lookup line_status, reassigned_number",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "sms.other_apps",
@@ -1833,7 +1941,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Contact discovery = account probing",
   "status": "new",
   "access": "Not allowed",
-  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md"
+  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
+  "plan": "not_planned",
+  "plan_decision": 10,
+  "plan_reason": "Breaks the account-probing and scraping rules; removed from the build list permanently"
  },
  {
   "id": "wa.phone",
@@ -1847,7 +1958,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "wa_id, from",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.user_id",
@@ -1861,7 +1975,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "user_id, from_user_id",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.profile_name",
@@ -1875,7 +1992,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "contacts[].profile.name",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.username",
@@ -1889,7 +2009,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "profile.username",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.message_time",
@@ -1903,7 +2026,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].timestamp",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages"
+  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.message_text",
@@ -1917,7 +2043,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].text.body",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages"
+  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.message_type",
@@ -1931,7 +2060,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].type",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages"
+  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.forwarded",
@@ -1945,7 +2077,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Forwarded, FrequentlyForwarded",
   "status": "new",
   "access": "OK",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.ad_referral",
@@ -1959,7 +2094,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "referral / ReferralHeadline, ReferralSourceUrl, ReferralCtwaClid",
   "status": "new",
   "access": "OK",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.reply_context",
@@ -1973,7 +2111,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "context / OriginalRepliedMessageSid",
   "status": "new",
   "access": "OK",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.read_receipts",
@@ -1987,7 +2128,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "statuses[].status, timestamp",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages"
+  "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.group",
@@ -2001,7 +2145,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].group_id",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.number_change",
@@ -2015,7 +2162,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "system.type user_changed_number / user_changed_user_id",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.marketing_pref",
@@ -2029,7 +2179,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "user_preferences[].category, value",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.edits",
@@ -2043,7 +2196,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].edit, messages[].revoke",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.number_derived",
@@ -2057,7 +2213,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.contact_book",
@@ -2071,7 +2230,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Contact Book API present",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.contact_share",
@@ -2085,7 +2247,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].contacts[] (origin)",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids"
+  "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.location_share",
@@ -2099,7 +2264,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Latitude, Longitude, Address, Label",
   "status": "new",
   "access": "OK",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.flow_answers",
@@ -2113,7 +2281,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "FlowData",
   "status": "new",
   "access": "OK",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.media",
@@ -2127,7 +2298,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages[].image/document/... , MediaUrl",
   "status": "new",
   "access": "Verify",
-  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request"
+  "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
+  "plan": "not_planned",
+  "plan_decision": 1,
+  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
  },
  {
   "id": "wa.other_apps",
@@ -2141,7 +2315,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Account probing",
   "status": "new",
   "access": "Not allowed",
-  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md"
+  "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
+  "plan": "not_planned",
+  "plan_decision": 10,
+  "plan_reason": "Breaks the account-probing and scraping rules; removed from the build list permanently"
  },
  {
   "id": "tg.numeric_id",
@@ -2631,7 +2808,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "getChat.rating",
   "status": "new",
   "access": "Verify",
-  "source": "https://core.telegram.org/bots/api"
+  "source": "https://core.telegram.org/bots/api",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "tg.profile_audio",
@@ -2785,7 +2965,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "message.document / photo",
   "status": "new",
   "access": "Verify",
-  "source": "https://core.telegram.org/bots/api"
+  "source": "https://core.telegram.org/bots/api",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "tg.group_role",
@@ -2865,7 +3048,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "attachments.media_keys",
   "status": "new",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "x.activity",
@@ -2879,7 +3065,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Account Activity events",
   "status": "new",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/account-activity"
+  "source": "https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/account-activity",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "x.typing_read",
@@ -2893,7 +3082,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Account Activity typing / read events",
   "status": "new",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/account-activity"
+  "source": "https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/account-activity",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "x.names",
@@ -2925,7 +3117,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "created_at",
   "status": "new",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "x.bio",
@@ -3046,7 +3241,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "posts: created_at, lang, source, geo",
   "status": "new",
   "access": "Paid",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "plan": "not_planned",
+  "plan_decision": 4,
+  "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
  },
  {
   "id": "x.email",
@@ -3060,7 +3258,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "confirmed_email",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary"
+  "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "ig.user_id",
@@ -3074,7 +3275,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "sender.id (IGSID)",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.message",
@@ -3088,7 +3292,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "messages webhook",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.message_time",
@@ -3102,7 +3309,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "time",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.name_username",
@@ -3116,7 +3326,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "name, username",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.photo",
@@ -3130,7 +3343,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "profile_pic",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.followers",
@@ -3144,7 +3360,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "follower_count",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.relationship",
@@ -3158,7 +3377,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "is_user_follow_business, is_business_follow_user",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "ig.verified",
@@ -3172,7 +3394,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "is_verified_user",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile"
+  "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.psid",
@@ -3186,7 +3411,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "sender.id (PSID)",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages"
+  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.message",
@@ -3200,7 +3428,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "message.text, attachments, quick_reply",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages"
+  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.message_time",
@@ -3214,7 +3445,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "timestamp",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages"
+  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.ad_referral",
@@ -3228,7 +3462,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "message.referral.*",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages"
+  "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.name",
@@ -3242,7 +3479,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "first_name, last_name",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile"
+  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.photo",
@@ -3256,7 +3496,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "profile_pic",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile"
+  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.locale_timezone",
@@ -3270,7 +3513,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "locale, timezone",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile"
+  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "fb.gender",
@@ -3284,7 +3530,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "gender",
   "status": "new",
   "access": "Partner access",
-  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile"
+  "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "li.comment",
@@ -3298,7 +3547,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Comments API actor, message",
   "status": "new",
   "access": "Partner access",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 5,
+  "plan_reason": "Needs platform partner approval; not applying now"
  },
  {
   "id": "li.name",
@@ -3312,7 +3564,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "name, given_name, family_name",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2"
+  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "li.photo",
@@ -3326,7 +3581,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "picture",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2"
+  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "li.locale",
@@ -3340,7 +3598,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "locale",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2"
+  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "li.email",
@@ -3354,7 +3615,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "email, email_verified",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2"
+  "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dc.user_id",
@@ -3522,7 +3786,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "email, verified",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://discord.com/developers/docs/resources/user"
+  "source": "https://discord.com/developers/docs/resources/user",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dc.connections",
@@ -3536,7 +3803,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "connections scope",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://discord.com/developers/docs/resources/user"
+  "source": "https://discord.com/developers/docs/resources/user",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dc.servers",
@@ -3550,7 +3820,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "guilds scope",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://discord.com/developers/docs/resources/user"
+  "source": "https://discord.com/developers/docs/resources/user",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dc.nitro_mfa",
@@ -3564,7 +3837,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "premium_type, mfa_enabled",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://discord.com/developers/docs/resources/user"
+  "source": "https://discord.com/developers/docs/resources/user",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "rd.message",
@@ -3578,7 +3854,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Inbox listing: author, body, created_utc",
   "status": "new",
   "access": "Verify",
-  "source": "https://www.reddit.com/dev/api/"
+  "source": "https://www.reddit.com/dev/api/",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "rd.about",
@@ -3592,7 +3871,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "GET /user/{name}/about",
   "status": "new",
   "access": "Verify",
-  "source": "https://www.reddit.com/dev/api/"
+  "source": "https://www.reddit.com/dev/api/",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "rd.trophies",
@@ -3606,7 +3888,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "GET /api/v1/user/{name}/trophies",
   "status": "new",
   "access": "Verify",
-  "source": "https://www.reddit.com/dev/api/"
+  "source": "https://www.reddit.com/dev/api/",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "rd.history",
@@ -3620,7 +3905,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "GET /user/{name}/overview, submitted, comments",
   "status": "new",
   "access": "Owner decision",
-  "source": "https://www.reddit.com/dev/api/"
+  "source": "https://www.reddit.com/dev/api/",
+  "plan": "not_planned",
+  "plan_decision": 11,
+  "plan_reason": "Held for an owner decision"
  },
  {
   "id": "yt.comment",
@@ -3718,7 +4006,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "contentDetails.relatedPlaylists.likes",
   "status": "new",
   "access": "Verify",
-  "source": "https://developers.google.com/youtube/v3/docs/channels"
+  "source": "https://developers.google.com/youtube/v3/docs/channels",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "gh.sender",
@@ -3760,7 +4051,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "push payload commits",
   "status": "new",
   "access": "Verify",
-  "source": "https://docs.github.com/en/webhooks/webhook-events-and-payloads"
+  "source": "https://docs.github.com/en/webhooks/webhook-events-and-payloads",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "gh.profile",
@@ -3830,7 +4124,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "read:user scope",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://docs.github.com/en/rest/users/users"
+  "source": "https://docs.github.com/en/rest/users/users",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "tt.ids",
@@ -3844,7 +4141,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "open_id, union_id",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info"
+  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "tt.name_photo",
@@ -3858,7 +4158,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "display_name, avatar_url",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info"
+  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "tt.profile",
@@ -3872,7 +4175,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "username, bio_description, profile_deep_link, is_verified",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info"
+  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "tt.stats",
@@ -3886,7 +4192,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "follower_count, following_count, likes_count, video_count",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info"
+  "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "line.user_id",
@@ -4012,7 +4321,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "LINE Login email scope (ID token)",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.line.biz/en/docs/line-login/integrate-line-login/"
+  "source": "https://developers.line.biz/en/docs/line-login/integrate-line-login/",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "line.profile_plus",
@@ -4026,7 +4338,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "LINE Profile+",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.line.biz/en/docs/line-login/integrate-line-login/"
+  "source": "https://developers.line.biz/en/docs/line-login/integrate-line-login/",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.bot_user_key",
@@ -4124,7 +4439,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "properties.appUserId (if app key set)",
   "status": "new",
   "access": "Verify",
-  "source": "https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format"
+  "source": "https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "kk.linked_at",
@@ -4152,7 +4470,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "kakao_account.profile.*",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.email",
@@ -4166,7 +4487,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "kakao_account.email, is_email_verified",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.name",
@@ -4180,7 +4504,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "kakao_account.name",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.age",
@@ -4194,7 +4521,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "age_range, birthyear",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.birthday",
@@ -4208,7 +4538,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "birthday, birthday_type, is_leap_month",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.gender",
@@ -4222,7 +4555,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "kakao_account.gender",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.phone",
@@ -4236,7 +4572,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "kakao_account.phone_number",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.ci",
@@ -4250,7 +4589,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "kakao_account.ci, ci_authenticated_at",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "kk.shipping",
@@ -4264,7 +4606,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "shipping_addresses[]",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api"
+  "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "wc.openid",
@@ -4362,7 +4707,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "unionid",
   "status": "new",
   "access": "Verify",
-  "source": "https://developers.weixin.qq.com/doc/service/api/usermanage/userinfo/api_userinfo.html"
+  "source": "https://developers.weixin.qq.com/doc/service/api/usermanage/userinfo/api_userinfo.html",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "wc.location",
@@ -4404,7 +4752,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "content, attachments",
   "status": "new",
   "access": "Verify",
-  "source": "https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/c2c_message_create.html"
+  "source": "https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/c2c_message_create.html",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "qq.friend_state",
@@ -4488,7 +4839,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "is_sensitive",
   "status": "new",
   "access": "Verify",
-  "source": "https://docs.zaloplatforms.com/docs/OA/quan-ly/quan-ly-thong-tin-nguoi-dung/truy-xuat-chi-tiet-nguoi-dung"
+  "source": "https://docs.zaloplatforms.com/docs/OA/quan-ly/quan-ly-thong-tin-nguoi-dung/truy-xuat-chi-tiet-nguoi-dung",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "zl.shared_info",
@@ -4726,7 +5080,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "users/show: screen_name, description, profile_image_url, verified_reason",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://open.weibo.com/wiki/2/users/show/en"
+  "source": "https://open.weibo.com/wiki/2/users/show/en",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "wb.place",
@@ -4740,7 +5097,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "province, city, location",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://open.weibo.com/wiki/2/users/show/en"
+  "source": "https://open.weibo.com/wiki/2/users/show/en",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "wb.gender",
@@ -4754,7 +5114,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "gender",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://open.weibo.com/wiki/2/users/show/en"
+  "source": "https://open.weibo.com/wiki/2/users/show/en",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "wb.stats",
@@ -4768,7 +5131,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "followers_count, friends_count, statuses_count, created_at",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://open.weibo.com/wiki/2/users/show/en"
+  "source": "https://open.weibo.com/wiki/2/users/show/en",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "wb.latest_post",
@@ -4782,7 +5148,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "status: text, geo, source",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://open.weibo.com/wiki/2/users/show/en"
+  "source": "https://open.weibo.com/wiki/2/users/show/en",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dy.ids",
@@ -4796,7 +5165,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "open_id, union_id",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info"
+  "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dy.name_photo",
@@ -4810,7 +5182,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "nickname, avatar, description",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info"
+  "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "dy.place",
@@ -4824,7 +5199,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "country, province, city",
   "status": "new",
   "access": "Verify",
-  "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info"
+  "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info",
+  "plan": "not_planned",
+  "plan_decision": 3,
+  "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
  },
  {
   "id": "nv.id",
@@ -4838,7 +5216,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/id",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "nv.name",
@@ -4852,7 +5233,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/name, nickname",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "nv.email",
@@ -4866,7 +5250,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/email",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "nv.age",
@@ -4880,7 +5267,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/age, birthday, birthyear",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "nv.gender",
@@ -4894,7 +5284,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/gender",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "nv.photo",
@@ -4908,7 +5301,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/profile_image",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "nv.mobile",
@@ -4922,7 +5318,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "response/mobile",
   "status": "new",
   "access": "Their sign-in",
-  "source": "https://developers.naver.com/docs/login/profile/profile.md"
+  "source": "https://developers.naver.com/docs/login/profile/profile.md",
+  "plan": "not_planned",
+  "plan_decision": 6,
+  "plan_reason": "The person must sign in with the platform; no sign-in flows now"
  },
  {
   "id": "call.number",
@@ -4936,7 +5335,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "From, Caller",
   "status": "new",
   "access": "OK",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.area",
@@ -4950,7 +5352,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "CallerCity, CallerState, CallerZip, CallerCountry",
   "status": "new",
   "access": "OK",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.verified",
@@ -4964,7 +5369,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "StirVerstat",
   "status": "new",
   "access": "OK",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.forwarded",
@@ -4978,7 +5386,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "ForwardedFrom, DIV PASSporT",
   "status": "new",
   "access": "Verify",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.voice",
@@ -4992,7 +5403,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Call audio, Record, Gather speech",
   "status": "new",
   "access": "OK",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.keys",
@@ -5006,7 +5420,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Gather Digits",
   "status": "new",
   "access": "OK",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.time",
@@ -5020,7 +5437,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "CallSid timestamps, CallDuration",
   "status": "new",
   "access": "OK",
-  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md"
+  "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.line_type",
@@ -5034,7 +5454,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Lookup line_type_intelligence",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.carrier",
@@ -5048,7 +5471,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Lookup line_type_intelligence.carrier_name",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.caller_name",
@@ -5062,7 +5488,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Lookup caller_name",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.number_region",
@@ -5076,7 +5505,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "call.sim_swap",
@@ -5090,7 +5522,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Lookup sim_swap",
   "status": "new",
   "access": "Owner decision",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 11,
+  "plan_reason": "Held for an owner decision"
  },
  {
   "id": "fax.number",
@@ -5104,7 +5539,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "from (caller ID)",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.telnyx.com/docs/programmable-fax/receiving-webhooks"
+  "source": "https://developers.telnyx.com/docs/programmable-fax/receiving-webhooks",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "fax.tsi",
@@ -5118,7 +5556,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "T.30 TSI frame",
   "status": "new",
   "access": "OK",
-  "source": "https://www.itu.int/rec/dologin_pub.asp?lang=s&id=T-REC-T.30-199904-S!!PDF-E&type=items"
+  "source": "https://www.itu.int/rec/dologin_pub.asp?lang=s&id=T-REC-T.30-199904-S!!PDF-E&type=items",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "fax.header",
@@ -5132,7 +5573,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Page header (TSI plus machine clock)",
   "status": "new",
   "access": "OK",
-  "source": "https://www.fax.plus/blog/glossary/csid-vs-tsid"
+  "source": "https://www.fax.plus/blog/glossary/csid-vs-tsid",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "fax.pages",
@@ -5146,7 +5590,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "media_url, page_count",
   "status": "new",
   "access": "OK",
-  "source": "https://developers.telnyx.com/docs/programmable-fax/receiving-webhooks"
+  "source": "https://developers.telnyx.com/docs/programmable-fax/receiving-webhooks",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "fax.clock",
@@ -5160,7 +5607,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Header timestamp vs receive time",
   "status": "new",
   "access": "Verify",
-  "source": "https://www.fax.plus/blog/glossary/csid-vs-tsid"
+  "source": "https://www.fax.plus/blog/glossary/csid-vs-tsid",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "fax.number_region",
@@ -5174,7 +5624,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "libphonenumber",
   "status": "new",
   "access": "OK",
-  "source": "https://github.com/google/libphonenumber"
+  "source": "https://github.com/google/libphonenumber",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "fax.line_type",
@@ -5188,7 +5641,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Lookup line_type_intelligence",
   "status": "new",
   "access": "Paid",
-  "source": "https://www.twilio.com/docs/lookup/v2-api"
+  "source": "https://www.twilio.com/docs/lookup/v2-api",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.return_address",
@@ -5202,7 +5658,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Envelope back or top-left",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.postmark",
@@ -5216,7 +5675,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Postmark or cancellation",
   "status": "new",
   "access": "OK",
-  "source": "https://pe.usps.com/archive/html/dmmarchive20030810/P030.htm"
+  "source": "https://pe.usps.com/archive/html/dmmarchive20030810/P030.htm",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.meter",
@@ -5230,7 +5692,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Indicium: meter serial, licensing post office",
   "status": "new",
   "access": "OK",
-  "source": "https://pe.usps.com/archive/html/dmmarchive20030810/P030.htm"
+  "source": "https://pe.usps.com/archive/html/dmmarchive20030810/P030.htm",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.imb",
@@ -5244,7 +5709,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "IMb: Mailer ID, Serial Number, routing ZIP",
   "status": "new",
   "access": "OK",
-  "source": "https://about.usps.com/election-mail/steps-to-creating-intelligent-mail-barcode.pdf"
+  "source": "https://about.usps.com/election-mail/steps-to-creating-intelligent-mail-barcode.pdf",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.handwriting",
@@ -5258,7 +5726,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Envelope and letter",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.contents",
@@ -5272,7 +5743,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Contents",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.stamp",
@@ -5286,7 +5760,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Stamp, label or meter",
   "status": "new",
   "access": "OK",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.address_check",
@@ -5300,7 +5777,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Public address and geocoding data",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.area_profile",
@@ -5314,7 +5794,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Public census tables",
   "status": "new",
   "access": "Verify",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 2,
+  "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
  },
  {
   "id": "post.registers",
@@ -5328,7 +5811,10 @@ export const HEXAGON_CATALOGUE = [
   "field": "Land registry, company registry",
   "status": "new",
   "access": "Owner decision",
-  "source": ""
+  "source": "",
+  "plan": "not_planned",
+  "plan_decision": 11,
+  "plan_reason": "Held for an owner decision"
  },
  {
   "id": "brokers.people_search_listing",

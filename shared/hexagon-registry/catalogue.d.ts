@@ -15,6 +15,10 @@ export interface CatalogueHexagon {
   /** Ids in the code that build this hexagon when they differ from `id` (the CK-8502 X hexagons). */
   code_ids?: string[];
   note?: string;
+  /** MPC-8689 owner decisions batch 1 (2026-10-29): 'not_planned' or 'later', with the decision number and reason. Absent = still open (or an earlier drop or hold recorded in hexagons-366.json). */
+  plan?: 'not_planned' | 'later';
+  plan_decision?: number;
+  plan_reason?: string;
 }
 export const CATALOGUE_CHANNELS: CatalogueChannel[];
 export const CATALOGUE_VERSION: string;

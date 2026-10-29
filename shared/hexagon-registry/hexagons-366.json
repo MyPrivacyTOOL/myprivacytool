@@ -993,7 +993,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "global-privacy-control"
+   "slug": "global-privacy-control",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.device_model",
@@ -1025,7 +1028,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "display-and-accessibility-preferences"
+   "slug": "display-and-accessibility-preferences",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.colour_gamut",
@@ -1041,7 +1047,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "screen-colour-range-hdr"
+   "slug": "screen-colour-range-hdr",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.touch_input",
@@ -1057,7 +1066,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "touch-and-pointer-type"
+   "slug": "touch-and-pointer-type",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.private_mode",
@@ -1073,7 +1085,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "private-browsing"
+   "slug": "private-browsing",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.automation",
@@ -1089,7 +1104,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "automated-browser"
+   "slug": "automated-browser",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.prior_permissions",
@@ -1105,7 +1123,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "permissions-already-granted"
+   "slug": "permissions-already-granted",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.voices",
@@ -1121,7 +1142,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "speech-voices-installed"
+   "slug": "speech-voices-installed",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.media_codecs",
@@ -1137,7 +1161,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "media-and-drm-support"
+   "slug": "media-and-drm-support",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.gpu_adapter",
@@ -1153,7 +1180,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "webgpu-adapter"
+   "slug": "webgpu-adapter",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.keyboard_layout",
@@ -1169,7 +1199,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "keyboard-layout"
+   "slug": "keyboard-layout",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.installed_app",
@@ -1185,7 +1218,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "installed-as-app"
+   "slug": "installed-as-app",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.multi_screen",
@@ -1201,7 +1237,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "window-size-and-extra-monitors"
+   "slug": "window-size-and-extra-monitors",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.clock_skew",
@@ -1233,7 +1272,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "biometric-unlock-available"
+   "slug": "biometric-unlock-available",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.reverse_dns",
@@ -1268,7 +1310,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "vpn-tor-or-proxy"
+   "slug": "vpn-tor-or-proxy",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "web.gps",
@@ -1284,7 +1329,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "precise-location"
+   "slug": "precise-location",
+   "plan": "not_planned",
+   "plan_decision": 8,
+   "plan_reason": "Needs a new permission prompt; not built"
   },
   {
    "id": "web.device_names",
@@ -1300,7 +1348,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "camera-and-microphone-names"
+   "slug": "camera-and-microphone-names",
+   "plan": "not_planned",
+   "plan_decision": 8,
+   "plan_reason": "Needs a new permission prompt; not built"
   },
   {
    "id": "web.notifications",
@@ -1316,7 +1367,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "notification-permission"
+   "slug": "notification-permission",
+   "plan": "not_planned",
+   "plan_decision": 8,
+   "plan_reason": "Needs a new permission prompt; not built"
   },
   {
    "id": "web.contacts_clipboard",
@@ -1332,7 +1386,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "contacts-clipboard-files"
+   "slug": "contacts-clipboard-files",
+   "plan": "not_planned",
+   "plan_decision": 8,
+   "plan_reason": "Needs a new permission prompt; not built"
   },
   {
    "id": "email-name",
@@ -1396,7 +1453,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
-   "slug": "if-they-email-us-sender-details"
+   "slug": "if-they-email-us-sender-details",
+   "plan": "later",
+   "plan_decision": 9,
+   "plan_reason": "Approved for a later inbound Email Worker (docs/email-inbound-worker-plan-mpc-8689.md); not built now"
   },
   {
    "id": "email.inbound_client",
@@ -1412,7 +1472,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
-   "slug": "if-they-email-us-mail-app-and-timezone"
+   "slug": "if-they-email-us-mail-app-and-timezone",
+   "plan": "later",
+   "plan_decision": 9,
+   "plan_reason": "Approved for a later inbound Email Worker (docs/email-inbound-worker-plan-mpc-8689.md); not built now"
   },
   {
    "id": "email.inbound_route",
@@ -1428,7 +1491,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
-   "slug": "if-they-email-us-sending-servers"
+   "slug": "if-they-email-us-sending-servers",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "email.inbound_signature",
@@ -1527,7 +1593,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "gravatar-profile-details"
+   "slug": "gravatar-profile-details",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "email.saas_records",
@@ -1613,7 +1682,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
-   "slug": "if-they-attach-files"
+   "slug": "if-they-attach-files",
+   "plan": "not_planned",
+   "plan_decision": 9,
+   "plan_reason": "Needs an inbound Email Worker or a queued domain job; not built now"
   },
   {
    "id": "email-github-commits",
@@ -1661,7 +1733,10 @@
    "status": "new",
    "access": "Owner decision",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "pgp-key-servers"
+   "slug": "pgp-key-servers",
+   "plan": "not_planned",
+   "plan_decision": 11,
+   "plan_reason": "Held for an owner decision"
   },
   {
    "id": "email.web_archive",
@@ -1677,7 +1752,10 @@
    "status": "new",
    "access": "Owner decision",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "web-archive-mentions"
+   "slug": "web-archive-mentions",
+   "plan": "not_planned",
+   "plan_decision": 11,
+   "plan_reason": "Held for an owner decision"
   },
   {
    "id": "sms.number",
@@ -1757,7 +1835,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "pictures-sent-mms"
+   "slug": "pictures-sent-mms",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "sms.number_type",
@@ -1773,7 +1854,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "number-type"
+   "slug": "number-type",
+   "plan": "not_planned",
+   "plan_decision": 7,
+   "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
   },
   {
    "id": "sms.original_carrier",
@@ -1789,7 +1873,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "original-carrier"
+   "slug": "original-carrier",
+   "plan": "not_planned",
+   "plan_decision": 7,
+   "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
   },
   {
    "id": "sms.number_timezone",
@@ -1805,7 +1892,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "number-timezone"
+   "slug": "number-timezone",
+   "plan": "not_planned",
+   "plan_decision": 7,
+   "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
   },
   {
    "id": "sms.number_region",
@@ -1821,7 +1911,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "sms-number-region-offline"
+   "slug": "sms-number-region-offline",
+   "plan": "not_planned",
+   "plan_decision": 7,
+   "plan_reason": "Needs a phone-number library with carrier and geocoder data; none added"
   },
   {
    "id": "sms.line_type_live",
@@ -1837,7 +1930,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "current-carrier-and-line-type"
+   "slug": "current-carrier-and-line-type",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "sms.caller_name",
@@ -1853,7 +1949,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "caller-name"
+   "slug": "caller-name",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "sms.sim_swap",
@@ -1869,7 +1968,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "recent-sim-swap"
+   "slug": "recent-sim-swap",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "sms.call_forwarding",
@@ -1885,7 +1987,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "call-forwarding"
+   "slug": "call-forwarding",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "sms.line_status",
@@ -1901,7 +2006,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "line-status-reassigned"
+   "slug": "line-status-reassigned",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "sms.other_apps",
@@ -1917,7 +2025,10 @@
    "status": "new",
    "access": "Not allowed",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "sms-number-on-other-apps"
+   "slug": "sms-number-on-other-apps",
+   "plan": "not_planned",
+   "plan_decision": 10,
+   "plan_reason": "Breaks the account-probing and scraping rules; removed from the build list permanently"
   },
   {
    "id": "wa.phone",
@@ -1933,7 +2044,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "phone-number-whatsapp-id"
+   "slug": "phone-number-whatsapp-id",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.user_id",
@@ -1949,7 +2063,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "whatsapp-user-id"
+   "slug": "whatsapp-user-id",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.profile_name",
@@ -1965,7 +2082,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "profile-name"
+   "slug": "profile-name",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.username",
@@ -1981,7 +2101,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "whatsapp-username"
+   "slug": "whatsapp-username",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.message_time",
@@ -1997,7 +2120,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
-   "slug": "whatsapp-message-time"
+   "slug": "whatsapp-message-time",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.message_text",
@@ -2013,7 +2139,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
-   "slug": "whatsapp-what-you-typed"
+   "slug": "whatsapp-what-you-typed",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.message_type",
@@ -2029,7 +2158,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
-   "slug": "message-type"
+   "slug": "message-type",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.forwarded",
@@ -2045,7 +2177,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "forwarded-message"
+   "slug": "forwarded-message",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.ad_referral",
@@ -2061,7 +2196,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "ad-that-brought-them"
+   "slug": "ad-that-brought-them",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.reply_context",
@@ -2077,7 +2215,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "reply-context"
+   "slug": "reply-context",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.read_receipts",
@@ -2093,7 +2234,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
-   "slug": "when-they-read-our-messages"
+   "slug": "when-they-read-our-messages",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.group",
@@ -2109,7 +2253,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "group-context"
+   "slug": "group-context",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.number_change",
@@ -2125,7 +2272,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "changed-number-or-id"
+   "slug": "changed-number-or-id",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.marketing_pref",
@@ -2141,7 +2291,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "marketing-opt-out"
+   "slug": "marketing-opt-out",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.edits",
@@ -2157,7 +2310,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "edits-and-deletions"
+   "slug": "edits-and-deletions",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.number_derived",
@@ -2173,7 +2329,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "number-type-carrier-range-timezone"
+   "slug": "number-type-carrier-range-timezone",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.contact_book",
@@ -2189,7 +2348,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "in-our-contact-book"
+   "slug": "in-our-contact-book",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.contact_share",
@@ -2205,7 +2367,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-   "slug": "phone-or-contact-card-you-share"
+   "slug": "phone-or-contact-card-you-share",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.location_share",
@@ -2221,7 +2386,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "whatsapp-location-you-share"
+   "slug": "whatsapp-location-you-share",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.flow_answers",
@@ -2237,7 +2405,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "form-answers"
+   "slug": "form-answers",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.media",
@@ -2253,7 +2424,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-   "slug": "files-and-photos-you-send"
+   "slug": "files-and-photos-you-send",
+   "plan": "not_planned",
+   "plan_decision": 1,
+   "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
   },
   {
    "id": "wa.other_apps",
@@ -2269,7 +2443,10 @@
    "status": "new",
    "access": "Not allowed",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "whatsapp-number-on-other-apps"
+   "slug": "whatsapp-number-on-other-apps",
+   "plan": "not_planned",
+   "plan_decision": 10,
+   "plan_reason": "Breaks the account-probing and scraping rules; removed from the build list permanently"
   },
   {
    "id": "tg.numeric_id",
@@ -2832,7 +3009,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://core.telegram.org/bots/api",
-   "slug": "user-rating"
+   "slug": "user-rating",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "tg.profile_audio",
@@ -3011,7 +3191,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://core.telegram.org/bots/api",
-   "slug": "files-you-send"
+   "slug": "files-you-send",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "tg.group_role",
@@ -3101,7 +3284,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
-   "slug": "attachment"
+   "slug": "attachment",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "x.activity",
@@ -3117,7 +3303,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/account-activity",
-   "slug": "follows-likes-mentions"
+   "slug": "follows-likes-mentions",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "x.typing_read",
@@ -3133,7 +3322,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://docs.x.com/x-api/enterprise-gnip-2.0/fundamentals/account-activity",
-   "slug": "typing-and-read-receipts"
+   "slug": "typing-and-read-receipts",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "x.names",
@@ -3169,7 +3361,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
-   "slug": "account-age"
+   "slug": "account-age",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "x.bio",
@@ -3304,7 +3499,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
-   "slug": "recent-posts"
+   "slug": "recent-posts",
+   "plan": "not_planned",
+   "plan_decision": 4,
+   "plan_reason": "Needs a paid API; not built without approval (no paid enrichment)"
   },
   {
    "id": "x.email",
@@ -3320,7 +3518,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://docs.x.com/x-api/fundamentals/data-dictionary",
-   "slug": "confirmed-email"
+   "slug": "confirmed-email",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "ig.user_id",
@@ -3336,7 +3537,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "instagram-scoped-id"
+   "slug": "instagram-scoped-id",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.message",
@@ -3352,7 +3556,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api",
-   "slug": "what-you-typed-or-shared"
+   "slug": "what-you-typed-or-shared",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.message_time",
@@ -3368,7 +3575,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "instagram-message-time"
+   "slug": "instagram-message-time",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.name_username",
@@ -3384,7 +3594,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "name-and-username"
+   "slug": "name-and-username",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.photo",
@@ -3400,7 +3613,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "instagram-profile-photo"
+   "slug": "instagram-profile-photo",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.followers",
@@ -3416,7 +3632,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "follower-count"
+   "slug": "follower-count",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.relationship",
@@ -3432,7 +3651,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "follows-us-we-follow-them"
+   "slug": "follows-us-we-follow-them",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "ig.verified",
@@ -3448,7 +3670,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api/user-profile",
-   "slug": "verified-account"
+   "slug": "verified-account",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.psid",
@@ -3464,7 +3689,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
-   "slug": "page-scoped-id"
+   "slug": "page-scoped-id",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.message",
@@ -3480,7 +3708,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
-   "slug": "what-you-typed-or-sent"
+   "slug": "what-you-typed-or-sent",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.message_time",
@@ -3496,7 +3727,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
-   "slug": "messenger-message-time"
+   "slug": "messenger-message-time",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.ad_referral",
@@ -3512,7 +3746,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/reference/webhook-events/messages",
-   "slug": "ad-or-post-that-brought-them"
+   "slug": "ad-or-post-that-brought-them",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.name",
@@ -3528,7 +3765,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
-   "slug": "first-and-last-name"
+   "slug": "first-and-last-name",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.photo",
@@ -3544,7 +3784,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
-   "slug": "messenger-profile-photo"
+   "slug": "messenger-profile-photo",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.locale_timezone",
@@ -3560,7 +3803,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
-   "slug": "language-and-timezone"
+   "slug": "language-and-timezone",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "fb.gender",
@@ -3576,7 +3822,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "https://developers.facebook.com/docs/messenger-platform/identity/user-profile",
-   "slug": "messenger-gender"
+   "slug": "messenger-gender",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "li.comment",
@@ -3592,7 +3841,10 @@
    "status": "new",
    "access": "Partner access",
    "source": "",
-   "slug": "comment-on-our-post"
+   "slug": "comment-on-our-post",
+   "plan": "not_planned",
+   "plan_decision": 5,
+   "plan_reason": "Needs platform partner approval; not applying now"
   },
   {
    "id": "li.name",
@@ -3608,7 +3860,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
-   "slug": "name"
+   "slug": "name",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "li.photo",
@@ -3624,7 +3879,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
-   "slug": "linkedin-profile-photo"
+   "slug": "linkedin-profile-photo",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "li.locale",
@@ -3640,7 +3898,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
-   "slug": "locale"
+   "slug": "locale",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "li.email",
@@ -3656,7 +3917,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/sign-in-with-linkedin-v2",
-   "slug": "email-and-verified-flag"
+   "slug": "email-and-verified-flag",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dc.user_id",
@@ -3848,7 +4112,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://discord.com/developers/docs/resources/user",
-   "slug": "email-and-verified"
+   "slug": "email-and-verified",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dc.connections",
@@ -3864,7 +4131,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://discord.com/developers/docs/resources/user",
-   "slug": "linked-accounts"
+   "slug": "linked-accounts",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dc.servers",
@@ -3880,7 +4150,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://discord.com/developers/docs/resources/user",
-   "slug": "server-list"
+   "slug": "server-list",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dc.nitro_mfa",
@@ -3896,7 +4169,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://discord.com/developers/docs/resources/user",
-   "slug": "nitro-and-2fa"
+   "slug": "nitro-and-2fa",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "rd.message",
@@ -3912,7 +4188,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://www.reddit.com/dev/api/",
-   "slug": "message-or-mention"
+   "slug": "message-or-mention",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "rd.about",
@@ -3928,7 +4207,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://www.reddit.com/dev/api/",
-   "slug": "account-profile"
+   "slug": "account-profile",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "rd.trophies",
@@ -3944,7 +4226,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://www.reddit.com/dev/api/",
-   "slug": "trophies"
+   "slug": "trophies",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "rd.history",
@@ -3960,7 +4245,10 @@
    "status": "new",
    "access": "Owner decision",
    "source": "https://www.reddit.com/dev/api/",
-   "slug": "public-post-and-comment-history"
+   "slug": "public-post-and-comment-history",
+   "plan": "not_planned",
+   "plan_decision": 11,
+   "plan_reason": "Held for an owner decision"
   },
   {
    "id": "yt.comment",
@@ -4072,7 +4360,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://developers.google.com/youtube/v3/docs/channels",
-   "slug": "liked-videos-if-public"
+   "slug": "liked-videos-if-public",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "gh.sender",
@@ -4120,7 +4411,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://docs.github.com/en/webhooks/webhook-events-and-payloads",
-   "slug": "commit-name-and-email"
+   "slug": "commit-name-and-email",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "gh.profile",
@@ -4200,7 +4494,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://docs.github.com/en/rest/users/users",
-   "slug": "private-account-details"
+   "slug": "private-account-details",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "tt.ids",
@@ -4216,7 +4513,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
-   "slug": "tiktok-ids"
+   "slug": "tiktok-ids",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "tt.name_photo",
@@ -4232,7 +4532,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
-   "slug": "tiktok-name-and-photo"
+   "slug": "tiktok-name-and-photo",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "tt.profile",
@@ -4248,7 +4551,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
-   "slug": "username-bio-verified"
+   "slug": "username-bio-verified",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "tt.stats",
@@ -4264,7 +4570,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.tiktok.com/doc/tiktok-api-v2-get-user-info",
-   "slug": "audience-and-output"
+   "slug": "audience-and-output",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "line.user_id",
@@ -4408,7 +4717,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.line.biz/en/docs/line-login/integrate-line-login/",
-   "slug": "email-from-line-login"
+   "slug": "email-from-line-login",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "line.profile_plus",
@@ -4424,7 +4736,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.line.biz/en/docs/line-login/integrate-line-login/",
-   "slug": "line-profile"
+   "slug": "line-profile",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.bot_user_key",
@@ -4536,7 +4851,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format",
-   "slug": "kakao-account-link"
+   "slug": "kakao-account-link",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "kk.linked_at",
@@ -4568,7 +4886,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "kakaotalk-nickname-and-photo"
+   "slug": "kakaotalk-nickname-and-photo",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.email",
@@ -4584,7 +4905,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "kakaotalk-email"
+   "slug": "kakaotalk-email",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.name",
@@ -4600,7 +4924,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "real-name"
+   "slug": "real-name",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.age",
@@ -4616,7 +4943,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "age-range-and-birth-year"
+   "slug": "age-range-and-birth-year",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.birthday",
@@ -4632,7 +4962,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "kakaotalk-birthday"
+   "slug": "kakaotalk-birthday",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.gender",
@@ -4648,7 +4981,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "kakaotalk-gender"
+   "slug": "kakaotalk-gender",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.phone",
@@ -4664,7 +5000,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "kakaotalk-phone-number"
+   "slug": "kakaotalk-phone-number",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.ci",
@@ -4680,7 +5019,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "korean-identity-key-ci"
+   "slug": "korean-identity-key-ci",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "kk.shipping",
@@ -4696,7 +5038,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.kakao.com/docs/latest/en/kakaologin/rest-api",
-   "slug": "delivery-addresses"
+   "slug": "delivery-addresses",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "wc.openid",
@@ -4808,7 +5153,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://developers.weixin.qq.com/doc/service/api/usermanage/userinfo/api_userinfo.html",
-   "slug": "cross-app-id"
+   "slug": "cross-app-id",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "wc.location",
@@ -4856,7 +5204,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://bot.q.qq.com/wiki/develop/api-v2/autogen/event/c2c_message_create.html",
-   "slug": "qq-what-they-sent"
+   "slug": "qq-what-they-sent",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "qq.friend_state",
@@ -4952,7 +5303,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://docs.zaloplatforms.com/docs/OA/quan-ly/quan-ly-thong-tin-nguoi-dung/truy-xuat-chi-tiet-nguoi-dung",
-   "slug": "sensitive-account-flag"
+   "slug": "sensitive-account-flag",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "zl.shared_info",
@@ -5224,7 +5578,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://open.weibo.com/wiki/2/users/show/en",
-   "slug": "weibo-public-profile"
+   "slug": "weibo-public-profile",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "wb.place",
@@ -5240,7 +5597,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://open.weibo.com/wiki/2/users/show/en",
-   "slug": "province-and-city"
+   "slug": "province-and-city",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "wb.gender",
@@ -5256,7 +5616,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://open.weibo.com/wiki/2/users/show/en",
-   "slug": "weibo-gender"
+   "slug": "weibo-gender",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "wb.stats",
@@ -5272,7 +5635,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://open.weibo.com/wiki/2/users/show/en",
-   "slug": "audience-and-age"
+   "slug": "audience-and-age",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "wb.latest_post",
@@ -5288,7 +5654,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://open.weibo.com/wiki/2/users/show/en",
-   "slug": "latest-post"
+   "slug": "latest-post",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dy.ids",
@@ -5304,7 +5673,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info",
-   "slug": "douyin-ids"
+   "slug": "douyin-ids",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dy.name_photo",
@@ -5320,7 +5692,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info",
-   "slug": "douyin-nickname-and-photo"
+   "slug": "douyin-nickname-and-photo",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "dy.place",
@@ -5336,7 +5711,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/openapi/account-permission/get-account-open-info",
-   "slug": "country-province-city"
+   "slug": "country-province-city",
+   "plan": "not_planned",
+   "plan_decision": 3,
+   "plan_reason": "Marked Verify: not built until a probe on our own test account confirms the field"
   },
   {
    "id": "nv.id",
@@ -5352,7 +5730,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "naver-app-id"
+   "slug": "naver-app-id",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "nv.name",
@@ -5368,7 +5749,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "name-and-nickname"
+   "slug": "name-and-nickname",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "nv.email",
@@ -5384,7 +5768,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "naver-email"
+   "slug": "naver-email",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "nv.age",
@@ -5400,7 +5787,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "age-birthday-birth-year"
+   "slug": "age-birthday-birth-year",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "nv.gender",
@@ -5416,7 +5806,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "naver-gender"
+   "slug": "naver-gender",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "nv.photo",
@@ -5432,7 +5825,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "naver-profile-photo"
+   "slug": "naver-profile-photo",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "nv.mobile",
@@ -5448,7 +5844,10 @@
    "status": "new",
    "access": "Their sign-in",
    "source": "https://developers.naver.com/docs/login/profile/profile.md",
-   "slug": "mobile-number"
+   "slug": "mobile-number",
+   "plan": "not_planned",
+   "plan_decision": 6,
+   "plan_reason": "The person must sign in with the platform; no sign-in flows now"
   },
   {
    "id": "call.number",
@@ -5464,7 +5863,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "caller-number"
+   "slug": "caller-number",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.area",
@@ -5480,7 +5882,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "number-s-area"
+   "slug": "number-s-area",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.verified",
@@ -5496,7 +5901,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "caller-id-verified"
+   "slug": "caller-id-verified",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.forwarded",
@@ -5512,7 +5920,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "forwarded-call"
+   "slug": "forwarded-call",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.voice",
@@ -5528,7 +5939,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "voice"
+   "slug": "voice",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.keys",
@@ -5544,7 +5958,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "keypad-input"
+   "slug": "keypad-input",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.time",
@@ -5560,7 +5977,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://static0.twilio.com/docs/voice/trusted-calling-with-shakenstir.md",
-   "slug": "call-time-and-length"
+   "slug": "call-time-and-length",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.line_type",
@@ -5576,7 +5996,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "line-type"
+   "slug": "line-type",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.carrier",
@@ -5592,7 +6015,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "carrier"
+   "slug": "carrier",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.caller_name",
@@ -5608,7 +6034,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "caller-name-us"
+   "slug": "caller-name-us",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.number_region",
@@ -5624,7 +6053,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "phone-number-region-offline"
+   "slug": "phone-number-region-offline",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "call.sim_swap",
@@ -5640,7 +6072,10 @@
    "status": "new",
    "access": "Owner decision",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "sim-swap"
+   "slug": "sim-swap",
+   "plan": "not_planned",
+   "plan_decision": 11,
+   "plan_reason": "Held for an owner decision"
   },
   {
    "id": "fax.number",
@@ -5656,7 +6091,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.telnyx.com/docs/programmable-fax/receiving-webhooks",
-   "slug": "sending-number"
+   "slug": "sending-number",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "fax.tsi",
@@ -5672,7 +6110,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.itu.int/rec/dologin_pub.asp?lang=s&id=T-REC-T.30-199904-S!!PDF-E&type=items",
-   "slug": "fax-machine-id-tsi"
+   "slug": "fax-machine-id-tsi",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "fax.header",
@@ -5688,7 +6129,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://www.fax.plus/blog/glossary/csid-vs-tsid",
-   "slug": "header-line"
+   "slug": "header-line",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "fax.pages",
@@ -5704,7 +6148,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.telnyx.com/docs/programmable-fax/receiving-webhooks",
-   "slug": "document"
+   "slug": "document",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "fax.clock",
@@ -5720,7 +6167,10 @@
    "status": "new",
    "access": "Verify",
    "source": "https://www.fax.plus/blog/glossary/csid-vs-tsid",
-   "slug": "machine-clock"
+   "slug": "machine-clock",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "fax.number_region",
@@ -5736,7 +6186,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/google/libphonenumber",
-   "slug": "fax-number-region-offline"
+   "slug": "fax-number-region-offline",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "fax.line_type",
@@ -5752,7 +6205,10 @@
    "status": "new",
    "access": "Paid",
    "source": "https://www.twilio.com/docs/lookup/v2-api",
-   "slug": "line-type-and-carrier"
+   "slug": "line-type-and-carrier",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.return_address",
@@ -5768,7 +6224,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "return-address"
+   "slug": "return-address",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.postmark",
@@ -5784,7 +6243,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://pe.usps.com/archive/html/dmmarchive20030810/P030.htm",
-   "slug": "postmark"
+   "slug": "postmark",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.meter",
@@ -5800,7 +6262,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://pe.usps.com/archive/html/dmmarchive20030810/P030.htm",
-   "slug": "meter-or-franking-id"
+   "slug": "meter-or-franking-id",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.imb",
@@ -5816,7 +6281,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://about.usps.com/election-mail/steps-to-creating-intelligent-mail-barcode.pdf",
-   "slug": "intelligent-mail-barcode"
+   "slug": "intelligent-mail-barcode",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.handwriting",
@@ -5832,7 +6300,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "handwriting-and-print"
+   "slug": "handwriting-and-print",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.contents",
@@ -5848,7 +6319,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "letter-contents"
+   "slug": "letter-contents",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.stamp",
@@ -5864,7 +6338,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "stamp-type"
+   "slug": "stamp-type",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.address_check",
@@ -5880,7 +6357,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "address-check"
+   "slug": "address-check",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.area_profile",
@@ -5896,7 +6376,10 @@
    "status": "new",
    "access": "Verify",
    "source": "",
-   "slug": "area-profile"
+   "slug": "area-profile",
+   "plan": "not_planned",
+   "plan_decision": 2,
+   "plan_reason": "Offline channels (phone, fax, letter) are parked; no intake is designed until a real use case exists"
   },
   {
    "id": "post.registers",
@@ -5912,7 +6395,10 @@
    "status": "new",
    "access": "Owner decision",
    "source": "",
-   "slug": "public-registers"
+   "slug": "public-registers",
+   "plan": "not_planned",
+   "plan_decision": 11,
+   "plan_reason": "Held for an owner decision"
   },
   {
    "id": "brokers.people_search_listing",

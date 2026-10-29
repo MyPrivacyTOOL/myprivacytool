@@ -56,3 +56,16 @@ assert.deepEqual(decided, { 'web.reverse_dns': 'dropped', 'email.wkd': 'dropped'
 assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.decided === '2026-10-29' && i.status === 'new'));
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');
+
+// Owner decisions batch 1 (2026-10-29): 162 unbuilt hexagons carry a plan (160 not planned, 2 approved for later) with a decision number and reason. Six earlier drops and holds keep their own
+// `decision` fields untouched, and the 9 still open are exactly these (Telegram edits and blocked-bot were built as extras in #649).
+const planned = HEXAGON_CATALOGUE.filter((i) => i.plan);
+assert.equal(planned.length, 162);
+assert.equal(planned.filter((i) => i.plan === 'not_planned').length, 160);
+assert.deepEqual(planned.filter((i) => i.plan === 'later').map((i) => i.id).sort(), ['email.inbound_client', 'email.inbound_sender']);
+assert.ok(planned.every((i) => i.status === 'new' && !EXTRA_HEXAGON_IDS.includes(i.id) && i.plan_decision >= 1 && i.plan_decision <= 11 && i.plan_reason), 'planned rows are unbuilt, have a decision and a reason');
+assert.ok(planned.every((i) => !raw.find((r) => r.id === i.id).decision), 'an earlier recorded drop or hold is never overwritten');
+assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => i.status === 'new' && !EXTRA_HEXAGON_IDS.includes(i.id) && !i.plan && !raw.find((r) => r.id === i.id).decision).map((i) => i.id).sort(),
+  ['kk.linked_at', 'line.language', 'line.name_photo', 'line.status', 'tg.miniapp_biometric', 'tg.miniapp_device', 'tg.miniapp_location', 'tg.miniapp_photo', 'tg.passport']);
+assert.ok(HEXAGON_CATALOGUE.filter((i) => i.status === 'defined').every((i) => !i.plan), 'defined rows are never marked');
+console.log('catalogue.test.mjs decisions ok');
