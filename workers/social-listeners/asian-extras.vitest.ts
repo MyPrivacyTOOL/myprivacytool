@@ -14,7 +14,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 const st = (l: { id: string; state: string }[]) => Object.fromEntries(l.map((x) => [x.id, x.state]));
 
 describe("catalogue", () => {
-  it("KakaoTalk 6, WeChat 5 and Zalo 4 are catalogue items marked OK and still 'new'; the lists match the registry", () => {
+  it("KakaoTalk 6, WeChat 7 and Zalo 7 are catalogue items marked OK and still 'new'; the lists match the registry", () => {
     expect(KAKAO_EXTRA_HEXAGONS.map((x) => x.id)).toEqual(KAKAO_EXTRA_IDS);
     expect(WECHAT_EXTRA_HEXAGONS.map((x) => x.id)).toEqual(WECHAT_EXTRA_IDS);
     expect(ZALO_EXTRA_HEXAGONS.map((x) => x.id)).toEqual(ZALO_EXTRA_IDS);
@@ -71,7 +71,7 @@ describe("WeChat", () => {
     expect(xmlField(TEXT, "FromUserName")).toBe("oUser1");
     expect(xmlField(TEXT, "CreateTime")).toBe("1700000000");
     expect(xmlField(TEXT, "Nope")).toBeNull();
-    expect(st(wechatStates(TEXT))).toEqual({ "wc.openid": "returned", "wc.message": "returned", "wc.voice": "not_returned", "wc.time": "returned", "wc.location": "not_returned" });
+    expect(st(wechatStates(TEXT))).toEqual({ "wc.openid": "returned", "wc.message": "returned", "wc.voice": "not_returned", "wc.time": "returned", "wc.location": "not_returned", "wc.follow": "not_checked", "wc.follow_scene": "not_checked" });
     expect(st(wechatStates(xml("voice", "<MediaId><![CDATA[m]]></MediaId><Format><![CDATA[amr]]></Format>")))["wc.voice"]).toBe("returned");
     expect(st(wechatStates(xml("location", "<Location_X>23.1</Location_X><Location_Y>113.2</Location_Y><Scale>20</Scale><Label><![CDATA[x]]></Label>")))["wc.location"]).toBe("returned");
     expect(st(wechatStates(xml("location", "<Location_X>23.1</Location_X>")))["wc.location"]).toBe("not_returned");
@@ -105,7 +105,7 @@ describe("Zalo", () => {
   const post = (body: unknown, e: Env, key: string | null = "zl-secret") => handleZaloExtras(new Request(`https://x/webhook/zalo${key === null ? "" : `?k=${key}`}`, { method: "POST", body: JSON.stringify(body) }), e);
 
   it("reads the event: location only from a location event with coordinates; a business card by its event name", () => {
-    expect(st(zaloStates(ev()))).toEqual({ "zl.sender_id": "returned", "zl.message": "returned", "zl.location": "not_returned", "zl.business_card": "not_returned" });
+    expect(st(zaloStates(ev()))).toEqual({ "zl.sender_id": "returned", "zl.message": "returned", "zl.location": "not_returned", "zl.business_card": "not_returned", "zl.name_photo": "not_checked", "zl.follower": "not_checked", "zl.shared_info": "not_checked" });
     expect(st(zaloStates(ev({ event_name: "user_send_location", message: { msg_id: "m", attachments: [{ type: "location", payload: { coordinates: { latitude: "10.8", longitude: "106.6" } } }] } })))).toMatchObject({ "zl.location": "returned", "zl.message": "not_returned" });
     expect(st(zaloStates(ev({ event_name: "user_send_location", message: { msg_id: "m", attachments: [{ type: "location", payload: {} }] } })))["zl.location"]).toBe("not_returned");
     expect(st(zaloStates(ev({ event_name: "user_send_business_card", message: {} })))["zl.business_card"]).toBe("returned");
