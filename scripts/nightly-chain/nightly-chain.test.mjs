@@ -56,7 +56,7 @@ function world(opts = {}) {
       html.h = opts.sentHtml ? opts.sentHtml(built.html) : built.html;
       return json({ html: html.h, text: opts.sentText ? opts.sentText(built.text) : built.text });
     }
-    if (url.startsWith('https://prod.invalid/api/unsubscribe')) {
+    if (url.startsWith('https://synth.invalid/api/unsubscribe')) {
       const e = decodeURIComponent(url.match(/e=([^&]+)/)[1]); if (db.users[e]) db.users[e].email_opt_out_at = NOW.toISOString();
       db.suppressions.add(createHash('sha256').update(e).digest('hex')); return json({ ok: true });
     }
@@ -128,7 +128,7 @@ for (const [name, opts, step] of broken) {
   check(r.ok && r.steps.map((s) => s.step).join() === 'unsubscribe,suppression_recorded,delete_by_scan_number,cleanup', 'weekly: unsubscribe, suppression, delete by scan number, cleanup all pass in order');
   check(w.db.deleted.length === 1 && w.db.erased.every((e) => isTestAddress(e)) && w.db.erased.length === 9, 'weekly: scan deleted by number; only test addresses erased (today plus eight older nightly aliases)');
   check(w.db.suppressions.size === 0 && Object.keys(w.db.users).length === 0, 'weekly: nothing left behind (suppression and user removed)');
-  check(w.db.gets.some((g) => g.startsWith('POST https://prod.invalid/api/unsubscribe')) && !w.db.gets.some((g) => g.includes('prod.invalid/api/scan')), 'weekly: unsubscribe goes to production, scan creation never does');
+  check(w.db.gets.some((g) => g.startsWith('POST https://synth.invalid/api/unsubscribe')) && !w.db.gets.some((g) => g.includes('prod.invalid')), 'weekly: unsubscribe goes to the synthetic Worker (test-only secret); nothing at all is sent to production');
 }
 {
   const w = world(); const orig = w.f;
