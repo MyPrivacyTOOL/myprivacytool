@@ -12,10 +12,10 @@ const env = {
 
 /** The response fields these tests read. */
 type Reply = { error?: { code?: string }; locale?: string; message_keys?: string[]; response_key?: string; state_source?: string };
-type Stub = { qwen?: unknown; state?: unknown; qwenFail?: boolean; stateFail?: boolean; rpcFail?: "http" | "throw" };
+type Stub = { qwen?: unknown; state?: unknown; qwenHang?: boolean; qwenFail?: boolean; stateFail?: boolean; rpcFail?: "http" | "throw" };
 let calls: { url: string; init?: RequestInit }[] = [];
 
-function stub({ qwen, state = [], qwenFail, stateFail, rpcFail }: Stub) {
+function stub({ qwen, state = [], qwenHang, qwenFail, stateFail, rpcFail }: Stub) {
   calls = [];
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
     calls.push({ url: String(url), init });
@@ -25,6 +25,8 @@ function stub({ qwen, state = [], qwenFail, stateFail, rpcFail }: Stub) {
       return Response.json({ state: "ok", trust_level: 0, persisted: true });
     }
     if (String(url).includes("/chat/completions")) {
+      // Never answers; ends only when the Worker's timeout aborts the request, like a stalled outside service.
+      if (qwenHang) return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
       if (qwenFail) return new Response("boom", { status: 500 });
       return Response.json({ choices: [{ message: { content: JSON.stringify(qwen) } }] });
     }
@@ -163,6 +165,20 @@ describe("degradation and privacy", () => {
     expect((await post(msg("scan me"))).body).toMatchObject({ intent: "scan", intent_source: "rules" });
     stub({ qwen: { intent: "bogus", confidence: 1 } });
     expect((await post(msg("help please"))).body).toMatchObject({ intent: "help", intent_source: "rules" });
+  });
+
+  it("a Qwen call that never answers is abandoned within 2 s and the rules classifier answers", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      stub({ qwenHang: true });
+      const pending = post(msg("scan me"));
+      await vi.advanceTimersByTimeAsync(2000);
+      const r = await pending;
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ intent: "scan", intent_source: "rules" });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("works without a Qwen key: rules classify, and Qwen is never called", async () => {
