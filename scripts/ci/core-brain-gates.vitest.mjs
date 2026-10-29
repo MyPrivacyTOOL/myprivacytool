@@ -10,10 +10,10 @@ const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../.
 const SECRET = "s3cr3t-value-for-test";
 const resp = (status, json) => ({ status, ok: status < 400, json: async () => json ?? {} });
 
-const brain = ({ source = "qwen", authed = 200 } = {}) => async (u, o = {}) => {
+const brain = ({ source = "qwen", authed = 200, state = "anonymous" } = {}) => async (u, o = {}) => {
   if (u.endsWith("/health")) return resp(200, { ok: true, worker: "core-brain", configured: true });
   if (u.endsWith("/webhook") && o.method === "POST") {
-    return o.headers?.["X-MPT-Webhook-Secret"] === SECRET ? resp(authed, { intent: "scan", intent_source: source }) : resp(401);
+    return o.headers?.["X-MPT-Webhook-Secret"] === SECRET ? resp(authed, { intent: "scan", intent_source: source, state_source: state }) : resp(401);
   }
   return resp(404);
 };
@@ -27,6 +27,21 @@ describe("core-brain-gates", () => {
     const failed = (await gates("https://b", SECRET, brain({ source: "rules" }))).filter((r) => !r.ok);
     expect(failed.map((r) => r.name)).toEqual(['3b live Qwen gate: intent_source is "qwen"']);
   });
+  it('fails when state_source is "fallback" (Supabase read failed) even though health and Qwen pass', async () => {
+    const failed = (await gates("https://b", SECRET, brain({ state: "fallback" }))).filter((r) => !r.ok);
+    expect(failed.map((r) => r.name)).toEqual(['3c state read works: state_source is not "fallback"']);
+  });
+  it("accepts a stored state as well as anonymous", async () => {
+    expect((await gates("https://b", SECRET, brain({ state: "supabase" }))).every((r) => r.ok)).toBe(true);
+  });
+  it("--skip-qwen keeps the state check but drops the Qwen gate", async () => {
+    const r = await gates("https://b", SECRET, brain({ source: "rules" }), { skipQwen: true });
+    expect(r.every((x) => x.ok)).toBe(true);
+    expect(r.map((x) => x.name).some((n) => /Qwen/.test(n))).toBe(false);
+    const bad = await gates("https://b", SECRET, brain({ source: "rules", state: "fallback" }), { skipQwen: true });
+    expect(bad.filter((x) => !x.ok)).toHaveLength(1);
+  });
+  it("parses --skip-qwen", () => { expect(parseArgs(["--skip-qwen"]).skipQwen).toBe(true); });
   it("fails closed when the secret is missing, without sending an authenticated request", async () => {
     let authed = 0;
     const f = async (u, o = {}) => { if (o.headers?.["X-MPT-Webhook-Secret"]) authed++; return brain()(u, o); };
