@@ -19,8 +19,8 @@ The owner answered **Y to all ten** proposals. Each affected hexagon in `shared/
 
 The first-match rule is why some counts differ from the access-status totals (for example, five Verify items sit under WhatsApp and the offline channels). Six drops and holds recorded earlier on 2026-10-29 (`decision` fields in the data file: reverse DNS, inbound signature block, subdomains, WKD, reactions and polls, join-request bio) are left exactly as recorded and are not counted here.
 
-## Still open: 11 hexagons, nothing waiting on the owner
-- **Telegram (7):** edits, blocked-or-unblocked-bot (separate updates that do not fit the single-report model), four Mini App items and Telegram Passport (need those flows built).
+## Still open: 9 hexagons, nothing waiting on the owner
+- **Telegram (5):** four Mini App items and Telegram Passport (need those flows built). Telegram edits and blocked-or-unblocked-bot were still open when this was written; they have since been built as extras (#649).
 - **LINE (3):** display name and photo, status message, app language (the profile docs page returned 403; the fields are unconfirmed).
 - **KakaoTalk (1):** when they linked (needs an app user id).
 
