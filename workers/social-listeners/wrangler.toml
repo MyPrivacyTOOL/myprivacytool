@@ -43,9 +43,13 @@ service = "core-brain"
 # MPC-7892: Telegram DEEP username check. Plain var kept here because every deploy replaces plain-text vars set outside this file
 # (the flag set through the Cloudflare API was wiped by the next deploy). Inert for everyone except the allow-listed test accounts
 # in the PROBE_TELEGRAM_IDS secret, and the Worker also needs the deep_jobs tables. Rollback: set "off" (or delete this block) and deploy.
-# TELEGRAM_BASELINE_SCAN (MPC-7891) is managed separately.
+# TELEGRAM_BASELINE_SCAN (MPC-7891): see the line below; it used to be managed only by the flags workflow, which every later deploy wiped.
 [vars]
 TELEGRAM_DEEP_SCAN = "on"
+# MPC-7891 baseline scan (the first risk number): moved here on 2026-10-29 at the owner's instruction so a deploy does not wipe it (the flags workflow value is dropped
+# by the next deploy). Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) unless TELEGRAM_SCAN_SCOPE="all" (NOT set; do not set it before the
+# rehearsal and wording approval, see docs/core-brain-game-flow.md). Rollback: set "off" (or delete this line) and deploy.
+TELEGRAM_BASELINE_SCAN = "on"
 # MPC-7893: kept here so a deploy does not wipe it (the flags workflow sets it, the next deploy dropped other workflow-set flags). Only acts for senders in
 # PROBE_TELEGRAM_IDS, and the link only works while the Pages variable DASHBOARD_ENABLED=1. Rollback: set "off" (or delete this line) and deploy.
 TELEGRAM_DASHBOARD_LINKS = "on"
