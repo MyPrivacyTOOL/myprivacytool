@@ -233,7 +233,9 @@ export async function process(env, { action, taskId, timestamp, approver, target
   // CK-8482: per-platform state. Tracking must never mask the real outcome, so a D1 failure here degrades to the legacy flow.
   const allPlatforms = payload.posts.map((p) => p.platform);
   // ROUTED_PLATFORMS: the platforms the Make scenario can actually publish. Unset = legacy behaviour (everything is sent).
-  const routedList = (env.ROUTED_PLATFORMS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // YouTube is routed only on every third day of the month (Hong Kong date), matching the Make route's own day filter.
+  const youtubeDay = new Date(approvedAt.getTime() + 8 * 3600e3).getUTCDate() % 3 === 0;
+  const routedList = (env.ROUTED_PLATFORMS ?? '').split(',').map((s) => s.trim()).filter((s) => s && (s !== 'youtube' || youtubeDay));
   const platforms = routedList.length ? allPlatforms.filter((p) => routedList.includes(p)) : allPlatforms;
   const unrouted = allPlatforms.filter((p) => !platforms.includes(p));
   if (!platforms.length) {
