@@ -115,6 +115,34 @@ describe("rollback.yml", () => {
   });
 });
 
+describe("deploy.yml: core-brain post-deploy smoke test, auto-rollback and state check", () => {
+  const s = steps(load("deploy.yml"), "deploy");
+  const deployIdx = s.findIndex((x) => x.name === "Deploy core-brain (MPC-7257)");
+  const smoke = s.find((x) => x.id === "smoke");
+  const rollback = s.find((x) => /rollback --yes/.test(x.with?.command ?? ""));
+  const state = s.find((x) => /core-brain-gates\.mjs/.test(x.run ?? ""));
+  it("smoke-tests the live core-brain after the deploy, for core-brain only", () => {
+    expect(smoke.run).toContain("smoke-test.mjs core-brain");
+    expect(s.indexOf(smoke)).toBeGreaterThan(deployIdx);
+    expect(smoke.if).toContain("matrix.worker == 'core-brain'");
+  });
+  it("rolls back core-brain only when its own smoke test failed, then re-checks", () => {
+    expect(rollback.if).toContain("steps.smoke.outcome == 'failure'");
+    expect(rollback.if).toContain("matrix.worker == 'core-brain'");
+    expect(rollback.with.workingDirectory).toBe("workers/core-brain");
+    expect(s.indexOf(rollback)).toBeGreaterThan(s.indexOf(smoke));
+    const recheck = s.find((x) => /smoke-test\.mjs core-brain --retries 3/.test(x.run ?? ""));
+    expect(s.indexOf(recheck)).toBeGreaterThan(s.indexOf(rollback));
+  });
+  it("checks the Supabase read after deploy without rolling back, and skips the Qwen gate", () => {
+    expect(state.run).toContain("--skip-qwen");
+    expect(state.if).toBe("matrix.worker == 'core-brain'");
+    expect(state.env.WEBHOOK_SECRET).toBe("${{ secrets.WEBHOOK_SECRET }}");
+    expect(state.run).not.toContain("secrets.");
+    expect(s.indexOf(state)).toBeGreaterThan(s.indexOf(smoke));
+  });
+});
+
 describe("deploy.yml (core-brain secrets, MPC-7260)", () => {
   const text = raw("deploy.yml");
   it("never replaces a secret with a literal stand-in for core-brain", () => {

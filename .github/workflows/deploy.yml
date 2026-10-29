@@ -87,6 +87,35 @@ jobs:
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
 
+      # Post-deploy check for core-brain, same pattern as the other Workers (deploy-mpt-leads.yml): smoke test the LIVE
+      # Worker; if it fails, roll back to the previous version, re-check, and leave the job red. See docs/ci-cd-testing.md#rollback.
+      - name: Smoke test live core-brain
+        id: smoke
+        if: matrix.worker == 'core-brain'
+        run: node scripts/ci/smoke-test.mjs core-brain --retries 4 --delay-ms 10000
+
+      - name: Roll back core-brain to the previous version (smoke test failed)
+        if: failure() && matrix.worker == 'core-brain' && steps.smoke.outcome == 'failure'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/core-brain
+          command: 'rollback --yes --message "auto-rollback, smoke test failed for ${{ github.sha }}"'
+
+      - name: Re-run core-brain smoke test after rollback
+        if: failure() && matrix.worker == 'core-brain' && steps.smoke.outcome == 'failure'
+        run: node scripts/ci/smoke-test.mjs core-brain --retries 3 --delay-ms 10000
+
+      # A rejected SUPABASE_KEY leaves /health green while every sender silently becomes anonymous (state_source
+      # "fallback"; it shipped unnoticed on 2026-10-08). Rolling back cannot fix a secret, so this step only fails the
+      # job loudly. Qwen is skipped here: a DashScope outage must not redden a good deploy (run the manual gates for that).
+      - name: Core-brain state check (Supabase read works)
+        if: matrix.worker == 'core-brain'
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: node scripts/ci/core-brain-gates.mjs --skip-qwen
+
       - name: Deploy social-listeners
         if: matrix.worker == 'social-listeners'
         uses: cloudflare/wrangler-action@v3
