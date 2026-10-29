@@ -89,7 +89,16 @@ export const EMAIL_EXTRA_IDS = ['email.alias', 'email.address_type', 'email.saas
 export const WEB_EXTRA_IDS = ['web.postal_area', 'web.ip_timezone', 'web.network_distance', 'web.network_owner', 'web.tls_fingerprint', 'web.http_protocol', 'web.eu_region', 'web.device_model', 'web.clock_skew'];
 // Discord extras live in workers/social-listeners/src/discord-interactions.ts (DISCORD_EXTRA_HEXAGONS). The four "Their sign-in" Discord candidates (email, linked accounts, servers, Nitro and 2FA) are not built.
 export const DISCORD_EXTRA_IDS = ['dc.user_id', 'dc.names', 'dc.avatar', 'dc.server_tag', 'dc.badges', 'dc.language', 'dc.context', 'dc.member', 'dc.purchases', 'dc.command_input', 'dc.banner'];
-export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS];
+// SMS (4), Viber (9) and LINE (5) extras live in workers/social-listeners/src/{sms,viber,line}-extras.ts.
+export const SMS_EXTRA_IDS = ['sms.number', 'sms.number_area', 'sms.message_time', 'sms.message_text'];
+export const VIBER_EXTRA_IDS = ['vb.user_id', 'vb.name_photo', 'vb.country', 'vb.language', 'vb.api_version', 'vb.message', 'vb.deeplink', 'vb.location', 'vb.contact'];
+export const LINE_EXTRA_IDS = ['line.user_id', 'line.message', 'line.follow_state', 'line.group', 'line.location'];
+export const GITHUB_EXTRA_IDS = ['gh.sender', 'gh.content', 'gh.profile', 'gh.account_age', 'gh.public_email', 'gh.activity_times'];
+export const YOUTUBE_EXTRA_IDS = ['yt.comment', 'yt.channel_age', 'yt.country', 'yt.channel_about', 'yt.stats', 'yt.topics'];
+export const KAKAO_EXTRA_IDS = ['kk.bot_user_key', 'kk.channel_key', 'kk.is_friend', 'kk.timezone', 'kk.lang', 'kk.message'];
+export const WECHAT_EXTRA_IDS = ['wc.openid', 'wc.message', 'wc.voice', 'wc.time', 'wc.location'];
+export const ZALO_EXTRA_IDS = ['zl.sender_id', 'zl.message', 'zl.location', 'zl.business_card'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...SMS_EXTRA_IDS, ...VIBER_EXTRA_IDS, ...LINE_EXTRA_IDS, ...GITHUB_EXTRA_IDS, ...YOUTUBE_EXTRA_IDS, ...KAKAO_EXTRA_IDS, ...WECHAT_EXTRA_IDS, ...ZALO_EXTRA_IDS];
 
 // CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
 // user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is
