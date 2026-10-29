@@ -71,6 +71,18 @@
   #cc p{margin:0;flex:1 1 260px;font-size:14px}
   #cc button{border:1px solid var(--white);background:transparent;color:var(--white);border-radius:8px;padding:10px 16px;font:600 14px/1 inherit;cursor:pointer}
   #cc button.ok{background:var(--green);border-color:var(--green);color:var(--black)}
+  /* MPC-8684: Alice opens the curtain and the headline words come out from behind it. Only runs when the visitor has not asked
+     for reduced motion (the .cur class is added by a tiny script in <head>); without it, or without JS, every word is simply visible. */
+  header.hero{position:relative;overflow:hidden;min-height:300px}
+  .curtain{display:none}
+  .cur .curtain{display:flex;align-items:center;justify-content:center;position:absolute;inset:0;z-index:3;background:#fff;cursor:pointer;
+    transition:transform 1000ms cubic-bezier(.7,0,.25,1)}
+  .curtain img{height:100%;max-height:300px;width:auto;max-width:90%;object-fit:contain;display:block}
+  .cur.open .curtain{transform:translateX(-101%);pointer-events:none}
+  .cur .reveal{opacity:0;transform:translateY(16px)}
+  .cur.open .reveal{animation:rise 650ms cubic-bezier(.2,.7,.2,1) forwards;animation-delay:calc(250ms + var(--i,0) * 90ms)}
+  .w{display:inline-block;white-space:pre}
+  @keyframes rise{to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <!-- Same consent-gated Google tag as index.html (Property 515216281 / G-1BWMDBJSPL). No request to googletagmanager.com
@@ -108,14 +120,26 @@
     sync();
   })();
 </script>
+<script>
+  /* Curtain animation only for visitors who have not asked for reduced motion. Failsafe: it always opens within 3.5 s. */
+  (function () {
+    var d = document.documentElement;
+    try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { return; }
+    d.className += ' cur';
+    function open() { if (d.className.indexOf(' open') < 0) d.className += ' open'; }
+    window.__mptOpenCurtain = open;
+    setTimeout(open, 3500);
+  })();
+</script>
 </head>
 <body>
 <header class="hero">
+  <div class="curtain" id="curtain" aria-hidden="true"><img src="/footprint/alice-curtain.jpg?v=2" alt="" width="544" height="554" fetchpriority="high" decoding="async"></div>
   <div class="wrap">
-    <div class="eyebrow">Telegram privacy check</div>
-    <h1>How exposed are your Telegram settings?</h1>
-    <p class="lede">Eight quick questions about your own account. You get a plain-English score in about a minute. Nothing you answer leaves this page.</p>
-    <a class="btn" href="#quiz" id="start-link">Start the check</a>
+    <div class="eyebrow reveal" style="--i:0">Telegram privacy check</div>
+    <h1><span class="w reveal" style="--i:1">How </span><span class="w reveal" style="--i:2">exposed </span><span class="w reveal" style="--i:3">are </span><span class="w reveal" style="--i:4">your </span><span class="w reveal" style="--i:5">Telegram </span><span class="w reveal" style="--i:6">settings?</span></h1>
+    <p class="lede reveal" style="--i:8">Eight quick questions about your own account. You get a plain-English score in about a minute. Nothing you answer leaves this page.</p>
+    <a class="btn reveal" style="--i:10" href="#quiz" id="start-link">Start the check</a>
   </div>
 </header>
 
@@ -310,6 +334,14 @@
       gateMsg.textContent = 'Something went wrong. Please try again in a moment.';
     });
   });
+})();
+</script>
+<script>
+(function () {
+  var c = document.getElementById('curtain');
+  if (!c || !window.__mptOpenCurtain) return;
+  setTimeout(window.__mptOpenCurtain, 650);
+  c.addEventListener('click', window.__mptOpenCurtain);
 })();
 </script>
 </body>

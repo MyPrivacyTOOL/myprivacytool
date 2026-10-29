@@ -59,4 +59,20 @@ describe("Telegram security check page", () => {
     // The public, sitemap-listed guide pages under /guides/ must never be noindexed (regression from the first MPC-8684 merge).
     expect(headers).not.toMatch(/^\/guides[^\n]*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/m);
   });
+  it("opens the Alice curtain on the headline without hiding anything from people who need it plain", () => {
+    // Decorative picture: hidden from assistive tech, empty alt, reuses the existing /footprint/ artwork.
+    expect(html).toMatch(/<div class="curtain" id="curtain" aria-hidden="true"><img src="\/footprint\/alice-curtain\.jpg[^"]*" alt=""/);
+    expect(existsSync(path.join(repo, "public/footprint/alice-curtain.jpg"))).toBe(true);
+    // The headline is real text in the page: the words are separate spans, but the heading still reads as one sentence.
+    const h1 = html.match(/<h1>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    expect(h1).toBe("How exposed are your Telegram settings?");
+    // Animation is opt-in per visitor: off for prefers-reduced-motion, and everything is visible without JS (the .cur class is added by script).
+    expect(html).toContain("(prefers-reduced-motion: reduce)");
+    expect(html).toMatch(/\.curtain\{display:none\}/);
+    expect(html).toMatch(/\.cur \.reveal\{opacity:0/);
+    expect(html).not.toMatch(/(?<!\.cur )\.reveal\{opacity:0/);
+    // Failsafe: the curtain always opens, and a tap opens it at once.
+    expect(html).toContain("setTimeout(open, 3500)");
+    expect(html).toContain("addEventListener('click', window.__mptOpenCurtain)");
+  });
 });
