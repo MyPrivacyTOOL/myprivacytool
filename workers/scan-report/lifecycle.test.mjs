@@ -199,7 +199,9 @@ class Killed extends Error { constructor() { super('worker killed'); } }
 }
 
 // ============================================================ 8. withdrawn consent
-const unsub = async (F, email) => { sandbox(F); return worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email)}`, { method: 'POST', headers: { Accept: 'application/json', Origin: 'https://myprivacytool.io' } }), env, { waitUntil: () => {} }); };
+// The Worker cancels only when the opt-out is strictly later than the scan request (Date.parse(opt_out_at) > Date.parse(created_at), millisecond resolution).
+// The stubbed backend answers instantly, so without a pause the request and the unsubscribe could share one millisecond and the report would (correctly, by that rule) still go out: ~40% flaky.
+const unsub = async (F, email) => { await new Promise((r) => setTimeout(r, 5)); sandbox(F); return worker.fetch(new Request(`https://x/api/unsubscribe?e=${encodeURIComponent(email)}&t=${await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email)}`, { method: 'POST', headers: { Accept: 'application/json', Origin: 'https://myprivacytool.io' } }), env, { waitUntil: () => {} }); };
 {
   const F = harness();
   await request(F); const u = await unsub(F, A); await run(F);
