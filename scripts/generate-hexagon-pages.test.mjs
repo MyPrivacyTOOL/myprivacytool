@@ -1,4 +1,4 @@
-// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all 366.
+// MPC-8689: every hexagon gets its own page with a unique, stable address; the master page lists all 368.
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,8 +7,8 @@ import { HEXAGON_CATALOGUE } from '../shared/hexagon-registry/catalogue.js';
 import { writeHexagonPages, hexagonPage, misuse } from './generate-hexagon-pages.mjs';
 
 const out = mkdtempSync(path.join(tmpdir(), 'hex-pages-'));
-assert.equal(writeHexagonPages(out), 367);
-assert.equal(readdirSync(path.join(out, 'hexagon')).length, 367);
+assert.equal(writeHexagonPages(out), 369);
+assert.equal(readdirSync(path.join(out, 'hexagon')).length, 369);
 for (const h of HEXAGON_CATALOGUE) {
   const f = path.join(out, 'hexagon', h.slug, 'index.html');
   assert.ok(existsSync(f), `page for ${h.id}`);
@@ -20,6 +20,6 @@ for (const h of HEXAGON_CATALOGUE) {
   assert.equal(hexagonPage(h).includes('<script>'), false, 'hexagon pages need no script');
 }
 const master = readFileSync(path.join(out, 'hexagon', 'index.html'), 'utf8');
-assert.equal((master.match(/<tr data-r=/g) || []).length, 366);
-assert.ok(master.includes('90 High') && master.includes('208 Medium') && master.includes('68 Low'));
+assert.equal((master.match(/<tr data-r=/g) || []).length, 368);
+assert.ok(master.includes('92 High') && master.includes('208 Medium') && master.includes('68 Low'));
 console.log('generate-hexagon-pages.test.mjs ok');

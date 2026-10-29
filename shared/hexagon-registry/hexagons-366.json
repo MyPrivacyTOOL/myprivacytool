@@ -1,6 +1,6 @@
 {
- "version": "hexagons-366-2026-10-28",
- "total": 366,
+ "version": "hexagons-366-2026-10-29",
+ "total": 368,
  "risk_tiers_approved": "2026-10-28",
  "items": [
   {
@@ -1249,7 +1249,10 @@
    "status": "new",
    "access": "OK",
    "source": "",
-   "slug": "ip-hostname"
+   "slug": "ip-hostname",
+   "decision": "dropped",
+   "decision_reason": "MPC-7350 rules out sending the visitor's IP to a third-party resolver.",
+   "decided": "2026-10-29"
   },
   {
    "id": "web.vpn_tor",
@@ -1441,7 +1444,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://developers.cloudflare.com/email-routing/email-workers/runtime-api/",
-   "slug": "if-they-email-us-signature-block"
+   "slug": "if-they-email-us-signature-block",
+   "decision": "dropped",
+   "decision_reason": "Reads the message body, which holds personal data; the inbound Email Worker is approved for sender details and mail app and timezone only.",
+   "decided": "2026-10-29"
   },
   {
    "id": "email-provider",
@@ -1553,7 +1559,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "own-domain-hostnames"
+   "slug": "own-domain-hostnames",
+   "decision": "held",
+   "decision_reason": "No certificate-transparency lookup (crt.sh) for now: it sends the domain to a new third party and needs a queued job.",
+   "decided": "2026-10-29"
   },
   {
    "id": "email.mail_protection",
@@ -1585,7 +1594,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://github.com/MyPrivacyTOOL/myprivacytool/blob/main/docs/osint-list-mpc-8452.md",
-   "slug": "own-server-encryption-key"
+   "slug": "own-server-encryption-key",
+   "decision": "dropped",
+   "decision_reason": "The Web Key Directory request carries a hash of the address, which breaks \"address never sent\".",
+   "decided": "2026-10-29"
   },
   {
    "id": "email.attachments",
@@ -2529,7 +2541,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://core.telegram.org/bots/api",
-   "slug": "reactions-and-poll-answers"
+   "slug": "reactions-and-poll-answers",
+   "decision": "dropped",
+   "decision_reason": "Needs a chat the bot administers, and poll answers only exist for polls the bot sent; it would show for almost no one.",
+   "decided": "2026-10-29"
   },
   {
    "id": "tg.bio",
@@ -2865,7 +2880,10 @@
    "status": "new",
    "access": "OK",
    "source": "https://core.telegram.org/bots/api",
-   "slug": "bio-in-join-request"
+   "slug": "bio-in-join-request",
+   "decision": "held",
+   "decision_reason": "Held until the owner names a chat the bot administers (ChatJoinRequest.bio only arrives for such a chat).",
+   "decided": "2026-10-29"
   },
   {
    "id": "tg.phone_shared",
@@ -5895,6 +5913,38 @@
    "access": "Owner decision",
    "source": "",
    "slug": "public-registers"
+  },
+  {
+   "id": "brokers.people_search_listing",
+   "channel": "brokers",
+   "channel_label": "Data brokers and news archives",
+   "group": "Core",
+   "code": "B1",
+   "arrival": "B",
+   "risk": "high",
+   "label": "Listing on a people-search site",
+   "reveals": "Whether a page on a people-search or data-broker site, whose address the person supplies, shows their name or email",
+   "field": "URL supplied by the person; fetched once, name or email matched locally",
+   "status": "new",
+   "access": "Verify",
+   "source": "",
+   "slug": "listing-on-a-people-search-site"
+  },
+  {
+   "id": "brokers.news_archive_mention",
+   "channel": "brokers",
+   "channel_label": "Data brokers and news archives",
+   "group": "Core",
+   "code": "B2",
+   "arrival": "B",
+   "risk": "high",
+   "label": "Named in a news archive",
+   "reveals": "Whether a news-archive page, whose address the person supplies, names them or shows their email",
+   "field": "URL supplied by the person; fetched once, name or email matched locally",
+   "status": "new",
+   "access": "Verify",
+   "source": "",
+   "slug": "named-in-a-news-archive"
   }
  ]
 }

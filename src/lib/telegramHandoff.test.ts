@@ -18,7 +18,7 @@ describe('telegram handoff (web side)', () => {
     expect(parseHandoff({ channels: 'x' }).ids).toEqual([]);
     expect(parseHandoff({ channels: [{ channel: 'web', checked_ids: ['location'] }] }).ids).toEqual([]);
   });
-  it('merged with the web scan: 54 web + 30 Telegram = 84 of 366 checked, 282 still to review', () => {
+  it('merged with the web scan: 54 web + 30 Telegram = 84 of 368 checked, 284 still to review', () => {
     const tg = Array.from({ length: 30 }, (_, i) => `tg.x${i}`); // ids outside the catalogue never count, so use the real ones below
     expect(footprintSummary(tg).checked).toBe(0);
     const real = [
@@ -27,6 +27,6 @@ describe('telegram handoff (web side)', () => {
       'personal_channel', 'channel_posts', 'forward_privacy', 'voice_restriction', 'phone_shared', 'location_shared', 'group_role',
     ].map((k) => `tg.${k}`);
     const s = footprintSummary([...HEXAGONS.map((h: { id: string }) => h.id), ...real]);
-    expect([s.checked, s.toReview]).toEqual([84, 282]);
+    expect([s.checked, s.toReview]).toEqual([84, 284]);
   });
 });

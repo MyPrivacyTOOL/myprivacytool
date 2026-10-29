@@ -74,6 +74,7 @@ export interface Env {
   TELEGRAM_DASHBOARD_LINKS?: string;
   /** MPC-8689 one-time footprint handoff link: "on" lets senders in PROBE_TELEGRAM_IDS ask for it with "footprint"; anything else (default) is off. */
   TELEGRAM_FOOTPRINT_LINKS?: string;
+  RECORDS_CHECK?: string; // MPC-8689: "on" enables /listing and /archive (allow-listed senders only); default off
   /** Base URL of the dashboard site (https only). Default https://www.myprivacytool.io. */
   DASHBOARD_BASE_URL?: string;
   /** MPC-7892 Telegram DEEP username check: "on" enables it for senders in PROBE_TELEGRAM_IDS; anything else (default) is off. */

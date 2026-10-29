@@ -9,7 +9,7 @@
 
 import { CATALOGUE_CHANNELS } from './catalogue.js';
 
-// MPC-8689: all 26 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
+// MPC-8689: all 27 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
 // their short labels; every other channel keeps the label from the discovery. Only Telegram has channel hexagons built (TELEGRAM_HEXAGONS below).
 export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
 CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
@@ -99,7 +99,9 @@ export const KAKAO_EXTRA_IDS = ['kk.bot_user_key', 'kk.channel_key', 'kk.is_frie
 export const WECHAT_EXTRA_IDS = ['wc.openid', 'wc.message', 'wc.voice', 'wc.time', 'wc.location', 'wc.follow', 'wc.follow_scene'];
 export const ZALO_EXTRA_IDS = ['zl.sender_id', 'zl.message', 'zl.location', 'zl.business_card', 'zl.name_photo', 'zl.follower', 'zl.shared_info'];
 export const QQ_EXTRA_IDS = ['qq.openid', 'qq.friend_state'];
-export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...SMS_EXTRA_IDS, ...VIBER_EXTRA_IDS, ...LINE_EXTRA_IDS, ...GITHUB_EXTRA_IDS, ...YOUTUBE_EXTRA_IDS, ...KAKAO_EXTRA_IDS, ...WECHAT_EXTRA_IDS, ...ZALO_EXTRA_IDS, ...QQ_EXTRA_IDS];
+// Records about a person (MPC-8689, owner decisions 2026-10-29): the two "Data brokers and news archives" hexagons, checked from a page address the person supplies. Code: workers/social-listeners/src/records-check.ts.
+export const RECORDS_EXTRA_IDS = ['brokers.people_search_listing', 'brokers.news_archive_mention'];
+export const EXTRA_HEXAGON_IDS = [...TELEGRAM_EXTRA_IDS, ...EMAIL_EXTRA_IDS, ...WEB_EXTRA_IDS, ...DISCORD_EXTRA_IDS, ...SMS_EXTRA_IDS, ...VIBER_EXTRA_IDS, ...LINE_EXTRA_IDS, ...GITHUB_EXTRA_IDS, ...YOUTUBE_EXTRA_IDS, ...KAKAO_EXTRA_IDS, ...WECHAT_EXTRA_IDS, ...ZALO_EXTRA_IDS, ...QQ_EXTRA_IDS, ...RECORDS_EXTRA_IDS];
 
 // CK-8502: X hexagons. Fields are the ones X's Account Activity documentation shows in its payload examples (docs.x.com, read 2026-10-28; the
 // user-object field list there is an EXAMPLE, not a specification, so a field may be absent). NOTE: that page says the Account Activity API is
