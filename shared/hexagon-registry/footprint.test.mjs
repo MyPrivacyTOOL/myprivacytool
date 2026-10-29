@@ -24,10 +24,10 @@ const newId = HEXAGON_CATALOGUE.find((h) => h.status === 'new' && !EXTRA_HEXAGON
 const odd = footprintSummary([newId, 'not-a-hexagon', 'location', 'location']);
 assert.deepEqual([odd.checked, odd.toReview], [1, 367]);
 
-// The six built Telegram extras (MPC-8689 pilot) count as checked: Telegram 35 of 47, still outside the 30 and every score.
+// The eight built Telegram extras (MPC-8689 pilot) count as checked: Telegram 35 of 47, still outside the 30 and every score.
 const withExtras = footprintSummary([...TELEGRAM_HEXAGONS.map((h) => h.id), ...TELEGRAM_EXTRA_IDS]);
-assert.deepEqual([withExtras.checked, withExtras.toReview], [36, 332]);
-assert.equal(footprintChannelsLine(withExtras), 'Telegram 36 of 47');
+assert.deepEqual([withExtras.checked, withExtras.toReview], [38, 330]);
+assert.equal(footprintChannelsLine(withExtras), 'Telegram 38 of 47');
 // The four built email extras count as checked too (email 7 + 4 of 21), still outside every score.
 const emailBuilt = footprintSummary(EMAIL_EXTRA_IDS);
 assert.deepEqual([emailBuilt.checked, emailBuilt.byChannel.find((c) => c.key === 'email').checked], [4, 4]);

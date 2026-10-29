@@ -201,14 +201,14 @@ describe("Delete my scan data button", () => {
   it("on confirm erases consent, scan data and DEEP data for the tapping user only, then says Done", async () => {
     const t = setup();
     await t.post(cb(`fw|${B8}|dy`, 61));
-    expect(rpcs(t)).toEqual(["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_deep_data"]);
+    expect(rpcs(t)).toEqual(["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_event_flags", "mpt_delete_deep_data"]);
     expect(t.calls.filter((c) => c.url.includes("/rpc/")).every((c) => Object.values(c.body).some((v) => v === String(ID) || v === "telegram"))).toBe(true);
     expect(t.shown()).toMatch(/Done\. I deleted/);
   });
   it("still deletes when the scan is already gone, and never says Done on a failure", async () => {
     const gone = setup({}, { baseline: null });
     await gone.post(cb("fw|zzzzzzzz|dy", 62));
-    expect(rpcs(gone)).toHaveLength(3);
+    expect(rpcs(gone)).toHaveLength(4);
     const bad = setup({}, { rpcFail: true });
     await bad.post(cb(`fw|${B8}|dy`, 63));
     expect(bad.shown()).toMatch(/could not finish deleting/);

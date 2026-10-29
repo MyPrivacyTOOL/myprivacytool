@@ -20,7 +20,7 @@ const snap = (over: Partial<SnapshotRow> = {}): SnapshotRow => ({
 });
 
 type Scope = "dashboard" | "footprint";
-function memoryStore(links: Record<string, { sender: string; snapshot: string; scope: Scope; used?: boolean }>, snaps: SnapshotRow[] = [snap()]) {
+function memoryStore(links: Record<string, { sender: string; snapshot: string; scope: Scope; used?: boolean }>, snaps: SnapshotRow[] = [snap()], flags?: Read<string[]>) {
   const sessions = new Map<string, SessionRow & { scope: Scope }>();
   const ok = <T,>(v: T): Read<T> => ({ ok: true, value: v });
   const store: DashboardStore = {
@@ -40,6 +40,7 @@ function memoryStore(links: Record<string, { sender: string; snapshot: string; s
     async laterSnapshot() { return ok(null); },
     async latestDeepJob() { return ok(null); },
     async deepResults() { return ok([]); },
+    ...(flags ? { async eventFlags() { return flags; } } : {}),
   };
   return { store, sessions };
 }
@@ -102,6 +103,17 @@ describe("GET /api/footprint", () => {
     expect(text).not.toContain("private value");
     expect(res.headers.get("cache-control")).toContain("no-store");
     expect(res.headers.get("x-robots-tag")).toContain("noindex");
+  });
+  it("adds the event-driven extras that really happened (edits, blocked or unblocked); a failed read or an unknown flag adds nothing", async () => {
+    const ids = async (flags?: Read<string[]>) => {
+      const mem = memoryStore(await link("footprint"), [snap()], flags);
+      const c = cookieOf(await handleFootprintRedeem(post(), ENV, TOKEN, { store: mem.store }), FOOTPRINT_COOKIE);
+      return (await (await handleFootprintData(footprintReq(c), ENV, { store: mem.store })).json()).channels[0].checked_ids;
+    };
+    expect(await ids({ ok: true, value: ["tg.edits", "tg.blocked_bot", "tg.message_text", "location"] })).toEqual(["tg.username", "tg.bio", "tg.edits", "tg.blocked_bot"]);
+    expect(await ids({ ok: false })).toEqual(["tg.username", "tg.bio"]);
+    expect(await ids({ ok: true, value: [] })).toEqual(["tg.username", "tg.bio"]);
+    expect(await ids()).toEqual(["tg.username", "tg.bio"]);
   });
   it("no cookie, a wrong cookie, or a dashboard cookie is 401; 503 when off; the scan being deleted is 410", async () => {
     const { mem, cookie } = await session();

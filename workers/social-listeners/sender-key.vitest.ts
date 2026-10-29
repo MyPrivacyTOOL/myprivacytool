@@ -142,6 +142,8 @@ describe("STOP with hashing on", () => {
       { fn: "mpt_erase_chat_sender", id: String(ID) },
       { fn: "mpt_delete_profile_snapshots", id: HASH },
       { fn: "mpt_delete_profile_snapshots", id: String(ID) },
+      { fn: "mpt_delete_event_flags", id: HASH },
+      { fn: "mpt_delete_event_flags", id: String(ID) },
       { fn: "mpt_delete_deep_data", id: String(ID) },
     ]);
     expect(t.calls.filter((c) => c.url.endsWith("/sendMessage")).map((c) => c.body.text)[0]).toMatch(/^Done\./);

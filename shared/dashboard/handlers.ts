@@ -119,6 +119,7 @@ export async function handleData(request: Request, env: DashboardEnv, deps: Deps
 
 // ---- MPC-8689: GET /api/footprint. Which Telegram hexagons had their check run, as ids only (never a value), for the web scan to add to its own count.
 const TELEGRAM_DEFINED = new Set(HEXAGON_CATALOGUE.filter((h: { channel: string; status: string }) => h.channel === "telegram" && h.status === "defined").map((h: { id: string }) => h.id).concat(TELEGRAM_EXTRA_IDS));
+const EVENT_FLAG_IDS = new Set(["tg.edits", "tg.blocked_bot"]);
 const RAN = new Set(["returned", "not_returned"]); // "not_checked" never counts as checked
 
 export async function handleFootprintData(request: Request, env: DashboardEnv, deps: Deps = {}): Promise<Response> {
@@ -137,5 +138,8 @@ export async function handleFootprintData(request: Request, env: DashboardEnv, d
   const rep = snap.value.report;
   const hexagons: Array<{ id?: unknown; state?: unknown }> = [...(Array.isArray(rep?.hexagons) ? rep.hexagons : []), ...(Array.isArray(rep?.extras) ? rep.extras : [])]; // extras: MPC-8689 pilot, outside every score
   const checked = [...new Set(hexagons.filter((h) => typeof h.id === "string" && typeof h.state === "string" && RAN.has(h.state) && TELEGRAM_DEFINED.has(h.id)).map((h) => h.id as string))];
-  return json({ channels: [{ channel: "telegram", checked_ids: checked, scan_at: snap.value.created_at, scan_version: snap.value.scan_version }] });
+  // MPC-8689: an event-driven extra (an edit, a block or unblock) is checked once it happened; a failed read just leaves it out, it never shows a result that was not checked.
+  const flags = store.eventFlags ? await store.eventFlags(s.value.sender_id) : null;
+  const flagged = flags?.ok ? flags.value.filter((id) => EVENT_FLAG_IDS.has(id)) : [];
+  return json({ channels: [{ channel: "telegram", checked_ids: [...new Set([...checked, ...flagged])], scan_at: snap.value.created_at, scan_version: snap.value.scan_version }] });
 }
