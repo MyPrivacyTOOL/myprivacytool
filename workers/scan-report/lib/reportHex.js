@@ -4,6 +4,8 @@
 import HEX, { EMAIL } from './hexagons.generated.js';
 // MPC-7471-F4: the one exposure score. Imported from the shared registry module, never re-implemented here.
 import { computeExposure } from '../../../shared/hexagon-registry/score.js';
+// MPC-7561: each approved hexagon has its own guide page; the rest fall back to the generic guide below.
+import { hasGuide, guidePath } from '../../../shared/hexagon-registry/guides.js';
 
 const SITE = 'https://myprivacytool.io';
 const BRAND = '#15803d';
@@ -95,7 +97,8 @@ const PILL = {
 };
 export const guideUrl = (h, { html = false, campaign = 'scan-report' } = {}) => {
   const amp = html ? '&amp;' : '&';
-  return `${SITE}${GUIDES[h.category] || GUIDE}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=${campaign}${amp}utm_content=${encodeURIComponent(h.id)}`;
+  const path = hasGuide(h.id) ? guidePath(h.id) : (GUIDES[h.category] || GUIDE);
+  return `${SITE}${path}?utm_source=email${amp}utm_medium=email${amp}utm_campaign=${campaign}${amp}utm_content=${encodeURIComponent(h.id)}`;
 };
 // An IP address is the most identifying value in a scan and an email can be forwarded or screenshotted, so it never appears in the body:
 // it stays in the attached JSON (the user's own file). Matches IPv4 and IPv6 (including ::1 and IPv4-mapped forms).
