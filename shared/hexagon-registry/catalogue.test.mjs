@@ -35,8 +35,8 @@ assert.deepEqual([...code].filter((id) => !covered.has(id)).sort(), ['x.lookup_p
 // Unmapped X candidates stay unbuilt (attachment, follows and likes, typing and read receipts, account age, recent posts, confirmed email).
 assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => i.channel === 'x' && i.status === 'new').map((i) => i.id).sort(), ['x.account_age', 'x.activity', 'x.dm_media', 'x.email', 'x.recent_posts', 'x.typing_read']);
 // Built extras (pilot) are catalogue items still marked "new": they are not among the 101 defined and not in the 30, so no approved count moves.
-assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 6);
-assert.equal(EXTRA_HEXAGON_IDS.length, 88); // 6 Telegram + 4 email + 9 web + 11 Discord + 4 SMS + 13 Viber + 5 LINE + 6 GitHub + 6 YouTube + 6 KakaoTalk + 7 WeChat + 7 Zalo + 2 QQ + 2 records
+assert.equal(TELEGRAM_EXTRA_HEXAGONS.length, 8);
+assert.equal(EXTRA_HEXAGON_IDS.length, 90); // 8 Telegram + 4 email + 9 web + 11 Discord + 4 SMS + 13 Viber + 5 LINE + 6 GitHub + 6 YouTube + 6 KakaoTalk + 7 WeChat + 7 Zalo + 2 QQ + 2 records
 for (const id of EXTRA_HEXAGON_IDS) {
   const item = HEXAGON_CATALOGUE.find((i) => i.id === id);
   assert.ok(item && item.status === 'new' && ['telegram', 'email', 'web', 'discord', 'sms', 'viber', 'line', 'github', 'youtube', 'kakaotalk', 'wechat', 'zalo', 'qq', 'brokers'].includes(item.channel), `extra ${id} is a new built-extra catalogue item`);

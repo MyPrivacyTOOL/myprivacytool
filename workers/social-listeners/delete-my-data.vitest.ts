@@ -48,6 +48,7 @@ describe("delete my data command", () => {
     expect(t.rpcs()).toEqual([
       { fn: "mpt_erase_chat_sender", args: { p_channel: "telegram", p_sender_id: String(ID) } },
       { fn: "mpt_delete_profile_snapshots", args: { p_sender_id: String(ID) } },
+      { fn: "mpt_delete_event_flags", args: { p_sender_id: String(ID) } },
       { fn: "mpt_delete_deep_data", args: { p_sender_id: String(ID) } },
     ]);
     expect(t.sent()).toHaveLength(1);
@@ -59,11 +60,11 @@ describe("delete my data command", () => {
   it("works with every feature switch off, so people can always delete", async () => {
     const t = setup({ TELEGRAM_BASELINE_SCAN: undefined, TELEGRAM_FIX_WIZARD: undefined });
     await t.post(msg("delete my data", 2));
-    expect(t.rpcs()).toHaveLength(3);
+    expect(t.rpcs()).toHaveLength(4);
   });
 
   it("says nothing was stored when every function deleted zero rows, and is safe to repeat", async () => {
-    const t = setup({}, { counts: { mpt_erase_chat_sender: 0, mpt_delete_profile_snapshots: 0, mpt_delete_deep_data: 0 } });
+    const t = setup({}, { counts: { mpt_erase_chat_sender: 0, mpt_delete_profile_snapshots: 0, mpt_delete_event_flags: 0, mpt_delete_deep_data: 0 } });
     await t.post(msg("/stop", 3));
     await t.post(msg("/stop", 4));
     expect(t.sent()).toHaveLength(2);
@@ -71,7 +72,7 @@ describe("delete my data command", () => {
   });
 
   it("never claims success when any step fails", async () => {
-    for (const fn of ["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_deep_data"]) {
+    for (const fn of ["mpt_erase_chat_sender", "mpt_delete_profile_snapshots", "mpt_delete_event_flags", "mpt_delete_deep_data"]) {
       const t = setup({}, { fail: [fn] });
       await t.post(msg("STOP", 5));
       expect(t.sent()).toHaveLength(1);
@@ -98,7 +99,7 @@ describe("who it applies to", () => {
   it("covers any private sender when the scope is all, but only that sender's own data", async () => {
     const t = setup({ TELEGRAM_SCAN_SCOPE: "all" });
     await t.post(msg("stop", 11, OTHER));
-    expect(t.rpcs().map((r) => r.args.p_sender_id)).toEqual([String(OTHER), String(OTHER), String(OTHER)]);
+    expect(t.rpcs().map((r) => r.args.p_sender_id)).toEqual([String(OTHER), String(OTHER), String(OTHER), String(OTHER)]);
   });
   it("ignores group chats", async () => {
     const t = setup({ TELEGRAM_SCAN_SCOPE: "all" });

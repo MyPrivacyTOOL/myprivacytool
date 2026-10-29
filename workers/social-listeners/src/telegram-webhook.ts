@@ -1,6 +1,7 @@
 // Telegram Bot API webhook listener. Validates, routes to core-brain, then sends the reply core-brain chose (MPC-7251).
 import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatusRequest, replyScanStatus, runBaselineScan } from "./baseline-scan";
 import { handleRecordsCheck, isRecordsCommand } from "./records-check";
+import { eventExtrasActive, handleEventExtra, observeEventExtra } from "./event-extras";
 import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
 import { handleDashboardCommand, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
@@ -67,6 +68,15 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const rc = handleRecordsCheck(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(rc);
     else await rc;
+    return done(new Response("OK"));
+  }
+
+  // MPC-8689 event extras (default off, allow-listed test accounts): an edit, or a block/unblock of the bot. Stores a flag and answers once; core-brain never sees it.
+  const evx = observeEventExtra(payload);
+  if (evx && eventExtrasActive(env, evx)) {
+    const ev = handleEventExtra(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(ev);
+    else await ev;
     return done(new Response("OK"));
   }
 

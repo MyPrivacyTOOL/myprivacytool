@@ -73,7 +73,7 @@ export const TELEGRAM_HEXAGONS = [
 // number (risk-count-1, out of 30), the web 54 and the exposure score until the owner approves a new score version. Fields were checked against the
 // current Bot API (10.3, 2026-08-24). Each is something that only appears when the person does it (forwards, sends while away, replies to a story, uses an
 // inline bot) or sets it up (profile music), so "not returned" means "not in this message", never "protected". Not built from the discovery list:
-// edits, reactions and poll answers, blocked or unblocked and the join-request bio arrive as separate updates the baseline does not read (ChatJoinRequest.bio is in the docs, but needs a chat the bot administers).
+// reactions and poll answers and the join-request bio arrive as separate updates the baseline does not read (ChatJoinRequest.bio is in the docs, but needs a chat the bot administers); edits and blocked or unblocked are event-driven, see the two entries below.
 export const TELEGRAM_EXTRA_HEXAGONS = [
   h('forward_origin', 'Where forwards come from', 'A', 'message.forward_origin', 'direct'),
   h('offline_send', 'Sent while away', 'A', 'message.is_from_offline', 'direct'),
@@ -81,6 +81,10 @@ export const TELEGRAM_EXTRA_HEXAGONS = [
   h('via_bot', 'Other bots used', 'A', 'message.via_bot', 'direct'),
   h('profile_audio', 'Profile music', 'B', 'getChat.first_profile_audio', 'direct'),
   h('personal_messages', 'Personal channel latest posts', 'B', 'getUserPersonalChatMessages', 'direct'),
+  // Event-driven (separate updates, not in the baseline message): the baseline reports them as "not checked". They are recorded as event flags
+  // (public.telegram_event_flags: that it happened, never content) and answered once in chat. See workers/social-listeners/src/event-extras.ts.
+  h('edits', 'Edits', 'A', 'edited_message.edit_date', 'direct'),
+  h('blocked_bot', 'Blocked or unblocked us', 'A', 'my_chat_member', 'direct'),
 ];
 export const TELEGRAM_EXTRA_IDS = TELEGRAM_EXTRA_HEXAGONS.map((x) => x.id);
 // Email extras live in workers/scan-report/lib/emailExtras.js (EMAIL_EXTRA_HEXAGONS); their catalogue ids are listed here so the footprint count knows they are built.
