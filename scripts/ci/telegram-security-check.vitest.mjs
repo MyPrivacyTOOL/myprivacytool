@@ -2,7 +2,7 @@
 // Guards the promises the page makes: it is a self-assessment (no scan claims), analytics only after consent,
 // no third-party requests before consent, the three GA4 events, and an email gate that stays closed until a
 // HubSpot form id is configured.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -45,5 +45,15 @@ describe("Telegram security check page", () => {
     expect(html).toContain('id="consent"');
     expect(html).toContain("consent_given_at");
     expect(html).toContain("source_tag");
+  });
+  it("serves the guide PDF from an unlisted path that exists, is a real PDF and is kept out of search", () => {
+    const m = html.match(/var PDF_URL = '(\/guides\/[A-Za-z0-9._-]+\.pdf)';/);
+    expect(m, "PDF_URL must point under /guides/").toBeTruthy();
+    const file = path.join(repo, "public", m[1]);
+    expect(existsSync(file)).toBe(true);
+    expect(readFileSync(file).subarray(0, 5).toString()).toBe("%PDF-");
+    const headers = readFileSync(path.join(repo, "public/_headers"), "utf8");
+    expect(headers).toMatch(/\/guides\/\*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/);
+    expect(html).not.toMatch(/<a[^>]+href=["']\/guides\//i);
   });
 });
