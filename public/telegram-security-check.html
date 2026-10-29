@@ -7,9 +7,9 @@
   answers leaves the page. There is no public Telegram scan endpoint (see docs/telegram-baseline-scan.md and
   docs/telegram-rollout-gates.md), so the page never claims one.
 
-  DRAFT: copy is pending Chris's approval, so the page is noindex and unlinked. The email gate stays disabled until
-  HUBSPOT_FORM_ID is filled in with a published HubSpot form (portal 246502821, fields: email, source_tag,
-  consent_given_at, consent_source) and the guide PDF exists at PDF_URL.
+  LIVE (launched with Chris's go-ahead, 2026-10-29): copy approved, indexable, listed in the sitemap. Email gate posts to
+  HubSpot form "Telegram Security Check — MPC-8684" (portal 246502821; fields email, source_tag, consent_given_at,
+  consent_source); the guide PDF (a soft gate, by decision) is served from /downloads/ with an X-Robots-Tag noindex header.
 -->
 <html lang="en">
 <head>
@@ -17,7 +17,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Telegram security check | MyPrivacyTOOL</title>
 <meta name="description" content="Eight questions about your own Telegram settings. Get a plain-English exposure score in a minute. Nothing you answer leaves this page.">
-<meta name="robots" content="noindex, nofollow">
 <link rel="canonical" href="https://myprivacytool.io/telegram-security-check">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Telegram security check | MyPrivacyTOOL">
@@ -164,7 +163,7 @@
   // ---- config (fill before publishing) ----
   var HUBSPOT_PORTAL_ID = '246502821';
   var HUBSPOT_FORM_ID = '52fb3807-d5c8-4f0d-9120-4b4850b3848c';  // HubSpot form "Telegram Security Check — MPC-8684" (portal 246502821)
-  var PDF_URL = '/guides/telegram-privacy-guide-2026-bdeb307d.pdf';
+  var PDF_URL = '/downloads/telegram-privacy-guide-2026-bdeb307d.pdf';
   var SOURCE_TAG = 'telegram-security-check';
 
   // ---- questions: yes = good practice. Equal weights. ----
