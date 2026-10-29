@@ -43,7 +43,7 @@ The first failing step stops the run; later steps are recorded as **skipped**, n
 
 ## 3. Weekly: unsubscribe and deletion on a test record
 
-Sunday 23:45 HKT, alias `testingnt69+weekly-<day>`: scan on the synthetic Worker, signed unsubscribe `POST` to the **synthetic Worker** (MPC-8748: signed with the test-only secret `SCAN_REPORT_UNSUBSCRIBE_SECRET`, which the synthetic deploy copies to that Worker only; production's own secret is not needed), check `users.email_opt_out_at` and the `email_suppressions` hash, `mpt_delete_web_scan(<scan number>)`, verify gone, then `mpt_dsar_erase` for the alias (and for nightly aliases 3 to 10 days old) and removal of the suppression row. The cleanup runs even if an earlier weekly step failed. Every destructive call is guarded by `isTestAddress` (the mailbox `testingnt69` and its `+aliases` only).
+Sunday 23:45 HKT, alias `testingnt69+weekly-<day>`: scan on the synthetic Worker, signed unsubscribe `POST` to the **synthetic Worker** (MPC-8748: signed with a throwaway key the weekly run puts on that Worker itself; production's own secret is not needed), check `users.email_opt_out_at` and the `email_suppressions` hash, `mpt_delete_web_scan(<scan number>)`, verify gone, then `mpt_dsar_erase` for the alias (and for nightly aliases 3 to 10 days old) and removal of the suppression row. The cleanup runs even if an earlier weekly step failed. Every destructive call is guarded by `isTestAddress` (the mailbox `testingnt69` and its `+aliases` only).
 
 ## 4. Alerts, no duplicates
 
@@ -64,5 +64,5 @@ Sunday 23:45 HKT, alias `testingnt69+weekly-<day>`: scan on the synthetic Worker
 
 ## 6. What activation needs (tracked as Notion tasks, not asks to Chris)
 
-* The synthetic Worker takes `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` from existing GitHub secrets on first deploy. Needed for the weekly run: GitHub secret `SCAN_REPORT_UNSUBSCRIBE_SECRET`, a fresh test-only value (`openssl rand -hex 32`), NOT production's secret. The synthetic deploy copies it to the synthetic Worker, and the weekly run signs its unsubscribe with it. The production deploy never reads this secret. Without it the weekly run reports **not configured** (alerted), never a pass.
+* The synthetic Worker takes `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` from existing GitHub secrets on first deploy. Weekly run: needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (already used by the deploy workflows). Each weekly run makes a throwaway key, puts it on the synthetic Worker as `UNSUBSCRIBE_SECRET` and signs the unsubscribe with it, so no UNSUBSCRIBE_SECRET repo secret is needed. It never reads or sets production's secret. If `SCAN_REPORT_UNSUBSCRIBE_SECRET` exists it is only a fallback.
 * The metrics collector must be redeployed (automatic on merge) before its alert path exists.
