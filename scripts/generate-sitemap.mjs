@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { HEXAGON_CATALOGUE } from "../shared/hexagon-registry/catalogue.js";
+import { GUIDES } from "../shared/hexagon-registry/guides.js";
 import { hkSpamSitemapEntry, patchRobots, readHkSpamConfig } from "./hkSpamFlag.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -109,6 +110,9 @@ function generateSitemap() {
   // MPC-8689: the master hexagon risk page and one page per hexagon (built into dist/hexagon by generate-hexagon-pages.mjs).
   const hexLastmod = gitLastmod("shared/hexagon-registry/hexagons-366.json");
   entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/`, priority: "0.7", changefreq: "monthly", lastmod: hexLastmod }));
+  // MPC-7561: the guides index and one guide per approved hexagon (built by generate-guide-pages.mjs).
+  entries.push(buildUrlEntry({ loc: `${SITE_URL}/guides/`, priority: "0.6", changefreq: "monthly", lastmod: hexLastmod }));
+  for (const g of GUIDES) entries.push(buildUrlEntry({ loc: `${SITE_URL}/guides/${g.id}/`, priority: "0.5", changefreq: "monthly", lastmod: gitLastmod("shared/hexagon-registry/guides.js") }));
   for (const h of HEXAGON_CATALOGUE) entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/${h.slug}/`, priority: h.risk === "high" ? "0.6" : "0.4", changefreq: "monthly", lastmod: hexLastmod }));
 
   // MPC-7446: /HongKongSpam is listed (and robots.txt un-blocked) only when the single flag in
