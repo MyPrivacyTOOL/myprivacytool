@@ -143,7 +143,9 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       const first = await steps.scan_request();   // the weekly alias needs a scan to unsubscribe from and delete
       await steps.saved_scan(); await steps.linked_contact_consent();
       const t = await unsubscribeToken(env.UNSUBSCRIBE_SECRET, email);
-      const res = await fetchImpl(`${prod}/api/unsubscribe?e=${encodeURIComponent(email)}&t=${t}`, { method: 'POST', headers: { Accept: 'application/json', Origin: ORIGIN } });
+      // MPC-8748: signed against the SYNTHETIC Worker, whose UNSUBSCRIBE_SECRET is the GitHub secret SCAN_REPORT_UNSUBSCRIBE_SECRET (a test-only value; the deploy workflow
+      // copies it to the synthetic Worker only). Production's own secret is never needed or touched. Same handler code, same shared database, test alias only.
+      const res = await fetchImpl(`${synth}/api/unsubscribe?e=${encodeURIComponent(email)}&t=${t}`, { method: 'POST', headers: { Accept: 'application/json', Origin: ORIGIN } });
       if (!res.ok) throw new Error(`POST /api/unsubscribe HTTP ${res.status}`);
       return `${first}; unsubscribe answered ${res.status}`;
     },
