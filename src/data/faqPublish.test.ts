@@ -33,6 +33,16 @@ describe("approved FAQ (MPC-7560 approved 2026-10-28)", () => {
     for (const q of APPROVED) expect(words(FAQS.find((f) => f.q === q)!.a), q).toBeLessThan(80);
   });
 
+  it("matches the Privacy Policy on the two email-address facts (breaches not currently checked; full address goes to GitHub)", () => {
+    const privacy = readFileSync(resolve(root, "src/pages/Privacy.tsx"), "utf8").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+    expect(privacy).toContain("We do not currently check data breaches");
+    expect(privacy).toContain("your whole email address, not a scrambled code, goes to GitHub");
+    const checks = FAQS.find((f) => f.q === "What do you check about my email address?")!.a;
+    expect(checks).toContain("do not currently check");
+    expect(checks).toContain("GitHub");
+    expect(FAQS.find((f) => f.q === "Do you sell or share my data?")!.a).toContain("GitHub");
+  });
+
   it("makes no promise the policy does not make (no 'open source', no self-service delete claim)", () => {
     const text = FAQS.map((f) => f.a).join(" ");
     expect(text).not.toMatch(/open[- ]source/i);
