@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { HEXAGON_CATALOGUE as ITEMS, CATALOGUE_CHANNELS as CHANNELS } from '../shared/hexagon-registry/catalogue.js';
 import { EXTRA_HEXAGON_IDS } from '../shared/hexagon-registry/channels.js';
+import { REVIEWED, REVIEWED_ON } from './hexagon-reviewed-copy.mjs';
 
 const EXTRA = new Set(EXTRA_HEXAGON_IDS); // built and checked, but outside every score (MPC-8689 pilot)
 
@@ -65,6 +66,8 @@ const PLACEHOLDER = /^(Already in the MPT registry|Registry hexagon)/;
 export const revealsText = (i) => (PLACEHOLDER.test(i.reveals) || !i.reveals ? `On ${chLabel[i.channel]}, MPT can read this from the account: ${i.label.toLowerCase()}${i.field ? ` (${i.field.replace(/_/g, '_')})` : ''}.` : i.reveals);
 
 export function misuse(i) {
+  const r = REVIEWED[i.slug];
+  if (r) return { heads: [r.heads], uses: r.uses };
   const text = ` ${i.label} ${PLACEHOLDER.test(i.reveals) ? '' : i.reveals} ${i.field} `.toLowerCase();
   const hit = THEMES.filter((t) => t[0].test(text)).slice(0, 3);
   const heads = hit.map((t) => t[1]);
@@ -116,12 +119,12 @@ export function hexagonPage(i) {
     ld: { '@context': 'https://schema.org', '@type': 'Article', headline: title, description: desc, url, publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL' } },
     body: `<nav><a href="${BASE}/">All hexagons</a> › ${esc(chLabel[i.channel])}</nav>
 <div class="eyebrow">MyPrivacyTOOL · Hexagon risk page</div><h1>${esc(i.label)}</h1>
-<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span><span class="tag">${extra ? 'Checked by MPT (extra check)' : mapped ? 'Built (capture switch)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
+<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span>${REVIEWED[i.slug] ? `<span class="tag">Text reviewed ${REVIEWED_ON}</span>` : ''}<span class="tag">${extra ? 'Checked by MPT (extra check)' : mapped ? 'Built (capture switch)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
 <div class="risk"><div class="hexb ${i.risk}" aria-hidden="true">${RL[i.risk]}</div><div><b>${RN[i.risk]} risk</b><p>${RDEF[i.risk]}</p></div></div>
 <h2>What it reveals</h2><p>${esc(revealsText(i))}</p>
 <h2>How easily it can be obtained</h2><p><b>${i.arrival} · ${AR[i.arrival]}.</b> ${ARX[i.arrival]}</p>
 <h2>What it could be used for</h2>${heads.length ? `<p>${esc(heads.join(' · '))}.</p>` : ''}<ul>${uses.map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
-<h2>What you can do</h2><ul>${DO[i.risk].map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
+<h2>What you can do</h2><ul>${(REVIEWED[i.slug]?.todo ?? DO[i.risk]).map((u) => `<li>${esc(u)}</li>`).join('')}</ul>
 <div class="box"><dl><dt>Hexagon id</dt><dd><code>${esc(i.id)}</code></dd><dt>Field</dt><dd>${esc(i.field || 'Not recorded yet')}</dd><dt>Access</dt><dd>${esc(i.access)}. ${esc(ACC[i.access] || '')}</dd><dt>Status</dt><dd>${mapped ? `Built in the code as ${esc(i.code_ids.join(', '))}. X capture records it only when its switch is on.${i.note ? ' ' + esc(i.note) : ''}` : extra ? 'Checked by MPT today as an extra check. It is shown to you but is not part of your risk number or any score yet.' : checked ? 'Checked by MPT today.' : 'Found in the platform documentation. Not checked by MPT yet, and not part of any score.'}</dd>${i.source ? `<dt>Source</dt><dd><a href="${esc(i.source)}" target="_blank" rel="noopener">${esc(i.source)}</a></dd>` : ''}</dl></div>
 ${rel.length ? `<h2>Other ${RN[i.risk].toLowerCase()}-risk hexagons on ${esc(chLabel[i.channel])}</h2><div class="rel">${rel.map((x) => `<a href="${BASE}/${x.slug}/">${esc(x.label)}</a>`).join('')}</div>` : ''}
 <p style="margin-top:24px"><a href="/footprint/">See the full footprint map</a> · <a href="${BASE}/">All ${ITEMS.length} hexagons</a></p>
