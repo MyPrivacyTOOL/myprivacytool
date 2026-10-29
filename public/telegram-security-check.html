@@ -1,0 +1,317 @@
+<!doctype html>
+<!--
+  MPC-8684 — Telegram security self-check (campaign landing page for MPC-8675).
+
+  What this is: an 8-question SELF-ASSESSMENT of the visitor's own Telegram settings, scored in the browser.
+  What this is NOT: a scan of their account. No Telegram data is read, no username is asked for, nothing about the
+  answers leaves the page. There is no public Telegram scan endpoint (see docs/telegram-baseline-scan.md and
+  docs/telegram-rollout-gates.md), so the page never claims one.
+
+  DRAFT: copy is pending Chris's approval, so the page is noindex and unlinked. The email gate stays disabled until
+  HUBSPOT_FORM_ID is filled in with a published HubSpot form (portal 246502821, fields: email, source_tag,
+  consent_given_at, consent_source) and the guide PDF exists at PDF_URL.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram security check | MyPrivacyTOOL</title>
+<meta name="description" content="Eight questions about your own Telegram settings. Get a plain-English exposure score in a minute. Nothing you answer leaves this page.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://myprivacytool.io/telegram-security-check">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Telegram security check | MyPrivacyTOOL">
+<meta property="og:description" content="Eight questions about your own Telegram settings. A plain-English exposure score in a minute.">
+<meta property="og:url" content="https://myprivacytool.io/telegram-security-check">
+<meta property="og:image" content="https://myprivacytool.io/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@MyPrivacyTOOL">
+<style>
+  /* Brand Guidelines v2 palette (locked, see src/index.css). System fonts: no third-party request before consent. */
+  :root{--green:#27AE60;--green-hover:#1E8449;--ink:#1E8449;--black:#000;--near:#1A1A1A;--border:#2A2A2A;--off:#F4F4F4;--white:#fff;--error:#E74C3C;--muted:#555}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--near);background:var(--white)}
+  .wrap{max-width:720px;margin:0 auto;padding:0 16px}
+  header.hero{background:var(--black);color:var(--white);padding:40px 0 36px}
+  .eyebrow{font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+  h1{font-size:clamp(28px,6vw,40px);line-height:1.15;margin:12px 0 12px}
+  .lede{font-size:18px;color:#ddd;margin:0 0 20px}
+  .btn{display:inline-block;background:var(--green);color:var(--black);border:0;border-radius:8px;padding:14px 22px;font:600 16px/1 inherit;cursor:pointer;text-decoration:none}
+  .btn:hover{background:var(--green-hover);color:var(--white)}
+  .btn[disabled]{background:#9aa;color:#333;cursor:not-allowed}
+  .btn:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+  main{padding:32px 0 56px}
+  h2{font-size:22px;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 20px}
+  fieldset{border:1px solid #ddd;border-radius:10px;margin:0 0 14px;padding:14px 16px}
+  legend{font-weight:600;padding:0 6px}
+  .why{font-size:14px;color:var(--muted);margin:4px 0 10px}
+  .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .opts label{position:relative;flex:1 1 130px;border:1px solid #bbb;border-radius:8px;padding:12px;cursor:pointer;text-align:center;min-height:44px}
+  .opts input{position:absolute;opacity:0}
+  .opts input:checked+span{font-weight:700}
+  .opts label:has(input:checked){border-color:var(--green-hover);background:var(--off);box-shadow:inset 0 0 0 2px var(--green-hover)}
+  .opts label:has(input:focus-visible){outline:3px solid var(--green);outline-offset:2px}
+  #result,#gate{display:none;margin-top:28px;border-radius:12px;padding:20px}
+  #result{background:var(--near);color:var(--white)}
+  .score{font-size:56px;font-weight:800;line-height:1;margin:6px 0}
+  .band{display:inline-block;border-radius:999px;padding:4px 12px;font-weight:700;font-size:14px;background:var(--off);color:var(--black)}
+  .band.high{background:var(--error);color:var(--white)}
+  .pillars{list-style:none;padding:0;margin:16px 0 0}
+  .pillars li{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--border);padding:8px 0}
+  .fine{font-size:13px;color:#bbb;margin-top:14px}
+  #gate{background:var(--off)}
+  #gate input[type=email]{width:100%;padding:12px;border:1px solid #888;border-radius:8px;font:inherit;margin:8px 0}
+  #gate .consent{display:flex;gap:10px;align-items:flex-start;font-size:14px;margin:8px 0 14px}
+  #gate .consent input{margin-top:4px;width:20px;height:20px}
+  .msg{margin-top:10px;font-size:14px}
+  .msg.err{color:#B02A1D}
+  footer{border-top:1px solid #ddd;padding:20px 0;font-size:13px;color:var(--muted)}
+  #cc{position:fixed;left:0;right:0;bottom:0;background:var(--near);color:var(--white);padding:14px 16px;display:none;z-index:10}
+  #cc .row{max-width:720px;margin:0 auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  #cc p{margin:0;flex:1 1 260px;font-size:14px}
+  #cc button{border:1px solid var(--white);background:transparent;color:var(--white);border-radius:8px;padding:10px 16px;font:600 14px/1 inherit;cursor:pointer}
+  #cc button.ok{background:var(--green);border-color:var(--green);color:var(--black)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<!-- Same consent-gated Google tag as index.html (Property 515216281 / G-1BWMDBJSPL). No request to googletagmanager.com
+     until the visitor accepts analytics; the choice is the shared localStorage key mpt_cookie_consent. -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  (function () {
+    var GA_ID = 'G-1BWMDBJSPL';
+    var loaded = false;
+    var h = location.hostname;
+    var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
+    window['ga-disable-' + GA_ID] = true;
+    function allowed() {
+      if (!isProd) return false;
+      try {
+        var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
+        return !!(c && c.v === 1 && c.analytics === true);
+      } catch (e) { return false; }
+    }
+    function sync() {
+      var ok = allowed();
+      window['ga-disable-' + GA_ID] = !ok;
+      if (!ok || loaded) return;
+      loaded = true;
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+      document.head.appendChild(s);
+      gtag('js', new Date());
+      gtag('config', GA_ID);
+    }
+    window.addEventListener('mpt:consent', sync);
+    window.__mptAnalyticsAllowed = allowed;
+    sync();
+  })();
+</script>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Telegram privacy check</div>
+    <h1>How exposed are your Telegram settings?</h1>
+    <p class="lede">Eight quick questions about your own account. You get a plain-English score in about a minute. Nothing you answer leaves this page.</p>
+    <a class="btn" href="#quiz" id="start-link">Start the check</a>
+  </div>
+</header>
+
+<main class="wrap" id="quiz">
+  <h2>Check your settings</h2>
+  <p class="sub">Open Telegram, then Settings, then Privacy and Security, and answer from what you see. Not sure? Pick &ldquo;Not sure&rdquo;. We won&rsquo;t count it against you or in your favour.</p>
+
+  <form id="quizForm" novalidate></form>
+
+  <section id="result" aria-live="polite" tabindex="-1">
+    <span class="band" id="band"></span>
+    <div class="score" id="score"></div>
+    <div id="scoreNote"></div>
+    <ul class="pillars" id="pillars"></ul>
+    <p class="fine">This is a self-assessment of the settings you told us about. It is not a scan of your account and not a measure of whether anyone will target you. Settings you marked &ldquo;Not sure&rdquo; are left out, not counted as safe.</p>
+  </section>
+
+  <section id="gate" aria-labelledby="gateTitle">
+    <h2 id="gateTitle">Get the step-by-step guide</h2>
+    <p class="sub">A short PDF that walks through fixing each setting above. Enter your email to download it.</p>
+    <form id="gateForm" novalidate>
+      <label for="email">Email address</label>
+      <input type="email" id="email" name="email" autocomplete="email" inputmode="email" required>
+      <label class="consent"><input type="checkbox" id="consent" required>
+        <span>I agree that MyPrivacyTOOL can email me this guide and occasional privacy tips. I can unsubscribe at any time. See the <a href="/privacy">Privacy Policy</a>.</span></label>
+      <button class="btn" type="submit" id="gateBtn">Download the guide</button>
+      <div class="msg" id="gateMsg" role="status"></div>
+    </form>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">MyPrivacyTOOL &middot; <a href="/privacy">Privacy</a> &middot; <a href="/cookies">Cookies</a>. Telegram is a trademark of its owner; MyPrivacyTOOL is not affiliated with Telegram.</div>
+</footer>
+
+<div id="cc" role="region" aria-label="Cookie choice">
+  <div class="row">
+    <p>We&rsquo;d like to use analytics cookies to see how this page performs. No ads, no selling data. See <a href="/cookies" style="color:#fff">Cookies</a>.</p>
+    <button type="button" id="ccNo">Decline</button><button type="button" class="ok" id="ccYes">Accept analytics</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---- config (fill before publishing) ----
+  var HUBSPOT_PORTAL_ID = '246502821';
+  var HUBSPOT_FORM_ID = '52fb3807-d5c8-4f0d-9120-4b4850b3848c';  // HubSpot form "Telegram Security Check — MPC-8684" (portal 246502821)
+  var PDF_URL = '/guides/telegram-privacy-guide-2026-bdeb307d.pdf';
+  var SOURCE_TAG = 'telegram-security-check';
+
+  // ---- questions: yes = good practice. Equal weights. ----
+  var PILLARS = { access: 'Account access', identity: 'Who can identify you', visibility: 'What others can see', contacts: 'Contacts' };
+  var QUESTIONS = [
+    { id: 'twofa', p: 'access', q: 'I have two-step verification (a cloud password) turned on.', why: 'Stops someone with your SMS code from taking over the account.' },
+    { id: 'sessions', p: 'access', q: 'I checked my active sessions in the last three months and removed any I don’t recognise.', why: 'Settings, Devices. Old logins are a common way accounts are watched.' },
+    { id: 'phone', p: 'identity', q: 'My phone number is hidden from people who aren’t in my contacts.', why: 'Privacy and Security, Phone Number: set to Nobody or My Contacts.' },
+    { id: 'photo', p: 'identity', q: 'My profile photo is limited to my contacts (or I don’t use one).', why: 'A photo is the easiest way to link an account to a real person.' },
+    { id: 'lastseen', p: 'visibility', q: 'Last seen and online status is limited to contacts or hidden.', why: 'Shows when you sleep, travel and are online.' },
+    { id: 'groups', p: 'visibility', q: 'Only my contacts can add me to groups.', why: 'Stops strangers placing you in groups you didn’t choose.' },
+    { id: 'forwards', p: 'visibility', q: 'Forwarded messages don’t link back to my profile.', why: 'Privacy and Security, Forwarded Messages: set to Nobody.' },
+    { id: 'sync', p: 'contacts', q: 'Contact syncing is off, or I’ve deleted synced contacts I don’t need.', why: 'Synced address books let others find you from your number.' }
+  ];
+  var MIN_ANSWERED = 4;                  // fewer answers than this means no score, never a score of 0
+  var answers = {};                      // id -> 'yes' | 'no' | 'unsure'
+  var started = false, completed = false, pdfTracked = false;
+
+  function $(id) { return document.getElementById(id); }
+
+  // ---- analytics (only when the visitor accepted analytics) ----
+  function track(name, params) {
+    try {
+      if (window.__mptAnalyticsAllowed && window.__mptAnalyticsAllowed()) gtag('event', name, params || {});
+    } catch (e) {}
+  }
+
+  // ---- consent banner: writes the same key/shape as src/lib/cookieConsent.ts ----
+  function choice() { try { return JSON.parse(localStorage.getItem('mpt_cookie_consent') || 'null'); } catch (e) { return null; } }
+  function setChoice(analytics) {
+    try { localStorage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics: analytics, at: new Date().toISOString() })); } catch (e) {}
+    window.dispatchEvent(new Event('mpt:consent'));
+    $('cc').style.display = 'none';
+    document.body.style.paddingBottom = '';
+  }
+  // The banner is fixed to the bottom, so leave room for it or it covers the last button on small screens.
+  if (!choice()) { $('cc').style.display = 'block'; document.body.style.paddingBottom = $('cc').offsetHeight + 'px'; }
+  $('ccYes').onclick = function () { setChoice(true); };
+  $('ccNo').onclick = function () { setChoice(false); };
+
+  // ---- build the quiz ----
+  var form = $('quizForm');
+  QUESTIONS.forEach(function (q) {
+    var fs = document.createElement('fieldset');
+    var lg = document.createElement('legend'); lg.textContent = q.q; fs.appendChild(lg);
+    var why = document.createElement('div'); why.className = 'why'; why.textContent = q.why; fs.appendChild(why);
+    var opts = document.createElement('div'); opts.className = 'opts';
+    [['yes', 'Yes'], ['no', 'No'], ['unsure', 'Not sure']].forEach(function (o) {
+      var l = document.createElement('label');
+      var i = document.createElement('input'); i.type = 'radio'; i.name = q.id; i.value = o[0];
+      var s = document.createElement('span'); s.textContent = o[1];
+      i.onchange = function () { onAnswer(q.id, o[0]); };
+      l.appendChild(i); l.appendChild(s); opts.appendChild(l);
+    });
+    fs.appendChild(opts); form.appendChild(fs);
+  });
+  var done = document.createElement('button');
+  done.type = 'button'; done.className = 'btn'; done.id = 'seeScore'; done.textContent = 'See my score';
+  done.onclick = showResult;
+  form.appendChild(done);
+  var qmsg = document.createElement('div'); qmsg.className = 'msg err'; qmsg.id = 'qmsg'; qmsg.setAttribute('role', 'alert');
+  form.appendChild(qmsg);
+
+  function onAnswer(id, v) {
+    answers[id] = v;
+    if (!started) { started = true; track('telegram_scan_started', { method: 'self_assessment' }); }
+  }
+
+  // ---- scoring: exposure 0-100 (higher = more exposed). No = exposed, Yes = not, unsure = left out. ----
+  function score() {
+    var per = {}, total = 0, n = 0;
+    QUESTIONS.forEach(function (q) {
+      var a = answers[q.id];
+      if (a !== 'yes' && a !== 'no') return;
+      var e = a === 'no' ? 100 : 0;
+      var p = per[q.p] || (per[q.p] = { sum: 0, n: 0 });
+      p.sum += e; p.n += 1; total += e; n += 1;
+    });
+    return { n: n, value: n >= MIN_ANSWERED ? Math.round(total / n) : null, per: per };
+  }
+  function band(v) { return v <= 39 ? 'Low' : v <= 69 ? 'Medium' : 'High'; }
+  var BAND_NOTE = {
+    Low: 'Most of the settings you checked are already tight. Use the guide to close any gaps.',
+    Medium: 'Some of what you checked is visible to people who shouldn’t need it. A few setting changes will help.',
+    High: 'Much of what you checked is open. The good news: most of it is a setting you can change in a few minutes.'
+  };
+
+  function showResult() {
+    var r = score(), res = $('result');
+    $('qmsg').textContent = '';
+    if (r.value === null) {
+      $('qmsg').textContent = 'Please answer at least ' + MIN_ANSWERED + ' questions with Yes or No to get a score.';
+      return;
+    }
+    var b = band(r.value);
+    $('band').textContent = b + ' exposure';
+    $('band').className = 'band' + (b === 'High' ? ' high' : '');
+    $('score').textContent = r.value + ' / 100';
+    $('scoreNote').textContent = BAND_NOTE[b] + ' (' + r.n + ' of ' + QUESTIONS.length + ' questions counted.)';
+    var ul = $('pillars'); ul.innerHTML = '';
+    Object.keys(PILLARS).forEach(function (k) {
+      var li = document.createElement('li'), l = document.createElement('span'), v = document.createElement('span');
+      l.textContent = PILLARS[k];
+      var p = r.per[k];
+      v.textContent = p ? band(Math.round(p.sum / p.n)) + ' (' + p.n + ' counted)' : 'Not checked';
+      li.appendChild(l); li.appendChild(v); ul.appendChild(li);
+    });
+    res.style.display = 'block'; $('gate').style.display = 'block';
+    res.focus();
+    if (!completed) { completed = true; track('telegram_scan_completed', { method: 'self_assessment', score_band: b, answered: r.n }); }
+  }
+
+  // ---- email gate -> HubSpot Forms API, then the PDF ----
+  var gateBtn = $('gateBtn'), gateMsg = $('gateMsg');
+  if (!HUBSPOT_FORM_ID) {
+    gateBtn.disabled = true;
+    gateMsg.textContent = 'The guide download isn’t open yet. Check back soon.';
+  }
+  $('gateForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (!HUBSPOT_FORM_ID) return;
+    var email = $('email').value.trim();
+    gateMsg.className = 'msg';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { gateMsg.className = 'msg err'; gateMsg.textContent = 'Please enter a valid email address.'; return; }
+    if (!$('consent').checked) { gateMsg.className = 'msg err'; gateMsg.textContent = 'Please tick the box to agree.'; return; }
+    gateBtn.disabled = true; gateMsg.textContent = 'Sending…';
+    var d = new Date(), fields = [
+      { name: 'email', value: email },
+      { name: 'source_tag', value: SOURCE_TAG },
+      { name: 'consent_given_at', value: String(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())) },
+      { name: 'consent_source', value: SOURCE_TAG }
+    ];
+    var m = document.cookie.match(/(?:^|;\s*)hubspotutk=([^;]+)/);
+    fetch('https://api.hsforms.com/submissions/v3/integration/submit/' + HUBSPOT_PORTAL_ID + '/' + HUBSPOT_FORM_ID, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: fields, context: { hutk: m ? decodeURIComponent(m[1]) : undefined, pageUri: location.href, pageName: document.title } })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('status ' + res.status);
+      if (!pdfTracked) { pdfTracked = true; track('telegram_pdf_downloaded', {}); }
+      gateMsg.innerHTML = 'Thanks. <a href="' + PDF_URL + '" download>Download the guide (PDF)</a>.';
+      window.location.href = PDF_URL;
+    }).catch(function () {
+      gateBtn.disabled = false; gateMsg.className = 'msg err';
+      gateMsg.textContent = 'Something went wrong. Please try again in a moment.';
+    });
+  });
+})();
+</script>
+</body>
+</html>
