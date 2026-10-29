@@ -1,8 +1,8 @@
 // Hexagon guides (MPC-7561). The approved text of one guide per hexagon, written in the Notion "Hexagon guides" database and approved by
-// the owner on 29 Oct 2026 (58 of 61). The guide pages (scripts/generate-guide-pages.mjs) and the report's Guide links
+// the owner on 29 Oct 2026 (59 of 61). The guide pages (scripts/generate-guide-pages.mjs) and the report's Guide links
 // (workers/scan-report/lib/reportHex.js) both read this list, so a link in a report can only point at a page that exists.
-// Three hexagons have no guide yet and fall back to the generic guide: email-breaches (the breach lookup is not confirmed live),
-// email-libravatar and webrtc-leak (no vendor source for the steps). Add a guide here only after it is approved.
+// Two hexagons have no guide yet and fall back to the generic guide: email-libravatar and webrtc-leak (no vendor source for the steps).
+// email-breaches is worded as 'not checked' because the owner decided (MPC-8589) that no breach check is built. Add a guide here only after it is approved.
 // `source` is present only when the steps come from a vendor help page; the rest give no product steps.
 export const GUIDES = [
   {
@@ -674,6 +674,17 @@ export const GUIDES = [
     "seen": "Every browser reports these to every site. It is informational, not a fault.",
     "why": "Together with other details they help sites tell visitors apart, which is called fingerprinting. They also place you in a region even without your IP address.",
     "inReport": "In your report this shows as FOUND with the value we read, or NOT CHECKED if the check failed or your browser gave us nothing. It is informational, so it is never shown as clear: there is nothing to be clear of."
+  },
+  {
+    "id": "email-breaches",
+    "label": "Known breaches",
+    "group": "Email address",
+    "change": "We do not check this for you. To see whether your address appears in known data breaches, use a lookup service you trust, such as haveibeenpwned.com, which the report links to. If you find one, change the password for that site and for any other site where you used the same one, and use a different password for each site. A password manager makes this easier. We have no vendor page to cite, so no product steps are given.",
+    "check": "Nothing to check here: this hexagon always reads NOT CHECKED. Run the lookup yourself, then confirm the passwords you changed.",
+    "what": "Whether your email address appears in a known data breach.",
+    "seen": "We do not look this up. Our Privacy Policy says we do not currently check data breaches, and no breach company receives your address from us. So this hexagon always reads NOT CHECKED, never clear. If we start, we will name the company and say what we send.",
+    "why": "If an address is in a breach, the password used with it at that site may be known to others. That is worth knowing, and it is not a sign that anything has happened to you.",
+    "inReport": "In your report this always shows as NOT CHECKED, with a link to check it yourself."
   }
 ];
 
@@ -683,4 +694,4 @@ export const GUIDE_PATH = '/guides';
 export const hasGuide = (id) => GUIDE_BY_ID.has(id);
 export const guidePath = (id) => `${GUIDE_PATH}/${id}/`;
 // Hexagons that have no approved guide yet (checked against the registry by guides.test.mjs).
-export const UNGUIDED_IDS = ['email-breaches', 'email-libravatar', 'webrtc-leak'];
+export const UNGUIDED_IDS = ['email-libravatar', 'webrtc-leak'];
