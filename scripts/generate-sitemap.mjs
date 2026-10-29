@@ -84,6 +84,17 @@ function generateSitemap() {
     }),
   );
 
+  // MPC-8684: the Telegram security self-check is a static page (public/telegram-security-check.html), not a React route,
+  // so it is listed here and deliberately NOT in STATIC_ROUTES (prerender-meta would otherwise overwrite its dist file).
+  entries.push(
+    buildUrlEntry({
+      loc: `${SITE_URL}/telegram-security-check`,
+      lastmod: gitLastmod("public/telegram-security-check.html"),
+      changefreq: "monthly",
+      priority: "0.5",
+    }),
+  );
+
   for (const post of loadBlogPosts()) {
     entries.push(
       buildUrlEntry({

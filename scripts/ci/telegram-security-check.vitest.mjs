@@ -12,8 +12,9 @@ const html = readFileSync(path.join(repo, "public/telegram-security-check.html")
 const visible = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
 
 describe("Telegram security check page", () => {
-  it("is noindex with a self-referencing absolute canonical and link-preview tags", () => {
-    expect(html).toContain('name="robots" content="noindex, nofollow"');
+  it("is indexable (launched), with a self-referencing absolute canonical and link-preview tags, and is in the sitemap", () => {
+    expect(html).not.toMatch(/name="robots"[^>]*noindex/i);
+    expect(readFileSync(path.join(repo, "scripts/generate-sitemap.mjs"), "utf8")).toContain("/telegram-security-check`");
     expect(html).toContain('rel="canonical" href="https://myprivacytool.io/telegram-security-check"');
     for (const tag of ["og:title", "og:description", "og:image", "twitter:card"]) expect(html).toContain(tag);
   });
@@ -46,14 +47,16 @@ describe("Telegram security check page", () => {
     expect(html).toContain("consent_given_at");
     expect(html).toContain("source_tag");
   });
-  it("serves the guide PDF from an unlisted path that exists, is a real PDF and is kept out of search", () => {
-    const m = html.match(/var PDF_URL = '(\/guides\/[A-Za-z0-9._-]+\.pdf)';/);
-    expect(m, "PDF_URL must point under /guides/").toBeTruthy();
+  it("serves the guide PDF from an unlisted /downloads/ path that exists, is a real PDF and is kept out of search", () => {
+    const m = html.match(/var PDF_URL = '(\/downloads\/[A-Za-z0-9._-]+\.pdf)';/);
+    expect(m, "PDF_URL must point under /downloads/").toBeTruthy();
     const file = path.join(repo, "public", m[1]);
     expect(existsSync(file)).toBe(true);
     expect(readFileSync(file).subarray(0, 5).toString()).toBe("%PDF-");
     const headers = readFileSync(path.join(repo, "public/_headers"), "utf8");
-    expect(headers).toMatch(/\/guides\/\*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/);
-    expect(html).not.toMatch(/<a[^>]+href=["']\/guides\//i);
+    expect(headers).toMatch(/\/downloads\/\*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/);
+    expect(html).not.toMatch(/<a[^>]+href=["']\/downloads\//i);
+    // The public, sitemap-listed guide pages under /guides/ must never be noindexed (regression from the first MPC-8684 merge).
+    expect(headers).not.toMatch(/^\/guides[^\n]*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/m);
   });
 });

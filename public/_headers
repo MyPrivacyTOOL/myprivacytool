@@ -69,6 +69,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), payment=(), usb=(), interest-cohort=()
 # MPC-8684: the Telegram privacy guide PDF. Unlisted, linked only after the email form succeeds (soft gate, decided with Chris 2026-10-29). Keep it out of search.
-/guides/*
+# Lives in /downloads/, NOT /guides/: /guides/ and /guides/<id>/ are the public, sitemap-listed guide pages and must stay indexable.
+/downloads/*
   X-Robots-Tag: noindex, nofollow, noarchive
   Cache-Control: public, max-age=86400
