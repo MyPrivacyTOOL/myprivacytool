@@ -14,7 +14,7 @@ afterEach(() => { vi.restoreAllMocks(); });
 const states = (l: { id: string; state: string }[]) => Object.fromEntries(l.map((x) => [x.id, x.state]));
 
 describe("the extras are catalogue items", () => {
-  it("SMS 4, Viber 9, LINE 5: each id is in the catalogue, marked OK, still 'new', and the lists match the registry", () => {
+  it("SMS 4, Viber 13, LINE 5: each id is in the catalogue, marked OK, still 'new', and the lists match the registry", () => {
     expect(SMS_EXTRA_HEXAGONS.map((x) => x.id)).toEqual(SMS_EXTRA_IDS);
     expect(VIBER_EXTRA_HEXAGONS.map((x) => x.id)).toEqual(VIBER_EXTRA_IDS);
     expect(LINE_EXTRA_HEXAGONS.map((x) => x.id)).toEqual(LINE_EXTRA_IDS);
@@ -72,7 +72,7 @@ describe("Viber", () => {
   };
 
   it("reads sender and message; location and contact only when the person shared them; context only from a deep link", () => {
-    expect(states(viberStates(msg()))).toEqual({ "vb.user_id": "returned", "vb.name_photo": "returned", "vb.country": "returned", "vb.language": "returned", "vb.api_version": "returned", "vb.message": "returned", "vb.deeplink": "not_returned", "vb.location": "not_returned", "vb.contact": "not_returned" });
+    expect(states(viberStates(msg()))).toEqual({ "vb.user_id": "returned", "vb.name_photo": "returned", "vb.country": "returned", "vb.language": "returned", "vb.api_version": "returned", "vb.message": "returned", "vb.deeplink": "not_returned", "vb.location": "not_returned", "vb.contact": "not_returned", "vb.device": "not_checked", "vb.app_version": "not_checked", "vb.carrier": "not_checked", "vb.online": "not_checked" });
     expect(states(viberStates(msg({ message: { type: "location", location: { lat: 1.5, lon: 2.5 } } })))["vb.location"]).toBe("returned");
     expect(states(viberStates(msg({ message: { type: "contact", contact: { name: "X", phone_number: "+1500" } } })))["vb.contact"]).toBe("returned");
     expect(states(viberStates({ event: "conversation_started", context: "ad7", user: sender }))).toMatchObject({ "vb.deeplink": "returned", "vb.user_id": "returned", "vb.message": "not_returned" });
@@ -90,6 +90,8 @@ describe("Viber", () => {
     const calls: any[] = [];
     const f = (async (u: string, init: any) => { calls.push({ u, init, body: JSON.parse(init.body) }); return new Response("{}"); }) as unknown as typeof fetch;
     expect((await post(msg(), env(), f)).status).toBe(200);
+    const sent = calls.filter((c) => c.u.endsWith("/send_message"));
+    calls.length = 0; calls.push(...sent);
     expect(calls).toHaveLength(1);
     expect(calls[0].u).toBe("https://chatapi.viber.com/pa/send_message");
     expect(calls[0].init.headers["X-Viber-Auth-Token"]).toBe(TOKEN);

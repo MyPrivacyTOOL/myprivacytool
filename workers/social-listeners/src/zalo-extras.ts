@@ -15,10 +15,25 @@ export const ZALO_EXTRA_HEXAGONS: readonly ExtraDef[] = [
   { id: "zl.message", label: "What they sent", arrival: "A", source: "event_name user_send_*, message" },
   { id: "zl.location", label: "Shared location", arrival: "C", source: "user_send_location" },
   { id: "zl.business_card", label: "Business card", arrival: "C", source: "user_send_business_card" },
+  { id: "zl.name_photo", label: "Display name and photo", arrival: "B", source: "oa/user/detail: display_name, avatar(s)" },
+  { id: "zl.follower", label: "Follower and last contact", arrival: "B", source: "oa/user/detail: user_is_follower, user_last_interaction_date" },
+  { id: "zl.shared_info", label: "Shared contact details", arrival: "C", source: "oa/user/detail: shared_info" },
 ];
 const SEND_EVENTS = new Set(["user_send_text", "user_send_image", "user_send_link", "user_send_audio", "user_send_video", "user_send_sticker", "user_send_file"]);
 
-export function zaloStates(event: unknown) {
+/** The three lookup hexagons from the user-detail `data` object. null = the lookup failed (not checked). */
+export function zaloDetailStates(d: Obj | null): { returned: Record<string, boolean>; skipped: string[] } {
+  if (!d) return { returned: {}, skipped: ["zl.name_photo", "zl.follower", "zl.shared_info"] };
+  const info = obj(d.shared_info) ?? {};
+  return { returned: {
+    "zl.name_photo": filled(d.display_name) || filled(d.avatar) || filled(d.avatars),
+    "zl.follower": typeof d.user_is_follower === "boolean" || filled(d.user_last_interaction_date),
+    "zl.shared_info": Object.values(info).some(filled),
+  }, skipped: [] };
+}
+
+export function zaloStates(event: unknown, detail: Obj | null = null) {
+  const dt = zaloDetailStates(detail);
   const e = obj(event) ?? {};
   const name = typeof e.event_name === "string" ? e.event_name : "";
   const msg = obj(e.message) ?? {};
@@ -28,10 +43,20 @@ export function zaloStates(event: unknown) {
     "zl.message": SEND_EVENTS.has(name) && (filled(msg.text) || filled(msg.attachments) || filled(msg.msg_id)),
     "zl.location": name === "user_send_location" && Boolean(coords),
     "zl.business_card": name === "user_send_business_card",
-  });
+    ...dt.returned,
+  }, dt.skipped);
 }
 
-export async function handleZaloExtras(request: Request, env: Env): Promise<Response> {
+export async function zaloLookup(userId: unknown, token: string | undefined, fetchImpl: typeof fetch = fetch): Promise<Obj | null> {
+  if (!token || typeof userId !== "string" || !/^[0-9]{5,30}$/.test(userId)) return null;
+  try {
+    const r = await fetchImpl(`https://openapi.zalo.me/v3.0/oa/user/detail?data=${encodeURIComponent(JSON.stringify({ user_id: userId }))}`, { headers: { access_token: token }, signal: AbortSignal.timeout(4000) });
+    const j = r.ok ? obj(await r.json()) : null;
+    return j && (j.error === 0 || j.error === undefined) ? obj(j.data) : null;
+  } catch { return null; }
+}
+
+export async function handleZaloExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.ZALO_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   const key = new URL(request.url).searchParams.get("k");
@@ -43,8 +68,8 @@ export async function handleZaloExtras(request: Request, env: Env): Promise<Resp
   if (!e) return new Response("Bad Request", { status: 400 });
   if (typeof e.event_name !== "string" || !e.event_name.startsWith("user_send_")) return Response.json({ ok: true, checked: false });
   if (!allowedId(env.ZALO_PROBE_IDS, obj(e.sender)?.id)) { log.info("not_allowed"); return Response.json({ ok: true, checked: false }); }
-  const states = zaloStates(e);
+  const states = zaloStates(e, await zaloLookup(obj(e.sender)?.id, env.ZALO_OA_ACCESS_TOKEN, fetchImpl));
   const seen = states.filter((s) => s.state === "returned").length;
   log.info("checked", { seen }); // counts only
-  return Response.json({ ok: true, checked: true, seen, total: states.length, states: states.map((s) => ({ id: s.id, state: s.state })) });
+  return Response.json({ ok: true, checked: true, seen, total: states.filter((s) => s.state !== "not_checked").length, states: states.map((s) => ({ id: s.id, state: s.state })) });
 }

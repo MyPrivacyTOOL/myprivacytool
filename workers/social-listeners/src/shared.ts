@@ -43,6 +43,7 @@ export interface Env {
   YOUTUBE_EXTRAS?: string; YOUTUBE_EXTRAS_SECRET?: string; YOUTUBE_API_KEY?: string; YOUTUBE_PROBE_CHANNEL_IDS?: string;
   KAKAO_EXTRAS?: string; KAKAO_SKILL_SECRET?: string; KAKAO_PROBE_IDS?: string;
   WECHAT_EXTRAS?: string; WECHAT_TOKEN?: string; WECHAT_PROBE_OPENIDS?: string;
+  QQ_EXTRAS?: string; QQ_BOT_SECRET?: string; QQ_PROBE_OPENIDS?: string; WECHAT_ACCESS_TOKEN?: string; ZALO_OA_ACCESS_TOKEN?: string;
   ZALO_EXTRAS?: string; ZALO_WEBHOOK_SECRET?: string; ZALO_PROBE_IDS?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Bot API token used to send replies (MPC-7251). Without it messages are still ingested, just not answered. */

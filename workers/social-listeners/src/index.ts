@@ -4,6 +4,7 @@ import { handleDiscordInteraction } from "./discord-interactions";
 import { handleGithubExtras } from "./github-extras";
 import { handleKakaoExtras } from "./kakao-extras";
 import { handleLineExtras } from "./line-extras";
+import { handleQqExtras } from "./qq-extras";
 import { handleSmsExtras } from "./sms-extras";
 import { handleViberExtras } from "./viber-extras";
 import { handleWechatExtras } from "./wechat-extras";
@@ -24,6 +25,7 @@ export default {
     if (pathname === "/webhook/github-extras") return handleGithubExtras(request, env);
     if (pathname === "/webhook/kakao") return handleKakaoExtras(request, env);
     if (pathname === "/webhook/wechat") return handleWechatExtras(request, env);
+    if (pathname === "/webhook/qq") return handleQqExtras(request, env);
     if (pathname === "/webhook/zalo") return handleZaloExtras(request, env);
     if (pathname === "/youtube/check") return handleYoutubeExtras(request, env);
     if (pathname === "/webhook/linkedin") return handleLinkedInWebhook(request, env);

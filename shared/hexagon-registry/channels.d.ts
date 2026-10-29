@@ -33,6 +33,7 @@ export const YOUTUBE_EXTRA_IDS: string[];
 export const KAKAO_EXTRA_IDS: string[];
 export const WECHAT_EXTRA_IDS: string[];
 export const ZALO_EXTRA_IDS: string[];
+export const QQ_EXTRA_IDS: string[];
 export const EXTRA_HEXAGON_IDS: string[];
 export const X_HEXAGONS: ChannelHexagon[];
 export const X_HEXAGON_COUNT: number;
