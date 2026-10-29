@@ -351,6 +351,18 @@ describe('routed platforms: only platforms Make can publish are sent, verified o
     expect(rep.resent).toEqual([{ id: TASK, platforms: ['linkedin', 'facebook'] }]);
     expect(sentPlatforms(makeCalls().length - 1)).toEqual(['linkedin', 'facebook']);
   });
+  it('routes YouTube only when the Hong Kong date is a multiple of 3, as the Make route does', async () => {
+    const withYt = (db) => env(db, { ROUTED_PLATFORMS: 'linkedin,facebook,instagram,youtube' });
+    const day = async (timestamp) => { const db = fakeD1(); seedDrafts(db); await processApproval(withYt(db), { action: 'approve_all', taskId: TASK, timestamp, approver: 'chris' }); return { sent: sentPlatforms(makeCalls().length - 1), st: states(db) }; };
+    const on = await day('2026-10-20T23:00:00.000Z'); // 21 Oct HKT
+    expect(on.sent).toEqual(['linkedin', 'instagram', 'facebook', 'youtube']);
+    expect(on.st.youtube).toBe('handed_off');
+    const off = await day('2026-10-21T23:00:00.000Z'); // 22 Oct HKT
+    expect(off.sent).toEqual(['linkedin', 'instagram', 'facebook']);
+    expect(off.st.youtube).toBe('not_routed');
+    const edge = await day('2026-10-29T22:10:00.000Z'); // 30 Oct 06:10 HKT, still 29 Oct in UTC
+    expect(edge.sent).toContain('youtube');
+  });
   it('fails closed when ROUTED_PLATFORMS names nothing that was drafted', async () => {
     const db = fakeD1(); seedDrafts(db);
     const out = await processApproval(env(db, { ROUTED_PLATFORMS: 'tiktok' }), { action: 'approve_all', taskId: TASK, timestamp: T0, approver: 'chris' });
