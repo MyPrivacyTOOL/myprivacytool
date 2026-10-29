@@ -77,7 +77,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What do you check about my email address?",
-    a: "Seven things, only for the address you give us: known data breaches, whether your address contains your name, your mail provider and domain, public profile pictures (two services), a website ownership record for your domain, and public code changes. Only checks that ran are reported; everything else says NOT CHECKED.",
+    a: "Up to seven checks: known data breaches (our Privacy Policy says we do not currently check these, so the report says NOT CHECKED), whether your address contains a name, your mail provider and domain, two public profile-picture services, a website ownership record, and public code changes. Only your domain or a scrambled code leaves us, except the code-changes search, which sends your full address to GitHub.",
   },
   {
     q: "What is my scan number?",
@@ -89,7 +89,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Do you sell or share my data?",
-    a: "We do not sell your personal data. We share it only with the service providers that run the product, such as hosting (Cloudflare), databases (Supabase), email (Resend, HubSpot) and analytics, as listed in the Privacy Policy. If you use help or messaging, message text may go to an AI model provider after we remove email addresses and phone numbers.",
+    a: "We do not sell your personal data. We share it only with the providers that run the product, such as hosting (Cloudflare), databases (Supabase), email (Resend, HubSpot) and analytics, as listed in the Privacy Policy. One check also sends your full email address to GitHub, to search public code changes. If you use help or messaging, message text may go to an AI provider after we remove email addresses and phone numbers.",
   },
   {
     q: "What is the JSON file?",
