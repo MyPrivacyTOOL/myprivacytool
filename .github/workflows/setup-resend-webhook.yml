@@ -1,0 +1,60 @@
+name: Setup Resend delivery tracking
+
+# MPC-8751 (MPC-7556 activation): creates the Resend webhook for delivery / bounce / complaint / click events, sets the sending domain to click tracking ON and open
+# tracking OFF, stores the webhook's signing secret on the production scan-report Worker, then proves the endpoint is on (unsigned request refused, signed test event accepted).
+# Manual dispatch only. Default mode "inspect" is read-only. "apply" is idempotent (an existing webhook is reused, never duplicated).
+# Needs repo secrets SCAN_REPORT_RESEND_API_KEY (a full-access key: managing webhooks and domains is refused for sending-only keys), CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+# Rollback: delete the webhook in Resend (or `wrangler secret delete RESEND_WEBHOOK_SECRET` on mpt-scan-report); the endpoint then answers 404 again. No address, key or secret is printed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'inspect (read-only) or apply'
+        default: 'inspect'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: setup-resend-webhook
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    name: Resend setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      MODE: ${{ inputs.mode }}
+      RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+      SECRET_OUT: ${{ runner.temp }}/resend-webhook-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resend - inspect or apply
+        run: node scripts/setup-resend-webhook.mjs
+      - name: Store the signing secret on the production Worker
+        if: inputs.mode == 'apply'
+        working-directory: workers/scan-report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          secret="$(cat "$SECRET_OUT")"
+          echo "::add-mask::$secret"
+          printf '%s' "$secret" | npx --yes wrangler@3 secret put RESEND_WEBHOOK_SECRET >/dev/null
+          echo "set RESEND_WEBHOOK_SECRET on mpt-scan-report"
+          echo "RESEND_WEBHOOK_SECRET=$secret" >> "$GITHUB_ENV"
+      - name: Verify the endpoint (unsigned refused, signed test event accepted)
+        if: inputs.mode == 'apply'
+        env:
+          MODE: verify
+        run: |
+          sleep 10
+          node scripts/setup-resend-webhook.mjs
+      - name: Remove the secret file
+        if: always()
+        run: rm -f "$SECRET_OUT"
