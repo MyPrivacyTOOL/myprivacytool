@@ -1,6 +1,6 @@
 # Core Brain game flow (PROPOSAL, DRAFT wording, needs owner approval)
 
-Status: **proposal only**. This PR changes no behaviour. It builds on `docs/core-brain-conversation-flow.md` (what exists today) and the
+Status: **proposal, with the age rule implemented** (see section 9). The rest is proposal only. It builds on `docs/core-brain-conversation-flow.md` (what exists today) and the
 owner's decisions of 2026-10-29: give something back for every ask, one ask per message, staged switches, no email or phone in chat.
 All copy below is DRAFT and uses the existing rule that nothing is shown that was not checked. Levels 0 to 3 need **no new code**;
 the progress lines in section 4 do.
@@ -73,9 +73,17 @@ and STOP / delete requests (a rise means the tone is wrong).
 6. Pick "Last seen" -> expect "cannot check" wording. 7. "dashboard" -> one link. 8. "delete my data" -> erasure confirmation, then "/fix" should say there is nothing.
 Record each reply next to the expected one. Do not open the scope to everyone until all eight match.
 
-## 8. Open questions for the owner
+## 8. Decisions (owner, 2026-10-29)
 
-- Approve the level names and badge names (section 2, 3)? They are placeholders.
-- Telegram has users under 18. Do we need an age line before the first ask? (Privacy/legal check needed; not decided here.)
-- Do you want the optional "what worries you most" question?
-- Who approves the DRAFT report and guide wording before `TELEGRAM_SCAN_SCOPE=all`? (The code marks it pending the owner's approval.)
+- Wording a to e (level names, badges, the two reply lines, the age line): **agreed**, as written above.
+- **Age: 19 or over only.** Telegram cannot verify age, so this is a self-declaration made with the Y. Implemented, see section 9.
+- **Email in chat: not at launch.** Email stays on the website. Phase 2 is Notion task MPC-7518: email only, never phone, explicit consent, after the age gate and approved privacy wording.
+- "What worries you most": **yes**, as buttons only (about five fixed choices), after the first number, skippable, stored as a choice code with no free text. Not built yet.
+- Still open: who approves the DRAFT report and guide wording before `TELEGRAM_SCAN_SCOPE=all`.
+
+## 9. Age rule: what the code does now
+
+- The teaser now carries the line "MyPrivacyTOOL is for people aged 19 or over." (`bot.first_hexagon.age`), and the prompts read "Reply *Y* if you are 19 or over and want the link" / "Reply *N* if you are not, or would rather not for now". The N reply says the service is for people aged 19 or over.
+- **Nothing is recorded before the Y.** Profile capture (`TELEGRAM_CAPTURE_HEXAGONS`) now records a message only if core-brain has stored `confirmed` for that sender; no row, any other state, or a failed lookup means nothing is recorded (fail closed). The Y message itself is not recorded, because core-brain writes the state after it replies.
+- Non-English locales hold empty placeholders and fall back to English, as before; translations and the swarm / real-people check are still needed before wider release.
+- Limits, stated plainly: a person can type Y without being 19 (self-declaration only); the disclosure sentence is still appended to replies while capture is on.

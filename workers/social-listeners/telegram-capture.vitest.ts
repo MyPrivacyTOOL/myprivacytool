@@ -6,6 +6,8 @@ import worker from "./src/index";
 interface Ev { key: string; data: Record<string, unknown> | null; at: string | null }
 let contacts: Map<string, Ev[]>;
 let calls: { url: string; body: string }[];
+// Owner rule 2026-10-29 (19 or over): capture only after core-brain stored "confirmed" (the Y that carries the age line). Default here = confirmed.
+let consent: "confirmed" | "awaiting_confirmation" | "none" | "error" = "confirmed";
 const stub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input), body = String(init?.body ?? "");
   calls.push({ url, body });
@@ -19,9 +21,13 @@ const stub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   if (url.includes("/rpc/mpt_erase_social_contact")) { const a = JSON.parse(body); return Response.json(contacts.delete(`${a.p_platform}:${a.p_user_id}`) ? 1 : 0); }
   if (url.includes("/rpc/")) return Response.json(1);
+  if (url.includes("/rest/v1/conversation_states")) {
+    if (consent === "error") return new Response("boom", { status: 500 });
+    return Response.json(consent === "none" ? [] : [{ state: consent }]);
+  }
   return new Response("{}");
 });
-beforeEach(() => { contacts = new Map(); calls = []; stub.mockClear(); vi.stubGlobal("fetch", stub); });
+beforeEach(() => { contacts = new Map(); calls = []; consent = "confirmed"; stub.mockClear(); vi.stubGlobal("fetch", stub); });
 afterEach(() => vi.unstubAllGlobals());
 
 const brain = () => ({ fetch: vi.fn(async () => Response.json({ ok: true, ignored: true })) });
@@ -43,6 +49,20 @@ describe("Telegram hexagon capture", () => {
     expect(ev.at).toBe(new Date(1_793_000_000_000).toISOString());
     expect(ev.data).toMatchObject({ "tg.first_name": "Ann", "tg.last_name": "Lee", "tg.username": "ann7", "tg.language": "en", "tg.message_text": "hello there", "tg.update_counter": 2 });
     expect(Object.keys(ev.data!).every((k) => k.startsWith("tg."))).toBe(true);
+  });
+
+  it("age rule: nothing is recorded before the sender has confirmed (no row, still awaiting, or a failed lookup)", async () => {
+    for (const c of ["none", "awaiting_confirmation", "error"] as const) {
+      consent = c;
+      await send(update(20, "hello"), env({ TELEGRAM_CAPTURE_HEXAGONS: "on" }));
+      expect(contacts.size, c).toBe(0);
+    }
+  });
+
+  it("age rule: once confirmed, capture records as before", async () => {
+    consent = "confirmed";
+    await send(update(21, "after the Y"), env({ TELEGRAM_CAPTURE_HEXAGONS: "on" }));
+    expect(contacts.get("telegram:7")![0].key).toBe("tg:21");
   });
 
   it("a Telegram retry of the same update adds nothing", async () => {

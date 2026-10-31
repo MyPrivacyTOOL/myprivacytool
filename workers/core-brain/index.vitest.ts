@@ -92,7 +92,11 @@ describe("intent -> response key", () => {
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ intent: "scan", intent_source: "qwen", trust_level: 0, state_source: "anonymous", locale: "en" });
     expect(r.body.response_key).toBe("bot.first_hexagon.title");
-    expect(r.body.message_keys).toHaveLength(10);
+    expect(r.body.message_keys).toHaveLength(11);
+    // Owner rule 2026-10-29 (19 or over only): the age line comes right before the Y/N prompts, so the Y is also the age declaration.
+    const keys = r.body.message_keys as string[];
+    expect(keys.indexOf("bot.first_hexagon.age")).toBe(keys.indexOf("bot.first_hexagon.reply_y") - 1);
+    expect(keys.indexOf("bot.first_hexagon.age")).toBeGreaterThan(keys.indexOf("bot.first_hexagon.question"));
   });
 
   it("scan for a trusted user (conversation_states.trust_level) goes to the report CTA", async () => {

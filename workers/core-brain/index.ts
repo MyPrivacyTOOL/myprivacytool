@@ -78,7 +78,8 @@ const KEYS = {
   firstHexagon: [
     "bot.first_hexagon.title", "bot.first_hexagon.name", "bot.first_hexagon.location", "bot.first_hexagon.phone",
     "bot.first_hexagon.email", "bot.first_hexagon.social", "bot.first_hexagon.brokers", "bot.first_hexagon.question",
-    "bot.first_hexagon.reply_y", "bot.first_hexagon.reply_n",
+    // Owner rule 2026-10-29: 19 or over only. Telegram cannot verify age, so this is a self-declaration made with the Y.
+    "bot.first_hexagon.age", "bot.first_hexagon.reply_y", "bot.first_hexagon.reply_n",
   ],
   confirmedYes: ["bot.confirmed_y.title", "bot.confirmed_y.generating", "bot.confirmed_y.cta", "bot.confirmed_y.duration"],
   confirmedNo: ["bot.confirmed_n.title", "bot.confirmed_n.cta", "bot.confirmed_n.duration"],

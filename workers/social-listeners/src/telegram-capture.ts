@@ -39,11 +39,31 @@ export function telegramRecord(update: unknown): { id: string; handle?: string; 
   };
 }
 
+/**
+ * Owner rule 2026-10-29 (19 or over only): nothing is recorded until the sender has answered Y to the teaser, which now carries the age line.
+ * core-brain stores that as conversation_states.state = "confirmed". Any other state, no row, or a failed lookup means NOT confirmed, so we record nothing
+ * (fail closed). The Y message itself is not recorded, because core-brain writes the state after it replies.
+ */
+export async function consentConfirmed(env: Env, senderId: string): Promise<boolean> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return false;
+  try {
+    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/conversation_states?channel=eq.telegram&sender_id=eq.${encodeURIComponent(senderId)}&order=updated_at.desc&limit=1&select=state`, {
+      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return false;
+    const rows = (await res.json().catch(() => [])) as { state?: unknown }[];
+    return rows[0]?.state === "confirmed";
+  } catch {
+    return false;
+  }
+}
+
 /** Never throws. A failure only means one uncaptured message. */
 export async function captureTelegram(env: Env, update: unknown, log: Logger): Promise<void> {
   if (!telegramCaptureEnabled(env)) return;
   const rec = telegramRecord(update);
   if (!rec) return;
+  if (!(await consentConfirmed(env, rec.id))) return;
   try {
     const res = await rpc(env, "mpt_social_record", {
       p_platform: "telegram", p_user_id: await senderKey(env, rec.id), p_handle: rec.handle ?? null, p_event: "dm", p_follows_us: null,
