@@ -85,12 +85,21 @@ Rules for email:
 1. Edit `curtain-core.js` (`BRAND` for settings, `panel()` for the drawing).
 2. Run `node scripts/ci/curtain.vitest.mjs` through `npx vitest run scripts/ci/curtain.vitest.mjs`.
 3. Look at it: open `/curtain/demo.html` and scrub, or render a strip of frames.
-4. Re-export any videos and GIFs that use it. The website picks it up on deploy (`/curtain/*` revalidates).
+4. Re-export any videos and GIFs that use it. Cloudflare keeps `.js` in visitors' browsers for about 4 hours whatever `_headers` says, so when a curtain script changes, bump the `?v=` on its `<script>`/`import` line in every page that loads it (`public/telegram-security-check.html`, `public/curtain/demo.html`).
 
 ## Known limits
 
+- The Telegram check page no longer uses the procedural curtain; it plays the Alice clip and draws it back with the pleat module (below). The procedural curtain stays for video and newsletter exports.
 - The folds are drawn procedurally in the engraving style. They are not a trace of the Alice curtain art, and Alice
   is not in this component. The layered Alice art (`assets/alice/animations/alice_p6_layers_v0/`) can be stacked
   behind or in front of it later; that is a design decision, not a code change.
 - Opening is left and right from the centre. Other directions (one side, up) are not built.
 - The `/footprint/` page has its own older curtain (`docs/footprint-curtain.md`); it has not been moved to this one.
+
+## The Alice pull-back (Telegram check page)
+
+`public/curtain/curtain-pleat.js` draws the Alice picture or clip back like cloth. `createPleat(canvas, {source, side})` splits
+the source into strips and folds them in CSS 3D; the page repaints the video into the strips every frame, so the clip keeps
+playing while it is drawn back. `pleatFrame(t, opts)` is the pure maths (tested). Settings are in `PLEAT` (gather width 7%,
+perspective, fold shading). Timing lives in the page: `PULL_AT` (3.9 s into the clip) and `GATHER_MS` (1300).
+Fallbacks open the page at once: autoplay blocked, video error, no start in 3.5 s, tap, reduced motion, and an 8 s failsafe.
