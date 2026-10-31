@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Curtain demo | MyPrivacyTOOL</title>
+<!-- Preview and scrub the brand curtain. Not linked from the site and kept out of search. See docs/curtain.md. -->
+<style>
+  body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee}
+  .wrap{max-width:980px;margin:0 auto;padding:16px}
+  mpt-curtain{height:min(56vw,520px);background:#000;color:#27AE60;font:700 28px/1.15 ui-monospace,Menlo,monospace;border-radius:8px}
+  .code{padding:24px;word-break:break-all;opacity:.9}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:14px 0}
+  button{background:#27AE60;color:#000;border:0;border-radius:8px;padding:10px 16px;font:600 15px/1 inherit;cursor:pointer}
+  input[type=range]{flex:1 1 240px}
+  code{background:#222;padding:2px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Brand curtain</h1>
+  <mpt-curtain id="c" trigger="manual" duration="1200">
+    <div class="code" aria-hidden="true">0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8 0110 4F 7A 3C 9E 12 B8</div>
+  </mpt-curtain>
+  <div class="row">
+    <button id="play">Open</button><button id="reset">Close</button>
+    <label>Scrub <input id="scrub" type="range" min="0" max="1" step="0.005" value="0"></label>
+  </div>
+  <p>Use it anywhere: <code>&lt;mpt-curtain trigger="visible"&gt;...your content...&lt;/mpt-curtain&gt;</code>. For video, GIF and PNG exports run <code>npm run curtain:render</code>. Full guide: <code>docs/curtain.md</code>.</p>
+</div>
+<script type="module">
+import '/curtain/curtain-element.js?v=1';
+const c = document.getElementById('c'), s = document.getElementById('scrub');
+document.getElementById('play').onclick = () => { c.reset(); c.play(); };
+document.getElementById('reset').onclick = () => { c.reset(); s.value = 0; };
+s.oninput = () => { c.reset(); c.progress = +s.value; };
+</script>
+</body>
+</html>

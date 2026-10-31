@@ -17,6 +17,8 @@
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 /footprint/
   Cache-Control: public, max-age=0, must-revalidate
+/curtain/*
+  Cache-Control: public, max-age=0, must-revalidate
 /footprint/curtain.json
   Cache-Control: public, max-age=0, must-revalidate
 /footprint/hexagons-366.json

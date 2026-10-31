@@ -59,10 +59,13 @@ describe("Telegram security check page", () => {
     // The public, sitemap-listed guide pages under /guides/ must never be noindexed (regression from the first MPC-8684 merge).
     expect(headers).not.toMatch(/^\/guides[^\n]*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/m);
   });
-  it("opens the Alice curtain on the headline without hiding anything from people who need it plain", () => {
-    // Decorative picture: hidden from assistive tech, empty alt, reuses the existing /footprint/ artwork.
-    expect(html).toMatch(/<div class="curtain" id="curtain" aria-hidden="true"><img src="\/footprint\/alice-curtain\.jpg[^"]*" alt=""/);
-    expect(existsSync(path.join(repo, "public/footprint/alice-curtain.jpg"))).toBe(true);
+  it("opens the curtain on the headline without hiding anything from people who need it plain", () => {
+    // Decorative curtain, drawn by the shared brand module (public/curtain/): hidden from assistive tech.
+    expect(html).toMatch(/<div class="curtain" id="curtain" aria-hidden="true"><\/div>/);
+    expect(html).toContain("/curtain/curtain-core.js");
+    expect(existsSync(path.join(repo, "public/curtain/curtain-core.js"))).toBe(true);
+    // The old effect slid a whole picture sideways; it must not come back.
+    expect(html).not.toMatch(/translateX\(-101%\)/);
     // The headline is real text in the page: the words are separate spans, but the heading still reads as one sentence.
     const h1 = html.match(/<h1>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
     expect(h1).toBe("How exposed are your Telegram settings?");

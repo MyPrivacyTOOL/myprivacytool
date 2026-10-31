@@ -71,14 +71,16 @@
   #cc p{margin:0;flex:1 1 260px;font-size:14px}
   #cc button{border:1px solid var(--white);background:transparent;color:var(--white);border-radius:8px;padding:10px 16px;font:600 14px/1 inherit;cursor:pointer}
   #cc button.ok{background:var(--green);border-color:var(--green);color:var(--black)}
-  /* MPC-8684: Alice opens the curtain and the headline words come out from behind it. Only runs when the visitor has not asked
-     for reduced motion (the .cur class is added by a tiny script in <head>); without it, or without JS, every word is simply visible. */
+  /* The curtain: two white line-drawn panels part from the middle and bunch at the sides, and the headline words come out
+     from behind it. Drawn by /curtain/curtain-core.js, the same function the video and newsletter exports use (docs/curtain.md).
+     Only runs when the visitor has not asked for reduced motion (the .cur class is added by a tiny script in <head>); without
+     it, or without JS, every word is simply visible. */
   header.hero{position:relative;overflow:hidden;min-height:300px}
   .curtain{display:none}
-  .cur .curtain{display:flex;align-items:center;justify-content:center;position:absolute;inset:0;z-index:3;background:#fff;cursor:pointer;
-    transition:transform 1000ms cubic-bezier(.7,0,.25,1)}
-  .curtain img{height:100%;max-height:300px;width:auto;max-width:90%;object-fit:contain;display:block}
-  .cur.open .curtain{transform:translateX(-101%);pointer-events:none}
+  .cur .curtain{display:block;position:absolute;inset:0;z-index:3;background:#fff;cursor:pointer;overflow:hidden}
+  .curtain svg{display:block;width:100%;height:100%}
+  /* If the curtain script cannot load, the failsafe adds .open and the white cover simply goes. */
+  .cur.open .curtain:not(.drawing){display:none}
   .cur .reveal{opacity:0;transform:translateY(16px)}
   .cur.open .reveal{animation:rise 650ms cubic-bezier(.2,.7,.2,1) forwards;animation-delay:calc(250ms + var(--i,0) * 90ms)}
   .w{display:inline-block;white-space:pre}
@@ -126,7 +128,11 @@
     var d = document.documentElement;
     try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { return; }
     d.className += ' cur';
-    function open() { if (d.className.indexOf(' open') < 0) d.className += ' open'; }
+    function open() {
+      if (d.className.indexOf(' open') >= 0) return;
+      d.className += ' open';
+      if (window.__mptCurtainDraw) window.__mptCurtainDraw();   // the curtain script draws the parting; without it the cover just goes
+    }
     window.__mptOpenCurtain = open;
     setTimeout(open, 3500);
   })();
@@ -134,7 +140,7 @@
 </head>
 <body>
 <header class="hero">
-  <div class="curtain" id="curtain" aria-hidden="true"><img src="/footprint/alice-curtain.jpg?v=2" alt="" width="544" height="554" fetchpriority="high" decoding="async"></div>
+  <div class="curtain" id="curtain" aria-hidden="true"></div>
   <div class="wrap">
     <div class="eyebrow reveal" style="--i:0">Telegram privacy check</div>
     <h1><span class="w reveal" style="--i:1">How </span><span class="w reveal" style="--i:2">exposed </span><span class="w reveal" style="--i:3">are </span><span class="w reveal" style="--i:4">your </span><span class="w reveal" style="--i:5">Telegram </span><span class="w reveal" style="--i:6">settings?</span></h1>
@@ -342,6 +348,30 @@
   if (!c || !window.__mptOpenCurtain) return;
   setTimeout(window.__mptOpenCurtain, 650);
   c.addEventListener('click', window.__mptOpenCurtain);
+})();
+</script>
+<script type="module">
+// The curtain drawing: one function of progress 0..1 shared with the video and newsletter exports (docs/curtain.md).
+import { curtainSvg } from '/curtain/curtain-core.js?v=1';
+(function () {
+  var c = document.getElementById('curtain'), d = document.documentElement;
+  if (!c) return;
+  var DURATION = 1200;   // ms; brand range is 500-1500
+  var animating = false;
+  function size() { var r = c.getBoundingClientRect(); return { width: Math.max(40, Math.round(r.width)), height: Math.max(40, Math.round(r.height)) }; }
+  function draw(t) { c.innerHTML = curtainSvg(t, size()); }
+  if (d.className.indexOf(' cur') >= 0 && d.className.indexOf(' open') < 0) draw(0);   // the closed curtain
+  window.addEventListener('resize', function () { if (!animating && d.className.indexOf(' open') < 0) draw(0); });
+  window.__mptCurtainDraw = function () {
+    animating = true; c.className += ' drawing'; c.style.background = 'transparent';
+    var start = performance.now();
+    (function tick(now) {
+      var t = Math.min(1, (now - start) / DURATION);
+      draw(t);
+      if (t < 1) requestAnimationFrame(tick);
+      else { animating = false; c.className = c.className.replace(' drawing', ''); }
+    })(start);
+  };
 })();
 </script>
 </body>
