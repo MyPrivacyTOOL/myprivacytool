@@ -69,7 +69,7 @@ export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000 
 }
 
 /** Steps of the chain in order. The first failing step stops the run; later ones are reported as skipped, never as passed. */
-export const STEPS = ['scan_request', 'saved_scan', 'linked_contact_consent', 'report_request', 'first_email_accepted', 'report_sent', 'report_checks', 'links_resolve'];
+export const STEPS = ['scan_request', 'saved_scan', 'linked_contact_consent', 'report_request', 'first_email_accepted', 'report_sent', 'report_checks', 'links_resolve', 'delivery_event_seen'];
 export const WEEKLY_STEPS = ['unsubscribe', 'suppression_recorded', 'delete_by_scan_number', 'cleanup'];
 
 export { HARD_LIMIT_BYTES };

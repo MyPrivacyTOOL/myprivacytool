@@ -9,7 +9,7 @@ import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
 const NOW = new Date('2026-10-28T16:00:00Z');
-const ENV = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k', SYNTHETIC_SCAN_URL: 'https://synth.invalid', PROD_SCAN_URL: 'https://prod.invalid', RESEND_API_KEY: 'r', UNSUBSCRIBE_SECRET: 'secret', WAIT_REPORT_MS: '60000', WAIT_CONFIRM_MS: '60000' };
+const ENV = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k', SYNTHETIC_SCAN_URL: 'https://synth.invalid', PROD_SCAN_URL: 'https://prod.invalid', RESEND_API_KEY: 'r', UNSUBSCRIBE_SECRET: 'secret', WAIT_REPORT_MS: '60000', WAIT_CONFIRM_MS: '60000', WAIT_EVENT_MS: '60000' };
 const json = (o, status = 200) => ({ ok: status < 400, status, json: async () => o, text: async () => JSON.stringify(o) });
 
 // ------------------------------------------------------------ fake world
@@ -47,6 +47,10 @@ function world(opts = {}) {
         if (!opts.neverSend && polls >= 4) { s.report_status = opts.failReport ? 'failed' : 'sent'; s.report_sent_at = NOW.toISOString(); s.resend_message_id = 'msg_1'; s.report_last_error = opts.failReport ? 'boom for someone@example.com' : null; s.report_attempts = 5; }
         return json([{ ...s, users: { email: opts.realAddress ? 'real.person@example.com' : s.email } }]);
       }
+      if (path.startsWith('email_sends?provider_message_id=eq.')) {   // MPC-7556: the row the Resend webhook updates
+        if (opts.noEvent) return json([{ status: 'sent' }]);
+        return json([{ status: opts.eventStatus ?? 'delivered' }]);
+      }
       if (path.startsWith('users?email=eq.')) { const e = decodeURIComponent(path.match(/eq\.([^&]+)/)[1]); return json(db.users[e] ? [db.users[e]] : []); }
       if (path.startsWith('email_suppressions?email_hash=eq.')) { const h = path.match(/eq\.([^&]+)/)[1]; return json(db.suppressions.has(h) ? [{ email_hash: h }] : []); }
     }
@@ -79,8 +83,8 @@ check(hkDay(NOW) === '20261029', 'run day is the Hong Kong date (16:00 UTC is al
 // ------------------------------------------------------------ nightly, all green
 {
   const w = world(); const r = await run({}, w);
-  check(r.ok && r.steps.every((s) => s.ok), 'nightly: all eight steps pass');
-  check(r.steps.map((s) => s.step).join() === 'scan_request,saved_scan,linked_contact_consent,report_request,first_email_accepted,report_sent,report_checks,links_resolve', 'nightly: steps run in the required order');
+  check(r.ok && r.steps.every((s) => s.ok), 'nightly: all nine steps pass');
+  check(r.steps.map((s) => s.step).join() === 'scan_request,saved_scan,linked_contact_consent,report_request,first_email_accepted,report_sent,report_checks,links_resolve,delivery_event_seen', 'nightly: steps run in the required order');
   const b = w.db.posts[0];
   check(isTestAddress(b.email) && b['cf-turnstile-response'] === 'XXXX.DUMMY.TOKEN.XXXX' && b.consent === true && b.save_consent === true && b.scan.length === fixtureScan().length, 'nightly: request is a consented test-alias scan carrying the Turnstile TEST token');
   check(w.db.gets.every((g) => !g.startsWith('POST https://prod.invalid/api/scan')), 'nightly: nothing is ever POSTed to the production /api/scan');
@@ -103,6 +107,8 @@ const broken = [
   ['plain text drifts from the HTML', { sentText: (t) => t.replace(/NOT CHECKED/g, 'unknown') }, 'report_checks'],
   ['sent report has unsupported markup', { sentHtml: (h) => h.replace('</body>', '<script>1</script></body>') }, 'report_checks'],
   ['a report link returns 404', { deadLink: '/opt-out' }, 'links_resolve'],
+  ['no delivery event ever stored for the test report (webhook not delivering)', { noEvent: true }, 'delivery_event_seen'],
+  ['the test report bounced', { eventStatus: 'bounced' }, 'delivery_event_seen'],
 ];
 for (const [name, opts, step] of broken) {
   const w = world(opts); const r = await run({}, w);
