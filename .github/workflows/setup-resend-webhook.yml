@@ -28,14 +28,15 @@ jobs:
     env:
       MODE: ${{ inputs.mode }}
       RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
-      SECRET_OUT: ${{ runner.temp }}/resend-webhook-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Resend - inspect or apply
-        run: node scripts/setup-resend-webhook.mjs
+        run: |
+          echo "SECRET_OUT=$RUNNER_TEMP/resend-webhook-secret" >> "$GITHUB_ENV"
+          SECRET_OUT="$RUNNER_TEMP/resend-webhook-secret" node scripts/setup-resend-webhook.mjs
       - name: Store the signing secret on the production Worker
         if: inputs.mode == 'apply'
         working-directory: workers/scan-report

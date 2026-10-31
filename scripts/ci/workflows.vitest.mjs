@@ -27,6 +27,18 @@ describe("every workflow is valid YAML with triggers and jobs", () => {
   }
 });
 
+// The `runner` context does not exist in workflow-level or job-level `env` (GitHub rejects the whole file at dispatch time, which CI on the PR never exercises).
+// Use $RUNNER_TEMP inside a step instead. Found on setup-resend-webhook.yml, MPC-8751.
+describe("workflow-level and job-level env never use the runner context", () => {
+  for (const f of readdirSync(wfDir).filter((x) => x.endsWith(".yml"))) {
+    it(f, () => {
+      const wf = load(f);
+      const envs = [wf.env, ...Object.values(wf.jobs).map((j) => j.env)].filter(Boolean);
+      for (const env of envs) for (const v of Object.values(env)) expect(String(v)).not.toMatch(/\$\{\{[^}]*\brunner\./);
+    });
+  }
+});
+
 describe("ci.yml (merge blocking)", () => {
   const wf = load("ci.yml");
   it("runs on every pull request and on pushes to main", () => {
