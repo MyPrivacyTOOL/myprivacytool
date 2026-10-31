@@ -34,7 +34,9 @@ const Terms = () => {
               </h2>
               <p className="text-muted-foreground">
                 You must be at least 16 years old and have the legal capacity to
-                enter into a binding agreement to use the Services. If you are
+                enter into a binding agreement to use the Services. Our Telegram
+                bot is for people aged 19 or over: by replying Y you confirm that
+                you are. If you are
                 using the Services on behalf of an organization, you represent and
                 warrant that you have authority to bind that organization to these
                 Terms.

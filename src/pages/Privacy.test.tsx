@@ -121,6 +121,18 @@ describe("Privacy: referral programme section", () => {
   });
 });
 
+describe("Privacy: Telegram 19 or over rule and 90 days from the last message (MPC-9014, draft wording)", () => {
+  it("states the bot is 19 or over, that age is self-declared, that nothing is kept before Y, and that the 90 days run from the last message", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Our Telegram bot is for people aged 19 or over");
+    expect(text).toContain("We cannot check your age, so this relies on your answer.");
+    expect(text).toContain("we start keeping these details only after you reply Y to confirm you are 19 or over");
+    expect(text).toContain("The 90 days count from your last message.");
+    expect(text).toContain("confirm you are 16 or older with a checkbox");
+  });
+});
+
 describe("Privacy: Telegram bot (draft wording, unreviewed)", () => {
   it("says message text and public profile details are received, the 90 day keep, and gives the privacy address for deletion", () => {
     renderPage(<Privacy />);
