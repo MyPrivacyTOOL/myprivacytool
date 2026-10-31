@@ -96,18 +96,27 @@ describe("Telegram reply flow", () => {
 });
 
 describe("CK-8502 capture disclosure", () => {
-  it("is appended only while TELEGRAM_CAPTURE_HEXAGONS is on, and never to an empty reply", async () => {
+  it("is appended only while TELEGRAM_CAPTURE_HEXAGONS is on AND the sender has confirmed with Y; never to an empty reply", async () => {
     const { CAPTURE_DISCLOSURE } = await import("./src/reply");
     const sent: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_u: unknown, init?: RequestInit) => { sent.push(JSON.parse(String(init?.body)).text); return new Response("{}"); });
-    const brain = () => Response.json({ message_keys: ["bot.unknown.title"], locale: "en" });
+    const brain = (over: object = {}) => Response.json({ message_keys: ["bot.unknown.title"], locale: "en", ...over });
     const { sendTelegramReply } = await import("./src/reply");
     const log = { info() {}, warn() {}, error() {} };
     const upd = { message: { chat: { id: 1 } } };
-    await sendTelegramReply({ TELEGRAM_BOT_TOKEN: "1:a" } as never, upd, brain(), log);
-    await sendTelegramReply({ TELEGRAM_BOT_TOKEN: "1:a", TELEGRAM_CAPTURE_HEXAGONS: "on" } as never, upd, brain(), log);
+    const off = { TELEGRAM_BOT_TOKEN: "1:a" } as never;
+    const on = { TELEGRAM_BOT_TOKEN: "1:a", TELEGRAM_CAPTURE_HEXAGONS: "on" } as never;
+    await sendTelegramReply(off, upd, brain({ state: "confirmed", next_state: "confirmed" }), log);             // 0: flag off -> never
+    await sendTelegramReply(on, upd, brain({ state: "new", next_state: "awaiting_confirmation" }), log);        // 1: before the Y -> no disclosure
+    await sendTelegramReply(on, upd, brain({ state: "awaiting_confirmation", next_state: "confirmed" }), log);  // 2: the reply that confirms the Y
+    await sendTelegramReply(on, upd, brain({ state: "confirmed", next_state: "confirmed" }), log);             // 3: later replies
+    await sendTelegramReply(on, upd, brain({ state: "new", next_state: null }), log);                           // 4: state unknown (fallback) -> no disclosure
+    const d = CAPTURE_DISCLOSURE.replace(/_/g, "\\_");
     expect(sent[0]).not.toContain(CAPTURE_DISCLOSURE);
-    expect(sent[1]).toContain(CAPTURE_DISCLOSURE.replace(/_/g, "\\_"));
+    expect(sent[1]).not.toContain(d);
+    expect(sent[2]).toContain(d);
+    expect(sent[3]).toContain(d);
+    expect(sent[4]).not.toContain(d);
     vi.restoreAllMocks();
   });
 });
