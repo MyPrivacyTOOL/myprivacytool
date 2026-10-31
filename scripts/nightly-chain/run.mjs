@@ -2,7 +2,7 @@
 // MPC-7557: nightly (and weekly) end-to-end test of the scan -> saved scan -> contact -> report request -> first email -> report chain.
 //
 //   MODE=nightly|weekly  SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY  node scripts/nightly-chain/run.mjs
-//   optional: SYNTHETIC_SCAN_URL, PROD_SCAN_URL, RESEND_API_KEY (read the sent report back), UNSUBSCRIBE_SECRET (weekly unsubscribe), WAIT_REPORT_MS, DRY_RUN=1
+//   optional: FORCE_FAILURE=alert_test (writes a failed result row only, to test the Slack alert), SYNTHETIC_SCAN_URL, PROD_SCAN_URL, RESEND_API_KEY (read the sent report back), UNSUBSCRIBE_SECRET (weekly unsubscribe), WAIT_REPORT_MS, DRY_RUN=1
 //
 // DESIGN (docs/nightly-chain-mpc-7557.md): production's POST /api/scan enforces Cloudflare Turnstile and must never be bypassed. So the scan request goes to a
 // SEPARATE deployment of the same Worker code (mpt-scan-report-synthetic) that holds Cloudflare's public TEST secret, has no cron, and may email only the test
@@ -54,6 +54,9 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
   const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].filter((k) => !env[k]);
   if (mode === 'weekly' && !env.UNSUBSCRIBE_SECRET) missing.push('UNSUBSCRIBE_SECRET');
   if (missing.length) { result.notConfigured = `missing ${missing.join(', ')}`; return result; }
+  // MPC-7557: ALERT TEST. A manual dispatch can force a failure to prove the Slack alert end to end. Nothing is scanned or sent; the run only writes its (failed) result row,
+  // under a step name that says what it is, because the alert shows step names but no detail. The schedule can never set this (the workflow only passes it on workflow_dispatch).
+  if (env.FORCE_FAILURE === 'alert_test') { result.failedStep = 'alert_test_forced_failure'; result.facts.forced = true; return result; }
   const synth = (env.SYNTHETIC_SCAN_URL || DEFAULTS.SYNTHETIC_SCAN_URL).replace(/\/$/, '');
   const prod = (env.PROD_SCAN_URL || DEFAULTS.PROD_SCAN_URL).replace(/\/$/, '');
   const sb = new Supabase(env, fetchImpl);
