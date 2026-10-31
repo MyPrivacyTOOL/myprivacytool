@@ -5,6 +5,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { curtainSvg, geometry, ease, BRAND } from "../../public/curtain/curtain-core.js";
 import { frameTimes } from "../../tools/curtain/render.mjs";
+import { pleatFrame, stripRightEdge, easeInOut, PLEAT } from "../../public/curtain/curtain-pleat.js";
 
 describe("curtain core (pure drawing)", () => {
   it("is deterministic: the same progress always draws the same curtain", () => {
@@ -101,5 +102,47 @@ describe("<mpt-curtain> element", () => {
     await el.play();
     expect(el.progress).toBe(1);
     expect(el.hasAttribute("data-open")).toBe(true);
+  });
+});
+
+describe("pleated pull-back (picture drawn back like a curtain)", () => {
+  const o = { n: 14, width: 1400, side: "right" };
+  it("starts as the flat picture: strips side by side, no fold, no shading", () => {
+    const f = pleatFrame(0, o);
+    f.strips.forEach((s, i) => {
+      expect(s.x).toBeCloseTo(i * 100, 9);
+      expect(s.z).toBeCloseTo(0, 9);
+      expect(s.deg).toBeCloseTo(0, 9);
+      expect(s.dark).toBeCloseTo(0, 9);
+    });
+    expect(f.bundleWidth).toBeCloseTo(1400, 9);
+  });
+  it("ends gathered into a bundle of the brand percentage at the chosen side", () => {
+    const f = pleatFrame(1, o);
+    expect(f.bundleWidth).toBeCloseTo((1400 * PLEAT.gatherPct) / 100, 6);
+    expect(f.strips[0].x + f.bundleWidth).toBeCloseTo(1400, 6);
+    const left = pleatFrame(1, { ...o, side: "left" });
+    expect(left.strips[0].x).toBeCloseTo(0, 9);
+    expect(left.bundleWidth).toBeCloseTo((1400 * PLEAT.gatherPct) / 100, 6);
+  });
+  it("is one continuous cloth: every strip's right edge meets the next strip's left edge in 3D, at every moment", () => {
+    for (const side of ["right", "left"]) {
+      for (let k = 0; k <= 40; k++) {
+        const f = pleatFrame(k / 40, { ...o, side });
+        for (let i = 0; i < o.n - 1; i++) {
+          const r = stripRightEdge(f, i), l = f.strips[i + 1];
+          expect(Math.hypot(r.x - l.x, r.z - l.z)).toBeLessThan(1e-6);
+        }
+      }
+    }
+  });
+  it("only gathers: the bundle never widens while the cloth is drawn back", () => {
+    let prev = Infinity;
+    for (let k = 0; k <= 100; k++) {
+      const w = pleatFrame(k / 100, o).bundleWidth;
+      expect(w).toBeLessThanOrEqual(prev + 1e-9);
+      prev = w;
+    }
+    expect(easeInOut(0.5)).toBeCloseTo(0.5, 9);
   });
 });

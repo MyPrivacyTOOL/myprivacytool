@@ -71,14 +71,16 @@
   #cc p{margin:0;flex:1 1 260px;font-size:14px}
   #cc button{border:1px solid var(--white);background:transparent;color:var(--white);border-radius:8px;padding:10px 16px;font:600 14px/1 inherit;cursor:pointer}
   #cc button.ok{background:var(--green);border-color:var(--green);color:var(--black)}
-  /* The curtain: two white line-drawn panels part from the middle and bunch at the sides, and the headline words come out
-     from behind it. Drawn by /curtain/curtain-core.js, the same function the video and newsletter exports use (docs/curtain.md).
-     Only runs when the visitor has not asked for reduced motion (the .cur class is added by a tiny script in <head>); without
-     it, or without JS, every word is simply visible. */
+  /* Alice pulls the curtain: a short clip of her pushing into it plays on a white cover, then the whole picture is drawn back
+     like a pleated curtain (public/curtain/curtain-pleat.js) while the clip keeps playing on the cloth, and the headline words
+     come out from behind it. Only runs when the visitor has not asked for reduced motion (the .cur class is added by a tiny
+     script in <head>); without it, or without JS, no video loads and every word is simply visible. */
   header.hero{position:relative;overflow:hidden;min-height:300px}
   .curtain{display:none}
-  .cur .curtain{display:block;position:absolute;inset:0;z-index:3;background:#fff;cursor:pointer;overflow:hidden}
-  .curtain svg{display:block;width:100%;height:100%}
+  .cur .curtain{display:flex;align-items:center;justify-content:center;position:absolute;inset:0;z-index:3;background:#fff;cursor:pointer;overflow:hidden}
+  .curtain video{height:100%;max-height:300px;width:auto;max-width:90%;object-fit:contain;display:block}
+  .curtain.drawing{background:transparent}
+  .curtain.drawing video{visibility:hidden}
   /* If the curtain script cannot load, the failsafe adds .open and the white cover simply goes. */
   .cur.open .curtain:not(.drawing){display:none}
   .cur .reveal{opacity:0;transform:translateY(16px)}
@@ -123,24 +125,24 @@
   })();
 </script>
 <script>
-  /* Curtain animation only for visitors who have not asked for reduced motion. Failsafe: it always opens within 3.5 s. */
+  /* Curtain animation only for visitors who have not asked for reduced motion. Failsafe: it always opens within 8 s
+     (the clip needs ~4 s before Alice pushes the curtain open); a tap opens it at once. */
   (function () {
     var d = document.documentElement;
     try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { return; }
     d.className += ' cur';
     function open() {
-      if (d.className.indexOf(' open') >= 0) return;
-      d.className += ' open';
-      if (window.__mptCurtainDraw) window.__mptCurtainDraw();   // the curtain script draws the parting; without it the cover just goes
+      if (window.__mptCurtainDraw) window.__mptCurtainDraw();   // the curtain script draws the cloth back; without it the cover just goes
+      if (d.className.indexOf(' open') < 0) d.className += ' open';
     }
     window.__mptOpenCurtain = open;
-    setTimeout(open, 3500);
+    setTimeout(open, 8000);
   })();
 </script>
 </head>
 <body>
 <header class="hero">
-  <div class="curtain" id="curtain" aria-hidden="true"></div>
+  <div class="curtain" id="curtain" aria-hidden="true"><video id="curtainVideo" muted playsinline preload="none" poster="/media/alice-curtain-pull-poster.jpg" width="560" height="560" tabindex="-1"><source src="/media/alice-curtain-pull.mp4" type="video/mp4"></video></div>
   <div class="wrap">
     <div class="eyebrow reveal" style="--i:0">Telegram privacy check</div>
     <h1><span class="w reveal" style="--i:1">How </span><span class="w reveal" style="--i:2">exposed </span><span class="w reveal" style="--i:3">are </span><span class="w reveal" style="--i:4">your </span><span class="w reveal" style="--i:5">Telegram </span><span class="w reveal" style="--i:6">settings?</span></h1>
@@ -346,32 +348,48 @@
 (function () {
   var c = document.getElementById('curtain');
   if (!c || !window.__mptOpenCurtain) return;
-  setTimeout(window.__mptOpenCurtain, 650);
   c.addEventListener('click', window.__mptOpenCurtain);
 })();
 </script>
 <script type="module">
-// The curtain drawing: one function of progress 0..1 shared with the video and newsletter exports (docs/curtain.md).
-import { curtainSvg } from '/curtain/curtain-core.js?v=1';
+// Alice pulls the curtain. The clip plays on the white cover; as she pushes into the curtain (PULL_AT) the whole picture is
+// drawn back like a pleated curtain, the clip still playing on the folding cloth, and the headline rises. If the clip cannot
+// play (autoplay blocked, slow connection, error) the still poster is drawn back instead, so the page is never held up.
+import { createPleat } from '/curtain/curtain-pleat.js?v=1';
 (function () {
-  var c = document.getElementById('curtain'), d = document.documentElement;
-  if (!c) return;
-  var DURATION = 1200;   // ms; brand range is 500-1500
-  var animating = false;
-  function size() { var r = c.getBoundingClientRect(); return { width: Math.max(40, Math.round(r.width)), height: Math.max(40, Math.round(r.height)) }; }
-  function draw(t) { c.innerHTML = curtainSvg(t, size()); }
-  if (d.className.indexOf(' cur') >= 0 && d.className.indexOf(' open') < 0) draw(0);   // the closed curtain
-  window.addEventListener('resize', function () { if (!animating && d.className.indexOf(' open') < 0) draw(0); });
-  window.__mptCurtainDraw = function () {
-    animating = true; c.className += ' drawing'; c.style.background = 'transparent';
-    var start = performance.now();
+  var c = document.getElementById('curtain'), v = document.getElementById('curtainVideo'), d = document.documentElement;
+  if (!c || !v || d.className.indexOf(' cur') < 0 || d.className.indexOf(' open') >= 0) return;   // reduced motion (no curtain, no video request), or the failsafe already opened it
+  var PULL_AT = 3.9;       // seconds into the clip: Alice starts pushing the curtain open
+  var GATHER_MS = 1300;    // how long the cloth takes to draw back
+  var still = new Image(); still.src = v.getAttribute('poster');
+  var started = false;
+
+  function draw() {
+    if (started) return; started = true;
+    if (getComputedStyle(c).display === 'none') return;   // already cleared (failsafe)
+    var playing = v.readyState >= 2 && v.videoWidth > 0 && v.currentTime > 0.1;
+    var src = playing ? v : (still.complete && still.naturalWidth ? still : null);
+    if (!src) { if (d.className.indexOf(' open') < 0) d.className += ' open'; c.style.display = 'none'; return; }
+    c.className += ' drawing';   // before .open: the failsafe rule hides the cover unless it is marked drawing, and createPleat measures it
+    if (d.className.indexOf(' open') < 0) d.className += ' open';
+    var pleat = createPleat(c, { source: src, side: 'right' });
+    var t0 = performance.now();
     (function tick(now) {
-      var t = Math.min(1, (now - start) / DURATION);
-      draw(t);
+      var t = Math.min(1, (now - t0) / GATHER_MS);
+      if (playing) pleat.render();      // keep painting the playing clip onto the folding strips
+      pleat.setProgress(t);
       if (t < 1) requestAnimationFrame(tick);
-      else { animating = false; c.className = c.className.replace(' drawing', ''); }
-    })(start);
-  };
+      else { pleat.destroy(); c.className = c.className.replace(' drawing', ''); v.pause(); }
+    })(t0);
+  }
+  window.__mptCurtainDraw = draw;
+
+  (function watch() { if (started) return; if (v.currentTime >= PULL_AT) draw(); else requestAnimationFrame(watch); })();
+  v.addEventListener('ended', draw);
+  v.addEventListener('error', function () { setTimeout(draw, 400); }, true);   // capture: a failing <source> reports on itself, not on the video
+  var timer = setTimeout(function () { if (!(v.currentTime > 0.1)) draw(); }, 3500);   // never started: use the still
+  var p = v.play();
+  if (p && p.catch) p.catch(function () { clearTimeout(timer); setTimeout(draw, 700); });   // autoplay blocked
 })();
 </script>
 </body>

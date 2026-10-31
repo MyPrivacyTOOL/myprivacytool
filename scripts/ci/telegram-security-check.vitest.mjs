@@ -59,12 +59,15 @@ describe("Telegram security check page", () => {
     // The public, sitemap-listed guide pages under /guides/ must never be noindexed (regression from the first MPC-8684 merge).
     expect(headers).not.toMatch(/^\/guides[^\n]*\n(?:\s+.*\n)*?\s+X-Robots-Tag: noindex/m);
   });
-  it("opens the curtain on the headline without hiding anything from people who need it plain", () => {
-    // Decorative curtain, drawn by the shared brand module (public/curtain/): hidden from assistive tech.
-    expect(html).toMatch(/<div class="curtain" id="curtain" aria-hidden="true"><\/div>/);
-    expect(html).toContain("/curtain/curtain-core.js");
-    expect(existsSync(path.join(repo, "public/curtain/curtain-core.js"))).toBe(true);
-    // The old effect slid a whole picture sideways; it must not come back.
+  it("opens the Alice curtain on the headline without hiding anything from people who need it plain", () => {
+    // Decorative clip of Alice pushing the curtain, hidden from assistive tech, muted, no request until the script runs.
+    expect(html).toMatch(/<div class="curtain" id="curtain" aria-hidden="true"><video id="curtainVideo" muted playsinline preload="none" poster="\/media\/alice-curtain-pull-poster\.jpg"/);
+    for (const f of ["public/media/alice-curtain-pull.mp4", "public/media/alice-curtain-pull-poster.jpg", "public/curtain/curtain-pleat.js"]) {
+      expect(existsSync(path.join(repo, f)), f).toBe(true);
+    }
+    expect(readFileSync(path.join(repo, "public/media/alice-curtain-pull.mp4")).subarray(4, 8).toString()).toBe("ftyp");
+    expect(html).toContain("/curtain/curtain-pleat.js");
+    // The old effect slid a whole picture sideways as a block; it must not come back.
     expect(html).not.toMatch(/translateX\(-101%\)/);
     // The headline is real text in the page: the words are separate spans, but the heading still reads as one sentence.
     const h1 = html.match(/<h1>([\s\S]*?)<\/h1>/)[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
@@ -75,7 +78,7 @@ describe("Telegram security check page", () => {
     expect(html).toMatch(/\.cur \.reveal\{opacity:0/);
     expect(html).not.toMatch(/(?<!\.cur )\.reveal\{opacity:0/);
     // Failsafe: the curtain always opens, and a tap opens it at once.
-    expect(html).toContain("setTimeout(open, 3500)");
+    expect(html).toContain("setTimeout(open, 8000)");
     expect(html).toContain("addEventListener('click', window.__mptOpenCurtain)");
   });
 });
