@@ -113,6 +113,15 @@ const send = async (F, key, to = 'person@example.com') => { const r = await quie
   N.db.scans.push({ id: 'sc2', resend_message_id: nid, report_status: 'sent' });
   const r = await deliver(N, ev('email.delivered', nid));
   check(r.status === 200 && N.db.scans[0].delivery_status === 'delivered', 'migration not applied yet: the event is acknowledged (no endless retries) and the scan row still updates');
+  // 2026-10-31: with the CK-8503 receipts function missing in production, every delivered/bounced/complained event answered 500 BEFORE the per-send row and the opt-out, so neither happened.
+  const R = await world({ noReceiptRpc: true }); const rid = await send(R, 'followup-9-11');
+  const rr = await deliver(R, ev('email.delivered', rid));
+  check(rr.status === 500 && R.db.email_sends[0].status === 'delivered', 'CK-8503 migration not applied: the per-send row is still stored, and 500 asks the provider to retry the report row later');
+  const R2 = await world({ noReceiptRpc: true }); const rid2 = await send(R2, 'followup-9-12');
+  const hb = await deliver(R2, ev('email.bounced', rid2, { bounce: { type: 'Permanent' }, to: ['bounce-check@example.test'] }));
+  check(hb.status === 500 && await isOptedOut({ select: (p) => R2.f(`https://x/rest/v1/${p}`).then((x) => x.json()) }, 'bounce-check@example.test'), 'CK-8503 migration not applied: a hard bounce still ends non-transactional email to that address (then 500 so the provider retries)');
+  const R3 = await world({ noReceiptRpc: true }); const rid3 = await send(R3, 'followup-9-13');
+  check((await deliver(R3, ev('email.clicked', rid3))).status === 200 && R3.db.email_sends[0].click_count >= 1, 'CK-8503 migration not applied: a click does not need the receipts function and is acknowledged (200)');
   const M = await world({ onRequest: (u, o, res) => (u.includes('/rpc/mpt_record_email_event') ? res(500, 'x') : undefined) });
   check((await deliver(M, ev('email.delivered', 'whatever'))).status === 500, 'a real database failure answers 500 so the provider retries');
   const O = await world({ onRequest: (u, o, res) => (u.includes('/email_suppressions') && o.method === 'POST' ? res(500, 'x') : undefined) }); const oid = await send(O, 'followup-9-10');
