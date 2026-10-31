@@ -1,0 +1,14 @@
+name = "mpt-shadow-audit-consumer"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[queues.consumers]]
+queue = "mpt-shadow-audit-queue"
+max_batch_size = 25
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "mpt-shadow-audit-dlq"
+
+[[analytics_engine_datasets]]
+binding = "AUDIT_METRICS"
+dataset = "mpt_shadow_audit"
