@@ -64,6 +64,10 @@ Sunday 23:45 HKT, alias `testingnt69+weekly-<day>`: scan on the synthetic Worker
 | Alert destination | The usual MPT Slack channel (via the existing collector), nothing new. |
 | Stop procedure | Disable the "Nightly chain test" workflow (Actions tab) or revert this PR; to stop the synthetic path delete Worker `mpt-scan-report-synthetic`. Neither touches production's Worker, cron or Turnstile. |
 
+## 5a. Testing the alert (MPC-7557)
+
+To see the Slack alert once for real: dispatch "Nightly chain test" with `force_failure` = `alert_test`. Nothing is scanned or sent; the run writes one FAILED result row whose failed step is `alert_test_forced_failure`, and the job goes red. The metrics collector (00:15 HKT) alerts on the LATEST nightly row, so dispatch it AFTER that night's scheduled run (15:30 UTC) and BEFORE the collector (16:15 UTC); the Slack text is: `Nightly chain test FAILED at step "alert_test_forced_failure" on <day>`. Afterwards dispatch one normal nightly run so the latest row is OK again (otherwise the Monday 01:00 UTC collector alerts a second time). The schedule can never force a failure: the workflow passes the input only on workflow_dispatch.
+
 ## 6. What activation needs (tracked as Notion tasks, not asks to Chris)
 
 * The synthetic Worker takes `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` from existing GitHub secrets on first deploy. Weekly run: needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (already used by the deploy workflows). Each weekly run makes a throwaway key, puts it on the synthetic Worker as `UNSUBSCRIBE_SECRET` and signs the unsubscribe with it, so no UNSUBSCRIBE_SECRET repo secret is needed. It never reads or sets production's secret. If `SCAN_REPORT_UNSUBSCRIBE_SECRET` exists it is only a fallback.

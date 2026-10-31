@@ -130,6 +130,17 @@ for (const [name, opts, step] of broken) {
   check(row.status === 'error' && row.error.includes(step) && !/@/.test(JSON.stringify(row)), `  metrics row is an error naming the step, no email address (${name})`);
 }
 
+// ------------------------------------------------------------ alert test (forced failure)
+{
+  const w = world(); const r = await run({ FORCE_FAILURE: 'alert_test' }, w);
+  const row = metricsRow(r, NOW);
+  check(!r.ok && r.failedStep === 'alert_test_forced_failure' && r.facts.forced === true, 'alert test: the run fails under a step name that says what it is');
+  check(w.db.posts.length === 0 && w.db.gets.every((g) => !g.includes('synth.invalid') && !g.includes('api.resend.com') && !g.includes('myprivacytool.io')), 'alert test: nothing is scanned, sent or fetched');
+  check(row.status === 'error' && row.payload.failed_step === 'alert_test_forced_failure' && row.error.includes('alert_test_forced_failure') && !/@/.test(JSON.stringify(row)), 'alert test: the result row is an error naming that step, no address');
+  const other = world(); const ro = await run({ FORCE_FAILURE: 'anything else' }, other);
+  check(ro.ok && other.db.posts.length === 1, 'any other FORCE_FAILURE value is ignored: a normal run');
+}
+
 // ------------------------------------------------------------ configuration
 {
   const w = world(); const r = await run({ SUPABASE_SERVICE_ROLE_KEY: '' }, w);
