@@ -14,7 +14,7 @@
 import { pathToFileURL } from 'node:url';
 import { webcrypto } from 'node:crypto';
 import { testAddress, isTestAddress } from '../../shared/test-records.js';
-import { fixtureScan, scanRequestBody, checkReport, linksToResolve, resolveLinks, STEPS, WEEKLY_STEPS } from './checks.mjs';
+import { fixtureScan, scanRequestBody, checkReport, linksToResolve, resolveLinks, STEPS, WEEKLY_STEPS, DB_REQUIRED } from './checks.mjs';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 import { unsubscribeToken } from '../../workers/scan-report/lib/onboarding.js';
 
@@ -64,6 +64,22 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
 
   const steps = {
     // ---- nightly
+    // MPC-7557: the database has what the Worker needs. A missing function answers 404 (PGRST202), a missing column 400 (42703); anything else is not "missing".
+    async db_ready() {
+      const missing = [];
+      for (const [fn, args] of DB_REQUIRED.functions) {
+        const r = await sb.f(`${sb.base}/rest/v1/rpc/${fn}`, { method: 'POST', headers: sb.h(), body: JSON.stringify({ ...args, ...(args.p_status ? { p_at: now.toISOString() } : {}) }) });
+        if (r.status === 404) missing.push(`function ${fn}`);
+        else if (r.status >= 500) throw new Error(`database answered ${r.status} while checking ${fn}`);
+      }
+      for (const [table, cols] of DB_REQUIRED.columns) {
+        const r = await sb.f(`${sb.base}/rest/v1/${table}?select=${cols.join(',')}&limit=1`, { headers: sb.h() });
+        if (r.status === 404 || r.status === 400) missing.push(`${table}(${cols.join(',')})`);
+        else if (r.status >= 500) throw new Error(`database answered ${r.status} while checking ${table}`);
+      }
+      if (missing.length) throw new Error(`the production database is missing: ${missing.join('; ')} (a migration is not applied)`);
+      return `${DB_REQUIRED.functions.length} functions and ${DB_REQUIRED.columns.length} tables present`;
+    },
     async scan_request() {
       const res = await fetchImpl(`${synth}/api/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN }, body: JSON.stringify(scanRequestBody(email, fixture)) });
       const out = await res.json().catch(() => ({}));

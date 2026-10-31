@@ -32,6 +32,7 @@ Two candidate designs:
 | 6 | `report_sent` | `report_status = sent` and `resend_message_id` (waits up to 15 min for the cron) |
 | 7 | `report_checks` | sent HTML/text read back from Resend (falls back to a rebuild from the saved scan, flagged in the result): two parts, bridge line, honest statuses, scan number in HTML + text + JSON, JSON valid and agreeing with the scan, HTML under 100 KB, no unsupported markup, plain-text parity |
 | 8 | `links_resolve` | every https link in the report answers 2xx (the signed unsubscribe link is not fetched) |
+| 0 | `db_ready` | (MPC-7557) the production database has what the Worker needs: the receipt, send-event, delivery-count and atomic-scan functions, and the columns on `scans`, `email_sends`, `email_suppressions`. Checked with calls that change nothing; a missing item fails the night naming it (a migration is not applied) before anything is sent. Added after the CK-8503 migration was recorded as applied but was not |
 | 9 | `delivery_event_seen` | (MPC-7556) the Resend webhook stored a `delivered` event for the test report on its `email_sends` row within 5 minutes. No event, or a bounce, fails the night: the webhook, its secret or the migration is broken |
 
 The first failing step stops the run; later steps are recorded as **skipped**, never as passed.

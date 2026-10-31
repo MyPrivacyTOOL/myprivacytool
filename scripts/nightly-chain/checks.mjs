@@ -69,7 +69,22 @@ export async function resolveLinks(urls, fetchImpl = fetch, { timeoutMs = 10000 
 }
 
 /** Steps of the chain in order. The first failing step stops the run; later ones are reported as skipped, never as passed. */
-export const STEPS = ['scan_request', 'saved_scan', 'linked_contact_consent', 'report_request', 'first_email_accepted', 'report_sent', 'report_checks', 'links_resolve', 'delivery_event_seen'];
+export const STEPS = ['db_ready', 'scan_request', 'saved_scan', 'linked_contact_consent', 'report_request', 'first_email_accepted', 'report_sent', 'report_checks', 'links_resolve', 'delivery_event_seen'];
+// What the scan-report Worker needs from the production database (MPC-7557). The CK-8503 receipts function was missing for days while its task read 'applied';
+// this list is checked every night with calls that change nothing. Names only; nothing here is an address.
+export const DB_REQUIRED = {
+  functions: [
+    ['mpt_record_email_receipt', { p_message_id: 'db-ready-probe', p_status: 'sent' }],          // updates 0 rows
+    ['mpt_record_email_event', { p_message_id: 'db-ready-probe', p_status: 'sent', p_bounce_type: null }],   // updates 0 rows
+    ['mpt_email_delivery_counts', { p_from: '2000-01-01T00:00:00Z', p_to: '2000-01-02T00:00:00Z' }],           // read only
+    ['mpt_request_scan', { p_user_id: '00000000-0000-4000-8000-000000000000', p_email: 'db-ready-probe', p_window: '1 second' }],   // window out of range: raises before any insert, so it exists (400) or not (404)
+  ],
+  columns: [
+    ['scans', ['id', 'delivery_status', 'delivery_status_at', 'fixed_at', 'followup_ended', 'resend_message_id']],
+    ['email_sends', ['provider_message_id', 'status', 'click_count']],
+    ['email_suppressions', ['email_hash']],
+  ],
+};
 export const WEEKLY_STEPS = ['unsubscribe', 'suppression_recorded', 'delete_by_scan_number', 'cleanup'];
 
 export { HARD_LIMIT_BYTES };
