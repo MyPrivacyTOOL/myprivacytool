@@ -32,6 +32,7 @@ Two candidate designs:
 | 6 | `report_sent` | `report_status = sent` and `resend_message_id` (waits up to 15 min for the cron) |
 | 7 | `report_checks` | sent HTML/text read back from Resend (falls back to a rebuild from the saved scan, flagged in the result): two parts, bridge line, honest statuses, scan number in HTML + text + JSON, JSON valid and agreeing with the scan, HTML under 100 KB, no unsupported markup, plain-text parity |
 | 8 | `links_resolve` | every https link in the report answers 2xx (the signed unsubscribe link is not fetched) |
+| 9 | `delivery_event_seen` | (MPC-7556) the Resend webhook stored a `delivered` event for the test report on its `email_sends` row within 5 minutes. No event, or a bounce, fails the night: the webhook, its secret or the migration is broken |
 
 The first failing step stops the run; later steps are recorded as **skipped**, never as passed.
 

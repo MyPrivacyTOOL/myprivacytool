@@ -138,6 +138,17 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (bad.length) throw new Error(`${bad.length} of ${urls.length} links do not resolve: ${bad.slice(0, 3).join('; ')}`);
       return `${urls.length} links resolve`;
     },
+    // MPC-7556: proves the Resend webhook is delivering events every night. The report email (sent through the real provider to the test mailbox) must come back as a
+    // stored 'delivered' event on its per-send row (email_sends, written by the webhook). No event in the wait = the webhook, the secret or the migration is broken.
+    async delivery_event_seen() {
+      const row = await waitFor(async () => {
+        const r = (await sb.select(`email_sends?provider_message_id=eq.${encodeURIComponent(ctx.messageId)}&select=status`))[0];
+        return r && ['delivered', 'bounced', 'complained', 'failed'].includes(r.status) ? r : null;
+      }, { timeoutMs: Number(env.WAIT_EVENT_MS ?? 5 * 60000), everyMs: 15000, sleep });
+      if (!row) throw new Error('no delivery event stored for the test report after the wait (is the Resend webhook delivering? is the send recorded?)');
+      if (row.status !== 'delivered') throw new Error(`the test report ended as ${row.status}, not delivered`);
+      return 'delivery event stored: delivered';
+    },
     // ---- weekly: unsubscribe, deletion by scan number, cleanup (test alias only)
     async unsubscribe() {
       const first = await steps.scan_request();   // the weekly alias needs a scan to unsubscribe from and delete
