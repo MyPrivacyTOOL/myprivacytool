@@ -2,8 +2,9 @@
 //   inspect : read-only. Lists whether the webhook exists and the domain's tracking flags. Changes nothing.
 //   apply   : creates the webhook if it does not exist (never a second one), reads its signing secret into SECRET_OUT (file, mode 0600, never printed),
 //             and sets the sending domain to click tracking ON, open tracking OFF (open tracking is a pixel; we do not use pixels).
-//   verify  : needs RESEND_WEBHOOK_SECRET. Posts an UNSIGNED request (must be 401: endpoint on, signature enforced) and a correctly SIGNED test event
-//             for a message id that does not exist (must be 200: verified, matched to nothing, nothing stored).
+//   verify  : needs RESEND_WEBHOOK_SECRET. Posts an UNSIGNED request (must be 401: endpoint on, signature enforced) and a correctly SIGNED click event
+//             for a message id that does not exist (must be 200: verified, matched to nothing, nothing stored). A click is used because it needs only the per-send
+//             function (MPC-7556); delivered/bounced/complained events also need the CK-8503 receipts function and answer 500 until that migration is applied.
 // No address, key or secret is printed. Exit 1 on any failed expectation.
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -23,7 +24,7 @@ export async function run(env, { fetchImpl = fetch, log = console.log, writeFile
 
   if (mode === 'verify') {
     if (!env.RESEND_WEBHOOK_SECRET) { fail('verify needs RESEND_WEBHOOK_SECRET'); return out; }
-    const body = JSON.stringify({ type: 'email.delivered', created_at: new Date().toISOString(), data: { email_id: `setup-check-${Date.now()}` } });
+    const body = JSON.stringify({ type: 'email.clicked', created_at: new Date().toISOString(), data: { email_id: `setup-check-${Date.now()}` } });
     const unsigned = await fetchImpl(endpoint, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
     log(unsigned.status === 401 ? 'PASS unsigned request refused (401): endpoint is on and enforces the signature' : `FAIL unsigned request answered ${unsigned.status}, expected 401`);
     if (unsigned.status !== 401) out.ok = false;
