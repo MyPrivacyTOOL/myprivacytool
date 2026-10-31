@@ -36,6 +36,14 @@ function world(opts = {}) {
       const path = url.slice('https://db.invalid/rest/v1/'.length);
       if (method === 'POST' && path.startsWith('rpc/mpt_delete_web_scan')) { const n = JSON.parse(init.body).p_scan_number; const found = Boolean(db.webScans[n]); delete db.webScans[n]; db.deleted.push(n); return json({ found }); }
       if (method === 'POST' && path.startsWith('rpc/mpt_dsar_erase')) { const e = JSON.parse(init.body).p_email; db.erased.push(e); delete db.users[e]; for (const [k, v] of Object.entries(db.scans)) if (v.email === e) delete db.scans[k]; return json({}); }
+      if (method === 'POST' && path.startsWith('rpc/mpt_') && !path.startsWith('rpc/mpt_delete_web_scan') && !path.startsWith('rpc/mpt_dsar_erase')) {   // db_ready probes
+        const fn = path.slice(4);
+        if (opts.missingFn === fn) return json({ code: 'PGRST202' }, 404);
+        return fn === 'mpt_request_scan' ? json({ code: '22023' }, 400) : json(0);
+      }
+      if (method === 'GET' && /^(scans|email_sends|email_suppressions)\?select=/.test(path)) {   // db_ready column probes
+        return opts.missingColumn && path.includes(opts.missingColumn) ? json({ code: '42703' }, 400) : json([]);
+      }
       if (method === 'POST' && path === 'mpt_raw_metrics') { db.metrics = JSON.parse(init.body); return json({}, 201); }
       if (method === 'DELETE' && path.startsWith('email_suppressions')) { db.suppressions.delete(path.split('eq.')[1]); return json({}, 204); }
       if (path.startsWith('web_scans?id=eq.')) { const r = db.webScans[path.match(/eq\.([^&]+)/)[1]]; return json(r ? [r] : []); }
@@ -83,8 +91,8 @@ check(hkDay(NOW) === '20261029', 'run day is the Hong Kong date (16:00 UTC is al
 // ------------------------------------------------------------ nightly, all green
 {
   const w = world(); const r = await run({}, w);
-  check(r.ok && r.steps.every((s) => s.ok), 'nightly: all nine steps pass');
-  check(r.steps.map((s) => s.step).join() === 'scan_request,saved_scan,linked_contact_consent,report_request,first_email_accepted,report_sent,report_checks,links_resolve,delivery_event_seen', 'nightly: steps run in the required order');
+  check(r.ok && r.steps.every((s) => s.ok), 'nightly: all ten steps pass');
+  check(r.steps.map((s) => s.step).join() === 'db_ready,scan_request,saved_scan,linked_contact_consent,report_request,first_email_accepted,report_sent,report_checks,links_resolve,delivery_event_seen', 'nightly: steps run in the required order');
   const b = w.db.posts[0];
   check(isTestAddress(b.email) && b['cf-turnstile-response'] === 'XXXX.DUMMY.TOKEN.XXXX' && b.consent === true && b.save_consent === true && b.scan.length === fixtureScan().length, 'nightly: request is a consented test-alias scan carrying the Turnstile TEST token');
   check(w.db.gets.every((g) => !g.startsWith('POST https://prod.invalid/api/scan')), 'nightly: nothing is ever POSTed to the production /api/scan');
@@ -107,6 +115,9 @@ const broken = [
   ['plain text drifts from the HTML', { sentText: (t) => t.replace(/NOT CHECKED/g, 'unknown') }, 'report_checks'],
   ['sent report has unsupported markup', { sentHtml: (h) => h.replace('</body>', '<script>1</script></body>') }, 'report_checks'],
   ['a report link returns 404', { deadLink: '/opt-out' }, 'links_resolve'],
+  ['the CK-8503 receipts function is missing in production', { missingFn: 'mpt_record_email_receipt' }, 'db_ready'],
+  ['the atomic scan function is missing in production', { missingFn: 'mpt_request_scan' }, 'db_ready'],
+  ['scans.delivery_status is missing in production', { missingColumn: 'delivery_status' }, 'db_ready'],
   ['no delivery event ever stored for the test report (webhook not delivering)', { noEvent: true }, 'delivery_event_seen'],
   ['the test report bounced', { eventStatus: 'bounced' }, 'delivery_event_seen'],
 ];
