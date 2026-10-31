@@ -708,6 +708,15 @@ select pg_temp.assert(pg_temp.try_as('service_role', $$select public.mpt_social_
 select pg_temp.assert(pg_temp.try_as('service_role', format($f$select public.mpt_social_record('x','777100',null,'dm',null,'dm:3',null,null,jsonb_build_object('k', %L))$f$, repeat('a', 5000))) = '23514', 'mpt_social_record: data is capped at 4 kB');
 select pg_temp.assert(public.mpt_erase_social_contact('x', '777100') = 1 and public.mpt_erase_social_contact('x', '777101') = 1, 'mpt_social_record: erase removes the contact; events cascade');
 select pg_temp.assert((select count(*) from public.social_events where event_key in ('follow:777100:1000','mention:t1','follow:777101:1000','dm:1')) = 0, 'mpt_social_record: no event survives an erase');
+-- MPC-9018: Telegram capture is kept 90 days after the last message, other platforms 2 years
+select public.mpt_social_record('telegram', '777300', 'tg_user', 'dm', null, 'tg:1', null, null, '{"tg.message_text":"hi"}'::jsonb);
+select public.mpt_social_record('x', '777301', 'x_user', 'dm', null, 'dm:9', null, null);
+select pg_temp.assert((select retain_until between now() + interval '89 days' and now() + interval '91 days' from public.social_contacts where platform = 'telegram' and platform_user_id = '777300'), 'mpt_social_record: a Telegram contact is kept 90 days');
+select pg_temp.assert((select retain_until between now() + interval '729 days' and now() + interval '731 days' from public.social_contacts where platform = 'x' and platform_user_id = '777301'), 'mpt_social_record: other platforms keep 2 years');
+update public.social_contacts set retain_until = now() - interval '1 day' where platform = 'telegram' and platform_user_id = '777300';
+select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 1, 'mpt_social_record: an expired Telegram contact is purged');
+select pg_temp.assert((select count(*) from public.social_contacts where platform_user_id = '777300') = 0 and (select count(*) from public.social_events where event_key = 'tg:1') = 0, 'mpt_social_record: the purge removes the Telegram contact and its captured message');
+select pg_temp.assert(public.mpt_erase_social_contact('x', '777301') = 1, 'mpt_social_record: erase removes the X test contact');
 reset role;
 set local role service_role;
 select pg_temp.assert(public.mpt_erase_social_contact('x', '777001') = 1, 'mpt_erase_social_contact: returns the number of contacts removed');
