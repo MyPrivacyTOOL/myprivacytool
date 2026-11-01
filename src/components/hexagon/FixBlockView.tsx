@@ -1,4 +1,5 @@
 import { FIX_COPY_IS_DRAFT, regionTextFor, type FixBlock } from '@/lib/hexagonFix';
+import GuideLink from './GuideLink';
 import { JURISDICTIONS } from '@/lib/hexagonFix';
 import { JURISDICTION_LABELS, useDeclaredJurisdiction } from '@/lib/declaredJurisdiction';
 
@@ -29,6 +30,7 @@ export default function FixBlockView({ block }: { block: FixBlock }) {
           <p className="text-sm text-foreground mt-2" data-testid="fix-region-text">{regionTextFor(block.region, jurisdiction)}</p>
         </div>
       )}
+      <GuideLink hexagonId={block.hexagon_id} />
       {(FIX_COPY_IS_DRAFT || block.copy_status === 'draft') && (
         <p className="text-xs text-muted-foreground mt-2" data-testid="fix-draft-note">Draft wording.</p>
       )}

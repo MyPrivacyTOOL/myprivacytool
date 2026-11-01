@@ -870,6 +870,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             <NextStepCard
               key={currentStep.id}
               label={currentStep.label}
+              hexagonId={currentStep.id}
               step={fixStepFor(currentStep.id)}
               block={fixBlocksV2Enabled() && canShowFix(currentStep.id, 'needs_fixing') ? fixBlockFor(currentStep.id) : undefined}
               position={1}

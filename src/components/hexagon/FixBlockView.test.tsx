@@ -83,3 +83,27 @@ describe('RemediationPanel behind the fix-blocks switch', () => {
     expect(fixBlocksV2Enabled('?fix_v2=0')).toBe(false);
   });
 });
+
+describe('guide link (MPC-8733 #4)', () => {
+  it('a guided hexagon links its fix block to /guides/<id>/ with the scan-again prompt', () => {
+    render(<FixBlockView block={fixBlockFor('webrtc-leak') as FixBlock} />);
+    // webrtc-leak is deliberately unguided; pick one that has a guide
+    cleanup();
+    render(<FixBlockView block={fixBlockFor('isp') as FixBlock} />);
+    const a = screen.getByRole('link', { name: /full guide/i });
+    expect(a.getAttribute('href')).toBe('/guides/isp/');
+    expect(screen.getByTestId('guide-link').textContent).toMatch(/scan again/i);
+  });
+  it('an unguided hexagon shows no link', () => {
+    render(<FixBlockView block={fixBlockFor('webrtc-leak') as FixBlock} />);
+    expect(screen.queryByTestId('guide-link')).toBeNull();
+  });
+  it('the older step and the no-fix message link too, only when guided', () => {
+    render(<NextStepCard label="x" hexagonId="isp" position={1} total={1} onDone={() => {}} onLater={() => {}} />);
+    expect(screen.getByTestId('no-fix-step')).toBeTruthy();
+    expect(screen.getByTestId('guide-link')).toBeTruthy();
+    cleanup();
+    render(<NextStepCard label="x" hexagonId="webrtc-leak" position={1} total={1} onDone={() => {}} onLater={() => {}} />);
+    expect(screen.queryByTestId('guide-link')).toBeNull();
+  });
+});
