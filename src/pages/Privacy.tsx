@@ -149,8 +149,7 @@ const Privacy = () => {
                   scan and to measure what a messaging channel makes visible about
                   a person. On Telegram we start keeping these details only
                   after you reply Y to confirm you are 19 or over; before that we
-                  keep only the stage of the conversation. We keep it for up to 90 days, then it is deleted
-                  automatically. The 90 days count from your last message. Our team can see it on a restricted basis; it is
+                  keep only the stage of the conversation. We keep it until you ask us to delete it. Our team can see it on a restricted basis; it is
                   not shared publicly. You can ask us to delete everything linked
                   to your Telegram id at any time by writing to{" "}
                   <a

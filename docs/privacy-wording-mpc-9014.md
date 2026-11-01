@@ -44,3 +44,6 @@ Recommendations: A: make the code match the policy (90 days for Telegram capture
 
 ## 5. Approval
 Owner approves, or edits, the wording in section 3 and decides A and B. Until then the PR stays a draft and nothing ships.
+
+## 6. Decision on conflict A (proposed 2026-11-01, awaiting owner approval)
+Owner direction: no automatic deletions for now. Instead of making the code match "90 days, then deleted automatically", the wording is changed to match what the code does today: Telegram capture is kept until the person asks for deletion (STOP in chat, or privacy@myprivacytool.io). Changed in this proposal: the English `bot.first_hexagon.question` and the Privacy "Messaging Channel Data" bullet. Not changed here: other "90 days" statements for scan snapshots and fix-list answers (those data sets do have an expiry in code but, like the capture purge, no job is known to run it), the deep-scan consent text in `baseline-scan.ts`, and the nine untranslated locales. Needs a new owner approval and a legal read (MPC-6798): "kept until asked" is a stronger position than a fixed period in some regions.

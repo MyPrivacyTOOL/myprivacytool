@@ -121,25 +121,27 @@ describe("Privacy: referral programme section", () => {
   });
 });
 
-describe("Privacy: Telegram 19 or over rule and 90 days from the last message (MPC-9014, draft wording)", () => {
-  it("states the bot is 19 or over, that age is self-declared, that nothing is kept before Y, and that the 90 days run from the last message", () => {
+describe("Privacy: Telegram 19 or over rule and keep-until-asked (MPC-9014, draft wording)", () => {
+  it("states the bot is 19 or over, that age is self-declared, that nothing is kept before Y, and that it is kept until you ask us to delete it", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("Our Telegram bot is for people aged 19 or over");
     expect(text).toContain("We cannot check your age, so this relies on your answer.");
     expect(text).toContain("we start keeping these details only after you reply Y to confirm you are 19 or over");
-    expect(text).toContain("The 90 days count from your last message.");
+    expect(text).toContain("We keep it until you ask us to delete it.");
+    expect(text).not.toContain("The 90 days count from your last message.");
     expect(text).toContain("confirm you are 16 or older with a checkbox");
   });
 });
 
 describe("Privacy: Telegram bot (draft wording, unreviewed)", () => {
-  it("says message text and public profile details are received, the 90 day keep, and gives the privacy address for deletion", () => {
+  it("says message text and public profile details are received, they are kept until you ask us to delete them, and gives the privacy address for deletion", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("we receive what you send (including message text)");
     expect(text).toContain("the public details of your profile that Telegram makes available to bots");
-    expect(text).toContain("We keep it for up to 90 days, then it is deleted automatically.");
+    expect(text).toContain("We keep it until you ask us to delete it.");
+    expect(text).not.toContain("then it is deleted automatically");
     expect(text).toContain("delete everything linked to your Telegram id at any time by writing to privacy@myprivacytool.io");
     expect(text).toContain("send STOP, or tap");
     expect(text).toContain("Delete my scan data");
