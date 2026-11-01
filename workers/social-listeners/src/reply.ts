@@ -63,7 +63,7 @@ export function replyTarget(update: unknown): number | string | null {
 }
 
 /** CK-8502: owner-approved disclosure (2026-10-28), appended to a reply while TELEGRAM_CAPTURE_HEXAGONS is on AND the sender has confirmed with Y (owner decision 2026-10-31: capture, and so the disclosure, only applies after the Y; before it the teaser question carries the saving notice). English only until the 10 locale files carry a reviewed translation. */
-export const CAPTURE_DISCLOSURE = "To reply, I keep the details Telegram sends me with your messages (your name, @username, language and what you write). Send STOP any time and I'll delete them.";
+export const CAPTURE_DISCLOSURE = "To reply, I keep the details Telegram sends me with your messages (your name, your Telegram username, language and what you write). Send STOP any time and I'll delete them.";
 
 /** Reads core-brain's answer and, if it carries message keys, sends the reply. Never throws: a failed send is logged only. */
 export async function sendTelegramReply(env: Env, update: unknown, brain: Response, log: Logger, events?: EventLog | null): Promise<void> {
