@@ -2,7 +2,7 @@
 // MPC-7557: nightly (and weekly) end-to-end test of the scan -> saved scan -> contact -> report request -> first email -> report chain.
 //
 //   MODE=nightly|weekly  SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY  node scripts/nightly-chain/run.mjs
-//   optional: SYNTHETIC_SCAN_URL, PROD_SCAN_URL, RESEND_API_KEY (read the sent report back), UNSUBSCRIBE_SECRET (weekly unsubscribe), WAIT_REPORT_MS, DRY_RUN=1
+//   optional: FORCE_FAILURE=alert_test (writes a failed result row only, to test the Slack alert), SYNTHETIC_SCAN_URL, PROD_SCAN_URL, RESEND_API_KEY (read the sent report back), UNSUBSCRIBE_SECRET (weekly unsubscribe), WAIT_REPORT_MS, DRY_RUN=1
 //
 // DESIGN (docs/nightly-chain-mpc-7557.md): production's POST /api/scan enforces Cloudflare Turnstile and must never be bypassed. So the scan request goes to a
 // SEPARATE deployment of the same Worker code (mpt-scan-report-synthetic) that holds Cloudflare's public TEST secret, has no cron, and may email only the test
@@ -14,7 +14,7 @@
 import { pathToFileURL } from 'node:url';
 import { webcrypto } from 'node:crypto';
 import { testAddress, isTestAddress } from '../../shared/test-records.js';
-import { fixtureScan, scanRequestBody, checkReport, linksToResolve, resolveLinks, STEPS, WEEKLY_STEPS } from './checks.mjs';
+import { fixtureScan, scanRequestBody, checkReport, linksToResolve, resolveLinks, STEPS, WEEKLY_STEPS, DB_REQUIRED } from './checks.mjs';
 import { buildReportEmail } from '../../workers/scan-report/lib/email.js';
 import { unsubscribeToken } from '../../workers/scan-report/lib/onboarding.js';
 
@@ -54,6 +54,9 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
   const missing = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'].filter((k) => !env[k]);
   if (mode === 'weekly' && !env.UNSUBSCRIBE_SECRET) missing.push('UNSUBSCRIBE_SECRET');
   if (missing.length) { result.notConfigured = `missing ${missing.join(', ')}`; return result; }
+  // MPC-7557: ALERT TEST. A manual dispatch can force a failure to prove the Slack alert end to end. Nothing is scanned or sent; the run only writes its (failed) result row,
+  // under a step name that says what it is, because the alert shows step names but no detail. The schedule can never set this (the workflow only passes it on workflow_dispatch).
+  if (env.FORCE_FAILURE === 'alert_test') { result.failedStep = 'alert_test_forced_failure'; result.facts.forced = true; return result; }
   const synth = (env.SYNTHETIC_SCAN_URL || DEFAULTS.SYNTHETIC_SCAN_URL).replace(/\/$/, '');
   const prod = (env.PROD_SCAN_URL || DEFAULTS.PROD_SCAN_URL).replace(/\/$/, '');
   const sb = new Supabase(env, fetchImpl);
@@ -64,6 +67,22 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
 
   const steps = {
     // ---- nightly
+    // MPC-7557: the database has what the Worker needs. A missing function answers 404 (PGRST202), a missing column 400 (42703); anything else is not "missing".
+    async db_ready() {
+      const missing = [];
+      for (const [fn, args] of DB_REQUIRED.functions) {
+        const r = await sb.f(`${sb.base}/rest/v1/rpc/${fn}`, { method: 'POST', headers: sb.h(), body: JSON.stringify({ ...args, ...(args.p_status ? { p_at: now.toISOString() } : {}) }) });
+        if (r.status === 404) missing.push(`function ${fn}`);
+        else if (r.status >= 500) throw new Error(`database answered ${r.status} while checking ${fn}`);
+      }
+      for (const [table, cols] of DB_REQUIRED.columns) {
+        const r = await sb.f(`${sb.base}/rest/v1/${table}?select=${cols.join(',')}&limit=1`, { headers: sb.h() });
+        if (r.status === 404 || r.status === 400) missing.push(`${table}(${cols.join(',')})`);
+        else if (r.status >= 500) throw new Error(`database answered ${r.status} while checking ${table}`);
+      }
+      if (missing.length) throw new Error(`the production database is missing: ${missing.join('; ')} (a migration is not applied)`);
+      return `${DB_REQUIRED.functions.length} functions and ${DB_REQUIRED.columns.length} tables present`;
+    },
     async scan_request() {
       const res = await fetchImpl(`${synth}/api/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: ORIGIN }, body: JSON.stringify(scanRequestBody(email, fixture)) });
       const out = await res.json().catch(() => ({}));
@@ -137,6 +156,17 @@ export async function runChain(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       result.facts.links_checked = urls.length;
       if (bad.length) throw new Error(`${bad.length} of ${urls.length} links do not resolve: ${bad.slice(0, 3).join('; ')}`);
       return `${urls.length} links resolve`;
+    },
+    // MPC-7556: proves the Resend webhook is delivering events every night. The report email (sent through the real provider to the test mailbox) must come back as a
+    // stored 'delivered' event on its per-send row (email_sends, written by the webhook). No event in the wait = the webhook, the secret or the migration is broken.
+    async delivery_event_seen() {
+      const row = await waitFor(async () => {
+        const r = (await sb.select(`email_sends?provider_message_id=eq.${encodeURIComponent(ctx.messageId)}&select=status`))[0];
+        return r && ['delivered', 'bounced', 'complained', 'failed'].includes(r.status) ? r : null;
+      }, { timeoutMs: Number(env.WAIT_EVENT_MS ?? 5 * 60000), everyMs: 15000, sleep });
+      if (!row) throw new Error('no delivery event stored for the test report after the wait (is the Resend webhook delivering? is the send recorded?)');
+      if (row.status !== 'delivered') throw new Error(`the test report ended as ${row.status}, not delivered`);
+      return 'delivery event stored: delivered';
     },
     // ---- weekly: unsubscribe, deletion by scan number, cleanup (test alias only)
     async unsubscribe() {

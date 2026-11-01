@@ -55,9 +55,16 @@ export async function handleResendWebhook(env, request, json, { sb, optOut, push
   const at = Date.parse(event.created_at || event.data?.created_at || '');
   const when = Number.isFinite(at) ? new Date(at).toISOString() : new Date().toISOString();
   const bounce = status === 'bounced' ? known(bounceKind(event)) : null;
+  let receiptPending = false;
   try {
     // 1. the report email's own row (CK-8503); a click is not a delivery state, so it skips this
-    const onScan = status === 'clicked' ? 0 : await sb.rpc('mpt_record_email_receipt', { p_message_id: messageId, p_status: status, p_at: when });
+    // 404 = the CK-8503 migration is not applied yet. Keep going so the per-send row and the bounce/complaint opt-out below are not blocked by it, then answer 500 at the end so Resend
+    // retries and the report row (scans.delivery_status) is filled once the migration lands. Steps 2 and 3 are idempotent, so the retries are harmless.
+    let onScan = 0;
+    if (status !== 'clicked') {
+      try { onScan = await sb.rpc('mpt_record_email_receipt', { p_message_id: messageId, p_status: status, p_at: when }); }
+      catch (e) { if (e.status !== 404) throw e; receiptPending = true; console.warn('report receipt not stored on the scan: migration 20261026220000_ck_8503_scan_receipts_and_dedupe not applied'); }
+    }
     // 2. the per-send row for every email type (MPC-7556). 404 = migration not applied yet: carry on, do not make Resend retry for ever.
     let onSend = 0;
     try { onSend = await sb.rpc('mpt_record_email_event', { p_message_id: messageId, p_status: status, p_at: when, p_bounce_type: bounce }); }
@@ -77,5 +84,6 @@ export async function handleResendWebhook(env, request, json, { sb, optOut, push
       optedOut = to.length > 0;
     } catch (e) { console.error('opt-out after bounce/complaint not recorded:', e.status || 'error'); return json({ error: 'Unavailable' }, 500); }   // Resend retries; optOutEverywhere is idempotent
   }
+  if (receiptPending) return json({ error: 'Unavailable' }, 500);   // CK-8503 migration missing: retry later (see step 1)
   return json({ ok: true, ...(optedOut ? { opted_out: true } : {}) });
 }

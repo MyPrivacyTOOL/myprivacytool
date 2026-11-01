@@ -147,8 +147,10 @@ const Privacy = () => {
                   linked personal channel. We do not receive your phone number or
                   contacts unless you share them. We use this to run your privacy
                   scan and to measure what a messaging channel makes visible about
-                  a person. We keep it for up to 90 days, then it is deleted
-                  automatically. Our team can see it on a restricted basis; it is
+                  a person. On Telegram we start keeping these details only
+                  after you reply Y to confirm you are 19 or over; before that we
+                  keep only the stage of the conversation. We keep it for up to 90 days, then it is deleted
+                  automatically. The 90 days count from your last message. Our team can see it on a restricted basis; it is
                   not shared publicly. You can ask us to delete everything linked
                   to your Telegram id at any time by writing to{" "}
                   <a
@@ -183,9 +185,12 @@ const Privacy = () => {
                   when, and which version of our wording you saw
                 </li>
                 <li>
-                  <strong>Age Confirmation:</strong> We ask you to confirm you are
-                  16 or older with a checkbox. We do not collect or store your date
-                  of birth
+                  <strong>Age Confirmation:</strong> On our website we ask you to
+                  confirm you are 16 or older with a checkbox. Our Telegram bot is
+                  for people aged 19 or over: it asks you to reply Y only if you
+                  are, and it records nothing from your messages before you do. We
+                  cannot check your age, so this relies on your answer. We do not
+                  collect or store your date of birth
                 </li>
                 <li>
                   <strong>Handles You Ask Us to Scan:</strong> Social media handles

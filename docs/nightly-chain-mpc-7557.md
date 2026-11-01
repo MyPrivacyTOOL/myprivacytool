@@ -32,6 +32,8 @@ Two candidate designs:
 | 6 | `report_sent` | `report_status = sent` and `resend_message_id` (waits up to 15 min for the cron) |
 | 7 | `report_checks` | sent HTML/text read back from Resend (falls back to a rebuild from the saved scan, flagged in the result): two parts, bridge line, honest statuses, scan number in HTML + text + JSON, JSON valid and agreeing with the scan, HTML under 100 KB, no unsupported markup, plain-text parity |
 | 8 | `links_resolve` | every https link in the report answers 2xx (the signed unsubscribe link is not fetched) |
+| 0 | `db_ready` | (MPC-7557) the production database has what the Worker needs: the receipt, send-event, delivery-count and atomic-scan functions, and the columns on `scans`, `email_sends`, `email_suppressions`. Checked with calls that change nothing; a missing item fails the night naming it (a migration is not applied) before anything is sent. Added after the CK-8503 migration was recorded as applied but was not |
+| 9 | `delivery_event_seen` | (MPC-7556) the Resend webhook stored a `delivered` event for the test report on its `email_sends` row within 5 minutes. No event, or a bounce, fails the night: the webhook, its secret or the migration is broken |
 
 The first failing step stops the run; later steps are recorded as **skipped**, never as passed.
 
@@ -61,6 +63,10 @@ Sunday 23:45 HKT, alias `testingnt69+weekly-<day>`: scan on the synthetic Worker
 | Schedule | Nightly 23:30 HKT (15:30 UTC), weekly Sunday 23:45 HKT. Chosen so the 00:15 HKT collector reports the same night and it does not overlap the 03:17 HKT drift job. |
 | Alert destination | The usual MPT Slack channel (via the existing collector), nothing new. |
 | Stop procedure | Disable the "Nightly chain test" workflow (Actions tab) or revert this PR; to stop the synthetic path delete Worker `mpt-scan-report-synthetic`. Neither touches production's Worker, cron or Turnstile. |
+
+## 5a. Testing the alert (MPC-7557)
+
+To see the Slack alert once for real: dispatch "Nightly chain test" with `force_failure` = `alert_test`. Nothing is scanned or sent; the run writes one FAILED result row whose failed step is `alert_test_forced_failure`, and the job goes red. The metrics collector (00:15 HKT) alerts on the LATEST nightly row, so dispatch it AFTER that night's scheduled run (15:30 UTC) and BEFORE the collector (16:15 UTC); the Slack text is: `Nightly chain test FAILED at step "alert_test_forced_failure" on <day>`. Afterwards dispatch one normal nightly run so the latest row is OK again (otherwise the Monday 01:00 UTC collector alerts a second time). The schedule can never force a failure: the workflow passes the input only on workflow_dispatch.
 
 ## 6. What activation needs (tracked as Notion tasks, not asks to Chris)
 
