@@ -82,3 +82,10 @@ describe("Telegram security check page", () => {
     expect(html).toContain("addEventListener('click', window.__mptOpenCurtain)");
   });
 });
+
+describe("Cloudflare edge injection (MPC-9057)", () => {
+  it("marks every response no-transform so Cloudflare cannot inject its analytics beacon before consent", () => {
+    const headers = readFileSync(path.join(repo, "public/_headers"), "utf8");
+    expect(headers).toMatch(/^\/\*\n\s+Cache-Control: no-transform\s*$/m);
+  });
+});

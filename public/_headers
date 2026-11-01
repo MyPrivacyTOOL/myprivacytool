@@ -1,6 +1,12 @@
 # Cloudflare Pages response headers (MPC-7200). Cloudflare compresses text assets (brotli/gzip) at the edge
 # automatically; this file controls browser + edge caching.
 
+# MPC-9057: stop Cloudflare auto-injecting its Web Analytics beacon (it would load before the visitor's cookie choice).
+# Cloudflare skips edge injection on responses marked no-transform. The consent-gated loader in src/lib/cfWebAnalytics.ts
+# is the only place the beacon is added.
+/*
+  Cache-Control: no-transform
+
 # Vite emits content-hashed filenames under /assets, so they can be cached forever.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
