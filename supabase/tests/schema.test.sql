@@ -714,7 +714,8 @@ select public.mpt_social_record('x', '777301', 'x_user', 'dm', null, 'dm:9', nul
 select pg_temp.assert((select retain_until is null from public.social_contacts where platform = 'telegram' and platform_user_id = '777300'), 'mpt_social_record: a Telegram contact has no expiry');
 select pg_temp.assert((select retain_until between now() + interval '729 days' and now() + interval '731 days' from public.social_contacts where platform = 'x' and platform_user_id = '777301'), 'mpt_social_record: other platforms keep 2 years');
 select pg_temp.assert(public.mpt_purge_expired_social_contacts() = 0 and (select count(*) from public.social_contacts where platform_user_id = '777300') = 1, 'mpt_social_record: the purge never removes a Telegram contact');
-select pg_temp.assert(public.mpt_erase_social_contact('telegram', '777300') = 1 and (select count(*) from public.social_events where event_key = 'tg:1') = 0, 'mpt_social_record: erase on request removes the Telegram contact and its captured message');
+select pg_temp.assert(public.mpt_erase_social_contact('telegram', '777300') = 1, 'mpt_social_record: erase on request removes the Telegram contact');
+select pg_temp.assert((select count(*) from public.social_events where event_key = 'tg:1') = 0, 'mpt_social_record: erase on request also removes its captured message');
 select pg_temp.assert(public.mpt_erase_social_contact('x', '777301') = 1, 'mpt_social_record: erase removes the X test contact');
 reset role;
 set local role service_role;
