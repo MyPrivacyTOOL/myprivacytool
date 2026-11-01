@@ -112,7 +112,7 @@ export default function RiskScore({ confirmed, total, counts, hexagons, fingerpr
           <div className="text-muted-foreground text-xs sm:text-sm mt-1" data-testid="footprint-line">
             {footprintLine(footprint)}
             {footprintChannelsLine(footprint) && ` (${footprintChannelsLine(footprint)})`}
-            {handoff.ids.length > 0 && ` Telegram part from your Telegram scan${handoff.scanAt ? ` on ${new Date(handoff.scanAt).toLocaleDateString()}` : ''}.`}
+            {handoff.ids.length > 0 && (footprint.byChannel.find((c) => c.key === 'telegram')?.checked ?? 0) > 0 && ` Telegram part from your Telegram scan${handoff.scanAt ? ` on ${new Date(handoff.scanAt).toLocaleDateString()}` : ''}.`}
             {' '}<a href="/hexagon/" className="underline">See all {footprint.total}</a>
           </div>
           {webExtras.length > 0 && (
