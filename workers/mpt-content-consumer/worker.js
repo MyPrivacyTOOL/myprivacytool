@@ -139,6 +139,32 @@ async function postSlack(env, topic, taskId, drafts) {
   return { channel: body.channel, ts: body.ts };
 }
 
+// Receipts for approved posts normally arrive within a minute. A platform still "handed_off" long after approval means the Make
+// receipt step or the Worker callback broke while the post may well be live, so the channel is told with the daily drafts.
+// Window: handed off 6 to 48 hours ago, so each case alerts at most twice and old test rows never alert.
+const RECEIPT_OVERDUE_MS = 6 * 3600e3;
+const RECEIPT_ALERT_WINDOW_MS = 48 * 3600e3;
+
+export async function warnOverdueReceipts(env, date, nowMs = Date.now()) {
+  const { results } = await env.AGENT_LOGS.prepare(
+    "SELECT content_id, platform FROM publication_receipts WHERE state = 'handed_off' AND handed_off_at < ? AND handed_off_at > ? AND content_id <= ? ORDER BY content_id, platform",
+  ).bind(new Date(nowMs - RECEIPT_OVERDUE_MS).toISOString(), new Date(nowMs - RECEIPT_ALERT_WINDOW_MS).toISOString(), taskIdFor(date)).all();
+  if (!results.length) return 0;
+  const lines = results.map((r) => `${r.content_id.replace('daily-posts-', '')}: ${PLATFORM_NAMES[r.platform] ?? r.platform}`);
+  const res = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({
+      channel: env.SLACK_CHANNEL,
+      text: `:warning: Receipts overdue: ${lines.join(', ')}. These posts were handed to Make more than 6 hours ago and never confirmed. They may be live. Check the platform and the Make run history (https://eu1.make.com/4179/scenarios/7817044/logs), and do not replay a run that already posted.`,
+      unfurl_links: false,
+    }),
+  });
+  const body = await res.json();
+  if (!body.ok) throw new Error(`Slack alert failed: ${body.error}`);
+  return results.length;
+}
+
 export async function generateDailyPosts(env, date, hint = {}) {
   const taskId = taskIdFor(date);
   if ((await rows(env, taskId, 'notified')).length) return 'skipped'; // retry / duplicate delivery
@@ -172,6 +198,7 @@ export async function generateDailyPosts(env, date, hint = {}) {
   const drafts = PLATFORMS.map((p) => have.get(p));
   const slack = await postSlack(env, resolveTopic(hint, schedule, 'x') ?? drafts[0].topic, taskId, drafts);
   await log(env, taskId, 'notified', { draft: slack });
+  await warnOverdueReceipts(env, date).catch((e) => console.error('receipt alert failed', String(e)));
   return 'notified';
 }
 
