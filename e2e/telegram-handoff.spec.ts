@@ -22,6 +22,7 @@ test("opened with ?handoff=1 and a valid session, the footprint line counts the 
   await expect(line).toContainText("Telegram part from your Telegram scan");
   await expect(line).toContainText(/of 368 footprint hexagons checked/);
   expect(asked).toBe(1);
+  await expect(page.getByTestId("telegram-handoff-notice")).toContainText(`${TG_IDS.length} Telegram checks`);
 });
 
 test("without ?handoff=1 the page never asks for the Telegram result and makes no Telegram claim", async ({ page }) => {
@@ -30,6 +31,7 @@ test("without ?handoff=1 the page never asks for the Telegram result and makes n
   await page.goto(grid);
   await scanSettled(page);
   await expect(page.getByTestId("footprint-line").first()).not.toContainText("Telegram");
+  await expect(page.getByTestId("telegram-handoff-notice")).toHaveCount(0);
   expect(asked).toBe(0);
 });
 
@@ -38,6 +40,7 @@ test("with ?handoff=1 but no valid session (401), no Telegram claim is made", as
   await page.goto(`${grid}&handoff=1`);
   await scanSettled(page);
   await page.waitForTimeout(500);
+  await expect(page.getByTestId("telegram-handoff-notice")).toHaveCount(0);
   await expect(page.getByTestId("footprint-line").first()).not.toContainText("Telegram");
 });
 
@@ -47,4 +50,5 @@ test("a wrong answer (ids that are not hexagons, values instead of ids) adds not
   await scanSettled(page);
   await page.waitForTimeout(500);
   await expect(page.getByTestId("footprint-line").first()).not.toContainText("Telegram");
+  await expect(page.getByTestId("telegram-handoff-notice")).toHaveCount(0);
 });
