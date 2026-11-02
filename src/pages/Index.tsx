@@ -28,6 +28,7 @@ import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
 import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
 import WelcomeBack from '@/components/WelcomeBack';
+import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
@@ -317,6 +318,7 @@ const Index = () => {
               )}
               <ScanSavingNotice variant="scan" />
               <WelcomeBack hexagons={hexagons} />
+              <TelegramHandoffNotice />
               <ScanNumberNotice />
             </>
           )}
