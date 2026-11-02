@@ -49,7 +49,7 @@ function sameOrigin(request: Request): boolean {
 
 interface RedeemCfg { scope: "dashboard" | "footprint"; cookie: string; enabled: (env: DashboardEnv) => boolean; location: string; failedHint: string }
 const DASHBOARD_REDEEM: RedeemCfg = { scope: "dashboard", cookie: SESSION_COOKIE, enabled, location: "/dashboard", failedHint: "Go back to Telegram and ask the bot for a new one." };
-const FOOTPRINT_REDEEM: RedeemCfg = { scope: "footprint", cookie: FOOTPRINT_COOKIE, enabled: (env) => env.FOOTPRINT_HANDOFF === "1", location: "/scan?handoff=1", failedHint: "Go back to Telegram and type FOOTPRINT for a new one." };
+const FOOTPRINT_REDEEM: RedeemCfg = { scope: "footprint", cookie: FOOTPRINT_COOKIE, enabled: (env) => env.FOOTPRINT_HANDOFF === "1", location: "/?handoff=1", failedHint: "Go back to Telegram and type FOOTPRINT for a new one." };
 
 async function redeemFlow(request: Request, env: DashboardEnv, token: string, deps: Deps, cfg: RedeemCfg): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);

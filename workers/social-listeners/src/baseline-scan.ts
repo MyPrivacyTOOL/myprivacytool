@@ -188,7 +188,7 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
     ...extraLines(extras),
     "",
     // MPC-8689: Telegram is one channel of the whole footprint. Only hexagons whose check ran here (returned or not returned) count as checked; the rest, including the web scan, are still to review.
-    `Your whole footprint: ${footprintLine(footprintSummary(hexagons.filter((x) => x.state === "returned" || x.state === "not_returned").map((x) => x.id)))}. Telegram is one channel of ${footprintSummary().byChannel.length}. To check the web side too: ${SCAN_URL}`,
+    `Your whole footprint: ${footprintLine(footprintSummary([...hexagons, ...extras].filter((x) => x.state === "returned" || x.state === "not_returned").map((x) => x.id)))}. Telegram is one channel of ${footprintSummary().byChannel.length}. To check the web side too: ${SCAN_URL}`,
     "",
     `✅ Never sent to bots by Telegram: ${NEVER_SENT.join(", ")}.`,
     "This is how Telegram's bot system works for every account. It is not a check of your own privacy settings.",

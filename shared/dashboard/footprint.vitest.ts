@@ -59,11 +59,11 @@ describe("landing and redeem", () => {
     expect(handleFootprintLanding(new Request(`${ORIGIN}/f/${TOKEN}`), { ...ENV, FOOTPRINT_HANDOFF: "0" }).status).toBe(503);
     expect(handleFootprintLanding(new Request(`${ORIGIN}/f/${TOKEN}`, { method: "POST" }), ENV).status).toBe(405);
   });
-  it("POST redeems a footprint link: 303 to /scan?handoff=1 with the footprint cookie only, and no token in the redirect", async () => {
+  it("POST redeems a footprint link: 303 to /?handoff=1 with the footprint cookie only, and no token in the redirect", async () => {
     const mem = memoryStore(await link("footprint"));
     const res = await handleFootprintRedeem(post(), ENV, TOKEN, { store: mem.store });
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("/scan?handoff=1");
+    expect(res.headers.get("location")).toBe("/?handoff=1");
     const sc = res.headers.get("set-cookie")!;
     expect(sc).toMatch(/^__Host-mpt_fp=/);
     expect(sc).toMatch(/HttpOnly/); expect(sc).toMatch(/Secure/); expect(sc).toMatch(/SameSite=Strict/);

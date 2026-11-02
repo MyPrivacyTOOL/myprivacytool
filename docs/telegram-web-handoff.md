@@ -14,7 +14,7 @@ and "never claim what was not checked" would break. **The server knows what was 
    Copy states what is shared: **which hexagons were checked, not your values**.
 2. `GET /f/<uuid>` shows one button (previews and crawlers stop here, nothing is used up). `POST` redeems the link atomically and sets the HttpOnly session
    cookie. Both are the existing MPC-7893 mechanics (`shared/dashboard/handlers.ts`, `dashboard_links`, `dashboard_sessions`).
-3. The redirect goes to `/scan?handoff=1` (no token, no data in the URL).
+3. The redirect goes to `/?handoff=1` (no token, no data in the URL).
 4. The web scan calls `GET /api/footprint` (same origin, cookie). The server returns, for the session's sender only, the ids of Telegram hexagons whose check ran in
    their newest complete, unexpired snapshot: state `returned` or `not_returned`, never `not_checked`. Ids only: no values, no names, no photos.
 5. In the browser: `footprintSummary([...webCheckedIds, ...telegramCheckedIds])` (shared/hexagon-registry/footprint.js, already built) gives the one number.
@@ -75,3 +75,6 @@ to `dashboard_links` and `dashboard_sessions` with values `dashboard | footprint
 - Tests: `shared/dashboard/footprint.vitest.ts`, `workers/social-listeners/footprint-link.vitest.ts`, `src/lib/telegramHandoff.test.ts`.
 - To turn on (in this order): merge (the migration is applied by the workflow); set Pages `FOOTPRINT_HANDOFF=1`; set the Worker `TELEGRAM_FOOTPRINT_LINKS = "on"` (allow-listed `PROBE_TELEGRAM_IDS` only). To turn off: unset either switch. "Delete my data" deletes the snapshot, which cascades to its links and sessions, so the Telegram part disappears from the web count.
 - Decisions taken (the recommended ones): consent line "shares which hexagons were checked, not your values"; merged number plus the per-channel split; allow-list only until MPC-8652.
+
+## Correction 2026-11-02 (found in the live sitting)
+The redirect used to go to `/scan?handoff=1`. `/scan` is the email sign-up page: it never asks `/api/footprint`, so the Telegram part was invisible and the "Check My Exposure" button there led the person away from the handoff. The redirect now goes to `/?handoff=1`, the page with the hexagon scan, where the footprint line (RiskScore) reads the handoff after the scan runs. Still to do: a banner on arrival saying the Telegram result is ready. The bot's own footprint line now counts the extra checks that ran, so it matches `/api/footprint` (31 of 368 on the test account, not 25).
