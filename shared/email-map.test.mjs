@@ -2,7 +2,7 @@
 // or an unsubscribe path does not write THE opt-out. Run: node shared/email-map.test.mjs
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { SENDERS, EXTERNAL, OPT_OUT_PATHS, CLASSES } from './email-map.js';
+import { SENDERS, EXTERNAL, OPT_OUT_PATHS, CLASSES, SEQUENCES, CHANNELS } from './email-map.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
@@ -40,6 +40,18 @@ for (const s of SENDERS.filter((x) => x.class === 'non_transactional')) {
 }
 for (const s of SENDERS.filter((x) => x.class === 'transactional')) check(Boolean(s.afterOptOut), `transactional "${s.id}" says what happens after an opt-out`);
 check(['transactional', 'non_transactional'].every((c) => SENDERS.some((s) => s.class === c)), 'both classes are in use');
+
+// 3b. taxonomy: stable, unique email IDs; every sender has a known sequence and channel (MPC taxonomy reconcile)
+const all = [...SENDERS, ...EXTERNAL];
+const withId = all.filter((s) => s.emailId);
+check(SENDERS.every((s) => s.emailId), 'every sender in code has an emailId');
+check(withId.every((s) => /^[A-Z]{2,5}-[a-z0-9]+(-[a-z0-9]+)*$/.test(s.emailId)), 'emailIds are {SEQUENCE}-{checkpoint}, lowercase with hyphens');
+check(withId.every((s) => !/^[A-Z]+-\d+-/.test(s.emailId)), 'emailIds carry no position number (order is a separate field)');
+check(new Set(withId.map((s) => s.emailId)).size === withId.length, 'emailIds are unique');
+check(withId.every((s) => s.emailId.split('-')[0] === s.sequence), 'emailId prefix equals its sequence');
+check(all.every((s) => s.sequence in SEQUENCES), 'every sender has a known sequence');
+check(all.every((s) => CHANNELS.includes(s.channel)), 'every sender has a known channel');
+check(withId.every((s) => Number.isInteger(s.order ?? 0)), 'order is a whole number');
 
 // 4. unsubscribe paths all write THE opt-out
 const suppression = read('workers/scan-report/lib/suppression.js');
