@@ -103,5 +103,6 @@ check(fail.status === 502 && String(fb.error).includes('channel_not_found') && !
 // Cloudflare day-of-week is 1-7 with 1 = Sunday: '0 1 * * 1' posted the digest on Sunday 09:00 HKT (2026-11-01).
 const toml = (await import('node:fs')).readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
 check(DIGEST_CRON === '0 1 * * 2', 'digest cron is Monday in Cloudflare numbering (2, not 1)');
-check(toml.includes(`"${DIGEST_CRON}"`) && !toml.includes('"0 1 * * 1"'), 'wrangler.toml carries exactly the cron the worker matches, and not the Sunday one');
+const cronsLine = toml.split('\n').find((l) => /^\s*crons\s*=/.test(l)) || '';
+check(cronsLine.includes(`"${DIGEST_CRON}"`) && !cronsLine.includes('"0 1 * * 1"'), 'wrangler.toml crons carries exactly the cron the worker matches, and not the Sunday one (comments are ignored)');
 process.exit(ok ? 0 : 1);
