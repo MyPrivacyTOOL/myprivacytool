@@ -5,7 +5,7 @@ import worker from './index.js';
 import { fake } from './test-support/fake-backend.mjs';
 import { signReceipt } from './lib/receipts.js';
 import { sendEmail } from './lib/email.js';
-import { emailTypeFromKey, KEY_TYPES } from './lib/emailSends.js';
+import { emailTypeFromKey, emailMetaFromKey, KEY_TYPES } from './lib/emailSends.js';
 import { emailHash, isOptedOut } from './lib/suppression.js';
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
@@ -33,6 +33,8 @@ const send = async (F, key, to = 'person@example.com') => { const r = await quie
   const keys = ['confirm-1', 'report-1', 'followup-1-1', 'unsubreq-ab-2026', 'unsubscribed-ab', 'referral-invite-1-ab', 'referral-reward-1', 'hk-spam-day10-1', 'hk-spam-test-1-en-x', 'something-new'];
   const ids = []; for (const k of keys) ids.push(await send(F, k));
   check(F.db.email_sends.length === keys.length && F.db.email_sends.map((s) => s.email_type).join() === 'confirm,report,followup,unsubscribe-request,unsubscribed,referral-invite,referral-reward,hk-spam-day10,hk-spam-test,other', 'send time: every email type is recorded under its own type (unknown keys as "other")');
+  check(F.db.email_sends.map((s) => s.email_id).join() === 'VIP-confirmation,VIP-report-ready,VIP-followup,SYS-unsubscribe-request,SYS-unsubscribed,REF-invite,REF-reward,HK-day10,HK-day10-test,' && F.db.email_sends.map((s) => s.channel).join() === 'web-scan,web-scan,web-scan,any,any,referral,referral,hk-spam,hk-spam,', 'send time: every mapped email is recorded with its taxonomy email_id and entry channel (unmapped keys: null)');
+  check(emailMetaFromKey('nothing-mapped').emailId === null && emailMetaFromKey(undefined).channel === null, 'send time: an unmapped or missing key yields null email_id and channel');
   check(!JSON.stringify(F.db.email_sends).includes('@') && F.db.email_sends.every((s) => s.is_test === false), 'send time: no address is stored; ordinary sends are not test sends');
   await send(F, 'report-test', 'testingnt69+nightly-20261028@gmail.com');
   check(F.db.email_sends.at(-1).is_test === true, 'send time: a send to the test mailbox is flagged is_test (never counted in KPIs)');
