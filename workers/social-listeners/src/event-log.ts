@@ -11,7 +11,6 @@ import type { Env } from "./shared";
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
 const SESSION_GAP_MS = 30 * 60_000;
-const DEFAULT_RETENTION_DAYS = 90;
 
 export type Direction = "in" | "out" | "brain";
 
@@ -43,12 +42,12 @@ const idSet = (raw: string | undefined): Set<string> =>
 /** PROBE_LOG_OPTIN_IDS: comma-separated numeric Telegram ids of people who opted in to the full log. */
 export const optInIds = (env: Env): Set<string> => idSet(env.PROBE_LOG_OPTIN_IDS);
 
-/** Days until a row expires: PROBE_LOG_RETENTION_DAYS, default 90, clamped 1-365; "forever" = null (never expires). */
+/** Days until a row expires: PROBE_LOG_RETENTION_DAYS clamped 1-365. Unset, "forever" or anything non-numeric = null (kept until the person asks for deletion). */
 export function logRetentionDays(env: Env): number | null {
   const raw = (env.PROBE_LOG_RETENTION_DAYS ?? "").trim().toLowerCase();
   if (raw === "forever") return null;
   const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : DEFAULT_RETENTION_DAYS;
+  return Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : null;
 }
 
 /** The logged sender of an update, or null when this update must not be logged (mode not "on", bot, unlisted, not opted in). */

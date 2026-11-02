@@ -131,18 +131,14 @@ const kinds = (rows: SavedRow[]) => rows.map((r) => r.kind);
 
 describe("probe reader mode all", () => {
   const all = { PROBE_MODE: "all" };
-  it("captures a sender who is not on any allow-list, with the full lookup set and a 90 day expiry", async () => {
+  it("captures a sender who is not on any allow-list, with the full lookup set and no expiry by default", async () => {
     const { calls, brain, post } = setup(all);
     const u = update();
-    const before = Date.now();
     expect((await post(u)).status).toBe(200);
     const rows = saved(calls);
     expect(kinds(rows).sort()).toEqual(["lookup:getChat", "lookup:getChat(personal_chat)", "lookup:getFile", "lookup:getUserPersonalChatMessages", "lookup:getUserProfileAudios", "lookup:getUserProfilePhotos", "update"]);
     expect(rows.find((r) => r.kind === "update")).toMatchObject({ platform: "telegram", sender_id: "111", payload: u });
-    const days = (Date.parse(rows[0].expires_at) - before) / 86_400_000;
-    expect(days).toBeGreaterThan(89.99);
-    expect(days).toBeLessThan(90.01);
-    expect(rows.every((r) => typeof r.expires_at === "string")).toBe(true);
+    expect(rows.every((r) => r.expires_at === null)).toBe(true); // kept until the person asks for deletion
     expect(brain).toHaveBeenCalledTimes(1);
   });
   it("uses the wider lookup parameters and getFile on the largest photo only as metadata (no download)", async () => {
@@ -212,11 +208,12 @@ describe("probe reader mode all", () => {
     expect((await b.post(update())).status).toBe(200);
   });
   it("applies the retention clamp and the throttle-hours fallback", () => {
-    expect(retentionDays(asEnv({}))).toBe(90);
+    expect(retentionDays(asEnv({}))).toBeNull();
     expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "30" }))).toBe(30);
     expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "0" }))).toBe(1);
     expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "9999" }))).toBe(365);
-    expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "abc" }))).toBe(90);
+    expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "abc" }))).toBeNull();
+    expect(retentionDays(asEnv({ PROBE_RETENTION_DAYS: "forever" }))).toBeNull();
     expect(lookupHours(asEnv({}))).toBe(24);
     expect(lookupHours(asEnv({ PROBE_LOOKUP_HOURS: "6" }))).toBe(6);
     expect(lookupHours(asEnv({ PROBE_LOOKUP_HOURS: "-1" }))).toBe(24);
@@ -225,7 +222,7 @@ describe("probe reader mode all", () => {
     const { calls, post } = setup({ ...all, PROBE_RETENTION_DAYS: "9999" });
     const before = Date.now();
     await post(update());
-    const days = (Date.parse(saved(calls)[0].expires_at) - before) / 86_400_000;
+    const days = (Date.parse(saved(calls)[0].expires_at as string) - before) / 86_400_000;
     expect(days).toBeGreaterThan(364.99);
     expect(days).toBeLessThan(365.01);
   });

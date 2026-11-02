@@ -229,16 +229,16 @@ describe("sessions", () => {
 });
 
 describe("retention", () => {
-  it("defaults to 90 days, clamps to 1-365, and accepts forever", () => {
-    expect(logRetentionDays(asEnv({}))).toBe(90);
-    expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: "abc" }))).toBe(90);
+  it("defaults to no expiry, clamps a number to 1-365, and accepts forever", () => {
+    expect(logRetentionDays(asEnv({}))).toBeNull();
+    expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: "abc" }))).toBeNull();
     expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: "30" }))).toBe(30);
     expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: "0" }))).toBe(1);
     expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: "-5" }))).toBe(1);
     expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: "9999" }))).toBe(365);
     expect(logRetentionDays(asEnv({ PROBE_LOG_RETENTION_DAYS: " Forever " }))).toBeNull();
   });
-  it("writes expires_at accordingly: 90 days by default, a clamped value, null for forever", async () => {
+  it("writes expires_at accordingly: null by default, a clamped value for a number, null for forever", async () => {
     const days = async (v?: string): Promise<string | null> => {
       const { calls, post } = setup({ ...ON, PROBE_LOG_OPTIN_IDS: "111", PROBE_LOG_RETENTION_DAYS: v });
       const before = Date.now();
@@ -246,7 +246,7 @@ describe("retention", () => {
       const at = rows(calls)[0].expires_at;
       return at === null ? null : ((Date.parse(at) - before) / 86_400_000).toFixed(1);
     };
-    expect(await days()).toBe("90.0");
+    expect(await days()).toBeNull();
     expect(await days("9999")).toBe("365.0");
     expect(await days("forever")).toBeNull();
   });

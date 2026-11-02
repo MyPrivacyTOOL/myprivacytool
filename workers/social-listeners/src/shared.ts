@@ -54,7 +54,7 @@ export interface Env {
   PROBE_TELEGRAM_IDS?: string;
   /** Mode "all": skip the public lookups for a sender looked up within this many hours (default 24). */
   PROBE_LOOKUP_HOURS?: string;
-  /** Mode "all": days until a row's expires_at (default 90, clamped 1-365). */
+  /** Mode "all": days until a row's expires_at (clamped 1-365). Unset or "forever" = no expiry: kept until the person asks for deletion. */
   PROBE_RETENTION_DAYS?: string;
   /** Full event log (mode "on" only): comma-separated numeric Telegram ids of people who opted in, logged in addition to PROBE_TELEGRAM_IDS. */
   PROBE_LOG_OPTIN_IDS?: string;

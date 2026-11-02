@@ -17,7 +17,6 @@ export const probeMode = (env: Env): ProbeMode => (env.PROBE_MODE === "on" || en
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 const DEFAULT_LOOKUP_HOURS = 24;
-const DEFAULT_RETENTION_DAYS = 90;
 const MAX_FILE_LOOKUPS = 5;
 
 /** PROBE_TELEGRAM_IDS: comma-separated numeric Telegram user ids of our own test accounts. */
@@ -78,7 +77,7 @@ export function isProbeIdRequest(update: unknown): boolean {
   return typeof text === "string" && /^\/probeid(@\w+)?$/i.test(text.trim());
 }
 
-interface Row { platform: string; sender_id: string; kind: string; payload: unknown; expires_at?: string }
+interface Row { platform: string; sender_id: string; kind: string; payload: unknown; expires_at?: string | null }
 
 async function save(env: Env, rows: Row[], log: Logger): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return log.warn("probe_storage_unconfigured");
@@ -118,10 +117,10 @@ export async function call(env: Env, method: string, body: Record<string, unknow
   }
 }
 
-/** Retention for mode "all" rows: PROBE_RETENTION_DAYS, default 90, clamped to 1-365. */
-export function retentionDays(env: Env): number {
+/** Retention for mode "all" rows: kept until the person asks for deletion (null = no expiry) unless PROBE_RETENTION_DAYS is a number, clamped to 1-365. */
+export function retentionDays(env: Env): number | null {
   const n = Number.parseInt(env.PROBE_RETENTION_DAYS ?? "", 10);
-  return Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : DEFAULT_RETENTION_DAYS;
+  return Number.isFinite(n) ? Math.min(365, Math.max(1, n)) : null;
 }
 
 /** Lookup throttle window for mode "all": PROBE_LOOKUP_HOURS, default 24 (a non-positive or non-numeric value falls back to the default). */
@@ -167,7 +166,8 @@ function largestPhotoFileIds(photos: { response: unknown }): string[] {
 async function captureAll(env: Env, update: unknown, log: Logger): Promise<void> {
   const actor = updateActor(update);
   if (!actor) return;
-  const expires_at = new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString();
+  const days = retentionDays(env);
+  const expires_at = days === null ? null : new Date(Date.now() + days * DAY_MS).toISOString();
   const row = (kind: string, payload: unknown): Row => ({ platform: "telegram", sender_id: actor.id, kind, payload, expires_at });
   const rows: Row[] = [row("update", update)];
   if (!env.TELEGRAM_BOT_TOKEN) {
