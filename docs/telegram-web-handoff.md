@@ -10,9 +10,9 @@ The web page must never take the Telegram result from the address bar. A number 
 and "never claim what was not checked" would break. **The server knows what was checked; the URL knows nothing.** (Same reason the dashboard link carries only a random UUID.)
 
 ## Flow
-1. In the Telegram report the bot offers: "Count this Telegram result in your web scan" with a one-time link `https://www.myprivacytool.io/d/<uuid>`.
+1. In the Telegram report the bot offers: "Count this Telegram result in your web scan" with a one-time link `https://www.myprivacytool.io/f/<uuid>` (the dashboard link keeps `/d/`).
    Copy states what is shared: **which hexagons were checked, not your values**.
-2. `GET /d/<uuid>` shows one button (previews and crawlers stop here, nothing is used up). `POST` redeems the link atomically and sets the HttpOnly session
+2. `GET /f/<uuid>` shows one button (previews and crawlers stop here, nothing is used up). `POST` redeems the link atomically and sets the HttpOnly session
    cookie. Both are the existing MPC-7893 mechanics (`shared/dashboard/handlers.ts`, `dashboard_links`, `dashboard_sessions`).
 3. The redirect goes to `/scan?handoff=1` (no token, no data in the URL).
 4. The web scan calls `GET /api/footprint` (same origin, cookie). The server returns, for the session's sender only, the ids of Telegram hexagons whose check ran in
@@ -68,9 +68,9 @@ to `dashboard_links` and `dashboard_sessions` with values `dashboard | footprint
 3. Keep it allow-list only until MPC-8652 (the real-product audit of the Find, Delete, Forget rules) is done?
 
 ## Status: built, off by default
-- Migration `20261028190000_mpc_8689_footprint_handoff_scope.sql` (scope column, 4-argument redeem function). **Merging to main applies it to the live project** (deploy-supabase.yml runs `supabase db push`); it is tested on a throwaway Postgres in CI (`supabase/tests/footprint-handoff.test.sql`).
+- Migration `20261028190000_mpc_8689_footprint_handoff_scope.sql` (scope column, 4-argument redeem function). **Merging to main does NOT apply it** unless the repo secrets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD and SUPABASE_PROJECT_ID are set (the workflow then runs `supabase db push`; without them it goes green and applies nothing, and now says so as an error annotation). This one was applied to the live project by hand on 2026-11-01. It is tested on a throwaway Postgres in CI (`supabase/tests/footprint-handoff.test.sql`).
 - Server: `shared/dashboard/handlers.ts` (`handleFootprintLanding`, `handleFootprintRedeem`, `handleFootprintData`, scope refusal in `handleData`), `functions/f/[token].ts`, `functions/api/footprint.ts`, own cookie `__Host-mpt_fp`.
-- Bot: `footprint` / `/footprint` command (`workers/social-listeners/src/dashboard-link.ts`), a hint line in the baseline report.
+- Bot: `footprint` / `/footprint` command (`workers/social-listeners/src/dashboard-link.ts`), a "Count it in my web scan" button (callback `fp|link`, same switch and allow-list as the typed command) plus a hint line with the typed fallback and the DELETE MY DATA instruction under the baseline report.
 - Web: `src/lib/telegramHandoff.ts` and `RiskScore` (reads `/api/footprint` only when the page is opened with `?handoff=1`).
 - Tests: `shared/dashboard/footprint.vitest.ts`, `workers/social-listeners/footprint-link.vitest.ts`, `src/lib/telegramHandoff.test.ts`.
 - To turn on (in this order): merge (the migration is applied by the workflow); set Pages `FOOTPRINT_HANDOFF=1`; set the Worker `TELEGRAM_FOOTPRINT_LINKS = "on"` (allow-listed `PROBE_TELEGRAM_IDS` only). To turn off: unset either switch. "Delete my data" deletes the snapshot, which cascades to its links and sessions, so the Telegram part disappears from the web count.

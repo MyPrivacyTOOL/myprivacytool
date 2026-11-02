@@ -50,7 +50,11 @@ jobs:
             exit 1
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Supabase migrations NOT deployed: repo secrets SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD / SUPABASE_PROJECT_ID are not set (CK-006)."
+            echo "::error title=Supabase migrations NOT applied::repo secrets SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD / SUPABASE_PROJECT_ID are not set (CK-006). This run is green but applied nothing: every migration in supabase/migrations must be applied to the live project by hand until the secrets exist (MPC-8689 found the footprint scope migration missing this way)."
+            {
+              echo "### Migrations were NOT applied"
+              echo "The three repo secrets are not set, so this green run did not touch the live database. Apply new files in supabase/migrations by hand, or set the secrets."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - uses: supabase/setup-cli@v1

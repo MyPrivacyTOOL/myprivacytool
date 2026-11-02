@@ -26,7 +26,9 @@ function setup(envOver: Record<string, unknown> = {}, opts: { snaps?: unknown[];
   const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_FOOTPRINT_LINKS: "on", SUPABASE_URL: "https://db.test", SUPABASE_KEY: "svc-key", CORE_BRAIN: { fetch: brain }, ...envOver } as unknown as Env;
   const post = (text: string, id = ID) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" },
     body: JSON.stringify({ update_id: 5, message: { message_id: 1, date: 1, text, from: { id, is_bot: false, first_name: "T" }, chat: { id, type: "private" } } }) }), env);
-  return { calls, logs, post, brain, sent: () => calls.filter((c) => c.url.includes("/sendMessage")), saved: () => calls.filter((c) => c.method === "POST" && c.url.includes("/dashboard_links")) };
+  const press = (data: string, id = ID, chatType = "private") => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" },
+    body: JSON.stringify({ update_id: 6, callback_query: { id: "cb1", data, from: { id, is_bot: false, first_name: "T" }, message: { message_id: 2, date: 1, chat: { id, type: chatType } } } }) }), env);
+  return { calls, logs, post, press, brain, sent: () => calls.filter((c) => c.url.includes("/sendMessage")), saved: () => calls.filter((c) => c.method === "POST" && c.url.includes("/dashboard_links")) };
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
@@ -71,5 +73,23 @@ describe("footprint command", () => {
     await t.post("/dashboard");
     expect(t.saved()[0].body).not.toHaveProperty("scope");
     expect(t.sent()[0].body.text as string).toContain("/d/");
+  });
+});
+
+describe("Count it in my web scan button (MPC-8689)", () => {
+  it("pressing it issues the same footprint link as the typed command and stops the spinner", async () => {
+    const t = setup();
+    expect((await t.press("fp|link")).status).toBe(200);
+    expect(t.calls.some((c) => c.url.includes("/answerCallbackQuery"))).toBe(true);
+    expect(t.saved()[0].body).toMatchObject({ sender_id: String(ID), snapshot_id: SNAP, scope: "footprint" });
+    expect(t.sent()[0].body.text as string).toMatch(/https:\/\/www\.myprivacytool\.io\/f\/[0-9a-f-]{36}/);
+    expect(t.brain).not.toHaveBeenCalled();
+  });
+  it("issues nothing for another button, a stranger, a group chat, or while the switch is off", async () => {
+    const wrong = setup(); await wrong.press("fw|x");
+    const stranger = setup(); await stranger.press("fp|link", 6000000002);
+    const group = setup(); await group.press("fp|link", ID, "group");
+    const off = setup({ TELEGRAM_FOOTPRINT_LINKS: undefined }); await off.press("fp|link");
+    for (const t of [wrong, stranger, group, off]) expect(t.saved()).toHaveLength(0);
   });
 });

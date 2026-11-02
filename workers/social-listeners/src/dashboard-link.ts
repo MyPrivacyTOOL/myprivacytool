@@ -51,6 +51,29 @@ export function isFootprintCommand(env: Env, update: unknown): boolean {
   return typeof text === "string" && /^\/?footprint(@\w+)?$/i.test(text.trim());
 }
 
+/** MPC-8689: the "Count it in my web scan" button under the baseline report. Same rules as the typed command: switch on, private chat, allow-listed account. */
+export const FOOTPRINT_CALLBACK = "fp|link";
+interface Callback { id?: unknown; data?: unknown; from?: { id?: unknown; is_bot?: unknown }; message?: { chat?: { id?: unknown; type?: unknown } } }
+const callbackOf = (update: unknown): Callback | null => ((update as { callback_query?: Callback } | null)?.callback_query ?? null);
+
+/** The button press as the same shape the typed command has, so one code path issues the link. Null for anything that is not our button from an allow-listed private chat. */
+export function footprintCallbackAsMessage(env: Env, update: unknown): unknown | null {
+  if (!footprintLinksEnabled(env)) return null;
+  const q = callbackOf(update);
+  if (!q || q.data !== FOOTPRINT_CALLBACK) return null;
+  const synthetic = { update_id: (update as { update_id?: unknown }).update_id, message: { from: q.from, chat: q.message?.chat, text: "footprint" } };
+  const s = telegramSender(synthetic);
+  return s && probeIds(env).has(s.id) ? synthetic : null;
+}
+
+export async function handleFootprintCallback(env: Env, update: unknown, log: Logger): Promise<void> {
+  const synthetic = footprintCallbackAsMessage(env, update);
+  const q = callbackOf(update);
+  if (!synthetic || !q || !env.TELEGRAM_BOT_TOKEN) return;
+  await call(env, "answerCallbackQuery", { callback_query_id: q.id }).catch(() => undefined); // stops the button spinner; the link follows as a normal message
+  await handleFootprintCommand(env, synthetic, log);
+}
+
 interface LinkKind { scope: "dashboard" | "footprint"; path: string; message: (url: string) => string; log: string; unavailable: string }
 const DASHBOARD_LINK: LinkKind = {
   scope: "dashboard", path: "/d/", log: "dashboard_link", unavailable: "The dashboard is not available right now.",
