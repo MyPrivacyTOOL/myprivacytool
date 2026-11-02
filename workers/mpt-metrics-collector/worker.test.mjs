@@ -170,7 +170,7 @@ check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'miss
   globalThis.fetch = realFetch;
   check((await call('/stage/collect_core', 'POST')).status === 401, 'POST /stage without token => 401');
   check((await call('/stage/nope', 'POST', { authorization: 'Bearer tok' })).status === 404, 'unknown stage => 404');
-  inserts = []; check((await call('/stage/collect_core', 'POST', { authorization: 'Bearer tok' })).status === 200 && inserts.length === COLLECTOR_GROUPS.collect_core.length, 'authorised POST /stage/collect_core stores that group only');
+  inserts = []; check((await call('/stage/collect_core', 'POST', { authorization: 'Bearer tok' })).status === 200 && inserts.length === COLLECTOR_GROUPS.collect_core.filter((c) => !c.skip?.(new Date())).length, 'authorised POST /stage/collect_core stores that group only (weekday-skipped collectors excluded)');
 }
 
 process.exit(ok ? 0 : 1);
