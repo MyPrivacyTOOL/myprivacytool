@@ -22,8 +22,8 @@ All channels write to the same single opt-out. An unsubscribe from one email sto
 
 Open decision for Chris (D1): when someone first reached us on WhatsApp and later also arrives by web scan, is that one person (merge on the hashed address) or two journeys? Recommendation: one person, with the first channel kept as `first_channel`.
 
-## 3. Draft change (NOT applied, NOT in `supabase/migrations/` on purpose)
-So the deploy-supabase workflow cannot pick it up. To be reviewed and moved by a person when approved.
+## 3. Change APPLIED to production 2026-11-02 (D3 approved by Chris)
+The two columns below are live on `email_sends`, read-back verified. Nothing reads or writes them yet. The same idempotent SQL is in `supabase/migrations/20261102060000_mpc_9201_email_sends_email_id_channel.sql`.
 
 ```sql
 -- additive; rollback: alter table public.email_sends drop column if exists email_id, drop column if exists channel;
@@ -32,7 +32,7 @@ alter table public.email_sends
   add column if not exists channel  text check (channel in ('web-scan','lead-form','web-newsletter','referral','hk-spam','support-inbox','whatsapp','telegram','discord','any'));
 create index if not exists email_sends_email_id_idx on public.email_sends (email_id, sent_at);
 ```
-Worker side (also not done): `sendEmail()` passes `emailId` and `channel` from the map instead of deriving `email_type` from the idempotency prefix, and adds both as Resend tags.
+Worker side (NOT done yet): `sendEmail()` passes `emailId` and `channel` from the map instead of deriving `email_type` from the idempotency prefix, and adds both as Resend tags.
 
 ## 4. Inbound triage (what Chris originally wanted from the Qwen review)
 One step for everything that arrives at the support / hello inboxes:
