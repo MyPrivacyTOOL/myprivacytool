@@ -61,7 +61,7 @@ zone `myprivacytool.io` (requests + unique visitors, `httpRequests1dGroups`) and
 
 ## Monday Slack digest (MPC-7383, task 8/9)
 
-`publishers/slack-digest.js` + `lib/digest.js`. Second cron `0 1 * * 1` = Monday 01:00 UTC = **09:00 Hong Kong**. It reads the latest two rows of the weekly tracker (the Monday 00:15 HKT publish has just written the week that ended) and posts **at most five lines** to Chris:
+`publishers/slack-digest.js` + `lib/digest.js`. Second cron `0 1 * * 2` = Monday 01:00 UTC = **09:00 Hong Kong** (Cloudflare counts the day of week 1-7 with 1 = Sunday, so Monday is 2; `* * 1` posted on Sunday). It reads the latest two rows of the weekly tracker (the Monday 00:15 HKT publish has just written the week that ended) and posts **at most five lines** to Chris:
 scans against target, pace status, biggest mover up and down (week on week), the agent's plan, and failed sources plus anything needing his decision.
 
 - **Never an estimate.** A blank cell stays blank and is not used as a mover. Failed sources are named (`DATA GAP: ga4, hubspot failed`): any source whose latest pull per report in the last 48h is `status=error` in `mpt_raw_metrics`. If the tracker cannot be read, the message says so and shows no figures.

@@ -4,7 +4,10 @@ import { buildDigest, summariseAgentTasks } from '../lib/digest.js';
 import { notion, NOTION_VERSION, DEFAULT_WEEKLY_DS } from './notion.js';
 
 export { NOTION_VERSION };
-export const DIGEST_CRON = '0 1 * * 1'; // 01:00 UTC Monday = 09:00 Hong Kong (UTC+8, no DST)
+// 01:00 UTC Monday = 09:00 Hong Kong (UTC+8, no DST). Cloudflare numbers the day of week 1-7 with 1 = SUNDAY
+// (not 0-6 with 1 = Monday), so Monday is 2. '0 1 * * 1' fired on Sunday 09:00 HKT, a day early (seen 2026-11-01).
+// wrangler.toml must carry this exact string: the worker matches event.cron against it.
+export const DIGEST_CRON = '0 1 * * 2';
 export const digestConfigured = (env) => Boolean(env.NOTION_TOKEN && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY && env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID);
 
 const numProp = (p) => {
