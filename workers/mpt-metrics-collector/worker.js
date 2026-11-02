@@ -24,6 +24,18 @@ import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } fro
 export const COLLECTOR_VERSION = '1.0.0';
 export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint, ...ga4Reports];
 
+// MPC-7557 fix: the daily run used to do everything in ONE Worker invocation (collectors, Notion pages, mirror, osint, KPI). Cloudflare
+// caps outbound requests per invocation (50 on the free plan), so from 2026-10-28 every run died with "Too many subrequests" before it
+// stored a row or posted an alert. The daily cron now calls each STAGE below through the Worker's own service binding (SELF); every
+// call is a separate invocation with its own budget. Each stage must stay well under 50 requests (worker.test.mjs enforces a budget).
+export const SUBREQUEST_BUDGET = 40;
+export const COLLECTOR_GROUPS = {
+  collect_core: [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop],
+  collect_email: [scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint],
+  collect_ga4: [...ga4Reports],
+};
+export const STAGES = ['collect_core', 'collect_email', 'collect_ga4', 'publish_notion', 'publish_mirror', 'publish_osint', 'publish_kpi'];
+
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
   for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON', 'HUBSPOT_READONLY_TOKEN', 'SLACK_BOT_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
@@ -99,6 +111,27 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
 const previousHkDate = (now) => hkDate(new Date(now.getTime() - 86400000));
 const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
 
+// One stage = one unit of the daily run. Collection stages store their own rows and raise their own alerts; publish stages are
+// independent so a Notion failure never affects collection.
+export async function runStage(stage, env, now = new Date()) {
+  if (COLLECTOR_GROUPS[stage]) return await runAll(env, COLLECTOR_GROUPS[stage], now);
+  if (stage.startsWith('publish_') && !notionConfigured(env)) return { skipped: 'NOTION_TOKEN not set' };
+  switch (stage) {
+    case 'publish_notion': return await publishAll(env);
+    case 'publish_mirror': return await publishMachineMirror(env, previousHkDate(now)); // machine mirror page (MPC-7492)
+    case 'publish_osint': return await publishChannelOsintDay(env, previousHkDate(now)); // channel osint rows (MPC-7641)
+    case 'publish_kpi': return await publishKpiDashboard(env); // KPI scorecard (MPC-7618)
+    default: throw new Error(`unknown stage ${stage}`);
+  }
+}
+
+async function callStage(env, stage) {
+  const res = await env.SELF.fetch(`https://self.internal/stage/${stage}`, { method: 'POST', headers: { authorization: `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}` } });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`stage call HTTP ${res.status}: ${text.slice(0, 200)}`);
+  try { return JSON.parse(text).result; } catch { return text.slice(0, 200); }
+}
+
 export default {
   async scheduled(event, env, ctx) {
     // Monday 09:00 HKT digest (MPC-7383): reads the tracker only, no collection. Failure never affects the daily run.
@@ -118,18 +151,17 @@ export default {
     }
     if (!configured(env)) { console.error('mpt-metrics-collector: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set'); return; }
     // Collect first, then publish the summaries to Notion (MPC-7382). A Notion failure never affects collection.
+    // Each stage runs as its own invocation through the SELF service binding (see the note above STAGES); without the binding or the
+    // token (tests, local runs) the same stages run in order inside this invocation.
     ctx.waitUntil((async () => {
-      console.log(JSON.stringify(await runAll(env)));
-      if (notionConfigured(env)) {
-        console.log(JSON.stringify(await publishAll(env)));
-        // Machine mirror page (MPC-7492): separate so a failure here never affects the other publishes.
-        try { console.log(JSON.stringify(await publishMachineMirror(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: machine mirror publish failed: ${SAFE(e?.message, env)}`); }
-        // Channel OSINT dashboard rows (MPC-7641): same isolation, a failure here never affects the other publishes.
-        try { console.log(JSON.stringify(await publishChannelOsintDay(env, previousHkDate(new Date())))); } catch (e) { console.error(`mpt-metrics-collector: channel osint publish failed: ${SAFE(e?.message, env)}`); }
-        // KPI scorecard on the MPT Dashboard (MPC-7618): separate so a failure here never affects the other publishes.
-        try { console.log(JSON.stringify(await publishKpiDashboard(env))); } catch (e) { console.error(`mpt-metrics-collector: KPI scorecard publish failed: ${SAFE(e?.message, env)}`); }
+      const viaSelf = Boolean(env.SELF && env.COLLECTOR_TRIGGER_TOKEN);
+      if (!viaSelf) console.error('mpt-metrics-collector: SELF binding or COLLECTOR_TRIGGER_TOKEN missing, running all stages in one invocation (may hit the subrequest limit)');
+      for (const stage of STAGES) {
+        try {
+          const out = viaSelf ? await callStage(env, stage) : await runStage(stage, env, new Date());
+          console.log(JSON.stringify({ stage, out }));
+        } catch (e) { console.error(`mpt-metrics-collector: stage ${stage} failed: ${SAFE(e?.message, env)}`); }
       }
-      else console.error('mpt-metrics-collector: NOTION_TOKEN not set, Notion publish skipped');
     })());
   },
 
@@ -137,6 +169,14 @@ export default {
     const url = new URL(request.url);
     const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
     if (url.pathname === '/health' && request.method === 'GET') return json({ ok: true, worker: 'mpt-metrics-collector', version: COLLECTOR_VERSION, configured: configured(env) });
+    // One stage of the daily run, called by the daily cron through the SELF binding (also usable by hand): POST /stage/<name>, same bearer token.
+    if (url.pathname.startsWith('/stage/') && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      const stage = url.pathname.slice('/stage/'.length);
+      if (!STAGES.includes(stage)) return json({ error: 'unknown stage' }, 404);
+      if (stage.startsWith('collect_') && !configured(env)) return json({ error: 'not configured' }, 500);
+      try { return json({ stage, result: await runStage(stage, env) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
+    }
     // Manual trigger for verification: POST /run with Authorization: Bearer <COLLECTOR_TRIGGER_TOKEN>.
     if (url.pathname === '/run' && request.method === 'POST') {
       if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
