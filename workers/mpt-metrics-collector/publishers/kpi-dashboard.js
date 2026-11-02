@@ -60,8 +60,8 @@ export async function readInputs(env, now = new Date()) {
   const [scans, paid, saves, savesWindow, days, weeks, mrr, sources] = await Promise.all([
     soft(() => supa(env, 'scans?select=id', true)),
     soft(() => supa(env, 'users?select=id&payment_status=eq.active&tier=neq.free', true)),
-    soft(() => supa(env, 'web_scan_contacts?select=scan_id&save_consent_at=not.is.null', true)),
-    soft(() => supa(env, `web_scan_contacts?select=scan_id&save_consent_at=gte.${encodeURIComponent(from)}&save_consent_at=lt.${encodeURIComponent(hkDayStartOf(today).toISOString())}`, true)),
+    soft(() => supa(env, 'web_scan_contacts?select=web_scan_id&save_consent_at=not.is.null', true)),
+    soft(() => supa(env, `web_scan_contacts?select=web_scan_id&save_consent_at=gte.${encodeURIComponent(from)}&save_consent_at=lt.${encodeURIComponent(hkDayStartOf(today).toISOString())}`, true)),
     soft(() => supa(env, 'mpt_daily_metrics?select=day,new_scans,ga4_sessions,new_users&order=day.desc&limit=9')),
     soft(() => supa(env, 'mpt_weekly_metrics?select=week_of,weekly_new_scans&order=week_of.desc&limit=3')),
     soft(() => supa(env, 'mpt_weekly_metrics?select=current_mrr&current_mrr=not.is.null&order=week_of.desc&limit=1')),

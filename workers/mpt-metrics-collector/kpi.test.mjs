@@ -22,15 +22,18 @@ check(card.growth.wow_pct === 50 && card.growth.last_full_week_of === '2026-10-0
 check(GOALS.scans === 10000 && GOALS.paid === 1000 && GOALS.arr === 120000, 'goals are the North Star numbers');
 
 // --- publisher
-let page, blocks, calls;
+let page, blocks, calls; let badColumnCalls = 0;
 const reset = (existing = false) => { calls = []; page = existing ? [{ id: 'intro', type: 'callout', callout: { rich_text: [{ plain_text: 'Chris\'s one page' }] } }, { id: 'kpi1', type: 'callout', callout: { rich_text: [{ plain_text: `${KPI_MARKER} old` }] } }, { id: 'db1', type: 'child_database' }] : [{ id: 'intro', type: 'callout', callout: { rich_text: [{ plain_text: 'Chris\'s one page' }] } }, { id: 'db1', type: 'child_database' }]; blocks = { kpi1: [{ id: 'old1' }, { id: 'old2' }] }; };
 const json = (b, status = 200, headers = {}) => ({ ok: status < 400, status, headers: new Headers(headers), json: async () => b });
 const daysRows = ['2026-10-12', '2026-10-11', '2026-10-10', '2026-10-09', '2026-10-08', '2026-10-07', '2026-10-06', '2026-10-05'].map((day, i) => ({ day, new_scans: 10 + i, ga4_sessions: i === 0 ? null : 100 + i, new_users: 1 }));
 globalThis.fetch = async (url, opts = {}) => {
   url = String(url); const method = opts.method || 'GET'; const body = opts.body ? JSON.parse(opts.body) : null;
   calls.push(`${method} ${url.replace(/^https:\/\/[^/]+/, '').split('?')[0]}`);
+  if (url.includes('web_scan_contacts') && /select=scan_id(&|$)/.test(url)) badColumnCalls++;
   if (url.includes('/rest/v1/scans')) return json([], 200, { 'content-range': '*/500' });
   if (url.includes('/rest/v1/users')) return json([], 200, { 'content-range': '*/3' });
+  // The real table has web_scan_id, not scan_id: asking for scan_id answered HTTP 400 in production (2026-11-02), so the scorecard never refreshed.
+  if (url.includes('web_scan_contacts') && /select=scan_id(&|$)/.test(url)) return json({ message: 'column web_scan_contacts.scan_id does not exist' }, 400);
   if (url.includes('web_scan_contacts')) return json([], 200, { 'content-range': '*/7' });
   if (url.includes('/rest/v1/mpt_daily_metrics')) return json(daysRows);
   if (url.includes('current_mrr=not.is.null')) return json([{ current_mrr: 100 }]);
@@ -77,5 +80,7 @@ check(blocks.sent.length === 1 && !calls.some((c) => c.includes('mpt_raw_metrics
 const noAuth = await worker.fetch(new Request('https://w/publish-kpi', { method: 'POST' }), env);
 check(noAuth.status === 401, 'POST /publish-kpi needs the bearer token');
 check(buildBlocks(card, 'now').length === 11, 'scorecard has its 11 blocks');
+
+check(badColumnCalls === 0, 'web_scan_contacts is read with web_scan_id (select=scan_id answered HTTP 400 and the soft() wrapper hid it)');
 
 process.exit(ok ? 0 : 1);
