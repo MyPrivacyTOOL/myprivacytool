@@ -16,6 +16,13 @@ enabled = true
 [triggers]
 crons = ["15 16 * * *", "0 1 * * 1"]
 
+# MPC-9168: the scheduled run is cut into phases (worker.js COLLECT_PHASES / PUBLISH_PHASES), each run as its own invocation through this
+# binding to the Worker itself, so each phase has its own limit of 50 outbound calls (Free plan) instead of all of them sharing one.
+# The binding needs no cron slot and no plan change. Calls are authenticated with COLLECTOR_TRIGGER_TOKEN; without the binding the phases run in-process.
+[[services]]
+binding = "SELF"
+service = "mpt-metrics-collector"
+
 # Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
 # Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).
 

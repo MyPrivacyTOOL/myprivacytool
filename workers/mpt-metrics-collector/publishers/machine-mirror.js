@@ -6,6 +6,7 @@ import { hkDayStartOf } from '../lib/hk.js';
 
 export const STRATEGY_PAGE_ID = '3f628547-eaa7-8140-82b4-fc9cd266ae1f'; // MPT > Inbound Funnels (the Mirror) strategy page
 export const MIRROR_MARKER = '[mpt-metrics-collector machine mirror]';
+export const MAX_BLOCK_DELETES = 25;
 export const pageTitle = (day) => `Machine mirror — ${day}`;
 
 const t = (s) => [{ type: 'text', text: { content: String(s).slice(0, 1900) } }];
@@ -87,6 +88,13 @@ export async function publishMachineMirror(env, day, now = new Date()) {
   const old = await notion(env, 'GET', `/blocks/${existing.id}/children?page_size=100`);
   const first = old.results?.[0]?.paragraph?.rich_text?.map((x) => x.plain_text ?? '').join('') ?? '';
   if (!first.startsWith(MIRROR_MARKER)) return { kind: 'machine_mirror', day, action: 'skipped_not_ours', url: existing.url };
+  // MPC-9168: Notion deletes one block per call, and a busy day's page has 60+ blocks (41 families on 2026-10-25), more than one
+  // Worker invocation may spend. Past MAX_BLOCK_DELETES the page (ours, marker checked above) is replaced instead of edited block by block.
+  if (old.results.length > MAX_BLOCK_DELETES) {
+    await notion(env, 'PATCH', `/pages/${existing.id}`, { in_trash: true });
+    const created = await notion(env, 'POST', '/pages', { parent: { type: 'page_id', page_id: STRATEGY_PAGE_ID }, properties: { title: { title: t(title) } }, children: blocks });
+    return { kind: 'machine_mirror', day, action: 'replaced', url: created.url };
+  }
   for (const b of old.results) await notion(env, 'DELETE', `/blocks/${b.id}`);
   await notion(env, 'PATCH', `/blocks/${existing.id}/children`, { children: blocks });
   return { kind: 'machine_mirror', day, action: 'updated', url: existing.url };

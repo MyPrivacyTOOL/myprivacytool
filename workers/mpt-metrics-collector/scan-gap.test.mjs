@@ -7,12 +7,12 @@ const NOW = new Date('2026-10-13T16:15:00Z');            // 00:15 HKT on the 14t
 const IN = Date.parse('2026-10-13T03:00:00Z');
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', HUBSPOT_READONLY_TOKEN: 'hs', HUBSPOT_PAUSE_MS: '0', SLACK_BOT_TOKEN: 'xoxb-test', MPTSLACK_CHANNEL_ID: 'C1' };
 
-let submissions = [], accepted = new Set(), slackPosts = [], hubspotStatus = 200;
+let scanReads = 0, submissions = [], accepted = new Set(), slackPosts = [], hubspotStatus = 200;
 globalThis.fetch = async (url, o = {}) => {
   url = String(url);
   const res = (status, body) => ({ ok: status < 400, status, json: async () => body, text: async () => JSON.stringify(body) });
   if (url.includes(`/form-integrations/v1/submissions/forms/${SCAN_FORM_ID}`)) return hubspotStatus === 200 ? res(200, { results: submissions }) : res(hubspotStatus, {});
-  if (url.includes('/rest/v1/scans?')) { const e = decodeURIComponent(/email_scanned=eq\.([^&]+)/.exec(url)[1]); return res(200, accepted.has(e) ? [{ id: 'x' }] : []); }
+  if (url.includes('/rest/v1/scans?')) { scanReads += 1; const list = decodeURIComponent(/email_scanned=in\.([^&]+)/.exec(url)[1]); const asked = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1]); return res(200, asked.filter((e) => accepted.has(e)).map((e) => ({ email_scanned: e }))); }
   if (url.startsWith('https://slack.com/api/chat.postMessage')) { slackPosts.push(JSON.parse(o.body)); return res(200, { ok: true, ts: '1', channel: 'C1' }); }
   return res(404, {});
 };
@@ -53,5 +53,10 @@ check(slackPosts.length === 0, 'no gap => nothing posted');
 accepted = new Set();
 let threw = false; try { await raiseAlerts({}, [scanGap], [{ source: 'supabase', report: 'scan_report_gap', status: 'ok', payload: { missing: 2, scan_page_submissions: 2, day: 'd' } }]); } catch { threw = true; }
 check(!threw, 'missing Slack settings never stops the run');
+
+// MPC-9168: 40 distinct addresses are matched with ONE database read, not 40 (subrequest budget)
+submissions = Array.from({ length: 40 }, (_, i) => sub(`u+${i}@example.com`)); accepted = new Set(submissions.slice(0, 30).map((s) => s.values[0].value)); scanReads = 0;
+out = await scanGap.collect(env, NOW);
+check(scanReads === 1 && out.payload.scan_page_submissions === 40 && out.payload.accepted_report_requests === 30 && out.payload.missing === 10, 'many addresses are matched with a single database read');
 
 process.exit(ok ? 0 : 1);

@@ -155,15 +155,17 @@ export async function publishWeekly(env, weekOf, now = new Date()) {
 }
 
 // Daily cron: publish yesterday's complete Hong Kong day; on Mondays (HKT) also the week that just ended.
-export async function publishAll(env, now = new Date(), { day, weekOf } = {}) {
+// `parts` (MPC-9168) lets the scheduled run publish each part in its own Worker invocation (own subrequest budget); default is all three.
+export const PUBLISH_PARTS = ['daily', 'weekly', 'learning-loop'];
+export async function publishAll(env, now = new Date(), { day, weekOf, parts = PUBLISH_PARTS } = {}) {
   const today = hkDate(now); // Hong Kong calendar date; weekday logic below runs on this date string
   const out = [];
   const run = async (label, fn) => { try { out.push(await fn()); } catch (e) { out.push({ kind: label, action: 'error', error: String(e?.message ?? e).split(env.NOTION_TOKEN).join('[redacted]').slice(0, 300) }); } };
   const d = day || addDays(today, -1);
-  await run('daily', () => publishDaily(env, d, now));
+  if (parts.includes('daily')) await run('daily', () => publishDaily(env, d, now));
   const w = weekOf || (new Date(`${today}T00:00:00Z`).getUTCDay() === 1 ? addDays(today, -7) : null);
-  if (w) await run('weekly', () => publishWeekly(env, w, now));
+  if (w && parts.includes('weekly')) await run('weekly', () => publishWeekly(env, w, now));
   // MPC-7493: the learning-loop page for the same week, when a parent page is configured. Aggregates only.
-  if (w && learningLoopConfigured(env)) await run('learning-loop', () => publishLearningLoop(env, w, now));
+  if (w && parts.includes('learning-loop') && learningLoopConfigured(env)) await run('learning-loop', () => publishLearningLoop(env, w, now));
   return out;
 }
