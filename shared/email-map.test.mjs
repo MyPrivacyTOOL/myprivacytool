@@ -3,6 +3,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { SENDERS, EXTERNAL, OPT_OUT_PATHS, CLASSES, SEQUENCES, CHANNELS } from './email-map.js';
+import { KEY_TYPES } from '../workers/scan-report/lib/emailSends.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
@@ -52,6 +53,12 @@ check(withId.every((s) => s.emailId.split('-')[0] === s.sequence), 'emailId pref
 check(all.every((s) => s.sequence in SEQUENCES), 'every sender has a known sequence');
 check(all.every((s) => CHANNELS.includes(s.channel)), 'every sender has a known channel');
 check(withId.every((s) => Number.isInteger(s.order ?? 0)), 'order is a whole number');
+
+// 3c. the IDs and channels the Worker records at send time (lib/emailSends.js KEY_TYPES) equal the map's, per idempotency prefix
+for (const x of SENDERS.filter((y) => y.idempotencyPrefix)) {
+  const row = KEY_TYPES.find(([p]) => p === x.idempotencyPrefix);
+  check(Boolean(row) && row[2] === x.emailId && row[3] === x.channel, `send-time email_id and channel for "${x.idempotencyPrefix}" equal the map (${x.emailId} / ${x.channel})`);
+}
 
 // 4. unsubscribe paths all write THE opt-out
 const suppression = read('workers/scan-report/lib/suppression.js');
