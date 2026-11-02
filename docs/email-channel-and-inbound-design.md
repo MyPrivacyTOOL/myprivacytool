@@ -40,7 +40,7 @@ One step for everything that arrives at the support / hello inboxes:
 - Output per message: category, channel, suggested owner, urgency. Stored without the body: category counts and a message id.
 - An unsubscribe-by-reply or a DSAR is never auto-answered; it is routed to a person and opens the existing opt-out / erase path.
 - Replies to a person's own message stay human-reviewed until accuracy is measured.
-- Classifier: a small model is enough for six categories. DECIDED (Chris, 2026-11-02), D2: score both Qwen (self-hosted, no message leaves our infrastructure) and Claude (better on ambiguous mail, message goes to the API) on a labelled sample of 100 messages before choosing. The sample source still needs Chris's approval (real messages are personal data); tracked as MPC-9225.
+- Classifier: a small model is enough for six categories. DECIDED (Chris, 2026-11-02), D2: score both Qwen (Alibaba Cloud's hosted API, as core-brain uses it today; already listed as the AI provider in the DPA, but a third party, not self-hosted) and Claude (Anthropic's API; NOT yet listed in the DPA or Privacy Policy, so it may not receive real messages until it is) on a labelled sample of 100 messages before choosing. The sample source still needs Chris's approval (real messages are personal data); tracked as MPC-9225.
 
 ## 5. Order of work after approval
 1. DONE 2026-11-02: columns applied (D3) and every send records `email_id` and `channel` (PR 704).
