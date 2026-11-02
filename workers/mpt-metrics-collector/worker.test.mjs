@@ -1,4 +1,4 @@
-import worker, { runAll, COLLECTORS } from './worker.js';
+import worker, { runAll, COLLECTORS, COLLECTOR_GROUPS, STAGES, SUBREQUEST_BUDGET, runStage } from './worker.js';
 import { hkDate, hkWeekday, previousHkWeek } from './lib/hk.js';
 import supabaseCounts, { TABLES } from './collectors/supabase-counts.js';
 import cloudflare, { previousDay, WORKERS } from './collectors/cloudflare-analytics.js';
@@ -144,6 +144,33 @@ check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'miss
   check(r.find((x) => x.source === 'b').stored === false && r.filter((x) => x.stored).map((x) => x.source).join() === 'a,c' && inserts.map((i) => i.row.source).join() === 'a,c', 'one bad row fails the batch, then falls back row by row so the others are still stored');
   insertRequests = 0; r = await runAll(env, []);
   check(r.length === 0 && insertRequests === 0, 'no collectors => no insert request');
+}
+
+// MPC-7557 fix: the daily run is split into stages; each stage is its own invocation, so each has its own outbound-request budget.
+{
+  const grouped = Object.values(COLLECTOR_GROUPS).flat();
+  check(grouped.length === COLLECTORS.length && COLLECTORS.every((c) => grouped.includes(c)), 'every collector is in exactly one stage group');
+  check(STAGES.filter((x) => x.startsWith('collect_')).every((x) => COLLECTOR_GROUPS[x]), 'every collect_ stage has a group');
+  const realFetch = globalThis.fetch; let calls = 0;
+  globalThis.fetch = async (...a) => { calls++; return realFetch(...a); };
+  for (const stage of STAGES) {
+    calls = 0; inserts = [];
+    try { await runStage(stage, { ...env, NOTION_TOKEN: 'n' }, new Date('2026-10-09T16:15:00Z')); } catch { /* a stage may fail on the fake backend; only the request count matters here */ }
+    check(calls <= SUBREQUEST_BUDGET, `stage ${stage} uses ${calls} outbound requests (budget ${SUBREQUEST_BUDGET})`);
+  }
+  // Through the SELF binding: the daily cron calls every stage once, each as its own request, in order.
+  const seen = [];
+  const selfEnv = { ...env, SELF: { fetch: async (u, o) => { seen.push({ path: new URL(u).pathname, auth: o.headers.authorization }); return new Response(JSON.stringify({ result: 'ok' }), { status: 200 }); } } };
+  const w2 = []; await worker.scheduled({ cron: '15 16 * * *' }, selfEnv, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
+  check(seen.map((x) => x.path).join() === STAGES.map((x) => '/stage/' + x).join() && seen.every((x) => x.auth === 'Bearer tok'), 'daily cron calls each stage once through SELF, in order, with the token');
+  // A failing stage does not stop the later ones.
+  const seen2 = []; const failEnv = { ...env, SELF: { fetch: async (u) => { seen2.push(new URL(u).pathname); return new Response('boom', { status: seen2.length === 1 ? 500 : 200 }); } } };
+  const w3 = []; await worker.scheduled({ cron: '15 16 * * *' }, failEnv, { waitUntil: (p) => w3.push(p) }); await Promise.all(w3);
+  check(seen2.length === STAGES.length, 'a failing stage does not stop the later stages');
+  globalThis.fetch = realFetch;
+  check((await call('/stage/collect_core', 'POST')).status === 401, 'POST /stage without token => 401');
+  check((await call('/stage/nope', 'POST', { authorization: 'Bearer tok' })).status === 404, 'unknown stage => 404');
+  inserts = []; check((await call('/stage/collect_core', 'POST', { authorization: 'Bearer tok' })).status === 200 && inserts.length === COLLECTOR_GROUPS.collect_core.length, 'authorised POST /stage/collect_core stores that group only');
 }
 
 process.exit(ok ? 0 : 1);

@@ -6,7 +6,7 @@
 // of an invocation, and a service-binding call to the Worker itself starts a fresh invocation with a fresh count), feeding it a
 // deliberately heavy data set, and fails if any invocation goes over the stated budget or if anything is left unstored/unpublished.
 import crypto from 'node:crypto';
-import worker, { COLLECTORS, COLLECT_PHASES, PUBLISH_PHASES, DAILY_ORDER, runScheduled } from './worker.js';
+import worker, { COLLECTORS, COLLECTOR_GROUPS as COLLECT_PHASES, STAGES as DAILY_ORDER, runStage } from './worker.js';
 import { INVOCATION_BUDGET, PLATFORM_LIMIT, RESERVED_FOR_WRITE } from './lib/budget.js';
 import { SCAN_FORM_ID, SCAN_SOURCE_TAG } from './collectors/scan-gap.js';
 import { KPI_MARKER, DASHBOARD_PAGE_ID } from './publishers/kpi-dashboard.js';
@@ -117,7 +117,7 @@ const run = async ({ withSelf, now = NOW, order, env = baseEnv() }) => {
   };
   const e = { ...env };
   if (withSelf) e.SELF = { fetch: async (url, init) => { world.current.calls += 1; return invoke(() => worker.fetch(new Request(url, init), e)); } };
-  try { await invoke(() => runScheduled(e, now, order)); } finally { globalThis.fetch = original; }
+  try { await invoke(async () => { const waits = []; await worker.scheduled({ cron: '15 16 * * *' }, e, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits); }); } finally { globalThis.fetch = original; }
   return world;
 };
 const silence = async (fn) => { const l = console.log, er = console.error; console.log = () => {}; console.error = () => {}; try { return await fn(); } finally { console.log = l; console.error = er; } };
@@ -134,7 +134,7 @@ const phases = split.invocations.slice(1);
 const rowOf = (name) => split.inserted.filter((r) => r.source === name);
 const byPhase = Object.fromEntries(phases.map((p, i) => [DAILY_ORDER[i], p.calls]));
 console.log(`phase calls: ${phases.map((p, i) => `${DAILY_ORDER[i]}=${p.calls}`).join(', ')}; orchestrator=${orchestrator.calls}`);
-check(byPhase['machine-mirror'] <= 10, `a busy day's mirror page (41 families, 40 old blocks) is replaced in ${byPhase['machine-mirror']} calls, not edited block by block`);
+check(byPhase.publish_mirror <= 10, `a busy day's mirror page (41 families, 40 old blocks) is replaced in ${byPhase.publish_mirror} calls, not edited block by block`);
 check(phases.length === DAILY_ORDER.length, `each of the ${DAILY_ORDER.length} phases ran as its own invocation`);
 check(phases.every((p) => p.calls <= INVOCATION_BUDGET), `no phase invocation made more than ${INVOCATION_BUDGET} outbound calls (max ${Math.max(...phases.map((p) => p.calls))})`);
 check(orchestrator.calls <= INVOCATION_BUDGET, `the scheduled invocation itself made ${orchestrator.calls} calls (one per phase), within ${INVOCATION_BUDGET}`);
@@ -151,30 +151,26 @@ check(JSON.stringify(split.inserted).includes('@') === false, 'stored rows carry
   const world = makeWorld({ now: NOW.getTime() }); world.mirrorDay = '2026-11-01';
   const original = globalThis.fetch; globalThis.fetch = world.fetch;
   const inv = { calls: 0, urls: [] }; world.current = inv;
-  const { runPhase } = await import('./worker.js');
+  const runPhase = runStage;
   const greedy = { source: 'greedy', report: 'r', async collect(env) { for (let i = 0; i < 100; i++) await fetch('https://x.supabase.co/rest/v1/other'); return { payload: {} }; } };
-  const { COLLECT_PHASES: phasesMap } = await import('./worker.js');
+  const phasesMap = COLLECT_PHASES;
   phasesMap.__test = [greedy, COLLECTORS[0]];
-  const out = await silence(() => runPhase(baseEnv(), '__test', NOW));
+  const out = await silence(() => runStage('__test', baseEnv(), NOW));
   globalThis.fetch = original; delete phasesMap.__test;
   check(inv.calls <= INVOCATION_BUDGET && inv.calls < PLATFORM_LIMIT, `a collector that loops is cut off by the budget guard (${inv.calls} calls made), never reaching the platform limit`);
-  check(out.results.length === 2 && out.results[0].status === 'error' && world.inserted.some((r) => r.source === 'greedy' && /budget/.test(r.error)) && out.results.every((r) => r.stored), 'the runaway collector is stored as an error row naming the budget, and the other collector and the insert still happen');
+  check(out.length === 2 && out[0].status === 'error' && world.inserted.some((r) => r.source === 'greedy' && /budget/.test(r.error)) && out.every((r) => r.stored), 'the runaway collector is stored as an error row naming the budget, and the other collector and the insert still happen');
 }
 
-// ---- 4. Monday 09:00 HKT cron: the OSINT note and the digest are separate invocations too ------------------------------------------
+// ---- 4. Monday 09:00 HKT cron (digest + channel OSINT note share one invocation) stays under the platform limit --------------------
 {
   const { DIGEST_CRON } = await import('./publishers/slack-digest.js');
   const world = makeWorld({ now: NOW.getTime() }); world.mirrorDay = '2026-11-01';
   const original = globalThis.fetch; globalThis.fetch = world.fetch;
   const top = { calls: 0, urls: [] }; world.invocations.push(top); world.current = top;
-  const env = baseEnv();
-  env.SELF = { fetch: async (url, init) => { top.calls += 1; const inv = { calls: 0, urls: [] }; world.invocations.push(inv); const prev = world.current; world.current = inv; try { return await worker.fetch(new Request(url, init), env); } finally { world.current = prev; } } };
   const waits = [];
-  await silence(async () => { await worker.scheduled({ cron: DIGEST_CRON }, env, { waitUntil: (p) => waits.push(p) }); await Promise.all(waits); });
+  await silence(async () => { await worker.scheduled({ cron: DIGEST_CRON }, baseEnv(), { waitUntil: (p) => waits.push(p) }); await Promise.all(waits); });
   globalThis.fetch = original;
-  const inv = world.invocations.slice(1);
-  check(inv.length === 2 && inv.every((i) => i.calls <= INVOCATION_BUDGET) && top.calls === 2, `Monday cron: OSINT note and digest run as 2 invocations (${inv.map((i) => i.calls).join(' and ')} calls), each within ${INVOCATION_BUDGET}`);
-  check(world.slack.filter((s) => s.method === 'chat.postMessage').length === 2, 'Monday cron: both Slack posts were made');
+  check(top.calls <= INVOCATION_BUDGET && world.slack.filter((s) => s.method === 'chat.postMessage').length === 2, `Monday cron: digest and OSINT note both posted in one invocation with ${top.calls} calls (within ${INVOCATION_BUDGET})`);
 }
 
 process.exit(ok ? 0 : 1);
