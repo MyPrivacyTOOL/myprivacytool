@@ -8,7 +8,7 @@ import { previousHkDay } from '../lib/hk.js';
 
 export const SCAN_FORM_ID = '22ee30ae-6cf9-419b-aa46-b656b0e7b1bf';   // the HubSpot "Start Scan" form shared by /start and /scan
 export const SCAN_SOURCE_TAG = 'scan-page';
-export const MAX_CHECK = 40;      // distinct addresses matched one by one (Workers free plan: 50 subrequests per run, the rest go to other collectors)
+export const MAX_CHECK = 40;      // distinct addresses matched one by one (a single batched query now; the limit only bounds the size of that query)
 const MAX_PAGES = 6;              // 50 submissions per page
 const DEDUPE_MS = 24 * 3600000;   // the Worker makes one report per address per 24h, so a repeat within 24h is covered by the earlier request
 
@@ -36,12 +36,16 @@ async function submittedAddresses(env, { start, end }) {
   return found;
 }
 
-async function hasReportRequest(env, email, start) {
+// One query for all addresses (MPC-9168): the old one-call-per-address loop cost up to MAX_CHECK (40) outbound calls, which
+// alone nearly used a Worker invocation's whole subrequest budget. Returns the subset that has an accepted report request.
+async function acceptedAddresses(env, emails, start) {
+  if (!emails.length) return new Set();
   const since = new Date(start.getTime() - DEDUPE_MS).toISOString();
-  const url = `${env.SUPABASE_URL}/rest/v1/scans?email_scanned=eq.${encodeURIComponent(email)}&source=eq.web_scan&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`;
+  const list = emails.map((e) => `"${e.replace(/"/g, '')}"`).join(',');
+  const url = `${env.SUPABASE_URL}/rest/v1/scans?email_scanned=in.(${encodeURIComponent(list)})&source=eq.web_scan&created_at=gte.${encodeURIComponent(since)}&select=email_scanned&limit=1000`;
   const res = await fetch(url, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
   if (!res.ok) throw new Error(`scan-gap: scans read failed: HTTP ${res.status}`);
-  return (await res.json()).length > 0;
+  return new Set((await res.json()).map((r) => norm(r.email_scanned)));
 }
 
 export default {
@@ -51,8 +55,8 @@ export default {
     const win = previousHkDay(now);
     const addresses = await submittedAddresses(env, win);
     if (addresses.size > MAX_CHECK) throw new Error(`scan-gap: ${addresses.size} distinct submissions, more than the ${MAX_CHECK} that can be matched in one run`);
-    let accepted = 0;
-    for (const a of addresses) if (await hasReportRequest(env, a, win.start)) accepted += 1;
+    const found = await acceptedAddresses(env, [...addresses], win.start);
+    const accepted = [...addresses].filter((a) => found.has(a)).length;
     const missing = addresses.size - accepted;
     return {
       payload: { day: win.day, scan_page_submissions: addresses.size, accepted_report_requests: accepted, missing, alert: missing > 0 },

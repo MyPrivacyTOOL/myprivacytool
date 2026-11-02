@@ -19,6 +19,7 @@ import { publishMachineMirror } from './publishers/machine-mirror.js';
 import { hkDate } from './lib/hk.js';
 import { channelOsintConfigured, postChannelOsint, buildChannelOsintText, publishChannelOsintDay } from './publishers/channel-osint.js';
 import { KPI_CRON, publishKpiDashboard } from './publishers/kpi-dashboard.js';
+import { withSubrequestBudget, INVOCATION_BUDGET, RESERVED_FOR_WRITE } from './lib/budget.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
@@ -28,13 +29,20 @@ export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot
 // caps outbound requests per invocation (50 on the free plan), so from 2026-10-28 every run died with "Too many subrequests" before it
 // stored a row or posted an alert. The daily cron now calls each STAGE below through the Worker's own service binding (SELF); every
 // call is a separate invocation with its own budget. Each stage must stay well under 50 requests (worker.test.mjs enforces a budget).
-export const SUBREQUEST_BUDGET = 40;
+// MPC-9168: the budget is enforced at run time (lib/budget.js: INVOCATION_BUDGET calls per stage, the last RESERVED_FOR_WRITE kept for the
+// insert and alerts) and checked by subrequest-budget.test.mjs against a deliberately heavy data set. Worst-case calls per stage:
+//   collect_core   supabase-counts 10, cloudflare 3, youtube 3, edge-machines 2, learning-loop 1
+//   collect_hubspot hubspot: variable (lifecycle stages, forms and their pages), alone so it gets a whole budget
+//   collect_email  scan-gap <=7 (one batched read), nightly-chain 2, hubspot-optout <=11, email-delivery 2, channel-osint 3
+//   collect_ga4    token + 6 reports (the channel-osint collector fetches its own GA4 token in its stage)
+export const SUBREQUEST_BUDGET = INVOCATION_BUDGET;
 export const COLLECTOR_GROUPS = {
-  collect_core: [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop],
+  collect_core: [supabaseCounts, cloudflareAnalytics, youtube, edgeMachines, learningLoop],
+  collect_hubspot: [hubspot],
   collect_email: [scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint],
   collect_ga4: [...ga4Reports],
 };
-export const STAGES = ['collect_core', 'collect_email', 'collect_ga4', 'publish_notion', 'publish_mirror', 'publish_osint', 'publish_kpi'];
+export const STAGES = ['collect_core', 'collect_hubspot', 'collect_email', 'collect_ga4', 'publish_notion', 'publish_learning', 'publish_mirror', 'publish_osint', 'publish_kpi'];
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
@@ -73,8 +81,11 @@ export async function raiseAlerts(env, collectors, rows) {
   }
 }
 
-export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
+export async function runAll(env, collectors = COLLECTORS, now = new Date(), { scope } = {}) {
   const rows = [];
+  // MPC-9168: collectors may not use the calls the database insert and the Slack alerts need (see lib/budget.js).
+  const fullLimit = scope?.limit;
+  if (scope) scope.limit = fullLimit - RESERVED_FOR_WRITE;
   const dayStart = hkDayStart(now); // default period: today so far, Hong Kong day
   for (const c of collectors) {
     if (c.skip?.(now)) continue; // e.g. GA4 weekly report runs on Mondays only
@@ -94,6 +105,7 @@ export async function runAll(env, collectors = COLLECTORS, now = new Date()) {
     }
     rows.push(row);
   }
+  if (scope) scope.limit = fullLimit;
   if (!rows.length) return [];
   await raiseAlerts(env, collectors, rows);
   const result = (row, stored, e) => (stored ? { source: row.source, status: row.status, stored: true } : { source: row.source, status: 'error', stored: false, error: SAFE(e?.message, env) });
@@ -114,15 +126,22 @@ const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROL
 // One stage = one unit of the daily run. Collection stages store their own rows and raise their own alerts; publish stages are
 // independent so a Notion failure never affects collection.
 export async function runStage(stage, env, now = new Date()) {
-  if (COLLECTOR_GROUPS[stage]) return await runAll(env, COLLECTOR_GROUPS[stage], now);
   if (stage.startsWith('publish_') && !notionConfigured(env)) return { skipped: 'NOTION_TOKEN not set' };
-  switch (stage) {
-    case 'publish_notion': return await publishAll(env);
-    case 'publish_mirror': return await publishMachineMirror(env, previousHkDate(now)); // machine mirror page (MPC-7492)
-    case 'publish_osint': return await publishChannelOsintDay(env, previousHkDate(now)); // channel osint rows (MPC-7641)
-    case 'publish_kpi': return await publishKpiDashboard(env); // KPI scorecard (MPC-7618)
-    default: throw new Error(`unknown stage ${stage}`);
-  }
+  const body = async (scope) => {
+    if (COLLECTOR_GROUPS[stage]) return await runAll(env, COLLECTOR_GROUPS[stage], now, { scope });
+    switch (stage) {
+      case 'publish_notion': return await publishAll(env, now, { parts: ['daily', 'weekly'] });
+      case 'publish_learning': return await publishAll(env, now, { parts: ['learning-loop'] }); // MPC-7493
+      case 'publish_mirror': return await publishMachineMirror(env, previousHkDate(now)); // machine mirror page (MPC-7492)
+      case 'publish_osint': return await publishChannelOsintDay(env, previousHkDate(now)); // channel osint rows (MPC-7641)
+      case 'publish_kpi': return await publishKpiDashboard(env, now); // KPI scorecard (MPC-7618)
+      default: throw new Error(`unknown stage ${stage}`);
+    }
+  };
+  // MPC-9168: count this stage's outbound calls and refuse the one past the budget (a named error row, not a platform error).
+  const { value, used } = await withSubrequestBudget(stage, INVOCATION_BUDGET, body);
+  console.log(JSON.stringify({ stage, subrequests: used, budget: INVOCATION_BUDGET }));
+  return value;
 }
 
 async function callStage(env, stage) {

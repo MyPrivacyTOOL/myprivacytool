@@ -120,3 +120,14 @@ Channel OSINT (the X / LinkedIn / Telegram bots) tracked apart from website scan
 - **Secrets:** none new. It needs `NOTION_TOKEN` (the integration must be able to edit the MPT Dashboard page), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - **Manual refresh:** `POST /publish-kpi` with the collector bearer token.
 - Test: `node workers/mpt-metrics-collector/kpi.test.mjs`.
+
+## Subrequest budget (MPC-9168, on top of the MPC-7557 stages)
+
+A Worker invocation may make a limited number of outbound calls: **50 on the Free plan** (every `fetch`, including retries; 1000 on Paid). Since 2026-10-27 one scheduled run made far more (about 130), so every step failed with "Too many subrequests by single Worker invocation": no rows stored, no alerts, no Notion or Slack publish.
+
+- **Stages** (`worker.js`: `COLLECTOR_GROUPS`, `STAGES`): the daily cron calls each stage as its own invocation through the `SELF` service binding (`wrangler.toml`), authenticated with `COLLECTOR_TRIGGER_TOKEN`. Each has its own 50-call limit. No cron slot and no plan change. Without the binding the stages run in-process and share one budget.
+- **Budget: 44 calls per stage** (`lib/budget.js`), 6 kept back for the database insert and the Slack alerts. The runtime guard refuses the call that would go over and the collector is stored as an `error` row naming the budget, so a runaway loop can no longer take the insert and the alerts down with it. Every stage logs `{"stage": ..., "subrequests": N, "budget": 44}`; read these in Worker observability to see the headroom.
+- **Calls dropped:** `scan-gap` used one database read per address (up to 40); it is one query now. The machine mirror page used one `DELETE` per old block (60+ on a busy day); past 25 blocks the page is replaced instead of edited. HubSpot (variable, about 22 to 36 calls) has its own stage.
+- **Test:** `node workers/mpt-metrics-collector/subrequest-budget.test.mjs` runs the scheduled handler against a fake platform that throws on call 51 of an invocation and starts a fresh count for each service-binding call, with a deliberately heavy data set. It fails if any invocation exceeds the budget, a collector is in no stage, a row fails on a subrequest error, or the old all-in-one shape stops being over the limit.
+- **Adding a collector or publisher:** put it in a stage, work out its worst-case calls, run the test. If a stage would exceed 44, give it its own stage. Do not raise the budget without confirming the plan.
+- Counts only: no address is read into a row or a log.
