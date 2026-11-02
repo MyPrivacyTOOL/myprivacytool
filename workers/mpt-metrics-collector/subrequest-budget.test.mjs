@@ -99,6 +99,12 @@ const makeWorld = ({ now }) => {
 };
 
 const NOW = new Date('2026-11-02T01:00:00Z'); // a Monday in Hong Kong too (09:00 HKT): the heaviest day (weekly GA4 report, weekly Notion row, learning loop)
+// The collectors read the wall clock (new Date()) for their day and week rules, so with the real date this test only passed on 2026-11-02 itself
+// (15 rows instead of 17 on any other day). Pin the clock to NOW for the whole file so it passes on every day.
+{
+  const RealDate = Date, pinned = NOW.getTime();
+  globalThis.Date = class extends RealDate { constructor(...a) { if (a.length === 0) super(pinned); else super(...a); } static now() { return pinned; } };
+}
 const baseEnv = () => ({
   SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok',
   CLOUDFLARE_ANALYTICS_TOKEN: 'cf', CLOUDFLARE_ZONE_ID: 'z', YOUTUBE_API_KEY: 'yt', GA4_SERVICE_ACCOUNT_JSON: SA, HUBSPOT_READONLY_TOKEN: 'hs', HUBSPOT_PAUSE_MS: '0',
