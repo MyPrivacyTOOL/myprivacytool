@@ -4,7 +4,7 @@
 import { ARRIVAL, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS, type ArrivalId, type ObservationState } from "../../../shared/hexagon-registry/channels.js";
 import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
 import { footprintSummary, footprintLine } from "../../../shared/hexagon-registry/footprint.js";
-import { footprintLinksEnabled } from "./dashboard-link";
+import { FOOTPRINT_CALLBACK, footprintLinksEnabled } from "./dashboard-link";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import { redactStoredId, senderKey } from "./sender-key";
@@ -227,7 +227,8 @@ async function saveSnapshot(env: Env, row: Record<string, unknown>, log: Logger)
 }
 
 const SCAN_URL = "https://myprivacytool.io/scan?utm_source=telegram&utm_medium=channel_osint&utm_campaign=baseline_report";
-const FOOTPRINT_HINT = "\n\nWant this counted in your web scan? Reply FOOTPRINT for a one-time link. It shares which hexagons were checked, not your values.";
+const FOOTPRINT_HINT = "\n\nWant this counted in your web scan? Press the button below (or reply FOOTPRINT) for a one-time link. It shares which hexagons were checked, not your values.\nTo remove everything stored about you, reply DELETE MY DATA.";
+const FOOTPRINT_KEYBOARD = { inline_keyboard: [[{ text: "Count it in my web scan", callback_data: FOOTPRINT_CALLBACK }]] };
 const FAILED_TEXT = "I couldn't complete the Telegram check just now, so I have no result to show. Nothing was scored. You can say \"scan me\" to try again later.";
 
 /** Runs after the Y reply. Never throws, never logs payloads or the token. Does nothing for senders outside the allow-list. */
@@ -255,8 +256,9 @@ export async function runBaselineScan(env: Env, update: unknown, log: Logger): P
       report: report ? { channel: "TG", risk: report.risk, never_sent: NEVER_SENT, hexagons: report.hexagons, extras: report.extras, insights: report.insights, disabled: DISABLED_INSIGHTS } : null,
       expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString(),
     }, log);
-    const text = report ? report.text + (footprintLinksEnabled(env) && probeIds(env).has(sender.id) ? FOOTPRINT_HINT : "") : FAILED_TEXT;
-    const sent = await call(env, "sendMessage", { chat_id: sender.chatId, text });
+    const offerLink = !!report && footprintLinksEnabled(env) && probeIds(env).has(sender.id);
+    const text = report ? report.text + (offerLink ? FOOTPRINT_HINT : "") : FAILED_TEXT;
+    const sent = await call(env, "sendMessage", { chat_id: sender.chatId, text, ...(offerLink ? { reply_markup: FOOTPRINT_KEYBOARD } : {}) });
     log.info("baseline_scan_done", { complete: !!report, saved, sent: sent.status });
   } catch (err) {
     log.warn("baseline_scan_failed", { error: err instanceof Error ? err.name : "unknown" });

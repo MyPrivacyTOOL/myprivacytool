@@ -3,7 +3,7 @@ import { baselineScanEnabled, baselineSender, isConsentConfirmation, isScanStatu
 import { handleRecordsCheck, isRecordsCommand } from "./records-check";
 import { eventExtrasActive, handleEventExtra, observeEventExtra } from "./event-extras";
 import { handleDeleteMyData, isDeleteMyDataRequest } from "./delete-my-data";
-import { handleDashboardCommand, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
+import { footprintCallbackAsMessage, handleDashboardCommand, handleFootprintCallback, handleFootprintCommand, isDashboardCommand, isFootprintCommand } from "./dashboard-link";
 import { handleDeepCommand, isDeepCommand } from "./deep-scan";
 import { isPhotoExifRequest, replyPhotoExif } from "./photo-exif";
 import { handleFixWizard, isFixWizardUpdate } from "./fix-wizard";
@@ -101,6 +101,14 @@ export async function handleTelegramWebhook(request: Request, env: Env, ctx?: Ex
     const fp = handleFootprintCommand(env, payload, log);
     if (ctx?.waitUntil) ctx.waitUntil(fp);
     else await fp;
+    return done(new Response("OK"));
+  }
+
+  // MPC-8689: the "Count it in my web scan" button under the report. Same switch and allow-list as the typed command.
+  if (footprintCallbackAsMessage(env, payload)) {
+    const cb = handleFootprintCallback(env, payload, log);
+    if (ctx?.waitUntil) ctx.waitUntil(cb);
+    else await cb;
     return done(new Response("OK"));
   }
 
