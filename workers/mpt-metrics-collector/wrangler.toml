@@ -16,6 +16,12 @@ enabled = true
 [triggers]
 crons = ["15 16 * * *", "0 1 * * 1"]
 
+# MPC-7557 fix: the daily run calls its own stages through this self service binding so each stage is a separate invocation with its own
+# outbound-request budget (50 on the free plan). Without it the whole daily run shares ONE budget and fails with "Too many subrequests".
+[[services]]
+binding = "SELF"
+service = "mpt-metrics-collector"
+
 # Secrets are NOT declared here (values live in Cloudflare; `wrangler deploy` leaves them alone).
 # Expected names: EXPECTED_SECRETS.txt (the deploy workflow fails if any goes missing).
 
