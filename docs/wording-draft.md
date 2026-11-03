@@ -1,11 +1,13 @@
 # Wording draft: Telegram bot copy and privacy page (UNREVIEWED)
 
+> **SUPERSEDED (2026-11-03).** The live wording changed on 2026-11-02 (PRs 691 and 692): Telegram data is kept until the person asks for deletion, not "up to 90 days, then deleted automatically". The 90-day text below is the OLD draft, kept as history. Live text: `locales/en/main.json` (`bot.first_hexagon.question`) and the "Messaging Channel Data" bullet in `src/pages/Privacy.tsx`. Approval status is recorded on Notion task TID-7873.
+
 Status: draft for review. The English bot copy (`locales/en/main.json`) and one bullet on the privacy page (`src/pages/Privacy.tsx`) carry this wording on this branch; nothing else is changed and nothing is reviewed by a legal or privacy owner.
 Needed before `PROBE_MODE=all` is switched on (see `docs/channel-probe.md`, "Mode all"). Needs legal / privacy-owner review and translation.
 
 ## What is true today
 - A Telegram bot can read public profile details of anyone who messages it, through public Bot API lookups, with no login. Which fields come back depends on that person's own privacy settings and can include name, @handle, photo, bio, birthdate, business details and a personal channel.
-- With `PROBE_MODE=all`, the Worker saves the raw update exactly as delivered, **message text included**, plus the profile lookups, to `public.channel_probe_captures`. Rows expire after `PROBE_RETENTION_DAYS` (default 90, clamp 1-365).
+- With `PROBE_MODE=all`, the Worker saves the raw update exactly as delivered, **message text included**, plus the profile lookups, to `public.channel_probe_captures`. Rows have no expiry by default (`PROBE_RETENTION_DAYS` unset); a number 1-365 makes them expire.
 - With `PROBE_MODE=on`, the same is saved for allow-listed test accounts only, and the full event log (`public.telegram_event_log`) can also be written for allow-listed or opted-in accounts.
 - With `PROBE_MODE` unset (default) none of this is stored.
 - Profile photos: only file metadata is stored, never the image bytes.
@@ -19,10 +21,10 @@ This is untrue for public profile details. It also says nothing about storing wh
 
 Proposed replacement (English), now in `locales/en/main.json`:
 
-> I can see the public details of your Telegram profile (such as your name, @handle, photo and bio, depending on your Telegram privacy settings), and what you type here. I don't get your phone number or contacts. I save what you send and those public details for up to 90 days to run your scan. Want to run the scan now?
+> I can see the public details of your Telegram profile (such as your name, @handle, photo and bio, depending on your Telegram privacy settings), and what you type here. I don't get your phone number or contacts. I save what you send and those public details to run your scan, and keep them until you ask me to delete them (send STOP any time). Want to run the scan now?
 
 Notes:
-- The number of days is written as a fixed value (90) and must be kept in sync with `PROBE_RETENTION_DAYS`.
+- No retention period is stated: by default rows have no expiry (`PROBE_RETENTION_DAYS` unset); if an expiry is ever set, the wording must say so.
 - "I save what you send" is only true while `PROBE_MODE` is `all` (or the sender is in a logged list in mode `on`). With the mode off nothing is saved, so this wording should go live together with the switch.
 - **Conflict to resolve:** `bot.contact_unsupported` still says "I haven't saved what you sent", and `workers/social-listeners/copy.vitest.ts` pins `/haven't saved/`. That line is about an email address or phone number sent in chat, but it now sits beside "I save what you send" and reads as a contradiction. It needs a wording decision.
 - Add a line or link to the privacy page, for example: "Details: https://myprivacytool.io/privacy".
@@ -34,7 +36,7 @@ Notes:
 >
 > **Why.** To run your privacy scan and to measure what a messaging channel makes visible about a person.
 >
-> **How long.** Up to 90 days, then deleted automatically.
+> **How long.** Until you ask us to delete it.
 >
 > **Who can see it.** Our team, on a restricted basis. It is not shared publicly.
 >
