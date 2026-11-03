@@ -45,6 +45,10 @@ service = "core-brain"
 # in the PROBE_TELEGRAM_IDS secret, and the Worker also needs the deep_jobs tables. Rollback: set "off" (or delete this block) and deploy.
 # TELEGRAM_BASELINE_SCAN (MPC-7891): see the line below; it used to be managed only by the flags workflow, which every later deploy wiped.
 [vars]
+# Channel probe reader, mode "all" (decision D-A; docs/channel-probe.md). Captures the raw update and the public profile lookups of EVERY non-bot Telegram sender into
+# channel_probe_captures, kept until the person asks for deletion (PROBE_RETENTION_DAYS deliberately unset). Wording approved by the owner, privacy owner and legal
+# (recorded on Notion task TID-7873 on 2026-11-02/03). Kept here so a deploy does not wipe it. ROLLBACK: delete this line (or set "off") and deploy.
+PROBE_MODE = "all"
 TELEGRAM_DEEP_SCAN = "on"
 # MPC-7891 baseline scan (the first risk number): moved here on 2026-10-29 at the owner's instruction so a deploy does not wipe it (the flags workflow value is dropped
 # by the next deploy). Only acts for senders in PROBE_TELEGRAM_IDS (allow-listed test accounts) unless TELEGRAM_SCAN_SCOPE="all" (NOT set; do not set it before the
