@@ -99,6 +99,16 @@ const makeWorld = ({ now }) => {
 };
 
 const NOW = new Date('2026-11-02T01:00:00Z'); // a Monday in Hong Kong too (09:00 HKT): the heaviest day (weekly GA4 report, weekly Notion row, learning loop)
+// The Worker reads the real clock (new Date()) inside its stages, but this test asserts the Monday workload. Without freezing the clock the
+// test passed only when the real Hong Kong weekday was a Monday (found 2026-11-02 16:56 UTC, a Tuesday in Hong Kong: 'every collector stored
+// its row (15 rows)' failed, and the test is in the collector deploy chain). Freeze `new Date()` / Date.now() at NOW; explicit dates are untouched.
+{
+  const RealDate = Date;
+  globalThis.Date = class extends RealDate {
+    constructor(...a) { if (a.length) super(...a); else super(NOW.getTime()); }
+    static now() { return NOW.getTime(); }
+  };
+}
 const baseEnv = () => ({
   SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', COLLECTOR_TRIGGER_TOKEN: 'tok',
   CLOUDFLARE_ANALYTICS_TOKEN: 'cf', CLOUDFLARE_ZONE_ID: 'z', YOUTUBE_API_KEY: 'yt', GA4_SERVICE_ACCOUNT_JSON: SA, HUBSPOT_READONLY_TOKEN: 'hs', HUBSPOT_PAUSE_MS: '0',
