@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import HexagonGrid from '@/components/HexagonGrid';
 import ShadowHands from '@/components/ShadowHands';
-import DeviceIcon from '@/components/DeviceIcon';
+import DeviceReveal from '@/components/DeviceReveal';
+import UnknownDeviceHero from '@/components/UnknownDeviceHero';
+import { identifyDevice, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
@@ -26,6 +28,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFederatedModal, setShowFederatedModal] = useState(false);
+  // null until the signals are read; then certain (carousel) or unknown (hexagon path)
+  const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
@@ -67,6 +71,8 @@ const Index = () => {
     // Start session timer on mount
     startSessionTimer();
     trackFunnelStep('page_load');
+
+    readDeviceSignalsWithModel().then((signals) => setIdentity(identifyDevice(signals)));
 
     async function loadDeviceData() {
       try {
@@ -237,18 +243,27 @@ const Index = () => {
         {/* Live Device Tracking Hero */}
         <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
           <div className="max-w-[280px] sm:max-w-sm mx-auto">
-            <DeviceIcon 
-              deviceType={liveDeviceData?.device?.type || 'Smartphone'}
-              rotationAngle={orientation.angle}
-              beta={motion.beta}
-              gamma={motion.gamma}
-            />
+            {identity?.certain && (
+              <DeviceReveal
+                identity={identity}
+                rotationAngle={orientation.angle}
+                beta={motion.beta}
+                gamma={motion.gamma}
+              />
+            )}
+            {identity && !identity.certain && (
+              <UnknownDeviceHero spotlightId="browser" spotlightLabel="Browser" />
+            )}
           </div>
         </section>
 
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
-          <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+          <HexagonGrid
+            hexagons={hexagons}
+            deviceData={deviceData || undefined}
+            spotlightId={identity && !identity.certain ? 'browser' : undefined}
+          />
         </section>
 
         {/* Journey teaser */}

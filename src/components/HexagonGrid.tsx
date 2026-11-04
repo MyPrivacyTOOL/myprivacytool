@@ -39,6 +39,8 @@ import confetti from 'canvas-confetti';
 interface HexagonGridProps {
   hexagons: HexagonData[];
   deviceData?: DeviceData;
+  /** Hexagon to draw the eye to (e.g. when the device itself is unknown). */
+  spotlightId?: string;
 }
 
 // Define progressive reveal thresholds - Total 46 hexagons
@@ -55,7 +57,7 @@ const REVEAL_THRESHOLDS = {
   behaviorWave: 45,     // After 45 confirmations: Behavior hexagons (6)
 };
 
-export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
+export default function HexagonGrid({ hexagons: allHexagons, deviceData, spotlightId }: HexagonGridProps) {
   const [visibleCount, setVisibleCount] = useState(5);
   const [hoveredHexagon, setHoveredHexagon] = useState<HexagonData | null>(null);
   const [confirmedCount, setConfirmedCount] = useState(0);
@@ -640,7 +642,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             return (
               <div
                 key={hex.id}
-                className={`absolute transition-all duration-500 ${isRevealing ? 'revealing-wrapper' : ''}`}
+                id={`hexagon-${hex.id}`}
+                className={`absolute transition-all duration-500 ${isRevealing ? 'revealing-wrapper' : ''} ${
+                  hex.id === spotlightId && !hex.confirmed && !confirmedHexagons.has(hex.id) ? 'hex-spotlight' : ''
+                }`}
                 style={{
                   left: `${pos.x}px`,
                   top: `${pos.y}px`,

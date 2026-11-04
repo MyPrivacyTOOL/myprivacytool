@@ -16,9 +16,15 @@ interface DeviceIconProps {
   rotationAngle: number;
   beta?: number | null;
   gamma?: number | null;
+  /** Name shown under the image; defaults to deviceType. */
+  label?: string;
+  /** "We know because" facts, shown once the device is locked in. */
+  evidence?: string[] | null;
+  /** True while the reveal carousel is still spinning. */
+  scanning?: boolean;
 }
 
-export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: DeviceIconProps) {
+export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, label, evidence, scanning = false }: DeviceIconProps) {
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
   const fallbackEmoji = deviceEmojis[deviceType] || '📱';
@@ -112,8 +118,20 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma }: D
 
           {/* Device type label */}
           <div className="text-foreground font-semibold text-base sm:text-lg">
-            {deviceType}
+            {label ?? deviceType}
           </div>
+
+          {/* Evidence: why we are certain (only for a locked-in identity) */}
+          {scanning && (
+            <div className="text-muted-foreground text-[10px] sm:text-xs" aria-live="polite">
+              Scanning…
+            </div>
+          )}
+          {!scanning && evidence && evidence.length > 0 && (
+            <div className="text-muted-foreground text-[10px] sm:text-xs text-center" aria-live="polite">
+              We know because: {evidence.join(' · ')}
+            </div>
+          )}
           
           {/* Orientation indicator */}
           <div className={`text-[10px] sm:text-xs font-medium px-2 sm:px-3 py-0.5 sm:py-1 rounded-full transition-colors ${
