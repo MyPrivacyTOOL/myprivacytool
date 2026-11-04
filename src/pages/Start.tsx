@@ -150,9 +150,12 @@ export default function Start() {
         {/* Confirmation prompt */}
         {confirmed === null && (
           <div className="bg-card border border-border rounded-xl p-6 mb-8">
-            <p className="text-foreground text-sm mb-2 font-semibold">Want your free privacy report?</p>
+            {/* MPC-7129: copy was "Want your free privacy report?" which implied a report would be generated
+                immediately. /start is a waitlist gate — no scan runs here, no report is produced until the
+                full product ships. Reworded to reflect what actually happens: early-access notification. */}
+            <p className="text-foreground text-sm mb-2 font-semibold">Get early access — be first to know</p>
             <p className="text-muted-foreground text-xs mb-6">
-              Join the list and we'll email you when your free privacy report is ready.
+              Sign up and we'll notify you the moment your full privacy report is live.
             </p>
             <div className="flex gap-3">
               <button
@@ -177,8 +180,10 @@ export default function Start() {
         {confirmed === true && (
           <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-8 motion-safe:animate-fade-in">
             <p className="text-brand text-sm font-semibold mb-1">Confirmed.</p>
+            {/* MPC-7129: "as soon as your free privacy report is ready" implied imminent delivery.
+                Reworded to match the actual waitlist flow. */}
             <p className="text-muted-foreground text-xs mb-5">
-              Enter your email and we'll let you know as soon as your free privacy report is ready.
+              Enter your email below. We'll let you know the moment your full report is ready.
             </p>
             <form onSubmit={handleSubmit} noValidate className="space-y-3">
               <div className="flex flex-wrap gap-3">
