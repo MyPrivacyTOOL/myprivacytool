@@ -43,6 +43,7 @@ const Monitoring = lazy(() => import("./pages/Monitoring"));
 const ScanResults = lazy(() => import("./pages/ScanResults"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
 const VerifyReport = lazy(() => import("./pages/VerifyReport"));
+const DeviceDemo = lazy(() => import("./pages/DeviceDemo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // MPC-7200: every route except the home page is code-split so the first paint only downloads what it renders.
@@ -111,6 +112,8 @@ const App = () => (
             <Route path="/hong-kong-spam" element={<Navigate to="/HongKongSpam" replace />} />
             {/* MPC-8281: check a signed report. Noindex and unlinked until signed reports are switched on. */}
             <Route path="/verify-report" element={<VerifyReport />} />
+            {/* MPC-DEMO: Device orientation & motion sensor test page. Noindex, staging only. */}
+            <Route path="/device-demo" element={<DeviceDemo />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Route>
