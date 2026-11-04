@@ -11,7 +11,8 @@
  * missing secret can never break a webhook reply.
  */
 
-const DEFAULT_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+export const SUPABASE_DEFAULT_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+const DEFAULT_URL = SUPABASE_DEFAULT_URL;
 
 // Allowlist — the caller can never name another table.
 const TABLES = new Set([
@@ -19,6 +20,9 @@ const TABLES = new Set([
   'mpt_user_engagement',
   'mpt_api_rate_limits',
   'mpt_channel_metrics',
+  'mpt_hexagon_interactions',
+  'mpt_hexagon_events',
+  'osint_engine_tuning_log',
 ]);
 
 /**
@@ -48,7 +52,9 @@ export async function insertMptRow(env, table, row) {
       body: JSON.stringify(row),
     });
     if (!res.ok) {
-      console.error(`Supabase ${table} insert failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
+      // Learning events: Postgres error text can quote the row (person_key), so log only the status.
+      const detail = table === 'mpt_hexagon_events' ? '' : ` ${(await res.text()).slice(0, 200)}`;
+      console.error(`Supabase ${table} insert failed: ${res.status}${detail}`);
       return false;
     }
     return true;

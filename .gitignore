@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Test output (MPC-7300)
+coverage
+playwright-report
+test-results
+
+# Secrets (MPT-1004): never commit real values; only .env.example is tracked
+.env
+.env.*
+!.env.example
+!.env.production
+.dev.vars
+.dev.vars.*
+
+# wrangler local dev state
+.wrangler
+supabase/.env
+e2e-screenshots
+playwright-report-live/

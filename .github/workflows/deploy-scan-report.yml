@@ -11,6 +11,8 @@ on:
     branches: [main]
     paths:
       - 'workers/scan-report/**'
+      - 'shared/hexagon-registry/**'
+      - 'shared/test-records.js'
       - 'src/data/optOutGuides.json'
       - '.github/workflows/deploy-scan-report.yml'
   workflow_dispatch:
@@ -28,19 +30,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check required secrets are configured
+      # MPC-7300: pre-deployment checks (secrets present, wrangler.toml valid, EXPECTED_SECRETS.txt names only).
+      - name: Pre-deployment checks (secrets present, Worker config valid)
         env:
-          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          A: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          [ -n "$T" ] && [ -n "$A" ] || { echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets are not set"; exit 1; }
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/scan-report
       - name: Generate guides module
         run: node workers/scan-report/scripts/sync-guides.mjs
+      - name: Generate HK Spam email strings module
+        run: node workers/scan-report/scripts/sync-hk-email-copy.mjs
 
       - name: Test Worker (stubbed fetch)
-        run: node workers/scan-report/worker.test.mjs
+        run: node workers/scan-report/worker.test.mjs && node workers/scan-report/lifecycle.test.mjs && node workers/scan-report/hk-spam.test.mjs && node workers/scan-report/recognise.test.mjs && node workers/scan-report/opt-out.test.mjs && node workers/scan-report/delivery-events.test.mjs && node workers/scan-report/followup-state.test.mjs
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
+        # The action runs `npm i wrangler@3.90.0` from the repo's npm workspace; a peer-dependency conflict from the
+        # core-brain workspace (wrangler 4 wants workers-types 5) makes that fail with ERESOLVE and blocks every deploy.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -54,11 +62,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          # MPC-7385-F5: after a key rotation the new key lives in NEW_SUPABASE_SECRET_KEY and wins over the old secret.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
           HUBSPOT_TOKEN: ${{ secrets.SCAN_REPORT_HUBSPOT_TOKEN }}
           HIBP_API_KEY: ${{ secrets.SCAN_REPORT_HIBP_API_KEY }}
+          # CK-8503: signing secret of the Resend webhook (delivery receipts). Skipped when the GitHub secret does not exist; the endpoint then stays off (404).
+          RESEND_WEBHOOK_SECRET: ${{ secrets.SCAN_REPORT_RESEND_WEBHOOK_SECRET }}
         run: |
-          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY HUBSPOT_TOKEN HIBP_API_KEY; do
+          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY HUBSPOT_TOKEN HIBP_API_KEY RESEND_WEBHOOK_SECRET; do
             value="${!name}"
             if [ -n "$value" ]; then
               printf '%s' "$value" | npx --yes wrangler@3 secret put "$name" >/dev/null && echo "set $name"

@@ -6,6 +6,8 @@ declare global {
   }
 }
 
+import { captureAttribution, getAttribution } from './attribution';
+
 // Session tracking
 let sessionStartTime: number = 0;
 let lastActivityTime: number = 0;
@@ -32,6 +34,23 @@ export const trackEvent = (
   }
 };
 
+// MPC-8451: a click on a share button. Carries only the channel and where on the site it was, never the visitor's address or results.
+export const trackShare = (channel: string, where: string) => {
+  trackEvent('share_click', { channel, where });
+};
+
+// Route-change page view for the single-page app (MPC-7376). gtag reads page_location and page_title itself.
+export const trackPageView = () => {
+  trackEvent('page_view');
+};
+
+// Events that must carry first-touch utm_* as custom parameters so GA4 can report scans by source (MPC-7182).
+// Register utm_source / utm_campaign as event-scoped custom dimensions in GA4.
+const attributedEvent = (eventName: string, params: Record<string, string | number | boolean>) => {
+  if (typeof window !== 'undefined') captureAttribution(window.location.search);
+  trackEvent(eventName, { ...params, ...getAttribution() });
+};
+
 // Funnel step tracking
 const funnelSteps: Record<string, number> = {
   'page_load': 1,
@@ -42,6 +61,15 @@ const funnelSteps: Record<string, number> = {
   'deep_scan_triggered': 6,
   'all_hexagons_confirmed': 7,
   'scroll_to_footer': 8,
+  // Wave steps previously reported step_number 0. New numbers only; 1-8 keep their historical meaning (MPC-7376).
+  'language_scan_triggered': 9,
+  'orientation_scan_triggered': 10,
+  'fingerprint_scan_triggered': 11,
+  'advanced_fingerprint_scan_triggered': 12,
+  'storage_scan_triggered': 13,
+  'social_scan_triggered': 14,
+  'security_scan_triggered': 15,
+  'behavior_scan_triggered': 16,
 };
 
 export const trackFunnelStep = (step: string, metadata?: Record<string, string | number | boolean>) => {
@@ -52,6 +80,16 @@ export const trackFunnelStep = (step: string, metadata?: Record<string, string |
   });
 };
 
+// A scan "starts" at the first hexagon interaction, so it can be told apart from a bare page load (MPC-7376).
+// Fires once per page session.
+let scanStartedTracked = false;
+
+export const trackScanStarted = () => {
+  if (scanStartedTracked) return;
+  scanStartedTracked = true;
+  attributedEvent('scan_started', {});
+};
+
 // Canonical O3 KPI event (MPC-7170). A scan is "completed" when every hexagon
 // is confirmed (funnel step all_hexagons_confirmed). Fires once per page session.
 let scanCompletedTracked = false;
@@ -59,7 +97,7 @@ let scanCompletedTracked = false;
 export const trackScanCompleted = (hexagonCount: number) => {
   if (scanCompletedTracked) return;
   scanCompletedTracked = true;
-  trackEvent('privacy_scan_completed', {
+  attributedEvent('privacy_scan_completed', {
     hexagon_count: hexagonCount,
     funnel_step: 'all_hexagons_confirmed',
   });
@@ -88,12 +126,13 @@ export const trackDeviceProfile = (deviceData: {
 };
 
 // Hexagon tracking events
-export const trackHexagonConfirm = (hexagonId: string, label: string, confirmed: boolean) => {
+export const trackHexagonConfirm = (hexagonId: string, label: string, confirmed: boolean, tileClass?: string) => {
   trackActivity();
   trackEvent('hexagon_confirm', {
     hexagon_id: hexagonId,
     hexagon_label: label,
     action: confirmed ? 'confirmed' : 'unconfirmed',
+    ...(tileClass ? { tile_class: tileClass } : {}),
   });
 };
 
@@ -415,18 +454,18 @@ export const trackAIAccessCheckCta = (
 };
 
 export const trackAIAccessCheckSignup = (params?: Record<string, string>) => {
-  trackEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
+  attributedEvent('ai_access_check_waitlist_submit', { form: 'ai_access_check', ...params });
   // GA4 recommended event so the signup can be marked as a key event
-  trackEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
+  attributedEvent('generate_lead', { method: 'ai_access_check_waitlist', ...params });
 };
 
 // ---------------------------------------------------------------------------
 // Newsletter signup (MPC-6977 tracking audit)
 // ---------------------------------------------------------------------------
 export const trackNewsletterSignup = (params?: Record<string, string>) => {
-  trackEvent('newsletter_signup', { form: 'newsletter', ...params });
+  attributedEvent('newsletter_signup', { form: 'newsletter', ...params });
   // GA4 recommended event so the signup can be marked as a key event
-  trackEvent('generate_lead', { method: 'newsletter', ...params });
+  attributedEvent('generate_lead', { method: 'newsletter', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -434,8 +473,29 @@ export const trackNewsletterSignup = (params?: Record<string, string>) => {
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackBusinessLead = (params?: Record<string, string>) => {
-  trackEvent('business_audit_request', { form: 'business_inquiry', ...params });
-  trackEvent('generate_lead', { method: 'business_inquiry', ...params });
+  attributedEvent('business_audit_request', { form: 'business_inquiry', ...params });
+  attributedEvent('generate_lead', { method: 'business_inquiry', ...params });
+};
+
+export const trackEnterpriseLead = (params?: Record<string, string>) => {
+  attributedEvent('enterprise_demo_request', { form: 'enterprise_demo', ...params });
+  attributedEvent('generate_lead', { method: 'enterprise_demo', ...params });
+};
+
+// ---------------------------------------------------------------------------
+// Report requested (MPC-7470, D12). The drop-off between "scan completed" (privacy_scan_completed, above) and "asked for the report" is
+// counted here instead of in the database: nothing is stored for a visitor who gives no contact. Like every event in this file it only
+// reaches GA4 once the visitor accepted analytics (gtag is loaded after consent). Carries NO personal values: no email, no scan
+// content, no scan number. Fire only after the request was accepted. `source` is the place: "scan_page" or "web_scan_summary".
+// ---------------------------------------------------------------------------
+export const trackReportRequested = (source: string, scanSaveTicked: boolean) => {
+  attributedEvent('report_requested', { source, scan_save_ticked: scanSaveTicked });
+};
+
+// MPC-7535: the report request was NOT accepted by the Worker (so the visitor was told to try again). Counts only: the kind of failure and the
+// HTTP status (0 = never answered). The daily check compares report_requested with this and with the Worker's own accepted requests.
+export const trackReportFailed = (source: string, kind: string, status: number) => {
+  attributedEvent('report_request_failed', { source, kind, status });
 };
 
 // ---------------------------------------------------------------------------
@@ -443,8 +503,8 @@ export const trackBusinessLead = (params?: Record<string, string>) => {
 // successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackStartSignup = (params?: Record<string, string>) => {
-  trackEvent('start_scan_signup', { form: 'start_scan', ...params });
-  trackEvent('generate_lead', { method: 'start_scan', ...params });
+  attributedEvent('start_scan_signup', { form: 'start_scan', ...params });
+  attributedEvent('generate_lead', { method: 'start_scan', ...params });
 };
 
 // ---------------------------------------------------------------------------
@@ -452,6 +512,105 @@ export const trackStartSignup = (params?: Record<string, string>) => {
 // confirmed successful HubSpot submit.
 // ---------------------------------------------------------------------------
 export const trackAliceHDWaitlistSignup = (params?: Record<string, string>) => {
-  trackEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
-  trackEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
+  attributedEvent('alice_hd_waitlist_submit', { form: 'alice_hd_waitlist', ...params });
+  attributedEvent('generate_lead', { method: 'alice_hd_waitlist', ...params });
+};
+
+// ---------------------------------------------------------------------------
+// Onboarding funnel + A/B experiments (MPC-7400)
+// ---------------------------------------------------------------------------
+
+// Fired when a visitor first sees the element under test (not on page load), so exposure is the
+// right denominator for conversion rate. Register experiment_id / variant_id as GA4 custom dimensions.
+export const trackExperimentExposure = (experimentId: string, variantId: string, forced = false) => {
+  if (forced) return; // QA overrides must not pollute results
+  trackEvent('experiment_exposure', { experiment_id: experimentId, variant_id: variantId });
+};
+
+export const trackExperimentCta = (experimentId: string, variantId: string, forced = false) => {
+  trackActivity();
+  if (forced) return;
+  trackEvent('experiment_cta_click', { experiment_id: experimentId, variant_id: variantId });
+};
+
+// MPC-7645: invitations sent from /invite. Counts only (no addresses). The A/B labels let the test be cut by what the person saw.
+export const trackReferralInvitesSent = (sent: number, ab: { layout?: string; block?: string }) => {
+  trackEvent('referral_invites_sent', { sent, ...(ab.layout ? { ab_referral_invite_layout: ab.layout } : {}), ...(ab.block ? { ab_referral_report_block: ab.block } : {}) });
+};
+
+// Client-side validation rejected a submit (no PII: only the form and field names).
+export const trackFormValidationError = (form: string, field: string) => {
+  trackEvent('form_validation_error', { form, field });
+};
+
+// A submit failed after validation passed (network or HubSpot error).
+export const trackFormSubmitError = (form: string) => {
+  trackEvent('form_submit_error', { form });
+};
+
+export const trackThankYouView = (source: string, params?: Record<string, string>) => {
+  trackEvent('thank_you_view', { source, ...params });
+};
+
+export const trackThankYouNextStep = (source: string, destination: string) => {
+  trackActivity();
+  trackEvent('thank_you_next_step_click', { source, destination });
+};
+
+// ---------------------------------------------------------------------------
+// Blog funnel (Blog Deployment Runbook step 6):
+// blog_list_view -> blog_post_click -> blog_post_view -> blog_scroll_depth -> blog_cta_click
+// -> (existing) privacy_scan_completed. Register blog_cta_click as a GA4 key event.
+// No PII: slugs, categories and percentages only. Consent is enforced by GA4 Consent Mode.
+// ---------------------------------------------------------------------------
+export const trackBlogListView = (postCount: number) => {
+  trackEvent('blog_list_view', { post_count: postCount });
+};
+
+export const trackBlogPostClick = (postSlug: string, category: string, position: number) => {
+  trackActivity();
+  trackEvent('blog_post_click', { post_slug: postSlug, category, position });
+};
+
+export const trackBlogPostView = (postSlug: string, category: string, readTimeMinutes: number) => {
+  trackEvent('blog_post_view', { post_slug: postSlug, category, read_time_minutes: readTimeMinutes });
+};
+
+// Fires once per threshold (25/50/75/100) per post view; the caller de-duplicates.
+export const trackBlogScrollDepth = (postSlug: string, percentScrolled: number) => {
+  trackActivity();
+  trackEvent('blog_scroll_depth', { post_slug: postSlug, percent_scrolled: percentScrolled });
+};
+
+export const trackBlogCtaClick = (postSlug: string, ctaLocation: string, destination: string) => {
+  trackActivity();
+  attributedEvent('blog_cta_click', { post_slug: postSlug, cta_location: ctaLocation, destination });
+};
+
+// ---------------------------------------------------------------------------
+// Pricing page (MPC-7376). No checkout exists yet, so plan buttons are the conversion signal.
+// ---------------------------------------------------------------------------
+export const trackPricingView = () => {
+  trackEvent('pricing_view');
+};
+
+// `variants` maps experiment id to variant id for the live (non-forced) pricing experiments (MPC-7638),
+// sent as ab_<experiment_id> so a click can be split by every test the visitor was in.
+export const trackPricingPlanClick = (
+  plan: string,
+  destination: string,
+  variants: Record<string, string> = {},
+) => {
+  trackActivity();
+  const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
+  trackEvent('pricing_plan_click', { plan, cta_location: 'pricing_card', destination, ...ab });
+};
+
+// MPC-7626: waitlist sign-up on /pricing. Fire only after a confirmed successful HubSpot submit.
+// `variants` as in trackPricingPlanClick (MPC-7638): the waitlist signup is the real conversion to split by variant.
+export const trackPricingWaitlistSignup = (plan: string, variants: Record<string, string> = {}) => {
+  const ab = Object.fromEntries(Object.entries(variants).map(([id, v]) => [`ab_${id}`, v]));
+  attributedEvent('pricing_waitlist_signup', { form: 'pricing_waitlist', plan, ...ab });
+  // GA4 recommended event so the signup can be marked as a key event
+  attributedEvent('generate_lead', { method: 'pricing_waitlist', plan, ...ab });
 };

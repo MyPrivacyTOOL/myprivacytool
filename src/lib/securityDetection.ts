@@ -1,6 +1,8 @@
 // Security and Privacy Vulnerability Detection
 // Detects critical security issues that could expose user data
 
+import { parseIceCandidateAddress } from "./fingerprintDetection";
+
 export interface DNSLeakResult {
   isLeaking: boolean;
   dnsServers: string[];
@@ -151,19 +153,15 @@ async function detectWebRTCLeak(): Promise<{ localIPs: string[], publicIP: strin
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           const candidate = event.candidate.candidate;
-          const ipMatch = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/);
-          
-          if (ipMatch) {
-            const ip = ipMatch[0];
-            if (!candidates.includes(ip)) {
-              candidates.push(ip);
-              
-              // Check if private or public IP
-              if (KNOWN_VPN_DNS.some(prefix => ip.startsWith(prefix))) {
-                result.localIPs.push(ip);
-              } else {
-                result.publicIP = ip;
-              }
+          // CK-8305: use the candidate's address field; mDNS names and foundation ids are not addresses
+          const parsed = parseIceCandidateAddress(candidate);
+
+          if (parsed && !candidates.includes(parsed.address)) {
+            candidates.push(parsed.address);
+            if (parsed.kind === 'local') {
+              result.localIPs.push(parsed.address);
+            } else {
+              result.publicIP = parsed.address;
             }
           }
         }

@@ -8,12 +8,16 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { hkSpamPrerenderRoute, readHkSpamConfig } from "./hkSpamFlag.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(ROOT, "dist");
 const SITE_URL = "https://www.myprivacytool.io";
 const SUFFIX = " | MyPrivacyTOOL";
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.jpg`;
+// Keep in sync with ARTICLE_AUTHOR / ARTICLE_PUBLISHER in src/components/Seo.tsx.
+const ARTICLE_AUTHOR = "Alice";
+const ARTICLE_PUBLISHER = "Wonderland";
 const readJson = (rel) => JSON.parse(readFileSync(path.join(ROOT, rel), "utf8"));
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -46,6 +50,8 @@ function buildRoutes() {
       description: g.summary,
     });
   }
+  // MPC-7446: /HongKongSpam, noindex until the single flag in src/data/hkSpam.json is flipped.
+  routes.push(hkSpamPrerenderRoute(readHkSpamConfig(ROOT), SITE_URL));
   return routes;
 }
 
@@ -60,6 +66,7 @@ function headBlock(r) {
     `<meta name="description" content="${d}" />`,
     `<meta name="robots" content="${r.noindex ? "noindex" : "index, follow"}" />`,
     `<link rel="canonical" href="${url}" />`,
+    ...(r.alternates ?? []).map((a) => `<link rel="alternate" hreflang="${esc(a.hreflang)}" href="${esc(a.href)}" />`),
     `<meta property="og:type" content="${r.type ?? "website"}" />`,
     `<meta property="og:url" content="${url}" />`,
     `<meta property="og:title" content="${t}" />`,
@@ -68,6 +75,13 @@ function headBlock(r) {
     `<meta property="og:image:width" content="1200" />`,
     `<meta property="og:image:height" content="630" />`,
     `<meta property="og:site_name" content="MyPrivacyTOOL.IO" />`,
+    ...(r.type === "article"
+      ? [
+          `<meta name="author" content="${ARTICLE_AUTHOR}" />`,
+          `<meta property="article:author" content="${ARTICLE_AUTHOR}" />`,
+          `<meta property="article:publisher" content="${ARTICLE_PUBLISHER}" />`,
+        ]
+      : []),
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,

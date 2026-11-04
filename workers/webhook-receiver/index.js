@@ -9,9 +9,14 @@
  */
 
 import { generateFirstHexagon } from './first-hexagon.js';
-import { saveConversationState, getConversationState } from './firestore-client.js';
+import { saveConversationState, getConversationState, purgeExpiredState } from './state-store.js';
 import { createHubSpotContact } from './hubspot-client.js';
+import { sendJson } from './send.js';
 import { recordEngagement } from './supabase-client.js';
+import {
+  verifyTelegram, verifyMeta, verifyTwilio, verifySharedSecret, escapeHtml, escapeXml, clip,
+  EMAIL_RE, corsFor, unauthorized, timingSafeEqual,
+} from './security.js';
 
 // Meta Graph API param names — these are URL query/body keys, not credentials
 const META_QUERY = {
@@ -21,6 +26,12 @@ const META_QUERY = {
 };
 
 export default {
+  // Cron Trigger handler. NOT scheduled in wrangler.toml: the Cloudflare account is at the Workers Free limit of 5 cron triggers (error 10072),
+  // so the purge runs hourly from Supabase pg_cron (job mpt-purge-conversation-state, migration 20261019160000) and also after every successful start-deep-dive (below). Add `[triggers] crons = [...]` if the account is upgraded. MPC-8320.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(purgeExpiredState(env).then((n) => console.log('state purge removed', n)));
+  },
+
   async fetch(request, env, ctx) {
     const url  = new URL(request.url);
     const path = url.pathname;
@@ -39,6 +50,43 @@ export default {
     if (path === '/webhook/email')     return handleEmail(request, env);
     if (path === '/webhook/leads')     return handleLeads(request, env);
 
+    // WhatsApp deep dive (OSINT -> web confirm -> person replies RESULTS). Lazy import: it is TypeScript, and the Node security test never reaches it.
+    if (path.startsWith('/api/scan/')) {
+      try {
+        const { handleDeepDive } = await import('./deepDive.ts');
+        const res = await handleDeepDive(request, env);
+        // Purge expired scan / conversation rows (24 h life) after each authenticated scan start, off the response path.
+        if (res && res.status === 200 && path === '/api/scan/start-deep-dive') ctx?.waitUntil?.(purgeExpiredState(env));
+        if (res) return res;
+      } catch (err) {
+        console.error('Deep dive error:', err);
+        return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // MPC-7902: proof-of-possession challenge + status (browser). Lazy import like the deep dive.
+    if (path.startsWith('/api/pop/')) {
+      try {
+        const { handlePop } = await import('./pop.ts');
+        const res = await handlePop(request, env);
+        if (res) return res;
+      } catch (err) {
+        console.error('PoP error:', err?.name);
+        return new Response(JSON.stringify({ error: 'proof_store_unavailable' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // MPC-7915: visitors' answers about a tile. OFF unless LEARNING_EVENTS_ENABLED is "true" (404 otherwise). Lazy import like the deep dive.
+    if (path === '/api/learning/event') {
+      try {
+        const { handleLearningEvent } = await import('./learningEvents.ts');
+        return await handleLearningEvent(request, env);
+      } catch (err) {
+        console.error('Learning event error:', err);
+        return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 };
@@ -46,6 +94,8 @@ export default {
 // ─── TELEGRAM ────────────────────────────────────────────────────────────────
 
 async function handleTelegram(request, env) {
+  if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
+  if (!verifyTelegram(request, env)) return unauthorized();   // MPC-7350: authenticated, fails closed
   try {
     const body    = await request.json();
     const message = body?.message || body?.callback_query?.message;
@@ -53,13 +103,13 @@ async function handleTelegram(request, env) {
 
     const chatId   = String(message.chat.id);
     const text     = message.text || '';
-    const userName = message.from?.first_name || message.from?.username || 'there';
+    const userName = escapeHtml(clip(message.from?.first_name || message.from?.username || 'there', 64));   // parse_mode HTML
     const userId   = String(message.from?.id);
     const state    = await getConversationState(env, `telegram:${userId}`);
 
     if (!state || state.stage === 'new') {
       const hexagon = generateFirstHexagon({
-        name: userName, platform: 'telegram', handle: message.from?.username || null,
+        name: userName, platform: 'telegram', handle: message.from?.username ? escapeHtml(clip(message.from.username, 64)) : null,
       });
       await saveConversationState(env, `telegram:${userId}`, {
         stage: 'awaiting_confirmation', platform: 'telegram',
@@ -83,11 +133,7 @@ async function handleTelegram(request, env) {
 
 async function sendTelegram(env, chatId, text) {
   const key = env.TELEGRAM_BOT_KEY;
-  await fetch(`https://api.telegram.org/bot${key}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-  });
+  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' });
 }
 
 // ─── FACEBOOK MESSENGER ──────────────────────────────────────────────────────
@@ -96,7 +142,9 @@ async function handleMessenger(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
 
   try {
-    const body      = await request.json();
+    const raw = await request.text();
+    if (!(await verifyMeta(request, raw, env))) return unauthorized();   // MPC-7350
+    const body      = JSON.parse(raw);
     const messaging = body.entry?.[0]?.messaging?.[0];
     if (!messaging) return ok();
 
@@ -126,12 +174,8 @@ async function handleMessenger(request, env) {
 async function sendMessenger(env, recipientId, text) {
   // Requires META_PAGE_ACCESS_KEY — stub until Meta App is approved
   if (!env.META_PAGE_ACCESS_KEY) return;
-  const url = `https://graph.facebook.com/v19.0/me/messages?${META_QUERY.accessParam}=${env.META_PAGE_ACCESS_KEY}`;
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
-  });
+  // MPC-7350: bearer header, not a query string (URLs end up in logs and proxies).
+  return sendJson('messenger', 'https://graph.facebook.com/v19.0/me/messages', { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, message: { text } });
 }
 
 // ─── INSTAGRAM DM ────────────────────────────────────────────────────────────
@@ -139,6 +183,7 @@ async function sendMessenger(env, recipientId, text) {
 async function handleInstagram(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
   // STUB — wire after Meta App approval (same Graph API structure as Messenger)
+  if (!(await verifyMeta(request, await request.text(), env))) return unauthorized();   // MPC-7350
   return ok();
 }
 
@@ -148,12 +193,41 @@ async function handleWhatsApp(request, env) {
   if (request.method === 'GET') return verifyMetaWebhook(request, env);
 
   try {
-    const body = await request.json();
+    const raw = await request.text();
+    if (!(await verifyMeta(request, raw, env))) return unauthorized();   // MPC-7350
+    const body = JSON.parse(raw);
     const msg  = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
     if (!msg) return ok();
 
     const from  = msg.from;
     const text  = msg.text?.body || '';
+    // Proof of possession for the deep dive: Meta's contact record (name) and the time of the person's own message.
+    const profileName = clip(body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name, 64);
+    const inboundTs   = Number(msg.timestamp) || Math.floor(Date.now() / 1000);
+
+    // MPC-7902: STOP / DELETE revokes every proof of possession for this sender (restrictive only; consent handling proper is MPC-7904).
+    // A message carrying a challenge code binds the web session that asked for it. Both run only after verifyMeta above.
+    const word = text.trim().toUpperCase();
+    if (word === 'STOP' || word === 'DELETE') {
+      const { revokePossession } = await import('./pop.ts');
+      await revokePossession(env, from);
+    } else if (/\bMPT-[A-Z0-9]{4}-[A-Z0-9]{4}\b/i.test(text)) {
+      const { redeemFromInbound } = await import('./pop.ts');
+      const r = await redeemFromInbound(env, { from, text, msgId: msg.id, ts: inboundTs });
+      if (r.outcome !== 'ignored') {
+        if (r.reply) await sendWhatsApp(env, from, r.reply);
+        return ok();
+      }
+    }
+
+    // Pull model: the person asks for their deep-dive result. Plain text reply, never a Meta template.
+    const cmd = text.trim().toUpperCase();
+    if (cmd === 'RESULTS' || cmd === 'STATUS') {
+      const { resultsReply } = await import('./deepDive.ts');
+      await sendWhatsApp(env, from, await resultsReply(env, from));
+      return ok();
+    }
+
     const state = await getConversationState(env, `whatsapp:${from}`);
 
     if (!state || state.stage === 'new') {
@@ -161,11 +235,12 @@ async function handleWhatsApp(request, env) {
       await saveConversationState(env, `whatsapp:${from}`, {
         stage: 'awaiting_confirmation', platform: 'whatsapp',
         phone: from, hexagonSent: true, ts: Date.now(),
+        profileName, inbound_message_timestamp: inboundTs,
       });
       await createHubSpotContact(env, { source: 'whatsapp', phone: from });
       await sendWhatsApp(env, from, hexagon);
     } else if (state.stage === 'awaiting_confirmation') {
-      const reply = await handleConfirmation(text, state, env, `whatsapp:${from}`);
+      const reply = await handleConfirmation(text, { ...state, profileName: profileName || state.profileName, inbound_message_timestamp: inboundTs }, env, `whatsapp:${from}`);
       await sendWhatsApp(env, from, reply);
     }
     return ok();
@@ -178,11 +253,7 @@ async function handleWhatsApp(request, env) {
 async function sendWhatsApp(env, to, text) {
   // Requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_KEY
   if (!env.META_WHATSAPP_KEY || !env.WHATSAPP_PHONE_NUMBER_ID) return;
-  await fetch(`https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } }),
-  });
+  return sendJson('whatsapp', `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } });
 }
 
 // ─── SMS / TWILIO ─────────────────────────────────────────────────────────────
@@ -191,6 +262,7 @@ async function handleSMS(request, env) {
   try {
     const raw    = await request.text();
     const params = new URLSearchParams(raw);
+    if (!(await verifyTwilio(request, params, env))) return unauthorized();   // MPC-7350
     const from   = params.get('From');
     const body   = params.get('Body') || '';
     const state  = await getConversationState(env, `sms:${from}`);
@@ -217,7 +289,7 @@ async function handleSMS(request, env) {
 
 function sendSMSResponse(text) {
   return new Response(
-    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${text}</Message></Response>`,
+    `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(text)}</Message></Response>`,
     { headers: { 'Content-Type': 'text/xml' } }
   );
 }
@@ -225,9 +297,12 @@ function sendSMSResponse(text) {
 // ─── EMAIL ───────────────────────────────────────────────────────────────────
 
 async function handleEmail(request, env) {
+  if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
+  if (!verifySharedSecret(request, env)) return unauthorized();   // MPC-7350
   try {
     const body  = await request.json();
-    const { from, name } = body;
+    const from = clip(body.from, 255).trim(), name = clip(body.name, 100);
+    if (!EMAIL_RE.test(from)) return new Response('Bad request', { status: 400 });
     const state = await getConversationState(env, `email:${from}`);
 
     if (!state || state.stage === 'new') {
@@ -253,27 +328,24 @@ async function handleEmail(request, env) {
 // ─── LEAD CAPTURE (EmailCaptureModal) ────────────────────────────────────────
 
 async function handleLeads(request, env) {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin':  '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-    });
-  }
+  // MPC-7350: origin allowlist instead of '*'. A browser request from another site is refused.
+  const cors = corsFor(request);
+  const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
+    status, headers: { ...cors.headers, 'Content-Type': 'application/json' },
+  });
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors.headers });
+  if (request.method !== 'POST') return new Response('Not Found', { status: 404 });
+  if (!cors.allowed) return json({ error: 'Forbidden origin' }, 403);
+  if (Number(request.headers.get('content-length') || 0) > 16 * 1024) return json({ error: 'Payload too large' }, 413);
 
   try {
     const body = await request.json();
-    const { email, riskScore, confirmedCount, source = 'web_scan' } = body;
+    const email = clip(body?.email, 255).trim();
+    const riskScore = Number.isFinite(Number(body?.riskScore)) ? Number(body.riskScore) : undefined;
+    const confirmedCount = Number.isFinite(Number(body?.confirmedCount)) ? Number(body.confirmedCount) : undefined;
+    const source = clip(body?.source ?? 'web_scan', 64).replace(/[^a-z0-9_-]/gi, '') || 'web_scan';
 
-    if (!email || !email.includes('@')) {
-      return new Response(JSON.stringify({ error: 'Invalid email' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      });
-    }
+    if (email.length > 254 || !EMAIL_RE.test(email)) return json({ error: 'Invalid email' }, 400);
 
     await createHubSpotContact(env, { source, email, riskScore, confirmedCount });
     await saveConversationState(env, `lead:${email}`, {
@@ -283,16 +355,10 @@ async function handleLeads(request, env) {
 
     await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: true });
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return json({ success: true });
   } catch (err) {
     console.error('Leads error:', err);
-    return new Response(JSON.stringify({ error: 'Internal error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-    });
+    return json({ error: err instanceof SyntaxError ? 'Invalid request' : 'Internal error' }, err instanceof SyntaxError ? 400 : 500);
   }
 }
 
@@ -304,7 +370,7 @@ function verifyMetaWebhook(request, env) {
   const provided  = url.searchParams.get(META_QUERY.verifyParam);
   const challenge = url.searchParams.get('hub.challenge');
 
-  if (mode === 'subscribe' && provided === env.META_VERIFY_KEY) {
+  if (mode === 'subscribe' && env.META_VERIFY_KEY && timingSafeEqual(provided, env.META_VERIFY_KEY)) {
     return new Response(challenge, { status: 200 });
   }
   return new Response('Forbidden', { status: 403 });

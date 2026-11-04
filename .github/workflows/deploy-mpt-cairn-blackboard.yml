@@ -1,0 +1,74 @@
+name: Deploy mpt-cairn-blackboard Worker
+
+# MPC-8413 steps 2 and 3: API bridge for the Cairn OSINT blackboard and its Supabase -> Notion mirror. Modelled on deploy-mpt-metrics-collector.yml.
+#
+# MANUAL ONLY (workflow_dispatch): merging the Worker code must not publish the endpoint. MPC-8413 lists the API bridge deployment as a
+# separate approval. Run it from the Actions tab when that approval is given.
+#
+# Repo secrets required (already used by the other deploy workflows):
+#   CLOUDFLARE_API_TOKEN   custom token, MPT account only, permission: Account > Workers Scripts > Edit
+#   CLOUDFLARE_ACCOUNT_ID  35cb17172c65a20f5cf1baf131485382
+#
+# Safety: runs the pre-deploy config checks and the Worker tests first; after deploy it lists the Worker's secret NAMES via the API and
+# FAILS if any name in workers/mpt-cairn-blackboard/EXPECTED_SECRETS.txt is missing. Secret values never appear here, in the repo or in logs.
+# On the very first deploy that check is expected to go red until a human has set the five secrets in Cloudflare; re-run afterwards.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mpt-cairn-blackboard
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pre-deployment checks (secrets present, Worker config valid)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-cairn-blackboard
+
+      - name: Test Worker (stubbed Supabase and Notion)
+        run: node workers/mpt-cairn-blackboard/worker.test.mjs && node workers/mpt-cairn-blackboard/notion-sync.test.mjs
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/mpt-cairn-blackboard
+          command: deploy
+
+      - name: Verify expected secret names are present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          curl -sf --oauth2-bearer "$CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/mpt-cairn-blackboard/secrets" \
+            | python3 -c 'import sys,json;print("\n".join(sorted(x["name"] for x in json.load(sys.stdin)["result"])))' > /tmp/secrets.after
+          echo "secret names present:"; cat /tmp/secrets.after
+          sort workers/mpt-cairn-blackboard/EXPECTED_SECRETS.txt > /tmp/secrets.expected
+          missing=$(comm -13 /tmp/secrets.after /tmp/secrets.expected)
+          [ -z "$missing" ] || { echo "::error::expected secrets missing: $missing"; exit 1; }
+          echo "OK: all expected secrets present"
+
+      - name: Health check live Worker
+        run: |
+          for i in 1 2 3 4; do
+            body=$(curl -sf https://mpt-cairn-blackboard.myprivacytool.workers.dev/health) && break
+            sleep 10
+          done
+          echo "$body"
+          echo "$body" | python3 -c 'import sys,json;d=json.load(sys.stdin);sys.exit(0 if d.get("ok") and d.get("configured") else 1)'

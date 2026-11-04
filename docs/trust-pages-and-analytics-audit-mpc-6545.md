@@ -1,0 +1,131 @@
+# MPC-6545: Trust & Legal Pages v1, plus analytics pipeline audit
+
+Format follows FLEET-TASK-V4.2 (goal, scope, acceptance criteria, rollback). Updates the existing MPC-6545 task; no new task created. Written 2026-10-06.
+
+## Goal
+
+Give the live site a complete, accurate trust surface (Privacy Policy, Terms, Cookie Policy, DPA summary) reachable from the footer and from one Trust hub, and record what the analytics pipeline actually captures today.
+
+## Scope
+
+In scope
+- `/dpa`: replaced the unrouted boilerplate DPA with a summary. The old page named AWS, Stripe, SendGrid and Auth0 as sub-processors and linked to a `/sub-processors` page that does not exist. None of those four is called anywhere in this repo (Stripe is mentioned in policy text only; no checkout exists).
+- `/trust`: new hub linking the four pages and stating only commitments the other pages already make.
+- Footer Legal column: added "Data Processing (DPA)" and "Trust Centre". Existing "Manage cookies" kept.
+- `pageMeta.json`, `generate-sitemap.mjs`: both routes get titles, descriptions, prerendered head tags and sitemap entries.
+- `Privacy.tsx` section 5: added Resend, Notion and Slack to the service-provider list, because `workers/mpt-leads` and `workers/scan-report` call them with lead data.
+
+Out of scope (unchanged on purpose)
+- Supabase cutover plan (blocked by MPC-6950).
+- OAuth work (MPC-6971) and anything under `workers/oauth-poc`.
+- `/pricing` (still a stub), `GDPRRights.tsx` and `Accessibility.tsx` (exist, not routed).
+- Legal review (MPC-6798) and Chris's sign-off on data-handling claims.
+
+## Acceptance criteria
+
+| # | Criterion | State |
+|---|---|---|
+| 1 | /privacy, /terms, /cookies exist, routed, footer-linked | Met (already live; PR #50 and earlier) |
+| 2 | DPA summary routed at /dpa, footer-linked, sub-processors match the code | Met in this PR |
+| 3 | Trust hub at /trust linking all four, footer-linked | Met in this PR |
+| 4 | Sitemap and prerendered meta include both new routes | Met (`npm run build`: 38 URLs, `dist/dpa.html`, `dist/trust.html`) |
+| 5 | `tsc`, eslint on touched files, `npm test` pass | Met |
+| 6 | Live URLs verified on production | NOT met. The cloud session cannot reach myprivacytool.io (egress proxy 403). Needs a check after merge. |
+| 7 | Chris sign-off and legal review (task has Requires_Human_Signoff = YES) | NOT met |
+
+## Rollback
+
+Revert the PR (single squash commit). `/dpa` returns to unrouted, `/trust` and the two footer links disappear, Privacy section 5 loses three provider names. Cloudflare Pages redeploys on merge, so a revert redeploys the previous site. No data, secrets, workers or schema are touched.
+
+## Open claims that need Chris before anything is called final
+
+- Privacy 2.0 says scan results are not sent to servers, while the device profile goes to GA4 and `workers/scan-report` and `mpt-leads` store scan summaries and emails. Wording has not been reconciled.
+- Cookie Policy says GA4 and HubSpot run only after consent. `index.html` loads gtag directly and relies on the Consentmanager auto-blocking script to hold it; this has not been tested in a browser.
+- Cookie Policy 2.2 lists "Session Recording: may record anonymised user interactions". No recording tool exists in the code (see below). Remove it or add the tool.
+- DPA breach-notice (72 hours), audit and SCC wording is template language. Legal review needed. Mailboxes privacy@ and dpo@ myprivacytool.io are unconfirmed (Notion Q6).
+- Domain: the task brief says myprivacytool.com; the repo, sitemap, canonical tags and every policy use myprivacytool.io (`https://www.myprivacytool.io`). I kept `.io`.
+
+## Analytics pipeline audit
+
+Method: static review of the repo and the Cloudflare account. I could not query live data: the sandbox cannot reach the site, and the Cloudflare tools available expose Workers/KV/D1/R2 but not Web Analytics or GraphQL analytics.
+
+### What is captured (verified in code)
+
+| Signal | Mechanism | Where |
+|---|---|---|
+| Page views, referrer, device, geography | Google Analytics 4, property 515216281, `G-1BWMDBJSPL` | `index.html` |
+| Funnel steps, `privacy_scan_completed`, device profile, social clicks | `gtag('event', …)` custom events | `src/lib/analytics.ts` |
+| Consent gating | Consentmanager auto-blocking script | `index.html`, `src/lib/cookieConsent.ts` |
+| Form submits and campaign attribution (UTM) | HubSpot tracking cookie and `mpt-leads` worker (Notion, Slack, HubSpot, Resend, Supabase) | `src/lib/hubspot.ts`, `workers/mpt-leads` |
+
+### What is not there
+
+| Expected | Finding |
+|---|---|
+| Cloudflare Web Analytics / Browser Insights | No beacon (`cloudflareinsights.com`) in the repo. It could be enabled with the Pages auto-inject toggle in the dashboard; that cannot be seen from code. Unverified. |
+| Heatmaps / session replay | None. No Clarity, Hotjar, FullStory or similar in `index.html`, `src/` or `workers/`. Cloudflare Browser Insights does not produce heatmaps; it reports page-load and Web Vitals only. |
+| Routing to CransfordClaw | No integration. Nothing in the repo, the four deployed Workers (`mpt-leads`, `mpt-scan-report`, `myprivacytool-oauth-poc`, `myprivacytool-github-channel`) or the Cloudflare account references CransfordClaw. The Notion task CK-7008, titled "Implement automatic analytics tracking to CransfordClaw (Heatmaps/Behavior)", has a body about the Livingstone Seedance task, so there is no usable spec for this requirement. |
+| Origin of visitors | GA4 provides country and city from IP when consent is given; no server-side capture. Visitors who decline consent are invisible. |
+| Scan counter | Still manual (537 as of 2026-09-21). No scheduled GA4 to Supabase to Notion job. |
+| `generate_lead` conversion | Not marked as a GA4 conversion (Chris-only action, pending since June). |
+
+### Gaps and recommended next steps
+
+1. **No heatmap tool exists.** Pick one (Microsoft Clarity is free and consent-friendly), add it behind Consentmanager, and update the Cookie Policy and DPA sub-processor table in the same PR.
+2. **CransfordClaw has no ingestion path.** Needs a spec first: what CransfordClaw consumes (webhook, Notion DB, Supabase table) and which fields. A small Worker or GA4 Data API export job is the likely shape. The CK-7008 title/body mismatch should be fixed by whoever owns it.
+3. **Confirm whether Cloudflare Web Analytics is on** for the Pages project (dashboard check by Chris), and decide whether it is worth a cookieless second source.
+4. **Fix the Cookie Policy "Session Recording" line** until a recorder exists.
+5. **Automate the scan counter** (GA4 Data API to Supabase to Notion) so the O3 KPI stops drifting.
+6. Test consent gating in a real browser: with the banner declined, no request to `googletagmanager.com` or HubSpot should fire.
+
+## Update 2026-10-07
+
+- Ad-blocker probe to google-analytics.com before consent: already fixed on main by MPC-7350 (#100).
+- Cookie Policy "Session Recording" line removed (no recorder exists); replaced with a statement that no session recording or heatmap tools are used.
+- Pre-consent IP/location lookups (ipify, ipapi.co) are now disclosed in the Cookie Policy and Privacy 2.2. They are still made before consent; Decision (Chris, 2026-10-07): they do NOT wait for consent; disclosure only. Do not gate them without asking.
+- HubSpot: the site never loads the HubSpot tracking script (no `hs-scripts` in `index.html` or `src/`); it only POSTs forms to `api.hsforms.com` on submit and reads `hubspotutk` if present. If a `hubspotutk` cookie exists it must come from the Consentmanager tag configuration; the Cookie Policy wording should be checked against that dashboard.
+- GA4 consent gating is still unverified in a browser (needs the Network screenshot of the first requests on a fresh load).
+
+## Status update 2026-10-10
+
+Done in this change
+- Homepage trust strip: a link-only row (Trust Centre, Privacy, Cookies, Terms, DPA) above the newsletter block in `src/pages/Index.tsx`. It makes no claims beyond what `/trust` and `/privacy` already say.
+
+Still open (needs a person, not code)
+| Item | Owner | What is needed |
+|---|---|---|
+| Legal review (MPC-6798) | Chris / counsel | Done: signed off 2026-10-10. |
+| `/pricing` | Chris | Decide: ship real pricing, or keep the noindex `ComingSoonPage` stub. Nothing is built because no pricing has been decided. |
+| GA4 consent gating | Anyone with a browser | Not a blocker; moved to a follow-up task. See checklist below. The cloud sandbox cannot reach myprivacytool.io (proxy 403), so this could not be tested here. |
+| Mailboxes | Chris | Not a blocker; moved to the same follow-up task. Confirm each address below receives mail. |
+
+GA4 consent-gating check (about 5 minutes, clean/incognito browser, DevTools Network tab, filter `google|gtm|collect`)
+1. Load `https://www.myprivacytool.io/` and do not touch the banner: no request to `googletagmanager.com/gtag/js` or `google-analytics.com/g/collect` may fire.
+2. Choose "Reject": still none.
+3. Reopen via footer "Manage cookies", accept analytics: requests now fire.
+4. Reject again after accepting: no further `collect` requests.
+Known separate gap (security audit finding): `fingerprintDetection.ts` pings `google-analytics.com`, and `deviceDetection.ts` calls ipify/ipapi, without a consent gate.
+
+Mailboxes to confirm (all appear in the site): `privacy@` (20 references), `support@`, `dpo@`, `legal@`, `accessibility@`, `scan@`, `chris@` at `myprivacytool.io`. Send a test to each and note where it lands.
+
+### Follow-up task progress (GA4 gating + mailboxes)
+
+Follow-up to MPC-6545 (not a blocker). Two human checks remain; neither can run from the cloud sandbox (myprivacytool.io returns proxy 403).
+
+| Check | Status | Result / where it lands |
+|---|---|---|
+| GA4 consent gating | Mostly verified 2026-10-11 (merged in #197) | Fresh incognito load, banner untouched: 9 requests only (consentmanager, favicons, local script, font, video); no `googletagmanager.com`, `google-analytics.com` or `hsforms` requests; console clean. After "Accept all": `googletagmanager` (gtag), `collect?v=2&tid=G-1BWMDBJSPL` and the HubSpot form frame (`hsforms`) load. Reject-all and accept-then-reject are covered by an automated test of the real inline script against a fake consentmanager (`scripts/index-consent-gate.test.mjs`, 2026-10-12: no gtag request on Reject, hits disabled after withdrawing consent, one script load only, fails closed). Not covered by a live browser test: the real consentmanager Reject payload (only the Accept path was seen live). Note: this gate applies to all regions; TID-7234 records the decision to target consent by region, deferred until legal review MPC-6798. |
+| privacy@myprivacytool.io | Confirmed 2026-10-11 (most referenced address, 20 places) | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:03). A Cloudflare "Missing email" notice also arrived there: it is the standard same-account dedupe notice, not a fault. |
+| support@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| dpo@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| legal@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| accessibility@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| scan@myprivacytool.io | Confirmed 2026-10-11 | Arrives in the Inbox of myprivacytool@gmail.com (mail sent from testingnt7@gmail.com, 12:00-12:01). |
+| chris@myprivacytool.io | Confirmed 2026-10-11 | Forwards to cransford@gmail.com (mail from testingnt7@gmail.com arrived in that Inbox). |
+
+Notes:
+- Mailbox check run 2026-10-10/11. Test mails (subject "MPC mailbox test: <name>@ (2026-10-10)") were sent with testingnt7@gmail.com on CC. Check Cloudflare Email Routing for the myprivacytool.io zone for the rule and destination of each address.
+- `index.html` loads gtag.js directly with no Consent Mode default, so the Consentmanager autoblocking script is the only gate. If the browser test shows early requests, add `gtag('consent','default',{ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',wait_for_update:500})` before `gtag('js', ...)` and grant via a Consentmanager consent callback (or its built-in Google Consent Mode setting). Not applied: an unverified change could silence analytics after consent.
+- ipify/ipapi pre-consent calls remain disclosure-only (Chris, 2026-10-07).
+- 2026-10-10 evidence so far (incognito, narrow responsive viewport, Keep log on, no clean first-load capture): GA4 `a?id=G-1BWMDBJSPL` and `collect?v=2` requests exist in the log (timing vs consent unknown), and the HubSpot forms embed (`src/pages/Index.tsx`) loads and pings (`ipl`, `tracking`, `rhumb`) with no consent check. Note: the DevTools Network filter treats `|` literally; use `/google|gtm|collect/` for a regex. Superseded by the 2026-10-11 result in the table above.
+- Code change (#197, merged): gtag.js (`index.html`) and the HubSpot embed script load only after consentmanager reports consent (`hasConsent` / `onConsentChange` in `src/lib/cookieConsent.ts`); withdrawing consent sets `ga-disable-G-1BWMDBJSPL`. Confirmed in a browser that Accept turns both on, so the `__cmp('getCMPData')` assumption held. Side effect: the home-page newsletter form stays blank until consent is given.

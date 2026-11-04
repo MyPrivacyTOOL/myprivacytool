@@ -2,6 +2,9 @@
 
 User-agent: *
 Allow: /
+Disallow: /scan/live
+Disallow: /d/
+Disallow: /dashboard
 
 # Sitemap
 Sitemap: https://www.myprivacytool.io/sitemap.xml

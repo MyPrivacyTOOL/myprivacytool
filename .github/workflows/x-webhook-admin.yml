@@ -1,0 +1,111 @@
+name: X webhook admin
+
+# MPC-7628: manual only. Lists, re-validates, deletes or creates the X (Twitter) webhook for the Mirror bot through the X API with the app
+# bearer token (X_BEARER_TOKEN), for when the developer console cannot do it (its Delete button returns a 500). Prints X's JSON answer: webhook
+# ids, URLs and validity, never a secret. See docs/channels/x-mirror-bot.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "list, validate (re-run the CRC check), delete, create, subs (list DM subscriptions) or subscribe (create the dm.received subscription)"
+        required: true
+        default: list
+        type: choice
+        options: [list, validate, delete, create, subs, subscribe, mediainit]
+      webhook_id:
+        description: "Webhook id (validate and delete only)"
+        required: false
+        type: string
+      url:
+        description: "Webhook URL (create only)"
+        required: false
+        default: "https://social-listeners.myprivacytool.workers.dev/webhook/x?app=2"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  x-webhook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the X API
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
+          X_USER_ACCESS_TOKEN: ${{ secrets.X_USER_ACCESS_TOKEN }}
+          X_CONSUMER_KEY: ${{ secrets.X_CONSUMER_KEY }}
+          X_CONSUMER_SECRET: ${{ secrets.X_CONSUMER_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}
+          ACTION: ${{ inputs.action }}
+          WEBHOOK_ID: ${{ inputs.webhook_id }}
+          WEBHOOK_URL: ${{ inputs.url }}
+        run: |
+          set -u
+          if [ -z "${X_BEARER_TOKEN:-}" ]; then echo "X_BEARER_TOKEN is not set"; exit 1; fi
+          case "$WEBHOOK_ID" in ''|*[!0-9]*) id_ok=0 ;; *) id_ok=1 ;; esac
+          call() { curl -sS -o /tmp/x.out -w '%{http_code}' -H "Authorization: Bearer ${X_BEARER_TOKEN}" "$@"; }
+          case "$ACTION" in
+            list)     code=$(call https://api.x.com/2/webhooks) ;;
+            validate) [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
+                      code=$(call -X PUT "https://api.x.com/2/webhooks/${WEBHOOK_ID}") ;;
+            delete)   [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
+                      code=$(call -X DELETE "https://api.x.com/2/webhooks/${WEBHOOK_ID}") ;;
+            create)   code=$(call -X POST -H 'Content-Type: application/json' -d "{\"url\":\"${WEBHOOK_URL}\"}" https://api.x.com/2/webhooks) ;;
+            subs)     code=$(call https://api.x.com/2/activity/subscriptions) ;;
+            subscribe) [ "$id_ok" = 1 ] || { echo "webhook_id (digits) required"; exit 1; }
+                      # Renew the OAuth 2.0 user token from the stored refresh token (the X API needs a user token to create this subscription),
+                      # save the new pair where the Worker keeps it (public.mpt_x_oauth_tokens, row "mirror"), then subscribe. Tokens are never printed.
+                      # A refresh token works once: prove the token store accepts our key BEFORE spending it.
+                      pc=$(curl -sS -o /dev/null -w '%{http_code}' -H "apikey: ${SUPABASE_KEY}" -H "Authorization: Bearer ${SUPABASE_KEY}" "${SUPABASE_URL%/}/rest/v1/mpt_x_oauth_tokens?select=id&limit=1")
+                      echo "token store check HTTP ${pc}"
+                      [ "$pc" = 200 ] || { echo "token store not reachable; refresh token NOT spent"; exit 1; }
+                      # Try the stored refresh token; if X refuses it, try the stored access-token secret in case the two were pasted the wrong way round.
+                      rc=0
+                      for cand in "${X_REFRESH_TOKEN}" "${X_USER_ACCESS_TOKEN}"; do
+                        [ -n "$cand" ] || continue
+                        rc=$(curl -sS -o /tmp/tok.json -w '%{http_code}' -u "${X_CLIENT_ID}:${X_CLIENT_SECRET}" -d grant_type=refresh_token -d "refresh_token=${cand}" -d "client_id=${X_CLIENT_ID}" https://api.x.com/2/oauth2/token)
+                        echo "token refresh HTTP ${rc} (candidate length ${#cand})"
+                        [ "$rc" = 200 ] && break
+                      done
+                      [ "$rc" = 200 ] || { jq -r '.error // .detail // .title // "no detail"' /tmp/tok.json; exit 1; }
+                      acc=$(jq -r .access_token /tmp/tok.json); ref=$(jq -r .refresh_token /tmp/tok.json); exp=$(jq -r '.expires_in // 7200' /tmp/tok.json)
+                      echo "::add-mask::${acc}"; echo "::add-mask::${ref}"
+                      expat=$(date -u -d "+${exp} seconds" +%Y-%m-%dT%H:%M:%SZ); nowt=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                      jq -n --arg a "$acc" --arg r "$ref" --arg e "$expat" --arg n "$nowt" '{id:"mirror",access_token:$a,refresh_token:$r,expires_at:$e,updated_at:$n}' > /tmp/row.json
+                      sc=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "apikey: ${SUPABASE_KEY}" -H "Authorization: Bearer ${SUPABASE_KEY}" -H 'Content-Type: application/json' -H 'Prefer: resolution=merge-duplicates,return=minimal' -d @/tmp/row.json "${SUPABASE_URL%/}/rest/v1/mpt_x_oauth_tokens?on_conflict=id")
+                      echo "token store HTTP ${sc}"
+                      code=$(call https://api.x.com/2/users/by/username/myprivacytool)
+                      echo "user lookup HTTP ${code}"
+                      uid=$(sed -n 's/.*"id":"\([0-9]*\)".*/\1/p' /tmp/x.out | head -1)
+                      [ -n "$uid" ] || { head -c 1000 /tmp/x.out; echo; exit 1; }
+                      code=$(curl -sS -o /tmp/x.out -w '%{http_code}' -X POST -H "Authorization: Bearer ${acc}" -H 'Content-Type: application/json' -d "{\"event_type\":\"dm.received\",\"filter\":{\"user_id\":\"${uid}\"},\"webhook_id\":\"${WEBHOOK_ID}\"}" https://api.x.com/2/activity/subscriptions) ;;
+            mediainit) # Try the video upload INIT step on both X endpoints, signed with OAuth 1.0a, and print X's answers (no secrets).
+                      enc() { jq -rn --arg s "$1" '$s|@uri'; }
+                      oauth() { # $1 = url
+                        local n t params base key sig
+                        n=$(openssl rand -hex 16); t=$(date +%s)
+                        params="oauth_consumer_key=$(enc "$X_CONSUMER_KEY")&oauth_nonce=${n}&oauth_signature_method=HMAC-SHA1&oauth_timestamp=${t}&oauth_token=$(enc "$X_ACCESS_TOKEN")&oauth_version=1.0"
+                        base="POST&$(enc "$1")&$(enc "$params")"
+                        key="$(enc "$X_CONSUMER_SECRET")&$(enc "$X_ACCESS_TOKEN_SECRET")"
+                        sig=$(printf %s "$base" | openssl dgst -sha1 -hmac "$key" -binary | base64)
+                        echo "OAuth oauth_consumer_key=\"$(enc "$X_CONSUMER_KEY")\", oauth_nonce=\"${n}\", oauth_signature=\"$(enc "$sig")\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"${t}\", oauth_token=\"$(enc "$X_ACCESS_TOKEN")\", oauth_version=\"1.0\""
+                      }
+                      u1="https://api.x.com/2/media/upload"
+                      c=$(curl -sS -o /tmp/a.out -w '%{http_code}' -X POST -H "Authorization: $(oauth "$u1")" -F command=INIT -F media_type=video/mp4 -F total_bytes=1000000 -F media_category=dm_video "$u1")
+                      echo "A (combined endpoint, form) HTTP ${c}: $(head -c 600 /tmp/a.out)"
+                      u2="https://api.x.com/2/media/upload/initialize"
+                      c=$(curl -sS -o /tmp/b.out -w '%{http_code}' -X POST -H "Authorization: $(oauth "$u2")" -H 'Content-Type: application/json' -d '{"media_type":"video/mp4","total_bytes":1000000,"media_category":"dm_video"}' "$u2")
+                      echo "B (initialize endpoint, JSON) HTTP ${c}: $(head -c 600 /tmp/b.out)"
+                      exit 0 ;;
+            *)        echo "unknown action"; exit 1 ;;
+          esac
+          echo "HTTP ${code}"
+          head -c 4000 /tmp/x.out; echo
+          case "$code" in 2*) ;; *) exit 1 ;; esac

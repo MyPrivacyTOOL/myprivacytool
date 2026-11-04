@@ -1,0 +1,31 @@
+name: Check Stripe prices match plans
+
+# MPC-7502 step 4: read-only, one-way check that each paid plan's Stripe price equals public.plans (the source of truth).
+# Changes nothing in Stripe or Supabase. Skips cleanly (green) until the STRIPE_SECRET_KEY repository secret exists, because checkout is off.
+# Use a Stripe RESTRICTED key with read-only access to Prices. Optional SUPABASE_SERVICE_ROLE_KEY lets the check read plans.stripe_price_id;
+# without it the check uses the STRIPE_PRICE_BASIC / _PRO / _EXECUTIVE repository secrets, if set.
+on:
+  schedule:
+    - cron: "43 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compare Stripe prices with the plans table
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STRIPE_PRICE_BASIC: ${{ secrets.STRIPE_PRICE_BASIC }}
+          STRIPE_PRICE_PRO: ${{ secrets.STRIPE_PRICE_PRO }}
+          STRIPE_PRICE_EXECUTIVE: ${{ secrets.STRIPE_PRICE_EXECUTIVE }}
+        run: node scripts/check-stripe-prices.mjs

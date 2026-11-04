@@ -1,0 +1,21 @@
+[Unit]
+Description=Render approved Alice video scripts (no upload)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=alice-render
+Group=alice-render
+ExecStart=/opt/alice-render/repo/tools/video-pipeline/droplet/render-pending.sh
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=3G
+CPUQuota=150%
+TimeoutStartSec=2h
+# Sandbox: it only needs to write its own state and output folders.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/alice-render /opt/alice-render

@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import RemovePersonalInfo, * as removePersonalInfo from "./removePersonalInfo";
 import RemoveFromGoogle, * as removeFromGoogle from "./removeFromGoogle";
 import StopSpam, * as stopSpam from "./stopSpam";
+import GithubProfile, * as githubProfile from "./githubProfile";
 
 export interface GuideSection {
   id: string;
@@ -35,5 +36,10 @@ export const guides: Record<string, Guide> = {
     Content: StopSpam,
     sections: stopSpam.sections,
     faqs: stopSpam.faqs,
+  },
+  "how-github-becomes-a-private-profile": {
+    Content: GithubProfile,
+    sections: githubProfile.sections,
+    faqs: githubProfile.faqs,
   },
 };

@@ -1,0 +1,34 @@
+# CK-8482: manual-only watchdog for the daily content pipeline. NO schedule is configured here on purpose:
+# turning one on is a separate decision (the Cloudflare Free plan's 5 cron triggers are all used, but a GitHub schedule
+# does not need one). To enable, add a `schedule:` trigger and make sure the APPROVAL_API_TOKEN repo secret exists.
+# Waiting for approval is reported but is not a failure; missing cycles, unknown outcomes, overdue receipts and
+# exhausted recovery fail the run. The token is only sent as a bearer header and never printed.
+name: Content pipeline watchdog
+on:
+  workflow_dispatch:
+    inputs:
+      recover:
+        description: "Also run bounded recovery (POST /recover) before reporting"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE: https://mpt-content-approval.myprivacytool.workers.dev
+      TOKEN: ${{ secrets.APPROVAL_API_TOKEN }}
+    steps:
+      - name: Require token
+        run: |
+          if [ -z "$TOKEN" ]; then echo "::error::APPROVAL_API_TOKEN repo secret is not set"; exit 1; fi
+      - name: Recover (optional)
+        if: ${{ inputs.recover }}
+        run: |
+          curl -fsS -X POST -H "authorization: Bearer $TOKEN" "$BASE/recover"
+      - name: Report
+        run: |
+          curl -fsS -H "authorization: Bearer $TOKEN" "$BASE/watchdog?days=3" | tee report.json
+          node -e 'const r=require("./report.json");console.log("awaiting approval (not a failure):",r.awaiting_approval.join(",")||"none");if(!r.healthy){console.error("problems:",JSON.stringify(r.problems));process.exit(1)}'

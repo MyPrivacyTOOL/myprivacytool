@@ -10,15 +10,15 @@
     "optOutUrlLabel": "dnc.gov.sg",
     "summary": "Stop unsolicited telemarketing calls, SMS and messaging-app marketing (including WhatsApp) to your Singapore numbers. Free and does not expire.",
     "timeNeeded": "5 minutes",
-    "processingTime": "Protection starts 21 calendar days after registration",
+    "processingTime": "Can take up to 21 days to take full effect after registration",
     "difficulty": "Easy",
     "requirements": ["A Singapore phone number you control", "Ability to receive an SMS or phone call on that number if using SMS or phone registration"],
     "steps": [
       "Go to dnc.gov.sg, the Personal Data Protection Commission's official DNC Registry site, and choose Register.",
       "Enter your Singapore mobile, home or office number and choose which types of messages to block: voice calls, text messages (SMS, MMS, WhatsApp and similar apps) or fax.",
       "Complete the verification step. Alternatively, SMS \"DNC\" to 78771 from the number you want to register (standard SMS charges apply), or call the toll-free line 1800 248 0771 from that number. Do not use a phone that blocks caller ID for the call option.",
-      "Wait 21 calendar days. After that, organisations must not send you telemarketing messages on the registered number unless you gave clear consent or have an ongoing relationship with them.",
-      "If you still receive telemarketing after 21 days, file a complaint through the DNC Registry website."
+      "Allow up to 21 days for your registration to take full effect (the PDPC says it may take up to 21 days). Once it has, organisations must not send you telemarketing messages on the registered number unless you gave clear consent or have an ongoing relationship with them.",
+      "If you still receive telemarketing once your registration has taken full effect, file a complaint through the DNC Registry website."
     ],
     "relistingWarning": "Registration is free and does not expire, but it only covers the numbers you register (register every number you own). It does not remove your data from broker or people-search databases and does not stop marketing from organisations you gave consent to. Withdraw consent with those senders directly.",
     "lastVerified": "2026-10-05"

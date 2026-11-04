@@ -1,0 +1,31 @@
+name: Core Brain production gates
+
+# CK-7318 / MPC-7260: runs DEPLOYMENT_RUNBOOK.md section 3 (health, auth, live Qwen) against
+# https://brain.myprivacytool.io on demand. Manual only: Actions -> "Core Brain production gates" -> Run workflow.
+# WEBHOOK_SECRET is read from the repo secret by this runner; it is never printed and never has to be handed to a
+# person or an agent. The test message is synthetic. Output is limited to pass/fail, status codes and `intent_source`.
+# Do not repoint X or Telegram at core-brain until this is green.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-brain-gates
+  cancel-in-progress: false
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Core Brain gates (3a health + auth, 3b live Qwen)
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: node scripts/ci/core-brain-gates.mjs

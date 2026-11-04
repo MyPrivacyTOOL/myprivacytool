@@ -26,6 +26,7 @@ vi.mock('@/lib/analytics', () => ({
   trackHexagonAccuracy: vi.fn(),
   trackTimeToFirstConfirmation: vi.fn(),
   trackActivity: vi.fn(),
+  trackScanStarted: vi.fn(),
 }));
 vi.mock('canvas-confetti', () => ({ default: vi.fn() }));
 

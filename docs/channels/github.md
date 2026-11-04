@@ -56,6 +56,22 @@ The session cookie is `HttpOnly; Secure; SameSite=None` so the SPA (different or
 - **Logs** hold event names and status codes only. The adapter's errors carry the HTTP status, never a URL, token or body.
 - **Cache** holds the sanitized PaPIT snapshot only, never tokens or raw GitHub responses.
 
+## SPA: "Connect GitHub"
+
+`/connect/github` (`src/pages/ConnectGitHub.tsx`, `src/components/ConnectGitHub.tsx`, client in `src/lib/githubChannel.ts`).
+The button is a plain link to the Worker's `/oauth/github/start`; after the GitHub round trip the Worker redirects back to
+`SUCCESS_REDIRECT` (`https://www.myprivacytool.io/?channel=github`). The page then reads `GET /channels/github/profile` with
+`credentials: "include"`, shows the sanitized profile, and offers **Disconnect** (`DELETE /channels/github`). `?channel_error=`
+codes are mapped to friendly copy and the raw code is never shown.
+
+- **Unlisted on purpose:** `noindex`, not in the sitemap or nav. Link to it when the channel is ready to launch.
+- After login the Worker redirects to `SUCCESS_REDIRECT` (`https://www.myprivacytool.io/connect/github`).
+- Override the Worker URL with `VITE_GITHUB_CHANNEL_URL` (e.g. for a custom domain).
+- **Served from `channels.myprivacytool.io`** (a Workers custom domain, `routes` in `wrangler.toml`), the same site as
+  `www.myprivacytool.io`, so the session cookie is not a third-party cookie and Safari/Firefox send it. The GitHub OAuth app's
+  callback URL must equal `REDIRECT_URI` (`https://channels.myprivacytool.io/oauth/github/callback`); GitHub allows only one.
+  `workers_dev` is `false`: the old `*.workers.dev` address is retired and the Worker is served only from `channels.myprivacytool.io`. Rollback: set `workers_dev = true`, redeploy, and re-add the `workers.dev` redirect URI in the GitHub OAuth app.
+
 ## Token expiry and refresh
 
 The OAuth app has GitHub's "expiring user tokens" on, so access tokens last about 8 hours and come with a refresh token

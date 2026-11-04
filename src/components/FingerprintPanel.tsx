@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,11 @@ import {
   BatteryStatusResult,
   MediaDevicesResult,
 } from '@/lib/fingerprintDetection';
-import FingerprintComparison from './FingerprintComparison';
 import FingerprintVerification from './FingerprintVerification';
 
+
+// MPC-7200: charts load on demand when the comparison section is opened.
+const FingerprintComparison = lazy(() => import('./FingerprintComparison'));
 interface FingerprintBreakdown {
   name: string;
   uniqueness: number;
@@ -868,10 +870,12 @@ export default function FingerprintPanel() {
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-4">
-            <FingerprintComparison 
-              fingerprint={fingerprint} 
-              uniquenessScore={uniquenessScore} 
-            />
+            <Suspense fallback={null}>
+              <FingerprintComparison 
+                fingerprint={fingerprint} 
+                uniquenessScore={uniquenessScore} 
+              />
+            </Suspense>
           </CollapsibleContent>
         </Collapsible>
 

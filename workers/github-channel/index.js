@@ -13,44 +13,16 @@
  */
 import { buildAuthUrl, exchangeCode, randomString, sign, verify, revokeGrant, refreshAccessToken } from './lib/oauth.js';
 import { GitHubAdapter, GitHubAdapterError } from './lib/adapter.js';
-import { githubToPapit } from './lib/papit.js';
+import { bridgeGithub } from './lib/bridge.js';
 import { getCached, putCached, deleteCached } from './lib/cache.js';
 import { saveToken, loadTokens, loadAccessToken, deleteToken } from './lib/store.js';
+import { log, originAllowed, corsHeaders, json, readCookie, setCookie } from './lib/http.js';
+import { handleReddit } from './lib/reddit-routes.js';
 
 const STATE_COOKIE = 'mpt_gh_oauth';
 const SESSION_COOKIE = 'mpt_gh_session';
 const STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-const log = (event, fields = {}) => console.log(JSON.stringify({ event, ...fields }));
-
-// ALLOWED_ORIGIN may list several origins, comma-separated (apex + www).
-const allowedOrigins = (env) => String(env.ALLOWED_ORIGIN || '').split(',').map((o) => o.trim()).filter(Boolean);
-const originAllowed = (env, origin) => !!origin && allowedOrigins(env).includes(origin);
-
-function corsHeaders(request, env) {
-  const origin = request.headers.get('Origin');
-  if (!originAllowed(env, origin)) return {};
-  return {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Credentials': 'true',
-    'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
-    Vary: 'Origin',
-  };
-}
-
-const json = (obj, status = 200, headers = {}) =>
-  new Response(JSON.stringify(obj), {
-    status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers },
-  });
-
-function readCookie(request, name) {
-  const m = (request.headers.get('Cookie') || '').match(new RegExp(`(?:^|; )${name}=([^;]+)`));
-  return m ? m[1] : null;
-}
-
-const setCookie = (name, value, maxAge, path, sameSite) =>
-  `${name}=${value}; Max-Age=${maxAge}; Path=${path}; HttpOnly; Secure; SameSite=${sameSite}`;
 
 export async function handle(request, env, deps = {}) {
   const { fetchFn = fetch, now = () => Date.now() } = deps;
@@ -59,6 +31,10 @@ export async function handle(request, env, deps = {}) {
 
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (url.pathname === '/health') return json({ status: 'ok' });
+  // Reddit channel (MPC-116): same Worker, same token table, provider = 'reddit'.
+  if (url.pathname.startsWith('/oauth/reddit/') || url.pathname.startsWith('/channels/reddit')) {
+    return handleReddit(request, url, env, { cors, fetchFn, now, limiter: deps.limiter });
+  }
   if (url.pathname === '/oauth/github/start' && request.method === 'GET') return start(env, now);
   if (url.pathname === '/oauth/github/callback' && request.method === 'GET') return callback(request, url, env, fetchFn, now);
   if (url.pathname === '/channels/github/profile' && request.method === 'GET') return profile(request, env, cors, fetchFn, now);
@@ -175,9 +151,9 @@ async function profile(request, env, cors, fetchFn, now) {
       log('token_refreshed');
       raw = await new GitHubAdapter({ token: fresh.access_token, fetchFn }).fetchIdentity();
     }
-    const papit = await githubToPapit(raw, { now: new Date(now()) });
+    const { papit, sanitization_receipt: sanitizationReceipt } = await bridgeGithub(raw, { now: new Date(now()) });
     await putCached(env.PROFILE_CACHE, subjectId, papit, now());
-    return json(papit, 200, { ...cors, 'X-Cache': 'MISS' });
+    return json(papit, 200, { ...cors, 'X-Cache': 'MISS', 'X-PaPIT-Sanitization-Receipt': sanitizationReceipt });
   } catch (e) {
     if (e instanceof GitHubAdapterError && e.status === 401) {
       // Token revoked on GitHub's side: drop our copy so the user is asked to reconnect.

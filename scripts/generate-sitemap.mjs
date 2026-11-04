@@ -5,6 +5,9 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { HEXAGON_CATALOGUE } from "../shared/hexagon-registry/catalogue.js";
+import { GUIDES } from "../shared/hexagon-registry/guides.js";
+import { hkSpamSitemapEntry, patchRobots, readHkSpamConfig } from "./hkSpamFlag.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -15,6 +18,8 @@ const STATIC_ROUTES = [
   { path: "/scan", file: "src/pages/Scan.tsx", priority: "0.8", changefreq: "weekly" },
   { path: "/report", file: "src/pages/Report.tsx", priority: "0.6", changefreq: "monthly" },
   { path: "/business", file: "src/pages/Business.tsx", priority: "0.8", changefreq: "weekly" },
+  { path: "/pricing", file: "src/pages/Pricing.tsx", priority: "0.7", changefreq: "monthly" },
+  { path: "/enterprise", file: "src/pages/Enterprise.tsx", priority: "0.7", changefreq: "monthly" },
   { path: "/start", file: "src/pages/Start.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/newsletter", file: "src/pages/Newsletter.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/ai-access-check", file: "src/pages/AIAccessCheck.tsx", priority: "0.5", changefreq: "monthly" },
@@ -22,12 +27,17 @@ const STATIC_ROUTES = [
   { path: "/opt-out-guides", file: "src/pages/OptOutGuides.tsx", priority: "0.9", changefreq: "weekly" },
   { path: "/journey", file: "src/pages/Journey.tsx", priority: "0.7", changefreq: "monthly" },
   { path: "/am-i-exposed", file: "src/pages/AmIExposed.tsx", priority: "0.8", changefreq: "monthly" },
+  { path: "/developers", file: "src/pages/Developers.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/about", file: "src/pages/About.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/faq", file: "src/pages/Faq.tsx", priority: "0.5", changefreq: "monthly" },
+  { path: "/how-we-calculate-your-score", file: "src/pages/ScoreMethod.tsx", priority: "0.5", changefreq: "monthly" },
   { path: "/contact", file: "src/pages/Contact.tsx", priority: "0.4", changefreq: "yearly" },
   { path: "/privacy", file: "src/pages/Privacy.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/terms", file: "src/pages/Terms.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/cookies", file: "src/pages/Cookies.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/acceptable-use", file: "src/pages/AcceptableUse.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/dpa", file: "src/pages/DPA.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/trust", file: "src/pages/Trust.tsx", priority: "0.4", changefreq: "yearly" },
 ];
 
 function gitLastmod(relativeFile) {
@@ -74,6 +84,17 @@ function generateSitemap() {
     }),
   );
 
+  // MPC-8684: the Telegram security self-check is a static page (public/telegram-security-check.html), not a React route,
+  // so it is listed here and deliberately NOT in STATIC_ROUTES (prerender-meta would otherwise overwrite its dist file).
+  entries.push(
+    buildUrlEntry({
+      loc: `${SITE_URL}/telegram-security-check`,
+      lastmod: gitLastmod("public/telegram-security-check.html"),
+      changefreq: "monthly",
+      priority: "0.5",
+    }),
+  );
+
   for (const post of loadBlogPosts()) {
     entries.push(
       buildUrlEntry({
@@ -97,11 +118,30 @@ function generateSitemap() {
     );
   }
 
+  // MPC-8689: the master hexagon risk page and one page per hexagon (built into dist/hexagon by generate-hexagon-pages.mjs).
+  const hexLastmod = gitLastmod("shared/hexagon-registry/hexagons-366.json");
+  entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/`, priority: "0.7", changefreq: "monthly", lastmod: hexLastmod }));
+  // MPC-7561: the guides index and one guide per approved hexagon (built by generate-guide-pages.mjs).
+  entries.push(buildUrlEntry({ loc: `${SITE_URL}/guides/`, priority: "0.6", changefreq: "monthly", lastmod: hexLastmod }));
+  for (const g of GUIDES) entries.push(buildUrlEntry({ loc: `${SITE_URL}/guides/${g.id}/`, priority: "0.5", changefreq: "monthly", lastmod: gitLastmod("shared/hexagon-registry/guides.js") }));
+  for (const h of HEXAGON_CATALOGUE) entries.push(buildUrlEntry({ loc: `${SITE_URL}/hexagon/${h.slug}/`, priority: h.risk === "high" ? "0.6" : "0.4", changefreq: "monthly", lastmod: hexLastmod }));
+
+  // MPC-7446: /HongKongSpam is listed (and robots.txt un-blocked) only when the single flag in
+  // src/data/hkSpam.json is true; until then it stays out of the sitemap and is disallowed.
+  const hkCfg = readHkSpamConfig(ROOT);
+  const hkEntry = hkSpamSitemapEntry(hkCfg, SITE_URL);
+  if (hkEntry) entries.push(buildUrlEntry({ ...hkEntry, lastmod: gitLastmod("src/pages/HongKongSpam.tsx") }));
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join("\n")}\n</urlset>\n`;
 
   const distDir = path.join(ROOT, "dist");
   if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true });
   writeFileSync(path.join(distDir, "sitemap.xml"), xml, "utf8");
+
+  const robotsPath = path.join(distDir, "robots.txt");
+  if (existsSync(robotsPath)) {
+    writeFileSync(robotsPath, patchRobots(readFileSync(robotsPath, "utf8"), hkCfg), "utf8");
+  }
 
   console.log(`sitemap.xml written with ${entries.length} URLs`);
 }

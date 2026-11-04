@@ -1,0 +1,3 @@
+cryptography>=42
+gunicorn>=22
+google-cloud-bigquery>=3

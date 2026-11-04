@@ -1,0 +1,22 @@
+{
+  "name": "@mpt/core-brain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MPT (MyPrivacyTOOL) core brain Worker",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@mpt/utils": "*",
+    "@supabase/supabase-js": "2.117.2",
+    "openai": "7.30.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20260702.1",
+    "wrangler": "4.148.0"
+  }
+}

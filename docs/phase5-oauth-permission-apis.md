@@ -23,7 +23,7 @@ Code: `workers/oauth-poc/` (`google.js` helpers, `index.js` routes, `oauth.test.
 
 - `GET /oauth/google/start` → consent redirect with PKCE challenge and signed state cookie.
 - `GET /oauth/google/callback` → verifies state, exchanges the code, calls `tokeninfo` and `userinfo`, then revokes MPT's own token and clears the cookie. The JSON response records what the token can and cannot see, which is the evidence MPC-6960 steps 3–4 need.
-- Tests (`node --test workers/oauth-poc/oauth.test.mjs`, 5 passing, mocked `fetch`): RFC 7636 PKCE vector, scope/`S256`/online-access on the auth URL, tamper and expiry rejection of signed state, state-mismatch rejection, and revoke-on-completion.
+- Tests (`node --test workers/oauth-poc/oauth.test.mjs`, 5 passing, mocked `fetch`; the session and permission API adds `api.test.mjs`, see section 8): RFC 7636 PKCE vector, scope/`S256`/online-access on the auth URL, tamper and expiry rejection of signed state, state-mismatch rejection, and revoke-on-completion.
 
 **Not yet done:** a live run. To finish: create a Web OAuth client in a Google Cloud project, add the test account as a test user, set the redirect URI and secrets, `wrangler dev`, open `/oauth/google/start`, and record the JSON output in the MPC-6960 doc.
 
@@ -93,3 +93,9 @@ Consent completed as `myprivacytool@gmail.com` against `https://myprivacytool-oa
 ```
 
 What this confirms: authorization code + PKCE, signed state cookie, token exchange, and revoke-on-finish work end to end with non-sensitive scopes only. It also confirms the MPC-6960 finding that the consumer Google token describes only itself; there is no endpoint to list other apps' grants. Microsoft, GitHub and Slack claims in section 3 remain **Pending Live Verification** (future sprint).
+
+## 8. Session, permission scoping and Supabase link (added 2026-10-06)
+
+The PoC proved the OAuth foundation. This increment adds what a product needs on top of it, without storing a provider token: `/oauth/google/start?mode=session` ends in an MPT-signed session cookie; `GET/DELETE /v1/session` validate and end it; `GET /v1/permissions` and `GET /v1/grants` expose MPT scopes (`identity:read` held, `grants:read` and `grants:revoke` defined but not grantable, because no consumer provider API lists other apps' grants); a verified email is linked to a confirmed Supabase auth user through a service_role-only function. The probe flow and its verified response are unchanged. Contract, task record (goal, scope, acceptance criteria, rollback) and limits: [phase5-oauth-api-contract.md](phase5-oauth-api-contract.md). Tests: `node --test workers/oauth-poc/oauth.test.mjs workers/oauth-poc/api.test.mjs` (25 passing).
+
+Not done here, by design: setting `SUPABASE_SERVICE_ROLE_KEY` on the Worker (blocked by the MPC-6950 key audit; the link reports `not_configured` until then), applying the migration to the live project, and the Microsoft/GitHub/Slack verification (own task).

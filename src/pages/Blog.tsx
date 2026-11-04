@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import blogPosts from '@/data/blogPosts.json';
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { trackBlogCtaClick, trackBlogListView, trackBlogPostClick } from "@/lib/analytics";
+import { blogCtaHref } from "@/lib/blogTracking";
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-secondary text-foreground",
@@ -18,6 +20,10 @@ const categoryColors: { [key: string]: string } = {
 
 export default function Blog() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    trackBlogListView(blogPosts.length);
+  }, []);
 
   const filteredPosts = selectedCategory
     ? blogPosts.filter(post => post.category === selectedCategory)
@@ -33,7 +39,7 @@ export default function Blog() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
+              <Link to="/" className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground md:min-h-0">
                 Home
               </Link>
               <span className="text-muted-foreground">/</span>
@@ -74,13 +80,15 @@ export default function Blog() {
 
         {/* Blog Posts Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredPosts.map(post => (
+          {filteredPosts.map((post, index) => (
             <Card key={post.slug} className="overflow-hidden hover:shadow-lg transition-shadow">
               {post.image && (
                 <div className="h-48 bg-muted overflow-hidden">
                   <img
                     src={post.image}
                     alt={post.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -102,11 +110,9 @@ export default function Blog() {
                     <p>{post.date}</p>
                   </div>
                 </div>
-                <Link to={`/blog/${post.slug}`}>
-                  <Button className="w-full" variant="outline">
-                    Read Article →
-                  </Button>
-                </Link>
+                <Button asChild className="w-full" variant="outline">
+                  <Link to={`/blog/${post.slug}`} onClick={() => trackBlogPostClick(post.slug, post.category, index + 1)}>Read Article →</Link>
+                </Button>
               </CardContent>
             </Card>
           ))}
@@ -119,13 +125,22 @@ export default function Blog() {
           </div>
         )}
 
+        {/* Scan CTA */}
+        <div className="mt-16 bg-secondary rounded-lg p-8 border border-border text-center">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Ready to reclaim your privacy?</h2>
+          <p className="mb-4 text-muted-foreground">See where your data is exposed, then take it back.</p>
+          <Button asChild size="lg">
+            <Link to={blogCtaHref("blog-index")} onClick={() => trackBlogCtaClick("blog-index", "blog_index", "/scan")}>Check My Exposure →</Link>
+          </Button>
+        </div>
+
         {/* Newsletter CTA */}
-        <div className="mt-16 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
+        <div className="mt-8 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
           <h2 className="text-2xl font-bold mb-2">Privacy Check</h2>
           <p className="mb-4 text-muted-foreground">Subscribe to Privacy Check, our newsletter, for privacy insights and practical steps you can act on</p>
-          <Link to="/newsletter">
-            <Button size="lg">Subscribe Now</Button>
-          </Link>
+          <Button asChild size="lg">
+            <Link to="/newsletter">Subscribe Now</Link>
+          </Button>
         </div>
       </div>
     </div>

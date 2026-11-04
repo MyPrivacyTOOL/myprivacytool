@@ -39,15 +39,19 @@ export async function sign(payload, secret) {
   return `${body}.${sig}`;
 }
 
-export async function verify(token, secret) {
+export async function verify(token, secret, nowMs = Date.now()) {
   const [body, sig] = String(token || '').split('.');
   if (!body || !sig) return null;
-  const sigBytes = Uint8Array.from(atob(sig.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-  const ok = await crypto.subtle.verify('HMAC', await hmacKey(secret), sigBytes, enc.encode(body));
-  if (!ok) return null;
-  const json = atob(body.replace(/-/g, '+').replace(/_/g, '/'));
-  const payload = JSON.parse(json);
-  return payload.exp && payload.exp < Date.now() ? null : payload;
+  try {
+    const sigBytes = Uint8Array.from(atob(sig.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const ok = await crypto.subtle.verify('HMAC', await hmacKey(secret), sigBytes, enc.encode(body));
+    if (!ok) return null;
+    const payload = JSON.parse(new TextDecoder().decode(
+      Uint8Array.from(atob(body.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))));
+    return payload.exp && payload.exp < nowMs ? null : payload;
+  } catch {
+    return null; // malformed base64/JSON must read as "invalid", never throw (a throw is a Worker 1101)
+  }
 }
 
 export async function buildAuthUrl({ clientId, redirectUri, state, verifier }) {

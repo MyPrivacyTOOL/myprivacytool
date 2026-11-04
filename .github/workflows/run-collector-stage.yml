@@ -1,0 +1,78 @@
+name: Run collector stage
+
+# MPC-9168: run one stage of the mpt-metrics-collector daily run by hand, from Actions, so a fix can be proven live without waiting for the
+# 16:15 UTC cron and without anyone pasting a token. Calls POST /stage/<name> on the live Worker with the repo secret COLLECTOR_TRIGGER_TOKEN
+# (the same value as the Worker secret of that name; never printed, GitHub masks it). Each stage runs as its own Worker invocation, exactly as the cron does it.
+# The log shows stage names, per-source status and the stage's subrequest count only: never a payload, an address or a token.
+# Stages and their budget: workers/mpt-metrics-collector/README.md ("Subrequest budget"). "all" runs the daily order, collectors first, then publishers.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Stage name (collect_core, collect_hubspot, collect_email, collect_ga4, publish_notion, publish_learning, publish_mirror, publish_osint, publish_kpi) or "all"'
+        default: 'collect_email'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: run-collector-stage
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    name: Run stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      STAGE: ${{ inputs.stage }}
+      COLLECTOR_TRIGGER_TOKEN: ${{ secrets.COLLECTOR_TRIGGER_TOKEN }}
+      WORKER_URL: https://mpt-metrics-collector.myprivacytool.workers.dev
+    steps:
+      - name: Run stage(s)
+        run: |
+          set -u
+          if [ -z "${COLLECTOR_TRIGGER_TOKEN}" ]; then echo "::error::repo secret COLLECTOR_TRIGGER_TOKEN is not set (same value as the Worker secret of that name)"; exit 2; fi
+          case "$STAGE" in
+            all) stages="collect_core collect_hubspot collect_email collect_ga4 publish_notion publish_learning publish_mirror publish_osint publish_kpi" ;;
+            collect_core|collect_hubspot|collect_email|collect_ga4|publish_notion|publish_learning|publish_mirror|publish_osint|publish_kpi) stages="$STAGE" ;;
+            *) echo "::error::unknown stage"; exit 2 ;;
+          esac
+          fail=0
+          for s in $stages; do
+            code=$(curl -sS -o "$RUNNER_TEMP/out.json" -w '%{http_code}' -X POST -H "Authorization: Bearer ${COLLECTOR_TRIGGER_TOKEN}" "${WORKER_URL}/stage/${s}" || echo 000)
+            python3 - "$s" "$code" "$RUNNER_TEMP/out.json" <<'PY' || fail=1
+          import json, sys
+          stage, code, path = sys.argv[1], sys.argv[2], sys.argv[3]
+          try:
+              body = json.load(open(path))
+          except Exception:
+              body = {}
+          res = body.get("result")
+          bad = code != "200"
+          lines = []
+          if isinstance(res, list):
+              for r in res:
+                  if not isinstance(r, dict):
+                      continue
+                  src = r.get("source") or r.get("kind") or "?"
+                  st = r.get("status") or r.get("action") or "?"
+                  stored = r.get("stored")
+                  err = (r.get("error") or "")[:120] if r.get("error") else ""
+                  if stored is False or st == "error" or "ubrequest" in err:
+                      bad = True
+                  lines.append(f"  {src}: {st}" + ("" if stored is None else f" stored={stored}") + (f" ERROR {err}" if err else ""))
+          elif isinstance(res, dict):
+              lines.append("  result keys: " + ",".join(sorted(res.keys())[:8]) + (f" action={res.get('action')}" if res.get("action") else ""))
+              if res.get("skipped"):
+                  lines.append(f"  skipped: {res['skipped']}")
+          if body.get("error"):
+              bad = True
+              lines.append("  worker error: " + str(body["error"])[:160])
+          print(f"{'FAIL' if bad else 'ok  '} {stage} HTTP {code}")
+          print("\n".join(lines))
+          sys.exit(1 if bad else 0)
+          PY
+          done
+          exit $fail

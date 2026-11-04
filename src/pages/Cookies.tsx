@@ -54,9 +54,10 @@ const Cookies = () => {
                   forgery attacks
                 </li>
                 <li>
-                  <strong>Consent Choice:</strong> Records your cookie choices via
-                  our consent manager (Consentmanager) so we do not ask again on
-                  every visit
+                  <strong>Consent Choice:</strong> Records your cookie choice
+                  (accept analytics, or essential only) and the date in your own
+                  browser storage so we do not ask again on every visit. It is
+                  not sent to us
                 </li>
                 <li>
                   <strong>User Preferences:</strong> Remembers your language and
@@ -92,11 +93,15 @@ const Cookies = () => {
                   links you arrive from are attached to sign-up and analytics
                   events
                 </li>
-                <li>
-                  <strong>Session Recording:</strong> May record anonymized user
-                  interactions to improve UX
-                </li>
               </ul>
+              <p className="mt-4 text-muted-foreground">
+                We do not use session recording or heatmap tools. The device scan
+                on our site asks two third-party services, ipify (api.ipify.org)
+                and ipapi.co, for your IP address and approximate location when
+                you load the scan. They necessarily see your IP address, and this
+                happens whether or not you have accepted analytics cookies,
+                because it is how the scan shows you what a website can see.
+              </p>
               <p className="mt-4 text-muted-foreground">
                 Google Analytics 4 and HubSpot tracking only run after you
                 allow analytics in our consent banner. Google Analytics 4 does not

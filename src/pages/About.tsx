@@ -56,7 +56,7 @@ const About = () => (
           <p className="text-gray-700">
             MyPrivacyTOOL Ltd
             <br />
-            12E, Block 5, 8 Pak Lai Road, Park Island, Ma Wan, Tsuen Wan District, New Territories, Hong Kong, HK99
+            Hong Kong
           </p>
         </section>
 

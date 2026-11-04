@@ -1,0 +1,22 @@
+# MPT support Worker (MPC-8528). SCAFFOLD ONLY: not deployed, not routed, disabled.
+# There is deliberately NO deploy workflow and NO route. workers_dev is off, so even a manual `wrangler deploy` would expose nothing
+# until a route is added. To enable, ALL of these are needed first (see docs/support-ai-backend-mpc-8528.md):
+#   approved MPC-8530 policy and decisions, the supabase/proposed schema moved into migrations (production approval), a rate-limiter
+#   binding, the secrets below, a provider listed as a sub-processor if MODEL_* is set, and the MPC-8531 review.
+name = "mpt-support"
+main = "index.ts"
+compatibility_date = "2024-09-23"
+workers_dev = false
+
+[vars]
+SUPPORT_AI_ENABLED = "0"
+
+[observability]
+enabled = true
+
+# Rate limiter: REQUIRED before enabling (the Worker refuses to run without it). Declare it like workers/core-brain/wrangler.toml
+# ([[unsafe.bindings]] type = "ratelimit") with an account-unique namespace_id chosen at enable time; none is reserved here.
+
+# Secrets (wrangler secret put): SUPPORT_INTAKE_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (required);
+# RESEND_API_KEY + SUPPORT_EMAIL_FROM (email replies); MODEL_BASE_URL + MODEL_API_KEY + MODEL_NAME (AI answers; provider listing first);
+# SUPPORT_FAQ_APPROVAL_VERSION + SUPPORT_FAQ_APPROVED_BY (set by the FAQ owners only).

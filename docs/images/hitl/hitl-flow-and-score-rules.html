@@ -1,0 +1,122 @@
+<title>HITL Confirmation Loop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: three lanes (browser, worker, database) read left to right, then the score rules table, then what is still open. */
+:root {
+  --bg: #f5f6f7; --surface: #ffffff; --line: #d6dbe0; --fg: #1b2530; --muted: #5b6875;
+  --accent: #0b6e6e; --accent-soft: #dcefee; --count: #1f7a46; --count-soft: #def3e6; --drop: #b3402f; --drop-soft: #f8e3df; --warn: #8a6100; --warn-soft: #f6ecd0;
+  --g3: #0f4d2a; --g2: #2f8a55; --g1: #a9d9bb; --n0: #ffffff; --r1: #efb3a8; --r2: #c0503d; --r3: #7a1c14;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171d; --surface: #19212a; --line: #2c3742; --fg: #e4e9ee; --muted: #93a1ae;
+  --accent: #5cc4c0; --accent-soft: #17383a; --count: #62c98d; --count-soft: #173324; --drop: #f08b7a; --drop-soft: #3a1f1b; --warn: #e5bb55; --warn-soft: #382c10; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11171d; --surface: #19212a; --line: #2c3742; --fg: #e4e9ee; --muted: #93a1ae;
+  --accent: #5cc4c0; --accent-soft: #17383a; --count: #62c98d; --count-soft: #173324; --drop: #f08b7a; --drop-soft: #3a1f1b; --warn: #e5bb55; --warn-soft: #382c10; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--sans); padding-block: 28px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1040px; margin: 0 auto; display: grid; gap: 36px; }
+h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; }
+h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+p { margin: 0; } .sub { color: var(--muted); max-width: 62ch; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+.lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.lane { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.lane > h3 { margin: 0; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+.lane > h3 span { font: 500 11px var(--mono); color: var(--muted); }
+.step { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 8px 10px; border-radius: 0 4px 4px 0; display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.step b { font-weight: 600; } .step small { color: var(--muted); font-size: 12.5px; }
+.step.stop { border-color: var(--drop); background: var(--drop-soft); }
+.step.store { border-color: var(--count); background: var(--count-soft); }
+.arrow { text-align: center; color: var(--muted); font: 500 12px var(--mono); }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; } tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; font: 500 12px var(--mono); padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.pill, .hex { --bg-c: var(--n0); --fg-c: #1b2530; background: var(--bg-c); color: var(--fg-c); }
+.pill { box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+.hex { box-shadow: none; }
+.s-g3 { --bg-c: var(--g3); --fg-c: #fff; } .s-g2 { --bg-c: var(--g2); --fg-c: #fff; } .s-g1 { --bg-c: var(--g1); --fg-c: #0b2a17; }
+.s-n0 { --bg-c: var(--n0); --fg-c: #1b2530; } .s-r1 { --bg-c: var(--r1); --fg-c: #4a120c; } .s-r2 { --bg-c: var(--r2); --fg-c: #fff; } .s-r3 { --bg-c: var(--r3); --fg-c: #fff; }
+.example { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+.hex { width: 74px; text-align: center; font: 500 10.5px/1.25 var(--mono); padding: 14px 4px; clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
+.scale { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font: 500 11px var(--mono); color: var(--muted); } .scale i { flex: 1; height: 10px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line); min-width: 60px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+.open { display: grid; gap: 8px; }
+.open > div { background: var(--warn-soft); color: var(--fg); border-left: 3px solid var(--warn); padding: 9px 12px; border-radius: 0 4px 4px 0; }
+.open b { color: var(--warn); }
+@media (max-width: 760px) { .lanes { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<main>
+  <header>
+    <h1>HITL confirmation loop</h1>
+    <p class="sub">What happens when someone taps a finding and says it is theirs, not theirs, or wrong. Merged in PR 375, on top of the deep-dive endpoints already in main.</p>
+  </header>
+
+  <section>
+    <h2>One tap, end to end</h2>
+    <div class="lanes">
+      <div class="lane">
+        <h3>Browser <span>useHexagonState</span></h3>
+        <div class="step"><b>Tap: yes, no, or dispute</b><small>The tile changes at once. The screen never waits for the server.</small></div>
+        <div class="arrow">POST /api/scan/hexagon-interaction</div>
+        <div class="step"><code>{ scan_id, hexagon_id, action }</code><small>action is confirm, reject or dispute. No finding value is sent.</small></div>
+        <div class="step stop"><b>Offline, 403, 5xx</b><small>Swallowed. The page keeps its own state.</small></div>
+      </div>
+      <div class="lane">
+        <h3>Worker <span>webhook-receiver</span></h3>
+        <div class="step stop"><b>Proof of possession</b><small>Scan must exist, be under 24h old, and belong to a wa_id that messaged us. Otherwise 404.</small></div>
+        <div class="step stop"><b>Transition rule</b><small>Only a guess can be confirmed or rejected. Only a checked finding above 0.8 can be disputed. Anything else is 409.</small></div>
+        <div class="step"><b>Save new state</b><small>Scan state in Firestore, status becomes confirmed, false_positive or disputed.</small></div>
+        <div class="step store"><b>persistInteraction</b><small>Fail-soft. A database problem never blocks the answer.</small></div>
+      </div>
+      <div class="lane">
+        <h3>Supabase <span>service_role only</span></h3>
+        <div class="step store"><b>mpt_hexagon_interactions</b><small>Every accepted answer: session, hexagon, action, confidence, provider.</small></div>
+        <div class="arrow">reject or dispute, and the finding names a provider</div>
+        <div class="step store"><b>osint_engine_tuning_log</b><small>rejected writes false_positive_rate. disputed writes dispute_rate. No session, no wa_id.</small></div>
+        <div class="step"><b>Learning loop</b><small>The OSINT engine reads this log to lower confidence for a provider that keeps being wrong.</small></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What counts toward the risk score</h2>
+    <div class="scale" aria-hidden="true"><span>counts most</span><i style="background:linear-gradient(90deg,var(--g3),var(--g2),var(--g1),var(--n0),var(--r1),var(--r2),var(--r3))"></i><span>excluded, strongest objection</span></div>
+    <div class="table-wrap"><table>
+      <tr><th>Final status</th><th>Counts</th><th>Why</th><th>Learning log row</th></tr>
+      <tr><td><code>confirmed</code></td><td><span class="pill s-g3">counts</span></td><td>The person said yes to a guess: this is me.</td><td>none</td></tr>
+      <tr><td><code>checked</code></td><td><span class="pill s-g2">counts</span></td><td>A provider answered with a well-formed value. Only if it is an exposure.</td><td>none</td></tr>
+      <tr><td><code>given</code></td><td><span class="pill s-g1">counts</span></td><td>The Meta display name. Main already counts it; the original brief said to exclude it.</td><td>none</td></tr>
+      <tr><td><code>guess</code>, <code>not_checked</code></td><td><span class="pill s-n0">neutral</span></td><td>Unanswered, or the provider failed. Never turned into clean.</td><td>none</td></tr>
+      <tr><td><code>false_positive</code></td><td><span class="pill s-r2">excluded</span></td><td>The engine only guessed, and the person answered no. A weaker claim, so a weaker signal.</td><td><code>false_positive_rate</code> for that provider</td></tr>
+      <tr><td><code>disputed</code></td><td><span class="pill s-r3">excluded</span></td><td>A provider marked it checked with confidence above 0.8, and the person says it is wrong. The provider claimed to know.</td><td><code>dispute_rate</code> for that provider</td></tr>
+    </table></div>
+    <div class="card" style="margin-top:14px">
+      <b>Example from the test run</b>
+      <div class="example" aria-label="Six hexagons, one counted">
+        <div class="hex s-g1">display name given</div>
+        <div class="hex s-r3">profile pic disputed</div>
+        <div class="hex s-n0">spam flag clean</div>
+        <div class="hex s-n0">breach not checked</div>
+        <div class="hex s-n0">hex 5</div>
+        <div class="hex s-n0">hex 6</div>
+      </div>
+      <p class="sub">GET /api/scan/final-risk-score returns <code>verified_exposure_count: 1</code>, <code>score: 16.7</code> (1 of the scan's 6 hexagons) and <code>confirmed_hexagon_ids: ["hex_contact_display_name"]</code>, the list to remediate.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Still open</h2>
+    <div class="open">
+      <div><b>Not switched on.</b> The browser needs <code>VITE_DEEP_DIVE_API_URL</code>. The webhook-receiver has no public route yet, so the hook sends nothing until it is set.</div>
+      <div><b>No page passes a scan id.</b> The hook accepts one, but no screen opens a deep-dive scan and hands it over yet.</div>
+      <div><b>Migration not applied to the live database.</b> It passes CI on a throwaway Postgres. Until it is applied, writes are skipped quietly.</div>
+      <div><b>Contract differs from the brief.</b> Main's field names and 404 for an unknown scan are kept. Say if you want <code>scan_session_id</code>, <code>user_action</code> and 403 instead.</div>
+    </div>
+  </section>
+</main>

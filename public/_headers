@@ -1,0 +1,83 @@
+# Cloudflare Pages response headers (MPC-7200). Cloudflare compresses text assets (brotli/gzip) at the edge
+# automatically; this file controls browser + edge caching.
+
+# MPC-9057: stop Cloudflare auto-injecting its Web Analytics beacon (it would load before the visitor's cookie choice).
+# Cloudflare skips edge injection on responses marked no-transform. The consent-gated loader in src/lib/cfWebAnalytics.ts
+# is the only place the beacon is added.
+/*
+  Cache-Control: no-transform
+
+# Vite emits content-hashed filenames under /assets, so they can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Pre-rendered route HTML and the SPA shell must revalidate so a deploy is visible immediately
+# (the hashed assets they reference make revalidation cheap).
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Unhashed static files: cache a day at the browser, a week at the edge, serve stale while refreshing.
+/*.jpg
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/footprint/
+  Cache-Control: public, max-age=0, must-revalidate
+/curtain/*
+  Cache-Control: public, max-age=0, must-revalidate
+/footprint/curtain.json
+  Cache-Control: public, max-age=0, must-revalidate
+/footprint/hexagons-366.json
+  Cache-Control: public, max-age=0, must-revalidate
+/hexagon/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/blog/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/media/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/favicon.ico
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+/site.webmanifest
+  Cache-Control: public, max-age=86400
+/robots.txt
+  Cache-Control: public, max-age=3600
+/version.json
+  Cache-Control: no-store
+/sitemap.xml
+  Cache-Control: public, max-age=3600
+
+# MPC-7893: the private Telegram dashboard and its one-time link. Never cached, never indexed, no referrer. (The Functions also set these on their own responses.)
+/d/*
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/dashboard
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/api/dashboard
+  Cache-Control: no-store, private
+  X-Robots-Tag: noindex, nofollow, noarchive
+# MPC-8689: the Telegram to Web footprint handoff link and its data.
+/f/*
+  Cache-Control: no-store, private
+  Referrer-Policy: no-referrer
+  X-Robots-Tag: noindex, nofollow, noarchive
+/api/footprint
+  Cache-Control: no-store, private
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+# MPC-7350: security response headers for Cloudflare Pages (served on every route).
+# CSP is intentionally NOT enforced here: the site loads GTM (after the visitor accepts analytics in our own cookie banner, MPC-8450), and index.html
+# has inline scripts. Roll out a Content-Security-Policy-Report-Only first (see docs/security-audit-mpc-7350.md).
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), payment=(), usb=(), interest-cohort=()
+# MPC-8684: the Telegram privacy guide PDF. Unlisted, linked only after the email form succeeds (soft gate, decided with Chris 2026-10-29). Keep it out of search.
+# Lives in /downloads/, NOT /guides/: /guides/ and /guides/<id>/ are the public, sitemap-listed guide pages and must stay indexable.
+/downloads/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Cache-Control: public, max-age=86400

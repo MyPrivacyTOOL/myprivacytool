@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
@@ -6,11 +6,13 @@ import Footer from "./Footer";
 import MatrixRain from "@/components/MatrixRain";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { usePageViewTracking } from "@/hooks/usePageViewTracking";
 
 const { title: DEFAULT_TITLE, description: DEFAULT_DESCRIPTION } = pageMeta["/"];
 
 const Layout = () => {
   const location = useLocation();
+  usePageViewTracking();
 
   useEffect(() => {
     if (!location.hash) return;
@@ -39,7 +41,10 @@ const Layout = () => {
       <div className="relative z-10 flex min-h-screen flex-1 flex-col">
         <Header />
         <main className="flex-1">
-          <Outlet />
+          {/* Route chunks load lazily (App.tsx); a full-viewport placeholder keeps the footer below the fold so it cannot shift into view (CLS). */}
+          <Suspense fallback={<div className="min-h-screen" aria-busy="true" />}>
+            <Outlet />
+          </Suspense>
         </main>
         <Footer />
       </div>

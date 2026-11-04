@@ -1,0 +1,41 @@
+name: Reconcile Cairn Notion mirror (MPC-8413)
+
+# Supabase deletes a Cairn session 72 hours after it starts. Notion has no retention of its own, so this archives the Notion rows of every
+# purged session. Runs every 6 hours (so Notion trails Supabase's purge by at most ~6 h) and on demand. It archives only; Notion keeps
+# archived pages in trash for 30 days. It prints counts, never values.
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reconcile-mpt-cairn-notion
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_CAIRN_TOKEN || secrets.NOTION_TOKEN }}
+      SUPABASE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SUPABASE_KEY }}
+      SUPABASE_URL: https://xmdmkumwxpgahmlweuug.supabase.co
+      NOTION_CAIRN_SESSIONS_DB: 318dfa5f-eb62-46fa-9bd0-c9fa58577c65
+      NOTION_CAIRN_FACTS_DB: 5aa01b41-879e-43f7-ac77-57bbb9bfcb77
+      NOTION_CAIRN_INTENTS_DB: 3cdbc13a-85fe-4fea-b108-bbcf955227e4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check secrets are present
+        run: |
+          missing=0
+          [ -n "$NOTION_TOKEN" ] || { echo "::error::No Notion token (set NOTION_CAIRN_TOKEN or NOTION_TOKEN)"; missing=1; }
+          [ -n "$SUPABASE_KEY" ] || { echo "::error::No Supabase key (set NEW_SUPABASE_SECRET_KEY or SUPABASE_KEY)"; missing=1; }
+          exit $missing
+      - name: Archive Notion rows of purged sessions
+        run: node workers/mpt-cairn-blackboard/reconcile-cli.mjs

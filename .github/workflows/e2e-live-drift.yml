@@ -1,0 +1,43 @@
+name: E2E live drift (read-only)
+
+# MPC-E2E-HAR: the PR suite replays e2e/hars/ (recorded production visitor lookups). This nightly job checks
+# production still matches those recordings, and that key pages render in a real browser.
+# Read-only: e2e-live/guard.ts aborts every non-GET request, so no lead, subscriber or report is created.
+# Red run = the recordings are stale or production broke. See docs/e2e-har-simulation.md#when-drift-fails.
+
+on:
+  schedule:
+    - cron: '17 19 * * *'   # 03:17 HKT
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-live-drift
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    name: Live drift (Playwright, read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Contract + render checks against https://www.myprivacytool.io
+        run: npm run test:e2e:live
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-live-report
+          path: |
+            playwright-report-live
+            test-results
+          retention-days: 14

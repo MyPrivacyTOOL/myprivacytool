@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { afterFirstPaint } from '@/lib/idle';
 
 /**
  * Site-wide Matrix rain (MPC-6906).
@@ -50,6 +51,7 @@ const MatrixRain = () => {
     let columns: Column[] = [];
     let rafId = 0;
     let lastStep = 0;
+    let ready = false;
 
     let glyph = '';
     let lead = '';
@@ -73,7 +75,8 @@ const MatrixRain = () => {
       const h = window.innerHeight;
       // Ignore small height changes (mobile URL bar) so we don't reallocate mid-scroll.
       if (w === width && Math.abs(h - height) < 120 && canvas.width > 0) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      // Phones: 1x is plenty for 18-32% alpha glyphs and quarters the pixels to fill.
+      const dpr = Math.min(window.devicePixelRatio || 1, w < 768 ? 1 : MAX_DPR);
       width = w;
       height = h;
       canvas.width = Math.round(w * dpr);
@@ -89,21 +92,21 @@ const MatrixRain = () => {
 
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
-      for (let c = 0; c < columns.length; c++) {
-        const col = columns[c];
-        const x = c * FONT_SIZE;
-        for (let t = 0; t < TRAIL; t++) {
+      // Fill style/alpha depend only on the trail index, so iterate trail-major and change canvas state
+      // TRAIL times per frame instead of once per glyph (same pixels, far less state churn).
+      for (let t = 0; t < TRAIL; t++) {
+        if (t === 0) {
+          ctx.fillStyle = lead;
+          ctx.globalAlpha = leadAlpha;
+        } else {
+          ctx.fillStyle = glyph;
+          ctx.globalAlpha = glyphAlpha * (1 - t / TRAIL);
+        }
+        for (let c = 0; c < columns.length; c++) {
+          const col = columns[c];
           const row = col.head - t;
           if (row < 0 || row > rows) continue;
-          const fade = 1 - t / TRAIL;
-          if (t === 0) {
-            ctx.fillStyle = lead;
-            ctx.globalAlpha = leadAlpha;
-          } else {
-            ctx.fillStyle = glyph;
-            ctx.globalAlpha = glyphAlpha * fade;
-          }
-          ctx.fillText(col.glyphs[t], x, row * FONT_SIZE);
+          ctx.fillText(col.glyphs[t], c * FONT_SIZE, row * FONT_SIZE);
         }
       }
       ctx.globalAlpha = 1;
@@ -127,7 +130,7 @@ const MatrixRain = () => {
     };
 
     const start = () => {
-      if (reduced || rafId || document.hidden) return;
+      if (!ready || reduced || rafId || document.hidden) return;
       lastStep = 0;
       rafId = requestAnimationFrame(tick);
     };
@@ -147,16 +150,24 @@ const MatrixRain = () => {
       }
     };
 
-    loadTokens();
-    resize();
-    start();
-    window.addEventListener('resize', resize);
+    // MPC-7200: decorative layer starts after the first paint so it never competes with LCP/INP.
+    let cancelled = false;
+    afterFirstPaint().then(() => {
+      if (cancelled) return;
+      ready = true;
+      loadTokens();
+      resize();
+      start();
+    });
+    const onResize = () => ready && resize();
+    window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', onVisibility);
     motionQuery.addEventListener('change', onMotion);
 
     return () => {
+      cancelled = true;
       stop();
-      window.removeEventListener('resize', resize);
+      window.removeEventListener('resize', onResize);
       document.removeEventListener('visibilitychange', onVisibility);
       motionQuery.removeEventListener('change', onMotion);
     };

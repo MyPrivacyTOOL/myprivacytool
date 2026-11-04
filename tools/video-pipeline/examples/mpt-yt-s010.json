@@ -1,0 +1,15 @@
+{
+  "id": "MPT-YT-S010",
+  "slug": "singapore-dnc-registry",
+  "title": "Singapore Do Not Call Registry: How to Sign Up",
+  "language": "en",
+  "beats": [
+    {"narration": "I'm Alice, and today we're looking behind the curtain at Singapore's Do Not Call Registry.", "on_screen": "Singapore Do Not Call Registry"},
+    {"narration": "It's free, and the government runs it.", "on_screen": "Free. Government-run."},
+    {"narration": "There are three registers: no voice calls, no text messages, and no faxes. You can join any of them, or all three.", "on_screen": "No Voice Call. No Text Message. No Fax."},
+    {"narration": "Register your Singapore number online, by SMS, or by phone.", "on_screen": "Online. SMS. Phone."},
+    {"narration": "After you register, it can take up to twenty-one days to take full effect.", "on_screen": "Up to 21 days to take full effect"},
+    {"narration": "It won't cover companies you already deal with, or public agencies, charities and surveys. For those, ask the sender to stop.", "on_screen": "Ask those senders to stop"},
+    {"narration": "Want to see where else your details are listed? Check your exposure.", "on_screen": "Check your exposure: myprivacytool.io/scan"}
+  ]
+}

@@ -82,6 +82,12 @@
     --brand-ink: 145 63% 27%;
     --brand-soft: 145 45% 94%;                   /* Matrix Green at ~10% on white */
 
+    /* MPC-7916: honest hexagon tiles. Green = clear, red = needs fixing, purple = our guess, grey = no claim made. Only used when the tile flag is on. */
+    --tile-green: var(--brand-ink);
+    --tile-red: 8 62% 48%;
+    --tile-purple: 267 43% 52%;
+    --tile-grey: 150 5% 50%;
+
     --surface: var(--brand-white);
     --surface-alpha: 0.94;                       /* lets the rain read faintly through cards */
     --surface-border: var(--border);
@@ -357,5 +363,14 @@
       animation: none;
       filter: drop-shadow(0 0 10px hsl(var(--brand-ink) / 0.7));
     }
+  }
+}
+/* MPC-7200: iOS Safari zooms the page when a focused field has a font-size under 16px. Keep form fields at
+   16px on phones (raw <input>/<select> use text-sm = 14px). !important is needed to beat the utility class. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }

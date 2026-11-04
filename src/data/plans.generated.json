@@ -1,0 +1,30 @@
+[
+  {
+    "slug": "free",
+    "name": "Free",
+    "monthly_price_cents": 0,
+    "scans_label": "1 scan per month",
+    "note": "No credit card required"
+  },
+  {
+    "slug": "basic",
+    "name": "Basic",
+    "monthly_price_cents": 799,
+    "scans_label": "5 scans per month",
+    "note": null
+  },
+  {
+    "slug": "pro",
+    "name": "Pro",
+    "monthly_price_cents": 1499,
+    "scans_label": "25 scans per month",
+    "note": null
+  },
+  {
+    "slug": "executive",
+    "name": "Executive",
+    "monthly_price_cents": 4999,
+    "scans_label": "Unlimited scans",
+    "note": null
+  }
+]
