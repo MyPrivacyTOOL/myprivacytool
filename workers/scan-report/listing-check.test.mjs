@@ -170,7 +170,7 @@ const pageFetch = (F) => async (url, o = {}) => {
   job = await runReportJob(env, f);
   const reportMail = JSON.parse(F.calls.filter((c) => c.url.includes('resend')).pop().body);
   check(job.sent === 1 && F.db.scans[0].report_status === 'sent', 'after the click: the report is sent');
-  check(/LISTINGS YOU SHOWED US/.test(reportMail.text) && /LISTED, a match for the details you gave/.test(reportMail.text) && reportMail.text.includes('https://listing-fixture.example/zelda') && /Listings you showed us/.test(reportMail.html), 'report email has the "Listings you showed us" block with state and the evidence page');
+  check(/BROKER SITES/.test(reportMail.text) && /: LISTED\n  We found a listing that matches what you told us/.test(reportMail.text) && reportMail.text.includes('https://listing-fixture.example/zelda') && /Broker sites/.test(reportMail.html) && /Evidence: the page/.test(reportMail.html), 'report email has the broker section with the pasted page LISTED, its confidence and the evidence page (MPC-9814)');
   check(F.fixtureCalls.length === 1, 'the report job reuses the stored result (the page is not read a third time)');
   const ls = await loadListings(F.db ? { select: async (p) => (p.startsWith('web_scan_listing_checks') ? F.db.web_scan_listing_checks.filter((x) => p.includes(x.scan_id)) : []) } : null, scan.id);
   check(ls.items.length === 1 && ls.items[0].state === 'listed' && ls.pending === false, 'loadListings returns the stored results for the screen');
@@ -214,7 +214,7 @@ const pageFetch = (F) => async (url, o = {}) => {
   const off = buildConfirmationEmail({ liveLink: 'https://www.myprivacytool.io/scan/live#v=x' });
   check(off.subject === 'Your privacy scan is starting' && !/Confirm this is my email/.test(off.html), 'gate off: confirmation email unchanged');
   const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: [], listings: { items: [{ key: 'spokeo', name: 'Spokeo', state: 'not_checked', not_checked_reason: 'fetch_blocked', evidence_url: 'https://www.spokeo.com/p/1', guide: { optOutUrl: 'https://www.spokeo.com/optout' } }] } });
-  check(/NOT CHECKED, the site would not let us read that page\. This is not a clear result\./.test(rep.text) && !/NOT LISTED/.test(rep.text), 'report block: a blocked page reads as NOT CHECKED, never NOT LISTED');
+  check(/Spokeo \(US\): NOT CHECKED\n  Not checked: the site would not let us read that page\. This is not a clear result\./.test(rep.text) && !/NOT LISTED/.test(rep.text), 'report block: a blocked page reads as NOT CHECKED, never NOT LISTED');
 }
 
 console.log(ok ? 'ALL PASS' : 'SOME FAILED');

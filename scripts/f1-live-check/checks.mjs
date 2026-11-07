@@ -1,5 +1,6 @@
 // MPC-9813: pure checks for the automated live check of the email confirm gate and the "show us your listing" check. No network, no secrets.
-export const FIXTURE_URL = 'https://www.myprivacytool.io/test-fixtures/listing-synthetic.html';
+// The canonical address: Cloudflare Pages redirects the same page's ".html" address (308), so the check pastes the address that answers 200 directly.
+export const FIXTURE_URL = 'https://www.myprivacytool.io/test-fixtures/listing-synthetic';
 export const IDENTITY = { full_name: 'Zelda Quillfeather', city_region: 'Austin, TX', country: 'US', phone: '5125550142' };   // invented person
 
 /** The POST /api/scan body: the nightly chain's synthetic scan plus the typed details and the pasted page. */
@@ -38,10 +39,14 @@ export function checkStoredResult(results) {
 /** Problems with the report email as sent (text + html). */
 export function checkReportBlock({ text, html }) {
   const p = [];
-  if (!/LISTINGS YOU SHOWED US/.test(text || '')) p.push('report text lacks "LISTINGS YOU SHOWED US"');
-  if (!/LISTED, a match for the details you gave/.test(text || '')) p.push('report text lacks the Listed state line');
-  if (!(text || '').includes(FIXTURE_URL)) p.push('report text lacks the evidence page link');
-  if (!/Listings you showed us/.test(html || '')) p.push('report HTML lacks the "Listings you showed us" block');
-  if (/NOT LISTED/.test(text || '')) p.push('report says NOT LISTED for a page that lists the identity');
+  // MPC-9814 renamed the block: the pasted page now sits inside the "Broker sites" section of the report. A report sent by the previous Worker
+  // ("Listings you showed us") is still accepted, so a run that straddles the deploy is judged on what that report was.
+  const t = text || '', h = html || '';
+  const newBlock = /BROKER SITES/.test(t), oldBlock = /LISTINGS YOU SHOWED US/.test(t);
+  if (!newBlock && !oldBlock) p.push('report text lacks "BROKER SITES" (or the earlier "LISTINGS YOU SHOWED US")');
+  if (!(newBlock ? /: LISTED\n\s+We found a listing that matches what you told us/ : /LISTED, a match for the details you gave/).test(t)) p.push('report text lacks the Listed state line');
+  if (!t.includes(FIXTURE_URL)) p.push('report text lacks the evidence page link');
+  if (!(newBlock ? /Broker sites/ : /Listings you showed us/).test(h)) p.push('report HTML lacks the broker block');
+  if (/NOT LISTED/.test(t)) p.push('report says NOT LISTED for a page that lists the identity');
   return p;
 }

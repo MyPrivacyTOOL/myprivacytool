@@ -9,8 +9,9 @@ const STYLE = {
   planned: "bg-muted text-muted-foreground border-border",
 } as const;
 
-const FeatureStatus = ({ feature, className }: { feature: FeatureId; className?: string }) => {
-  const state = FEATURE_STATUS[feature];
+// `state` (MPC-9814) pins a marker for a part of a claim that is not live even when its feature is: e.g. F1 live = the free check, paid coverage stays Planned.
+const FeatureStatus = ({ feature, className, state: pinned }: { feature: FeatureId; className?: string; state?: "in_build" | "planned" }) => {
+  const state = pinned ?? FEATURE_STATUS[feature];
   if (state === "live") return null;
   return (
     <span

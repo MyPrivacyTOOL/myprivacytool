@@ -17,10 +17,22 @@ export type ListingResult = {
   guide: { slug: string; name: string; optOutUrl: string | null } | null;
 };
 export type LiveListings = { pending: boolean; items: ListingResult[] };
+/** MPC-9814: one broker row of the panel the Worker builds (workers/scan-report/lib/brokerPanel.js owns the wording). All nine shortlist brokers always come back. */
+export type BrokerRow = {
+  key: string; name: string; region: string | null;
+  state: "listed" | "not_listed" | "not_checked"; match: "exact" | "probable" | "possible" | null; is_guess: boolean;
+  confidence: "high" | "medium" | "low" | null; confidenceWord: string | null; confidenceLevel: number;
+  text: string; checkedOn: string | null; evidenceUrl: string | null;
+  also: { state: string; evidenceUrl: string | null }[];
+  guide: { slug: string; timeNeeded: string | null } | null; noGuideText: string | null;
+};
+export type BrokerPanel = { pending: boolean; pasteAvailable: boolean; intro: string; rows: BrokerRow[]; others: BrokerRow[]; regionNote: string; coverageNote: string };
 export type LiveSnapshot = {
   items: LiveItem[]; done: boolean; reportSent: boolean; verified: boolean;
   /** MPC-9813: present only while the email-confirm gate is on. */
   confirmRequired?: boolean; confirmed?: boolean; listings?: LiveListings;
+  /** MPC-9814: the broker section of every scan's result. */
+  brokerPanel?: BrokerPanel;
 };
 /** "stream" = the short-lived key from the request (low-sensitivity view). "verified" = the key from the email link (proves inbox ownership; values shown). */
 export type LiveKind = "stream" | "verified";
@@ -36,7 +48,7 @@ export async function fetchLive(token: string, kind: LiveKind = "stream"): Promi
       : await fetch(`${base}/api/scan/live?t=${encodeURIComponent(token)}`);
     if (res.status === 401 || res.status === 403 || res.status === 503) return "gone";
     if (!res.ok) return null;
-    const b = (await res.json()) as { items?: unknown; done?: unknown; report_sent?: unknown; verified?: unknown; confirm_required?: unknown; confirmed?: unknown; listings?: unknown };
+    const b = (await res.json()) as { items?: unknown; done?: unknown; report_sent?: unknown; verified?: unknown; confirm_required?: unknown; confirmed?: unknown; listings?: unknown; broker_panel?: unknown };
     const items = Array.isArray(b.items)
       ? b.items.flatMap((i: Partial<LiveItem>) =>
           typeof i?.id === "string" && typeof i?.label === "string" && (i.status === "found" || i.status === "clear" || i.status === "not_checked")
@@ -48,6 +60,7 @@ export async function fetchLive(token: string, kind: LiveKind = "stream"): Promi
       items, done: b.done === true, reportSent: b.report_sent === true, verified: b.verified === true,
       ...(typeof b.confirm_required === "boolean" ? { confirmRequired: b.confirm_required, confirmed: b.confirmed === true } : {}),
       ...(readListings(b.listings) ? { listings: readListings(b.listings)! } : {}),
+      ...(readBrokerPanel(b.broker_panel) ? { brokerPanel: readBrokerPanel(b.broker_panel)! } : {}),
     };
   } catch {
     return null;
@@ -80,6 +93,32 @@ export function readListings(raw: unknown): LiveListings | null {
     }];
   });
   return { pending: l.pending === true, items };
+}
+
+const LEVEL: Record<string, number> = { high: 3, medium: 2, low: 1 };
+const readRow = (r: Record<string, unknown>): BrokerRow[] => {
+  if (!r || typeof r !== "object" || typeof r.state !== "string" || !STATES.includes(r.state) || typeof r.name !== "string" || typeof r.text !== "string") return [];
+  const https = (v: unknown) => { const u = str(v, 500); return u && u.startsWith("https://") ? u : null; };
+  const conf = typeof r.confidence === "string" && r.confidence in LEVEL ? (r.confidence as BrokerRow["confidence"]) : null;
+  const g = r.guide as { slug?: unknown; timeNeeded?: unknown } | null;
+  const slug = g ? str(g.slug, 80) : null;
+  return [{
+    key: str(r.key, 64) ?? "other", name: r.name.slice(0, 120), region: str(r.region, 40), state: r.state as BrokerRow["state"],
+    match: typeof r.match === "string" && MATCHES.includes(r.match) ? (r.match as BrokerRow["match"]) : null, is_guess: r.is_guess === true,
+    confidence: conf, confidenceWord: conf ? str(r.confidence_word, 20) : null, confidenceLevel: conf ? LEVEL[conf] : 0,
+    text: r.text.slice(0, 400), checkedOn: str(r.checked_on, 10), evidenceUrl: https(r.evidence_url),
+    also: Array.isArray(r.also) ? (r.also as Record<string, unknown>[]).slice(0, 3).flatMap((a) => (a && typeof a.state === "string" ? [{ state: a.state, evidenceUrl: https(a.evidence_url) }] : [])) : [],
+    guide: slug ? { slug, timeNeeded: str(g!.timeNeeded, 60) } : null, noGuideText: str(r.no_guide_text, 400),
+  }];
+};
+/** Only a well-formed panel is kept. The panel is the Worker's own wording; this page adds none of its own. */
+export function readBrokerPanel(raw: unknown): BrokerPanel | null {
+  const p = raw as Record<string, unknown> | null;
+  if (!p || typeof p !== "object" || !Array.isArray(p.rows) || typeof p.intro !== "string") return null;
+  const rows = (p.rows as Record<string, unknown>[]).flatMap(readRow);
+  if (!rows.length) return null;
+  const others = Array.isArray(p.others) ? (p.others as Record<string, unknown>[]).flatMap(readRow) : [];
+  return { pending: p.pending === true, pasteAvailable: p.paste_available !== false, intro: p.intro.slice(0, 500), rows, others, regionNote: str(p.region_note, 600) ?? "", coverageNote: str(p.coverage_note, 300) ?? "" };
 }
 
 /** MPC-9813: the click-to-confirm. POST /api/scan/confirm with the key from the email link (header, never the URL). true = the Worker confirmed the address. */

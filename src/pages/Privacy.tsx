@@ -110,16 +110,21 @@ const Privacy = () => {
               </h3>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Account Registration:</strong> Email address, name,
-                  password, phone number (optional), organization name
+                  <strong>Account Registration:</strong> We do not have user
+                  accounts today and collect no password. When paid plans open,
+                  we expect to ask for an email address, name and password, and
+                  optionally a phone number and organization name, and we will
+                  update this policy before we do
                 </li>
                 <li>
                   <strong>Scan Requests:</strong> Email addresses and data
                   exposure information you request us to search for
                 </li>
                 <li>
-                  <strong>Payment Information:</strong> Billing address, payment
-                  method (processed securely by Stripe)<FeatureStatus feature="F3" />
+                  <strong>Payment Information:</strong> We take no payments and
+                  hold no payment details today. When paid plans open, we expect
+                  payments to be handled by Stripe, and we will update this
+                  policy before we collect any billing address or payment details
                 </li>
                 <li>
                   <strong>Communications:</strong> Feedback, support requests,
@@ -233,6 +238,9 @@ const Privacy = () => {
                 </li>
               </ul>
 
+              {/* TODO(MPC-9789): the recipient list for the visitor's IP address (who receives it: Cloudflare, Google STUN, Turnstile, edge
+                  logging, raw-IP stores, and the ipify/ipapi.co sentences in 2.2 above and in Cookies 2.2) is BLOCKED on Chris's sign-off of the
+                  Data Recipients Map (MPC-9789). Do not edit those recipient sentences until it is signed. MPC-9828 pass 1 left them as they were. */}
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 2.3 Server Logs of Every Page Request
               </h3>
@@ -390,9 +398,23 @@ const Privacy = () => {
               </h2>
               <p className="text-muted-foreground">
                 We do not collect your date of birth or your street address for our
-                free scan or waitlist. If a paid feature later requires a billing
+                free scan or waitlist. If a paid plan later requires a billing
                 address, we will tell you at the point of collection and keep it
                 only as long as tax and accounting law requires.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">
+                2B. Partners We Are Considering
+              </h2>
+              <p className="text-muted-foreground">
+                We are considering a licensed broker-data vendor to help check
+                whether your details appear in data-broker listings. It is
+                planned and not yet active: no data is sent to any such vendor
+                today. Before we switch one on, we will name it in this policy
+                and in our DPA, and say what it receives. The vendor has not yet
+                been chosen.
               </p>
             </section>
 
@@ -406,15 +428,16 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
                   <strong>Service Delivery:</strong> Performing privacy scans,
-                  generating exposure reports, managing your account
+                  generating exposure reports (and, when paid plans open, managing your account)
                 </li>
                 <li>
                   <strong>Customer Support:</strong> Responding to inquiries,
-                  troubleshooting issues, sending account updates
+                  troubleshooting issues (and, when paid plans open, sending account updates)
                 </li>
                 <li>
-                  <strong>Billing & Payments:</strong> Processing subscription
-                  payments and generating invoices
+                  <strong>Billing & Payments:</strong> When paid plans open,
+                  processing subscription payments and generating invoices. We
+                  do none of this today
                 </li>
                 <li>
                   <strong>Marketing:</strong> Sending promotional emails, product
@@ -477,12 +500,14 @@ const Privacy = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Service Providers:</strong> Payment processors (Stripe),<FeatureStatus feature="F3" />
-                  hosting and edge infrastructure (Cloudflare), databases (Supabase,
+                  <strong>Service Providers:</strong> Hosting and edge infrastructure (Cloudflare), databases (Supabase,
                   Google Cloud), CRM and email (HubSpot), messaging platforms
                   (Telegram), transactional email (Resend), internal task and
                   notification tools (Notion, Slack), and analytics (Google Analytics 4, and Cloudflare
-                  Web Analytics, which counts page loads without cookies)
+                  Web Analytics, which counts page loads without cookies). When
+                  paid plans open, we expect to add a payment processor (planned:
+                  Stripe) and will name it here and in our DPA before it receives
+                  any data
                 </li>
                 <li>
                   <strong>AI Model Providers:</strong> When you send us a message
@@ -557,14 +582,16 @@ const Privacy = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Account Data:</strong> Retained for the duration of
-                  your subscription plus 30 days<FeatureStatus feature="F3" />
+                  <strong>Account Data:</strong> We hold none today. When paid
+                  plans open, account data will be kept for the duration of your
+                  subscription plus 30 days
                 </li>
                 <li>
                   <strong>Scan Results:</strong> Per-session scan results for
                   submitted handles are deleted automatically after 24 hours.
-                  Results saved to an account are retained for 2 years for
-                  historical comparison and reporting<FeatureStatus feature="F3" />
+                  When paid plans open, results saved to an account will be
+                  retained for 2 years for historical comparison and reporting.
+                  We have no accounts today
                 </li>
                 <li>
                   <strong>Saved Web Scans:</strong> The full result of a scan you
@@ -604,8 +631,9 @@ const Privacy = () => {
                   or anonymised
                 </li>
                 <li>
-                  <strong>Billing Records:</strong> Retained for 7 years
-                  (legal requirement)<FeatureStatus feature="F3" />
+                  <strong>Billing Records:</strong> We hold none today. When
+                  paid plans open, billing records will be kept for 7 years
+                  (legal requirement)
                 </li>
                 <li>
                   <strong>Analytics Data:</strong> Aggregated data retained for

@@ -412,9 +412,8 @@ const Index = () => {
             </div>
 
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
-              The scan runs in your browser and its results aren't stored on our
-              servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only store what you choose to submit, such as your email
-              address, and we use analytics only with your consent.<FeatureStatus feature="F8" />{" "}
+              The scan runs in your browser. We save a scan only if you tick &ldquo;save my scan&rdquo;; we then keep it for 12 months, and you can have it deleted at any time by quoting your scan number. We only store what you choose to submit, such as your email
+              address, and we use analytics only with your consent.{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>
