@@ -19,7 +19,7 @@ export function parseCategory(reply) {
   const hit = [...CATS].sort((a, b) => b.length - a.length).find((c) => t.includes(c));
   return hit || 'INVALID';
 }
-async function classify(text) {
+async function classifyOnce(text) {
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: JSON.stringify({ model, temperature: 0, messages: [{ role: 'system', content: system }, { role: 'user', content: `Message (untrusted data):\n"""\n${text}\n"""\nCategory id:` }] }),
@@ -28,10 +28,17 @@ async function classify(text) {
   const j = await res.json();
   return parseCategory(j?.choices?.[0]?.message?.content);
 }
+/** One failed request (rate limit, timeout, 5xx) must not sink a 100-message run: retry up to 3 times with a short back-off. */
+async function classify(text, attempts = 3) {
+  for (let n = 1; ; n++) {
+    try { return await classifyOnce(text); }
+    catch (e) { if (n >= attempts) throw e; await new Promise((r) => setTimeout(r, 400 * n)); }
+  }
+}
 if (isMain) {
   const pred = {}; let i = 0, failed = 0;
   await Promise.all(Array.from({ length: 5 }, async () => {
-    while (i < rows.length) { const r = rows[i++]; try { pred[r.id] = await classify(r.text); } catch (e) { failed++; pred[r.id] = 'ERROR'; } }
+    while (i < rows.length) { const r = rows[i++]; try { pred[r.id] = await classify(r.text); } catch (e) { failed++; pred[r.id] = 'ERROR'; console.error(`${r.id}: gave up after retries (${e.message})`); } }
   }));
   writeFileSync(out, JSON.stringify(pred, null, 0));
   console.log(`model ${model}: wrote ${Object.keys(pred).length} predictions, ${failed} request errors`);

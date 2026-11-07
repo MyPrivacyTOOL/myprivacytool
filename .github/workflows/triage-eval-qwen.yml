@@ -31,5 +31,15 @@ jobs:
           if [ -z "$QWEN_API_KEY" ]; then echo "::error::repo secret QWEN_API_KEY is not set; nothing was run"; exit 1; fi
       - name: Run Qwen on the synthetic messages
         run: node scripts/triage-eval/run-model.mjs "$RUNNER_TEMP/qwen.json"
+      # Score and keep the predictions even if some requests failed, so a partial run is still readable (failed ones count as invalid, never as correct).
       - name: Score
+        if: ${{ !cancelled() }}
         run: node scripts/triage-eval/score.mjs "$RUNNER_TEMP/qwen.json"
+      - name: Keep the predictions
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen-predictions
+          path: ${{ runner.temp }}/qwen.json
+          if-no-files-found: ignore
+          retention-days: 14

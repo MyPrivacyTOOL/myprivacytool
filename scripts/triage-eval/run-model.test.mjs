@@ -20,11 +20,14 @@ const run = (cmd, args, env = {}) => new Promise((resolve) => {
   const p = spawn(cmd, args, { env: { ...process.env, ...env } }); let out = '';
   p.stdout.on('data', (d) => (out += d)); p.stderr.on('data', (d) => (out += d)); p.on('close', (code) => resolve({ code, out }));
 });
+let flakyHit = false;
 const srv = http.createServer((req, res) => {
   let b = ''; req.on('data', (d) => (b += d));
   req.on('end', () => {
     const user = JSON.parse(b).messages[1].content; const text = user.split('"""\n')[1].replace(/\n$/, '');
-    const label = byText[text]; const answer = label === 'partner' ? 'I think this is partner.' : label === 'spam' ? 'support' : label;   // mock gets every spam wrong
+    const label = byText[text];
+    if (!flakyHit && label === 'support') { flakyHit = true; res.statusCode = 500; res.end('boom'); return; }   // one transient failure: the runner must retry it
+    const answer = label === 'partner' ? 'I think this is partner.' : label === 'spam' ? 'support' : label;   // mock gets every spam wrong
     res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ choices: [{ message: { content: answer } }] }));
   });
 });
