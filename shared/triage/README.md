@@ -17,3 +17,20 @@ False alarms on ordinary messages: 0 on every set except one known case ("delete
 **Conclusion:** the rules alone catch roughly a quarter to a third of unseen phrasing. They are a cheap extra net with almost no false alarms, NOT the safety guarantee. The guarantee has to come from the design around them: every message reaches a person and nothing is auto-discarded (see the Notion task MPC-9783), plus a dedicated model check for opt-out/data-request wording.
 
 Regenerate the sets: they are plain JSON; add new fresh sets rather than tuning on `heldout3`.
+
+## The triage module (MPC-9783, decisions T4, T5, T6 by Chris, 2026-11-07)
+
+| File | Role |
+| --- | --- |
+| `prompts.js` | The ONE copy of the model prompts. The production module and `scripts/triage-eval` both import it: what was measured is what runs. |
+| `parse.js` | Reading a model reply; anything unreadable is INVALID, never guessed. |
+| `qwen.js` | The only place that talks to the model. No tools or functions are offered; the key goes in the Authorization header only. |
+| `rules.js` | The plain keyword rules (extra layer, see above). |
+| `triage.js` | `triage(message, {ask})`: rules + the yes/no check + the category -> flagged / kind / queue / urgency / owner. Metadata only. Off unless `TRIAGE_ENABLED === "true"`. |
+| `alert.js` | The Slack alert a person sees (metadata only; the function never receives the message text). |
+
+Guarantees the tests pin (and fail if broken): every message reaches a person (`discard` is always false; spam is a LOW-priority queue, not a bin); the plain rules, a model "yes", or ANY failure/unreadable answer of the yes/no check raises a message to the priority owner; a failed category check gives "unclassified", still queued; the result and alert never hold the message body, an address or a name.
+
+**Measured (synthetic messages only):** the yes/no check caught 81 of 81 should-flag messages, including 51 phrased in ways it had never seen; it raised 6 of 119 ordinary messages. Real mail is the real test and needs Chris's approval of a sample source first.
+
+**Not done / not wired:** nothing calls `triage()` from live mail yet; the Slack channel and bot access are Chris's to create; the case-record columns are only a DRAFT (`docs/triage-case-columns-draft.md`) and are applied only on Chris's explicit approval of that exact text.
