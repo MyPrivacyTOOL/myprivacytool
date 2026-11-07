@@ -69,7 +69,7 @@ const Index = () => {
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
-  const { motion } = useDeviceMotion();
+  const { motion, permission: motionPermission, requestPermission: requestMotionPermission } = useDeviceMotion();
 
   // Merge live orientation/motion data into deviceData
   const liveDeviceData = useMemo(() => {
@@ -298,6 +298,8 @@ const Index = () => {
                   rotationAngle={orientation.angle}
                   beta={motion.beta}
                   gamma={motion.gamma}
+                  motionPrompt={motionPermission === 'unknown'}
+                  onEnableMotion={() => { void requestMotionPermission(); }}
                 />
               )}
               {identity && !identity.certain && (

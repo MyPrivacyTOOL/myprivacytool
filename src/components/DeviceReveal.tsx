@@ -14,6 +14,9 @@ const ILLUSTRATION: Record<DeviceCategory, string> = {
   chromeos: 'Laptop',
 };
 
+/** Only these have motion sensors worth asking about; a Mac or PC never should see the prompt. */
+const HAS_MOTION_SENSORS: DeviceCategory[] = ['iphone', 'ipad', 'android-phone', 'android-tablet'];
+
 type CertainIdentity = Extract<DeviceIdentity, { certain: true }>;
 
 interface DeviceRevealProps {
@@ -21,6 +24,8 @@ interface DeviceRevealProps {
   rotationAngle: number;
   beta?: number | null;
   gamma?: number | null;
+  motionPrompt?: boolean;
+  onEnableMotion?: () => void;
 }
 
 const START_DELAY_MS = 55;
@@ -35,7 +40,7 @@ const prefersReducedMotion = () =>
  * Spins through the devices we can recognise, decelerates, and locks onto the
  * visitor's. Only rendered for a certain identity — unknown never reaches here.
  */
-export default function DeviceReveal({ identity, rotationAngle, beta, gamma }: DeviceRevealProps) {
+export default function DeviceReveal({ identity, rotationAngle, beta, gamma, motionPrompt, onEnableMotion }: DeviceRevealProps) {
   const targetIndex = useMemo(
     () => Math.max(0, CAROUSEL_DEVICES.findIndex((d) => d.category === identity.category)),
     [identity.category],
@@ -85,6 +90,8 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma }: D
       rotationAngle={rotationAngle}
       beta={beta}
       gamma={gamma}
+      motionPrompt={motionPrompt && locked && HAS_MOTION_SENSORS.includes(identity.category)}
+      onEnableMotion={onEnableMotion}
     />
   );
 }
