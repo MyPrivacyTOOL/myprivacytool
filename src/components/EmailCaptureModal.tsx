@@ -240,7 +240,7 @@ export default function EmailCaptureModal({
             {[
               'Your browser findings, replayed with what each one found',
               'What your email address reveals',
-              'A first email straight away, then your report within a few minutes',
+              'A confirmation email within a minute. Press its button, and your report arrives within about 5 minutes',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
                 <ChevronRight className="w-4 h-4 text-brand shrink-0 mt-0.5" />
@@ -260,7 +260,7 @@ export default function EmailCaptureModal({
               ) : (
                 <>
                   <p className="font-semibold text-risk-low">Your report is on its way.</p>
-                  <p className="text-sm text-muted-foreground">Check your inbox: a first email comes straight away and your report follows within a few minutes.</p>
+                  <p className="text-sm text-muted-foreground">Check your inbox and spam folder. A confirmation email arrives within a minute; press its button and your report follows within about 5 minutes.</p>
                 </>
               )}
               {outcome?.scanSaved && outcome.scanNumber ? (
