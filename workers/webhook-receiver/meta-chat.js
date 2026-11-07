@@ -1,4 +1,4 @@
-// CK-9837: visual, minimal Messenger and WhatsApp conversation, test mode. All words below were approved by Chris on 2026-11-07.
+// CK-9837: visual, minimal Messenger and WhatsApp conversation, test mode. All words below were approved by Chris on 2026-11-07 (person line: "A higher consciousness will reply", Chris's wording).
 // Flow: HOME card first (free scan / talk to a person / delete my data), so the person sees the value before any legal step. Nothing is saved until
 // the person taps "Talk to a person" and then "I agree" on the consent card. STOP, or the "Delete my data" button, deletes the saved conversation. Replaces the old "first hexagon" reply on these two channels
 // (it claimed a public-data snapshot and a report in 60 seconds, neither backed, and created a HubSpot contact before any consent).
@@ -17,9 +17,9 @@ export const DEFAULT_IMAGE = `${SITE}/og-image.jpg`;
 export const TEXT = {
   consentTitle: "Hi 👋 I'm MyPrivacyTOOL's automated assistant.",
   consentSubtitle: 'By chatting you agree to our Privacy Policy.',
-  homeSubtitle: 'Run the free scan to see your digital footprint.',   // NEW 2026-11-07: needs Chris's approval before MESSAGING_ENABLED is turned on
+  homeSubtitle: 'Run the free scan to see your digital footprint.',   // approved by Chris 2026-11-07
   menu: 'What would you like to do?',
-  person: 'Thanks 🙌 A person will reply within 1 business day.',
+  person: 'Thanks 🙌 A higher consciousness will reply within 1 business day.',
   deleted: `Done ✅ Deleted. Anything else: ${PRIVACY_MAIL}`,
   declined: "No problem 👍 We won't message you again.",
 };
