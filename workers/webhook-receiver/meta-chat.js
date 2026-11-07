@@ -1,69 +1,125 @@
-// CK-9837: honest first replies for Messenger and WhatsApp, in test mode. Plain text only (these channels do not render HTML).
-// Replaces the old "first hexagon" for these two channels: that message claimed a snapshot of what is publicly visible about the person,
-// said data brokers may be sharing it, and promised a report within 60 seconds. None of that was backed, and a HubSpot contact was created
-// before the person had agreed to anything. Strategy 4I: an instant reply that says it is automated, a link to /scan, a person within
-// 1 business day, no sensitive data collected in the chat. The wording below needs Chris's approval before any public go-live.
+// CK-9837: visual, minimal Messenger and WhatsApp conversation, test mode. All words below were approved by Chris on 2026-11-07.
+// Flow: consent card (tap "I agree") -> menu card (free scan / talk to a person / delete my data). Nothing else is sent before the person
+// agrees. STOP, or the "Delete my data" button, deletes the saved conversation. Replaces the old "first hexagon" reply on these two channels
+// (it claimed a public-data snapshot and a report in 60 seconds, neither backed, and created a HubSpot contact before any consent).
+// Strategy 4I: automated, a person within 1 business day, no sensitive data collected in the chat. Needs the Privacy Policy to cover
+// these channels, and Chris's legal review, before any public go-live.
 
-export const SCAN_URL = 'https://www.myprivacytool.io/scan';
-export const DELETE_URL = 'https://www.myprivacytool.io/data-deletion';
+export const SITE = 'https://www.myprivacytool.io';
+export const SCAN_URL = `${SITE}/scan`;
+export const PRIVACY_URL = `${SITE}/privacy`;
+export const DELETE_URL = `${SITE}/data-deletion`;
 export const PRIVACY_MAIL = 'privacy@myprivacytool.io';
+/** The Privacy Policy "Last updated" date the person agreed to. Change it when the policy changes. */
+export const NOTICE_VERSION = '2026-10-12';
+export const DEFAULT_IMAGE = `${SITE}/og-image.jpg`;
 
-/** Master switch for the new replies. OFF unless the Worker var MESSAGING_ENABLED is exactly "true". */
+export const TEXT = {
+  consentTitle: "Hi 👋 I'm MyPrivacyTOOL's automated assistant.",
+  consentSubtitle: 'By chatting you agree to our Privacy Policy.',
+  menu: 'What would you like to do?',
+  person: 'Thanks 🙌 A person will reply within 1 business day.',
+  deleted: `Done ✅ Deleted. Anything else: ${PRIVACY_MAIL}`,
+  declined: "No problem 👍 We won't message you again.",
+};
+export const BTN = { agree: '✅ I agree', decline: '❌ No thanks', policy: 'Privacy Policy', scan: '🔍 Free scan', person: '🙋 Talk to a person', del: '🗑️ Delete my data' };
+export const PAYLOAD = { start: 'GET_STARTED', yes: 'CONSENT_YES', no: 'CONSENT_NO', person: 'HUMAN', del: 'DELETE', scan: 'SCAN' };
+
+/** Master switch. OFF unless the Worker var MESSAGING_ENABLED is exactly the string "true". */
 export const messagingEnabled = (env) => env?.MESSAGING_ENABLED === 'true';
-
 /** Graph API version. ⚠️ UNVERIFIED default; Meta retires versions after about two years. Override with META_GRAPH_VERSION. */
 export const graphVersion = (env) => String(env?.META_GRAPH_VERSION || 'v23.0');
+export const imageUrl = (env) => String(env?.META_CARD_IMAGE_URL || DEFAULT_IMAGE);
+export const trackedScanUrl = (channel) => `${SCAN_URL}?utm_source=facebook&utm_medium=${channel}&utm_campaign=${channel}-welcome`;
 
-const tracked = (channel) => `${SCAN_URL}?utm_source=facebook&utm_medium=${channel}&utm_campaign=${channel}-welcome`;
+export const isStopWord = (text) => { const w = String(text ?? '').trim().toUpperCase(); return w === 'STOP' || w === 'DELETE'; };
 
-export function welcomeText(channel) {
-  return [
-    'Hi, this is MyPrivacyTOOL. This reply is automated.',
-    '',
-    `You can run the free privacy scan here: ${tracked(channel)}`,
-    '',
-    'A person will answer any question within 1 business day.',
-    '',
-    `To delete this conversation from our records, reply STOP. Other requests: ${DELETE_URL}`,
-  ].join('\n');
-}
-
-export function ackText() {
-  return `Thanks, we have your message. A person will reply within 1 business day. Reply STOP to delete this conversation from our records.`;
-}
-
-export function stopText() {
-  return `Done: we deleted this conversation from our records. To ask us to delete anything else, email ${PRIVACY_MAIL} or see ${DELETE_URL}.`;
-}
-
-export const isStopWord = (text) => {
-  const w = String(text ?? '').trim().toUpperCase();
-  return w === 'STOP' || w === 'DELETE';
-};
-
-/** All real inbound text/attachment messages in a Messenger webhook body. Skips echoes of our own messages, delivery and read receipts. */
+/** Real inbound events of a Messenger webhook body: typed messages and button taps. Echoes of our own messages, delivery and read receipts are skipped. */
 export function messengerEvents(body) {
   const out = [];
   for (const entry of body?.entry ?? []) {
     for (const m of entry?.messaging ?? []) {
-      if (!m?.message || m.message.is_echo || !m?.sender?.id) continue;
-      out.push({ senderId: String(m.sender.id), text: String(m.message.text ?? '') });
+      const senderId = m?.sender?.id;
+      if (!senderId) continue;
+      if (m.message && !m.message.is_echo) {
+        out.push({ senderId: String(senderId), text: String(m.message.text ?? ''), payload: m.message.quick_reply?.payload ?? null });
+      } else if (m.postback) {
+        out.push({ senderId: String(senderId), text: '', payload: String(m.postback.payload ?? '') || null });
+      }
     }
   }
   return out;
 }
 
 /**
- * Decide what to do with one inbound message. state is the saved conversation state (or null).
- * Returns { reply, next } where next is the state to save (or 'delete' to remove it). reply may be null (stay silent).
+ * One inbound event -> what to send and what to save.
+ * Returns { steps: [{ kind: 'consent'|'menu'|'scanlink'|'text', text? }], next, handoff } where next is the state to save, or 'delete'.
  */
-export function decide({ channel, text, state, now = Date.now() }) {
-  if (isStopWord(text)) return { reply: stopText(), next: 'delete' };
-  if (!state || state.stage === 'new') {
-    return { reply: welcomeText(channel), next: { stage: 'welcomed', channel, ts: now } };
+export function decide({ text, payload, state, now = Date.now() }) {
+  const st = state?.stage ?? 'new';
+  if (isStopWord(text) || payload === PAYLOAD.del) return { steps: [{ kind: 'text', text: TEXT.deleted }], next: 'delete', handoff: false };
+  if (payload === PAYLOAD.no) return { steps: [{ kind: 'text', text: TEXT.declined }], next: { stage: 'declined', ts: now }, handoff: false };
+  if (payload === PAYLOAD.yes) {
+    return { steps: [{ kind: 'menu' }], next: { stage: 'consented', consentAt: now, noticeVersion: NOTICE_VERSION, ts: now }, handoff: false };
   }
-  if (state.stage === 'welcomed') {
-    return { reply: ackText(), next: { ...state, stage: 'acked', ts: now } };
+  if (st === 'declined' && payload !== PAYLOAD.start) return { steps: [], next: state, handoff: false };      // we said we would not message again
+  if (st === 'new' || payload === PAYLOAD.start) return { steps: [{ kind: 'consent' }], next: { stage: 'asked', askedCount: 1, ts: now }, handoff: false };
+  if (st === 'asked') {
+    const n = (state.askedCount ?? 1) + 1;
+    return n <= 3 ? { steps: [{ kind: 'consent' }], next: { ...state, askedCount: n, ts: now }, handoff: false } : { steps: [], next: state, handoff: false };
   }
-  return { reply: null, next: state }; // already acknowledged: a person answers; no repeated automatic replies
+  // consented or human_requested: only now do buttons and messages do anything
+  if (payload === PAYLOAD.scan) return { steps: [{ kind: 'scanlink' }], next: state, handoff: false };
+  if (st === 'consented') return { steps: [{ kind: 'text', text: TEXT.person }], next: { ...state, stage: 'human_requested', ts: now }, handoff: true };
+  return { steps: [], next: state, handoff: false };   // a person already has the request: no repeated automatic replies
+}
+
+const messengerButtons = (kind, channel) => kind === 'consent'
+  ? [{ type: 'postback', title: BTN.agree, payload: PAYLOAD.yes }, { type: 'postback', title: BTN.decline, payload: PAYLOAD.no }, { type: 'web_url', url: PRIVACY_URL, title: BTN.policy, webview_height_ratio: 'tall' }]
+  : [{ type: 'web_url', url: trackedScanUrl(channel), title: BTN.scan, webview_height_ratio: 'tall' }, { type: 'postback', title: BTN.person, payload: PAYLOAD.person }, { type: 'postback', title: BTN.del, payload: PAYLOAD.del }];
+
+/** The Messenger `message` object for one step. */
+export function messengerMessage(step, env) {
+  if (step.kind === 'consent' || step.kind === 'menu') {
+    const consent = step.kind === 'consent';
+    return { attachment: { type: 'template', payload: { template_type: 'generic', elements: [{
+      title: consent ? TEXT.consentTitle : TEXT.menu, ...(consent ? { subtitle: TEXT.consentSubtitle } : {}),
+      image_url: imageUrl(env), buttons: messengerButtons(step.kind, 'messenger'),
+    }] } } };
+  }
+  if (step.kind === 'scanlink') return { text: trackedScanUrl('messenger') };
+  return { text: step.text };
+}
+
+const waReply = (id, title) => ({ type: 'reply', reply: { id, title } });
+/** The WhatsApp message body (without messaging_product and to) for one step. ⚠️ Interactive button format not verified against Meta's current docs. */
+export function whatsappMessage(step, env) {
+  if (step.kind === 'consent') {
+    return { type: 'interactive', interactive: { type: 'button', header: { type: 'image', image: { link: imageUrl(env) } },
+      body: { text: `${TEXT.consentTitle}\n${TEXT.consentSubtitle}\n${PRIVACY_URL}` },
+      action: { buttons: [waReply(PAYLOAD.yes, BTN.agree), waReply(PAYLOAD.no, BTN.decline)] } } };
+  }
+  if (step.kind === 'menu') {
+    return { type: 'interactive', interactive: { type: 'button', header: { type: 'image', image: { link: imageUrl(env) } },
+      body: { text: TEXT.menu },
+      action: { buttons: [waReply(PAYLOAD.scan, BTN.scan), waReply(PAYLOAD.person, BTN.person), waReply(PAYLOAD.del, BTN.del)] } } };
+  }
+  if (step.kind === 'scanlink') return { type: 'text', text: { body: trackedScanUrl('whatsapp'), preview_url: true } };
+  return { type: 'text', text: { body: step.text } };
+}
+
+/**
+ * "Talk to a person" needs somewhere to go. If the Worker secret HANDOFF_SLACK_WEBHOOK_URL (a Slack incoming webhook) is set, post one line:
+ * channel and a short hash of the conversation id so staff can find it in the Meta inbox. No message text and no name is sent.
+ * Without it the request is only logged. ⚠️ Until a target is chosen and set, nobody is told: the "within 1 business day" line is not yet backed.
+ */
+export async function notifyHandoff(env, channel, id, fetchImpl = fetch) {
+  const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${channel}:${id}`)))].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
+  console.log(`handoff_requested channel=${channel} ref=${hash}`);
+  if (!env?.HANDOFF_SLACK_WEBHOOK_URL) return { notified: false };
+  try {
+    const res = await fetchImpl(env.HANDOFF_SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: `:raising_hand: Someone asked to talk to a person on ${channel} (ref ${hash}). Open the Meta inbox and reply within 1 business day.` }) });
+    return { notified: Boolean(res.ok) };
+  } catch { return { notified: false }; }
 }
