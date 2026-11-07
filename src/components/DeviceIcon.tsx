@@ -22,19 +22,21 @@ interface DeviceIconProps {
   evidence?: string[] | null;
   /** True while the reveal carousel is still spinning. */
   scanning?: boolean;
+  /** iOS needs a tap to grant motion access: show the connect button. */
+  motionPrompt?: boolean;
+  onEnableMotion?: () => void;
 }
 
-export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, label, evidence, scanning = false }: DeviceIconProps) {
+export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, label, evidence, scanning = false, motionPrompt = false, onEnableMotion }: DeviceIconProps) {
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
   const fallbackEmoji = deviceEmojis[deviceType] || '📱';
 
-  // Detect landscape orientation based on gamma (Y-axis tilt)
-  // If absolute gamma > 45°, device is in landscape mode
-  const isLandscape = Math.abs(gammaVal) > 45;
-  
-  // Get the appropriate illustration (portrait or landscape variant)
-  const DeviceIllustration = getDeviceIllustration(deviceType, isLandscape);
+  // The screen is landscape when the browser has rotated it (angle 90 / 270).
+  // We always draw the portrait illustration and turn it with rotateZ below, so
+  // the rotation is a visible flip instead of a swap between two drawings.
+  const isLandscape = Math.abs(rotationAngle) % 180 === 90;
+  const DeviceIllustration = getDeviceIllustration(deviceType, false);
   
   // Determine orientation label
   const orientationLabel = isLandscape ? 'Landscape' : 'Portrait';
@@ -74,9 +76,12 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
 
           {/* 3D Rotating illustration container */}
           <div 
-            className="relative flex items-center justify-center"
+            data-testid="device-flip"
+            className="relative flex items-center justify-center transition-transform duration-700 ease-in-out motion-reduce:transition-none"
             style={{
               transformStyle: 'preserve-3d',
+              // Slow, eased turn so a rotation of the phone is seen as a flip (the page reflows at the same moment)
+              transform: `rotateZ(${rotationAngle}deg)`,
               width: 'min(140px, 50vw)',
               height: 'min(140px, 50vw)',
               minWidth: '120px',
@@ -87,7 +92,7 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
             <div 
               className="absolute inset-0 blur-xl opacity-30 flex items-center justify-center pointer-events-none"
               style={{
-                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
+                transform: `rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
               }}
@@ -101,7 +106,7 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
             <div
               className="relative flex items-center justify-center"
               style={{
-                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
+                transform: `rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
                 width: '100%',
@@ -141,6 +146,17 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
           }`}>
             {orientationLabel}
           </div>
+
+          {/* iOS only reveals tilt after a tap */}
+          {motionPrompt && onEnableMotion && (
+            <button
+              type="button"
+              onClick={onEnableMotion}
+              className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full border border-surface-border bg-brand-soft text-foreground"
+            >
+              Tap to connect your phone’s sensors
+            </button>
+          )}
 
           {/* 3D Rotation indicators */}
           <div className="grid grid-cols-3 gap-1 sm:gap-2 w-full">
