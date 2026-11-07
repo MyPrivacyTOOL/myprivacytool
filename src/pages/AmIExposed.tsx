@@ -2,6 +2,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import PasswordCheck from "@/components/PasswordCheck";
 
 const AmIExposed = () => (
   <>
@@ -27,6 +28,7 @@ const AmIExposed = () => (
           </div>
         ))}
       </div>
+      <div className="mb-12"><PasswordCheck /></div>   {/* MPC-9776: renders nothing unless VITE_PASSWORD_CHECK=true */}
       <p className="text-muted-foreground">
         Already know who has your data? Jump straight to the{" "}
         <Link to="/opt-out-guides" className="text-brand hover:underline">opt-out guides</Link>.
