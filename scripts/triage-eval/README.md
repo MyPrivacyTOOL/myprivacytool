@@ -9,7 +9,7 @@ Design and decisions: Notion "MPT > Email > Channel email capture and inbound tr
 | `build-dataset.py` | The 100 invented messages (7 categories) and their labels. Run it to regenerate the two files below. |
 | `dataset.jsonl` | Messages only (`id`, `text`), shuffled, no labels. This is what a classifier sees. |
 | `labels.json` | `id` -> category. Keep it away from a classifier you want to run blind. |
-| `prompt.md` | The classification rules both models are given (the message is untrusted data; category definitions). |
+| `../../shared/triage/prompts.js` | The ONE copy of the category and yes/no prompts: the production module and these scripts both import it, so what is measured is what runs. |
 | `run-model.mjs` | Runs `dataset.jsonl` through an OpenAI-compatible endpoint (Qwen via DashScope by default) and writes predictions. |
 | `score.mjs` | Accuracy, per-category recall, confusions, and the SAFETY count (see below). |
 | `results-claude-sonnet.json` | Claude's blind predictions (2026-11-02). |

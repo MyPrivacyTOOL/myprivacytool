@@ -1,6 +1,8 @@
 name: Triage eval (Qwen, synthetic only)
 
-# MPC-9225: runs the 100 SYNTHETIC messages in scripts/triage-eval through Qwen and scores them. Manual only. Sends no real mail and reads no database.
+# MPC-9225 / MPC-9783: runs SYNTHETIC messages from scripts/triage-eval through Qwen and scores them. Manual only. Sends no real mail and reads no database.
+#   task=category : the 100 invented messages -> one of 7 categories (score.mjs)
+#   task=flag     : 200 invented messages -> yes/no "does this ask us to stop contacting them, or about their personal data?" (score-flag.mjs, reports recall)
 # Needs repo secret QWEN_API_KEY (the same DashScope key core-brain uses). Without it the job fails with a clear message instead of passing.
 
 on:
@@ -9,6 +11,9 @@ on:
       model:
         description: 'Qwen model id'
         default: 'qwen-plus'
+      task:
+        description: 'category or flag'
+        default: 'category'
 
 permissions:
   contents: read
@@ -21,6 +26,7 @@ jobs:
     env:
       QWEN_API_KEY: ${{ secrets.QWEN_API_KEY }}
       QWEN_MODEL: ${{ inputs.model }}
+      TASK: ${{ inputs.task }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,11 +36,13 @@ jobs:
         run: |
           if [ -z "$QWEN_API_KEY" ]; then echo "::error::repo secret QWEN_API_KEY is not set; nothing was run"; exit 1; fi
       - name: Run Qwen on the synthetic messages
-        run: node scripts/triage-eval/run-model.mjs "$RUNNER_TEMP/qwen.json"
-      # Score and keep the predictions even if some requests failed, so a partial run is still readable (failed ones count as invalid, never as correct).
+        run: |
+          if [ "$TASK" = "flag" ]; then node scripts/triage-eval/run-flag.mjs "$RUNNER_TEMP/qwen.json"; else node scripts/triage-eval/run-model.mjs "$RUNNER_TEMP/qwen.json"; fi
+      # Score and keep the predictions even if some requests failed, so a partial run is still readable (failed ones count as invalid / yes, never as correct).
       - name: Score
         if: ${{ !cancelled() }}
-        run: node scripts/triage-eval/score.mjs "$RUNNER_TEMP/qwen.json"
+        run: |
+          if [ "$TASK" = "flag" ]; then node scripts/triage-eval/score-flag.mjs "$RUNNER_TEMP/qwen.json"; else node scripts/triage-eval/score.mjs "$RUNNER_TEMP/qwen.json"; fi
       - name: Keep the predictions
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
