@@ -5,6 +5,7 @@ Allow: /
 Disallow: /scan/live
 Disallow: /d/
 Disallow: /dashboard
+Disallow: /test-fixtures/
 
 # Sitemap
 Sitemap: https://www.myprivacytool.io/sitemap.xml
