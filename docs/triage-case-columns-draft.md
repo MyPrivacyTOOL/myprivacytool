@@ -1,6 +1,6 @@
-# DRAFT: triage columns on `support_cases` (MPC-9783, decision T6c)
+# Triage columns on `support_cases` (MPC-9783, decision T6c)
 
-**Status: DRAFT. NOT APPLIED. Deliberately NOT in `supabase/migrations/`**, because `.github/workflows/deploy-supabase.yml` runs `supabase db push` on merge to `main`: a file there would apply the moment its PR merges. It is applied only after Chris approves THIS exact text, through the Supabase connector (as for the `email_sends` columns), and then recorded as a migration file.
+**Status: APPLIED to production 2026-11-07** on Chris's approval of this exact text (T6c), through the Supabase connector, read-back verified (six columns, index, six checks; row-level security still forced; the table had 0 rows). The same idempotent SQL is in `supabase/migrations/20261107120000_mpc_9783_support_cases_triage_columns.sql`. Nothing writes the columns yet.
 
 ## What it does
 Adds six nullable columns to the existing `public.support_cases` table so a case can carry what triage decided. Additive only: no existing column, constraint, policy or function changes; existing rows get NULL.

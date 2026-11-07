@@ -33,4 +33,4 @@ Guarantees the tests pin (and fail if broken): every message reaches a person (`
 
 **Measured (synthetic messages only):** the yes/no check caught 81 of 81 should-flag messages, including 51 phrased in ways it had never seen; it raised 6 of 119 ordinary messages. Real mail is the real test and needs Chris's approval of a sample source first.
 
-**Not done / not wired:** nothing calls `triage()` from live mail yet; the Slack channel and bot access are Chris's to create; the case-record columns are only a DRAFT (`docs/triage-case-columns-draft.md`) and are applied only on Chris's explicit approval of that exact text.
+**Not done / not wired:** nothing calls `triage()` from live mail yet; the Slack channel and bot access are Chris's to create; the six case-record columns are APPLIED to production (`docs/triage-case-columns-draft.md`, Chris's approval 2026-11-07) but nothing writes them yet.
