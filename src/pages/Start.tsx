@@ -126,7 +126,7 @@ export default function Start() {
             <span className="text-brand">See where. Take it back.</span>
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            A free check of what your browser tells websites about you, plus what your email address reveals. No data broker search is included yet.
+            A free check of what your browser tells websites about you, plus what your email address reveals. We don't search broker sites for you yet — paste any page that lists you and we'll verify it. Paid plans will add coverage.<FeatureStatus feature="F1" />
           </p>
         </div>
 

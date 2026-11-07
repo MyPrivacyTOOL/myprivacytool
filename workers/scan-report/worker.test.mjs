@@ -34,7 +34,7 @@ check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: 
 // ---- brokers never guess
 const br = await checkBrokers(EMAIL, {});
 check(br.length === 5 && br.every((b) => b.status === 'not_checked'), 'all 5 brokers reported not_checked');
-check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spokeo.com') && br.find((b) => b.key === 'mylife').removal_url === null, 'removal links only from verified guides');
+check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spokeo.com') && br.find((b) => b.key === 'mylife').removal_url.startsWith('https://www.mylife.com') && br.find((b) => b.key === 'intelius').removal_url.startsWith('https://www.intelius.com') && br.every((b) => b.removal_url && b.steps?.length), 'removal links only from written guides; MPC-9813 wrote MyLife and Intelius, so all five have one');
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
@@ -151,7 +151,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const brk = await checkBrokers(EMAIL, {});
   const free = buildMirrorReport({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk });
   check(free.score === null && free.coverage.checked === 0 && free.coverage.total === 8 && free.hexagons.every((h) => h.status === 'not_checked' && h.score === null), 'mirror: nothing checked => no score, every hexagon not_checked');
-  check(free.next_steps[0].id === 'check-breaches' && free.next_steps.some((s) => s.id === 'opt-out-spokeo') && !free.next_steps.some((s) => s.id === 'opt-out-mylife'), 'mirror: HIBP self-check first; opt-out steps only where a verified guide exists');
+  check(free.next_steps[0].id === 'check-breaches' && free.next_steps.some((s) => s.id === 'opt-out-spokeo') && free.next_steps.some((s) => s.id === 'opt-out-mylife') && free.next_steps.some((s) => s.id === 'opt-out-intelius'), 'mirror: HIBP self-check first; an opt-out step for each broker that has a written guide (all five since MPC-9813)');
   const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
   check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
   const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, webScan: null });

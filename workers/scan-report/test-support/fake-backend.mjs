@@ -3,7 +3,7 @@
 //   opts.resendIdempotent  the same Idempotency-Key returns the first message id and counts as one email (what Resend does)
 //   opts.onRequest(url, init, res, db)  return a response to replace the call (inject a fault), or nothing to carry on
 export function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [] }; const calls = []; let n = 0; const seenKeys = new Map();
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [] }; const calls = []; let n = 0; const seenKeys = new Map();
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -90,8 +90,10 @@ export function fake(opts = {}) {
     const cs = q.get('check_status')?.replace('eq.', ''); if (cs) rows = rows.filter((x) => x.check_status === cs);   // MPC-7554
     const sc = q.get('scan_id')?.replace('eq.', ''); if (sc) rows = rows.filter((x) => x.scan_id === sc);   // like PostgREST: a read by scan_id returns that scan's rows only
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
+    // MPC-9813: the gated queue read (and=(or(pending...),or(email_confirm_required.eq.false,email_confirmed_at.not.is.null,confirmation_sent_at.is.null))): same rule as the SQL filter
+    if (t === 'scans' && q.get('and')) rows = rows.filter((x) => x.report_status === 'pending' && (!x.email_confirm_required || x.email_confirmed_at || !x.confirmation_sent_at));
     if (t === 'scans' && (q.get('select') || '').includes('users(')) rows = rows.map((r) => ({ ...r, users: { email_opt_out_at: (db.users.find((u) => u.id === r.user_id) || {}).email_opt_out_at ?? null } }));
-    if (t === 'scans' && q.get('or')) rows = rows.slice(Number(q.get('offset') || 0), Number(q.get('offset') || 0) + Number(q.get('limit') || rows.length));   // oldest first = insertion order
+    if (t === 'scans' && (q.get('or') || q.get('and'))) rows = rows.slice(Number(q.get('offset') || 0), Number(q.get('offset') || 0) + Number(q.get('limit') || rows.length));   // oldest first = insertion order
     return res(200, rows);
   };
   return { f, db, calls, provider: seenKeys };   // provider: Idempotency-Key -> message id, one entry per distinct email the provider accepted (resendIdempotent only)

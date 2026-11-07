@@ -79,8 +79,10 @@ const CONFIRMATION_PARTS = [
   { key: 'device', label: 'Your browser findings' },
   { key: 'email', label: 'What your email address reveals' },
 ];
-export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber } = {}) {
-  const subject = 'Your privacy scan is starting';
+// MPC-9813: with the confirm gate on, this email is the click-to-confirm. The report and every check that uses details about the person wait for the button.
+const CONFIRM_LINE = 'We only check details you’ve confirmed are yours.';
+export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber, confirmGate = false } = {}) {
+  const subject = confirmGate ? 'Confirm your email to get your privacy report' : 'Your privacy scan is starting';
   // MPC-7471-F3: the same number, wording and deletion guidance as the report (MPC-7488), only when a scan was really saved with this request.
   const scanNumberLine = scanNumber ? `Your scan number: ${scanNumber}. Quote this number if you want this scan deleted.` : '';
   const text = [
@@ -96,11 +98,12 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber }
     '',
     'My job is to show you what you look like from the outside: what’s exposed, what it means for you, and what to change first.',
     '',
-    ...(liveLink ? ['Watch it live: open your results page and I’ll show each result as I find it. Keep this link private: anyone who has it can see your results:', liveLink, ''] : []),
+    ...(confirmGate && liveLink ? [`First, confirm this is your email. ${CONFIRM_LINE} Until you press the confirm button on this page, I send no report and run no checks that use your details. Keep this link private: anyone who has it can see your results. If you did not ask for this, ignore this email and nothing happens:`, liveLink, ''] : []),
+    ...(!confirmGate && liveLink ? ['Watch it live: open your results page and I’ll show each result as I find it. Keep this link private: anyone who has it can see your results:', liveLink, ''] : []),
     ...(scanNumberLine ? [scanNumberLine, ''] : []),
     'Here’s what happens next.',
     '',
-    'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
+    confirmGate ? 'Once you have confirmed, your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:' : 'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
     '',
     '  1. Your browser findings, replayed. The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.',
     '  2. What your email address reveals. New hexagons about the one new thing you gave us: your email address.',
@@ -126,10 +129,11 @@ ${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m y
 ${para('You asked us to look at your privacy exposure, so we&rsquo;re starting right now.')}
 ${para('MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We&rsquo;re starting with two things: your browser and your email address. More channels will follow over time.')}
 ${para('My job is to show you what you look like from the outside: what&rsquo;s exposed, what it means for you, and what to change first.')}
-${liveLink ? para('<strong>Watch it live.</strong> Open your results page and I&rsquo;ll show each result as I find it. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
+${confirmGate && liveLink ? para(`<strong>First, confirm this is your email.</strong> ${esc(CONFIRM_LINE)} Until you press the confirm button on the page this opens, I send no report and run no checks that use your details. Keep this link private: anyone who has it can see your results. If you did not ask for this, ignore this email and nothing happens.`) + button(liveLink, 'Confirm this is my email') : ''}
+${!confirmGate && liveLink ? para('<strong>Watch it live.</strong> Open your results page and I&rsquo;ll show each result as I find it. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
 ${scanNumberLine ? para(esc(scanNumberLine)) : ''}
 ${h2('Here&rsquo;s what happens next.')}
-${para('Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
+${para(confirmGate ? 'Once you have confirmed, your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:' : 'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
 <ol style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
 <li style="margin-bottom:6px"><strong>Your browser findings, replayed.</strong> The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.</li>
 <li><strong>What your email address reveals.</strong> New hexagons about the one new thing you gave us: your email address.</li></ol>
@@ -188,7 +192,24 @@ const MAX_BREACH_ROWS = 10;
 const brokersRelevant = (emailHexes, breaches) => emailHexes.some((h) => h.id === 'email-name' && h.status === 'found')
   || breaches.some((b) => (b.DataClasses || []).some((c) => /^(names|phone numbers|physical addresses)$/i.test(String(c))));
 
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
+// MPC-9813 (minimal rendering; polish is MPC-9814): "Listings you showed us". One line per page the person pasted: what we found, the page itself as evidence, the guide.
+const MATCH_WORDS = { exact: 'a match for the details you gave (name and place)', probable: 'a likely match (name matches, place only in part)', possible: 'a possible match: this is a guess, please check the page yourself' };
+const REASON_WORDS = { fetch_blocked: 'the site would not let us read that page', timeout: 'the page took too long to answer', no_identifiers: 'no name or phone was given to look for', not_a_listing_page: 'that address is not a page we can read as a listing' };
+export const listingLine = (r) => {
+  const where = r.name || r.host || 'that page';
+  if (r.state === 'listed') return `${where}: LISTED, ${MATCH_WORDS[r.match] || 'a match'}.`;
+  if (r.state === 'not_listed') return `${where}: NOT LISTED. ${r.note === 'page_gone' ? 'That page no longer exists.' : 'The page loaded and does not show the details you gave. This is about that one page only.'}`;
+  return `${where}: NOT CHECKED, ${REASON_WORDS[r.not_checked_reason] || 'we could not check it'}. This is not a clear result.`;
+};
+const listingsText = (listings) => (listings?.items?.length ? [
+  'LISTINGS YOU SHOWED US', 'We read only the pages you gave us, and only for details you gave us and confirmed. We search no broker site for you.',
+  ...listings.items.flatMap((r) => [`  - ${listingLine(r)}`, ...(r.evidence_url ? [`    Page: ${r.evidence_url}`] : []), ...(r.guide?.optOutUrl ? [`    How to remove it: ${r.guide.optOutUrl}`] : [])]), '',
+] : []);
+const listingsHtml = (listings) => (listings?.items?.length
+  ? `${h2('Listings you showed us')}${para('We read only the pages you gave us, and only for details you gave us and confirmed. We search no broker site for you.')}<ul style="margin:0 0 14px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${listings.items.map((r) => `<li style="margin-bottom:8px">${esc(listingLine(r))}${r.evidence_url ? ` <a href="${esc(r.evidence_url)}" style="color:${BRAND}">The page</a>` : ''}${r.guide?.optOutUrl ? ` &middot; <a href="${esc(r.guide.optOutUrl)}" style="color:${BRAND}">How to remove it</a>` : ''}</li>`).join('')}</ul>`
+  : '');
+
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], listings = null, webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -215,6 +236,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
     'PART 2: YOUR EMAIL ADDRESS', `${tallyLine(et, 'hexagons')}.`, ...hexText(emailHexes),
     ...breachRows.map((b) => `  - ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`), ...(breachMore ? [`  ...and ${breachMore} more (all of them are in the attached JSON file)`] : []), '',
     'The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.', '',
+    ...listingsText(listings),
     ...(showBrokers ? ['PEOPLE-SEARCH SITES', 'A finding above makes these relevant. We have not searched these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.', '', ...brokerLines.flatMap((l) => [l, ''])]
       : [`US people-search removal guides (we have not searched these sites for you): ${SITE}/opt-out`, '']),
     `More removal guides: ${SITE}/opt-out`, '',
@@ -242,6 +264,7 @@ ${h2('Part 1: your web scan, replayed')}${para(esc(part1Intro))}${scanNumberLine
 ${h2('Part 2: your email address')}${para(esc(`${tallyLine(et, 'hexagons')}.`))}${hexGroups(emailHexes)}
 ${breachRows.length ? `<ul style="margin:10px 0 12px 0;padding-left:20px;font-size:13px;line-height:19px;color:#374151">${breachRows.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}${breachMore ? `<li>&hellip;and ${breachMore} more (all of them are in the attached file)</li>` : ''}</ul>` : ''}
 ${para('<strong>The full data is attached.</strong> The JSON file holds every hexagon with its full value and the technical detail that did not fit here, so you can open it, search it and analyse it yourself.')}
+${listingsHtml(listings)}
 ${showBrokers ? `${h2('People-search sites')}${para('A finding above makes these relevant. We have <strong>not searched</strong> these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.')}${brokerCards}`
     : para(`US people-search removal guides: <a href="${SITE}/opt-out" style="color:${BRAND}">see them on the site</a>. We have not searched these sites for you.`)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}

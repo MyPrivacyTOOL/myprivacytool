@@ -20,6 +20,8 @@ import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan"
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
 import { ReportRequestError, BAD_EMAIL_MESSAGE, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport } from "@/lib/scanReport";
 import { suggestEmail } from "@/lib/emailTypo";
+import ListingCheckFields from "@/components/ListingCheckFields";
+import { emptyListingFields, hasListingFields, listingPayload, listingProblem } from "@/lib/listingFields";
 
 // Same HubSpot "Start Scan" form as /start (public form GUID, see src/pages/Start.tsx).
 const FORM_ID =
@@ -54,6 +56,8 @@ const Scan = () => {
   const [waitingForToken, setWaitingForToken] = useState(false);
   // MPC-8452: key for the live results shown under the thank-you (memory only: a refresh starts again)
   const [liveToken, setLiveToken] = useState("");
+  // MPC-9813: the optional "show us your listing" details. Kept with the saved scan, so they travel only with the save consent.
+  const [listingFields, setListingFields] = useState(emptyListingFields);
 
   // MPC-7493: the contact step was opened. Under D12 (MPC-7470) a scan is saved only at the contact step, so this sends nothing unless this visit
   // already saved a scan; the drop-off before it is read from the GA4 events.
@@ -72,6 +76,10 @@ const Scan = () => {
       typoAsked.current = email.trim().toLowerCase();
       setErrorMsg(`Did you mean ${suggestion}? If ${email.trim()} is right, press the button again.`);
       return;
+    }
+    if (hasListingFields(listingFields)) {
+      const problem = listingProblem(listingFields) || (offerSave && saveConsent ? "" : "To check a page you show us, tick \"save my scan\" too: the details are kept with your saved scan and deleted with it. Or clear those fields to go on without them.");
+      if (problem) { setErrorMsg(problem); return; }
     }
     if (tsWidgets.current > 0 && !tsToken) {
       setErrorMsg("");
@@ -95,7 +103,7 @@ const Scan = () => {
       }
       let sent: { liveToken?: string } = {};
       try {
-        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token);
+        sent = await requestScanReport(email.trim(), offerSave && saveConsent, offerSave && saveConsent && offerRecognise && recogniseConsent, token, { listing: listingPayload(listingFields) });
       } catch (reportErr) {
         const kind = reportErr instanceof ReportRequestError ? reportErr.kind : "network";
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
@@ -151,6 +159,7 @@ const Scan = () => {
         resetSignal={tsReset}
       />
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      {offerSave && <ListingCheckFields idSuffix={idSuffix} value={listingFields} onChange={setListingFields} disabled={submitting} />}
       {offerSave && (
         <>
           <SaveScanConsentCheckbox id={`scan-save-consent-${idSuffix}`} checked={saveConsent} onChange={onSaveChange} disabled={submitting} />

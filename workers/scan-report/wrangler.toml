@@ -87,6 +87,16 @@ FOLLOWUP_STATE_ENABLED = "false"
 EMAIL_DOMAIN_CHECK = "true"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
+
+# MPC-9813 (F1 broker lookup, Chris Decision 7, 2026-11-07). Both need migration 20261107140000_mpc_9813_confirm_gate_and_listing_check.sql (applied on merge by deploy-supabase.yml).
+#  EMAIL_CONFIRM_GATE_ENABLED  "true": a new scan waits for the click-to-confirm in the confirmation email. No report is sent and no check that uses details about
+#                              the person runs before it. Scans created before this switch are unaffected. Fails closed: if a scan cannot be marked as waiting, the request fails.
+#  LISTING_CHECK_ENABLED       "true" (needs the gate): the optional name / place / phone / up to 3 "page that lists you" addresses are accepted with a saved scan, stored with it
+#                              (same 12-month retention and scan-number deletion), and the pages are read after the click. No broker site is ever searched.
+# Anything but the exact string "true" is off. Rollback: set "false" and redeploy (scans already marked keep waiting only while the gate is on).
+EMAIL_CONFIRM_GATE_ENABLED = "true"
+LISTING_CHECK_ENABLED = "true"
+
 [observability]
 enabled = true
 
