@@ -1,4 +1,4 @@
-// CK-9837: visual, minimal Messenger and WhatsApp conversation, test mode. All words below were approved by Chris on 2026-11-07 (person line: "A higher consciousness will reply", Chris's wording).
+// CK-9837: visual, minimal Messenger and WhatsApp conversation, test mode. All words below were approved by Chris on 2026-11-07 (reply line: "A higher consciousness will reply within 24 hours", Chris's wording; 24 hours because Meta only lets a Page reply within 24 hours of the last message, ⚠️ unverified).
 // Flow: HOME card first (free scan / talk to a person / delete my data), so the person sees the value before any legal step. Nothing is saved until
 // the person taps "Talk to a person" and then "I agree" on the consent card. STOP, or the "Delete my data" button, deletes the saved conversation. Replaces the old "first hexagon" reply on these two channels
 // (it claimed a public-data snapshot and a report in 60 seconds, neither backed, and created a HubSpot contact before any consent).
@@ -19,11 +19,11 @@ export const TEXT = {
   consentSubtitle: 'By chatting you agree to our Privacy Policy.',
   homeSubtitle: 'Run the free scan to see your digital footprint.',   // approved by Chris 2026-11-07
   menu: 'What would you like to do?',
-  person: 'Thanks 🙌 A higher consciousness will reply within 1 business day.',
+  person: 'Thanks 🙌 A higher consciousness will reply within 24 hours.',
   deleted: `Done ✅ Deleted. Anything else: ${PRIVACY_MAIL}`,
   declined: "No problem 👍 We won't message you again.",
 };
-export const BTN = { agree: '✅ I agree', decline: '❌ No thanks', policy: 'Privacy Policy', scan: '🔍 Free scan', person: '🙋 Talk to a person', del: '🗑️ Delete my data' };
+export const BTN = { agree: '✅ I agree', decline: '❌ No thanks', policy: 'Privacy Policy', scan: '🔍 Free scan', person: '💬 Ask a question', del: '🗑️ Delete my data' };
 export const PAYLOAD = { start: 'GET_STARTED', yes: 'CONSENT_YES', no: 'CONSENT_NO', person: 'HUMAN', del: 'DELETE', scan: 'SCAN' };
 
 /** Master switch. OFF unless the Worker var MESSAGING_ENABLED is exactly the string "true". */
@@ -122,7 +122,7 @@ export function whatsappMessage(step, env) {
 /**
  * "Talk to a person" needs somewhere to go. If the Worker secret HANDOFF_SLACK_WEBHOOK_URL (a Slack incoming webhook) is set, post one line:
  * channel and a short hash of the conversation id so staff can find it in the Meta inbox. No message text and no name is sent.
- * Without it the request is only logged. ⚠️ Until a target is chosen and set, nobody is told: the "within 1 business day" line is not yet backed.
+ * Without it the request is only logged. ⚠️ Until a target is chosen and set, nobody is told: the "within 24 hours" line is not yet backed.
  */
 export async function notifyHandoff(env, channel, id, fetchImpl = fetch) {
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${channel}:${id}`)))].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -130,7 +130,7 @@ export async function notifyHandoff(env, channel, id, fetchImpl = fetch) {
   if (!env?.HANDOFF_SLACK_WEBHOOK_URL) return { notified: false };
   try {
     const res = await fetchImpl(env.HANDOFF_SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: `:raising_hand: Someone asked to talk to a person on ${channel} (ref ${hash}). Open the Meta inbox and reply within 1 business day.` }) });
+      body: JSON.stringify({ text: `:raising_hand: Someone asked a question on ${channel} (ref ${hash}). Open the Meta inbox and reply within 24 hours.` }) });
     return { notified: Boolean(res.ok) };
   } catch { return { notified: false }; }
 }

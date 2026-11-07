@@ -57,7 +57,7 @@ describe('Messenger flow', () => {
     expect(c.title).toBe("Hi 👋 I'm MyPrivacyTOOL's automated assistant.");
     expect(c.subtitle).toBe('Run the free scan to see your digital footprint.');
     expect(c.image_url).toBe('https://www.myprivacytool.io/og-image.jpg');
-    expect(c.buttons.map((b) => b.title)).toEqual(['🔍 Free scan', '🙋 Talk to a person', '🗑️ Delete my data']);
+    expect(c.buttons.map((b) => b.title)).toEqual(['🔍 Free scan', '💬 Ask a question', '🗑️ Delete my data']);
     expect(c.buttons[0]).toMatchObject({ type: 'web_url', url: 'https://www.myprivacytool.io/scan?utm_source=facebook&utm_medium=messenger&utm_campaign=messenger-welcome' });
     expect(sends.every((x) => x.url === 'https://graph.facebook.com/v23.0/me/messages' && x.headers.Authorization === `Bearer ${TOKEN}`)).toBe(true);
     expect(JSON.stringify(sends)).not.toContain('/me/messages?');
@@ -86,7 +86,7 @@ describe('Messenger flow', () => {
     const env = { ...ENV, HANDOFF_SLACK_WEBHOOK_URL: 'https://hooks.slack.test/x' };
     await post('/webhook/messenger', msgr('u1', 'hello'), env); await post('/webhook/messenger', tap('u1', PAYLOAD.person), env); sends.length = 0;
     await post('/webhook/messenger', tap('u1', PAYLOAD.yes), env);
-    expect(messages()).toEqual([{ text: 'Thanks 🙌 A higher consciousness will reply within 1 business day.' }]);
+    expect(messages()).toEqual([{ text: 'Thanks 🙌 A higher consciousness will reply within 24 hours.' }]);
     const st = store.get('messenger:u1'); expect(st).toMatchObject({ stage: 'human_requested', noticeVersion: NOTICE_VERSION }); expect(typeof st.consentAt).toBe('number');
     expect(hooks).toHaveLength(1); expect(hooks[0].text).toMatch(/messenger \(ref [0-9a-f]{8}\)/); expect(JSON.stringify(hooks)).not.toMatch(/u1|hello/);
     sends.length = 0;
@@ -154,7 +154,7 @@ describe('WhatsApp flow', () => {
     expect(sends[0].body.interactive.body.text).toContain('By chatting you agree to our Privacy Policy.');
     expect(sends[0].body.interactive.action.buttons.map((x) => x.reply.id)).toEqual(['CONSENT_YES', 'CONSENT_NO']); expect(store.size).toBe(0);
     sends.length = 0; await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.yes));
-    expect(sends[0].body.text.body).toBe('Thanks 🙌 A higher consciousness will reply within 1 business day.'); expect(store.get('whatsapp:85200000000')).toMatchObject({ stage: 'human_requested' });
+    expect(sends[0].body.text.body).toBe('Thanks 🙌 A higher consciousness will reply within 24 hours.'); expect(store.get('whatsapp:85200000000')).toMatchObject({ stage: 'human_requested' });
     sends.length = 0; await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.del));
     expect(sends[0].body.text.body).toBe('Done ✅ Deleted. Anything else: privacy@myprivacytool.io'); expect(store.has('whatsapp:85200000000')).toBe(false);
   });
@@ -169,7 +169,7 @@ describe('meta-chat helpers', () => {
   it('graphVersion has a default and an override', () => { expect(graphVersion({})).toBe('v23.0'); expect(graphVersion({ META_GRAPH_VERSION: 'v1.0' })).toBe('v1.0'); });
   it('button titles fit the 20-character limit and the approved words are exact', () => {
     for (const t of Object.values(BTN)) expect([...t].length).toBeLessThanOrEqual(20);
-    expect(TEXT.person).toBe('Thanks 🙌 A higher consciousness will reply within 1 business day.'); expect(TEXT.declined).toBe("No problem 👍 We won't message you again.");
+    expect(TEXT.person).toBe('Thanks 🙌 A higher consciousness will reply within 24 hours.'); expect(TEXT.declined).toBe("No problem 👍 We won't message you again.");
   });
   it('decide: nothing is saved before consent; only "I agree" saves and hands off; STOP always deletes', () => {
     for (const input of [{ text: 'hi' }, { payload: PAYLOAD.start }, { payload: PAYLOAD.person }, { payload: PAYLOAD.scan }]) expect(decide({ ...input, state: null }).next).toBeNull();
