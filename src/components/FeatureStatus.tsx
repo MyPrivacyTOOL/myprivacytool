@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { FEATURE_STATUS, type FeatureId } from "@/config/featureStatus";
+import { FEATURE_STATUS, CHANNEL_STATUS, type FeatureId, type ChannelId, type FeatureState } from "@/config/featureStatus";
 
 // MPC-9836: inline status marker. Renders nothing once the feature is "live". Text carries the meaning (works without
 // colour). Pill style mirrors the Journey StatusPill (JourneyGuide.tsx).
@@ -9,13 +9,12 @@ const STYLE = {
   planned: "bg-muted text-muted-foreground border-border",
 } as const;
 
-const FeatureStatus = ({ feature, className }: { feature: FeatureId; className?: string }) => {
-  const state = FEATURE_STATUS[feature];
+const StatusPill = ({ state, dataKey, className }: { state: FeatureState; dataKey: { "data-feature"?: string; "data-channel"?: string }; className?: string }) => {
   if (state === "live") return null;
   return (
     <span
       data-feature-status={state}
-      data-feature={feature}
+      {...dataKey}
       className={cn(
         "ml-2 inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 align-middle text-xs font-semibold leading-none",
         STYLE[state],
@@ -26,5 +25,14 @@ const FeatureStatus = ({ feature, className }: { feature: FeatureId; className?:
     </span>
   );
 };
+
+const FeatureStatus = ({ feature, className }: { feature: FeatureId; className?: string }) => (
+  <StatusPill state={FEATURE_STATUS[feature]} dataKey={{ "data-feature": feature }} className={className} />
+);
+
+// MPC-9826: marker for a /start channel card, driven by CHANNEL_STATUS. "Live" shows a plain text label so all six states are readable.
+export const ChannelStatus = ({ channel, className }: { channel: ChannelId; className?: string }) => (
+  <StatusPill state={CHANNEL_STATUS[channel]} dataKey={{ "data-channel": channel }} className={className} />
+);
 
 export default FeatureStatus;

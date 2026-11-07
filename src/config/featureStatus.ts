@@ -30,3 +30,19 @@ export const FEATURE_STATUS: Record<FeatureId, FeatureState> = {
   // F10 Report delivery and storage. LIVE test: /start states what arrives and when, matching a real scan submitted from the live site.
   F10: "in_build",
 };
+
+// MPC-9826 (F7a): per-channel state for the /start channel cards, same vocabulary and same rule as FEATURE_STATUS: this map is the ONLY place a
+// channel's state is set, and /start reads it (src/pages/Start.tsx). "live" = a real message round-trips today; anything else shows its marker and the
+// card is not a link. Flip one line the day the channel's adapter passes its LIVE test.
+export type ChannelId = "web" | "telegram" | "email" | "whatsapp" | "messenger" | "instagram";
+
+export const CHANNEL_STATUS: Record<ChannelId, FeatureState> = {
+  web: "live",              // /scan runs in the browser today
+  // Telegram: the bot and webhook are built (workers/social-listeners) but a synthetic message could not be round-tripped from the build session
+  // (MPC-9826, 2026-11-08: no outbound route to api.telegram.org or the Worker from the sandbox). Stays in_build until that check is recorded.
+  telegram: "in_build",
+  email: "live",            // the report email is sent; a reply reaches a person (not Alice: that is F7b, planned)
+  whatsapp: "planned",      // adapter is a stub; /wa only redirects back to /start
+  messenger: "planned",     // stub
+  instagram: "planned",     // stub
+};

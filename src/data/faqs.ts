@@ -1,6 +1,8 @@
 // Every answer here is limited to what the code does (src/lib/deviceDetection.ts, EmailCaptureModal.tsx,
 // index.html) or to the published Privacy Policy (sections 2.4 and 6). Encryption and audit claims are deliberately absent: see the MPC-6545 PR notes.
 // Never say "open source": the repo is public to read but has no licence (CK-7721).
+import { REPLY_PROMISE } from "../../shared/reply-wording.js";
+
 export const FAQS: { q: string; a: string }[] = [
   {
     q: "What is MyPrivacyTOOL?",
@@ -56,7 +58,12 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Who or what is Alice?",
-    a: "Alice is an AI guide. Her lines are scripted and are read aloud by your own device's voice. There is no chat, and nothing you do with her voice is sent to us.",
+    a: "Alice is MyPrivacyTOOL's AI guide. On the site her lines are scripted and are read aloud by your own device's voice, and nothing you do with her voice is sent to us. There is no live chat with her on the site today. In email, a person on the team answers your replies, with her help. A conversation with Alice herself is coming (Planned).",
+  },
+  // MPC-9826 (F7a): the same sentences as the confirmation and report emails (shared/reply-wording.js); faqs.reply.test.ts fails if they drift.
+  {
+    q: "Can I reply to my report email?",
+    a: `Yes. ${REPLY_PROMISE} We do not promise a reply time.`,
   },
   {
     q: "What happens if I save my scan?",

@@ -1,0 +1,36 @@
+Your MyPrivacyTOOL privacy report: 100/100 (partial)
+
+Your privacy score: 100/100 (low exposure)
+Alice looks behind the digital curtain, then shows you what to change.
+
+Partial score, based only on the checks that ran (email). Everything marked NOT CHECKED below is not in it.
+
+PART 1: YOUR WEB SCAN, REPLAYED
+We have no saved web scan for this request, so there is nothing to replay here. That happens if you asked for a report without running the web scan first, or your browser was set not to let us keep the result. Run the scan at https://myprivacytool.io/?utm_source=email&utm_medium=email&utm_campaign=scan-report and request your report again to see every hexagon your browser gives away. Nothing below is guessed in its place.
+
+You saw what your browser gives away. Now look at what one email address gives away.
+
+PART 2: YOUR EMAIL ADDRESS
+0 found, 1 checked and clear, 6 not checked (7 hexagons).
+
+YOUR EMAIL ADDRESS
+⬢ Known breaches [CHECKED AND CLEAR]
+⬡ Name in your address [NOT CHECKED]
+⬡ Mail provider and domain [NOT CHECKED]
+⬡ Public profile picture [NOT CHECKED]
+⬡ Second public profile-picture service [NOT CHECKED]
+⬡ Website ownership record [NOT CHECKED]
+⬡ Public code changes [NOT CHECKED]
+
+The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.
+
+US people-search removal guides (we have not searched these sites for you): https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=scan-report
+
+More removal guides: https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=scan-report
+
+Questions about this report? Read the FAQ: https://myprivacytool.io/faq?utm_source=email&utm_medium=email&utm_campaign=scan-report
+
+Reply to this email and a person on the MyPrivacyTOOL team will read it and answer, with Alice’s help. A conversation with Alice herself in this thread (coming). You can also reply to ask us to delete your data.
+
+Fixed what is in this report? Then you do not need to hear from us again.
+Unsubscribe and we will send you no more follow-up or marketing emails: https://myprivacytool.io/unsubscribe?e=a%40b.co&t=abc
