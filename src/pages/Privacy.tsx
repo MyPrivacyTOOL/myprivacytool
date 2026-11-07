@@ -57,7 +57,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 12 October 2026
+              Last updated: 7 November 2026
             </p>
 
             <section className="mb-8">
@@ -176,6 +176,25 @@ const Privacy = () => {
                   Telegram settings stay yours to change and we never change them
                   for you, and anything Telegram itself stores is outside our
                   control.
+                </li>
+                <li>
+                  <strong>Email Address Given in Telegram:</strong> If our
+                  Telegram bot offers to email you your report and you reply with
+                  your email address, we keep that address only to send you one
+                  confirmation email. We do not store it in the record of your
+                  Telegram messages, our analytics or our logs. If you do not
+                  click the link in that email within 24 hours, we delete the
+                  address. If you do click it, we send your report, the address
+                  is kept like any other email address you give us (see section
+                  6), and we keep a record of your consent: a scrambled code
+                  (a SHA-256 hash) of the address, the channel (Telegram), when we
+                  asked, when you confirmed, and which version of our wording you
+                  saw. We link your Telegram id to that address so that sending
+                  STOP can find and delete your Telegram details. Typing an
+                  address is not consent to marketing emails. Sending STOP
+                  deletes your Telegram details and adds your address to our
+                  single list of addresses we never email, which keeps only the
+                  scrambled code, not the address.
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
@@ -592,6 +611,15 @@ const Privacy = () => {
                   send to confirm it is you expire within 15 minutes and are
                   deleted the next day. To have a case deleted sooner, email
                   privacy@myprivacytool.io
+                </li>
+                <li>
+                  <strong>Email Given in Telegram:</strong> An address you type
+                  in Telegram and do not confirm is deleted after 24 hours. The
+                  record of your consent (a scrambled code of the address, the
+                  channel, the times and the wording version) is kept for 24
+                  months, or until you ask us to delete it. An address on our list
+                  of addresses we never email stays on it as a scrambled code only,
+                  so that we keep honouring your request
                 </li>
                 <li>
                   <strong>Newsletter, Waitlist & Lead Records:</strong> Retained
