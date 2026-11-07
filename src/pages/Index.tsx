@@ -8,8 +8,7 @@ import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
 import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
-import DeviceReveal from '@/components/DeviceReveal';
-import UnknownDeviceHero from '@/components/UnknownDeviceHero';
+import DeviceRevealScreen from '@/components/DeviceRevealScreen';
 import { identifyDevice, hedgeDeviceHexagon, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
@@ -45,6 +44,8 @@ const Index = () => {
   const [showFederatedModal, setShowFederatedModal] = useState(false);
   // null until the signals are read; then certain (carousel) or unknown (hexagon path)
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
+  // The full-screen reveal is shown until the visitor continues (or presses Escape)
+  const [revealDone, setRevealDone] = useState(false);
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
@@ -70,7 +71,7 @@ const Index = () => {
 
   // Real-time orientation and motion hooks
   const orientation = useOrientation();
-  const { motion } = useDeviceMotion();
+  const { motion, permission: motionPermission, requestPermission: requestMotionPermission } = useDeviceMotion();
 
   // Merge live orientation/motion data into deviceData
   const liveDeviceData = useMemo(() => {
@@ -289,23 +290,24 @@ const Index = () => {
           )}
         </section>
 
-        {/* Live Device Tracking Hero: hidden while the experience is reworked (src/config/deviceHero.ts) */}
-        {deviceHeroEnabled() && (
-          <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
-            <div className="max-w-[280px] sm:max-w-sm mx-auto">
-              {identity?.certain && (
-                <DeviceReveal
-                  identity={identity}
-                  rotationAngle={orientation.angle}
-                  beta={motion.beta}
-                  gamma={motion.gamma}
-                />
-              )}
-              {identity && !identity.certain && (
-                <UnknownDeviceHero spotlightId="browser" spotlightLabel="Browser" canJump={!honeycombDashboardEnabled()} />
-              )}
-            </div>
-          </section>
+        {/* Device reveal: a full-screen opening moment, hidden while the experience is reworked (src/config/deviceHero.ts) */}
+        {deviceHeroEnabled() && !revealDone && (
+          <DeviceRevealScreen
+            identity={identity}
+            rotationAngle={orientation.angle}
+            beta={motion.beta}
+            gamma={motion.gamma}
+            motionPrompt={motionPermission === 'unknown'}
+            onEnableMotion={() => { void requestMotionPermission(); }}
+            onDone={(jumpToSpotlight) => {
+              setRevealDone(true);
+              if (jumpToSpotlight && !honeycombDashboardEnabled()) {
+                window.setTimeout(() => {
+                  document.getElementById('hexagon-browser')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 60);
+              }
+            }}
+          />
         )}
 
         {/* Hexagon Grid Section */}

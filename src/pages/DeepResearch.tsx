@@ -75,7 +75,7 @@ export default function DeepResearch() {
                   onClick={() => setPopup(h)}
                   aria-label={`${h.label}: ${isFreeNow(h) ? "see what is coming" : "coming soon"}`}
                 >
-                  {isFreeNow(h) ? "See what's coming" : "Run this check"}
+                  {isFreeNow(h) ? "See what's coming" : "See when this opens"}
                 </Button>
               )}
             </li>

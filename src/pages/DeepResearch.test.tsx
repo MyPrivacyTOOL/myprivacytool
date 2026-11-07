@@ -34,6 +34,13 @@ describe("DeepResearch page", () => {
     ids.forEach((id) => expect(screen.getByTestId(`deep-${id}`)).toBeTruthy());
   });
 
+  it("uses the approved button wording on the Coming soon cards, not 'Run this check'", () => {
+    open();
+    // Dark Web, Social Graph and Crypto, plus the credential card while its free password check is switched off (the default here).
+    expect(screen.getAllByText("See when this opens")).toHaveLength(4);
+    expect(screen.queryByText("Run this check")).toBeNull();
+  });
+
   it("no hexagon is marked built while no provider is connected", () => {
     expect(DEEP_HEXAGONS.every((h) => h.build_state === "planned")).toBe(true);
   });

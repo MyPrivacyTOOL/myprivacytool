@@ -22,19 +22,23 @@ interface DeviceIconProps {
   evidence?: string[] | null;
   /** True while the reveal carousel is still spinning. */
   scanning?: boolean;
+  /** iOS needs a tap to grant motion access: show the connect button. */
+  motionPrompt?: boolean;
+  onEnableMotion?: () => void;
+  /** Full-screen presentation: no card chrome, a large illustration. */
+  fullscreen?: boolean;
 }
 
-export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, label, evidence, scanning = false }: DeviceIconProps) {
+export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, label, evidence, scanning = false, motionPrompt = false, onEnableMotion, fullscreen = false }: DeviceIconProps) {
   const betaVal = beta ?? 0;
   const gammaVal = gamma ?? 0;
   const fallbackEmoji = deviceEmojis[deviceType] || '📱';
 
-  // Detect landscape orientation based on gamma (Y-axis tilt)
-  // If absolute gamma > 45°, device is in landscape mode
-  const isLandscape = Math.abs(gammaVal) > 45;
-  
-  // Get the appropriate illustration (portrait or landscape variant)
-  const DeviceIllustration = getDeviceIllustration(deviceType, isLandscape);
+  // The screen is landscape when the browser has rotated it (angle 90 / 270).
+  // We always draw the portrait illustration and turn it with rotateZ below, so
+  // the rotation is a visible flip instead of a swap between two drawings.
+  const isLandscape = Math.abs(rotationAngle) % 180 === 90;
+  const DeviceIllustration = getDeviceIllustration(deviceType, false);
   
   // Determine orientation label
   const orientationLabel = isLandscape ? 'Landscape' : 'Portrait';
@@ -51,19 +55,23 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
   }, [deviceType, rotationAngle, betaVal, gammaVal, isLandscape, DeviceIllustration]);
 
   return (
-    <div className="w-full max-w-[280px] sm:max-w-xs mx-auto">
+    <div className={fullscreen ? 'w-full max-w-md mx-auto' : 'w-full max-w-[280px] sm:max-w-xs mx-auto'}>
       <div 
-        className="relative rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-card border border-surface-border overflow-visible"
+        className={fullscreen
+          ? 'relative p-2 overflow-visible'
+          : 'relative rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-card border border-surface-border overflow-visible'}
         style={{
-          background: 'hsl(var(--surface) / var(--surface-alpha))',
+          background: fullscreen ? 'transparent' : 'hsl(var(--surface) / var(--surface-alpha))',
           perspective: '1000px',
         }}
       >
         {/* Decorative background elements */}
+        {!fullscreen && (
         <div className="absolute inset-0 overflow-hidden rounded-xl sm:rounded-2xl opacity-60 pointer-events-none">
           <div className="absolute top-0 left-0 w-24 sm:w-32 h-24 sm:h-32 bg-brand-soft rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 right-0 w-32 sm:w-40 h-32 sm:h-40 bg-brand-soft rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
         </div>
+        )}
 
         {/* Content */}
         <div className="relative z-10 flex flex-col items-center space-y-2 sm:space-y-4">
@@ -74,25 +82,28 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
 
           {/* 3D Rotating illustration container */}
           <div 
-            className="relative flex items-center justify-center"
+            data-testid="device-flip"
+            className="relative flex items-center justify-center transition-transform duration-700 ease-in-out motion-reduce:transition-none"
             style={{
               transformStyle: 'preserve-3d',
-              width: 'min(140px, 50vw)',
-              height: 'min(140px, 50vw)',
-              minWidth: '120px',
-              minHeight: '120px',
+              // Slow, eased turn so a rotation of the phone is seen as a flip (the page reflows at the same moment)
+              transform: `rotateZ(${rotationAngle}deg)`,
+              width: fullscreen ? 'min(300px, 62vw, 34vh)' : 'min(140px, 50vw)',
+              height: fullscreen ? 'min(300px, 62vw, 34vh)' : 'min(140px, 50vw)',
+              minWidth: fullscreen ? '140px' : '120px',
+              minHeight: fullscreen ? '140px' : '120px',
             }}
           >
             {/* Glow effect */}
             <div 
               className="absolute inset-0 blur-xl opacity-30 flex items-center justify-center pointer-events-none"
               style={{
-                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
+                transform: `rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
               }}
             >
-              <div className="w-[100px] sm:w-[150px] h-[100px] sm:h-[150px] flex items-center justify-center">
+              <div className={fullscreen ? 'w-full h-full flex items-center justify-center' : 'w-[100px] sm:w-[150px] h-[100px] sm:h-[150px] flex items-center justify-center'}>
                 <DeviceIllustration className="w-full h-full" />
               </div>
             </div>
@@ -101,7 +112,7 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
             <div
               className="relative flex items-center justify-center"
               style={{
-                transform: `rotateZ(${rotationAngle}deg) rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
+                transform: `rotateX(${betaVal * 0.3}deg) rotateY(${gammaVal * 0.3}deg)`,
                 transition: 'transform 0.1s ease-out',
                 transformStyle: 'preserve-3d',
                 width: '100%',
@@ -117,7 +128,7 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
           </div>
 
           {/* Device type label */}
-          <div className="text-foreground font-semibold text-base sm:text-lg">
+          <div className={fullscreen ? 'text-foreground font-semibold text-2xl sm:text-3xl' : 'text-foreground font-semibold text-base sm:text-lg'}>
             {label ?? deviceType}
           </div>
 
@@ -141,6 +152,17 @@ export default function DeviceIcon({ deviceType, rotationAngle, beta, gamma, lab
           }`}>
             {orientationLabel}
           </div>
+
+          {/* iOS only reveals tilt after a tap */}
+          {motionPrompt && onEnableMotion && (
+            <button
+              type="button"
+              onClick={onEnableMotion}
+              className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full border border-surface-border bg-brand-soft text-foreground"
+            >
+              Tap to connect your phone’s sensors
+            </button>
+          )}
 
           {/* 3D Rotation indicators */}
           <div className="grid grid-cols-3 gap-1 sm:gap-2 w-full">

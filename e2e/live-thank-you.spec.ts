@@ -117,8 +117,8 @@ for (const motion of ["no-preference", "reduce"] as const) {
       await expect(live.getByRole("status")).toContainText(/that is what i can see from the outside/i, { timeout: 20_000 });
       // what each check says, in words (colour is never the only clue)
       const text = await live.innerText();
-      expect(text).toMatch(/Public code changes\s*Found something/);
-      expect(text).toMatch(/Nothing seen in the places we looked|Could not check this one/);
+      expect(text).toMatch(/Public code changes\s*This address appears in public code changes on GitHub/);   // MPC-9835: per-row wording
+      expect(text).toMatch(/Nothing seen in the places we looked|Could not check this one|No name spotted|No public picture found|Owner details hidden, or a shared mail domain/);
       expect(text).not.toMatch(/%|score/i);                                                    // no score or percentage, ever
       // the first view never shows a value or a repository name
       expect(text).not.toContain("jane-example");
