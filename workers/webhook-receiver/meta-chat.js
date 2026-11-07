@@ -1,6 +1,6 @@
 // CK-9837: visual, minimal Messenger and WhatsApp conversation, test mode. All words below were approved by Chris on 2026-11-07.
-// Flow: consent card (tap "I agree") -> menu card (free scan / talk to a person / delete my data). Nothing else is sent before the person
-// agrees. STOP, or the "Delete my data" button, deletes the saved conversation. Replaces the old "first hexagon" reply on these two channels
+// Flow: HOME card first (free scan / talk to a person / delete my data), so the person sees the value before any legal step. Nothing is saved until
+// the person taps "Talk to a person" and then "I agree" on the consent card. STOP, or the "Delete my data" button, deletes the saved conversation. Replaces the old "first hexagon" reply on these two channels
 // (it claimed a public-data snapshot and a report in 60 seconds, neither backed, and created a HubSpot contact before any consent).
 // Strategy 4I: automated, a person within 1 business day, no sensitive data collected in the chat. Needs the Privacy Policy to cover
 // these channels, and Chris's legal review, before any public go-live.
@@ -17,6 +17,7 @@ export const DEFAULT_IMAGE = `${SITE}/og-image.jpg`;
 export const TEXT = {
   consentTitle: "Hi 👋 I'm MyPrivacyTOOL's automated assistant.",
   consentSubtitle: 'By chatting you agree to our Privacy Policy.',
+  homeSubtitle: 'Run the free scan to see your digital footprint.',   // NEW 2026-11-07: needs Chris's approval before MESSAGING_ENABLED is turned on
   menu: 'What would you like to do?',
   person: 'Thanks 🙌 A person will reply within 1 business day.',
   deleted: `Done ✅ Deleted. Anything else: ${PRIVACY_MAIL}`,
@@ -53,39 +54,48 @@ export function messengerEvents(body) {
 
 /**
  * One inbound event -> what to send and what to save.
- * Returns { steps: [{ kind: 'consent'|'menu'|'scanlink'|'text', text? }], next, handoff } where next is the state to save, or 'delete'.
+ * Returns { steps: [{ kind: 'home'|'consent'|'scanlink'|'text', text?, again? }], next, handoff } where next is the state to save,
+ * 'delete' to remove it, or null to save nothing. Nothing is stored until the person has tapped "I agree".
  */
 export function decide({ text, payload, state, now = Date.now() }) {
   const st = state?.stage ?? 'new';
   if (isStopWord(text) || payload === PAYLOAD.del) return { steps: [{ kind: 'text', text: TEXT.deleted }], next: 'delete', handoff: false };
-  if (payload === PAYLOAD.no) return { steps: [{ kind: 'text', text: TEXT.declined }], next: { stage: 'declined', ts: now }, handoff: false };
+  if (payload === PAYLOAD.no) return { steps: [{ kind: 'text', text: TEXT.declined }], next: 'delete', handoff: false };
   if (payload === PAYLOAD.yes) {
-    return { steps: [{ kind: 'menu' }], next: { stage: 'consented', consentAt: now, noticeVersion: NOTICE_VERSION, ts: now }, handoff: false };
+    // The consent card is only shown when the person asked to talk to a person, so agreeing means: save, and hand off.
+    if (st === 'human_requested') return { steps: [], next: state, handoff: false };
+    return { steps: [{ kind: 'text', text: TEXT.person }], next: { stage: 'human_requested', consentAt: now, noticeVersion: NOTICE_VERSION, ts: now }, handoff: true };
   }
-  if (st === 'declined' && payload !== PAYLOAD.start) return { steps: [], next: state, handoff: false };      // we said we would not message again
-  if (st === 'new' || payload === PAYLOAD.start) return { steps: [{ kind: 'consent' }], next: { stage: 'asked', askedCount: 1, ts: now }, handoff: false };
-  if (st === 'asked') {
-    const n = (state.askedCount ?? 1) + 1;
-    return n <= 3 ? { steps: [{ kind: 'consent' }], next: { ...state, askedCount: n, ts: now }, handoff: false } : { steps: [], next: state, handoff: false };
+  if (payload === PAYLOAD.scan) return { steps: [{ kind: 'scanlink' }, { kind: 'home', again: true }], next: state ?? null, handoff: false };   // WhatsApp scan button
+  if (payload === PAYLOAD.person) {
+    if (st === 'human_requested') return { steps: [], next: state, handoff: false };                  // a person already has the request
+    return { steps: [{ kind: 'consent' }], next: null, handoff: false };                              // ask first; nothing saved yet
   }
-  // consented or human_requested: only now do buttons and messages do anything
-  if (payload === PAYLOAD.scan) return { steps: [{ kind: 'scanlink' }], next: state, handoff: false };
-  if (st === 'consented') return { steps: [{ kind: 'text', text: TEXT.person }], next: { ...state, stage: 'human_requested', ts: now }, handoff: true };
-  return { steps: [], next: state, handoff: false };   // a person already has the request: no repeated automatic replies
+  // Get Started, or anything typed
+  if (st === 'human_requested') return { steps: [], next: state, handoff: false };                    // a person has it: no repeated automatic replies
+  return { steps: [{ kind: 'home' }], next: null, handoff: false };                                   // never silent, never saved before consent
 }
 
-const messengerButtons = (kind, channel) => kind === 'consent'
-  ? [{ type: 'postback', title: BTN.agree, payload: PAYLOAD.yes }, { type: 'postback', title: BTN.decline, payload: PAYLOAD.no }, { type: 'web_url', url: PRIVACY_URL, title: BTN.policy, webview_height_ratio: 'tall' }]
-  : [{ type: 'web_url', url: trackedScanUrl(channel), title: BTN.scan, webview_height_ratio: 'tall' }, { type: 'postback', title: BTN.person, payload: PAYLOAD.person }, { type: 'postback', title: BTN.del, payload: PAYLOAD.del }];
+const homeButtons = (channel) => [
+  { type: 'web_url', url: trackedScanUrl(channel), title: BTN.scan, webview_height_ratio: 'tall' },
+  { type: 'postback', title: BTN.person, payload: PAYLOAD.person },
+  { type: 'postback', title: BTN.del, payload: PAYLOAD.del },
+];
+const consentButtons = () => [
+  { type: 'postback', title: BTN.agree, payload: PAYLOAD.yes },
+  { type: 'postback', title: BTN.decline, payload: PAYLOAD.no },
+  { type: 'web_url', url: PRIVACY_URL, title: BTN.policy, webview_height_ratio: 'tall' },
+];
 
 /** The Messenger `message` object for one step. */
 export function messengerMessage(step, env) {
-  if (step.kind === 'consent' || step.kind === 'menu') {
-    const consent = step.kind === 'consent';
+  if (step.kind === 'home') {
     return { attachment: { type: 'template', payload: { template_type: 'generic', elements: [{
-      title: consent ? TEXT.consentTitle : TEXT.menu, ...(consent ? { subtitle: TEXT.consentSubtitle } : {}),
-      image_url: imageUrl(env), buttons: messengerButtons(step.kind, 'messenger'),
-    }] } } };
+      title: TEXT.consentTitle, subtitle: TEXT.homeSubtitle, image_url: imageUrl(env), buttons: homeButtons('messenger') }] } } };
+  }
+  if (step.kind === 'consent') {
+    return { attachment: { type: 'template', payload: { template_type: 'generic', elements: [{
+      title: TEXT.consentSubtitle, image_url: imageUrl(env), buttons: consentButtons() }] } } };
   }
   if (step.kind === 'scanlink') return { text: trackedScanUrl('messenger') };
   return { text: step.text };
@@ -94,15 +104,16 @@ export function messengerMessage(step, env) {
 const waReply = (id, title) => ({ type: 'reply', reply: { id, title } });
 /** The WhatsApp message body (without messaging_product and to) for one step. ⚠️ Interactive button format not verified against Meta's current docs. */
 export function whatsappMessage(step, env) {
-  if (step.kind === 'consent') {
-    return { type: 'interactive', interactive: { type: 'button', header: { type: 'image', image: { link: imageUrl(env) } },
-      body: { text: `${TEXT.consentTitle}\n${TEXT.consentSubtitle}\n${PRIVACY_URL}` },
-      action: { buttons: [waReply(PAYLOAD.yes, BTN.agree), waReply(PAYLOAD.no, BTN.decline)] } } };
-  }
-  if (step.kind === 'menu') {
-    return { type: 'interactive', interactive: { type: 'button', header: { type: 'image', image: { link: imageUrl(env) } },
-      body: { text: TEXT.menu },
+  const header = { type: 'image', image: { link: imageUrl(env) } };
+  if (step.kind === 'home') {
+    return { type: 'interactive', interactive: { type: 'button', header,
+      body: { text: step.again ? TEXT.menu : `${TEXT.consentTitle}\n${TEXT.homeSubtitle}` },
       action: { buttons: [waReply(PAYLOAD.scan, BTN.scan), waReply(PAYLOAD.person, BTN.person), waReply(PAYLOAD.del, BTN.del)] } } };
+  }
+  if (step.kind === 'consent') {
+    return { type: 'interactive', interactive: { type: 'button', header,
+      body: { text: `${TEXT.consentSubtitle}\n${PRIVACY_URL}` },
+      action: { buttons: [waReply(PAYLOAD.yes, BTN.agree), waReply(PAYLOAD.no, BTN.decline)] } } };
   }
   if (step.kind === 'scanlink') return { type: 'text', text: { body: trackedScanUrl('whatsapp'), preview_url: true } };
   return { type: 'text', text: { body: step.text } };

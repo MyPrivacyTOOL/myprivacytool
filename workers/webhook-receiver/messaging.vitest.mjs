@@ -49,73 +49,62 @@ describe('Messenger flow', () => {
     expect(sends).toHaveLength(0); expect(store.size).toBe(0);
   });
 
-  it('first contact: typing indicator, then ONE consent card with the approved words, image and three buttons; nothing else is sent; no HubSpot contact', async () => {
+  it('first contact: typing indicator, then ONE home card (value first) with image and three buttons; NOTHING is saved; no HubSpot contact', async () => {
     await post('/webhook/messenger', msgr('u1', 'hello'));
     expect(sends[0].body).toMatchObject({ recipient: { id: 'u1' }, sender_action: 'typing_on' });
     expect(messages()).toHaveLength(1);
     const c = card(messages()[0]);
     expect(c.title).toBe("Hi 👋 I'm MyPrivacyTOOL's automated assistant.");
-    expect(c.subtitle).toBe('By chatting you agree to our Privacy Policy.');
+    expect(c.subtitle).toBe('Run the free scan to see your digital footprint.');
     expect(c.image_url).toBe('https://www.myprivacytool.io/og-image.jpg');
-    expect(c.buttons.map((b) => b.title)).toEqual(['✅ I agree', '❌ No thanks', 'Privacy Policy']);
-    expect(c.buttons[2]).toMatchObject({ type: 'web_url', url: 'https://www.myprivacytool.io/privacy' });
-    expect(sends.every((s) => s.url === 'https://graph.facebook.com/v23.0/me/messages' && s.headers.Authorization === `Bearer ${TOKEN}`)).toBe(true);
-    expect(JSON.stringify(sends)).not.toContain(`/me/messages?`);          // token never in a URL
-    expect(hubspot).toBe(0);
-    expect(store.get('messenger:u1')).toMatchObject({ stage: 'asked' });
-  });
-
-  it('"I agree" saves the consent time and the policy version and shows the menu card with the three buttons', async () => {
-    await post('/webhook/messenger', msgr('u1', 'hello'));
-    sends.length = 0;
-    await post('/webhook/messenger', tap('u1', PAYLOAD.yes));
-    const st = store.get('messenger:u1');
-    expect(st).toMatchObject({ stage: 'consented', noticeVersion: NOTICE_VERSION }); expect(typeof st.consentAt).toBe('number');
-    const c = card(messages()[0]);
-    expect(c.title).toBe('What would you like to do?');
     expect(c.buttons.map((b) => b.title)).toEqual(['🔍 Free scan', '🙋 Talk to a person', '🗑️ Delete my data']);
     expect(c.buttons[0]).toMatchObject({ type: 'web_url', url: 'https://www.myprivacytool.io/scan?utm_source=facebook&utm_medium=messenger&utm_campaign=messenger-welcome' });
+    expect(sends.every((x) => x.url === 'https://graph.facebook.com/v23.0/me/messages' && x.headers.Authorization === `Bearer ${TOKEN}`)).toBe(true);
+    expect(JSON.stringify(sends)).not.toContain('/me/messages?');
+    expect(hubspot).toBe(0); expect(store.size).toBe(0);
   });
 
-  it('"Talk to a person" sends the approved line once, flags a handoff, and later messages get no automatic reply', async () => {
-    await post('/webhook/messenger', msgr('u1', 'hello')); await post('/webhook/messenger', tap('u1', PAYLOAD.yes));
-    sends.length = 0; hooks.length = 0;
+  it('before consent a person is never left in silence and nothing is ever saved: each typed message gets the home card again', async () => {
+    for (const t of ['hello', 'scan me', 'anyone there?', 'hello??', 'hi']) await post('/webhook/messenger', msgr('u1', t));
+    expect(messages()).toHaveLength(5); expect(messages().every((m) => card(m).title.includes('automated assistant'))).toBe(true);
+    expect(store.size).toBe(0); expect(hooks).toHaveLength(0);
+  });
+
+  it('"Talk to a person" first asks for agreement (consent card, still nothing saved); "No thanks" sends the approved line and saves nothing', async () => {
+    await post('/webhook/messenger', msgr('u1', 'hello')); sends.length = 0;
+    await post('/webhook/messenger', tap('u1', PAYLOAD.person));
+    const c = card(messages()[0]);
+    expect(c.title).toBe('By chatting you agree to our Privacy Policy.');
+    expect(c.buttons.map((b) => b.title)).toEqual(['✅ I agree', '❌ No thanks', 'Privacy Policy']);
+    expect(c.buttons[2]).toMatchObject({ type: 'web_url', url: 'https://www.myprivacytool.io/privacy' });
+    expect(store.size).toBe(0);
+    sends.length = 0; await post('/webhook/messenger', tap('u1', PAYLOAD.no));
+    expect(messages()).toEqual([{ text: "No problem 👍 We won't message you again." }]); expect(store.size).toBe(0); expect(hooks).toHaveLength(0);
+  });
+
+  it('"I agree" saves consent time and policy version, sends the approved line once and flags ONE handoff; later messages get no automatic reply', async () => {
     const env = { ...ENV, HANDOFF_SLACK_WEBHOOK_URL: 'https://hooks.slack.test/x' };
-    await post('/webhook/messenger', tap('u1', PAYLOAD.person), env);
+    await post('/webhook/messenger', msgr('u1', 'hello'), env); await post('/webhook/messenger', tap('u1', PAYLOAD.person), env); sends.length = 0;
+    await post('/webhook/messenger', tap('u1', PAYLOAD.yes), env);
     expect(messages()).toEqual([{ text: 'Thanks 🙌 A person will reply within 1 business day.' }]);
-    expect(hooks).toHaveLength(1); expect(hooks[0].text).toMatch(/messenger \(ref [0-9a-f]{8}\)/);
-    expect(JSON.stringify(hooks)).not.toMatch(/u1|hello/);                   // no id, no message text sent to Slack
+    const st = store.get('messenger:u1'); expect(st).toMatchObject({ stage: 'human_requested', noticeVersion: NOTICE_VERSION }); expect(typeof st.consentAt).toBe('number');
+    expect(hooks).toHaveLength(1); expect(hooks[0].text).toMatch(/messenger \(ref [0-9a-f]{8}\)/); expect(JSON.stringify(hooks)).not.toMatch(/u1|hello/);
     sends.length = 0;
-    await post('/webhook/messenger', msgr('u1', 'a question'), env); await post('/webhook/messenger', msgr('u1', 'another'), env);
+    await post('/webhook/messenger', msgr('u1', 'a question'), env); await post('/webhook/messenger', tap('u1', PAYLOAD.person), env); await post('/webhook/messenger', tap('u1', PAYLOAD.yes), env);
     expect(sends).toHaveLength(0); expect(hooks).toHaveLength(1);
   });
 
-  it('"Delete my data" and typed STOP delete the saved conversation and send the approved line; the next message starts fresh', async () => {
-    for (const how of ['button', 'text']) {
+  it('"Delete my data" and typed STOP send the approved line and leave nothing saved, before or after consent', async () => {
+    for (const how of ['button', 'text']) for (const consented of [false, true]) {
       store.clear(); sends.length = 0;
-      await post('/webhook/messenger', msgr('u1', 'hello')); await post('/webhook/messenger', tap('u1', PAYLOAD.yes)); sends.length = 0;
+      await post('/webhook/messenger', msgr('u1', 'hello'));
+      if (consented) { await post('/webhook/messenger', tap('u1', PAYLOAD.person)); await post('/webhook/messenger', tap('u1', PAYLOAD.yes)); }
+      sends.length = 0;
       await post('/webhook/messenger', how === 'button' ? tap('u1', PAYLOAD.del) : msgr('u1', ' stop '));
       expect(store.has('messenger:u1')).toBe(false);
       expect(messages()).toEqual([{ text: 'Done ✅ Deleted. Anything else: privacy@myprivacytool.io' }]);
-      sends.length = 0; await post('/webhook/messenger', msgr('u1', 'hi again'));
-      expect(card(messages()[0]).title).toContain('automated assistant');
+      sends.length = 0; await post('/webhook/messenger', msgr('u1', 'hi again')); expect(card(messages()[0]).title).toContain('automated assistant');
     }
-  });
-
-  it('"No thanks" sends the approved line and then nothing more, until the person taps Get Started again', async () => {
-    await post('/webhook/messenger', msgr('u1', 'hello')); sends.length = 0;
-    await post('/webhook/messenger', tap('u1', PAYLOAD.no));
-    expect(messages()).toEqual([{ text: "No problem 👍 We won't message you again." }]);
-    sends.length = 0; await post('/webhook/messenger', msgr('u1', 'hello?')); expect(sends).toHaveLength(0);
-    await post('/webhook/messenger', tap('u1', PAYLOAD.start)); expect(card(messages()[0]).title).toContain('automated assistant');
-  });
-
-  it('before the person agrees, typing or tapping a menu button does nothing but repeat the consent card, at most 3 times in all', async () => {
-    await post('/webhook/messenger', msgr('u1', 'hello')); sends.length = 0;
-    await post('/webhook/messenger', tap('u1', PAYLOAD.person)); await post('/webhook/messenger', msgr('u1', 'scan me'));
-    expect(messages().every((m) => card(m).title.includes('automated assistant'))).toBe(true);
-    expect(hooks).toHaveLength(0);
-    sends.length = 0; await post('/webhook/messenger', msgr('u1', 'again')); expect(sends).toHaveLength(0);
   });
 
   it('ignores echoes of our own messages, delivery and read receipts; answers every sender in a batch', async () => {
@@ -144,20 +133,28 @@ describe('WhatsApp flow', () => {
     expect(sends).toHaveLength(0); expect(store.size).toBe(0);
   });
 
-  it('first message: one interactive consent message with an image header and two reply buttons; button taps drive the rest', async () => {
+  it('home message with image header and three reply buttons; scan button sends the preview link then the menu again; nothing saved before consent', async () => {
     await post('/webhook/whatsapp', wa('85200000000', 'hello'));
     expect(sends).toHaveLength(1);
     expect(sends[0].url).toBe('https://graph.facebook.com/v23.0/999/messages');
     const b = sends[0].body;
     expect(b).toMatchObject({ messaging_product: 'whatsapp', to: '85200000000', type: 'interactive' });
     expect(b.interactive.header.image.link).toBe('https://www.myprivacytool.io/og-image.jpg');
-    expect(b.interactive.body.text).toContain('automated assistant'); expect(b.interactive.body.text).toContain('https://www.myprivacytool.io/privacy');
-    expect(b.interactive.action.buttons.map((x) => x.reply.id)).toEqual(['CONSENT_YES', 'CONSENT_NO']);
-    expect(hubspot).toBe(0);
-    sends.length = 0; await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.yes));
-    expect(sends[0].body.interactive.action.buttons.map((x) => x.reply.title)).toEqual(['🔍 Free scan', '🙋 Talk to a person', '🗑️ Delete my data']);
+    expect(b.interactive.body.text).toContain('automated assistant'); expect(b.interactive.body.text).toContain('digital footprint');
+    expect(b.interactive.action.buttons.map((x) => x.reply.id)).toEqual(['SCAN', 'HUMAN', 'DELETE']);
+    expect(hubspot).toBe(0); expect(store.size).toBe(0);
     sends.length = 0; await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.scan));
     expect(sends[0].body).toMatchObject({ type: 'text', text: { preview_url: true } }); expect(sends[0].body.text.body).toContain('utm_medium=whatsapp');
+    expect(sends[1].body.interactive.body.text).toBe('What would you like to do?'); expect(store.size).toBe(0);
+  });
+
+  it('talk to a person asks for agreement with two reply buttons, then agrees; delete removes everything', async () => {
+    await post('/webhook/whatsapp', wa('85200000000', 'hello')); sends.length = 0;
+    await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.person));
+    expect(sends[0].body.interactive.body.text).toContain('By chatting you agree to our Privacy Policy.');
+    expect(sends[0].body.interactive.action.buttons.map((x) => x.reply.id)).toEqual(['CONSENT_YES', 'CONSENT_NO']); expect(store.size).toBe(0);
+    sends.length = 0; await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.yes));
+    expect(sends[0].body.text.body).toBe('Thanks 🙌 A person will reply within 1 business day.'); expect(store.get('whatsapp:85200000000')).toMatchObject({ stage: 'human_requested' });
     sends.length = 0; await post('/webhook/whatsapp', waTap('85200000000', PAYLOAD.del));
     expect(sends[0].body.text.body).toBe('Done ✅ Deleted. Anything else: privacy@myprivacytool.io'); expect(store.has('whatsapp:85200000000')).toBe(false);
   });
@@ -174,10 +171,12 @@ describe('meta-chat helpers', () => {
     for (const t of Object.values(BTN)) expect([...t].length).toBeLessThanOrEqual(20);
     expect(TEXT.person).toBe('Thanks 🙌 A person will reply within 1 business day.'); expect(TEXT.declined).toBe("No problem 👍 We won't message you again.");
   });
-  it('decide: nothing happens for buttons before consent; STOP always deletes', () => {
-    expect(decide({ payload: PAYLOAD.person, state: { stage: 'asked', askedCount: 1 } }).handoff).toBe(false);
-    expect(decide({ text: 'DELETE', state: { stage: 'consented' } }).next).toBe('delete');
-    expect(decide({ payload: PAYLOAD.scan, state: { stage: 'human_requested' } }).steps[0].kind).toBe('scanlink');
+  it('decide: nothing is saved before consent; only "I agree" saves and hands off; STOP always deletes', () => {
+    for (const input of [{ text: 'hi' }, { payload: PAYLOAD.start }, { payload: PAYLOAD.person }, { payload: PAYLOAD.scan }]) expect(decide({ ...input, state: null }).next).toBeNull();
+    expect(decide({ payload: PAYLOAD.person, state: null }).handoff).toBe(false);
+    expect(decide({ payload: PAYLOAD.yes, state: null })).toMatchObject({ handoff: true, next: { stage: 'human_requested' } });
+    expect(decide({ text: 'DELETE', state: { stage: 'human_requested' } }).next).toBe('delete');
+    expect(decide({ text: 'hello', state: { stage: 'human_requested' } }).steps).toEqual([]);
   });
   it('messengerEvents tolerates malformed bodies; renderers return the expected shapes', () => {
     expect(messengerEvents(null)).toEqual([]); expect(messengerEvents({ entry: [{}] })).toEqual([]);

@@ -153,7 +153,7 @@ async function handleMessenger(request, env) {
     for (const { senderId, text, payload } of events) {
       const key = `messenger:${senderId}`;
       const { steps, next, handoff } = decide({ text, payload, state: await getConversationState(env, key) });
-      if (next === 'delete') await takeState(env, key); else await saveConversationState(env, key, next);
+      if (next === 'delete') await takeState(env, key); else if (next) await saveConversationState(env, key, next);   // null: nothing is saved before consent
       if (steps.length) await sendMessengerAction(env, senderId, 'typing_on');   // looks like a person typing, not a data dump
       for (const step of steps) await sendMessenger(env, senderId, messengerMessage(step, env));
       if (handoff) await notifyHandoff(env, 'messenger', senderId);
@@ -233,7 +233,7 @@ async function handleWhatsApp(request, env) {
     if (!messagingEnabled(env)) { console.log('whatsapp_replies_disabled'); return ok(); }   // MESSAGING_ENABLED must be "true"
     const key = `whatsapp:${from}`;
     const { steps, next, handoff } = decide({ text, payload, state: await getConversationState(env, key) });
-    if (next === 'delete') await takeState(env, key); else await saveConversationState(env, key, next);
+    if (next === 'delete') await takeState(env, key); else if (next) await saveConversationState(env, key, next);   // null: nothing is saved before consent
     for (const step of steps) await sendWhatsApp(env, from, whatsappMessage(step, env));
     if (handoff) await notifyHandoff(env, 'whatsapp', from);
     return ok();
