@@ -38,7 +38,7 @@ export default function ListingCheckFields({ idSuffix, value, onChange, disabled
         </label>
         {Array.from({ length: MAX_LISTING_URLS }, (_, i) => (
           <label key={i} htmlFor={id(`url${i}`)} className="block">
-            {i === 0 ? "Address of a page that lists you (up to 3)" : `Another page that lists you (${i + 1} of ${MAX_LISTING_URLS})`}
+            {i === 0 ? "Address of a page that lists you (up to 3)" : "Another page that lists you"}
             <input id={id(`url${i}`)} className={inputClass} type="url" inputMode="url" maxLength={500} placeholder="https://" value={value.urls[i] ?? ""} disabled={disabled}
               onChange={(e) => set({ urls: value.urls.map((u, j) => (j === i ? e.target.value : u)) })} />
           </label>
