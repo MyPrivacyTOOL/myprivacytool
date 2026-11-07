@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import DeviceIcon from '@/components/DeviceIcon';
+import { firstSpinDelay, SPIN_SLOW_DOWN } from '@/lib/revealSpin';
 import { CAROUSEL_DEVICES, type DeviceCategory, type DeviceIdentity } from '@/lib/deviceIdentity';
 
 /** Which illustration represents each category. Computers share a neutral screen. */
@@ -28,9 +29,6 @@ interface DeviceRevealProps {
   onEnableMotion?: () => void;
 }
 
-const START_DELAY_MS = 55;
-const SLOW_DOWN = 1.06;
-
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   typeof window.matchMedia === 'function' &&
@@ -58,7 +56,7 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma, mot
     // One lap plus the distance to the target, slowing down as it goes.
     const steps = CAROUSEL_DEVICES.length + targetIndex;
     let step = 0;
-    let delay = START_DELAY_MS;
+    let delay = firstSpinDelay(steps);
     let timer: ReturnType<typeof setTimeout>;
 
     setIndex(0);
@@ -71,7 +69,7 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma, mot
         setLocked(true);
         return;
       }
-      delay *= SLOW_DOWN;
+      delay *= SPIN_SLOW_DOWN;
       timer = setTimeout(tick, delay);
     };
     timer = setTimeout(tick, delay);
