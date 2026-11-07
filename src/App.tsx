@@ -39,6 +39,7 @@ const OptOutGuide = lazy(() => import("./pages/OptOutGuide"));
 const Journey = lazy(() => import("./pages/Journey"));
 const AmIExposed = lazy(() => import("./pages/AmIExposed"));
 const ConnectGitHubPage = lazy(() => import("./pages/ConnectGitHub"));
+const DeepResearch = lazy(() => import("./pages/DeepResearch"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const ScanResults = lazy(() => import("./pages/ScanResults"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
@@ -98,6 +99,8 @@ const App = () => (
             <Route path="/journey" element={<Journey />} />
             <Route path="/am-i-exposed" element={<AmIExposed />} />
             <Route path="/connect/github" element={<ConnectGitHubPage />} />
+            {/* MPC-9546: unlisted (noindex) until the Deep Research suite launches. */}
+            <Route path="/deep-research" element={<DeepResearch />} />
             {/* Developer portal (MPC-7250) */}
             <Route path="/developers" element={<Developers />} />
             <Route path="/guides/remove-my-info-from-internet" element={<Navigate to="/blog/remove-personal-information-from-internet" replace />} />
