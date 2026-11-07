@@ -4,6 +4,8 @@ interface UnknownDeviceHeroProps {
   /** Hexagon id to jump to (a data point we CAN read with certainty). */
   spotlightId: string;
   spotlightLabel: string;
+  /** False when the target hexagon is not on the page (e.g. the honeycomb dashboard view). */
+  canJump?: boolean;
 }
 
 /**
@@ -11,7 +13,7 @@ interface UnknownDeviceHeroProps {
  * this is. Being hard to identify is good news for the visitor — and the
  * honest alternative to guessing — so we say so and point at what we CAN see.
  */
-export default function UnknownDeviceHero({ spotlightId, spotlightLabel }: UnknownDeviceHeroProps) {
+export default function UnknownDeviceHero({ spotlightId, spotlightLabel, canJump = true }: UnknownDeviceHeroProps) {
   const jump = () => {
     const el = document.getElementById(`hexagon-${spotlightId}`);
     if (!el) return;
@@ -31,11 +33,14 @@ export default function UnknownDeviceHero({ spotlightId, spotlightLabel }: Unkno
           We can’t be certain what you’re using
         </div>
         <p className="text-muted-foreground text-xs sm:text-sm">
-          That’s good for your privacy — we won’t guess. Here’s something we <em>can</em> see:
+          That’s good for your privacy — we won’t guess.
+          {canJump && <> Here’s something we <em>can</em> see:</>}
         </p>
-        <Button variant="outline" size="sm" onClick={jump}>
-          See your {spotlightLabel} ↓
-        </Button>
+        {canJump && (
+          <Button variant="outline" size="sm" onClick={jump}>
+            See your {spotlightLabel} ↓
+          </Button>
+        )}
       </div>
     </div>
   );

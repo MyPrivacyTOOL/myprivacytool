@@ -6,6 +6,8 @@
  * is shown only for certain identities; unknown follows the hexagon path.
  */
 
+import type { HexagonData } from './deviceDetection';
+
 export type DeviceCategory =
   | 'iphone'
   | 'ipad'
@@ -155,4 +157,27 @@ export async function readDeviceSignalsWithModel(): Promise<DeviceSignals> {
     /* hints unavailable — fall back to what we have */
   }
   return signals;
+}
+
+/**
+ * When we cannot be certain of the device, the Device Type hexagon must not
+ * present the old regex guess as a 92% fact. Relabel it as a question for the
+ * visitor to confirm, with a low confidence. Certain (or not yet known)
+ * identities leave the hexagons untouched.
+ */
+export function hedgeDeviceHexagon(
+  hexagons: HexagonData[],
+  identity: DeviceIdentity | null,
+): HexagonData[] {
+  if (!identity || identity.certain) return hexagons;
+  return hexagons.map((hex) =>
+    hex.id === 'device'
+      ? {
+          ...hex,
+          label: 'Device Type (our guess)',
+          value: hex.value.endsWith('?') ? hex.value : `${hex.value}?`,
+          confidence: Math.min(hex.confidence, 50),
+        }
+      : hex,
+  );
 }

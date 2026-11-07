@@ -5,10 +5,11 @@ import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
 import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
+import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceReveal from '@/components/DeviceReveal';
 import UnknownDeviceHero from '@/components/UnknownDeviceHero';
-import { identifyDevice, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
+import { identifyDevice, hedgeDeviceHexagon, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
@@ -61,6 +62,8 @@ const Index = () => {
   useEffect(() => {
     markScanStarted();
   }, []);
+  // Unknown device: the Device Type hexagon asks instead of asserting the old regex guess
+  const displayHexagons = useMemo(() => hedgeDeviceHexagon(hexagons, identity), [hexagons, identity]);
   const resultsShown = !loading && hexagons.length > 0;
   useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
 
@@ -285,22 +288,24 @@ const Index = () => {
           )}
         </section>
 
-        {/* Live Device Tracking Hero */}
-        <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
-          <div className="max-w-[280px] sm:max-w-sm mx-auto">
-            {identity?.certain && (
-              <DeviceReveal
-                identity={identity}
-                rotationAngle={orientation.angle}
-                beta={motion.beta}
-                gamma={motion.gamma}
-              />
-            )}
-            {identity && !identity.certain && (
-              <UnknownDeviceHero spotlightId="browser" spotlightLabel="Browser" />
-            )}
-          </div>
-        </section>
+        {/* Live Device Tracking Hero: hidden while the experience is reworked (src/config/deviceHero.ts) */}
+        {deviceHeroEnabled() && (
+          <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
+            <div className="max-w-[280px] sm:max-w-sm mx-auto">
+              {identity?.certain && (
+                <DeviceReveal
+                  identity={identity}
+                  rotationAngle={orientation.angle}
+                  beta={motion.beta}
+                  gamma={motion.gamma}
+                />
+              )}
+              {identity && !identity.certain && (
+                <UnknownDeviceHero spotlightId="browser" spotlightLabel="Browser" canJump={!honeycombDashboardEnabled()} />
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
@@ -323,12 +328,12 @@ const Index = () => {
             <>
               {/* The scan is complete here (loading is over), which is when WebScanDashboard must mount: it keeps its own answers from then on. */}
               {honeycombDashboardEnabled() ? (
-                <WebScanDashboard scanned={hexagons} title="Your Digital Footprint" />
+                <WebScanDashboard scanned={displayHexagons} title="Your Digital Footprint" />
               ) : (
                 <HexagonGrid
-                  hexagons={hexagons}
+                  hexagons={displayHexagons}
                   deviceData={deviceData || undefined}
-                  spotlightId={identity && !identity.certain ? 'browser' : undefined}
+                  spotlightId={deviceHeroEnabled() && identity && !identity.certain ? 'browser' : undefined}
                 />
               )}
               <ScanSavingNotice variant="scan" />

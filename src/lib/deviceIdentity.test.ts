@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { identifyDevice, type DeviceSignals } from './deviceIdentity';
+import { identifyDevice, hedgeDeviceHexagon, type DeviceSignals } from './deviceIdentity';
+import type { HexagonData } from './deviceDetection';
 
 const base: DeviceSignals = {
   userAgent: '',
@@ -71,5 +72,33 @@ describe('identifyDevice', () => {
   it('is unknown for unrecognised signals', () => {
     expect(identifyDevice({ ...base, userAgent: 'curl/8.0', platform: '' }).certain).toBe(false);
     expect(identifyDevice({ ...base, userAgent: '', platform: '' }).certain).toBe(false);
+  });
+});
+
+describe('hedgeDeviceHexagon', () => {
+  const hex = (id: string): HexagonData => ({
+    id, label: 'Device Type', value: 'Mobile (Android 14)', icon: '📱',
+    confidence: 92, risk: '', confirmed: false, category: 'device',
+  });
+  const unknown = { certain: false as const, reason: 'x' };
+  const certain = identifyDevice({
+    ...base, userAgent: UA.mac, platform: 'MacIntel',
+  });
+
+  it('relabels the device hexagon as a low-confidence question when unknown', () => {
+    const [device, other] = hedgeDeviceHexagon([hex('device'), hex('browser')], unknown);
+    expect(device).toMatchObject({ label: 'Device Type (our guess)', value: 'Mobile (Android 14)?', confidence: 50 });
+    expect(other).toMatchObject({ label: 'Device Type', confidence: 92 });
+  });
+
+  it('leaves hexagons untouched when certain or not yet identified', () => {
+    const list = [hex('device')];
+    expect(hedgeDeviceHexagon(list, certain)).toBe(list);
+    expect(hedgeDeviceHexagon(list, null)).toBe(list);
+  });
+
+  it('is idempotent', () => {
+    const once = hedgeDeviceHexagon([hex('device')], unknown);
+    expect(hedgeDeviceHexagon(once, unknown)[0].value).toBe('Mobile (Android 14)?');
   });
 });
