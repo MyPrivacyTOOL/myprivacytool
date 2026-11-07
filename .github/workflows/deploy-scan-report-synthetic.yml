@@ -14,6 +14,8 @@ on:
       - 'shared/test-records.js'
       - 'src/data/optOutGuides.json'
       - '.github/workflows/deploy-scan-report-synthetic.yml'
+      - '.github/workflows/f1-live-check.yml'
+      - 'scripts/f1-live-check/**'
   workflow_dispatch:
 
 concurrency:
