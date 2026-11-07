@@ -27,6 +27,7 @@ interface DeviceRevealProps {
   gamma?: number | null;
   motionPrompt?: boolean;
   onEnableMotion?: () => void;
+  fullscreen?: boolean;
 }
 
 const prefersReducedMotion = () =>
@@ -38,7 +39,7 @@ const prefersReducedMotion = () =>
  * Spins through the devices we can recognise, decelerates, and locks onto the
  * visitor's. Only rendered for a certain identity — unknown never reaches here.
  */
-export default function DeviceReveal({ identity, rotationAngle, beta, gamma, motionPrompt, onEnableMotion }: DeviceRevealProps) {
+export default function DeviceReveal({ identity, rotationAngle, beta, gamma, motionPrompt, onEnableMotion, fullscreen }: DeviceRevealProps) {
   const targetIndex = useMemo(
     () => Math.max(0, CAROUSEL_DEVICES.findIndex((d) => d.category === identity.category)),
     [identity.category],
@@ -90,6 +91,7 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma, mot
       gamma={gamma}
       motionPrompt={motionPrompt && locked && HAS_MOTION_SENSORS.includes(identity.category)}
       onEnableMotion={onEnableMotion}
+      fullscreen={fullscreen}
     />
   );
 }
