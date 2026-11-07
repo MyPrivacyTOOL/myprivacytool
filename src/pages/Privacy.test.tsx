@@ -42,7 +42,17 @@ describe("Privacy: saved scan", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("your whole email address, not a scrambled code, goes to GitHub");
-    expect(text).toContain("We do not currently check data breaches");
+    expect(text).toContain("We do not currently check whether your email address appears in data breaches");
+  });
+
+  // MPC-9776: the optional password check sends 5 hash characters to Have I Been Pwned from the visitor's browser; that must be named here (wording approved 2026-11-07).
+  it("names Have I Been Pwned for the password check and says what is sent", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Password Check (only if you use it):");
+    expect(text).toContain("sends only the first 5 characters of that code to Have I Been Pwned (haveibeenpwned.com)");
+    expect(text).toContain("The password and the full code never leave your device, and we do not receive, store or log them");
+    expect(text).toContain("it can see your IP address and browser details");
   });
 });
 

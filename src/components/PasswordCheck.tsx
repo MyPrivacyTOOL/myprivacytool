@@ -32,8 +32,9 @@ const PasswordCheck = () => {
     <section className="rounded-lg border border-border p-5 text-left" data-testid="password-check" aria-labelledby="pwcheck-h">
       <h2 id="pwcheck-h" className="font-semibold text-foreground mb-1">Has your password been exposed?</h2>
       <p className="text-sm text-muted-foreground mb-3">
-        Your password never leaves your browser. Only the first 5 characters of a one-way fingerprint of it are sent to
-        Have I Been Pwned, which cannot tell what you typed. We do not see, store or log it.
+        Your password never leaves your browser. We turn it into a scrambled code on your device and send only the first 5
+        characters of that code to Have I Been Pwned, which cannot tell what you typed. Like any website you visit, Have I
+        Been Pwned can see your IP address. We do not see, store or log your password.
       </p>
       <form onSubmit={run} className="flex gap-2">
         <Input type="password" autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Password to check" />
