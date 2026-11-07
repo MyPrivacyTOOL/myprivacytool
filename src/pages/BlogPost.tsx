@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import FeatureStatus from "@/components/FeatureStatus";
 import { Helmet } from 'react-helmet';
 import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
@@ -22,8 +23,8 @@ const blogContent: { [key: string]: React.ReactNode } = {
       <div className="article article-headings:text-foreground article-p:text-foreground article-li:text-foreground article-strong:text-foreground article-a:text-brand max-w-none">
         <p>Your digital footprint is likely larger than you think. Your personal data is collected, packaged, sold, and used in ways you may not have agreed to, and you can take control of it.</p>
         
-        <h2>The 46 Privacy Vectors Exposing Your Data</h2>
-        <p>We've identified 46 distinct sources where your personal information is currently exposed:</p>
+        <h2>The 54 Privacy Vectors Exposing Your Data</h2>
+        <p>54 run in the scan, 368 in the catalogue. We've identified distinct sources where your personal information is currently exposed:<FeatureStatus feature="F9" /></p>
         
         <h3>Data Broker Networks (12)</h3>
         <ul>
@@ -86,7 +87,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         </ul>
         
         <h2>Why This Matters</h2>
-        <p>The combination of these 46 vectors creates a complete digital shadow profile of you. Advertisers, employers, landlords, and others can use it to:</p>
+        <p>The combination of these 54 vectors creates a complete digital shadow profile of you. Advertisers, employers, landlords, and others can use it to:</p>
         <ul>
           <li>Reconstruct your entire movement history</li>
           <li>Predict your health status, financial situation, and life choices</li>
@@ -96,7 +97,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         </ul>
         
         <h2>What You Can Do Right Now</h2>
-        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 46 vectors for you, then give you step-by-step removal instructions for each one.</p>
+        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 54 vectors for you, then give you step-by-step removal instructions for each one.<FeatureStatus feature="F9" /></p>
         
         <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough, so ongoing monitoring and regular removal rounds help keep your footprint small.</p>
       </div>

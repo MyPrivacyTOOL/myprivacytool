@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Shield, Eye, MapPin, Mail, Globe, ArrowRight, Check, X, MessageCircle, Send, MessageSquare, Instagram } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
@@ -38,10 +39,10 @@ const CTA_LABEL: Record<string, string> = {
 };
 
 const channels = [
-  { name: "WhatsApp", Icon: MessageCircle, url: "/wa" },
+  { name: "WhatsApp", Icon: MessageCircle, url: "/wa", status: true },
   { name: "Telegram", Icon: Send, url: "https://t.me/MyPrivacyToolBot?start=scan" },
-  { name: "Messenger", Icon: MessageSquare, url: "https://m.me/myprivacytool" },
-  { name: "Instagram", Icon: Instagram, url: "https://ig.me/m/myprivacytool" },
+  { name: "Messenger", Icon: MessageSquare, url: "https://m.me/myprivacytool", status: true },
+  { name: "Instagram", Icon: Instagram, url: "https://ig.me/m/myprivacytool", status: true },
   { name: "Email", Icon: Mail, url: "mailto:scan@myprivacytool.io?subject=Scan%20Me" },
 ];
 
@@ -152,7 +153,7 @@ export default function Start() {
           <div className="bg-card border border-border rounded-xl p-6 mb-8">
             <p className="text-foreground text-sm mb-2 font-semibold">Want your free privacy report?</p>
             <p className="text-muted-foreground text-xs mb-6">
-              Join the list and we'll email you when your free privacy report is ready.
+              Join the list and we'll email you when your free privacy report is ready.<FeatureStatus feature="F10" />
             </p>
             <div className="flex gap-3">
               <button
@@ -273,6 +274,7 @@ export default function Start() {
               >
                 <ch.Icon size={18} className="text-brand shrink-0" aria-hidden="true" />
                 <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{ch.name}</span>
+                {"status" in ch && <FeatureStatus feature="F7a" className="ml-auto" />}
               </a>
             ))}
           </div>

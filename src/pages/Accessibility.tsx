@@ -3,7 +3,7 @@ import Seo from "@/components/Seo";
 const Accessibility = () => {
   return (
     <>
-      <Seo title="Accessibility Statement | MyPrivacyTOOL" description="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance." />
+      <Seo title="Accessibility Statement | MyPrivacyTOOL" description="MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance." path="/accessibility" />
       <main className="min-h-screen bg-background">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">

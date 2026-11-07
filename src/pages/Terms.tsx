@@ -1,4 +1,5 @@
 import Seo from "@/components/Seo";
+import FeatureStatus from "@/components/FeatureStatus";
 import pageMeta from "@/data/pageMeta.json";
 
 const Terms = () => {
@@ -92,10 +93,10 @@ const Terms = () => {
                 <li>Free privacy scans to identify your data exposure</li>
                 <li>Exposure scoring and privacy risk assessment</li>
                 <li>
-                  Paid removal and data suppression services (where available)
+                  Paid removal and data suppression services (where available)<FeatureStatus feature="F4" />
                 </li>
                 <li>Privacy education and guidance resources</li>
-                <li>Account monitoring and alerts (premium tier)</li>
+                <li>Account monitoring and alerts (premium tier)<FeatureStatus feature="F5" /></li>
                 <li>
                   Newsletter, waitlist and messaging channels (such as Telegram)
                   for scan follow-up
@@ -172,7 +173,7 @@ const Terms = () => {
                 Paid subscriptions are billed monthly or annually as specified at
                 purchase. Your subscription renews automatically unless you cancel
                 before the renewal date. Cancellation must be submitted through your
-                account settings or by contacting support.
+                account settings or by contacting support.<FeatureStatus feature="F3" />
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
@@ -189,7 +190,7 @@ const Terms = () => {
                   Applicable sales tax, VAT, or GST will be added to your invoice
                 </li>
                 <li>
-                  We accept major credit cards and other payment methods via Stripe
+                  We accept major credit cards and other payment methods via Stripe<FeatureStatus feature="F3" />
                 </li>
                 <li>
                   If payment fails, we will attempt to charge your account up to
@@ -204,7 +205,7 @@ const Terms = () => {
                 Subscriptions are non-refundable except where required by law. We
                 may issue refunds for billing errors or service failures at our
                 discretion. Monthly subscriptions may be cancelled within 14 days
-                of purchase for a full refund.
+                of purchase for a full refund.<FeatureStatus feature="F3" />
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">

@@ -1,9 +1,11 @@
 import { useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Search, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
 import HkStopSpamCard from "@/components/HkStopSpamCard";
 import pageMeta from "@/data/pageMeta.json";
+import type { FeatureId } from "@/config/featureStatus";
 
 const Report = () => {
   const [selected, setSelected] = useState<string | null>(null);
@@ -15,43 +17,29 @@ const Report = () => {
       price: "Free",
       period: "",
       features: [
-        "See which brokers have your data",
-        "Overview of data categories exposed",
-        "Removal priority list",
-      ],
+        { text: "See which brokers have your data", feature: "F1" },
+        { text: "Overview of data categories exposed" },
+        { text: "Removal priority list" },
+      ] as { text: string; feature?: FeatureId }[],
       cta: "Check My Exposure",
       highlight: false,
     },
     {
       id: "full",
       name: "Full Exposure Report",
-      price: "$9",
-      period: "/month",
+      price: "$7.99",
+      period: "/month (Basic)",
       features: [
-        "Everything in Basic",
-        "Detailed data per broker — exactly what they hold",
-        "One-click removal requests",
-        "Monthly re-scan (brokers re-add you)",
-        "Dark web monitoring",
-        "Priority email support",
-      ],
+        { text: "Everything in Basic" },
+        { text: "Detailed data per broker — exactly what they hold", feature: "F1" },
+        { text: "One-click removal requests", feature: "F4" },
+        { text: "Monthly re-scan (brokers re-add you)", feature: "F4" },
+        { text: "Dark web monitoring", feature: "F5" },
+        { text: "Priority email support" },
+      ] as { text: string; feature?: FeatureId }[],
       cta: "Get Full Report",
       highlight: true,
       badge: "Most Popular",
-    },
-    {
-      id: "annual",
-      name: "Annual Protection",
-      price: "$79",
-      period: "/year",
-      features: [
-        "Everything in Full Report",
-        "Save 30% vs monthly",
-        "Quarterly privacy health score",
-        "Family member add-on available",
-      ],
-      cta: "Get Annual",
-      highlight: false,
     },
   ];
 
@@ -69,14 +57,15 @@ const Report = () => {
           <span className="text-brand">
             Remove Everything.
           </span>
+          <FeatureStatus feature="F2" className="align-middle text-sm" />
         </h1>
 
         <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
           A free scan shows you where your data is. The Full Exposure Report gives you the
-          complete picture — every broker, every data point, every removal path.
+          complete picture — every broker, every data point, every removal path.<FeatureStatus feature="F2" />
         </p>
         <p className="text-muted-foreground text-base mb-16 max-w-xl mx-auto">
-          And because brokers re-add you within weeks, we scan continuously.
+          And because brokers re-add you within weeks, we scan continuously.<FeatureStatus feature="F5" />
         </p>
       </section>
 
@@ -87,14 +76,14 @@ const Report = () => {
       <section className="max-w-3xl mx-auto px-6 mb-16">
         <div className="grid md:grid-cols-3 gap-4 text-center">
           {[
-            { Icon: Search, title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you." },
-            { Icon: Mail, title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs." },
-            { Icon: RefreshCw, title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again." },
-          ].map(({ Icon, title, desc }) => (
+            { Icon: Search, title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you.", feature: "F1" as FeatureId },
+            { Icon: Mail, title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs.", feature: "F4" as FeatureId },
+            { Icon: RefreshCw, title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again.", feature: "F5" as FeatureId },
+          ].map(({ Icon, title, desc, feature }) => (
             <div key={title} className="p-6 rounded-xl bg-surface border border-surface-border">
               <Icon className="w-8 h-8 text-brand mx-auto mb-3" aria-hidden="true" />
               <div className="font-bold text-foreground mb-2">{title}</div>
-              <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
+              <div className="text-muted-foreground text-sm leading-relaxed">{desc}<FeatureStatus feature={feature} /></div>
             </div>
           ))}
         </div>
@@ -105,7 +94,7 @@ const Report = () => {
         <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
           Choose your level of protection
         </h2>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
           {plans.map((plan) => (
             <div
               key={plan.id}
@@ -124,7 +113,7 @@ const Report = () => {
                 </div>
               )}
               <div className="mb-4">
-                <div className="text-muted-foreground text-sm font-semibold mb-1">{plan.name}</div>
+                <div className="text-muted-foreground text-sm font-semibold mb-1">{plan.name}{plan.id === "full" && <FeatureStatus feature="F2" />}</div>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-foreground">{plan.price}</span>
                   {plan.period && <span className="text-muted-foreground text-sm">{plan.period}</span>}
@@ -132,9 +121,9 @@ const Report = () => {
               </div>
               <ul className="space-y-2 mb-6">
                 {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <li key={f.text} className="flex items-start gap-2 text-sm text-muted-foreground">
                     <span className="text-brand mt-0.5 flex-shrink-0">✓</span>
-                    {f}
+                    <span>{f.text}{f.feature && <FeatureStatus feature={f.feature} />}</span>
                   </li>
                 ))}
               </ul>
@@ -167,16 +156,16 @@ const Report = () => {
             </thead>
             <tbody>
               {[
-                ["Broker list (who has your data)", "✓", "✓"],
-                ["Category overview (what type)", "✓", "✓"],
-                ["Exact data fields per broker", "—", "✓"],
-                ["Automated removal requests", "—", "✓"],
-                ["Monthly re-scan", "—", "✓"],
-                ["Dark web monitoring", "—", "✓"],
-                ["Removal confirmation", "—", "✓"],
-              ].map(([feature, free, paid]) => (
+                ["Broker list (who has your data)", "✓", "✓", "F1"],
+                ["Category overview (what type)", "✓", "✓", ""],
+                ["Exact data fields per broker", "—", "✓", "F1"],
+                ["Automated removal requests", "—", "✓", "F4"],
+                ["Monthly re-scan", "—", "✓", "F4"],
+                ["Dark web monitoring", "—", "✓", "F5"],
+                ["Removal confirmation", "—", "✓", "F4"],
+              ].map(([feature, free, paid, fid]) => (
                 <tr key={feature} className="border-b border-surface-border hover:bg-muted">
-                  <td className="px-4 py-3 text-muted-foreground">{feature}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{feature}{fid && <FeatureStatus feature={fid as FeatureId} />}</td>
                   <td className="px-4 py-3 text-center text-muted-foreground">{free}</td>
                   <td className="px-4 py-3 text-center text-brand font-semibold">{paid}</td>
                 </tr>

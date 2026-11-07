@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import Seo from "@/components/Seo";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ export default function DeepResearch() {
                 <Badge variant={isFreeNow(h) ? "default" : "secondary"}>
                   {isFreeNow(h) ? "Free now" : "Coming soon"}
                 </Badge>
+                {!isFreeNow(h) && <FeatureStatus feature="F5" className="ml-0 shrink-0" />}
               </div>
               <p className="text-sm text-muted-foreground mt-1">{h.summary}</p>
 

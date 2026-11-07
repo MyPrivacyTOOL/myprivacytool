@@ -55,6 +55,14 @@
     "title": "Cookie Policy | MyPrivacyTOOL",
     "description": "Learn about the cookies and tracking technologies MyPrivacyTOOL uses and how to manage your preferences."
   },
+  "/accessibility": {
+    "title": "Accessibility Statement | MyPrivacyTOOL",
+    "description": "MyPrivacyTOOL accessibility statement. Learn about our commitment to digital accessibility and WCAG 2.1 compliance."
+  },
+  "/gdpr-rights": {
+    "title": "GDPR Rights Request | MyPrivacyTOOL",
+    "description": "Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data."
+  },
   "/acceptable-use": {
     "title": "Acceptable Use Policy | MyPrivacyTOOL",
     "description": "Rules for using MyPrivacyTOOL: what you may and may not do when scanning for data breach and dark web exposure."

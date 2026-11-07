@@ -3,7 +3,7 @@ import Seo from "@/components/Seo";
 const GDPRRights = () => {
   return (
     <>
-      <Seo title="GDPR Rights Request | MyPrivacyTOOL" description="Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data." />
+      <Seo title="GDPR Rights Request | MyPrivacyTOOL" description="Exercise your GDPR rights with MyPrivacyTOOL. Access, correct, delete, or export your personal data." path="/gdpr-rights" />
       <main className="min-h-screen bg-background">
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <div className="prose prose-lg max-w-none">

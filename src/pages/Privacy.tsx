@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import Seo from "@/components/Seo";
 import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from "@/data/hkSpamCopy";
 import pageMeta from "@/data/pageMeta.json";
@@ -118,7 +119,7 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Payment Information:</strong> Billing address, payment
-                  method (processed securely by Stripe)
+                  method (processed securely by Stripe)<FeatureStatus feature="F3" />
                 </li>
                 <li>
                   <strong>Communications:</strong> Feedback, support requests,
@@ -211,7 +212,7 @@ const Privacy = () => {
                   system, browser type, IP address. To show you your IP address
                   and approximate location, the scan asks two third-party
                   services (ipify and ipapi.co) from your browser when the scan
-                  loads, so they receive your IP address
+                  loads, so they receive your IP address<FeatureStatus feature="F8" />
                 </li>
                 <li>
                   <strong>Usage Analytics:</strong> Pages visited, time spent on
@@ -476,7 +477,7 @@ const Privacy = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Service Providers:</strong> Payment processors (Stripe),
+                  <strong>Service Providers:</strong> Payment processors (Stripe),<FeatureStatus feature="F3" />
                   hosting and edge infrastructure (Cloudflare), databases (Supabase,
                   Google Cloud), CRM and email (HubSpot), messaging platforms
                   (Telegram), transactional email (Resend), internal task and
@@ -557,13 +558,13 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
                   <strong>Account Data:</strong> Retained for the duration of
-                  your subscription plus 30 days
+                  your subscription plus 30 days<FeatureStatus feature="F3" />
                 </li>
                 <li>
                   <strong>Scan Results:</strong> Per-session scan results for
                   submitted handles are deleted automatically after 24 hours.
                   Results saved to an account are retained for 2 years for
-                  historical comparison and reporting
+                  historical comparison and reporting<FeatureStatus feature="F3" />
                 </li>
                 <li>
                   <strong>Saved Web Scans:</strong> The full result of a scan you
@@ -604,7 +605,7 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Billing Records:</strong> Retained for 7 years
-                  (legal requirement)
+                  (legal requirement)<FeatureStatus feature="F3" />
                 </li>
                 <li>
                   <strong>Analytics Data:</strong> Aggregated data retained for

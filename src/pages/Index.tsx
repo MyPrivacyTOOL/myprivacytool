@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import FeatureStatus from "@/components/FeatureStatus";
 import { hexTileV2Enabled } from '@/config/hexagonTile';
 import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1 } from '@/lib/scanCopy';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
@@ -354,7 +355,7 @@ const Index = () => {
               See your footprint as a beehive
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
-              Open the curtain and watch the 54 data points appear one by one.
+              Open the curtain and watch the 54 data points appear one by one.<FeatureStatus feature="F9" />
             </p>
             <Button asChild>
               <a href="/footprint/">Open the footprint</a>
@@ -369,7 +370,7 @@ const Index = () => {
               Get clean before you go agentic
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
-              Eight steps from seeing your footprint to bringing AI agents on board safely.
+              Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" />
             </p>
             <Button asChild>
               <Link to="/journey">See your journey</Link>
@@ -410,7 +411,7 @@ const Index = () => {
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
               The scan runs in your browser and its results aren't stored on our
               servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only store what you choose to submit, such as your email
-              address, and we use analytics only with your consent.{" "}
+              address, and we use analytics only with your consent.<FeatureStatus feature="F8" />{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>

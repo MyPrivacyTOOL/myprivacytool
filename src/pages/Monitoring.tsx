@@ -1,6 +1,7 @@
 // Continuous monitoring dashboard for Pro and Executive plans (MPC-7649). Shows the schedule, alert settings, open
 // exposures and the false-positive rate. Until user accounts and the monitoring Worker exist it renders sample data,
 // is noindex, and is hidden in production (src/config/monitoring.ts).
+import FeatureStatus from "@/components/FeatureStatus";
 import { useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,7 @@ const Monitoring = () => {
         <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
           <h1 className="mb-2 text-4xl font-bold text-foreground">Monitoring</h1>
           <p role="note" className="mb-8 rounded-md bg-muted p-3 text-sm text-muted-foreground">
-            Preview with sample data. Live checks are not switched on yet.
+            Preview with sample data. Live checks are not switched on yet.<FeatureStatus feature="F5" />
           </p>
 
           <section aria-labelledby="mon-summary" className="mb-8 grid gap-4 sm:grid-cols-3">

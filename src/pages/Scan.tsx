@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Home, Phone, Users, MapPin, Mail, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -186,13 +187,14 @@ const Scan = () => {
         <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
           Find Out What the<br />
           <span className="text-brand">Internet Knows About You</span>
+          <FeatureStatus feature="F1" className="align-middle text-sm" />
         </h1>
 
         <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
           Data brokers and people-search sites can list your name, address and phone number without you knowing.
         </p>
         <p className="text-muted-foreground text-base mb-12 max-w-xl mx-auto">
-          Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.
+          Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.<FeatureStatus feature="F1" />
         </p>
 
         {!submitted ? renderForm("top") : thanks}
@@ -234,7 +236,7 @@ const Scan = () => {
       {/* Bottom CTA */}
       <section className="bg-muted/40 border-t border-border py-16 text-center px-6">
         <h2 className="text-2xl md:text-3xl font-bold mb-4">
-          Find out where you are listed.
+          Find out where you are listed.<FeatureStatus feature="F1" />
         </h2>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
           Check your exposure, then use our opt-out guides to take your details down.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,7 +171,7 @@ const Pricing = () => {
     <main className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
         <h1 className="mb-2 text-4xl font-bold text-foreground">{copy.h1}</h1>
-        <p className="mb-4 text-lg text-muted-foreground">{copy.sub}</p>
+        <p className="mb-4 text-lg text-muted-foreground">{copy.sub}<FeatureStatus feature="F4" /></p>
         <p className="mb-10 text-sm text-muted-foreground">
           Choose the plan that fits you. Prices are in US dollars per month.
         </p>
@@ -194,7 +195,7 @@ const Pricing = () => {
                 <span className="text-base font-normal text-muted-foreground"> /month</span>
               </p>
               <ul className="mb-6 flex-1 space-y-1 text-sm text-muted-foreground">
-                <li>{plan.scans}</li>
+                <li>{plan.scans}<FeatureStatus feature="F3" /></li>
                 {plan.note && <li>{plan.note}</li>}
               </ul>
               {plan.cta.to.startsWith("#") ? (
@@ -205,6 +206,7 @@ const Pricing = () => {
                   onClick={() => choosePlan(plan)}
                 >
                   {paidLabel}
+                  {paidLabel === "Get this plan" && <FeatureStatus feature="F3" />}
                 </Button>
               ) : (
                 <Button asChild variant="outline">
@@ -301,7 +303,7 @@ const Pricing = () => {
           <h2 id="family-plan" className="mb-2 text-xl font-semibold text-foreground">Family members on Pro and Executive</h2>
           <p className="text-muted-foreground">
             Add up to 4 family members for $5/month each, on one subscription. Everyone gets their own scan history,
-            reports and monitoring. You can see the reports of children on your plan; adults keep their reports private from each other.
+            reports and monitoring. You can see the reports of children on your plan; adults keep their reports private from each other.<FeatureStatus feature="F3" />
           </p>
         </section>
 

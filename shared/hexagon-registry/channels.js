@@ -9,7 +9,7 @@
 
 import { CATALOGUE_CHANNELS } from './catalogue.js';
 
-// MPC-8689: all 27 channels of the complete footprint come from catalogue.js (generated from the approved 366-hexagon discovery). Telegram and WhatsApp keep
+// MPC-8689: all 27 channels of the complete footprint come from catalogue.js (generated from the approved 366-item discovery plus 2 records items (368)). Telegram and WhatsApp keep
 // their short labels; every other channel keeps the label from the discovery. Only Telegram has channel hexagons built (TELEGRAM_HEXAGONS below).
 export const CHANNELS = Object.fromEntries(CATALOGUE_CHANNELS.map((c) => [c.key, { code: c.code, label: c.label }]));
 CHANNELS.telegram = { code: 'TG', label: 'Telegram' };
