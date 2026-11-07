@@ -76,8 +76,10 @@ const Terms = () => {
               <p className="text-muted-foreground">
                 We reserve the right to suspend or terminate your account if you
                 violate these Terms or engage in any fraudulent, abusive, or
-                illegal activity. You may delete your account at any time by
-                contacting support@myprivacytool.io.
+                illegal activity. You may request deletion of your account by
+                contacting support@myprivacytool.io. Account deletion requests are
+                processed in accordance with applicable data protection laws and
+                our retention policies.
               </p>
             </section>
 
@@ -190,7 +192,7 @@ const Terms = () => {
                   Applicable sales tax, VAT, or GST will be added to your invoice
                 </li>
                 <li>
-                  We accept major credit cards and other payment methods via Stripe<FeatureStatus feature="F3" />
+                  We accept payment through RevenueCat and platform app store billing (Apple App Store, Google Play Store) for mobile applications
                 </li>
                 <li>
                   If payment fails, we will attempt to charge your account up to
