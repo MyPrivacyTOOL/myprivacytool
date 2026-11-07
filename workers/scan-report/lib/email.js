@@ -1,5 +1,6 @@
 import { recordSend } from './emailSends.js';
 import { REPLY_SENTENCE, ALICE_COMING_SENTENCE, REPLY_PROMISE, SIGN_OFF_LINES } from '../../../shared/reply-wording.js';
+import { buildBrokerPanel, STATE_LABEL } from './brokerPanel.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, emailItems, tally, tallyLine, hexGroups, hexText, buildReportJson } from './reportHex.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -190,29 +191,30 @@ ${para('To have your data deleted, write to privacy@myprivacytool.io.')}`, null,
 
 export const BRIDGE = 'You saw what your browser gives away. Now look at what one email address gives away.';
 const MAX_BREACH_ROWS = 10;
-// US people-search removal guides stay out of the main body unless a finding makes them relevant: a name in the address, or a breach that
-// exposed names, phone numbers or physical addresses.
-const brokersRelevant = (emailHexes, breaches) => emailHexes.some((h) => h.id === 'email-name' && h.status === 'found')
-  || breaches.some((b) => (b.DataClasses || []).some((c) => /^(names|phone numbers|physical addresses)$/i.test(String(c))));
+// MPC-9814: the broker section. ALWAYS shown, for every scan, with all shortlist brokers in registry order (lib/brokerPanel.js owns the wording).
+// A site is listed / not listed only when the person pasted a page and we read it; every other site is "not checked", said in words, with its guide.
+// Kept small on purpose: one compact card per site, links to the guides instead of their steps, so the HTML stays well under the 100 KB rule.
+const dots = (n) => '\u25CF'.repeat(n) + '\u25CB'.repeat(3 - n);
+const confText = (r) => (r.confidence_word ? `Confidence: ${r.confidence_word} ${dots(r.confidence_level)}` : 'Confidence: none, nothing was checked');
+const guideUrl = (r) => r.guide?.optOutUrl || null;
+const guideSite = (r) => (r.guide?.slug ? `${SITE}/opt-out-guides/${r.guide.slug}` : null);
+const brokerRowText = (r) => [
+  `${r.name}${r.region ? ` (${r.region})` : ''}: ${STATE_LABEL[r.state].toUpperCase()}`,
+  `  ${r.text}`, `  ${confText(r)}`,
+  ...(r.evidence_url ? [`  Evidence (the page): ${r.evidence_url}`] : []),
+  ...((r.also || []).filter((a) => a.evidence_url).map((a) => `  Also read (${STATE_LABEL[a.state].toLowerCase()}): ${a.evidence_url}`)),
+  ...(r.guide ? [`  How to remove it: ${guideUrl(r) || guideSite(r)}${r.guide.timeNeeded ? ` (${r.guide.timeNeeded})` : ''}`] : [`  ${r.no_guide_text}`]),
+];
+const brokerSectionText = (panel) => [
+  'BROKER SITES', panel.intro, '',
+  ...[...panel.rows, ...panel.others].flatMap((r) => [...brokerRowText(r), '']),
+  panel.region_note, panel.coverage_note, '',
+];
+const STATE_COLOR = { listed: '#991b1b', not_listed: '#166534', not_checked: '#6b7280' };
+const brokerCardHtml = (r) => `<div style="margin:0 0 8px 0;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:14px;line-height:20px;color:#374151"><strong style="font-size:15px;color:#111827">${esc(r.name)}</strong>${r.region ? ` <span style="font-size:12px;color:#6b7280">${esc(r.region)}</span>` : ''} <strong style="font-size:12px;color:${STATE_COLOR[r.state]}">&middot; ${esc(STATE_LABEL[r.state].toUpperCase())}</strong><br>${esc(r.text)}<br><span style="font-size:13px;color:#6b7280">${esc(confText(r))}</span>${r.evidence_url ? `<br><a href="${esc(r.evidence_url)}" style="color:${BRAND}">Evidence: the page</a>` : ''}${(r.also || []).filter((a) => a.evidence_url).map((a) => `<br><a href="${esc(a.evidence_url)}" style="color:${BRAND}">Also read (${esc(STATE_LABEL[a.state].toLowerCase())})</a>`).join('')}${r.guide ? `<br><a href="${esc(guideUrl(r) || guideSite(r))}" style="color:${BRAND}">How to remove it</a>${r.guide.timeNeeded ? ` <span style="font-size:13px;color:#6b7280">(${esc(r.guide.timeNeeded)})</span>` : ''}` : `<br><span style="font-size:13px;color:#6b7280">${esc(r.no_guide_text)}</span>`}</div>`;
+const brokerSectionHtml = (panel) => `${h2('Broker sites')}${para(esc(panel.intro))}${[...panel.rows, ...panel.others].map(brokerCardHtml).join('')}${para(esc(panel.region_note))}${para(esc(panel.coverage_note))}`;
 
-// MPC-9813 (minimal rendering; polish is MPC-9814): "Listings you showed us". One line per page the person pasted: what we found, the page itself as evidence, the guide.
-const MATCH_WORDS = { exact: 'a match for the details you gave (name and place)', probable: 'a likely match (name matches, place only in part)', possible: 'a possible match: this is a guess, please check the page yourself' };
-const REASON_WORDS = { fetch_blocked: 'the site would not let us read that page', timeout: 'the page took too long to answer', no_identifiers: 'no name or phone was given to look for', not_a_listing_page: 'that address is not a page we can read as a listing' };
-export const listingLine = (r) => {
-  const where = r.name || r.host || 'that page';
-  if (r.state === 'listed') return `${where}: LISTED, ${MATCH_WORDS[r.match] || 'a match'}.`;
-  if (r.state === 'not_listed') return `${where}: NOT LISTED. ${r.note === 'page_gone' ? 'That page no longer exists.' : 'The page loaded and does not show the details you gave. This is about that one page only.'}`;
-  return `${where}: NOT CHECKED, ${REASON_WORDS[r.not_checked_reason] || 'we could not check it'}. This is not a clear result.`;
-};
-const listingsText = (listings) => (listings?.items?.length ? [
-  'LISTINGS YOU SHOWED US', 'We read only the pages you gave us, and only for details you gave us and confirmed. We search no broker site for you.',
-  ...listings.items.flatMap((r) => [`  - ${listingLine(r)}`, ...(r.evidence_url ? [`    Page: ${r.evidence_url}`] : []), ...(r.guide?.optOutUrl ? [`    How to remove it: ${r.guide.optOutUrl}`] : [])]), '',
-] : []);
-const listingsHtml = (listings) => (listings?.items?.length
-  ? `${h2('Listings you showed us')}${para('We read only the pages you gave us, and only for details you gave us and confirmed. We search no broker site for you.')}<ul style="margin:0 0 14px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${listings.items.map((r) => `<li style="margin-bottom:8px">${esc(listingLine(r))}${r.evidence_url ? ` <a href="${esc(r.evidence_url)}" style="color:${BRAND}">The page</a>` : ''}${r.guide?.optOutUrl ? ` &middot; <a href="${esc(r.guide.optOutUrl)}" style="color:${BRAND}">How to remove it</a>` : ''}</li>`).join('')}</ul>`
-  : '');
-
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], listings = null, webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], listings = null, pasteAvailable = true, webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -221,7 +223,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   const noteScore = s.score === null
     ? 'No privacy score yet: we only score what we actually checked, and we will not invent a number.'
     : `Partial score, based only on the checks that ran (${s.categories_checked.join(', ') || 'none'}). Everything marked NOT CHECKED below is not in it.`;
-  const showBrokers = brokersRelevant(emailHexes, breaches);
+  const panel = buildBrokerPanel(listings, { pasteAvailable });
   const breachRows = breachStatus === 'checked' ? breaches.slice(0, MAX_BREACH_ROWS) : [];
   const breachMore = breachStatus === 'checked' ? Math.max(0, breaches.length - MAX_BREACH_ROWS) : 0;
   const part1Intro = webScan
@@ -230,8 +232,6 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   // MPC-7488: the visitor's scan number, so they can quote it to have the saved scan deleted. Only when a saved scan is in this report.
   const scanNumberLine = webScan?.id ? `Your scan number: ${webScan.id}. Quote this number if you want this scan deleted.` : '';
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
-  const brokerLines = brokers.map((b) => (!b.removal_url && !b.steps ? `${b.name}\n  We have not yet written a verified removal guide for ${b.name}.`
-    : `${b.name}  (${b.time_needed || 'a few minutes'}; ${b.processing_time || 'timing varies'})\n  Official opt-out page: ${b.removal_url}\n${b.steps ? b.steps.map((st, i) => `   ${i + 1}. ${st}`).join('\n') : ''}`));
   const text = [
     s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, ALICE_TAGLINE, '', noteScore, '',
     'PART 1: YOUR WEB SCAN, REPLAYED', part1Intro, ...(scanNumberLine ? [scanNumberLine] : []), ...(webScan ? hexText(web) : []), '',
@@ -239,9 +239,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
     'PART 2: YOUR EMAIL ADDRESS', `${tallyLine(et, 'hexagons')}.`, ...hexText(emailHexes),
     ...breachRows.map((b) => `  - ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`), ...(breachMore ? [`  ...and ${breachMore} more (all of them are in the attached JSON file)`] : []), '',
     'The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.', '',
-    ...listingsText(listings),
-    ...(showBrokers ? ['PEOPLE-SEARCH SITES', 'A finding above makes these relevant. We have not searched these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.', '', ...brokerLines.flatMap((l) => [l, ''])]
-      : [`US people-search removal guides (we have not searched these sites for you): ${SITE}/opt-out`, '']),
+    ...brokerSectionText(panel),
     `More removal guides: ${SITE}/opt-out`, '',
     `Questions about this report? Read the FAQ: ${SITE}/faq`, '',
     `${REPLY_PROMISE} You can also reply to ask us to delete your data.`,
@@ -253,12 +251,6 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   ].join('\n');
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
   const box = (t) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${t}</td></tr></table>`;
-  const brokerCards = brokers.map((b) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px 0"><tr><td style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px">
-<div style="font-size:15px;font-weight:700;color:#111827">${esc(b.name)}</div>
-${b.removal_url ? `<div style="margin:6px 0 4px 0;font-size:13px;color:#6b7280">${esc(b.time_needed || '')}${b.time_needed && b.processing_time ? ' &middot; ' : ''}${esc(b.processing_time || '')}</div>
-${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${b.steps.map((st) => `<li style="margin-bottom:4px">${esc(st)}</li>`).join('')}</ol>` : ''}${button(b.removal_url, 'Open the official opt-out page')}`
-    : `<div style="margin-top:6px;font-size:14px;color:#6b7280">We have not yet written a verified removal guide for ${esc(b.name)}.</div>`}
-</td></tr></table>`).join('');
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
     `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`, 'peek')}
 ${box(esc(noteScore))}
@@ -267,9 +259,7 @@ ${h2('Part 1: your web scan, replayed')}${para(esc(part1Intro))}${scanNumberLine
 ${h2('Part 2: your email address')}${para(esc(`${tallyLine(et, 'hexagons')}.`))}${hexGroups(emailHexes)}
 ${breachRows.length ? `<ul style="margin:10px 0 12px 0;padding-left:20px;font-size:13px;line-height:19px;color:#374151">${breachRows.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}${breachMore ? `<li>&hellip;and ${breachMore} more (all of them are in the attached file)</li>` : ''}</ul>` : ''}
 ${para('<strong>The full data is attached.</strong> The JSON file holds every hexagon with its full value and the technical detail that did not fit here, so you can open it, search it and analyse it yourself.')}
-${listingsHtml(listings)}
-${showBrokers ? `${h2('People-search sites')}${para('A finding above makes these relevant. We have <strong>not searched</strong> these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.')}${brokerCards}`
-    : para(`US people-search removal guides: <a href="${SITE}/opt-out" style="color:${BRAND}">see them on the site</a>. We have not searched these sites for you.`)}
+${brokerSectionHtml(panel)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para(`Questions about this report? <a href="${SITE}/faq" style="color:${BRAND}">Read the FAQ</a>.`)}
 ${para(`${esc(REPLY_PROMISE)} You can also reply to ask us to delete your data.`)}

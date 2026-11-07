@@ -5,6 +5,8 @@ import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import FeatureStatus from "@/components/FeatureStatus";
+import optOutGuides from "@/data/optOutGuides.json";
 import SubmitButton from "@/components/SubmitButton";
 import { useLeadSubmit } from "@/hooks/useLeadSubmit";
 import { suggestEmail, validateEmail } from "@/lib/formFeedback";
@@ -30,6 +32,14 @@ const CHECKS = [
   { icon: Eye, title: "What they can infer", body: "Your browser fingerprint, network and locale add up to a profile. We show you what that profile looks like." },
   { icon: ShieldCheck, title: "What to lock down first", body: "A short, prioritised list of fixes so you close the biggest gaps first." },
 ];
+
+// MPC-9814 (F1): the nine shortlist brokers of docs/broker-lookup-contract-mpc-9812.md, in registry order. The guides are the site's own (src/data/optOutGuides.json);
+// a test pins that all nine exist and match the Worker's registry.
+const BROKER_GUIDE_SLUGS = ["spokeo", "whitepages", "beenverified", "truthfinder", "fastpeoplesearch", "mylife", "intelius", "australia-white-pages-listing", "truecaller-unlist-number"] as const;
+const BROKER_GUIDES = BROKER_GUIDE_SLUGS.flatMap((slug) => {
+  const g = (optOutGuides as { slug: string; name: string }[]).find((x) => x.slug === slug);
+  return g ? [{ slug, name: g.name }] : [];
+});
 
 export default function AIAccessCheck() {
   const [email, setEmail] = useState("");
@@ -101,7 +111,7 @@ export default function AIAccessCheck() {
         </h1>
         <p className="text-muted-foreground text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
           Run the AI Access Check: in about three minutes, see what AI systems and data brokers
-          can learn about you from your browser alone — no account, no personal details.
+          can learn about you from your browser alone — no account, no personal details. It does not search broker sites for you; the broker section below says exactly what it does check.
         </p>
         <Link
           to={scanHref}
@@ -120,6 +130,35 @@ export default function AIAccessCheck() {
             <p className="text-xs text-muted-foreground leading-relaxed">{body}</p>
           </div>
         ))}
+      </section>
+
+      <section className="max-w-3xl mx-auto px-6 pb-14" aria-labelledby="broker-checks-title" data-testid="ai-check-brokers">
+        <h2 id="broker-checks-title" className="text-xl font-bold mb-3">Data broker sites: what this check does</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="bg-surface border border-surface-border rounded-xl p-5">
+            <h3 className="text-sm font-bold mb-2">Today: it checks pages you show us</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              We do not search any broker site for you. If you find a page that lists you, paste its address when you scan, together with the details you want us to look for.
+              We read that one page, tell you whether it lists you, show you the page as evidence, and link the site&apos;s opt-out guide.
+              Every other broker site is reported as not checked, with the reason in plain words.
+              <FeatureStatus feature="F1" />
+            </p>
+          </div>
+          <div className="bg-surface border border-surface-border rounded-xl p-5">
+            <h3 className="text-sm font-bold mb-2">Later: coverage that checks for you</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Paid coverage will look for you across broker data, so you do not have to find the pages yourself. It is not live yet and no price or date is set.
+              <FeatureStatus feature="F1" state="planned" />
+            </p>
+          </div>
+        </div>
+        <h3 className="text-sm font-bold mt-6 mb-2">Opt-out guides for the nine broker sites we cover</h3>
+        <ul className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2" data-testid="ai-check-broker-guides">
+          {BROKER_GUIDES.map((g) => (
+            <li key={g.slug}><Link to={`/opt-out-guides/${g.slug}`} className="underline text-brand">{g.name}</Link></li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground mt-3">Hong Kong and Singapore: we know of no people-search site there that we can lawfully read, so nothing is checked for you in those places. The guides still apply.</p>
       </section>
 
       <section id="waitlist" className="max-w-lg mx-auto px-6 pb-20" aria-label="Join the waitlist">

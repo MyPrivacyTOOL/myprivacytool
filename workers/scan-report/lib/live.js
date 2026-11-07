@@ -6,6 +6,7 @@
 // as the deletion handle. The token goes in the URL query of a read-only GET; it expires after LIVE_TTL_MS.
 import { EMAIL_HEXAGONS, emailHexagonSignalRows, enabledEmailHexagonIds, runEmailHexagons } from './emailHexagons.js';
 import { confirmGateEnabled, listingCheckEnabled, loadListings } from './confirmGate.js';
+import { buildBrokerPanel } from './brokerPanel.js';
 
 export const LIVE_TTL_MS = 15 * 60 * 1000;
 export const VERIFY_TTL_MS = 7 * 24 * 3600 * 1000;   // the email link: possession of it proves the reader controls the inbox the scan was requested for
@@ -109,8 +110,10 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
     const confirmed = !confirmRequired || Boolean(scan[0]?.email_confirmed_at);
     // The pages the person showed us: evidence and detail are shown only to the reader of the email link, and only once they confirmed the address.
     const listings = verified && confirmed && listingCheckEnabled(env) ? await loadListings(sb, scanId) : null;
+    // MPC-9814: the broker panel is part of every scan's result, pasted page or not. Pages the visitor showed us appear in it only for the reader of the email link.
+    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env) });
     return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified,
-      ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}) });
+      ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}), broker_panel });
   } catch (e) {
     console.error('live read failed:', String(e).replace(/\S+@\S+/g, '[email]'));
     return json({ error: 'Unavailable' }, 503);

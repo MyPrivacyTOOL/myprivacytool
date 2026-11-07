@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { confirmEmail, fetchLive, type ListingResult, type LiveItem, type LiveKind, type LiveListings, type LiveStatus } from "@/lib/liveScan";
+import BrokerPanel from "@/components/BrokerPanel";
+import { confirmEmail, fetchLive, type BrokerPanel as Panel, type LiveItem, type LiveKind, type LiveStatus } from "@/lib/liveScan";
 
 // MPC-8452: what happens on the thank-you screen. Alice draws back the curtain, and the checks appear behind it one by one as the Worker finishes them.
 // Nothing is invented: each line is a real check result. Only what was checked and whether it found something is shown, never the value; the detail
@@ -12,46 +12,8 @@ const WATCH_POLL_MS = 30000; // the email-link view keeps watching after the fir
 const MAX_WATCH_POLLS = 120; // about an hour
 const STATUS_TEXT: Record<LiveStatus, string> = { found: "Found something", clear: "Nothing seen in the places we looked", not_checked: "Could not check this one" };
 
-// MPC-9813 (minimal rendering; polish is MPC-9814): the sentence the confirm gate stands on, and one line per page the visitor showed us.
+// MPC-9813: the sentence the confirm gate stands on. MPC-9814: the broker section is BrokerPanel (words come from the Worker, same as the report email).
 const CONFIRM_LINE = "We only check details you've confirmed are yours.";
-const MATCH_TEXT = { exact: "a match for the details you gave", probable: "a likely match", possible: "a possible match: this is a guess, check the page yourself" } as const;
-const REASON_TEXT: Record<string, string> = {
-  fetch_blocked: "the site would not let us read that page",
-  timeout: "the page took too long to answer",
-  no_identifiers: "no name or phone was given to look for",
-  not_a_listing_page: "that address is not a page we can read as a listing",
-};
-function listingText(r: ListingResult): string {
-  if (r.state === "listed") return `Listed: ${r.match ? MATCH_TEXT[r.match] : "a match"}.`;
-  if (r.state === "not_listed") return r.note === "page_gone" ? "Not listed: that page no longer exists." : "Not listed: the page loaded and does not show the details you gave. This is about that one page only.";
-  return `Not checked: ${(r.not_checked_reason && REASON_TEXT[r.not_checked_reason]) || "we could not check it"}. This is not a clear result.`;
-}
-
-function ListingsBlock({ listings }: { listings: LiveListings }) {
-  if (!listings.items.length && !listings.pending) return null;
-  return (
-    <section aria-labelledby="listings-title" className="mt-5" data-testid="listings-block">
-      <h3 id="listings-title" className="text-sm font-semibold text-foreground">Listings you showed us</h3>
-      <p className="mt-1 text-xs text-muted-foreground">We read only the pages you gave us. We search no broker site for you.</p>
-      {listings.items.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground" role="status">Reading the pages you showed us. This takes a moment.</p>
-      ) : (
-        <ul className="mt-2 space-y-2">
-          {listings.items.map((r, i) => (
-            <li key={`${r.key}-${i}`} className="rounded-md border border-border bg-background px-3 py-2 text-sm" data-state={r.state}>
-              <span className="font-medium text-foreground">{r.name}</span>
-              <span className="block text-muted-foreground">{listingText(r)}</span>
-              <span className="mt-1 flex flex-wrap gap-x-3 text-xs">
-                {r.evidence_url && <a href={r.evidence_url} target="_blank" rel="noopener noreferrer" className="underline">The page</a>}
-                {r.guide && <Link to={`/opt-out-guides/${r.guide.slug}`} className="underline">How to remove it ({r.guide.name})</Link>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
 
 // MPC-9835: what each row found, in the visitor's terms. Only found / clear are worded per row; "not checked" stays generic.
 const ROW_TEXT: Record<string, { found: string; clear: string }> = {
@@ -81,7 +43,7 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
   const [confirmed, setConfirmed] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [confirmFailed, setConfirmFailed] = useState(false);
-  const [listings, setListings] = useState<LiveListings | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setOpen(true), 400); // the curtain starts to move almost at once
@@ -102,11 +64,11 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
       if (snap) {
         setItems((prev) => (snap.items.length >= prev.length ? snap.items : prev)); // never take a result away from the visitor
         if (snap.confirmRequired !== undefined) { setConfirmRequired(snap.confirmRequired); setConfirmed(snap.confirmed === true); }
-        if (snap.listings) setListings(snap.listings);
+        if (snap.brokerPanel) setPanel(snap.brokerPanel);
         if (snap.done) {
           setDone(true);
           if (kind !== "verified") return; // the first view stops here; the email-link view keeps watching for new or changed findings
-          if (polls < MAX_WATCH_POLLS) timer = window.setTimeout(tick, snap.listings?.pending ? POLL_MS : WATCH_POLL_MS);   // MPC-9813: pages are being read, look often
+          if (polls < MAX_WATCH_POLLS) timer = window.setTimeout(tick, snap.brokerPanel?.pending ? POLL_MS : WATCH_POLL_MS);   // MPC-9813: pages are being read, look often
           return;
         }
       }
@@ -163,7 +125,7 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
         </div>
       )}
       {waiting && kind !== "verified" && <p className="mt-3 text-center text-xs text-muted-foreground" data-testid="confirm-note">{CONFIRM_LINE}</p>}
-      {kind === "verified" && !waiting && listings && <ListingsBlock listings={listings} />}
+      {panel && <BrokerPanel panel={panel} />}
       <ul aria-live="polite" className="mt-3 space-y-2">
         {items.map((i) => (
           <li key={i.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm animate-in fade-in duration-700">

@@ -156,7 +156,7 @@ export default function Start() {
           <div className="bg-card border border-border rounded-xl p-6 mb-8">
             <p className="text-foreground text-sm mb-2 font-semibold">Want your free privacy report?</p>
             <p className="text-muted-foreground text-xs mb-6">
-              Join the list and we'll email you when your free privacy report is ready.<FeatureStatus feature="F10" />
+              Joining the list signs you up for product updates only: it does not run a scan or send a report. To get a free report now, run the scan on our <a href="/scan" className="underline text-foreground">scan page</a>. We email a confirmation within a minute, and your report arrives within about 5 minutes of you pressing the confirm button in that email.<FeatureStatus feature="F10" />
             </p>
             <div className="flex gap-3">
               <button
@@ -182,7 +182,7 @@ export default function Start() {
           <div className="bg-primary/5 border border-primary/30 rounded-xl p-6 mb-8 motion-safe:animate-fade-in">
             <p className="text-brand text-sm font-semibold mb-1">Confirmed.</p>
             <p className="text-muted-foreground text-xs mb-5">
-              Enter your email and we'll let you know as soon as your free privacy report is ready.
+              Enter your email to get product updates. This does not send a report; the free report comes from the scan page.
             </p>
             <form onSubmit={handleSubmit} noValidate className="space-y-3">
               <div className="flex flex-wrap gap-3">

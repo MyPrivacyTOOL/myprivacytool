@@ -26,8 +26,9 @@ const StatusPill = ({ state, dataKey, className }: { state: FeatureState; dataKe
   );
 };
 
-const FeatureStatus = ({ feature, className }: { feature: FeatureId; className?: string }) => (
-  <StatusPill state={FEATURE_STATUS[feature]} dataKey={{ "data-feature": feature }} className={className} />
+// `state` (MPC-9814) pins a marker for a part of a claim that is not live even when its feature is: e.g. F1 live = the free check, paid coverage stays Planned.
+const FeatureStatus = ({ feature, className, state: pinned }: { feature: FeatureId; className?: string; state?: "in_build" | "planned" }) => (
+  <StatusPill state={pinned ?? FEATURE_STATUS[feature]} dataKey={{ "data-feature": feature }} className={className} />
 );
 
 // MPC-9826: marker for a /start channel card, driven by CHANNEL_STATUS. "Live" shows a plain text label so all six states are readable.

@@ -24,7 +24,56 @@ YOUR EMAIL ADDRESS
 
 The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.
 
-US people-search removal guides (we have not searched these sites for you): https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=scan-report
+BROKER SITES
+We check a broker site only when you paste the address of a page that lists you. We search no broker site for you, and we use only details you typed about yourself and confirmed.
+
+Spokeo (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.spokeo.com/optout (10 minutes)
+
+Whitepages (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.whitepages.com/suppression-requests (10 minutes)
+
+BeenVerified (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.beenverified.com/app/optout/search (10 minutes)
+
+TruthFinder (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.truthfinder.com/opt-out/ (10 minutes)
+
+FastPeopleSearch (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.fastpeoplesearch.com/removal (10 minutes)
+
+MyLife (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.mylife.com/ccpa/index.pubview (10 minutes)
+
+Intelius (US): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.intelius.com/opt-out (10 minutes)
+
+White Pages Australia (Australia): NOT CHECKED
+  Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
+  Confidence: none, nothing was checked
+  How to remove it: https://help.whitepages.com.au/residential-listings/my-residential-listing/ (15 minutes)
+
+Truecaller (Phone directory): NOT CHECKED
+  Not checked. A Truecaller lookup needs you to sign in, so we cannot read it for you. The guide shows how to take your number off.
+  Confidence: none, nothing was checked
+  How to remove it: https://www.truecaller.com/unlisting (10 minutes)
+
+Hong Kong and Singapore: we know of no people-search site there that we can lawfully read, so nothing is checked for you in those places. The guides are still yours to use: they cover the do-not-call registers and your legal opt-out rights.
+Paid coverage that checks these sites for you is coming. It is not live yet.
 
 More removal guides: https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=scan-report
 

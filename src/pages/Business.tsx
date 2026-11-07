@@ -97,7 +97,7 @@ const Business = () => {
               >
                 <h2 className="text-xl font-bold mb-2">Get a Free Company Audit</h2>
                 <p className="text-muted-foreground text-sm mb-6">
-                  We'll scan your team and send an exposure report within 48 hours.
+                  We'll scan your team and send an exposure report within 48 hours.<FeatureStatus feature="F6" />
                 </p>
                 <Input
                   placeholder="Your name"
@@ -143,7 +143,7 @@ const Business = () => {
                   {status === "loading" ? "Sending..." : "Talk to us"}
                 </Button>
                 <p className="text-muted-foreground text-xs text-center">
-                  No payment required. Results in 48 hours.
+                  No payment required. Results in 48 hours.<FeatureStatus feature="F6" />
                 </p>
                 <p className="text-muted-foreground text-xs text-center">
                   We use your details only to prepare and send your audit. See our{" "}
@@ -156,7 +156,7 @@ const Business = () => {
                 <h3 className="text-xl font-bold mb-2">Request received</h3>
                 <p className="text-muted-foreground text-sm">
                   We'll run your company audit and send results to{" "}
-                  <span className="text-foreground">{form.email}</span> within 48 hours.
+                  <span className="text-foreground">{form.email}</span> within 48 hours.<FeatureStatus feature="F6" />
                 </p>
               </div>
             )}
