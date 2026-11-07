@@ -17,6 +17,7 @@ import { handleResendWebhook } from './lib/receipts.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
+import { handleDeepResearchStart, handleDeepResearchVerify, handleDeepResearchResults, handleDeepResearchDelete } from './lib/deepResearch.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
 import { abOn, abVariant } from './lib/referralAb.js';
@@ -66,6 +67,11 @@ export default {
     // MPC-7645: referral programme. Both answer 404 unless REFERRALS_ENABLED is "true". Authorised by the signed manage link in the referrer's report email.
     if (request.method === 'POST' && url.pathname === '/api/referral/status') return handleReferralStatus(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/referral/invite') return handleReferralInvite(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
+    // MPC-9546: Deep Research ownership check and results. All four answer 404 unless DEEP_RESEARCH_ENABLED is "true". See lib/deepResearch.js.
+    if (request.method === 'POST' && url.pathname === '/api/deep-research/start') return handleDeepResearchStart(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
+    if (request.method === 'POST' && url.pathname === '/api/deep-research/verify') return handleDeepResearchVerify(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    if (request.method === 'POST' && url.pathname === '/api/deep-research/results') return handleDeepResearchResults(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    if (request.method === 'POST' && url.pathname === '/api/deep-research/delete') return handleDeepResearchDelete(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
