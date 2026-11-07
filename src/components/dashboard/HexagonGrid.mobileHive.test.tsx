@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { HexagonGrid } from './HexagonGrid';
 import type { Hexagon, ScanResult } from '@/types/hexagon';
 
 const width = vi.hoisted(() => ({ value: 390 }));
+const assignment = vi.hoisted(() => ({ value: { experimentId: 'mobile_hive', variantId: 'readable_tiles', forced: false, active: true } }));
 vi.mock('@/hooks/useElementWidth', () => ({ useElementWidth: () => width.value }));
+vi.mock('@/hooks/useExperiment', () => ({ useExperiment: () => assignment.value }));
 const trackEvent = vi.fn();
 const trackExposure = vi.fn();
 vi.mock('@/lib/analytics', async () => {
@@ -12,37 +14,61 @@ vi.mock('@/lib/analytics', async () => {
   return { ...actual, trackEvent: (...a: unknown[]) => trackEvent(...a), trackExperimentExposure: (...a: unknown[]) => trackExposure(...a) };
 });
 
-const hex = (id: string): Hexagon => ({
-  id, pillar: 'device', label: `Tile ${id}`, status: 'checked', data: `Value ${id}`, source: 's', confidence_score: 0.9, remediation: 'n/a', exposure: false,
+const hex = (id: string, pillar: string, o: Partial<Hexagon> = {}): Hexagon => ({
+  id, pillar, label: `Tile ${id}`, status: 'checked', data: `Value ${id}`, source: 's', confidence_score: 0.9, remediation: 'n/a', exposure: false, ...o,
 });
-const data: ScanResult = { hexagons: [hex('a'), hex('b'), hex('c')] };
+// Two pillars, so a per-pillar event would fire twice. One tile has no data and so shows no value line.
+const data: ScanResult = { hexagons: [hex('a', 'security'), hex('b', 'security'), hex('c', 'contact'), hex('d', 'contact', { data: undefined })] };
 const noop = () => {};
-const view = (path: string) => {
-  window.history.replaceState({}, '', path);
-  return render(<HexagonGrid scanResult={data} onConfirm={noop} onDispute={noop} onSelect={noop} />);
-};
+const view = () => render(<HexagonGrid scanResult={data} onConfirm={noop} onDispute={noop} onSelect={noop} />);
+const setAssignment = (o: Partial<typeof assignment.value>) => { assignment.value = { ...assignment.value, ...o }; };
 
-beforeEach(() => { vi.clearAllMocks(); width.value = 390; window.sessionStorage.clear(); });
-afterEach(() => window.history.replaceState({}, '', '/'));
+beforeEach(() => {
+  vi.clearAllMocks();
+  width.value = 390;
+  assignment.value = { experimentId: 'mobile_hive', variantId: 'readable_tiles', forced: false, active: true };
+});
 
 describe('dashboard HexagonGrid mobile_hive', () => {
-  it('control on a phone: no value line, and the layout is reported as values_shown=false', () => {
-    view('/?ab_mobile_hive=control');
-    expect(screen.queryByText('Value a')).toBeNull();
-    expect(trackExposure).toHaveBeenCalledWith('mobile_hive', 'control', true); // forced preview: the helper itself drops it
-  });
-
-  it('readable_tiles on a phone: every tile shows its value', () => {
-    view('/?ab_mobile_hive=readable_tiles');
+  it('readable_tiles on a phone: tiles show their values', () => {
+    view();
     for (const id of ['a', 'b', 'c']) expect(screen.getByText(`Value ${id}`)).toBeInTheDocument();
   });
 
-  it('forced (QA) views send no hive event; a wide container is not a phone and sends nothing', () => {
-    view('/?ab_mobile_hive=readable_tiles');
-    expect(trackEvent).not.toHaveBeenCalledWith('hive_values_rendered', expect.anything());
-    vi.clearAllMocks();
+  it('control on a phone: no value line', () => {
+    setAssignment({ variantId: 'control' });
+    view();
+    expect(screen.queryByText('Value a')).toBeNull();
+  });
+
+  it('sends ONE exposure and ONE hex_value_rendered for the whole grid, counting tiles that show a value', () => {
+    view();
+    expect(trackExposure).toHaveBeenCalledTimes(1);
+    expect(trackExposure).toHaveBeenCalledWith('mobile_hive', 'readable_tiles', false);
+    const sent = trackEvent.mock.calls.filter((c) => c[0] === 'hex_value_rendered');
+    expect(sent).toEqual([['hex_value_rendered', { experiment_id: 'mobile_hive', variant_id: 'readable_tiles', hexes_with_value: 3 }]]);
+  });
+
+  it('control reports zero tiles with a value (the baseline the test group is compared with)', () => {
+    setAssignment({ variantId: 'control' });
+    view();
+    expect(trackEvent).toHaveBeenCalledWith('hex_value_rendered', { experiment_id: 'mobile_hive', variant_id: 'control', hexes_with_value: 0 });
+  });
+
+  it('sends nothing for a wide container, a forced QA view, or a flag that is off', () => {
     width.value = 800;
-    view('/?ab_mobile_hive=readable_tiles');
+    view();
+    expect(trackExposure).not.toHaveBeenCalled();
+    expect(trackEvent).not.toHaveBeenCalled();
+
+    width.value = 390;
+    setAssignment({ forced: true, active: false });
+    view();
+    expect(trackEvent).not.toHaveBeenCalledWith('hex_value_rendered', expect.anything());
+
+    vi.clearAllMocks();
+    setAssignment({ forced: false, active: false, variantId: 'control' });
+    view();
     expect(trackExposure).not.toHaveBeenCalled();
     expect(trackEvent).not.toHaveBeenCalled();
   });

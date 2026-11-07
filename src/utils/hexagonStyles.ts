@@ -1,5 +1,5 @@
 import type { Hexagon, ObservationStatus } from '@/types/hexagon';
-import type { TileKind } from '@/lib/hexagonTile';
+import { TILE_COPY, type TileKind } from '@/lib/hexagonTile';
 
 export interface HexagonVisuals {
   className: string;
@@ -81,4 +81,15 @@ export function effectiveTile(h: Hexagon, fixed = false): TileKind | undefined {
   if (h.status === 'guess') return 'our_guess';
   if (h.status === 'checked' || h.status === 'not_checked') return fixed && h.tile === 'needs_fixing' ? 'you_told_us' : h.tile;
   return undefined;
+}
+
+const WAITING = new Set<Hexagon['status']>(['not_checked', 'false_positive']);
+/** A tile that has not been checked (or was ruled out) shows a magnifier and no value. */
+export const isWaiting = (status: Hexagon['status']): boolean => WAITING.has(status);
+
+/** Whether a tile draws its value line. One rule for the screen and for the mobile_hive count of tiles that show a value. */
+export function tileShowsValue(hexagon: Hexagon, fixed: boolean, compact: boolean): boolean {
+  const kind = effectiveTile(hexagon, fixed);
+  const tile = kind ? TILE_COPY[kind] : null;
+  return !compact && !!hexagon.data && !isWaiting(hexagon.status) && (!tile || tile.showValue);
 }

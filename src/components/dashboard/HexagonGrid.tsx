@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Hexagon, ScanResult } from '@/types/hexagon';
 import { InteractiveHexagonTile } from '@/components/InteractiveHexagonTile';
+import { tileShowsValue } from '@/utils/hexagonStyles';
 import { useElementWidth } from '@/hooks/useElementWidth';
 import { HEX_RATIO, hiveLayout } from '@/lib/honeycomb';
 import { groupHexagonsByInterest } from '@/lib/hexagonGroups';
@@ -17,19 +18,18 @@ interface Props {
   fixedIds?: ReadonlySet<string>;
 }
 
-const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
+interface HiveReport { phone: boolean; withValue: number }
+
+const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect, variantId, onReport }: Omit<Props, 'scanResult'> & { items: Hexagon[]; variantId: string; onReport: (r: HiveReport) => void }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const { variantId, forced } = useExperiment('mobile_hive');
   const width = useElementWidth(ref);
   const layout = hiveLayout(items.length, width, { readable: variantId === 'readable_tiles' });
-  // Phones only (the layouts below four columns): that is who the experiment is about. Once per mount and layout, not per render.
+  // Phones only (the layouts below four columns): that is who the experiment is about. Nothing is reported until the width is measured.
   const phone = width > 0 && layout.cols < 4;
+  const withValue = items.filter((h) => tileShowsValue(h, !!fixedIds?.has(h.id), layout.compact)).length;
   useEffect(() => {
-    if (!phone) return;
-    trackExperimentExposure('mobile_hive', variantId, forced);
-    // Counts only: how many tiles were drawn and whether their value line was. No values, no scan data.
-    if (!forced) trackEvent('hive_values_rendered', { experiment_id: 'mobile_hive', variant_id: variantId, tiles: items.length, values_shown: !layout.compact });
-  }, [phone, variantId, forced, items.length, layout.compact]);
+    if (width > 0) onReport({ phone, withValue });
+  }, [width, phone, withValue, onReport]);
   return (
     <div ref={ref} className="w-full">
       <div className="relative mx-auto" style={{ width: layout.width, height: layout.height }}>
@@ -53,15 +53,36 @@ const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect }: Omit<
 };
 
 /** One column on a phone or iPad held upright, two pillars side by side once there is room (desktop, landscape). */
-export const HexagonGrid = ({ scanResult, ...handlers }: Props) => (
-  <div className="grid gap-x-6 gap-y-8 [grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))]">
-    {groupHexagonsByInterest(scanResult.hexagons).map((group) => (
-      <section key={group.id} aria-labelledby={`pillar-${group.id.replace(/\W+/g, '-')}`}>
-        <h2 id={`pillar-${group.id.replace(/\W+/g, '-')}`} className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-          {group.title}
-        </h2>
-        <Hive items={group.items} {...handlers} />
-      </section>
-    ))}
-  </div>
-);
+export const HexagonGrid = ({ scanResult, ...handlers }: Props) => {
+  const { variantId, forced, active } = useExperiment('mobile_hive');
+  const groups = groupHexagonsByInterest(scanResult.hexagons);
+  // mobile_hive measurement: ONE exposure and ONE hex_value_rendered per grid, sent once every pillar has been measured (not per pillar,
+  // or a visitor would count once for each pillar). Counts only: how many tiles show a value line. No values, no scan data.
+  const [reports, setReports] = useState<Record<number, HiveReport>>({});
+  const sent = useRef(false);
+  useEffect(() => {
+    const all = Object.values(reports);
+    // Only while the experiment is live (or a forced QA view, which sends nothing): with the flag off, GA4 hears nothing new.
+    if (!active && !forced) return;
+    if (sent.current || groups.length === 0 || all.length < groups.length) return;
+    sent.current = true;
+    if (!all.some((r) => r.phone)) return; // not a phone-width grid: the experiment is not about this visitor
+    trackExperimentExposure('mobile_hive', variantId, forced);
+    if (!forced) trackEvent('hex_value_rendered', { experiment_id: 'mobile_hive', variant_id: variantId, hexes_with_value: all.reduce((n, r) => n + r.withValue, 0) });
+  }, [reports, groups.length, variantId, forced, active]);
+  const reporters = useRef<Record<number, (r: HiveReport) => void>>({});
+  const reporter = (i: number) =>
+    (reporters.current[i] ??= (r) => setReports((prev) => (prev[i]?.phone === r.phone && prev[i]?.withValue === r.withValue ? prev : { ...prev, [i]: r })));
+  return (
+    <div className="grid gap-x-6 gap-y-8 [grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))]">
+      {groups.map((group, i) => (
+        <section key={group.id} aria-labelledby={`pillar-${group.id.replace(/\W+/g, '-')}`}>
+          <h2 id={`pillar-${group.id.replace(/\W+/g, '-')}`} className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+            {group.title}
+          </h2>
+          <Hive items={group.items} {...handlers} variantId={variantId} onReport={reporter(i)} />
+        </section>
+      ))}
+    </div>
+  );
+};
