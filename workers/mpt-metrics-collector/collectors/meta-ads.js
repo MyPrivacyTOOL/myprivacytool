@@ -1,5 +1,7 @@
 // Meta (Facebook) ads daily collector. READ-ONLY: Marketing API insights for the ad account, previous full Hong Kong day.
-// Needs the system-user token META_ADS_READ_KEY (permissions ads_read only; sent as a Bearer header, never in the URL)
+// Needs the system-user token META_ADS_KEY (the same token as the Composio Meta Ads connection; it was generated with broader
+// permissions than ads_read, so this collector only ever issues GET requests to the insights edge and never calls a write endpoint;
+// sent as a Bearer header, never in the URL)
 // for the ad account DEFAULT_AD_ACCOUNT_ID ("MyPrivacyTOOL FB Ads", currency GBP, timezone Asia/Hong_Kong; override with the
 // non-secret META_AD_ACCOUNT_ID, digits with or without the act_ prefix). Until the token is set the collector stores an ok row
 // with payload.configured=false instead of an error, so an unfinished setup raises no alarm.
@@ -20,13 +22,13 @@ export default {
   async collect(env, now = new Date()) {
     const { start, end, day } = previousDay(now);
     const period = { period_start: start.toISOString(), period_end: end.toISOString() };
-    if (!env.META_ADS_READ_KEY) return { ...period, payload: { configured: false, day, missing: ['META_ADS_READ_KEY'] } };
+    if (!env.META_ADS_KEY) return { ...period, payload: { configured: false, day, missing: ['META_ADS_KEY'] } };
     const account = env.META_AD_ACCOUNT_ID || DEFAULT_AD_ACCOUNT_ID;
     if (!/^(act_)?\d{5,20}$/.test(String(account).trim())) throw new Error('META_AD_ACCOUNT_ID is not a numeric ad account id');
     const version = env.META_GRAPH_VERSION || DEFAULT_GRAPH_VERSION;
     const params = new URLSearchParams({ fields: FIELDS, level: 'account', time_range: JSON.stringify({ since: day, until: day }) });
     const res = await fetch(`https://graph.facebook.com/${version}/${accountPath(account)}/insights?${params}`, {
-      headers: { Authorization: `Bearer ${env.META_ADS_READ_KEY}` },
+      headers: { Authorization: `Bearer ${env.META_ADS_KEY}` },
     });
     if (!res.ok) throw new Error(`meta ads insights: HTTP ${res.status}`); // body not echoed: it may repeat request details
     const raw = await res.json();
