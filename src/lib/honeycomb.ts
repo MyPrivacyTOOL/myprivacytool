@@ -29,15 +29,32 @@ export interface HiveLayout {
  * Up to four tiles per row: eight tiles fill two interlocked rows and the ninth starts a third.
  * Narrow containers (a phone held upright) get smaller tiles and three per row, never fewer than two.
  */
-export function hiveLayout(count: number, containerWidth: number): HiveLayout {
+export interface HiveOptions {
+  /**
+   * Narrow containers only. Two bigger tiles per row instead of three small ones, so every tile has room for its value and status line.
+   * Off by default: the `mobile_hive` experiment turns it on for the test group (docs/ab-testing.md).
+   */
+  readable?: boolean;
+}
+
+/** Widest tile used for the readable phone layout, so a tablet-width container never gets oversized tiles. */
+const READABLE_MAX_HW = 170;
+
+export function hiveLayout(count: number, containerWidth: number, opts: HiveOptions = {}): HiveLayout {
   const available = containerWidth > 0 ? containerWidth : FALLBACK_WIDTH;
   // Wide enough: exactly four per row, tiles sized to fill the width (4 tiles + half a tile of shift = 4.5 steps).
   // Narrower: small fixed tiles, as many as fit (three on most phones).
   const four = available >= NARROW_BELOW;
-  const hw = four ? Math.min(MAX_HW, Math.floor(available / (MAX_COLS + 0.5)) - HEX_GAP) : SMALL_HW;
+  const readable = !four && !!opts.readable;
+  // Readable: two tiles plus the half-tile shift (2.5 steps) fill the width, and the tile is never smaller than the small size.
+  const hw = four
+    ? Math.min(MAX_HW, Math.floor(available / (MAX_COLS + 0.5)) - HEX_GAP)
+    : readable
+      ? Math.min(READABLE_MAX_HW, Math.max(SMALL_HW, Math.floor(available / (MIN_COLS + 0.5)) - HEX_GAP))
+      : SMALL_HW;
   const step = hw + HEX_GAP;
   const rowH = hw * HEX_RATIO * 0.75 + HEX_GAP;
-  const cols = four ? MAX_COLS : Math.min(MAX_COLS, Math.max(MIN_COLS, Math.floor((available - step / 2) / step)));
+  const cols = four ? MAX_COLS : readable ? MIN_COLS : Math.min(MAX_COLS, Math.max(MIN_COLS, Math.floor((available - step / 2) / step)));
   const rows = Math.ceil(count / cols);
   const positions = Array.from({ length: count }, (_, i) => ({
     left: (i % cols) * step + (Math.floor(i / cols) % 2) * (step / 2),

@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import logoHeader from "@/assets/logo-header.png";
 import SessionBadge from "@/components/layout/SessionBadge";
 import HelpButton from "@/components/layout/HelpButton";
+import { useExperiment } from "@/hooks/useExperiment";
+import { trackEvent, trackExperimentCta } from "@/lib/analytics";
 
 interface NavItem {
   label: string;
@@ -33,6 +35,9 @@ const NAV_ITEMS: NavItem[] = [
 const Header = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // mobile_hive: the test group gets the scan button in the bar on phones (the control only has it inside the menu).
+  const { variantId, forced } = useExperiment("mobile_hive");
+  const showPhoneCta = variantId === "readable_tiles" && location.pathname !== "/scan";
 
   const isActive = (href: string) => {
     if (href === "/") return location.pathname === "/";
@@ -97,6 +102,20 @@ const Header = () => {
             <Link to="/scan">Check My Exposure</Link>
           </Button>
         </div>
+        {showPhoneCta && (
+          <Button asChild size="sm" className="md:hidden">
+            <Link
+              to="/scan"
+              data-testid="header-phone-cta"
+              onClick={() => {
+                trackExperimentCta("mobile_hive", variantId, forced);
+                if (!forced) trackEvent("header_cta_click", { experiment_id: "mobile_hive", variant_id: variantId });
+              }}
+            >
+              Check My Exposure
+            </Link>
+          </Button>
+        )}
 
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>

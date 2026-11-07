@@ -1,9 +1,11 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Hexagon, ScanResult } from '@/types/hexagon';
 import { InteractiveHexagonTile } from '@/components/InteractiveHexagonTile';
 import { useElementWidth } from '@/hooks/useElementWidth';
 import { HEX_RATIO, hiveLayout } from '@/lib/honeycomb';
 import { groupHexagonsByInterest } from '@/lib/hexagonGroups';
+import { useExperiment } from '@/hooks/useExperiment';
+import { trackEvent, trackExperimentExposure } from '@/lib/analytics';
 
 interface Props {
   scanResult: ScanResult;
@@ -17,7 +19,17 @@ interface Props {
 
 const Hive = ({ items, fixedIds, onConfirm, onDispute, onKeep, onSelect }: Omit<Props, 'scanResult'> & { items: Hexagon[] }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const layout = hiveLayout(items.length, useElementWidth(ref));
+  const { variantId, forced } = useExperiment('mobile_hive');
+  const width = useElementWidth(ref);
+  const layout = hiveLayout(items.length, width, { readable: variantId === 'readable_tiles' });
+  // Phones only (the layouts below four columns): that is who the experiment is about. Once per mount and layout, not per render.
+  const phone = width > 0 && layout.cols < 4;
+  useEffect(() => {
+    if (!phone) return;
+    trackExperimentExposure('mobile_hive', variantId, forced);
+    // Counts only: how many tiles were drawn and whether their value line was. No values, no scan data.
+    if (!forced) trackEvent('hive_values_rendered', { experiment_id: 'mobile_hive', variant_id: variantId, tiles: items.length, values_shown: !layout.compact });
+  }, [phone, variantId, forced, items.length, layout.compact]);
   return (
     <div ref={ref} className="w-full">
       <div className="relative mx-auto" style={{ width: layout.width, height: layout.height }}>
