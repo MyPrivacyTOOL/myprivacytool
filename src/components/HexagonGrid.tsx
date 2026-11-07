@@ -63,6 +63,8 @@ const TilesCompleteDialog = lazy(() => import('./TilesCompleteDialog'));
 interface HexagonGridProps {
   hexagons: HexagonData[];
   deviceData?: DeviceData;
+  /** Hexagon to draw the eye to (e.g. when the device itself is unknown). */
+  spotlightId?: string;
 }
 
 // Define progressive reveal thresholds. The hexagon total shown to the user comes from the registry (HEXAGON_COUNT).
@@ -89,7 +91,7 @@ const REVEAL_THRESHOLDS = {
   behaviorWave: 45,     // After 45 confirmations: Behavior hexagons (6)
 };
 
-export default function HexagonGrid({ hexagons: allHexagons, deviceData }: HexagonGridProps) {
+export default function HexagonGrid({ hexagons: allHexagons, deviceData, spotlightId }: HexagonGridProps) {
   // MPC-7916: honest tiles (colour, transparency and words say how we know). Off unless the flag is on.
   const v2 = useMemo(() => hexTileV2Enabled(), []);
   // MPC-7916 Phase 2: one job per screen. Hexagons first; more hexagons on a button, not on taps; one next step at a time;
@@ -784,7 +786,10 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData }: Hexag
             return (
               <div
                 key={hex.id}
-                className={`absolute transition-all duration-500 ${isRevealing ? 'revealing-wrapper' : ''}`}
+                id={`hexagon-${hex.id}`}
+                className={`absolute transition-all duration-500 ${isRevealing ? 'revealing-wrapper' : ''} ${
+                  hex.id === spotlightId && !hex.confirmed && !confirmedHexagons.has(hex.id) ? 'hex-spotlight' : ''
+                }`}
                 style={{
                   left: `${pos.x}px`,
                   top: `${pos.y}px`,

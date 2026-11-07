@@ -7,7 +7,9 @@ import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
 import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
-import DeviceIcon from '@/components/DeviceIcon';
+import DeviceReveal from '@/components/DeviceReveal';
+import UnknownDeviceHero from '@/components/UnknownDeviceHero';
+import { identifyDevice, hedgeDeviceHexagon, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
 import { RefreshCw } from 'lucide-react';
@@ -40,6 +42,8 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFederatedModal, setShowFederatedModal] = useState(false);
+  // null until the signals are read; then certain (carousel) or unknown (hexagon path)
+  const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
@@ -58,6 +62,8 @@ const Index = () => {
   useEffect(() => {
     markScanStarted();
   }, []);
+  // Unknown device: the Device Type hexagon asks instead of asserting the old regex guess
+  const displayHexagons = useMemo(() => hedgeDeviceHexagon(hexagons, identity), [hexagons, identity]);
   const resultsShown = !loading && hexagons.length > 0;
   useEffect(() => (resultsShown ? trackResults() : undefined), [resultsShown]);
 
@@ -98,6 +104,8 @@ const Index = () => {
     // Start session timer on mount
     startSessionTimer();
     trackFunnelStep('page_load');
+
+    readDeviceSignalsWithModel().then((signals) => setIdentity(identifyDevice(signals)));
 
     async function loadDeviceData() {
       try {
@@ -284,12 +292,17 @@ const Index = () => {
         {deviceHeroEnabled() && (
           <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
             <div className="max-w-[280px] sm:max-w-sm mx-auto">
-              <DeviceIcon
-                deviceType={liveDeviceData?.device?.type || 'Smartphone'}
-                rotationAngle={orientation.angle}
-                beta={motion.beta}
-                gamma={motion.gamma}
-              />
+              {identity?.certain && (
+                <DeviceReveal
+                  identity={identity}
+                  rotationAngle={orientation.angle}
+                  beta={motion.beta}
+                  gamma={motion.gamma}
+                />
+              )}
+              {identity && !identity.certain && (
+                <UnknownDeviceHero spotlightId="browser" spotlightLabel="Browser" canJump={!honeycombDashboardEnabled()} />
+              )}
             </div>
           </section>
         )}
@@ -315,9 +328,13 @@ const Index = () => {
             <>
               {/* The scan is complete here (loading is over), which is when WebScanDashboard must mount: it keeps its own answers from then on. */}
               {honeycombDashboardEnabled() ? (
-                <WebScanDashboard scanned={hexagons} title="Your Digital Footprint" />
+                <WebScanDashboard scanned={displayHexagons} title="Your Digital Footprint" />
               ) : (
-                <HexagonGrid hexagons={hexagons} deviceData={deviceData || undefined} />
+                <HexagonGrid
+                  hexagons={displayHexagons}
+                  deviceData={deviceData || undefined}
+                  spotlightId={deviceHeroEnabled() && identity && !identity.certain ? 'browser' : undefined}
+                />
               )}
               <ScanSavingNotice variant="scan" />
               <WelcomeBack hexagons={hexagons} />

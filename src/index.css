@@ -345,9 +345,23 @@
     animation: hexagon-confirm 0.4s ease-out;
   }
 
+  /* Spotlight: the hexagon we can read with certainty when the device is unknown */
+  @keyframes hex-spotlight {
+    0%, 100% { filter: drop-shadow(0 0 2px hsl(var(--brand-ink) / 0.35)); }
+    50% { filter: drop-shadow(0 0 14px hsl(var(--brand-ink) / 0.85)); }
+  }
+
+  .hex-spotlight {
+    animation: hex-spotlight 1.8s ease-in-out infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-hexagon-confirm {
       animation: none;
+    }
+    .hex-spotlight {
+      animation: none;
+      filter: drop-shadow(0 0 10px hsl(var(--brand-ink) / 0.7));
     }
   }
 }
