@@ -63,6 +63,10 @@
     "title": "Data Processing Agreement Summary | MyPrivacyTOOL",
     "description": "Plain-language summary of how MyPrivacyTOOL processes personal data on behalf of business customers: roles, sub-processors, security, transfers and deletion."
   },
+  "/data-deletion": {
+    "title": "How to delete your data | MyPrivacyTOOL",
+    "description": "How to ask MyPrivacyTOOL to delete the personal data we hold about you: by email, in Telegram, or for a website scan. Free, any time."
+  },
   "/trust": {
     "title": "Trust & Legal | MyPrivacyTOOL",
     "description": "How MyPrivacyTOOL handles your data: privacy policy, terms, cookie policy and data processing summary in one place."

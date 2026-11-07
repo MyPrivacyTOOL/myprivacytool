@@ -32,6 +32,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Cookies = lazy(() => import("./pages/Cookies"));
 const AcceptableUse = lazy(() => import("./pages/AcceptableUse"));
 const DPA = lazy(() => import("./pages/DPA"));
+const DataDeletion = lazy(() => import("./pages/DataDeletion"));
 const Trust = lazy(() => import("./pages/Trust"));
 const Developers = lazy(() => import("./pages/Developers"));
 const OptOutGuides = lazy(() => import("./pages/OptOutGuides"));
@@ -91,6 +92,7 @@ const App = () => (
             <Route path="/cookies" element={<Cookies />} />
             <Route path="/acceptable-use" element={<AcceptableUse />} />
             <Route path="/dpa" element={<DPA />} />
+            <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/trust" element={<Trust />} />
             {/* Guides */}
             <Route path="/opt-out-guides" element={<OptOutGuides />} />

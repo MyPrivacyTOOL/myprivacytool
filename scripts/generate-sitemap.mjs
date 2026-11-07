@@ -37,6 +37,7 @@ const STATIC_ROUTES = [
   { path: "/cookies", file: "src/pages/Cookies.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/acceptable-use", file: "src/pages/AcceptableUse.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/dpa", file: "src/pages/DPA.tsx", priority: "0.3", changefreq: "yearly" },
+  { path: "/data-deletion", file: "src/pages/DataDeletion.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/trust", file: "src/pages/Trust.tsx", priority: "0.4", changefreq: "yearly" },
 ];
 
