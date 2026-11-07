@@ -96,12 +96,7 @@ const Cookies = () => {
                 </li>
               </ul>
               <p className="mt-4 text-muted-foreground">
-                We do not use session recording or heatmap tools. The device scan
-                on our site asks two third-party services, ipify (api.ipify.org)
-                and ipapi.co, for your IP address and approximate location when
-                you load the scan. They necessarily see your IP address, and this
-                happens whether or not you have accepted analytics cookies,
-                because it is how the scan shows you what a website can see.<FeatureStatus feature="F8" />
+                We do not use session recording or heatmap tools.
               </p>
               <p className="mt-4 text-muted-foreground">
                 Google Analytics 4 and HubSpot tracking only run after you
@@ -152,9 +147,6 @@ const Cookies = () => {
                   analysis
                 </li>
                 <li>
-                  <strong>Stripe:</strong> Payment processing and fraud prevention<FeatureStatus feature="F3" />
-                </li>
-                <li>
                   <strong>Social Media Platforms:</strong> Share buttons and social
                   tracking
                 </li>
@@ -163,6 +155,9 @@ const Cookies = () => {
                   retargeting
                 </li>
               </ul>
+              <p className="mt-4 text-muted-foreground">
+                Note: Stripe is not used on this website. Billing is handled through RevenueCat and platform app stores (Apple App Store, Google Play Store) for the mobile application only.
+              </p>
               <p className="mt-4 text-muted-foreground">
                 These third parties have their own privacy policies. We recommend
                 reviewing their cookie and privacy policies to understand their
