@@ -34,6 +34,7 @@ import {
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { scanCounts } from '../../shared/hexagon-registry/counts.js';
+import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { hexTileV2Enabled, hexScreenV2Enabled } from '@/config/hexagonTile';
 import { toTile, riskProfile, riskProfileParts, withUserStatement, withGuessAnswer, cannotCheckLast, HexagonTile, type GuessOutcome } from '@/lib/hexagonTile';
 import { guessCheckFor, type DeviceCheckResult } from '@/lib/guessCheck';
@@ -68,8 +69,10 @@ interface HexagonGridProps {
 }
 
 // Define progressive reveal thresholds. The hexagon total shown to the user comes from the registry (HEXAGON_COUNT).
-// FINAL_SUMMARY_MIN_VISIBLE is the wave boundary after which the behavior wave has been revealed, not a count of hexagons.
-const FINAL_SUMMARY_MIN_VISIBLE = 46;
+// MPC-9832: the final summary waits until every hexagon this scan can show is visible, i.e. the registry count (never a typed
+// number), or all the hexagons the device offers when conditional ones are absent. The 40/46 in revealNextWave below are
+// wave INDEXES into the ordered list (where the security and behavior waves start), not a count of hexagons.
+const finalSummaryMinVisible = (available: number) => Math.min(HEXAGON_COUNT, available);
 // CK-7805: the 'what a stranger could guess' card appears with the language panel.
 const STRANGER_CARD_MIN_CONFIRMED = 8;
 // CK-7805 (owner suggestion): the fingerprint panel waits for 8 fingerprint confirmations, not 3.
@@ -332,7 +335,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData, spotlig
     if (progressCount >= REVEAL_THRESHOLDS.securityWave + 6 && !revealWaves.behavior) {
       trackFunnelStep('behavior_scan_triggered');
       setRevealWaves(prev => ({ ...prev, behavior: true }));
-      revealNextWave(46, Math.min(52, orderedHexagons.length));
+      revealNextWave(46, Math.min(HEXAGON_COUNT, orderedHexagons.length));
     }
     
     // Show Language panel after language hexagons confirmed
@@ -340,8 +343,8 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData, spotlig
       setShowLanguagePanel(true);
     }
     
-    // Check for final summary (all 46+ hexagons confirmed)
-    if (confirmedCount >= visibleCount && visibleCount >= FINAL_SUMMARY_MIN_VISIBLE && !showFinalSummary) {
+    // Check for final summary (every available hexagon, up to the registry count, confirmed)
+    if (confirmedCount >= visibleCount && visibleCount >= finalSummaryMinVisible(orderedHexagons.length) && !showFinalSummary) {
       trackFunnelStep('all_hexagons_confirmed');
       trackScanCompleted(visibleCount);
       setShowFinalSummary(true);
@@ -596,7 +599,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData, spotlig
     return positions;
   };
 
-  const positions = generatePositions(52); // Support up to 52 hexagons (46 + 6 behavior)
+  const positions = generatePositions(HEXAGON_COUNT); // Support every hexagon in the registry
   const visiblePositions = positions.slice(0, visibleCount);
   const maxY = visiblePositions.length > 0 ? Math.max(...visiblePositions.map(p => p.y)) : 0;
   const containerWidth = isMobile ? (hSpacing * 1.5 + hexWidth) : (hSpacing * 2 + hexWidth);
@@ -613,7 +616,7 @@ export default function HexagonGrid({ hexagons: allHexagons, deviceData, spotlig
     if (visibleCount <= 35) return 'Storage analysis running...';
     if (visibleCount <= 40) return 'Social tracking scan...';
     if (visibleCount <= 46) return 'Security vulnerability check...';
-    if (visibleCount <= 52) return 'Behavior analysis active...';
+    if (visibleCount <= HEXAGON_COUNT) return 'Behavior analysis active...';
     return 'Complete analysis';
   };
 
