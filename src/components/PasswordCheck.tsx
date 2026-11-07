@@ -1,8 +1,10 @@
 // MPC-9776: free password exposure check. Browser-only; see src/lib/pwnedPassword.ts for what leaves the page (5 hash characters).
 // Off unless VITE_PASSWORD_CHECK is "true". The typed password is cleared as soon as the check starts and is never stored.
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { trackPasswordCheckError, trackPasswordCheckScanClick, trackPasswordCheckUsed } from "@/lib/analytics";
 import { checkPwnedPassword, passwordCheckEnabled, type PwnedResult } from "@/lib/pwnedPassword";
 
 const FIX_STEPS = [
@@ -23,8 +25,11 @@ const PasswordCheck = () => {
     const pw = value;
     setValue("");   // clear at once: the password lives only in this call
     if (!pw) return;
+    trackPasswordCheckUsed();   // MPC-9785: a count only, no data
     setBusy(true);
-    setResult(await checkPwnedPassword(pw));
+    const r = await checkPwnedPassword(pw);
+    if (r.status === "error") trackPasswordCheckError();
+    setResult(r);
     setBusy(false);
   };
 
@@ -49,6 +54,15 @@ const PasswordCheck = () => {
       {result?.status === "checked" && result.count === 0 && (
         <p role="status" className="mt-3 text-sm text-foreground">
           Not found in known breaches. That is good, but it does not prove the password is strong or unused elsewhere. Keep it unique per account.
+        </p>
+      )}
+      {result?.status === "checked" && (
+        // MPC-9786: line approved by Chris 2026-11-07. Static link, no user data in the URL; not shown on error.
+        <p className="mt-3 text-sm text-muted-foreground" data-testid="password-check-scan-link">
+          Your email can be exposed too.{" "}
+          <Link to="/scan?utm_source=password_check" onClick={trackPasswordCheckScanClick} className="text-brand hover:underline">
+            Run the free scan to check.
+          </Link>
         </p>
       )}
       {result?.status === "error" && (

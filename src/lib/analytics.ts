@@ -7,6 +7,7 @@ declare global {
 }
 
 import { captureAttribution, getAttribution } from './attribution';
+import { hasConsent } from './cookieConsent';
 
 // Session tracking
 let sessionStartTime: number = 0;
@@ -33,6 +34,16 @@ export const trackEvent = (
     window.gtag('event', eventName, params);
   }
 };
+
+// MPC-9785: password-check usage counts (event names approved by Chris 2026-11-07). Fixed names, NO parameters: nothing derived from
+// the password (text, hash, prefix) and no outcome or breach count is ever sent. Each also checks the visitor's analytics choice itself,
+// because window.gtag exists before consent (it only queues) and a queued event could otherwise be sent once consent is given later.
+const passwordCheckEvent = (name: 'password_check_used' | 'password_check_error' | 'password_check_scan_click') => {
+  if (hasConsent()) trackEvent(name);
+};
+export const trackPasswordCheckUsed = () => passwordCheckEvent('password_check_used');
+export const trackPasswordCheckError = () => passwordCheckEvent('password_check_error');
+export const trackPasswordCheckScanClick = () => passwordCheckEvent('password_check_scan_click');
 
 // MPC-8451: a click on a share button. Carries only the channel and where on the site it was, never the visitor's address or results.
 export const trackShare = (channel: string, where: string) => {
