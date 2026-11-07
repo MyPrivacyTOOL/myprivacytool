@@ -1,0 +1,40 @@
+Your privacy scan is starting
+
+Alice looks behind the digital curtain, then shows you what to change.
+
+Hi,
+
+I’m Alice, MyPrivacyTOOL’s AI guide. My aim is to be your personal point of contact for your privacy concerns (coming). Today I guide you through your report, and the team behind me answers your replies.
+
+You asked us to look at your privacy exposure, so we’re starting right now.
+
+MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We’re starting with two things: your browser and your email address. More channels will follow over time.
+
+My job is to show you what you look like from the outside: what’s exposed, what it means for you, and what to change first.
+
+Watch it live: open your results page and I’ll show each result as I find it. Keep this link private: anyone who has it can see your results:
+https://www.myprivacytool.io/scan/live?utm_source=email&utm_medium=email&utm_campaign=scan-confirmation#v=t
+
+Your scan number: 11111111-1111-4111-8111-111111111111. Quote this number if you want this scan deleted.
+
+Here’s what happens next.
+
+Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:
+
+  1. Your browser findings, replayed. The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.
+  2. What your email address reveals. New hexagons about the one new thing you gave us: your email address.
+
+Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won’t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.
+
+Reply to this email and a person on the MyPrivacyTOOL team will read it and answer, with Alice’s help. A conversation with Alice herself in this thread (coming). You can reply with a question, or with the name of either hexagon below.
+
+Your report, in two hexagons:
+  ⬡ Your browser findings
+  ⬡ What your email address reveals
+
+Talk soon,
+Alice, MyPrivacyTOOL
+Our AI guide. This email was written with AI assistance.
+
+hello@myprivacytool.io  We never sell your data.
+Unsubscribe from further emails: https://myprivacytool.io/unsubscribe?e=a%40b.co&t=abc

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import FeatureStatus from "@/components/FeatureStatus";
+import FeatureStatus, { ChannelStatus } from "@/components/FeatureStatus";
+import { CHANNEL_STATUS, type ChannelId } from "@/config/featureStatus";
 import { Shield, Eye, MapPin, Mail, Globe, ArrowRight, Check, X, MessageCircle, Send, MessageSquare, Instagram } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
@@ -38,12 +39,14 @@ const CTA_LABEL: Record<string, string> = {
   early_access: "Get early access, free",
 };
 
-const channels = [
-  { name: "WhatsApp", Icon: MessageCircle, url: "/wa", status: true },
-  { name: "Telegram", Icon: Send, url: "https://t.me/MyPrivacyToolBot?start=scan" },
-  { name: "Messenger", Icon: MessageSquare, url: "https://m.me/myprivacytool", status: true },
-  { name: "Instagram", Icon: Instagram, url: "https://ig.me/m/myprivacytool", status: true },
-  { name: "Email", Icon: Mail, url: "mailto:scan@myprivacytool.io?subject=Scan%20Me" },
+// MPC-9826: state comes from CHANNEL_STATUS (src/config/featureStatus.ts), never from this list. A channel that is not live has no link.
+const channels: { id: ChannelId; name: string; Icon: typeof Globe; url: string; external: boolean }[] = [
+  { id: "web", name: "Web", Icon: Globe, url: "/scan", external: false },
+  { id: "telegram", name: "Telegram", Icon: Send, url: "https://t.me/MyPrivacyToolBot?start=scan", external: true },
+  { id: "email", name: "Email", Icon: Mail, url: "mailto:scan@myprivacytool.io?subject=Scan%20Me", external: true },
+  { id: "whatsapp", name: "WhatsApp", Icon: MessageCircle, url: "", external: false },
+  { id: "messenger", name: "Messenger", Icon: MessageSquare, url: "", external: false },
+  { id: "instagram", name: "Instagram", Icon: Instagram, url: "", external: false },
 ];
 
 export default function Start() {
@@ -262,24 +265,35 @@ export default function Start() {
 
         {/* Channel CTAs */}
         <div className="border-t border-border pt-8">
-          <p className="text-muted-foreground text-xs uppercase tracking-widest mb-4 text-center">Or message us directly on any platform</p>
+          <p className="text-muted-foreground text-xs uppercase tracking-widest mb-4 text-center">Where you can reach us</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {channels.map((ch) => (
-              <a
-                key={ch.name}
-                href={ch.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 bg-card hover:bg-muted border border-border rounded-lg px-4 py-3 transition-colors group"
-              >
-                <ch.Icon size={18} className="text-brand shrink-0" aria-hidden="true" />
-                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{ch.name}</span>
-                {"status" in ch && <FeatureStatus feature="F7a" className="ml-auto" />}
-              </a>
-            ))}
+            {channels.map((ch) => {
+              const live = CHANNEL_STATUS[ch.id] !== "planned" && ch.url !== "";
+              const inner = (
+                <>
+                  <ch.Icon size={18} className="text-brand shrink-0" aria-hidden="true" />
+                  <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">{ch.name}</span>
+                  <ChannelStatus channel={ch.id} className="ml-auto" />
+                </>
+              );
+              return live ? (
+                <a
+                  key={ch.id}
+                  href={ch.url}
+                  {...(ch.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="flex items-center gap-3 bg-card hover:bg-muted border border-border rounded-lg px-4 py-3 transition-colors group"
+                >
+                  {inner}
+                </a>
+              ) : (
+                <div key={ch.id} data-channel-card={ch.id} aria-disabled="true" className="flex items-center gap-3 bg-card border border-border rounded-lg px-4 py-3 opacity-80 group">
+                  {inner}
+                </div>
+              );
+            })}
           </div>
           <p className="text-muted-foreground text-xs text-center mt-4">
-            Prefer to chat? Message us on any of these platforms.
+            Web and Email work today. Telegram is built and we are still checking it end to end. WhatsApp, Messenger and Instagram are planned; each one switches on when it really works.
           </p>
         </div>
       </div>

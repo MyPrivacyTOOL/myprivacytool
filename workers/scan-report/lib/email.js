@@ -1,11 +1,14 @@
 import { recordSend } from './emailSends.js';
+import { REPLY_SENTENCE, ALICE_COMING_SENTENCE, REPLY_PROMISE, SIGN_OFF_LINES } from '../../../shared/reply-wording.js';
 import { buildBrokerPanel, STATE_LABEL } from './brokerPanel.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, emailItems, tally, tallyLine, hexGroups, hexText, buildReportJson } from './reportHex.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SITE = 'https://myprivacytool.io';
 // Sign-off for the scan, report and follow-up emails: Alice, the AI guide, not an anonymous team.
-export const SIGN_OFF = ['Alice', 'Your Dedicated MyPrivacyTOOL AI'];
+// MPC-9826: "Alice, MyPrivacyTOOL" with the AI assistance disclosed (shared/reply-wording.js).
+export { REPLY_PROMISE, REPLY_SENTENCE, ALICE_COMING_SENTENCE };
+export const SIGN_OFF = SIGN_OFF_LINES;
 
 // MPC-7406 follow-up: shared HTML shell for the transactional emails. Table layout with inline styles only (mail apps strip <style>
 // and scripts), 600px max width, system fonts, light/dark safe colours. The plain-text parts are unchanged.
@@ -91,7 +94,7 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber, 
     '',
     'Hi,',
     '',
-    'I’m Alice, MyPrivacyTOOL’s AI guide. From now on I’m your personal point of contact for your privacy concerns.',
+    'I’m Alice, MyPrivacyTOOL’s AI guide. My aim is to be your personal point of contact for your privacy concerns (coming). Today I guide you through your report, and the team behind me answers your replies.',
     '',
     'You asked us to look at your privacy exposure, so we’re starting right now.',
     '',
@@ -111,7 +114,7 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber, 
     '',
     'Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won’t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.',
     '',
-    'This email is now our open channel. You can reply anytime with a question, or simply reply with the name of either hexagon below, and we’ll continue the conversation right here. A real person on our team can step in whenever you ask.',
+    `${REPLY_PROMISE} You can reply with a question, or with the name of either hexagon below.`,
     '',
     'Your report, in two hexagons:',
     ...CONFIRMATION_PARTS.map((p) => `  ${HEX_OFF} ${p.label}`),
@@ -126,7 +129,7 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber, 
   const html = shell(subject, 'Your report is on its way: your browser findings, plus what your email address reveals.',
     `${aliceHero('Your privacy scan is starting', 'wave')}
 ${para('Hi,')}
-${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m your personal point of contact for your privacy concerns.')}
+${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. My aim is to be your personal point of contact for your privacy concerns (coming). Today I guide you through your report, and the team behind me answers your replies.')}
 ${para('You asked us to look at your privacy exposure, so we&rsquo;re starting right now.')}
 ${para('MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We&rsquo;re starting with two things: your browser and your email address. More channels will follow over time.')}
 ${para('My job is to show you what you look like from the outside: what&rsquo;s exposed, what it means for you, and what to change first.')}
@@ -139,7 +142,7 @@ ${para(confirmGate ? 'Once you have confirmed, your report usually arrives withi
 <li style="margin-bottom:6px"><strong>Your browser findings, replayed.</strong> The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.</li>
 <li><strong>What your email address reveals.</strong> New hexagons about the one new thing you gave us: your email address.</li></ol>
 ${para('Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won&rsquo;t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.')}
-${para('This email is now our open channel. You can reply anytime with a question, or simply click either hexagon below, and we&rsquo;ll continue the conversation right here. A real person on our team can step in whenever you ask.')}
+${para(`${esc(REPLY_PROMISE)} You can reply with a question, or click either hexagon below to email us about it.`)}
 ${para('<strong>Your report, in two hexagons.</strong>')}
 <table role="presentation" width="67%" align="center" cellpadding="0" cellspacing="0" style="width:67%;margin:6px auto 14px auto"><tr>${tiles.join('')}</tr></table>
 ${para(`Talk soon,<br><strong>${SIGN_OFF[0]}</strong><br>${SIGN_OFF[1]}`)}`, unsubscribeLink);
@@ -239,7 +242,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
     ...brokerSectionText(panel),
     `More removal guides: ${SITE}/opt-out`, '',
     `Questions about this report? Read the FAQ: ${SITE}/faq`, '',
-    'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
+    `${REPLY_PROMISE} You can also reply to ask us to delete your data.`,
     ...(liveLink ? ['', `Keep an eye on your results: open this page and new findings appear as we find them. Keep this link private: anyone who has it can see your results: ${liveLink}`] : []),
     ...(referral ? ['', referral.text] : []),
     // MPC-7554: with the follow-up state on, "I have fixed this" stops the follow-ups for this report only; unsubscribing stops everything non-transactional.
@@ -259,7 +262,7 @@ ${para('<strong>The full data is attached.</strong> The JSON file holds every he
 ${brokerSectionHtml(panel)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para(`Questions about this report? <a href="${SITE}/faq" style="color:${BRAND}">Read the FAQ</a>.`)}
-${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
+${para(`${esc(REPLY_PROMISE)} You can also reply to ask us to delete your data.`)}
 ${liveLink ? para('<strong>Keep an eye on your results.</strong> Open your results page and new findings appear as we find them. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
 ${referral ? referral.html : ''}
 ${unsubscribeLink && fixedLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Press <a href="${esc(fixedLink)}" style="color:${BRAND};font-weight:600">I have fixed this</a> and we will stop the follow-up emails about it. Or <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">unsubscribe from all our emails</a>.</td></tr></table>`
