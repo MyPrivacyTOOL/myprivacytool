@@ -1,12 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import DeepResearch from "./DeepResearch";
 import { DEEP_HEXAGONS } from "@/config/deepResearch";
 
+// The password check itself lives in src/lib/pwnedPassword.ts (MPC-9776) and is tested there. Here only the page wiring is tested.
 vi.mock("@/lib/pwnedPassword", () => ({
-  checkPassword: vi.fn().mockResolvedValue({ status: "found", count: 42 }),
+  checkPwnedPassword: vi.fn().mockResolvedValue({ status: "checked", count: 42 }),
+  passwordCheckEnabled: vi.fn(),
 }));
+import { passwordCheckEnabled } from "@/lib/pwnedPassword";
 
 const open = () =>
   render(
@@ -16,6 +19,8 @@ const open = () =>
   );
 
 describe("DeepResearch page", () => {
+  beforeEach(() => vi.mocked(passwordCheckEnabled).mockReturnValue(false));
+
   it("lists the five hexagons in the approved order, credential leak first", () => {
     open();
     const ids = DEEP_HEXAGONS.map((h) => h.id);
@@ -42,10 +47,20 @@ describe("DeepResearch page", () => {
     expect(screen.queryByText(/Needs: Licensed threat-intelligence feed/)).toBeNull();
   });
 
-  it("runs the free password check and shows the result", async () => {
+  it("says Coming soon, not Free now, for the credential card while the password check flag is off", () => {
     open();
+    const card = screen.getByTestId("deep-cred_leak_trace");
+    expect(card.textContent).toContain("Coming soon");
+    expect(card.textContent).not.toContain("Free now");
+    expect(screen.queryByLabelText("Password to check")).toBeNull();
+  });
+
+  it("shows the free password check and its result once the flag is on", async () => {
+    vi.mocked(passwordCheckEnabled).mockReturnValue(true);
+    open();
+    expect(screen.getByTestId("deep-cred_leak_trace").textContent).toContain("Free now");
     fireEvent.change(screen.getByLabelText("Password to check"), { target: { value: "hunter2" } });
-    fireEvent.click(screen.getByRole("button", { name: "Check password" }));
-    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/appears in known breaches \(42 times\)/));
+    fireEvent.click(screen.getByRole("button", { name: "Check" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/appeared 42 times/));
   });
 });

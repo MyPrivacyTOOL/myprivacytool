@@ -173,4 +173,30 @@ check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'miss
   inserts = []; check((await call('/stage/collect_core', 'POST', { authorization: 'Bearer tok' })).status === 200 && inserts.length === COLLECTOR_GROUPS.collect_core.filter((c) => !c.skip?.(new Date())).length, 'authorised POST /stage/collect_core stores that group only (weekday-skipped collectors excluded)');
 }
 
+// MPC-7557: any collector row that errors and has no alert of its own is reported in ONE combined Slack message (source/report and a short error class only).
+{
+  const realFetch = globalThis.fetch; const posts = []; let inserted = 0;
+  globalThis.fetch = async (url, opts = {}) => {
+    url = String(url);
+    if (url.startsWith('https://slack.com/api/')) { posts.push(JSON.parse(opts.body).text); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
+    if (url.includes('/rest/v1/mpt_raw_metrics')) { inserted += JSON.parse(opts.body).length; return { ok: true, status: 201, json: async () => ({}) }; }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const okC = { source: 'a', report: 'fine', collect: async () => ({ payload: {} }) };
+  const badC = { source: 'b', report: 'silent_failure', collect: async () => ({ error: 'mpt_x failed: HTTP 404 for someone@example.com sekret' }) };
+  const badEmailed = { source: 'c', report: 'has_own_alert', collect: async () => ({ error: 'boom' }), alertText: () => 'own alert text' };
+  const slackEnv = { ...env, SLACK_BOT_TOKEN: 'xoxb-token', MPTSLACK_CHANNEL_ID: 'C1' };
+  await runAll(slackEnv, [okC, badC, badEmailed], new Date('2026-11-04T16:15:00Z'));
+  check(posts.length === 2 && posts.includes('own alert text'), 'a collector with its own alert keeps it, and is not repeated in the combined message');
+  const combined = posts.find((t) => t !== 'own alert text') ?? '';
+  check(/1 metrics collector row failed/.test(combined) && combined.includes('b/silent_failure') && !combined.includes('a/fine') && !combined.includes('c/has_own_alert'), 'the combined message names only the silent failing row');
+  check(!combined.includes('someone@example.com') && !combined.includes('xoxb-token') && !combined.includes('sekret'), 'no email address or token in the combined message');
+  check(inserted === 3, 'error rows are still stored');
+  posts.length = 0; await runAll(slackEnv, [okC], new Date('2026-11-04T16:15:00Z'));
+  check(posts.length === 0, 'no failing rows means no message');
+  posts.length = 0; await runAll(env, [okC, badC], new Date('2026-11-04T16:15:00Z'));
+  check(posts.length === 0, 'without Slack settings nothing is posted and nothing throws');
+  globalThis.fetch = realFetch;
+}
+
 process.exit(ok ? 0 : 1);

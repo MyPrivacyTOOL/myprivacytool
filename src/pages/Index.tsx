@@ -5,6 +5,7 @@ import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
 import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
+import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
 import DeviceIcon from '@/components/DeviceIcon';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
@@ -279,17 +280,19 @@ const Index = () => {
           )}
         </section>
 
-        {/* Live Device Tracking Hero */}
-        <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
-          <div className="max-w-[280px] sm:max-w-sm mx-auto">
-            <DeviceIcon 
-              deviceType={liveDeviceData?.device?.type || 'Smartphone'}
-              rotationAngle={orientation.angle}
-              beta={motion.beta}
-              gamma={motion.gamma}
-            />
-          </div>
-        </section>
+        {/* Live Device Tracking Hero: hidden while the experience is reworked (src/config/deviceHero.ts) */}
+        {deviceHeroEnabled() && (
+          <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
+            <div className="max-w-[280px] sm:max-w-sm mx-auto">
+              <DeviceIcon
+                deviceType={liveDeviceData?.device?.type || 'Smartphone'}
+                rotationAngle={orientation.angle}
+                beta={motion.beta}
+                gamma={motion.gamma}
+              />
+            </div>
+          </section>
+        )}
 
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">

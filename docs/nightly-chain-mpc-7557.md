@@ -72,3 +72,13 @@ To see the Slack alert once for real: dispatch "Nightly chain test" with `force_
 
 * The synthetic Worker takes `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` from existing GitHub secrets on first deploy. Weekly run: needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (already used by the deploy workflows). Each weekly run makes a throwaway key, puts it on the synthetic Worker as `UNSUBSCRIBE_SECRET` and signs the unsubscribe with it, so no UNSUBSCRIBE_SECRET repo secret is needed. It never reads or sets production's secret. If `SCAN_REPORT_UNSUBSCRIBE_SECRET` exists it is only a fallback.
 * The metrics collector must be redeployed (automatic on merge) before its alert path exists.
+
+
+## Collector alive check (added 2026-11-04)
+
+The failure alert above is raised by the metrics collector Worker, so it cannot say that the collector itself has died. That is what happened from 2026-10-27 to 2026-11-02 (`Too many subrequests`, nothing stored, no message). Two guards were added:
+
+- **`.github/workflows/collector-alive.yml`** (daily 18:00 UTC, `scripts/collector-alive/check.mjs`): reads the newest `supabase/table_counts` collector row straight from the database and goes RED when it is older than 26 hours or cannot be read. Independent of the collector. Read-only. Missing credentials exit 2 (red), never a pass. Alerts by a red run (GitHub email to watchers), not by Slack.
+- **Combined error message in the collector** (`raiseAlerts` in `workers/mpt-metrics-collector/worker.js`): any collector row that ends in `error` and has no alert of its own is listed in ONE Slack message (source/report and a short error class, emails removed). Tested in `worker.test.mjs`.
+
+Rollback: delete the workflow file; revert the `raiseAlerts` change.

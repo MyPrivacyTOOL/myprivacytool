@@ -12,74 +12,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DEEP_HEXAGONS, type DeepHexagon } from "@/config/deepResearch";
-import { checkPassword, type PasswordCheck } from "@/lib/pwnedPassword";
+import PasswordCheck from "@/components/PasswordCheck";
+import { passwordCheckEnabled } from "@/lib/pwnedPassword";
 
 // Deep Research suite (MPC-9546). Unlisted on purpose (noindex, not in the sitemap or nav) until launch.
 // No-spend phase: free checks run for real; anything that needs a paid provider opens a "Coming soon" popup.
 
-function PasswordResult({ result }: { result: PasswordCheck }) {
-  if (result.status === "found") {
-    return (
-      <p role="status" className="text-sm text-destructive">
-        This password appears in known breaches ({result.count.toLocaleString()} times). Stop using it everywhere and
-        pick a new one.
-      </p>
-    );
-  }
-  if (result.status === "not_found") {
-    return (
-      <p role="status" className="text-sm text-foreground">
-        Not found in the known-breach list. That is good, but it does not prove the password is strong.
-      </p>
-    );
-  }
-  return (
-    <p role="status" className="text-sm text-muted-foreground">
-      We could not check this right now, so no result. Try again in a moment.
-    </p>
-  );
-}
-
-function PasswordCheckForm() {
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<PasswordCheck | null>(null);
-
-  const run = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setResult(null);
-    try {
-      setResult(await checkPassword(value));
-    } finally {
-      setBusy(false);
-      setValue("");
-    }
-  };
-
-  return (
-    <form onSubmit={run} className="mt-4 space-y-3" aria-label="Password breach check">
-      <label htmlFor="deep-pw" className="text-sm font-medium text-foreground">
-        Password to check
-      </label>
-      <input
-        id="deep-pw"
-        type="password"
-        autoComplete="off"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-      />
-      <p className="text-xs text-muted-foreground">
-        Only the first 5 characters of a one-way hash leave your browser. The password itself is never sent or stored.
-      </p>
-      <Button type="submit" disabled={busy || value.length === 0}>
-        {busy ? "Checking…" : "Check password"}
-      </Button>
-      {result && <PasswordResult result={result} />}
-    </form>
-  );
-}
+// A hexagon is only "free now" when what it offers actually runs. The password check ships behind VITE_PASSWORD_CHECK (MPC-9776),
+// so while that flag is off the credential card says "Coming soon" instead of promising a form that is not there.
+const isFreeNow = (h: DeepHexagon): boolean =>
+  h.availability === "free_now" && (h.freeAction?.kind !== "password_check" || passwordCheckEnabled());
 
 export default function DeepResearch() {
   const [popup, setPopup] = useState<DeepHexagon | null>(null);
@@ -106,13 +48,17 @@ export default function DeepResearch() {
                 <h2 className="font-semibold text-foreground">
                   {h.rank}. {h.label}
                 </h2>
-                <Badge variant={h.availability === "free_now" ? "default" : "secondary"}>
-                  {h.availability === "free_now" ? "Free now" : "Coming soon"}
+                <Badge variant={isFreeNow(h) ? "default" : "secondary"}>
+                  {isFreeNow(h) ? "Free now" : "Coming soon"}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">{h.summary}</p>
 
-              {h.freeAction?.kind === "password_check" && <PasswordCheckForm />}
+              {h.freeAction?.kind === "password_check" && (
+                <div className="mt-4">
+                  <PasswordCheck />
+                </div>
+              )}
               {h.freeAction?.kind === "link" && h.freeAction.to && (
                 <Button asChild className="mt-4">
                   <Link to={h.freeAction.to}>{h.freeAction.label}</Link>
@@ -124,9 +70,9 @@ export default function DeepResearch() {
                   variant="outline"
                   className="mt-4"
                   onClick={() => setPopup(h)}
-                  aria-label={`${h.label}: ${h.availability === "free_now" ? "see what is coming" : "coming soon"}`}
+                  aria-label={`${h.label}: ${isFreeNow(h) ? "see what is coming" : "coming soon"}`}
                 >
-                  {h.availability === "free_now" ? "See what's coming" : "Run this check"}
+                  {isFreeNow(h) ? "See what's coming" : "Run this check"}
                 </Button>
               )}
             </li>

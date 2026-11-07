@@ -1,53 +1,62 @@
-import { describe, expect, it, vi } from "vitest";
-import { checkPassword, countFromRange, sha1Hex } from "./pwnedPassword";
+import { describe, it, expect, vi } from 'vitest';
+import { checkPwnedPassword, countForSuffix, sha1Hex } from './pwnedPassword';
 
 // SHA-1("password") = 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8
-const PW_PREFIX = "5BAA6";
-const PW_SUFFIX = "1E4C9B93F3F0682250B6CF8331B7EE68FD8";
-const rangeBody = (rows: string[]) => rows.join("\r\n");
-const okFetch = (body: string, status = 200) =>
-  vi.fn().mockResolvedValue(new Response(body, { status })) as unknown as typeof fetch;
+const PW = 'password';
+const PREFIX = '5BAA6';
+const SUFFIX = '1E4C9B93F3F0682250B6CF8331B7EE68FD8';
 
-describe("pwnedPassword", () => {
-  it("hashes with SHA-1, uppercase hex", async () => {
-    expect(await sha1Hex("password")).toBe(PW_PREFIX + PW_SUFFIX);
+const okResponse = (body: string) => ({ ok: true, status: 200, text: async () => body }) as unknown as Response;
+
+describe('pwnedPassword (k-anonymity)', () => {
+  it('hashes with SHA-1 correctly', async () => {
+    expect(await sha1Hex(PW)).toBe(PREFIX + SUFFIX);
   });
 
-  it("parses the count for a suffix and ignores padding rows", () => {
-    const body = rangeBody([`${PW_SUFFIX}:9545824`, "00000000000000000000000000000000000:0"]);
-    expect(countFromRange(body, PW_SUFFIX)).toBe(9545824);
-    expect(countFromRange(body, "ABCDEF0000000000000000000000000000A")).toBe(0);
+  it('finds a known-pwned password and reports the count', async () => {
+    const f = vi.fn(async () => okResponse(`0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n${SUFFIX}:10434004\r\nFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:0`));
+    const r = await checkPwnedPassword(PW, f as unknown as typeof fetch);
+    expect(r).toEqual({ status: 'checked', count: 10434004 });
   });
 
-  it("sends only the 5-character prefix, never the password or full hash", async () => {
-    const f = okFetch(rangeBody([`${PW_SUFFIX}:12`]));
-    const r = await checkPassword("password", f);
-    expect(r).toEqual({ status: "found", count: 12 });
-    const [url] = (f as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toBe(`https://api.pwnedpasswords.com/range/${PW_PREFIX}`);
-    expect(String(url)).not.toContain(PW_SUFFIX);
-
-    // A distinctive password must not appear in the request at all, in either its plain or hashed form.
-    const g = okFetch(rangeBody(["0018A45C4D1DEF81644B54AB7F969B88D65:3"]));
-    await checkPassword("zq-unique-secret-91", g);
-    const [url2] = (g as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(String(url2)).not.toContain("zq-unique-secret-91");
-    expect(String(url2).split("/range/")[1]).toHaveLength(5);
+  it('returns 0 when the suffix is absent or only padding', async () => {
+    const f = vi.fn(async () => okResponse(`0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n${SUFFIX}:0`));
+    expect(await checkPwnedPassword(PW, f as unknown as typeof fetch)).toEqual({ status: 'checked', count: 0 });
   });
 
-  it("returns not_found when the suffix is absent", async () => {
-    const f = okFetch(rangeBody(["0018A45C4D1DEF81644B54AB7F969B88D65:3"]));
-    expect(await checkPassword("password", f)).toEqual({ status: "not_found" });
+  it('sends only the 5-char prefix: no password, no full hash, no suffix leaves the browser', async () => {
+    const SECRET = 'Zq7-unique-secret-9!';   // distinctive, so a substring check cannot match the hostname
+    const full = await sha1Hex(SECRET);
+    const f = vi.fn(async () => okResponse(''));
+    await checkPwnedPassword(SECRET, f as unknown as typeof fetch);
+    expect(f).toHaveBeenCalledTimes(1);
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.pwnedpasswords.com/range/' + full.slice(0, 5));
+    const sent = JSON.stringify([url, init]);
+    expect(sent).not.toContain(SECRET);
+    expect(sent).not.toContain(encodeURIComponent(SECRET));
+    expect(sent).not.toContain(full.slice(5));
+    expect(sent).not.toContain(full);
+    expect(init.body).toBeUndefined();
+    expect(init.credentials).toBe('omit');
+    expect(init.referrerPolicy).toBe('no-referrer');
+    expect((init.headers as Record<string, string>)['Add-Padding']).toBe('true');
   });
 
-  it("is not_checked, never safe, on empty input, network failure, bad status or junk body", async () => {
-    expect(await checkPassword("", okFetch(""))).toEqual({ status: "not_checked", reason: "empty" });
-    const boom = vi.fn().mockRejectedValue(new Error("offline")) as unknown as typeof fetch;
-    expect(await checkPassword("x", boom)).toEqual({ status: "not_checked", reason: "network" });
-    expect(await checkPassword("x", okFetch("", 429))).toEqual({ status: "not_checked", reason: "network" });
-    expect(await checkPassword("x", okFetch("<html>nope</html>"))).toEqual({
-      status: "not_checked",
-      reason: "bad_response",
-    });
+  it('never reports "safe" on failure: HTTP error and network error are status error', async () => {
+    const bad = vi.fn(async () => ({ ok: false, status: 503, text: async () => '' }) as unknown as Response);
+    expect(await checkPwnedPassword(PW, bad as unknown as typeof fetch)).toEqual({ status: 'error', reason: 'HTTP 503' });
+    const boom = vi.fn(async () => { throw new Error('offline'); });
+    expect(await checkPwnedPassword(PW, boom as unknown as typeof fetch)).toEqual({ status: 'error', reason: 'unreachable' });
+  });
+
+  it('rejects an empty password without any network call', async () => {
+    const f = vi.fn();
+    expect(await checkPwnedPassword('', f as unknown as typeof fetch)).toEqual({ status: 'error', reason: 'empty' });
+    expect(f).not.toHaveBeenCalled();
+  });
+
+  it('countForSuffix is case-insensitive and tolerant of blank lines', () => {
+    expect(countForSuffix(`\r\n${SUFFIX.toLowerCase()}:7\r\n`, SUFFIX)).toBe(7);
   });
 });
