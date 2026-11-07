@@ -8,7 +8,7 @@ const SUB_PROCESSORS = [
   { name: "Cloudflare", purpose: "Site hosting (Pages), edge Workers that receive forms and run the scan report" },
   { name: "Supabase", purpose: "Database for lead, scan-summary and engagement records" },
   { name: "HubSpot", purpose: "CRM for newsletter, waitlist and business enquiries; marketing email" },
-  { name: "Resend", purpose: "Transactional email (for example the scan summary you request)" },
+  { name: "Resend", purpose: "Transactional email (for example the scan summary you request, and the confirmation email when you give your address in a messaging channel)" },
   { name: "Notion", purpose: "Internal task and lead log used by our team" },
   { name: "Slack", purpose: "Internal notifications when a new lead or enquiry arrives" },
   { name: "Telegram", purpose: "Messaging channel, only if you choose to talk to us there" },
@@ -62,7 +62,7 @@ const DPA = () => {
                 .
               </p>
               <p className="mt-4 text-sm text-muted-foreground">
-                Last updated: October 2026. Template summary; not legal advice.
+                Last updated: November 2026. Template summary; not legal advice.
               </p>
             </div>
 

@@ -188,3 +188,21 @@ describe("Privacy: answers about a hexagon (2.4A)", () => {
   });
 });
 
+
+// MPC-9224: wording for the Telegram email ask (Chris approved 2026-11-07, 24-month consent record). Legal read MPC-6798 of THIS text still needed.
+describe("Privacy: email given in Telegram", () => {
+  it("states what is kept, the 24-hour deletion, the consent record and what STOP does", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Email Address Given in Telegram");
+    expect(text).toContain("If you do not click the link in that email within 24 hours, we delete the address.");
+    expect(text).toContain("Typing an address is not consent to marketing emails.");
+    expect(text).toContain("which keeps only the scrambled code, not the address");
+    expect(text).toContain("is kept for 24 months, or until you ask us to delete it");
+  });
+
+  it("does not promise to remove everything we hold", () => {
+    renderPage(<Privacy />);
+    expect(flat(document.body.textContent ?? "")).not.toMatch(/remove everything I hold/i);
+  });
+});
