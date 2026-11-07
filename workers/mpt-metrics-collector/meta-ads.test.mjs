@@ -1,10 +1,11 @@
 // Meta ads collector (read-only). Stubbed fetch. Run: node workers/mpt-metrics-collector/meta-ads.test.mjs
-import collector, { accountPath, DEFAULT_GRAPH_VERSION } from './collectors/meta-ads.js';
+import collector, { accountPath, DEFAULT_GRAPH_VERSION, DEFAULT_AD_ACCOUNT_ID } from './collectors/meta-ads.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
 const KEY = 'metaadsSECRETvalue';
 const ENV = { META_ADS_READ_KEY: KEY, META_AD_ACCOUNT_ID: '1234567890' };
+const ONLY_KEY = { META_ADS_READ_KEY: KEY };
 const NOW = new Date('2026-11-10T00:30:00+08:00'); // previous HK day = 2026-11-09
 const real = globalThis.fetch;
 let calls = [];
@@ -27,8 +28,9 @@ check(out.payload.summary.impressions === 0 && out.payload.summary.spend === 0 &
 calls = [];
 out = await collector.collect({ META_AD_ACCOUNT_ID: '1234567890' }, NOW);
 check(out.payload.configured === false && out.payload.missing.join() === 'META_ADS_READ_KEY' && calls.length === 0, 'key missing => ok row, configured=false, no network call');
-out = await collector.collect({ META_ADS_READ_KEY: KEY }, NOW);
-check(out.payload.configured === false && out.payload.missing.join() === 'META_AD_ACCOUNT_ID' && calls.length === 0, 'account id missing => ok row, configured=false, no network call');
+reply = { ok: true, status: 200, body: { data: [] } };
+out = await collector.collect(ONLY_KEY, NOW);
+check(out.payload.configured === true && calls.length === 1 && calls[0].u.includes(`/${DEFAULT_AD_ACCOUNT_ID}/insights?`) && DEFAULT_AD_ACCOUNT_ID === 'act_266295748910383', 'account id unset => the built-in MyPrivacyTOOL FB Ads account is used');
 
 reply = { ok: false, status: 190, body: { error: { message: `bad token ${KEY}` } } };
 let err = null; try { await collector.collect(ENV, NOW); } catch (e) { err = e; }
