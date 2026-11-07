@@ -1,0 +1,16 @@
+name: MPC-9833 re-crawl
+on:
+  push:
+    branches: ['measure/mpc-9833-crawl']
+permissions:
+  contents: read
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm i --no-save --no-audit --no-fund playwright@1.49.1 && npx playwright install --with-deps chromium
+      - run: node scripts/mpc-9833-recrawl.mjs
