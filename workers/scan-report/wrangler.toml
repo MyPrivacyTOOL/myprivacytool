@@ -58,11 +58,11 @@ RECOGNITION_ENABLED = "true"
 REFERRALS_ENABLED = "true"
 
 # MPC-9546/9549: Deep Research ownership check + own results list (lib/deepResearch.js, routes /api/deep-research/{start,verify,results,delete}).
-# OFF. Anything but the exact string "true" does nothing: all four routes answer 404. Turn on only after: (1) the Worker SECRET DEEP_RESEARCH_HMAC_KEY is set
-# (`wrangler secret put DEEP_RESEARCH_HMAC_KEY`, a long random value, never in this file; deliberately NOT in EXPECTED_SECRETS.txt while the flag is off),
-# (2) Chris has approved the page wording and the code email (buildCodeEmail), and (3) the site flag VITE_DEEP_RESEARCH is also on. Retention is 90 days (Chris, 2026-11-07).
-# Rollback: set "false". Codes already sent cannot be recalled; they expire in 10 minutes.
-DEEP_RESEARCH_ENABLED = "false"
+# ON since 2026-11-07 on Chris's instruction ("switch it on now"). Anything but the exact string "true" does nothing: all four routes answer 404.
+# Needs the Worker SECRET DEEP_RESEARCH_HMAC_KEY (set 2026-11-07; without it the routes answer 503). The site has a matching flag, VITE_DEEP_RESEARCH (a Cloudflare Pages
+# build variable): the form only shows when BOTH are on. Retention is 90 days (Chris, 2026-11-07).
+# Rollback: set "false" and merge (routes 404 again). Codes already sent cannot be recalled; they expire in 10 minutes.
+DEEP_RESEARCH_ENABLED = "true"
 # Tester mode: set the Worker SECRET REFERRALS_TEST_RECIPIENTS (comma separated addresses, `wrangler secret put`, never in this file) to limit the programme to
 # those addresses while it is tested: the invite block, invite page, invitations (to listed addresses only) and reward emails. Everyone else is unchanged.
 # Delete the secret to open the programme to every user. Order matters: set the secret BEFORE setting REFERRALS_ENABLED = "true".
