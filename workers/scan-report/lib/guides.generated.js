@@ -11,7 +11,7 @@ export default [
     "optOutUrlLabel": "dnc.gov.sg",
     "summary": "Stop unsolicited telemarketing calls, SMS and messaging-app marketing (including WhatsApp) to your Singapore numbers. Free and does not expire.",
     "timeNeeded": "5 minutes",
-    "processingTime": "Protection starts 21 calendar days after registration",
+    "processingTime": "Can take up to 21 days to take full effect after registration",
     "difficulty": "Easy",
     "requirements": [
       "A Singapore phone number you control",
@@ -21,8 +21,8 @@ export default [
       "Go to dnc.gov.sg, the Personal Data Protection Commission's official DNC Registry site, and choose Register.",
       "Enter your Singapore mobile, home or office number and choose which types of messages to block: voice calls, text messages (SMS, MMS, WhatsApp and similar apps) or fax.",
       "Complete the verification step. Alternatively, SMS \"DNC\" to 78771 from the number you want to register (standard SMS charges apply), or call the toll-free line 1800 248 0771 from that number. Do not use a phone that blocks caller ID for the call option.",
-      "Wait 21 calendar days. After that, organisations must not send you telemarketing messages on the registered number unless you gave clear consent or have an ongoing relationship with them.",
-      "If you still receive telemarketing after 21 days, file a complaint through the DNC Registry website."
+      "Allow up to 21 days for your registration to take full effect (the PDPC says it may take up to 21 days). Once it has, organisations must not send you telemarketing messages on the registered number unless you gave clear consent or have an ongoing relationship with them.",
+      "If you still receive telemarketing once your registration has taken full effect, file a complaint through the DNC Registry website."
     ],
     "relistingWarning": "Registration is free and does not expire, but it only covers the numbers you register (register every number you own). It does not remove your data from broker or people-search databases and does not stop marketing from organisations you gave consent to. Withdraw consent with those senders directly.",
     "lastVerified": "2026-10-05"
@@ -324,5 +324,59 @@ export default [
     ],
     "relistingWarning": "BeenVerified refreshes its data from public and commercial sources, so your record can return. Check again every few months and re-submit.",
     "lastVerified": "2026-09-30"
+  },
+  {
+    "slug": "mylife",
+    "name": "MyLife",
+    "country": "US",
+    "countryName": "United States",
+    "region": "US",
+    "type": "People-search site",
+    "optOutUrl": "https://www.mylife.com/ccpa/index.pubview",
+    "optOutUrlLabel": "mylife.com/ccpa",
+    "summary": "Ask MyLife to remove or hide your public profile with its privacy request form, then confirm by email.",
+    "timeNeeded": "10 minutes",
+    "processingTime": "Up to 45 days; MyLife may ask you to verify your identity",
+    "difficulty": "Medium",
+    "requirements": [
+      "The address of your MyLife profile page (or your name and city to find it)",
+      "An email address you can open"
+    ],
+    "steps": [
+      "Open the MyLife privacy request page at mylife.com/ccpa. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
+      "Choose the request to delete or remove your information (not just to see it) and enter your name, city and the email address you can open.",
+      "Add the address of your profile page if the form asks which listing is yours.",
+      "Submit the form, then open the email from MyLife and follow its confirmation link. MyLife may ask for more details to confirm it is you.",
+      "Come back after a few days and search for your name on mylife.com to confirm the profile no longer shows."
+    ],
+    "relistingWarning": "MyLife rebuilds profiles from public and commercial records, so a profile can return. Check again every few months and re-submit.",
+    "lastVerified": "2026-11-07"
+  },
+  {
+    "slug": "intelius",
+    "name": "Intelius",
+    "country": "US",
+    "countryName": "United States",
+    "region": "US",
+    "type": "People-search site",
+    "optOutUrl": "https://www.intelius.com/opt-out",
+    "optOutUrlLabel": "intelius.com/opt-out",
+    "summary": "Suppress your Intelius listing with its opt-out request, then confirm by email.",
+    "timeNeeded": "10 minutes",
+    "processingTime": "Within a few days after email confirmation",
+    "difficulty": "Medium",
+    "requirements": [
+      "Your name and state to find your record",
+      "An email address you can open"
+    ],
+    "steps": [
+      "Open intelius.com/opt-out. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
+      "Search for your record using your name and state, and select the listing that is you.",
+      "Enter an email address you can open and submit the opt-out request.",
+      "Open the email from Intelius and click its confirmation link. Intelius may ask for more details to confirm it is you.",
+      "Come back after a few days and search for your name to confirm the listing no longer shows."
+    ],
+    "relistingWarning": "Intelius updates its records from public and commercial sources, so a listing can return. Check again every few months and re-submit.",
+    "lastVerified": "2026-11-07"
   }
 ];
