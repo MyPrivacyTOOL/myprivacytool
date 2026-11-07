@@ -89,6 +89,17 @@ export const EXPERIMENTS = {
       { id: "email_first", weight: 50 }, // email form first, then the share link
     ],
   },
+  // Phone landing page: do visitors engage more when every hexagon shows its value, and the header carries a "Check My Exposure" button?
+  // Two changes in one variant on purpose (cheapest test of the idea); split them if it wins. No new copy: the button reuses existing wording.
+  mobile_hive: {
+    id: "mobile_hive",
+    description: "Readable hexagon tiles (values shown) and a header button on phones",
+    enabled: import.meta.env.VITE_AB_MOBILE_HIVE_ENABLED === "true",
+    variants: [
+      { id: "control", weight: 50 }, // small tiles with no value line, no header button
+      { id: "readable_tiles", weight: 50 }, // two bigger tiles per row with values, header button on its own row below the md breakpoint
+    ],
+  },
 } as const satisfies Record<string, Experiment>;
 
 export type ExperimentId = keyof typeof EXPERIMENTS;

@@ -87,3 +87,17 @@ Consent means GA4 sees only part of the traffic; the ratio between variants is s
 
 ## Adding an experiment
 Add an entry to `EXPERIMENTS` (first variant = control, flag `VITE_AB_<ID>_ENABLED`), call `useExperiment("<id>")`, fire `trackExperimentExposure` when the element is first visible and `trackExperimentCta` on click, and include `experiment_id`/`variant_id` on the success event. Cloudflare edge splitting is a later option if flicker or SEO ever matters; not needed for a button label.
+
+## Phone landing page: `mobile_hive`
+Where: the honeycomb on the results of the landing page scan, and the site header, on phones. Off until `VITE_AB_MOBILE_HIVE_ENABLED=true` is set on Cloudflare Pages and the site redeploys. No new copy: the header button reuses "Check My Exposure".
+| Variant | What a phone visitor sees | Share |
+|---|---|---|
+| `control` | Small tiles (88px, three per row) with no value line; scan button only inside the menu | 50% |
+| `readable_tiles` | Two bigger tiles per row (`hiveLayout(..., { readable: true })`) with the value and status line; "Check My Exposure" button on its own full-width row under the header logo row | 50% |
+
+- **Why:** below 420px the layout uses 88px tiles, and tiles under 100px are `compact`, which drops the value line (`src/lib/honeycomb.ts`, `InteractiveHexagonTile.tsx`). The hypothesis is that showing visitors their own values drives engagement and report requests.
+- **Two changes in one variant, on purpose:** it is the cheapest test of the idea. If `readable_tiles` wins, split the tiles and the button to see which one did it.
+- **Events** (consent-gated like all events, counts only, no scan data), all with `experiment_id=mobile_hive` and `variant_id`: `experiment_exposure` and `hex_value_rendered` (`hexes_with_value`: how many tiles show a value line), each sent ONCE per results grid, after every pillar is measured, and only at phone width; `experiment_cta_click` and `header_cta_click` for the header button. Nothing is sent while the flag is off (unlike the other experiments, so GA4 has a clean start date) and nothing for forced QA views. The control reports `hexes_with_value` of 0, which is the baseline. Primary outcome: `report_requested` per exposure, by `variant_id`. Guardrail: engaged-session rate. Tile taps: `hexagon_confirm`.
+- **Known gap:** the header button is shown on every page, but exposure fires only when a hive renders. Clicks from visitors who never reached a hive have no matching exposure, so read the header button as a secondary signal.
+- **Decide the success line before starting:** for example a 25% relative lift in `report_requested` per exposure at 95% confidence, with engaged-session rate not falling. At low traffic (pricing was about 6 sessions a day) this may take weeks; check the exposure counts before calling it.
+- Preview: `/?ab_mobile_hive=readable_tiles` at a phone width (forced views are never counted).
