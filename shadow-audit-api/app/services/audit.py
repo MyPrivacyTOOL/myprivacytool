@@ -1,6 +1,7 @@
 """Orchestrates one audit: fetch logs -> detect -> score -> sign -> persist -> notify."""
 import itertools
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -15,8 +16,9 @@ _seq = itertools.count(1)
 
 class AuditService:
     def __init__(self, settings: Settings, source, signer: Optional[signing.PassportSigner],
-                 notion=None, slack=None):
+                 notion=None, slack=None, queue=None):
         self.s, self.source, self.signer, self.notion, self.slack = settings, source, signer, notion, slack
+        self.queue = queue
         self.audits: Dict[str, Dict] = {}
 
     def run(self, agent_id: str, lookback_days: Optional[int] = None) -> Dict:
@@ -87,6 +89,22 @@ class AuditService:
             except Exception as exc:  # noqa: BLE001
                 log.exception("slack notify failed")
                 r["errors"].append(f"slack: {exc}")
+
+        # MPC-8644: scored audits only (an incomplete / insufficient-data audit has no score to chart).
+        if self.queue and r["overallScore"] is not None:
+            try:
+                self.queue.publish(self._queue_record(r))
+            except Exception as exc:  # noqa: BLE001
+                log.exception("queue publish failed")
+                r["errors"].append(f"queue: {exc}")
+
+    @staticmethod
+    def _queue_record(r: Dict) -> Dict:
+        pillars = {re.sub(r"[^a-z0-9_]", "_", k.lower())[:40]: v["score"] for k, v in r["pillars"].items()}
+        return {"audit_id": r["auditId"], "created_at": r["auditDate"],
+                "outcome": "pass" if r["riskLevel"] == "APPROVED_FOR_P1_DATA" else "fail",
+                "env": "prod" if r["environment"] == "production" else "staging",
+                "pillar_scores": pillars}
 
     def history(self, agent_id: str, limit: int = 10) -> List[Dict]:
         rows = [a for a in self.audits.values() if a["agentId"] == agent_id]
