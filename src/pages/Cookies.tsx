@@ -152,9 +152,6 @@ const Cookies = () => {
                   analysis
                 </li>
                 <li>
-                  <strong>Stripe:</strong> Payment processing and fraud prevention<FeatureStatus feature="F3" />
-                </li>
-                <li>
                   <strong>Social Media Platforms:</strong> Share buttons and social
                   tracking
                 </li>
@@ -164,7 +161,10 @@ const Cookies = () => {
                 </li>
               </ul>
               <p className="mt-4 text-muted-foreground">
-                These third parties have their own privacy policies. We recommend
+                We set no payment cookies today, because we take no payments.
+                When paid plans open, a payment provider (planned: Stripe) may set
+                cookies, and we will list them here before they are used. These
+                third parties have their own privacy policies. We recommend
                 reviewing their cookie and privacy policies to understand their
                 practices.
               </p>
