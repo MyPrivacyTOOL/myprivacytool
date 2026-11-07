@@ -70,11 +70,11 @@ export async function run(env, fetchImpl = fetch) {
     const rep = await resendFind(/report|privacy/i);
     const text = rep?.text || '';
     out.report = rep ? {
-      subject: rep.subject, html_bytes: (rep.html || '').length, promise_sentences: sentences(text),
+      subject: rep.subject, html_bytes: (rep.html || '').length, promise_sentences: sentences(text).filter((s) => !/#v=|Change:|friend|Pro /.test(s)),
       has_part1_web_scan: /Part 1/i.test(text), has_part2_email: /Part 2/i.test(text),
       has_listings_block: /Listings you showed us/i.test(text), score_line: (text.match(/.{0,40}\b(score|0-100)\b.{0,60}/i) || [''])[0].replace(/\s+/g, ' '),
       found_clear_notchecked: { FOUND: (text.match(/\bFOUND\b/g) || []).length, CLEAR: (text.match(/CHECKED AND CLEAR/gi) || []).length, NOT_CHECKED: (text.match(/NOT CHECKED/gi) || []).length },
-      retention_sentences: sentences(text).filter((s) => /month|delete|kept|keep/i.test(s)),
+      retention_sentences: sentences(text).filter((s) => /month|delete|kept/i.test(s) && !/#v=|Change:|friend/.test(s)),
     } : 'NOT READ BACK from provider';
     const ws = (await sel(`web_scans?id=eq.${scanNumber}&select=*`))[0] || {};
     out.retention = { web_scan_columns_with_time: Object.fromEntries(Object.entries(ws).filter(([k]) => /expire|created|retain/i.test(k))), policy: (await sel('web_scan_retention?select=months,unlinked_days'))[0] };
@@ -88,7 +88,7 @@ export async function run(env, fetchImpl = fetch) {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const r = await run(process.env);
-  const t = '```json\n' + JSON.stringify(r, null, 2) + '\n```';
+  const t = '```json\n' + JSON.stringify(r, null, 2).replace(/#v=[^\s"\\]+/g, '#v=[token]') + '\n```';
   console.log(t);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, t + '\n');
   process.exit(r.notConfigured ? 2 : r.ok ? 0 : 1);
