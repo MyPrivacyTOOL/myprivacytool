@@ -102,20 +102,6 @@ const Header = () => {
             <Link to="/scan">Check My Exposure</Link>
           </Button>
         </div>
-        {showPhoneCta && (
-          <Button asChild size="sm" className="md:hidden">
-            <Link
-              to="/scan"
-              data-testid="header-phone-cta"
-              onClick={() => {
-                trackExperimentCta("mobile_hive", variantId, forced);
-                if (!forced) trackEvent("header_cta_click", { experiment_id: "mobile_hive", variant_id: variantId });
-              }}
-            >
-              Check My Exposure
-            </Link>
-          </Button>
-        )}
 
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
@@ -143,6 +129,23 @@ const Header = () => {
         </Sheet>
         </div>
       </nav>
+      {/* mobile_hive: its own full-width row, because a button beside the logo, HELP and the menu does not fit at phone widths (it pushed the menu off screen). */}
+      {showPhoneCta && (
+        <div className="border-t border-border px-4 py-2 md:hidden">
+          <Button asChild size="sm" className="w-full">
+            <Link
+              to="/scan"
+              data-testid="header-phone-cta"
+              onClick={() => {
+                trackExperimentCta("mobile_hive", variantId, forced);
+                if (!forced) trackEvent("header_cta_click", { experiment_id: "mobile_hive", variant_id: variantId });
+              }}
+            >
+              Check My Exposure
+            </Link>
+          </Button>
+        </div>
+      )}
       <SessionBadge />
     </header>
   );

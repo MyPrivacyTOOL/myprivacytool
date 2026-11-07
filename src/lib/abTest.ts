@@ -97,7 +97,7 @@ export const EXPERIMENTS = {
     enabled: import.meta.env.VITE_AB_MOBILE_HIVE_ENABLED === "true",
     variants: [
       { id: "control", weight: 50 }, // small tiles with no value line, no header button
-      { id: "readable_tiles", weight: 50 }, // two bigger tiles per row with values, header button below the md breakpoint
+      { id: "readable_tiles", weight: 50 }, // two bigger tiles per row with values, header button on its own row below the md breakpoint
     ],
   },
 } as const satisfies Record<string, Experiment>;

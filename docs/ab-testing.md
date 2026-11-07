@@ -93,7 +93,7 @@ Where: the honeycomb on the results of the landing page scan, and the site heade
 | Variant | What a phone visitor sees | Share |
 |---|---|---|
 | `control` | Small tiles (88px, three per row) with no value line; scan button only inside the menu | 50% |
-| `readable_tiles` | Two bigger tiles per row (`hiveLayout(..., { readable: true })`) with the value and status line; "Check My Exposure" button in the header bar | 50% |
+| `readable_tiles` | Two bigger tiles per row (`hiveLayout(..., { readable: true })`) with the value and status line; "Check My Exposure" button on its own full-width row under the header logo row | 50% |
 
 - **Why:** below 420px the layout uses 88px tiles, and tiles under 100px are `compact`, which drops the value line (`src/lib/honeycomb.ts`, `InteractiveHexagonTile.tsx`). The hypothesis is that showing visitors their own values drives engagement and report requests.
 - **Two changes in one variant, on purpose:** it is the cheapest test of the idea. If `readable_tiles` wins, split the tiles and the button to see which one did it.
