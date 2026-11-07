@@ -21,6 +21,7 @@ for (const h of HEXAGON_CATALOGUE) {
 }
 const master = readFileSync(path.join(out, 'hexagon', 'index.html'), 'utf8');
 assert.equal((master.match(/<tr data-r=/g) || []).length, 368);
+assert.ok(master.includes('54 run in the scan, 368 in the catalogue'), 'master page carries the one count sentence');
 assert.ok(master.includes('92 High') && master.includes('208 Medium') && master.includes('68 Low'));
 console.log('generate-hexagon-pages.test.mjs ok');
 

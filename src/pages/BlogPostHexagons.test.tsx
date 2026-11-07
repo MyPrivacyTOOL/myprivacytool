@@ -23,3 +23,15 @@ describe("blog: how-exposed-are-you lists the registry's hexagons", () => {
     expect(headingCounts.reduce((a, b) => a + b, 0)).toBe(54);
   });
 });
+
+import ScoreMethod from "./ScoreMethod";
+import { countSentence } from "@/lib/scanCopy";
+
+describe("one count sentence (MPC-9832)", () => {
+  it("is exactly '54 run in the scan, 368 in the catalogue' and appears on the score page", () => {
+    expect(countSentence()).toBe("54 run in the scan, 368 in the catalogue");
+    const { container } = render(<MemoryRouter><ScoreMethod /></MemoryRouter>);
+    expect(container.textContent).toContain("54 run in the scan, 368 in the catalogue");
+    expect(container.textContent).not.toMatch(/\b46\b/);
+  });
+});

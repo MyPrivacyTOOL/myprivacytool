@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
 import { HEXAGONS, HEXAGON_GROUPS, HEXAGON_COUNT, HEXAGON_ALWAYS_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { countSentence } from '../../shared/hexagon-registry/countSentence.js';
 import blogPosts from '@/data/blogPosts.json';
 import { guides } from '@/content/guides';
 import { trackBlogCtaClick, trackBlogPostView, trackBlogScrollDepth } from '@/lib/analytics';
@@ -25,7 +26,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <p>Your digital footprint is likely larger than you think. Your personal data is collected, packaged, sold, and used in ways you may not have agreed to, and you can take control of it.</p>
         
         <h2>The 54 Privacy Vectors Exposing Your Data</h2>
-        <p>54 run in the scan, 368 in the catalogue. We've identified distinct sources where your personal information is currently exposed:<FeatureStatus feature="F9" /></p>
+        <p>{countSentence()}. We've identified distinct sources where your personal information is currently exposed:<FeatureStatus feature="F9" /></p>
         
         {/* MPC-9832: the real 54 web-scan hexagons, grouped by the registry's own groups. Rendered from the registry so the
             list and its counts cannot drift from the scan again (the old hand-written lists added up to 46). */}

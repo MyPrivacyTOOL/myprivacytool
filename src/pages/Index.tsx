@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import FeatureStatus from "@/components/FeatureStatus";
 import { hexTileV2Enabled } from '@/config/hexagonTile';
-import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1 } from '@/lib/scanCopy';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1, countSentence } from '@/lib/scanCopy';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
 import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
@@ -288,6 +288,7 @@ const Index = () => {
               </p>
             </>
           )}
+          <p className="mt-2 text-xs sm:text-sm text-muted-foreground">{countSentence()}.</p>
         </section>
 
         {/* Device reveal: a full-screen opening moment, hidden while the experience is reworked (src/config/deviceHero.ts) */}
