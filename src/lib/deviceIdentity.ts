@@ -53,6 +53,9 @@ export const CAROUSEL_DEVICES: { category: DeviceCategory; label: string }[] = [
   { category: 'chromeos', label: 'Chromebook' },
 ];
 
+const IPHONE_MAX_SHORT_SIDE = 500;
+const IPAD_MIN_SHORT_SIDE = 700;
+
 const unknown = (reason: string): DeviceIdentity => ({ certain: false, reason });
 
 const touchFact = (n: number) =>
@@ -82,14 +85,29 @@ export function identifyDevice(s: DeviceSignals): DeviceIdentity {
     };
   }
 
-  // iPadOS Safari presents as a Mac; real Macs report ≤1 touch point.
+  // iPadOS Safari (and iPhone Safari with "Request Desktop Site") presents as a
+  // Mac; real Macs report ≤1 touch point. Tell them apart by screen size: no
+  // iPhone has a short side above ~500 CSS px, no iPad below ~700. In between
+  // we do not know.
   if (/iPad/.test(ua) || (/Macintosh/.test(ua) && s.maxTouchPoints > 1)) {
-    return {
-      certain: true,
-      category: 'ipad',
-      label: 'iPad',
-      evidence: ['Apple iPadOS', touchFact(s.maxTouchPoints), screenFact],
-    };
+    const shortSide = Math.min(s.screenWidth, s.screenHeight);
+    if (!/iPad/.test(ua) && shortSide <= IPHONE_MAX_SHORT_SIDE) {
+      return {
+        certain: true,
+        category: 'iphone',
+        label: 'iPhone',
+        evidence: ['Apple iOS (desktop site requested)', touchFact(s.maxTouchPoints), screenFact],
+      };
+    }
+    if (/iPad/.test(ua) || shortSide >= IPAD_MIN_SHORT_SIDE) {
+      return {
+        certain: true,
+        category: 'ipad',
+        label: 'iPad',
+        evidence: ['Apple iPadOS', touchFact(s.maxTouchPoints), screenFact],
+      };
+    }
+    return unknown('Touch Apple device with an ambiguous screen size');
   }
 
   if (/Android/.test(ua)) {
