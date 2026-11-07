@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { HEXAGON_COUNT } from "../../shared/hexagon-registry/registry.js";
+import { countSentence } from "../../shared/hexagon-registry/countSentence.js";
 import { BANDS, BAND_LABEL, CATEGORY_WEIGHTS, SCORE_VERSION } from "../../shared/hexagon-registry/score.js";
 
 // MPC-7471-F4: "How we calculate your score". Wording approved by Chris (2026-10-26) from docs/exposure-score-explainer-draft.md.
@@ -53,7 +54,7 @@ const ScoreMethod = () => (
 
         <section className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900">How it is worked out</h2>
-          <p className="mt-2 text-gray-700">We check up to {HEXAGON_COUNT} things (we call them hexagons). Each one ends up in exactly one of three states:</p>
+          <p className="mt-2 text-gray-700">We check up to {HEXAGON_COUNT} things (we call them hexagons): {countSentence()}. Each one ends up in exactly one of three states:</p>
           <ul className="mt-2 list-disc space-y-1 pl-6 text-gray-700">
             <li><strong>Found</strong>: your browser showed us a real value.</li>
             <li><strong>Checked and clear</strong>: we could check, and there was nothing to show. Only a few things can ever be clear.</li>

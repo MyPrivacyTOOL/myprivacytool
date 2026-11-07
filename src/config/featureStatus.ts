@@ -46,3 +46,26 @@ export const CHANNEL_STATUS: Record<ChannelId, FeatureState> = {
   messenger: "planned",     // stub
   instagram: "planned",     // stub
 };
+
+// MPC-9832: the eight /journey steps. One line per step; flip to "live" the day that step works end to end for a visitor.
+// States come from the code, not the page copy (evidence per step is in the MPC-9832 pull request):
+//   1 Know           live      the free scan runs in the browser and renders the hexagons
+//   2 Baseline       in_build  "Is this you?" confirmation exists (MPC-9813); no dated snapshot or Identity Baseline is stored
+//   3 Erase          in_build  /opt-out-guides is live (manual opt-out); removal requests are not built (F4)
+//   4 Clean baseline planned   no timestamped clean baseline; monitoring is sample data only (F5)
+//   5 Go agentic     planned   /ai-access-check is a waitlist form, no agent inventory exists
+//   6 Agent footprint planned  nothing in the code (F6)
+//   7 Agent passport planned   nothing in the code (F6)
+//   8 Agent trust    planned   nothing in the code (F6)
+export type JourneyStepId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export const JOURNEY_STEPS: Record<JourneyStepId, FeatureState> = {
+  1: "live",
+  2: "in_build",
+  3: "in_build",
+  4: "planned",
+  5: "planned",
+  6: "planned",
+  7: "planned",
+  8: "planned",
+};
