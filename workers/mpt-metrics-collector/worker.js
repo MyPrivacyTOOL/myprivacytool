@@ -13,6 +13,7 @@ import hubspotOptout from './collectors/hubspot-optout.js';
 import emailDelivery from './collectors/email-delivery.js';
 import edgeMachines from './collectors/edge-machines.js';
 import channelOsint from './collectors/channel-osint.js';
+import metaAds from './collectors/meta-ads.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 import { publishMachineMirror } from './publishers/machine-mirror.js';
@@ -23,7 +24,7 @@ import { withSubrequestBudget, INVOCATION_BUDGET, RESERVED_FOR_WRITE } from './l
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
-export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint, ...ga4Reports];
+export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint, metaAds, ...ga4Reports];
 
 // MPC-7557 fix: the daily run used to do everything in ONE Worker invocation (collectors, Notion pages, mirror, osint, KPI). Cloudflare
 // caps outbound requests per invocation (50 on the free plan), so from 2026-10-28 every run died with "Too many subrequests" before it
@@ -31,13 +32,13 @@ export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot
 // call is a separate invocation with its own budget. Each stage must stay well under 50 requests (worker.test.mjs enforces a budget).
 // MPC-9168: the budget is enforced at run time (lib/budget.js: INVOCATION_BUDGET calls per stage, the last RESERVED_FOR_WRITE kept for the
 // insert and alerts) and checked by subrequest-budget.test.mjs against a deliberately heavy data set. Worst-case calls per stage:
-//   collect_core   supabase-counts 10, cloudflare 3, youtube 3, edge-machines 2, learning-loop 1
+//   collect_core   supabase-counts 10, cloudflare 3, youtube 3, edge-machines 2, learning-loop 1, meta-ads 1
 //   collect_hubspot hubspot: variable (lifecycle stages, forms and their pages), alone so it gets a whole budget
 //   collect_email  scan-gap <=7 (one batched read), nightly-chain 2, hubspot-optout <=11, email-delivery 2, channel-osint 3
 //   collect_ga4    token + 6 reports (the channel-osint collector fetches its own GA4 token in its stage)
 export const SUBREQUEST_BUDGET = INVOCATION_BUDGET;
 export const COLLECTOR_GROUPS = {
-  collect_core: [supabaseCounts, cloudflareAnalytics, youtube, edgeMachines, learningLoop],
+  collect_core: [supabaseCounts, cloudflareAnalytics, youtube, edgeMachines, learningLoop, metaAds],
   collect_hubspot: [hubspot],
   collect_email: [scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint],
   collect_ga4: [...ga4Reports],
@@ -46,7 +47,7 @@ export const STAGES = ['collect_core', 'collect_hubspot', 'collect_email', 'coll
 
 const SAFE = (msg, env) => {
   let s = String(msg ?? '');
-  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON', 'HUBSPOT_READONLY_TOKEN', 'SLACK_BOT_TOKEN']) if (env[k]) s = s.split(env[k]).join('[redacted]');
+  for (const k of ['SUPABASE_SERVICE_ROLE_KEY', 'COLLECTOR_TRIGGER_TOKEN', 'CLOUDFLARE_ANALYTICS_TOKEN', 'YOUTUBE_API_KEY', 'GA4_SERVICE_ACCOUNT_JSON', 'HUBSPOT_READONLY_TOKEN', 'SLACK_BOT_TOKEN', 'META_ADS_READ_KEY']) if (env[k]) s = s.split(env[k]).join('[redacted]');
   return s.slice(0, 500);
 };
 
