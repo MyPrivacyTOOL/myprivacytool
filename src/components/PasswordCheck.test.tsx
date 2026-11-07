@@ -16,6 +16,15 @@ describe("PasswordCheck", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("shows the approved disclosure: 5 characters of the code, and that Have I Been Pwned sees the IP address", () => {
+    vi.stubEnv("VITE_PASSWORD_CHECK", "true");
+    render(<PasswordCheck />);
+    const text = screen.getByTestId("password-check").textContent ?? "";
+    expect(text).toContain("send only the first 5 characters of that code to Have I Been Pwned");
+    expect(text).toContain("Have I Been Pwned can see your IP address");
+    expect(text).toContain("We do not see, store or log your password.");
+  });
+
   it("shows the count and the fix checklist for an exposed password, and clears the field", async () => {
     vi.stubEnv("VITE_PASSWORD_CHECK", "true");
     const spy = vi.spyOn(lib, "checkPwnedPassword").mockResolvedValue({ status: "checked", count: 1234 });

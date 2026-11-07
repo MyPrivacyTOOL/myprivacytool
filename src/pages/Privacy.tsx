@@ -511,13 +511,25 @@ const Privacy = () => {
                   (rdap.org and the registry it points to). We send a scrambled
                   code made from your address (a SHA-256 hash), not the address
                   itself, to Gravatar and to Libravatar, to see whether a public
-                  profile picture exists. We do not currently check data
-                  breaches. If we start, we will name the company here and say
+                  profile picture exists. We do not currently check whether
+                  your email address appears in data breaches. If we start, we will name the company here and say
                   what we send to it. We also search public code changes
                   (commits) on GitHub: your whole email address, not a scrambled
                   code, goes to GitHub, in a search for public code changes that
                   name it as the author, so we can tell you if your address is
                   published in public code
+                </li>
+                <li>
+                  <strong>Password Check (only if you use it):</strong> The
+                  optional password check runs in your browser. It turns the
+                  password you type into a scrambled code (a SHA-1 hash) on your
+                  device and sends only the first 5 characters of that code to
+                  Have I Been Pwned (haveibeenpwned.com) to see whether the
+                  password appears in known data breaches. The password and the
+                  full code never leave your device, and we do not receive, store
+                  or log them. Because your browser contacts Have I Been Pwned
+                  directly, it can see your IP address and browser details, as
+                  any website you visit can.
                 </li>
                 <li>
                   <strong>Legal Authorities:</strong> When required by law or to

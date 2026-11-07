@@ -35,7 +35,7 @@ describe("approved FAQ (MPC-7560 approved 2026-10-28)", () => {
 
   it("matches the Privacy Policy on the two email-address facts (breaches not currently checked; full address goes to GitHub)", () => {
     const privacy = readFileSync(resolve(root, "src/pages/Privacy.tsx"), "utf8").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
-    expect(privacy).toContain("We do not currently check data breaches");
+    expect(privacy).toContain("We do not currently check whether your email address appears in data breaches");
     expect(privacy).toContain("your whole email address, not a scrambled code, goes to GitHub");
     const checks = FAQS.find((f) => f.q === "What do you check about my email address?")!.a;
     expect(checks).toContain("do not currently check");
