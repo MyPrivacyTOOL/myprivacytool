@@ -37,7 +37,7 @@ export async function requestScanReport(
   saveScan: boolean,
   recognise: boolean,
   turnstileToken = "",
-  opts: { consentSource?: string; requestId?: string } = {},
+  opts: { consentSource?: string; requestId?: string; listing?: Record<string, unknown> | null } = {},
 ): Promise<ReportOutcome> {
   const base = resolveScanApiUrl();
   if (!base) return {}; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
@@ -55,6 +55,7 @@ export async function requestScanReport(
         ...(opts.requestId ? { request_id: opts.requestId } : {}),
         ...(turnstileToken ? { "cf-turnstile-response": turnstileToken } : {}), // MPC-8430
         ...(saveScan ? scanSaveFields({ recognise }) : {}),
+        ...(saveScan && opts.listing ? { listing: opts.listing } : {}), // MPC-9813: kept with the saved scan, so only sent with it
         ...(ref ? { ref } : {}),
         utm_source: q.get("utm_source") ?? "",
         utm_medium: q.get("utm_medium") ?? "",
