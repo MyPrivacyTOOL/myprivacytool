@@ -114,9 +114,9 @@ describe("Pricing A/B tests (MPC-7638)", () => {
     window.history.replaceState({}, "", "/pricing?ab_pricing_headline=free_first&ab_pricing_cta=notify_text&ab_pricing_social_proof=above_plans");
     renderPage(<Pricing />);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Know your exposure for free. Wipe your footprints with a plan.");
-    expect(screen.getAllByRole("button", { name: "Get this plan" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Get this plan/ })).toHaveLength(3);
     expect(screen.getByText("The scan is free and needs no credit card.")).toBeTruthy();
-    fireEvent.click(screen.getAllByRole("button", { name: "Get this plan" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /^Get this plan/ })[0]);
     expect(eventNames()).toEqual(["pricing_view", "pricing_plan_click"]);
     expect(gtag).toHaveBeenLastCalledWith("event", "pricing_plan_click", expect.not.objectContaining({ ab_pricing_cta: expect.anything() }));
   });

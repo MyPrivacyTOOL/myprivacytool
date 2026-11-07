@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import { Globe2, ShieldCheck, Users, ChevronDown, type LucideIcon } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -13,6 +14,7 @@ interface Topic {
   icon: LucideIcon;
   title: string;
   desc: string;
+  status?: "F6";
   links: { label: string; to: string }[];
   guide: { title: string; desc: string }[];
   faq: { q: string; a: string }[];
@@ -25,6 +27,7 @@ const TOPICS: Topic[] = [
     icon: Globe2,
     title: "APAC coverage",
     desc: "Our removal workflows focus on Hong Kong, Singapore and Australia, alongside major US data brokers, so regional staff are not an afterthought.",
+    status: "F6",
     links: [
       { label: "Opt-out guides (HK, SG, AU, US)", to: "/opt-out-guides" },
       { label: "How a scan works (FAQ)", to: "/faq" },
@@ -94,7 +97,7 @@ const EnterpriseIncludes = () => {
 
   return (
     <Accordion type="single" collapsible className="grid md:grid-cols-3 gap-4 items-start">
-      {TOPICS.map(({ id, icon: Icon, title, desc, links, guide, faq, checklist }) => {
+      {TOPICS.map(({ id, icon: Icon, title, desc, status, links, guide, faq, checklist }) => {
         const ticked = checklist.filter((_, i) => done[`${id}-${i}`]).length;
         return (
           <AccordionItem key={id} value={id} className="rounded-xl bg-card border border-border md:data-[state=open]:col-span-3">
@@ -102,7 +105,7 @@ const EnterpriseIncludes = () => {
               <span className="block">
                 <span className="mb-4 block"><Icon className="w-6 h-6 text-brand" aria-hidden="true" /></span>
                 <span className="font-bold mb-2 block">{title}</span>
-                <span className="text-muted-foreground text-sm leading-relaxed font-normal block">{desc}</span>
+                <span className="text-muted-foreground text-sm leading-relaxed font-normal block">{desc}{status && <FeatureStatus feature={status} />}</span>
                 <span className="text-brand text-xs font-semibold mt-3 inline-flex items-center gap-1">
                   See what this means <ChevronDown className="w-3 h-3" aria-hidden="true" />
                 </span>

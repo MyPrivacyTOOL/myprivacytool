@@ -1,4 +1,5 @@
 import Seo from "@/components/Seo";
+import FeatureStatus from "@/components/FeatureStatus";
 import pageMeta from "@/data/pageMeta.json";
 
 const Cookies = () => {
@@ -100,7 +101,7 @@ const Cookies = () => {
                 and ipapi.co, for your IP address and approximate location when
                 you load the scan. They necessarily see your IP address, and this
                 happens whether or not you have accepted analytics cookies,
-                because it is how the scan shows you what a website can see.
+                because it is how the scan shows you what a website can see.<FeatureStatus feature="F8" />
               </p>
               <p className="mt-4 text-muted-foreground">
                 Google Analytics 4 and HubSpot tracking only run after you
@@ -151,7 +152,7 @@ const Cookies = () => {
                   analysis
                 </li>
                 <li>
-                  <strong>Stripe:</strong> Payment processing and fraud prevention
+                  <strong>Stripe:</strong> Payment processing and fraud prevention<FeatureStatus feature="F3" />
                 </li>
                 <li>
                   <strong>Social Media Platforms:</strong> Share buttons and social

@@ -53,6 +53,6 @@ describe("Start", () => {
     renderPage(<Start />);
     await user.click(screen.getByRole("button", { name: /not now/i }));
     expect(screen.getByRole("link", { name: /check my exposure/i })).toHaveAttribute("href", "/scan");
-    for (const n of ["WhatsApp", "Telegram", "Messenger", "Instagram", "Email"]) expect(screen.getByRole("link", { name: n })).toBeInTheDocument();
+    for (const n of ["WhatsApp", "Telegram", "Messenger", "Instagram", "Email"]) expect(screen.getByRole("link", { name: new RegExp(`^${n}`) })).toBeInTheDocument();
   });
 });

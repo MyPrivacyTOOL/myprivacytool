@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,7 @@ const Enterprise = () => {
             <p className="text-muted-foreground text-lg mb-4 leading-relaxed">
               Home addresses, personal numbers and family details listed by data brokers give attackers
               material for targeted phishing and impersonation. We find that exposure across your organisation
-              and remove it.
+              and remove it.<FeatureStatus feature="F6" />
             </p>
             <p className="text-muted-foreground text-base mb-8">
               Built for security and risk teams who need coverage, reporting and a named contact, not a

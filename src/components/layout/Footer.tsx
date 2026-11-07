@@ -31,6 +31,8 @@ const LEGAL_LINKS = [
   { label: "Acceptable Use Policy", to: "/acceptable-use" },
   { label: "Data Processing (DPA)", to: "/dpa" },
   { label: "Trust Centre", to: "/trust" },
+  { label: "Accessibility", to: "/accessibility" },
+  { label: "GDPR Rights", to: "/gdpr-rights" },
   { label: "Unsubscribe", to: "/unsubscribe" },
 ];
 

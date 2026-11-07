@@ -1,4 +1,5 @@
 import { useState } from "react";
+import FeatureStatus from "@/components/FeatureStatus";
 import { Link } from "react-router-dom";
 import { KeyRound, Mail, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -204,16 +205,16 @@ const Business = () => {
           <div className="space-y-6">
             {[
               { step: "01", title: "Submit your team list", desc: "Provide a list of employee names and work emails (or let us start with your leadership team)." },
-              { step: "02", title: "We run the full scan", desc: "We check data brokers for each team member: addresses, phone numbers, family, social profiles." },
+              { step: "02", title: "We run the full scan", desc: "We check data brokers for each team member: addresses, phone numbers, family, social profiles.", feature: "F6" as const },
               { step: "03", title: "You get the exposure report", desc: "We send you a company privacy report within 48 hours: who's exposed, what data is visible, and your risk level." },
-              { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days." },
-              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint." },
-            ].map(({ step, title, desc }) => (
+              { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days.", feature: "F6" as const },
+              { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint.", feature: "F6" as const },
+            ].map(({ step, title, desc, feature }: { step: string; title: string; desc: string; feature?: "F6" }) => (
               <div key={step} className="flex gap-6 items-start">
                 <div className="text-brand font-bold text-2xl w-10 flex-shrink-0">{step}</div>
                 <div>
                   <div className="font-semibold text-foreground mb-1">{title}</div>
-                  <div className="text-muted-foreground text-sm leading-relaxed">{desc}</div>
+                  <div className="text-muted-foreground text-sm leading-relaxed">{desc}{feature && <FeatureStatus feature={feature} />}</div>
                 </div>
               </div>
             ))}
@@ -247,7 +248,7 @@ const Business = () => {
                 <ul className="space-y-2 mb-6">
                   {features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> {f}
+                      <span className="text-brand flex-shrink-0 mt-0.5">✓</span> <span>{f}{F6_FEATURES.includes(f) && <FeatureStatus feature="F6" />}</span>
                     </li>
                   ))}
                 </ul>
@@ -268,5 +269,8 @@ const Business = () => {
     </div>
   );
 };
+
+// MPC-9836: tier features that are not built yet (F6). "Company report" and support are staffed, so unmarked.
+const F6_FEATURES = ["Monthly scan", "Automated removals", "Slack/Teams alerts", "API access", "SSO / SCIM"];
 
 export default Business;
