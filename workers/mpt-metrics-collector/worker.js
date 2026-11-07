@@ -69,16 +69,27 @@ async function insertRows(env, rows) {
 // MPC-7535: a collector may define alertText(row); a non-null text is posted to the usual Slack channel (the one the Monday digest uses).
 // Never throws: a Slack problem must not stop the metrics being stored, but it is logged so the missing alert is visible.
 export async function raiseAlerts(env, collectors, rows) {
+  const unalerted = []; // error rows whose collector has no alert of its own: one combined message below, so a failing source never goes unseen
   for (const row of rows) {
     const c = collectors.find((x) => x.source === row.source && x.report === row.report);
     let text = null;
     try { text = c?.alertText?.(row) ?? null; } catch { /* a broken alertText must not stop the run */ }
-    if (!text) continue;
+    if (!text) { if (row.status === 'error') unalerted.push(row); continue; }
     console.error(`mpt-metrics-collector ALERT ${row.source}/${row.report}: ${SAFE(text, env)}`);
     if (!(env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID)) { console.error('mpt-metrics-collector: alert not posted, SLACK_BOT_TOKEN / MPTSLACK_CHANNEL_ID not set'); continue; }
     try { await slack(env, 'chat.postMessage', { channel: env.MPTSLACK_CHANNEL_ID, text: SAFE(text, env) }); }
     catch (e) { console.error(`mpt-metrics-collector: alert post failed: ${SAFE(e?.message, env)}`); }
   }
+  if (!unalerted.length) return;
+  // MPC-7557: until 2026-11-02 the channel_osint row errored with HTTP 404 and the KPI stage failed for days with no message anywhere. Source and report
+  // names plus a short error class only (no data, no addresses): the full error stays in the stored row and the Worker log.
+  const short = (e) => SAFE(e, env).replace(/[^\s@]+@[^\s@]+/g, '[email]').slice(0, 100);
+  const lines = unalerted.slice(0, 10).map((r) => `${r.source}/${r.report}: ${short(r.error) || 'error'}`);
+  const text = `:warning: ${unalerted.length} metrics collector row${unalerted.length === 1 ? '' : 's'} failed in today's run. ${lines.join('; ')}${unalerted.length > 10 ? '; and more' : ''}. Details: the stored error rows in mpt_raw_metrics and the Worker log (MPC-7557).`;
+  console.error(`mpt-metrics-collector ALERT collector_rows_failed: ${text}`);
+  if (!(env.SLACK_BOT_TOKEN && env.MPTSLACK_CHANNEL_ID)) { console.error('mpt-metrics-collector: alert not posted, SLACK_BOT_TOKEN / MPTSLACK_CHANNEL_ID not set'); return; }
+  try { await slack(env, 'chat.postMessage', { channel: env.MPTSLACK_CHANNEL_ID, text }); }
+  catch (e) { console.error(`mpt-metrics-collector: alert post failed: ${SAFE(e?.message, env)}`); }
 }
 
 export async function runAll(env, collectors = COLLECTORS, now = new Date(), { scope } = {}) {
