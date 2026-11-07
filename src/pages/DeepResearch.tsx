@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { DEEP_HEXAGONS, type DeepHexagon } from "@/config/deepResearch";
 import PasswordCheck from "@/components/PasswordCheck";
+import DeepResearchVerify from "@/components/DeepResearchVerify";
 import { passwordCheckEnabled } from "@/lib/pwnedPassword";
 
 // Deep Research suite (MPC-9546). Unlisted on purpose (noindex, not in the sitemap or nav) until launch.
@@ -80,6 +81,8 @@ export default function DeepResearch() {
             </li>
           ))}
         </ol>
+
+        <DeepResearchVerify />
 
         <Dialog open={popup !== null} onOpenChange={(open) => !open && setPopup(null)}>
           <DialogContent>
