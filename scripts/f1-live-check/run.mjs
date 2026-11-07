@@ -167,7 +167,7 @@ export async function runCheck(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (!full) throw new Error('could not read the sent report back from the provider');
       const problems = checkReportBlock({ text: full.text, html: full.html });
       if (problems.length) throw new Error(problems.join('; '));
-      return 'report read back from the provider: "Listings you showed us" with Listed state and the evidence link';
+      return 'report read back from the provider: the broker block with the Listed state and the evidence link';
     },
     async delete_by_scan_number() {
       const r = await sb.rpc('mpt_delete_web_scan', { p_scan_number: ctx.scanNumber });

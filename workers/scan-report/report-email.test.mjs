@@ -73,8 +73,14 @@ const withNo = buildReportEmail({ scan, breaches: [], breachStatus: 'checked', b
 check(withNo.text.includes(`Your scan number: ${SN}. Quote this number if you want this scan deleted.`) && withNo.html.includes(`Your scan number: ${SN}. Quote this number if you want this scan deleted.`), 'scan number and what it is for are in the email text and HTML');
 check(withNo.report.web_scan.id === SN && Buffer.from(reportAttachment(withNo.report).content, 'base64').toString('utf8').includes(SN), 'scan number is in the JSON attachment');
 check(!/Your scan number/.test(none.text) && !/Your scan number/.test(none.html), 'no saved scan: no scan number line');
-check(!/PEOPLE-SEARCH SITES/.test(none.text) && none.text.includes('/opt-out') && !none.html.includes('Open the official opt-out page'), 'people-search guides move to a link when no finding makes them relevant');
-check(/PEOPLE-SEARCH SITES/.test(worst.text) && worst.html.includes('Open the official opt-out page'), 'people-search guides appear when a finding makes them relevant');
+// MPC-9814: the broker section is in EVERY report (no hiding behind a finding), all 9 shortlist brokers in registry order, each with a guide; nothing implies a search was run
+for (const r of [none, worst, real]) {
+  const order = ['Spokeo', 'Whitepages (US)', 'BeenVerified', 'TruthFinder', 'FastPeopleSearch', 'MyLife', 'Intelius', 'White Pages Australia', 'Truecaller'].map((n) => r.text.indexOf(`\n${n}`));
+  check(/BROKER SITES/.test(r.text) && /Broker sites/.test(r.html) && order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), 'broker section is present for every scan, 9 sites in registry order');
+  check((r.text.match(/Not checked\. We don't search broker sites for you\./g) || []).length >= 8 && !/PEOPLE-SEARCH SITES|have not searched these sites/i.test(r.text + r.html), 'no pasted page: each site reads "Not checked", and no sentence implies a search');
+  check((r.text.match(/How to remove it:/g) || []).length === 9, 'every one of the 9 sites carries its guide');
+}
+check(/Hong Kong and Singapore/.test(none.text) && /Paid coverage .* is coming\. It is not live yet/.test(none.text), 'HK/SG honest line and the paid-coverage note are present');
 check(/Alice/.test(real.html) && real.html.includes('/email/alice/alice-peek.gif'), 'Alice is kept');
 
 // text in step with HTML

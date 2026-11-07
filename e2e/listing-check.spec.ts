@@ -97,7 +97,13 @@ test("F1: nothing is read before the click; after it, the pasted page is verifie
   const live = page.getByTestId("live-scan");
   await expect(live).toBeVisible();
   await expect(live.getByTestId("confirm-note")).toContainText(/only check details you've confirmed are yours/i);
-  await expect(live.getByTestId("listings-block")).toHaveCount(0);
+  // MPC-9814: the /scan on-screen result already carries the broker section: all nine shortlist brokers, each Not checked, none read yet
+  const early = live.getByTestId("broker-panel");
+  await expect(early).toBeVisible({ timeout: 20_000 });
+  await expect(early.locator("li")).toHaveCount(9);
+  await expect(early.locator("li[data-state='not_checked']")).toHaveCount(9);
+  await expect(early).toContainText("We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.");
+  await expect(early.locator("li[data-broker='spokeo'] a[href='/opt-out-guides/spokeo']")).toBeVisible();
   await runReportJob({ ...ENV }, be.fetchImpl);
   expect(be.F.db.scans[0].report_status).toBe("pending");
   expect(be.fixtureReads).toHaveLength(0);
@@ -111,23 +117,32 @@ test("F1: nothing is read before the click; after it, the pasted page is verifie
   expect(be.fixtureReads).toHaveLength(0);                       // opening the link read nothing
   await box.getByRole("button", { name: /yes, this is my email/i }).click();
 
-  // after the click: the page is read once and the block appears with state, evidence and guide
-  const block = page.getByTestId("listings-block");
+  // after the click: the page is read once and the polished broker section shows it: state, match level, confidence word + bar, evidence, guide
+  const block = page.getByTestId("broker-panel");
   await expect(block).toBeVisible({ timeout: 30_000 });
-  await expect(block).toContainText(/listings you showed us/i);
-  await expect(block.locator("li[data-state='listed']")).toHaveCount(1, { timeout: 30_000 });
-  await expect(block).toContainText(/Listed: a match for the details you gave/);
-  await expect(block.getByRole("link", { name: "The page" })).toHaveAttribute("href", FIXTURE_URL);
-  await expect(block.getByRole("link", { name: /how to remove it/i })).toHaveAttribute("href", "/opt-out-guides/spokeo");
+  const spokeo = block.locator("li[data-broker='spokeo']");
+  await expect(spokeo).toHaveAttribute("data-state", "listed", { timeout: 30_000 });
+  await expect(spokeo).toContainText(/We found a listing that matches what you told us \(an exact match/);
+  await expect(spokeo.getByTestId("confidence")).toContainText("Confidence: High");
+  await expect(spokeo.locator("[data-testid='confidence'] span span.bg-foreground")).toHaveCount(3);
+  await expect(spokeo.getByRole("link", { name: "Evidence: the page" })).toHaveAttribute("href", FIXTURE_URL);
+  await expect(spokeo.getByRole("link", { name: /how to remove it/i })).toHaveAttribute("href", "/opt-out-guides/spokeo");
+  await expect(block.locator("li")).toHaveCount(9);                                   // still all nine, registry order
+  await expect(block.locator("li[data-state='not_checked']")).toHaveCount(8);          // the other eight stay honest
+  await expect(block.getByTestId("broker-region-note")).toContainText(/Hong Kong and Singapore/);
   expect(be.fixtureReads).toEqual([FIXTURE_URL]);
 
   // the report now goes out and carries the same block
   await runReportJob({ ...ENV }, be.fetchImpl);
   expect(be.F.db.scans[0].report_status).toBe("sent");
   const report = JSON.parse(be.F.calls.filter((c: { url: string }) => c.url.includes("resend")).pop()!.body);
-  expect(report.text).toContain("LISTINGS YOU SHOWED US");
-  expect(report.text).toContain("LISTED, a match for the details you gave");
+  expect(report.text).toContain("BROKER SITES");
+  expect(report.text).toMatch(/Spokeo \(US\): LISTED\n {2}We found a listing that matches what you told us/);
+  expect(report.text).toContain("Confidence: High");
   expect(report.text).toContain(FIXTURE_URL);
+  expect(report.text.match(/How to remove it:/g)).toHaveLength(9);                  // all nine guides, pasted or not
+  expect(report.html).toContain("Broker sites");
+  expect(Buffer.byteLength(report.html)).toBeLessThan(100_000);                     // the 100 KB rule
   expect(be.fixtureReads).toHaveLength(1);                       // the report reused the stored result
   // the stored result holds result fields only, not the page and not the name
   // (the evidence address is the visitor's own pasted URL and may carry the name; everything else must be free of page text)
@@ -139,6 +154,17 @@ test("/start states the honest sentence with its In build marker", async ({ page
   await page.goto("/start");
   const intro = page.locator("p", { hasText: /We don't search broker sites for you yet/ }).first();
   await expect(intro).toContainText("paste any page that lists you and we'll verify it. Paid plans will add coverage.");
-  await expect(intro.locator("[data-feature='F1'][data-feature-status='in_build']")).toBeVisible();
+  // the marker follows src/config/featureStatus.ts: shown while F1 is in build, gone once it is live
+  const live = readFileSync(new URL("../src/config/featureStatus.ts", import.meta.url), "utf8").includes('F1: "live"');
+  await expect(intro.locator("[data-feature='F1'][data-feature-status='in_build']")).toHaveCount(live ? 0 : 1);
   await expect(page.getByText(/No data broker search is included yet/)).toHaveCount(0);
+});
+
+test("/ai-access-check: the broker section says what runs, marks paid coverage Planned and links the nine guides", async ({ page }) => {
+  await page.goto("/ai-access-check");
+  const sec = page.getByTestId("ai-check-brokers");
+  await expect(sec).toContainText(/We do not search any broker site for you/);
+  await expect(sec.locator("[data-feature-status='planned']")).toHaveText("Planned");
+  await expect(page.getByTestId("ai-check-broker-guides").locator("a")).toHaveCount(9);
+  await expect(page.getByTestId("ai-check-broker-guides").locator("a").first()).toHaveAttribute("href", "/opt-out-guides/spokeo");
 });

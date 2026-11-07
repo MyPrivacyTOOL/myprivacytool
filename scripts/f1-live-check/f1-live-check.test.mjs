@@ -12,6 +12,8 @@ check(checkStoredResult([]).length > 0 && checkStoredResult(null).length > 0, 'n
 const bad = { state: 'listed', match: 'possible', confidence: 'low', is_guess: true, evidence_url: FIXTURE_URL, source: good.source };
 check(checkStoredResult([bad]).length > 0, 'a guess is not accepted for the full-identity fixture');
 check(checkReportBlock({ text: 'LISTINGS YOU SHOWED US\n- Page: LISTED, a match for the details you gave.\n' + FIXTURE_URL, html: '<h2>Listings you showed us</h2>' }).length === 0, 'a correct report block passes');
+check(checkReportBlock({ text: 'BROKER SITES\nSpokeo (US): LISTED\n  We found a listing that matches what you told us (an exact match for the details you gave).\n  Evidence (the page): ' + FIXTURE_URL, html: '<h2>Broker sites</h2>' }).length === 0, 'the MPC-9814 report block passes');
+check(checkReportBlock({ text: 'BROKER SITES\nSpokeo (US): NOT CHECKED\n  Not checked. We don\'t search broker sites for you.\n' + FIXTURE_URL, html: '<h2>Broker sites</h2>' }).length > 0, 'a broker section where the page is not Listed fails');
 check(checkReportBlock({ text: 'nothing', html: '' }).length >= 3, 'a report without the block fails');
 check(checkConfirmationEmail({ subject: 'Confirm your email to get your privacy report', text: "We only check details you’ve confirmed are yours. https://www.myprivacytool.io/scan/live#v=abc", html: 'Confirm this is my email' }).length === 0, 'a correct confirmation email passes');
 check(checkConfirmationEmail({ subject: 'Your privacy scan is starting', text: '', html: '' }).length >= 3, 'the old confirmation email fails');

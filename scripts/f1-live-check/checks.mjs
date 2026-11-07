@@ -38,10 +38,14 @@ export function checkStoredResult(results) {
 /** Problems with the report email as sent (text + html). */
 export function checkReportBlock({ text, html }) {
   const p = [];
-  if (!/LISTINGS YOU SHOWED US/.test(text || '')) p.push('report text lacks "LISTINGS YOU SHOWED US"');
-  if (!/LISTED, a match for the details you gave/.test(text || '')) p.push('report text lacks the Listed state line');
-  if (!(text || '').includes(FIXTURE_URL)) p.push('report text lacks the evidence page link');
-  if (!/Listings you showed us/.test(html || '')) p.push('report HTML lacks the "Listings you showed us" block');
-  if (/NOT LISTED/.test(text || '')) p.push('report says NOT LISTED for a page that lists the identity');
+  // MPC-9814 renamed the block: the pasted page now sits inside the "Broker sites" section of the report. A report sent by the previous Worker
+  // ("Listings you showed us") is still accepted, so a run that straddles the deploy is judged on what that report was.
+  const t = text || '', h = html || '';
+  const newBlock = /BROKER SITES/.test(t), oldBlock = /LISTINGS YOU SHOWED US/.test(t);
+  if (!newBlock && !oldBlock) p.push('report text lacks "BROKER SITES" (or the earlier "LISTINGS YOU SHOWED US")');
+  if (!(newBlock ? /: LISTED\n\s+We found a listing that matches what you told us/ : /LISTED, a match for the details you gave/).test(t)) p.push('report text lacks the Listed state line');
+  if (!t.includes(FIXTURE_URL)) p.push('report text lacks the evidence page link');
+  if (!(newBlock ? /Broker sites/ : /Listings you showed us/).test(h)) p.push('report HTML lacks the broker block');
+  if (/NOT LISTED/.test(t)) p.push('report says NOT LISTED for a page that lists the identity');
   return p;
 }
