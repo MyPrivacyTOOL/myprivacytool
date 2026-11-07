@@ -1,5 +1,6 @@
 // MPC-9813: pure checks for the automated live check of the email confirm gate and the "show us your listing" check. No network, no secrets.
-export const FIXTURE_URL = 'https://www.myprivacytool.io/test-fixtures/listing-synthetic.html';
+// The canonical address: Cloudflare Pages redirects the same page's ".html" address (308), so the check pastes the address that answers 200 directly.
+export const FIXTURE_URL = 'https://www.myprivacytool.io/test-fixtures/listing-synthetic';
 export const IDENTITY = { full_name: 'Zelda Quillfeather', city_region: 'Austin, TX', country: 'US', phone: '5125550142' };   // invented person
 
 /** The POST /api/scan body: the nightly chain's synthetic scan plus the typed details and the pasted page. */

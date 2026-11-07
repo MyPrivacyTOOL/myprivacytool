@@ -40,12 +40,13 @@ jobs:
       - name: Wait for the synthetic listing page to be served
         run: |
           for i in $(seq 1 40); do
-            code="$(curl -s -o /dev/null -w '%{http_code}' https://www.myprivacytool.io/test-fixtures/listing-synthetic.html || true)"
+            code="$(curl -sL -o /tmp/fixture.html -w '%{http_code}' https://www.myprivacytool.io/test-fixtures/listing-synthetic || true)"
             echo "attempt $i: HTTP $code"
-            [ "$code" = "200" ] && exit 0
+            # 200 alone is not enough (the site answers 200 with its app shell for an unknown path): the page must be the fixture itself.
+            if [ "$code" = "200" ] && grep -q 'SYNTHETIC TEST FIXTURE' /tmp/fixture.html && grep -q 'Zelda Quillfeather' /tmp/fixture.html; then exit 0; fi
             sleep 15
           done
-          echo "::error::the synthetic listing page is not being served (HTTP $code)"; exit 1
+          echo "::error::the synthetic listing page is not being served (last HTTP $code)"; exit 1
       # No long-lived signing secret is needed (and none exists in the repo): like the weekly nightly-chain run (MPC-8748), each run makes a throwaway key, puts it on the F1
       # SYNTHETIC Worker only (the same Cloudflare token the deploy workflows use) and signs the confirm token with it. Production's UNSUBSCRIBE_SECRET is never read or set.
       - name: Set a throwaway signing key on the F1 synthetic Worker
