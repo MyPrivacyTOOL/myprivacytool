@@ -70,11 +70,11 @@ export async function readToken(env, token, now = Date.now()) {
 
 export function buildCodeEmail(code) {
   const subject = 'Your MyPrivacyTOOL verification code';
-  const text = `Your MyPrivacyTOOL verification code is ${code}.\n\nIt works for 10 minutes. We send it so only the owner of this address can run Deep Research checks on it.\nIf you did not ask for this, ignore this email: nobody can see anything about you without this code.\n\nAlice\nYour Dedicated MyPrivacyTOOL AI`;
+  const text = `Your MyPrivacyTOOL verification code is ${code}.\n\nIt works for 10 minutes. We send it so only the owner of this address can run Deep Research checks on it.\nIf you did not ask for this, ignore this email. No one can see results for this address without this code.\n\nAlice\nYour Dedicated MyPrivacyTOOL AI`;
   const inner = `<p style="margin:0 0 14px 0;font-size:16px;line-height:24px">Your verification code is:</p>
 <p style="margin:0 0 14px 0;font-size:32px;line-height:40px;font-weight:700;letter-spacing:6px">${code}</p>
 <p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">It works for 10 minutes. We send it so only the owner of this address can run Deep Research checks on it.</p>
-<p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">If you did not ask for this, ignore this email: nobody can see anything about you without this code.</p>
+<p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">If you did not ask for this, ignore this email. No one can see results for this address without this code.</p>
 <p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">Alice<br>Your Dedicated MyPrivacyTOOL AI</p>`;
   const footer = 'This is a one-time security email, not marketing. Questions, or want your data deleted? Reply to this email or write to hello@myprivacytool.io.';
   return { subject, text, html: shell(subject, `Your code is ${code}`, inner, null, { footer }) };

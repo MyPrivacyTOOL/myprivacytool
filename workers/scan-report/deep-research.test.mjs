@@ -77,6 +77,7 @@ check(/^[0-9a-f]{64}$/.test(s1) && s1 === s2, 'subjectHash: 64 hex, case and spa
 check(s1 !== await subjectHash({ ...env, DEEP_RESEARCH_HMAC_KEY: 'another-key' }, 'person@gmail.com'), 'subjectHash depends on the secret key (not a bare hash of the address)');
 const mail = buildCodeEmail('123456');
 check(mail.text.includes('123456') && mail.html.includes('123456') && /10 minutes/.test(mail.text) && /ignore this email/i.test(mail.text), 'code email: has the code, the 10-minute limit and the ignore line');
+check(/No one can see results for this address without this code/.test(mail.text) && /No one can see results for this address without this code/.test(mail.html) && !/nobody can see anything/i.test(mail.text + mail.html), 'code email: the approved wording (no over-promise) in both the text and the HTML version');
 
 // ---- start
 {
