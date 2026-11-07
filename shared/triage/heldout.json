@@ -1,0 +1,36 @@
+{
+ "catch": [
+  "I'd like to stop receiving your newsletter.",
+  "Please don't send me any more messages.",
+  "Cancel my subscription to your emails.",
+  "Kindly remove my details from your database.",
+  "Could you tell me what information you have about me?",
+  "I'm exercising my right of access.",
+  "Can I get a copy of everything you hold on me?",
+  "Please forget me.",
+  "I revoke my consent for you to process my data.",
+  "Wipe my data from your servers.",
+  "STOP ALL MESSAGES",
+  "Not interested, please do not email me again.",
+  "I want my account and all associated personal data permanently deleted.",
+  "你可唔可以刪除我嘅個人資料？",
+  "請取消我嘅電郵訂閱",
+  "The unsubscribe link in your email goes to a 404 page."
+ ],
+ "dont_catch": [
+  "How do I stop my report from showing my old address?",
+  "Can you explain what a data broker is?",
+  "I think someone else used my email to request a scan.",
+  "Where can I read your privacy policy?",
+  "My report shows 12 data brokers. What should I do first?",
+  "Thanks for the report, very helpful!",
+  "We'd like to sponsor your newsletter. Can we talk rates?",
+  "Is the scan free? How long does it take?",
+  "Your site deleted my progress when I refreshed the page.",
+  "Please share the pricing for 50 seats.",
+  "I'd like to correct a mistake in the report: my first name is spelled wrong.",
+  "Do you send emails in Cantonese?",
+  "Can I change my notification preferences?",
+  "What is your data retention period?"
+ ]
+}
