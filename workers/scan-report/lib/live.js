@@ -5,6 +5,7 @@
 // Access is a short-lived stream token (HMAC with UNSUBSCRIBE_SECRET, nothing stored). It is NOT the scan number, which is shown to the visitor
 // as the deletion handle. The token goes in the URL query of a read-only GET; it expires after LIVE_TTL_MS.
 import { EMAIL_HEXAGONS, emailHexagonSignalRows, enabledEmailHexagonIds, runEmailHexagons } from './emailHexagons.js';
+import { confirmGateEnabled, listingCheckEnabled, loadListings } from './confirmGate.js';
 
 export const LIVE_TTL_MS = 15 * 60 * 1000;
 export const VERIFY_TTL_MS = 7 * 24 * 3600 * 1000;   // the email link: possession of it proves the reader controls the inbox the scan was requested for
@@ -98,12 +99,18 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
   if (!scanId) return json({ error: 'Invalid or expired' }, 401);
   const verified = Boolean(verifiedScan);
   try {
+    const gate = confirmGateEnabled(env);   // MPC-9813: the columns exist only once the migration is applied, so they are read only while the gate is on
     const [rows, scan] = await Promise.all([
       sb.select(`signals?scan_id=eq.${scanId}&signal_type=like.email-*&select=signal_type,check_status${verified ? ',details' : ''}`),
-      sb.select(`scans?id=eq.${scanId}&select=report_status&limit=1`),
+      sb.select(`scans?id=eq.${scanId}&select=report_status${gate ? ',email_confirm_required,email_confirmed_at' : ''}&limit=1`),
     ]);
     const items = liveItems(rows, { verified });
-    return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified });
+    const confirmRequired = gate && Boolean(scan[0]?.email_confirm_required);
+    const confirmed = !confirmRequired || Boolean(scan[0]?.email_confirmed_at);
+    // The pages the person showed us: evidence and detail are shown only to the reader of the email link, and only once they confirmed the address.
+    const listings = verified && confirmed && listingCheckEnabled(env) ? await loadListings(sb, scanId) : null;
+    return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified,
+      ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}) });
   } catch (e) {
     console.error('live read failed:', String(e).replace(/\S+@\S+/g, '[email]'));
     return json({ error: 'Unavailable' }, 503);

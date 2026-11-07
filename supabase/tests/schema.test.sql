@@ -949,3 +949,9 @@ select pg_temp.assert(not exists (select 1 from public.mpt_email_delivery_counts
 reset role;
 rollback;
 select 'schema.test.sql: all assertions passed' as result;
+
+-- ===== MPC-9813: confirm gate columns + web_scan_listing_checks (service_role only, cascades with the saved scan) =====
+select pg_temp.assert(pg_temp.try_as('anon', $$select 1 from public.web_scan_listing_checks$$) = '42501', 'web_scan_listing_checks: anon must not read');
+select pg_temp.assert(pg_temp.try_as('authenticated', $$select 1 from public.web_scan_listing_checks$$) = '42501', 'web_scan_listing_checks: authenticated must not read');
+select pg_temp.assert((select column_default from information_schema.columns where table_schema = 'public' and table_name = 'scans' and column_name = 'email_confirm_required') = 'false', 'scans.email_confirm_required defaults to false (existing scans unaffected)');
+select pg_temp.assert(exists (select 1 from pg_constraint c join pg_class t on t.oid = c.conrelid where t.relname = 'web_scan_listing_checks' and c.contype = 'f' and c.confdeltype = 'c'), 'web_scan_listing_checks: deleting the saved scan cascades to it');
