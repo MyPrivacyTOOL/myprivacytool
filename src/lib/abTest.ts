@@ -96,8 +96,8 @@ export const EXPERIMENTS = {
     description: "Readable hexagon tiles (values shown) and a header button on phones",
     enabled: import.meta.env.VITE_AB_MOBILE_HIVE_ENABLED === "true",
     variants: [
-      { id: "control", weight: 50 }, // small tiles with no value line, no header button
-      { id: "readable_tiles", weight: 50 }, // two bigger tiles per row with values, header button on its own row below the md breakpoint
+      { id: "control", weight: 20 }, // 20% hold-back: small tiles with no value line, no header button. A sanity check, not a measurement (too little traffic)
+      { id: "readable_tiles", weight: 80 }, // two bigger tiles per row with values, header button on its own row below the md breakpoint
     ],
   },
 } as const satisfies Record<string, Experiment>;
