@@ -35,6 +35,17 @@ describe('identifyDevice', () => {
     expect(mac).toMatchObject({ certain: true, category: 'mac' });
   });
 
+  it('does not call an iPhone in desktop-site mode an iPad', () => {
+    const desktopMode = { ...base, userAgent: UA.ipadDesktop, platform: 'MacIntel', maxTouchPoints: 5 };
+    expect(identifyDevice({ ...desktopMode, screenWidth: 393, screenHeight: 852 })).toMatchObject({ certain: true, category: 'iphone' });
+    expect(identifyDevice({ ...desktopMode, screenWidth: 820, screenHeight: 1180 })).toMatchObject({ certain: true, category: 'ipad' });
+  });
+
+  it('is unknown for a touch Apple device with an ambiguous screen size', () => {
+    const r = identifyDevice({ ...base, userAgent: UA.ipadDesktop, platform: 'MacIntel', maxTouchPoints: 5, screenWidth: 600, screenHeight: 900 });
+    expect(r.certain).toBe(false);
+  });
+
   it('names an Android phone exactly only when the browser reports the model', () => {
     const named = identifyDevice({
       ...base, userAgent: UA.androidPhone, platform: 'Linux armv8l', maxTouchPoints: 5,
