@@ -7,7 +7,7 @@ import { sha256Hex, SESSION_COOKIE } from "./crypto";
 import type { DashboardStore, DeepJobRow, DeepResultRow, Read, SessionRow, SnapshotRow } from "./store";
 import { baselineView, enhancedView, finalView, valuesOf, NOT_KEPT, NOT_RETURNED_EXPLAIN, NOT_CHECKED_DEFAULT } from "./view";
 
-const ENV = { DASHBOARD_ENABLED: "1", SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "svc" };
+const ENV = { DASHBOARD_ENABLED: "1", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "svc" };
 const TOKEN = "3f6c9f0e-5d0a-4c1e-9b0e-0a1b2c3d4e5f";
 const ORIGIN = "https://myprivacytool.io";
 const hex = (states: Record<string, string>) => Object.entries(states).map(([id, state]) => ({ id, state }));
@@ -269,9 +269,9 @@ describe("views", () => {
 
 describe("storage configuration", () => {
   it("accepts either service key variable name and refuses to run without one", () => {
-    expect(supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "a" })).not.toBeNull();
-    expect(supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_ROLE_KEY: "b" })).not.toBeNull();
-    expect(supabaseStore({ SUPABASE_URL: "https://x.test" })).toBeNull();
+    expect(supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "a" })).not.toBeNull();
+    expect(supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "b" })).not.toBeNull();
+    expect(supabaseStore({ SUPABASE_URL: "https://x.supabase.co" })).toBeNull();
     expect(supabaseStore({ SUPABASE_SERVICE_KEY: "a" })).toBeNull();
   });
 });

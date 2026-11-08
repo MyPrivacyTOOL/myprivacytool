@@ -72,7 +72,7 @@ export async function handleGithubExtras(request: Request, env: Env, fetchImpl?:
   if (request.headers.get("X-GitHub-Event") === "ping") return Response.json({ ok: true });
   const login = obj(payload.sender)?.login;
   if (typeof login !== "string" || !/^[A-Za-z0-9-]{1,39}$/.test(login) || !allowedId(env.GITHUB_PROBE_LOGINS, login)) { log.info("not_allowed"); return Response.json({ ok: true, checked: false }); }
-  const rctx = workerRecipientContext(env, { fetchImpl });
+  const rctx = workerRecipientContext(env as unknown as Record<string, unknown>, { fetchImpl });
   const [user, events] = await Promise.all([getJson(`https://api.github.com/users/${login}`, rctx), getJson(`https://api.github.com/users/${login}/events/public`, rctx)]);
   const states = githubStates(payload, obj(user), Array.isArray(events) ? events : null);
   const seen = states.filter((s) => s.state === "returned").length;

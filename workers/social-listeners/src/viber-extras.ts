@@ -69,7 +69,7 @@ export async function verifyViberSignature(signature: string | null, rawBody: st
   return timingSafeEqual(signature, hex(await hmac("SHA-256", env.VIBER_AUTH_TOKEN, rawBody)));
 }
 
-async function viberPost(path: string, body: unknown, token: string, fetchImpl: typeof fetch): Promise<Obj | null> {
+async function viberPost(path: string, body: unknown, token: string, fetchImpl: typeof fetch | undefined): Promise<Obj | null> {
   try {
     const r = await recipientFetcher("platform-replies", ["username"], workerRecipientContext(undefined, { fetchImpl }))(`https://chatapi.viber.com/pa/${path}`, { method: "POST", headers: { "content-type": "application/json", "X-Viber-Auth-Token": token }, body: JSON.stringify(body), signal: AbortSignal.timeout(4000) });
     const j = r.ok ? obj(await r.json()) : null;

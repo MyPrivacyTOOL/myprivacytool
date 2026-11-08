@@ -124,7 +124,7 @@ describe("raw visit row", () => {
   });
 });
 
-const env: CaptureEnv = { EDGE_CAPTURE_ENABLED: "true", SUPABASE_URL: "https://store.example.test", SUPABASE_SERVICE_ROLE_KEY: "service-key" };
+const env: CaptureEnv = { EDGE_CAPTURE_ENABLED: "true", SUPABASE_URL: "https://store.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "service-key" };
 
 describe("switch", () => {
   it("is off unless explicitly on", () => {
@@ -155,7 +155,7 @@ describe("store failure and no delay", () => {
     const f = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
     expect(await captureVisit(env, req("https://x.test/p", { "user-agent": "Mozilla/5.0 Chrome/1 Safari/1", accept: "x", "accept-language": "en" }), 200, f)).toBe(true);
     const [url, init] = f.mock.calls[0];
-    expect(url).toBe("https://store.example.test/rest/v1/edge_visits");
+    expect(url).toBe("https://store.supabase.co/rest/v1/edge_visits");
     expect(init.headers.authorization).toBe("Bearer service-key");
     expect(JSON.parse(init.body)).toMatchObject({ path: "/p", class: "person", rule: "R8" });
   });

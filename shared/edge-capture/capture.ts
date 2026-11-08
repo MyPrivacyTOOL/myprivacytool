@@ -172,7 +172,10 @@ export async function recordVisit(env: CaptureEnv, row: VisitRow, fetchImpl: typ
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return false;
     // MPC-9885: the one row serves the visit log and the bot record; it carries what the visit-log entry declares (see its note).
     const ctx = rctx ?? workerRecipientContext(env as Record<string, unknown>, { fetchImpl, country: row.country });
-    const res = await callRecipient("visit-log", { url: `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/edge_visits`, sent: ["ip", "user_agent", "referrer", "utm", "country", "city", "device_profile", "page_load"], init: {
+    const res = await callRecipient("visit-log", {
+      url: `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/edge_visits`,
+      sent: ["ip", "user_agent", "referrer", "utm", "country", "city", "device_profile", "page_load"],
+      init: {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -182,7 +185,8 @@ export async function recordVisit(env: CaptureEnv, row: VisitRow, fetchImpl: typ
       },
       body: JSON.stringify(row),
       signal: AbortSignal.timeout(3000),
-    } }, ctx);
+    },
+    }, ctx);
     return res.ok;
   } catch {
     return false;

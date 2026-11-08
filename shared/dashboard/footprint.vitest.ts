@@ -7,7 +7,7 @@ import { FOOTPRINT_COOKIE, SESSION_COOKIE, sha256Hex } from "./crypto";
 import { supabaseStore } from "./store";
 import type { DashboardStore, Read, SessionRow, SnapshotRow } from "./store";
 
-const ENV = { DASHBOARD_ENABLED: "1", FOOTPRINT_HANDOFF: "1", SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "svc" };
+const ENV = { DASHBOARD_ENABLED: "1", FOOTPRINT_HANDOFF: "1", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "svc" };
 const TOKEN = "3f6c9f0e-5d0a-4c1e-9b0e-0a1b2c3d4e5f";
 const ORIGIN = "https://myprivacytool.io";
 const hexes = [
@@ -154,7 +154,7 @@ describe("Supabase store", () => {
     const bodies: string[] = [];
     const urls: string[] = [];
     const fake = (async (url: string, init?: { body?: string }) => { urls.push(String(url)); if (init?.body) bodies.push(init.body); return new Response("true"); }) as unknown as typeof fetch;
-    const store = supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "k" }, fake)!;
+    const store = supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "k" }, fake)!;
     await store.redeem("a".repeat(64), "b".repeat(64));
     await store.redeem("a".repeat(64), "b".repeat(64), "footprint");
     expect(JSON.parse(bodies[0])).not.toHaveProperty("p_scope");
