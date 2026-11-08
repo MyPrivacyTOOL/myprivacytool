@@ -83,7 +83,7 @@ const AcceptableUse = () => {
                 6. Accounts and Payments
               </h2>
               <p className="text-muted-foreground">
-                There are no user accounts or payments today. When paid plans open, you will be responsible for keeping your account credentials secure and for all activity under your account, and we expect payments to be processed by Stripe. You must not use stolen, unauthorised or fraudulent payment methods, and must not initiate fraudulent chargebacks.
+                Free accounts are optional, and there are no payments today. You are responsible for keeping your sign-in link secure and for all activity under your account. When paid plans open, we expect payments to be processed by Stripe. You must not use stolen, unauthorised or fraudulent payment methods, and must not initiate fraudulent chargebacks.
               </p>
             </section>
 

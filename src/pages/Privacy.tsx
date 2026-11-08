@@ -110,11 +110,16 @@ const Privacy = () => {
               </h3>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Account Registration:</strong> We do not have user
-                  accounts today and collect no password. When paid plans open,
-                  we expect to ask for an email address, name and password, and
-                  optionally a phone number and organization name, and we will
-                  update this policy before we do
+                  <strong>Free Account:</strong> A free account is optional. If you
+                  tick "Keep my scan and create my free account" (consent version
+                  2026-11-08-v1) or sign in at /account, we hold your email
+                  address, the scans you link to the account and the record of the
+                  consent you gave. There is no password: you sign in with an
+                  emailed link, and the sign-in session is kept in your browser's
+                  local storage. You can delete the account and every linked scan
+                  at any time with "Delete my account and all scans" on /account.
+                  When paid plans open, we expect to ask for more details, such as
+                  a name, and we will update this policy before we do
                 </li>
                 <li>
                   <strong>Scan Requests:</strong> Email addresses and data
@@ -582,16 +587,19 @@ const Privacy = () => {
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Account Data:</strong> We hold none today. When paid
-                  plans open, account data will be kept for the duration of your
+                  <strong>Account Data:</strong> Your email address, linked scans and
+                  consent record are kept until you delete your account with
+                  "Delete my account and all scans", which deletes them. When paid
+                  plans open, billing data will be kept for the duration of your
                   subscription plus 30 days
                 </li>
                 <li>
                   <strong>Scan Results:</strong> Per-session scan results for
                   submitted handles are deleted automatically after 24 hours.
-                  When paid plans open, results saved to an account will be
-                  retained for 2 years for historical comparison and reporting.
-                  We have no accounts today
+                  A scan you link to your free account is kept until you
+                  delete the account or the scan. When paid plans open, results
+                  saved to an account may be retained for up to 2 years for
+                  historical comparison and reporting
                 </li>
                 <li>
                   <strong>Saved Web Scans:</strong> The full result of a scan you
