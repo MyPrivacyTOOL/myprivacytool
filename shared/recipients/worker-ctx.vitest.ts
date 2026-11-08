@@ -9,15 +9,18 @@ const okFetch = () => vi.fn(async () => new Response("{}", { status: 200 })) as 
 const codeOf = async (p: Promise<unknown>) => { try { await p; return "no error"; } catch (e) { return e instanceof RecipientError ? e.code : `other: ${e}`; } };
 
 describe("consent gate switch", () => {
-  it("is a constant that is off until MPC-9887, and Workers get the pending policy", () => {
-    expect(CONSENT_GATE_ACTIVE).toBe(false);
-    expect(workerRecipientContext({}).consentGate).toBe("pending_mpc_9887");
+  it("is a constant (the MPC-9887 store exists), and a context outside a scan gets the none policy", () => {
+    expect(CONSENT_GATE_ACTIVE).toBe(true);
+    expect(workerRecipientContext({}).consentGate).toBe("none");
+    expect(workerRecipientContext({ CONSENT_GATE_ENFORCED: "true" }).consentGate).toBe("none");   // no scan id: not on a visitor's behalf
+    expect(workerRecipientContext({}, { scanId: "s" }).consentGate).toBe("none");               // inside a scan but the switch is off and no consent id was sent
+    expect(workerRecipientContext({ CONSENT_GATE_ENFORCED: "true" }, { scanId: "s" }).consentGate).toBe("enforce");
   });
-  it("skips check 4 only when the policy says so; a post_click call without a consent id is still refused by default", async () => {
+  it("skips check 4 only when the policy says none; a post_click call without a consent id is still refused by default", async () => {
     const f = okFetch();
     expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["email"] }, { fetchImpl: f }))).toBe("CONSENT_REQUIRED");
     expect(f).not.toHaveBeenCalled();
-    expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["email"] }, { fetchImpl: f, consentGate: "pending_mpc_9887" }))).toBe("no error");
+    expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["email"] }, { fetchImpl: f, consentGate: "none" }))).toBe("no error");
     expect(f).toHaveBeenCalledTimes(1);
   });
   it("the pending policy skips ONLY check 4: host, items, disabled and flag checks still refuse", async () => {
@@ -91,8 +94,8 @@ describe("test seam", () => {
     const copy = JSON.parse(JSON.stringify(registry)) as RecipientRegistry;
     copy.recipients.find((r) => r.key === "hibp")!.enabled = true;
     const restore = setBundledRegistryForTests(copy);
-    expect(await codeOf(callRecipient("hibp", { url: "https://haveibeenpwned.com/api/v3/x", sent: ["email"] }, { fetchImpl: okFetch(), consentGate: "pending_mpc_9887", flags: { HIBP_API_KEY: "k" } }))).toBe("no error");
+    expect(await codeOf(callRecipient("hibp", { url: "https://haveibeenpwned.com/api/v3/x", sent: ["email"] }, { fetchImpl: okFetch(), consentGate: "none", flags: { HIBP_API_KEY: "k" } }))).toBe("no error");
     restore();
-    expect(await codeOf(callRecipient("hibp", { url: "https://haveibeenpwned.com/api/v3/x", sent: ["email"] }, { fetchImpl: okFetch(), consentGate: "pending_mpc_9887" }))).toBe("DISABLED");
+    expect(await codeOf(callRecipient("hibp", { url: "https://haveibeenpwned.com/api/v3/x", sent: ["email"] }, { fetchImpl: okFetch(), consentGate: "none" }))).toBe("DISABLED");
   });
 });
