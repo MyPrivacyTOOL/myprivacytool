@@ -1,5 +1,5 @@
 // MPC-9884: the allowlist. Every existing finding is recorded here with a note naming the task that removes it (MPC-9885 server side, MPC-9886
-// browser side). It is a RATCHET, not an exemption list:
+// browser side, MPC-9888 the two pre-click STUN findings that the consent UI removes). It is a RATCHET, not an exemption list:
 //   - a finding with no matching entry fails (new violation);
 //   - an entry that matches nothing fails (the call site is gone: delete the line, that is the point of MPC-9885/9886);
 //   - an entry older than 14 days fails (hygiene rule), so the list cannot become permanent.
@@ -14,7 +14,7 @@ export function validateAllowlist(list) {
     const at = `entries[${i}]`;
     for (const f of ["rule", "file", "detail", "added", "note"]) if (typeof e[f] !== "string" || !e[f]) errs.push(`${at}: ${f} is required`);
     if (typeof e.added === "string" && !/^\d{4}-\d{2}-\d{2}$/.test(e.added)) errs.push(`${at}: added must be YYYY-MM-DD`);
-    if (typeof e.note === "string" && !/^pending MPC-(9885|9886)\b/.test(e.note)) errs.push(`${at}: note must start with "pending MPC-9885" or "pending MPC-9886"`);
+    if (typeof e.note === "string" && !/^pending MPC-(9885|9886|9888)\b/.test(e.note)) errs.push(`${at}: note must start with "pending MPC-9885", "pending MPC-9886" or "pending MPC-9888"`);
   });
   return errs;
 }

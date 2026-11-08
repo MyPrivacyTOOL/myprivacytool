@@ -11,6 +11,7 @@ import ScanRevealFlow, { HexagonFinding } from '@/components/ScanRevealFlow';
 import { Card } from '@/components/ui/card';
 import Seo from '@/components/Seo';
 import pageMeta from '@/data/pageMeta.json';
+import { recipientFetch } from '@/lib/recipientClient';
 
 interface ScanData {
   scan_id: string;
@@ -39,7 +40,7 @@ export default function ScanResults() {
     const fetchScan = async () => {
       try {
         // Call our edge function / API to fetch scan + enrich with hexagon registry
-        const response = await fetch(`/api/scans/${scanId}`);
+        const response = await recipientFetch('cloudflare-edge', `/api/scans/${scanId}`, undefined, ['page_load']);
         if (!response.ok) {
           throw new Error('Scan not found or expired');
         }

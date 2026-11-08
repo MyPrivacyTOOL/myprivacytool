@@ -29,7 +29,7 @@ export default tseslint.config(
   // allowlist and are removed by MPC-9885 (server side) and MPC-9886 (browser side).
   {
     files: ["{src,functions,workers,shared}/**/*.{ts,tsx,js,mjs}"],
-    ignores: ["**/*.{test,vitest,spec}.*", "**/{test,tests,__tests__}/**", "shared/recipients/outbound.*", "shared/recipients/fetch-spy.ts"],
+    ignores: ["**/*.{test,vitest,spec}.*", "**/{test,tests,__tests__}/**", "shared/recipients/outbound.*", "shared/recipients/fetch-spy.ts", "src/lib/recipientClient.ts"],
     rules: {
       "no-restricted-globals": ["error",
         ...["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "RTCPeerConnection", "webkitRTCPeerConnection", "importScripts"].map((name) => ({
@@ -42,7 +42,7 @@ export default tseslint.config(
       ],
       "no-restricted-syntax": ["error",
         { selector: "ImportExpression > Literal[value=/^https?:/]", message: "Dynamic import() of a remote URL is an outbound call. (MPC-9884)" },
-        { selector: "CallExpression[callee.name=/^(callRecipient|fetchRecipient|loadRecipientScript|createPeerConnection)$/][arguments.0.type!='Literal']", message: "A recipient wrapper call must pass a string-literal registry key that exists in shared/recipients/recipients.json. (MPC-9884)" },
+        { selector: "CallExpression[callee.name=/^(callRecipient|fetchRecipient|loadRecipientScript|createPeerConnection|recipientFetch|recipientScript|recipientPeerConnection)$/][arguments.0.type!='Literal']", message: "A recipient wrapper call must pass a string-literal registry key that exists in shared/recipients/recipients.json. (MPC-9884)" },
       ],
     },
   },

@@ -1,4 +1,5 @@
 // MPC-8368: Cloudflare Turnstile for the post-scan email form. Privacy-preserving, cookieless, no puzzle for real visitors
+import { recipientScript } from '@/lib/recipientClient';
 // (appearance "interaction-only" only shows UI if Cloudflare cannot decide silently). The site key is public by design;
 // the secret lives on the mpt-leads Worker (TURNSTILE_SECRET_KEY), which verifies the token.
 export const TURNSTILE_SITE_KEY =
@@ -25,15 +26,11 @@ export function loadTurnstile(): Promise<TurnstileApi | undefined> {
   const ready = api();
   if (ready) return Promise.resolve(ready);
   if (!loading) {
-    loading = new Promise((resolve) => {
-      const s = document.createElement('script');
-      s.src = SCRIPT_SRC;
-      s.async = true;
-      s.defer = true;
-      s.onload = () => resolve(api());
-      s.onerror = () => { loading = null; resolve(undefined); };
-      document.head.appendChild(s);
-    });
+    // MPC-9886: through the registry ("cloudflare-turnstile", the named pre-click exception). Timing is unchanged here; running it only at the Scan me click is MPC-9888.
+    loading = recipientScript('cloudflare-turnstile', SCRIPT_SRC, { defer: '' }).then(
+      () => api(),
+      () => { loading = null; return undefined; },
+    );
   }
   return loading;
 }

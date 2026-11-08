@@ -7,6 +7,7 @@ import { protectionStartDate } from "@/lib/hkWorkingDays";
 import { getUtm } from "@/lib/hkSpamTrack";
 import type { PageLang } from "@/lib/hkSpamPage";
 import { ivrLanguage } from "@/lib/hkSpamPage";
+import { recipientFetch } from "@/lib/recipientClient";
 
 const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV";
@@ -64,7 +65,7 @@ export function buildRegistrationRow(input: RegistrationInput): RegistrationRow 
 /** Inserts the row. Resolves true on success, false on any failure; never throws and never reads data back. */
 export async function insertRegistration(row: RegistrationRow): Promise<boolean> {
   try {
-    const res = await fetch(REGISTRATIONS_ENDPOINT, {
+    const res = await recipientFetch("supabase", REGISTRATIONS_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -73,7 +74,7 @@ export async function insertRegistration(row: RegistrationRow): Promise<boolean>
         Prefer: "return=minimal",
       },
       body: JSON.stringify(row),
-    });
+    }, row.email ? ["email", "utm"] : ["utm"]);
     return res.ok;
   } catch {
     return false;

@@ -4,9 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MPT Digital Footprint</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@500&display=swap">
+<script src="/recipient-client.min.js"></script>
+<!-- MPC-9886: fonts are self-hosted (OFL, latin subset, /footprint/fonts/); no request goes to fonts.googleapis.com or fonts.gstatic.com. -->
+<style>
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(/footprint/fonts/inter-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url(/footprint/fonts/inter-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url(/footprint/fonts/inter-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:700;font-display:swap;src:url(/footprint/fonts/inter-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Fira Code';font-style:normal;font-weight:500;font-display:swap;src:url(/footprint/fonts/fira-code-latin-500-normal.woff2) format('woff2')}
+</style>
 <style>
 /* Layout: the website's own hexagon (src/components/Hexagon.tsx) packed into a beehive over matrix rain.
    Colours are the brand tokens from src/index.css. Unknown cells are not drawn: the rain shows through. */
@@ -643,7 +649,7 @@ function applyCurtain(c){
   else{vidEl.removeAttribute('src');vidEl.load()}
   openBtn.textContent=CUR.buttonLabel||'Open the curtain';
   if(CUR.dataset&&!datasetLoaded){datasetLoaded=true;
-    fetch(CUR.dataset,{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d)&&d.length&&d.length<=5000){build(mergeDataset(d));reset()}}).catch(()=>{})}
+    rfetch(CUR.dataset,{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d)&&d.length&&d.length<=5000){build(mergeDataset(d));reset()}}).catch(()=>{})}
 }
 /* MPC-8689: a dataset item with the same id as a built-in item keeps the built-in emoji, example and confidence and only supplies the fields it carries (the approved risk tier);
    every other item is added. So the 54 web hexagons stay as they are and the other channels join them. */
@@ -664,7 +670,7 @@ function doOpen(){curtainOpen=true;document.body.classList.remove('pre');syncHel
   autoZoom=setTimeout(()=>setView('zoom',1300),CUR.zoomDelayMs)}
 function closeCurtain(){window.rainSetActive(false);armIdle();curtainOpen=false;opening=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open','playing');grid.inert=true;
   vidEl.pause();vidEl.hidden=true;if(CUR.image)imgEl.hidden=false;setView('overview',600)}
-fetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
+rfetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
 document.getElementById('openCurtain').onclick=openCurtain;
 /* Help: three yes-steps that end on the curtain button. */
 const helpBtn=document.getElementById('helpBtn'),helpBox=document.getElementById('helpbox'),helpGo=document.getElementById('helpGo');

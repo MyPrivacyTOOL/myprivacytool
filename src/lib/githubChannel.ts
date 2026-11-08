@@ -3,6 +3,7 @@
  * the SPA only starts the login (a plain link), reads the sanitized profile, and asks to disconnect.
  * Requests send the Worker's session cookie (`credentials: "include"`); the Worker allows this origin via CORS.
  */
+import { recipientFetch } from "@/lib/recipientClient";
 export const GITHUB_CHANNEL_URL: string =
   (import.meta.env.VITE_GITHUB_CHANNEL_URL as string | undefined) ??
   "https://channels.myprivacytool.io";
@@ -28,9 +29,9 @@ export type ProfileResult =
 
 type FetchFn = typeof fetch;
 
-export async function fetchGithubProfile(fetchFn: FetchFn = fetch): Promise<ProfileResult> {
+export async function fetchGithubProfile(fetchFn?: FetchFn): Promise<ProfileResult> {
   try {
-    const res = await fetchFn(`${GITHUB_CHANNEL_URL}/channels/github/profile`, { credentials: "include" });
+    const res = await recipientFetch("github-channel", `${GITHUB_CHANNEL_URL}/channels/github/profile`, { credentials: "include" }, ["username"], fetchFn ? { fetchImpl: fetchFn } : {});
     if (res.ok) return { status: "connected", profile: (await res.json()) as PapitProfile };
     // 401 = no session or token revoked/expired (`reauthorize`), 404 = never connected: both mean "show Connect".
     if (res.status === 401 || res.status === 404) return { status: "disconnected" };
@@ -40,9 +41,9 @@ export async function fetchGithubProfile(fetchFn: FetchFn = fetch): Promise<Prof
   }
 }
 
-export async function disconnectGithub(fetchFn: FetchFn = fetch): Promise<boolean> {
+export async function disconnectGithub(fetchFn?: FetchFn): Promise<boolean> {
   try {
-    const res = await fetchFn(`${GITHUB_CHANNEL_URL}/channels/github`, { method: "DELETE", credentials: "include" });
+    const res = await recipientFetch("github-channel", `${GITHUB_CHANNEL_URL}/channels/github`, { method: "DELETE", credentials: "include" }, [], fetchFn ? { fetchImpl: fetchFn } : {});
     return res.ok;
   } catch {
     return false;

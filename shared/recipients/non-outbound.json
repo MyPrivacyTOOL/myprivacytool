@@ -40,5 +40,88 @@
     "reference",
     "learnMore",
     "href"
+  ],
+  "_about_link_hosts": "MPC-9886: hosts that appear in the site's code ONLY as the destination of a link the visitor chooses to open (a share button, a social profile, 'learn more', a window.open on a click) or as text we show for the visitor to type into their own settings. Our code never fetches them and the page does not load them; the browser navigates only when the visitor clicks. The static scan accepts them; the built-site CRAWL does not (a REQUEST to one of these hosts is still a finding), so a link host that becomes a real call is caught. A host we actually contact belongs in recipients.json.",
+  "link_hosts": [
+    {
+      "host": "mozilla.cloudflare-dns.com",
+      "reason": "DoH address shown as text in the DNS-leak fix guide for the visitor to paste into their own browser settings"
+    },
+    {
+      "host": "1.1.1.1",
+      "reason": "Cloudflare resolver address shown as text in the DNS-leak fix guide"
+    },
+    {
+      "host": "dns.quad9.net",
+      "reason": "Quad9 DoH address shown as text in the DNS-leak fix guide"
+    },
+    {
+      "host": "doh.opendns.com",
+      "reason": "OpenDNS DoH address shown as text in the DNS-leak fix guide"
+    },
+    {
+      "host": "dns.google",
+      "reason": "Google DoH address shown as text in the DNS-leak fix guide"
+    },
+    {
+      "host": "privacyguides.org",
+      "reason": "'Learn more' button opened in a new tab on click"
+    },
+    {
+      "host": "coveryourtracks.eff.org",
+      "reason": "outside privacy-test link opened in a new tab on click"
+    },
+    {
+      "host": "amiunique.org",
+      "reason": "outside privacy-test link opened in a new tab on click"
+    },
+    {
+      "host": "browserleaks.com",
+      "reason": "outside privacy-test link opened in a new tab on click"
+    },
+    {
+      "host": "www.dnsleaktest.com",
+      "reason": "outside privacy-test link opened in a new tab on click"
+    },
+    {
+      "host": "www.privacytools.io",
+      "reason": "outside reading link opened on click"
+    },
+    {
+      "host": "www.eff.org",
+      "reason": "outside reading link opened on click"
+    },
+    {
+      "host": "securityheaders.com",
+      "reason": "outside privacy-test link opened on click"
+    },
+    {
+      "host": "www.facebook.com",
+      "reason": "share button and social-profile link; opened on click"
+    },
+    {
+      "host": "login.microsoftonline.com",
+      "reason": "sign-out page the visitor is sent to when they press 'log out'"
+    },
+    {
+      "host": "x.com",
+      "reason": "share button and social-profile link; opened on click"
+    },
+    {
+      "host": "www.linkedin.com",
+      "reason": "share button and social-profile link; opened on click"
+    },
+    {
+      "host": "www.instagram.com",
+      "reason": "social-profile link; opened on click"
+    },
+    {
+      "host": "wa.me",
+      "reason": "WhatsApp share link; opened on click"
+    },
+    {
+      "host": "t.me",
+      "reason": "Telegram bot link ('Scan me on Telegram'); opened on click"
+    }
   ]
 }

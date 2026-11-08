@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VERIFY_PROMPT } from '../../workers/webhook-receiver/pop';
 import { isVerified, POSSESSION_PROMPT, requestChallenge } from './possessionApi';
 
 const res = (status: number, body?: unknown) => new Response(body === undefined ? null : JSON.stringify(body), { status });
-const BASE = 'https://api.example';
+const BASE = 'https://myprivacytool-webhook-receiver.myprivacytool.workers.dev';
+beforeEach(() => { vi.stubEnv('VITE_DEEP_DIVE_API_URL', BASE); }); // the registry entry's flag (MPC-9886)
 
 describe('possessionApi (MPC-7902)', () => {
   it('sends nothing when the API address is not configured', async () => {

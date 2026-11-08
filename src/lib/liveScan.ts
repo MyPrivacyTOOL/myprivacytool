@@ -1,4 +1,5 @@
 import { resolveScanApiUrl } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-8452: the live view after a scan request. The Worker returns a short-lived stream token with POST /api/scan; this reads
 // GET /api/scan/live with it. Only low-sensitivity facts come back (what was checked and whether it found something), never a value.
@@ -44,8 +45,8 @@ export async function fetchLive(token: string, kind: LiveKind = "stream"): Promi
   try {
     // The email-link key travels in a header, not the URL, so it never lands in a request log.
     const res = kind === "verified"
-      ? await fetch(`${base}/api/scan/live`, { headers: { Authorization: `Bearer ${token}` } })
-      : await fetch(`${base}/api/scan/live?t=${encodeURIComponent(token)}`);
+      ? await recipientFetch("scan-report", `${base}/api/scan/live`, { headers: { Authorization: `Bearer ${token}` } }, [])
+      : await recipientFetch("scan-report", `${base}/api/scan/live?t=${encodeURIComponent(token)}`, undefined, []);
     if (res.status === 401 || res.status === 403 || res.status === 503) return "gone";
     if (!res.ok) return null;
     const b = (await res.json()) as { items?: unknown; done?: unknown; report_sent?: unknown; verified?: unknown; confirm_required?: unknown; confirmed?: unknown; listings?: unknown; broker_panel?: unknown };
@@ -127,7 +128,7 @@ export async function confirmEmailResult(token: string): Promise<{ confirmed: bo
   const base = resolveScanApiUrl();
   if (!base) return { confirmed: false };
   try {
-    const res = await fetch(`${base}/api/scan/confirm`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const res = await recipientFetch("scan-report", `${base}/api/scan/confirm`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }, []);
     if (!res.ok) return { confirmed: false };
     const b = (await res.json().catch(() => null)) as { confirmed?: unknown; account?: { token_hash?: unknown; scan_number?: unknown } } | null;
     if (b?.confirmed !== true) return { confirmed: false };

@@ -1,4 +1,5 @@
 import { SCAN_API_URL } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-9546/9549: client for the Deep Research ownership check (workers/scan-report/lib/deepResearch.js).
 // OFF unless VITE_DEEP_RESEARCH is exactly "true"; the Worker has its own switch (DEEP_RESEARCH_ENABLED), so both must be on.
@@ -26,15 +27,15 @@ const fail = <T>(error: string, status?: string): ApiResult<T> => ({ ok: false, 
 
 const FALLBACK = "Something went wrong. Please try again.";
 
-async function post<T>(path: string, body: Record<string, unknown>, fetchImpl: typeof fetch = fetch): Promise<ApiResult<T>> {
+async function post<T>(path: string, body: Record<string, unknown>, fetchImpl?: typeof fetch): Promise<ApiResult<T>> {
   try {
-    const res = await fetchImpl(`${SCAN_API_URL.replace(/\/$/, "")}/api/deep-research/${path}`, {
+    const res = await recipientFetch("scan-report", `${SCAN_API_URL.replace(/\/$/, "")}/api/deep-research/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       credentials: "omit",
       referrerPolicy: "no-referrer",
-    });
+    }, ["email"], fetchImpl ? { fetchImpl } : {});
     const json = (await res.json().catch(() => null)) as (Record<string, unknown> & { error?: string; status?: string }) | null;
     if (!res.ok || !json || json.ok === false) {
       return fail<T>(typeof json?.error === "string" ? json.error : FALLBACK, typeof json?.status === "string" ? json.status : undefined);

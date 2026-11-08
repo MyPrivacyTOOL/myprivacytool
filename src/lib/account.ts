@@ -1,4 +1,5 @@
 import { resolveScanApiUrl } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-9817: the client for the Worker's account routes (workers/scan-report/lib/accounts.js). Passwordless: an emailed link, then a session.
 // The session (Supabase access + refresh token) is kept in this browser's localStorage only; the browser never talks to Supabase Auth, so no visitor
@@ -27,10 +28,10 @@ async function call(path: string, body: unknown, token?: string, method = "POST"
   const base = resolveScanApiUrl();
   if (!base) return { status: 0, json: null };
   try {
-    const res = await fetch(`${base}/api/account/${path}`, {
+    const res = await recipientFetch("scan-report", `${base}/api/account/${path}`, {
       method, headers: { ...(method === "POST" ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       ...(method === "POST" ? { body: JSON.stringify(body ?? {}) } : {}),
-    });
+    }, ["email"]);
     return { status: res.status, json: (await res.json().catch(() => null)) as Record<string, unknown> | null };
   } catch { return { status: 0, json: null }; }
 }

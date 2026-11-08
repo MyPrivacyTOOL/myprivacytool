@@ -21,8 +21,8 @@ const codeOf = async (p: Promise<unknown>) => { try { await p; return "no error"
 
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 8 first-party and 21 third-party/processor/platform live recipients", () => {
-    expect(live.filter((r) => r.party === "first")).toHaveLength(8);
+  it("pins 11 first-party (8 from the Map + 3 added by MPC-9886) and 21 third-party/processor/platform live recipients", () => {
+    expect(live.filter((r) => r.party === "first")).toHaveLength(11); // 8 from the Map + github-channel, oauth-session and deep-dive-api (MPC-9886: live browser calls that were missing from the registry)
     expect(live.filter((r) => r.party !== "first")).toHaveLength(21);
   });
   it("has the user-pasted-listing structural entry, 4 known-host disabled entries and 6 planned disabled entries", () => {
@@ -31,7 +31,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(6);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(40);
+    expect(registry.recipients).toHaveLength(43);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);

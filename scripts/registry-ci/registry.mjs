@@ -32,6 +32,11 @@ export function isNonOutbound(host, nonOutbound) {
   return hostMatches(host, nonOutbound.hosts.map((h) => h.host));
 }
 
+/** MPC-9886: hosts that are only ever the destination of a link the visitor clicks (see non-outbound.json link_hosts). Accepted by the static scan, NOT by the crawl. */
+export function isLinkHost(host, nonOutbound) {
+  return hostMatches(host, (nonOutbound.link_hosts ?? []).map((h) => h.host));
+}
+
 /** Hosts we never treat as outbound: loopback, and RFC 2606 / 6761 reserved names that cannot reach a real party. */
 export function isLocalHost(host) {
   return host === "localhost" || /^127\.\d+\.\d+\.\d+$/.test(host) || host === "[::1]" || host === "0.0.0.0" || /\.(test|invalid|example|localhost)$/.test(host);
