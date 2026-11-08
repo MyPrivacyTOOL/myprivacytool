@@ -13,7 +13,7 @@ function walk(dir, out = []) {
   for (const n of readdirSync(join(ROOT, dir))) {
     if (n === 'node_modules' || n.startsWith('.')) continue;
     const rel = join(dir, n);
-    if (statSync(join(ROOT, rel)).isDirectory()) walk(rel, out); else if (/\.(js|mjs|ts|tsx)$/.test(n) && !/\.(test|vitest|spec)\./.test(n) && !/generated/.test(n) && !/test-support/.test(rel)) out.push(rel);
+    if (statSync(join(ROOT, rel)).isDirectory()) walk(rel, out); else if (/\.(js|mjs|ts|tsx)$/.test(n) && !/\.(test|vitest|spec)\./.test(n) && !/generated/.test(n) && !/^recipients\.data\./.test(n) && !/test-support/.test(rel)) out.push(rel);
   }
   return out;
 }

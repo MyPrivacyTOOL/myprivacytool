@@ -58,6 +58,10 @@ jobs:
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3
+        # The action runs `npm i wrangler` from the repo's npm workspace; a peer-dependency conflict from the core-brain workspace (wrangler 4 wants
+        # workers-types 5) fails with ERESOLVE. Same fix as deploy-mpt-leads.yml.
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -88,6 +92,8 @@ jobs:
       - name: Roll back to the previous Worker version (smoke test failed)
         if: failure() && steps.smoke.outcome == 'failure'
         uses: cloudflare/wrangler-action@v3
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

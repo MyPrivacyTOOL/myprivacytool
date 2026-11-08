@@ -8,7 +8,7 @@
 //   5 resolved host matches the entry's hosts  6 declared `sent` is a subset of its data items (after country exclusions)
 //   7 user_supplied: https only, no private ranges, no redirect to a new host, size and time caps
 // On a call that reaches the network it logs {key, items, at, status}; item NAMES only, never values.
-import recipientsData from "./recipients.json" with { type: "json" };
+import recipientsData from "./recipients.data.js";   // generated from recipients.json (npm run recipients:module): bundler-safe, loads in plain Node
 import {
   DATA_ITEMS, effectiveDataItems, enabledForCountry, findRecipient, flagIsOn, hostMatches, parseRegistry,
   type DataItem, type Recipient, type RecipientRegistry,
