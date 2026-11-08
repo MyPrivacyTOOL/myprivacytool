@@ -1,0 +1,39 @@
+name: Telegram round-trip check
+
+# MPC-9850: automated, no-human synthetic round-trip of "/start scan" through the DEPLOYED @MyPrivacyTOOL_Bot webhook (social-listeners Worker): signed webhook POST from
+# an id on PROBE_TELEGRAM_IDS, core-brain answers, the Worker sends the reply through the real Telegram Bot API, and the event log must show message in -> reply out within 60 s.
+# Design and limits: scripts/ci/telegram-roundtrip.mjs. Runs on demand, whenever its own files change on any branch, and after every social-listeners deploy.
+# A missing credential is NOT CONFIGURED (exit 2), never a pass. Secrets are never printed.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/telegram-roundtrip.yml'
+      - 'scripts/ci/telegram-roundtrip.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-roundtrip
+  cancel-in-progress: false
+
+jobs:
+  roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Round-trip /start scan
+        env:
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SYNTHETIC_TELEGRAM_ID: ${{ secrets.SYNTHETIC_TELEGRAM_ID }}
+        run: node scripts/ci/telegram-roundtrip.mjs
