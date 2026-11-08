@@ -79,6 +79,6 @@ describe("Start", () => {
   });
 
   it("states the six channels exactly as Chris decided (MPC-9826, 2026-11-07)", () => {
-    expect(CHANNEL_STATUS).toEqual({ web: "live", telegram: "in_build", email: "live", whatsapp: "planned", messenger: "planned", instagram: "planned" });
+    expect(CHANNEL_STATUS).toEqual({ web: "live", telegram: "live", email: "live", whatsapp: "planned", messenger: "planned", instagram: "planned" });
   });
 });

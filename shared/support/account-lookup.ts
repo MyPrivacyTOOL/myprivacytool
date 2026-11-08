@@ -1,4 +1,6 @@
 import type { AccountLookup } from "./proof-request";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 export interface RestAccountLookupConfig { baseUrl: string; serviceKey: string; fetchImpl?: typeof fetch; restPrefix?: string; timeoutMs?: number; tenantId?: string }
 
@@ -16,16 +18,18 @@ export interface RestAccountLookupConfig { baseUrl: string; serviceKey: string; 
  * can match safely through PostgREST's pattern syntax). Two matching rows, or zero, mean "no account": it never guesses between accounts.
  */
 export class RestAccountLookup implements AccountLookup {
+  private f: typeof fetch;
   constructor(private c: RestAccountLookupConfig) {
     if (!/^https:\/\//.test(c.baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(c.baseUrl)) throw new Error("baseUrl must be https (or localhost for tests)");
     if (!c.serviceKey) throw new Error("serviceKey required");
+    this.f = recipientFetcher("supabase", ["email"], workerRecipientContext(null, { fetchImpl: c.fetchImpl })); // the address is in the query string
   }
   async findByEmail(email: string): Promise<{ subjectId: string; tenantId: string } | null> {
     const e = typeof email === "string" ? email.trim().toLowerCase() : "";
     if (!e || e.length > 255 || /[*%\\\s]/.test(e)) return null;
     const pattern = e.replace(/_/g, "\\_"); // `_` is a single-character wildcard in ILIKE
     const url = `${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/users?email=ilike.${encodeURIComponent(pattern)}&select=id,email&limit=2`;
-    const res = await (this.c.fetchImpl ?? fetch)(url, {
+    const res = await this.f(url, {
       headers: { apikey: this.c.serviceKey, Authorization: `Bearer ${this.c.serviceKey}` },
       signal: AbortSignal.timeout(this.c.timeoutMs ?? 5000),
     });

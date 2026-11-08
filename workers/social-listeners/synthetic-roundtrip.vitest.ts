@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import worker from "./src/index";
 import type { Env } from "./src/shared";
 
-const LOG = "https://sb.test/rest/v1/telegram_event_log";
+const LOG = "https://x.supabase.co/rest/v1/telegram_event_log";
 const asEnv = (o: object) => o as unknown as Env;
 afterEach(() => vi.unstubAllGlobals());
 
@@ -18,7 +18,7 @@ function setup(over: Record<string, unknown> = {}) {
     return Response.json({ ok: true, result: {} });
   }));
   const brain = vi.fn(async () => Response.json({ message_keys: ["bot.unknown.title"], locale: "en" }));
-  const env = asEnv({ TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: "1:T", SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", CORE_BRAIN: { fetch: brain }, PROBE_MODE: "all", SYNTHETIC_IDS: "555, 666", ...over });
+  const env = asEnv({ TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: "1:T", SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", CORE_BRAIN: { fetch: brain }, PROBE_MODE: "all", SYNTHETIC_IDS: "555, 666", ...over });
   const call = (headers: Record<string, string> = { "X-Telegram-Bot-Api-Secret-Token": "s" }) => worker.fetch(new Request("https://x/synthetic/telegram-roundtrip", { method: "POST", headers }), env);
   return { call, sent, rows };
 }

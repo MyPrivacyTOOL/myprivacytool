@@ -10,6 +10,8 @@ import { buildConfirmationEmail, buildReportEmail } from './lib/email.js';
 import { computeScore } from './lib/score.js';
 import guides from './lib/guides.generated.js';
 import { BROKER_SITES } from './lib/brokers.js';
+import { enableHibpForTests } from './test-support/hibp-on.mjs';
+enableHibpForTests();   // MPC-9885: hibp is enabled:false in the registry; this suite's breach results need it on
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const EMAIL = 'zelda.quillfeather@example.test';

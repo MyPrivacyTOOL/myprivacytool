@@ -36,7 +36,7 @@ function setup(envOver: Record<string, unknown> = {}, o: { brain?: unknown; chat
   }));
   const brain = vi.fn(async () => Response.json(o.brain ?? decision()));
   const env = {
-    TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc",
+    TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc",
     CORE_BRAIN: { fetch: brain }, TELEGRAM_BASELINE_SCAN: "on", PROBE_TELEGRAM_IDS: String(ID), ...envOver,
   } as unknown as Env;
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(u) }), env);

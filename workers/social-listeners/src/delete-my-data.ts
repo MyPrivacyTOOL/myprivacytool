@@ -7,10 +7,11 @@
 //   mpt_delete_event_flags  MPC-8689 event flags (edits, blocked or unblocked)
 // Not covered here (stated honestly in the reply): the bot-wide probe logs (PROBE_MODE) and anything already sent to Telegram.
 import { scanAllowed } from "./baseline-scan";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { senderIds } from "./sender-key";
 import { call, telegramSender } from "./probe-reader";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 
@@ -28,12 +29,16 @@ export function isDeleteMyDataRequest(env: Env, update: unknown): boolean {
 async function rpc(env: Env, fn: string, args: Record<string, string>, missingOk = false): Promise<number | null> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return null;
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify(args),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // the sender key whose rows are erased
+    }, recipientCtx(env));
     if (!res.ok) return missingOk && res.status === 404 ? 0 : null;
     const n = Number(await res.json().catch(() => 0));
     return Number.isFinite(n) ? n : 0;

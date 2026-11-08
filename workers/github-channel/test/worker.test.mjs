@@ -13,7 +13,7 @@ const baseEnv = () => {
   return {
     GITHUB_CLIENT_ID: 'cid', GITHUB_CLIENT_SECRET: 'csec', STATE_SIGNING_KEY: 's'.repeat(32),
     ENCRYPTION_KEY: 'c3'.repeat(32), ENCRYPTION_KEY_VERSION: '1',
-    SUPABASE_URL: 'https://sb.test', SUPABASE_SERVICE_ROLE_KEY: 'srk',
+    SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'srk',
     REDIRECT_URI: 'https://w.test/oauth/github/callback',
     ALLOWED_ORIGIN: 'https://app.test,https://www.app.test', SUCCESS_REDIRECT: 'https://app.test/?channel=github',
     PROFILE_CACHE: { get: async (k) => store.get(k) ?? null, put: async (k, v, opts) => { store.set(k, v); ttls.push(opts?.expirationTtl); }, delete: async (k) => { store.delete(k); }, _store: store, _ttls: ttls },
@@ -31,7 +31,7 @@ function fakeNetwork({ githubStatus = 200 } = {}) {
     if (u === 'https://github.com/login/oauth/access_token') {
       return ok({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN, scope: 'read:user', token_type: 'bearer' });
     }
-    if (u.startsWith('https://sb.test/rest/v1/channel_tokens')) {
+    if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
       if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, r); return new Response(null, { status: 201 }); }
       if (init.method === 'GET') { const id = decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1]); return ok(rows.has(id) ? [rows.get(id)] : []); }
       if (init.method === 'DELETE') { rows.delete(decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])); return new Response(null, { status: 204 }); }
@@ -147,7 +147,7 @@ test('revoked-at-GitHub token (401): row deleted and client told to reauthorize'
   const dead = fakeNetwork({ githubStatus: 401 });
   dead.rows = net.rows; // same DB
   const res = await handle(profileReq(session), env, {
-    fetchFn: async (u, i) => (String(u).startsWith('https://sb.test') ? net.fetchFn(u, i) : dead.fetchFn(u, i)), now,
+    fetchFn: async (u, i) => (String(u).startsWith('https://x.supabase.co') ? net.fetchFn(u, i) : dead.fetchFn(u, i)), now,
   });
   assert.equal(res.status, 401);
   assert.equal((await res.json()).error, 'reauthorize');

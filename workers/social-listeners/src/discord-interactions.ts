@@ -4,6 +4,8 @@
 // Fields confirmed against docs.discord.com (Interaction object, User object, interactions security): Ed25519 over timestamp + raw body with X-Signature-Ed25519 and
 // X-Signature-Timestamp, 401 on a bad signature, PING type 1 answered with PONG type 1, APPLICATION_COMMAND type 2, reply type 4 with flag 64 (ephemeral).
 // Not built from the Discord candidates: email and verified, linked accounts, server list, Nitro and 2FA (all need the person to sign in with Discord).
+import { recipientFetcher } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, readRawBody } from "./shared";
 import type { ObservationState } from "../../../shared/hexagon-registry/channels.js";
@@ -69,10 +71,10 @@ export function discordStates(interaction: unknown): DiscordState[] {
 }
 
 /** dc.banner: the public profile banner or colour, read with our bot token. Any failure is not_checked, never a guess. */
-export async function bannerState(userId: unknown, token: string | undefined, fetchImpl: typeof fetch = fetch): Promise<ObservationState> {
+export async function bannerState(userId: unknown, token: string | undefined, fetchImpl?: typeof fetch): Promise<ObservationState> {
   if (!token || typeof userId !== "string" || !/^[0-9]{15,21}$/.test(userId)) return "not_checked";
   try {
-    const res = await fetchImpl(`https://discord.com/api/v10/users/${userId}`, { headers: { authorization: `Bot ${token}` }, signal: AbortSignal.timeout(4000) });
+    const res = await recipientFetcher("platform-replies", ["username"], workerRecipientContext(undefined, { fetchImpl }))(`https://discord.com/api/v10/users/${userId}`, { headers: { authorization: `Bot ${token}` }, signal: AbortSignal.timeout(4000) });
     if (!res.ok) return "not_checked";
     const u = obj(await res.json());
     return u && (filled(u.banner) || filled(u.accent_color)) ? "returned" : "not_returned";
@@ -117,7 +119,7 @@ export async function verifyDiscordSignature(publicKeyHex: string | undefined, s
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const allowed = (env: Env, id: unknown): boolean => typeof id === "string" && (env.DISCORD_PROBE_IDS ?? "").split(",").map((x) => x.trim()).filter(Boolean).includes(id);
 
-export async function handleDiscordInteraction(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleDiscordInteraction(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.DISCORD_SCAN !== "on") return new Response("Not Found", { status: 404 });
   const raw = await readRawBody(request);

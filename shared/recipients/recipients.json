@@ -70,7 +70,10 @@
         "referrer",
         "utm",
         "country",
-        "device_profile"
+        "device_profile",
+        "user_agent",
+        "page_load",
+        "city"
       ],
       "purpose": "Traffic attribution only, kept apart from your scan and account and never joined to them.",
       "party": "first",
@@ -85,7 +88,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: shared/edge-capture/capture.ts writes ONE edge_visits row per request that serves both the visit log and the bot record: it also carries user_agent, the request path and host (page_load) and request.cf (city, region, coordinates, timezone, network); added user_agent, page_load, city. The query string (utm tags) is kept except credential-like values."
     },
     {
       "key": "machine-mirror",
@@ -258,6 +262,88 @@
       "until": null
     },
     {
+      "key": "github-channel",
+      "name": "GitHub connect channel (channels.myprivacytool.io)",
+      "hosts": [
+        "channels.myprivacytool.io"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Shows the GitHub profile you chose to connect, and disconnects it on request.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Until you disconnect"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: the site already called this host from src/lib/githubChannel.ts and it was missing from the registry. Same account as the rest of the platform; no third-party host added."
+    },
+    {
+      "key": "oauth-session",
+      "name": "Sign-in session (OAuth Worker)",
+      "hosts": [
+        "myprivacytool-oauth-poc.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Tells the site whether you are signed in (a Google sign-in you started), and signs you out.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Until you sign out"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: the site already called this host from src/lib/oauthSession.ts and it was missing from the registry. Only called when this browser holds the sign-in hint. No third-party host added."
+    },
+    {
+      "key": "deep-dive-api",
+      "name": "Deep-dive and ownership-check API (webhook-receiver Worker)",
+      "hosts": [
+        "myprivacytool-webhook-receiver.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "email",
+        "scan_result"
+      ],
+      "purpose": "Saves the answers you give about a finding and checks you own the address you want to look into.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Per the deep-dive and ownership-check retention rules"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "VITE_DEEP_DIVE_API_URL",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: src/lib/hexagonInteractionApi.ts and src/lib/possessionApi.ts call whatever VITE_DEEP_DIVE_API_URL names (unset = nothing is sent). The flag is that variable, so the entry is live only where the site build sets it. If the variable names any other host the wrapper refuses the call, by design: add that host here first."
+    },
+    {
       "key": "cloudflare-turnstile",
       "name": "Cloudflare Turnstile",
       "hosts": [
@@ -411,7 +497,7 @@
         "ip",
         "user_agent"
       ],
-      "purpose": "Web fonts on two static pages; being replaced by self-hosted fonts.",
+      "purpose": "Web fonts on /footprint and /hexagon-taxonomy. Ended 2026-11-08: both pages now serve their fonts from our own origin.",
       "party": "third",
       "retention": {
         "days": null,
@@ -424,9 +510,9 @@
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null,
-      "note": "until date to be set by the font self-hosting task (MPC-9886)",
-      "exception": "Existing pre-click call, to be removed by self-hosting (MPC-9886); disclosed until then"
+      "until": "2026-11-08",
+      "note": "Ended by MPC-9886: Inter, Fira Code, Bricolage Grotesque, IBM Plex Sans/Mono are self-hosted (latin subsets, SIL OFL 1.1). The registry crawl fails if either host is requested after the until date.",
+      "exception": "Ended 2026-11-08 (MPC-9886); kept so the history renders. No call site remains."
     },
     {
       "key": "supabase",
@@ -437,9 +523,19 @@
       "host_kind": "pattern",
       "surface": "db",
       "data_items": [
+        "city",
+        "country",
         "email",
+        "email_domain",
+        "email_hash",
         "ip",
-        "scan_result"
+        "message_text",
+        "name",
+        "phone",
+        "referrer",
+        "scan_result",
+        "username",
+        "utm"
       ],
       "purpose": "Database that holds saved scans and sign-ups.",
       "party": "processor",
@@ -454,7 +550,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: webhook-receiver state-store.js keeps chat conversation state (24 h) whose keys and bodies carry phone, email, name and the platform user id (username); added phone, name, username. MPC-9885: mpt-leads saveBaseline sends SHA-256(email) as email_hash plus the scan scores; added email_hash. MPC-9885: partner-api monitors store the monitored value (email, phone, handle or a domain); added email_domain. MPC-9885: mpt-cairn-blackboard stores the investigation seed email and username and fact values (email, username; phone only if HASH_FACT_TYPES leaves it unhashed); username and phone were already listed (MPC-9885 other tasks). MPC-9885: social-listeners stores Telegram/X updates, probe captures and event-log rows (sender key, @username, name, message text; a shared contact adds a phone); added message_text. MPC-9885: shared/support rest-store.ts keeps support cases (message text and the sender's email, phone or handle); added message_text. MPC-9885: scan-report writes users/leads rows with the visitor IP and utm/referrer, and the listing inputs (name, phone, city, country); added utm, referrer, city, country. MPC-9886: utm added because /HongKongSpam inserts its row (utm_source/medium/campaign, optional email) straight into Supabase from the browser."
     },
     {
       "key": "notion",
@@ -469,7 +566,12 @@
         "name",
         "phone",
         "country",
-        "ip"
+        "ip",
+        "city",
+        "device_profile",
+        "utm",
+        "referrer",
+        "username"
       ],
       "purpose": "Lead log.",
       "party": "third",
@@ -484,7 +586,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: the mpt-leads lead row (workers/mpt-leads/worker.js) also carries city, browser/OS/device (device_profile), UTM tags and the referrer URL; added city, device_profile, utm, referrer. MPC-9885: the Cairn Notion mirror (mpt-cairn-blackboard/notion-sync.js) copies fact values as stored, so usernames reach Notion; added username."
     },
     {
       "key": "resend",
@@ -495,7 +598,10 @@
       "host_kind": "fixed",
       "surface": "worker",
       "data_items": [
-        "email"
+        "email",
+        "ip",
+        "name",
+        "scan_result"
       ],
       "purpose": "Sends your report and follow-up email.",
       "party": "processor",
@@ -510,7 +616,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: the mpt-leads confirmation and alert emails greet the visitor by first name and the alert names the lead; added name. MPC-9885: scan-report report email carries the scan findings in the body and the IP values in its attached JSON file; added scan_result, ip."
     },
     {
       "key": "hubspot",
@@ -526,7 +633,8 @@
         "email",
         "name",
         "phone",
-        "scan_result"
+        "scan_result",
+        "username"
       ],
       "purpose": "CRM and newsletter.",
       "party": "third",
@@ -541,7 +649,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: webhook-receiver hubspot-client.js also sends the channel handle and platform user id (twitter_handle, platform_user_id); added username."
     },
     {
       "key": "github-commit-search",
@@ -614,12 +723,13 @@
       },
       "consent_basis": "scan_consent",
       "phase": "post_click",
-      "enabled": true,
+      "enabled": false,
       "flag": "HIBP_API_KEY",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "reason": "Not live: no HIBP_API_KEY is set and the Privacy page says breach checks are not performed (MPC-9823). Stays off until MPC-9904 ships the paid-key check, the DPA entry and the copy."
     },
     {
       "key": "gravatar",
@@ -798,6 +908,7 @@
         "openidconnect.googleapis.com",
         "www.googleapis.com",
         "github.com",
+        "api.github.com",
         "www.reddit.com",
         "oauth.reddit.com"
       ],
@@ -819,7 +930,8 @@
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: added api.github.com (workers/github-channel reads the connected account's own profile, repos, starred and events, and revokes the grant). The host is shared with github-commit-search and github-issues; each call declares its own key."
     },
     {
       "key": "slack",
@@ -832,7 +944,8 @@
       "data_items": [
         "country",
         "device_profile",
-        "utm"
+        "utm",
+        "referrer"
       ],
       "purpose": "Internal lead notification (no IP or email).",
       "party": "third",
@@ -847,7 +960,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: the mpt-leads lead notification quotes the referrer URL in its Other Info line; added referrer."
     },
     {
       "key": "user-pasted-listing",
@@ -885,7 +999,7 @@
       "data_items": [
         "plan_name"
       ],
-      "purpose": "Checkout (flag-gated; not live).",
+      "purpose": "Starts a paid-plan Checkout session (gated by CHECKOUT_ENABLED; answers 503 and sends nothing until it is set).",
       "party": "processor",
       "retention": {
         "days": null,
@@ -893,13 +1007,13 @@
       },
       "consent_basis": "user_action",
       "phase": "post_click",
-      "enabled": false,
-      "flag": "STRIPE_ENABLED",
+      "enabled": true,
+      "flag": "CHECKOUT_ENABLED",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "reason": "Paid plans not live; Privacy and Cookies wrongly list Stripe as live (EXT-01 C20/C21)."
+      "note": "MPC-9885: the entry named a flag (STRIPE_ENABLED) that no code reads. functions/api/stripe-checkout.ts is gated by CHECKOUT_ENABLED, so the entry now says that and is enabled: with the switch off no call is made, exactly as before. The call sends the plan name only (price id and plan in the return URL); the customer's card and email are entered at checkout.stripe.com by the visitor. MPC-9894: Privacy/Cookies must say Stripe is used once checkout is switched on, and that it is currently off."
     },
     {
       "key": "pwned-passwords",
@@ -912,7 +1026,7 @@
       "data_items": [
         "password_hash_prefix"
       ],
-      "purpose": "Password check (off by default).",
+      "purpose": "Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password.",
       "party": "third",
       "retention": {
         "days": null,
@@ -920,12 +1034,13 @@
       },
       "consent_basis": "scan_consent",
       "phase": "post_click",
-      "enabled": false,
+      "enabled": true,
       "flag": "VITE_PASSWORD_CHECK",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9886: switched on in the registry because the Pages production build sets VITE_PASSWORD_CHECK=true (verified in the Cloudflare Pages project wwwmyprivacytool, 2026-11-08), i.e. the check is live. The flag still gates the feature."
     },
     {
       "key": "meta-graph",
@@ -937,9 +1052,10 @@
       "surface": "worker",
       "data_items": [
         "message_text",
-        "username"
+        "username",
+        "phone"
       ],
-      "purpose": "Meta channel adapters (stubs).",
+      "purpose": "Delivers WhatsApp replies (live) and Messenger replies (the Messenger adapter is still a stub that sends nothing until META_PAGE_ACCESS_KEY is set).",
       "party": "platform",
       "retention": {
         "days": null,
@@ -947,13 +1063,13 @@
       },
       "consent_basis": "user_action",
       "phase": "post_click",
-      "enabled": false,
+      "enabled": true,
       "flag": null,
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "reason": "Adapters are stubs; nothing is sent."
+      "note": "MPC-9885: switched ON because webhook-receiver sendWhatsApp already calls graph.facebook.com whenever META_WHATSAPP_KEY and WHATSAPP_PHONE_NUMBER_ID are set (it was seeded off as 'stubs'). Both senders self-gate on their own secrets, so no flag. phone added (WhatsApp `to`). MPC-9894: Privacy/Cookies must say WhatsApp is live."
     },
     {
       "key": "platform-replies",
@@ -973,7 +1089,7 @@
         "message_text",
         "username"
       ],
-      "purpose": "Channel replies (flag and allow-list gated).",
+      "purpose": "Replies and lookups on the secondary chat/social channels (Discord, LINE, Viber, WeChat, Zalo); each channel runs only when its own switch is on and the sender is allow-listed.",
       "party": "platform",
       "retention": {
         "days": null,
@@ -981,13 +1097,41 @@
       },
       "consent_basis": "user_action",
       "phase": "post_click",
-      "enabled": false,
-      "flag": "PLATFORM_REPLIES_ENABLED",
+      "enabled": true,
+      "flag": null,
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "reason": "Flag and allow-list gated; flags not individually verified."
+      "note": "MPC-9885: switched ON because the channel handlers already call these hosts whenever their own switch is on (DISCORD_SCAN, LINE_EXTRAS, VIBER_EXTRAS, WECHAT_EXTRAS, ZALO_EXTRAS) plus an allow-list; the registry flag PLATFORM_REPLIES_ENABLED was read by no code. With every switch off nothing is called. MPC-9894 to confirm which channels are live before Privacy lists them."
+    },
+    {
+      "key": "xposedornot",
+      "name": "XposedOrNot (breach lookup)",
+      "hosts": [
+        "api.xposedornot.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Free community breach lookup, switched off: not used without a licence.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "reason": "Decision B (Director, 2026-11-08): no XposedOrNot without a licence. src/lib/osintLookup.ts refuses this provider before any request is made.",
+      "note": "Registered disabled by MPC-9886 so the host is known to CI and the wrapper; enabling it needs a licence decision."
     },
     {
       "key": "planned-licensed-people-data",
@@ -1151,6 +1295,384 @@
       "until": null,
       "reason": "Planned, disabled until added to registry and policy before switch-on (rule 7). Nothing planned; ipify and ipapi.co exist only as a false policy claim.",
       "planned": true
+    },
+    {
+      "key": "anthropic",
+      "name": "Anthropic API (content drafting)",
+      "hosts": [
+        "api.anthropic.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Drafts our own marketing posts from our own prompts in the content pipeline; no visitor data is sent.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (not verified in MPC-9885; MPC-9894 confirms before the DPA copy)"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "ANTHROPIC_API_KEY",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: the content-consumer Worker already called this host. Sends prompts only."
+    },
+    {
+      "key": "cloudflare-api",
+      "name": "Cloudflare API (analytics reads)",
+      "hosts": [
+        "api.cloudflare.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own zone traffic totals for the metrics collector; sends no visitor data.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "CLOUDFLARE_ANALYTICS_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. Read-only GraphQL; the request carries our API token and a date range. MPC-9885: flag corrected to CLOUDFLARE_ANALYTICS_TOKEN, the secret the collector reads (it skips the call when unset); CLOUDFLARE_API_TOKEN is not set on that Worker."
+    },
+    {
+      "key": "ga4-data-api",
+      "name": "Google Analytics Data API (reports)",
+      "hosts": [
+        "analyticsdata.googleapis.com",
+        "oauth2.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own GA4 report totals for the metrics collector; sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "GA4_SERVICE_ACCOUNT_JSON",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: collector reads aggregate reports with our service-account token. The tag that sends visitor data to GA4 is the separate `ga4` entry. MPC-9885: flag corrected to GA4_SERVICE_ACCOUNT_JSON, the secret the collector requires (GA4_PROPERTY_ID is a constant in code, not an env var)."
+    },
+    {
+      "key": "youtube-data-api",
+      "name": "YouTube Data API (channel stats)",
+      "hosts": [
+        "www.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Reads our own YouTube channel statistics for the metrics collector (no visitor data), and, when YOUTUBE_EXTRAS is on, the public channel of an allow-listed commenter (their channel id).",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "YOUTUBE_API_KEY",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. MPC-9885: username added for workers/social-listeners/src/youtube-extras.ts (channels.list with the commenter's channel id). MPC-9894: Privacy must mention it."
+    },
+    {
+      "key": "meta-ads-insights",
+      "name": "Meta Marketing API (ad insights)",
+      "hosts": [
+        "graph.facebook.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own ad account totals for the metrics collector; read-only, sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "META_ADS_KEY",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. Separate from `meta-graph` (Messenger/Instagram/WhatsApp, still stubs and switched off)."
+    },
+    {
+      "key": "firestore",
+      "name": "Google Firestore (conversation state)",
+      "hosts": [
+        "firestore.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "name",
+        "phone",
+        "message_text",
+        "username"
+      ],
+      "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (document ids carry the channel user id, phone or email)"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "FIRESTORE_SA_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": true,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: webhook-receiver firestore-client.js. Not in the Map's 29; MPC-9894 decides the DPA and Privacy wording. Also added name (the state holds the channel display name)."
+    },
+    {
+      "key": "x-api",
+      "name": "X (Twitter) API",
+      "hosts": [
+        "api.x.com",
+        "upload.twitter.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "username",
+        "message_text"
+      ],
+      "purpose": "Reads and posts on our own X account (mirror replies, media upload, channel probes).",
+      "party": "platform",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. `platform-replies` (the reply channels, flag-gated and off) keeps api.x.com too; this entry is the live account-level use. MPC-9885: flag is null, not X_BEARER_TOKEN: the DM, token-refresh and media-upload calls use the OAuth user token / consumer keys and ran without a bearer token, so a bearer flag would newly refuse them (the bearer-only lookups already skip themselves when it is unset)."
+    },
+    {
+      "key": "make-webhooks",
+      "name": "Make.com webhooks (content hand-off)",
+      "hosts": [
+        "*.make.com"
+      ],
+      "host_kind": "pattern",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Hands approved marketing posts to our Make scenario for publishing; carries post text only, no visitor data.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "MAKE_WEBHOOK_URL",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: host is built from the MAKE_WEBHOOK_URL secret (hook.eu1.make.com today); the wrapper checks it at runtime."
+    },
+    {
+      "key": "github-issues",
+      "name": "GitHub Issues (support intake)",
+      "hosts": [
+        "api.github.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "message_text"
+      ],
+      "purpose": "Opens an issue in our private repository when a support case needs engineering.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "SUPPORT_GITHUB_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: shared/support/github-issue-intake.ts. Shares the host with `github-commit-search`; different purpose and data."
+    },
+    {
+      "key": "github-extras",
+      "name": "GitHub public profile (extras check)",
+      "hosts": [
+        "api.github.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent).",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "GITHUB_EXTRAS",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: workers/social-listeners/src/github-extras.ts. Shares the host with `github-commit-search`; the handler is off unless GITHUB_EXTRAS=on. MPC-9894: Privacy must mention it."
+    },
+    {
+      "key": "internal-workers",
+      "name": "Our own Workers (service-to-service)",
+      "hosts": [
+        "*.myprivacytool.workers.dev"
+      ],
+      "host_kind": "pattern",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "phone",
+        "username"
+      ],
+      "purpose": "One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Not stored by the call itself"
+      },
+      "consent_basis": "service",
+      "phase": "pre_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. First party, so no outside recipient; registered so a workers.dev host is checked rather than exempt. MPC-9885: cairn-push.mjs and e2e.mjs send the seed email and fact values (email, raw phone, username) to the cairn bridge Worker, which hashes phones before storing; added email, phone, username."
+    },
+    {
+      "key": "osint-whatsapp-profile",
+      "name": "WhatsApp profile metadata provider (RapidAPI, paid tier)",
+      "hosts": [],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "phone"
+      ],
+      "purpose": "Deep dive: whether the WhatsApp number has a profile photo or is a business account.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (vendor not yet named)"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "planned": true,
+      "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
+      "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
+    },
+    {
+      "key": "osint-spam-registry",
+      "name": "Phone spam-registry provider (paid tier)",
+      "hosts": [],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "phone"
+      ],
+      "purpose": "Deep dive: how many spam flags a phone number has.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (vendor not yet named)"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "planned": true,
+      "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
+      "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
+    },
+    {
+      "key": "osint-breach-db",
+      "name": "Phone breach-database provider (paid tier)",
+      "hosts": [],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "phone"
+      ],
+      "purpose": "Deep dive: how many breach records contain a phone number.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (vendor not yet named)"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "planned": true,
+      "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
+      "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
     }
   ]
 }

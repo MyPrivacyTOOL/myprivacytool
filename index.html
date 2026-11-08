@@ -59,6 +59,7 @@
          Loaded only after consent: no request to googletagmanager.com / google-analytics.com
          before the visitor chooses "Accept analytics" in our own cookie banner (src/components/CookieBanner.tsx, choice kept in
          localStorage under mpt_cookie_consent, MPC-8450). Withdrawing consent sets the ga-disable flag so no further hits are sent. -->
+    <script src="/recipient-client.min.js" defer></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -80,15 +81,17 @@
           var ok = allowed();
           window['ga-disable-' + GA_ID] = !ok;
           if (!ok || loaded) return;
+          // MPC-9886: the script load goes through the recipient registry (key "ga4", basis analytics_consent). The client (/recipient-client.min.js, deferred)
+          // announces itself with mpt:recipients-ready; until then nothing is requested and sync() simply runs again when it does. The consent test above is unchanged.
+          var r = window.mptRecipients;
+          if (!r) return;
           loaded = true;
-          var s = document.createElement('script');
-          s.async = true;
-          s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-          document.head.appendChild(s);
+          r.script('ga4', 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID).catch(function () {});
           gtag('js', new Date());
           gtag('config', GA_ID);
         }
         window.addEventListener('mpt:consent', sync);
+        window.addEventListener('mpt:recipients-ready', sync);
         sync();
       })();
     </script>

@@ -83,19 +83,17 @@ describe("checkPage: one address, no extras", () => {
     expect(await checkPage(req(), (async () => new Response("nope", { status: 404 })) as any)).toEqual({ status: "clear", reason: "gone" });
     expect(await checkPage(req(), (async () => new Response("Forbidden", { status: 403 })) as any)).toEqual({ status: "not_checked", reason: "blocked" });
   });
-  it("follows at most 3 redirects, only to public https addresses", async () => {
-    const hops = ["https://b.example/1", "https://c.example/2", "https://d.example/3"];
+  it("follows ONE redirect inside the same registrable domain; anything else is not_checked (MPC-9885: the shared user_supplied rule replaced the old 3-hop chain)", async () => {
     let n = 0;
-    const chain = vi.fn(async () => (n < 3 ? new Response(null, { status: 301, headers: { location: hops[n++] } }) : page("<p>Jane Smith</p>")));
-    expect((await checkPage(req(), chain as any)).status).toBe("found");
-    expect(chain).toHaveBeenCalledTimes(4);
-    const loop = vi.fn(async () => new Response(null, { status: 302, headers: { location: "https://a.example/again" } }));
-    expect(await checkPage(req(), loop as any)).toEqual({ status: "not_checked", reason: "too_many_redirects" });
-    expect(loop).toHaveBeenCalledTimes(4);
-    for (const to of ["http://b.example/x", "https://127.0.0.1/x", "https://localhost/x"]) {
-      expect(await checkPage(req(), (async () => new Response(null, { status: 302, headers: { location: to } })) as any)).toEqual({ status: "not_checked", reason: "redirect_to_unsafe_address" });
+    const sibling = vi.fn(async () => (n++ === 0 ? new Response(null, { status: 301, headers: { location: "https://www.example.com/listing" } }) : page("<p>Jane Smith</p>")));
+    expect((await checkPage(req(undefined, undefined, "https://example.com/p/1"), sibling as any)).status).toBe("found");
+    expect(sibling).toHaveBeenCalledTimes(2);
+    for (const to of ["https://b.example/1", "http://example.com/x", "https://127.0.0.1/x", "https://localhost/x"]) {
+      expect(await checkPage(req(undefined, undefined, "https://example.com/p/1"), (async () => new Response(null, { status: 302, headers: { location: to } })) as any)).toEqual({ status: "not_checked", reason: "could_not_fetch" });
     }
-    expect(await checkPage(req(), (async () => new Response(null, { status: 302 })) as any)).toEqual({ status: "not_checked", reason: "too_many_redirects" });
+    const loop = vi.fn(async () => new Response(null, { status: 302, headers: { location: "https://example.com/again" } }));
+    expect(await checkPage(req(undefined, undefined, "https://example.com/p/1"), loop as any)).toEqual({ status: "not_checked", reason: "could_not_fetch" });
+    expect(loop).toHaveBeenCalledTimes(2);
   });
   it("a network error is not_checked, a slow site times out, an unsafe address is never fetched", async () => {
     expect(await checkPage(req(), (async () => { throw new TypeError("boom"); }) as any)).toEqual({ status: "not_checked", reason: "could_not_fetch" });

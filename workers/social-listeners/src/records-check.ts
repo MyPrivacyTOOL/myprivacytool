@@ -12,6 +12,8 @@
 //   not_checked  everything else: blocked, challenged, timed out, too big to read in full, not a web page, unsafe address. Never "clear".
 // Off unless RECORDS_CHECK=on, allow-listed senders only (PROBE_TELEGRAM_IDS), outside the 54, scanCounts and the exposure score; both stay status "new".
 // We submit nothing for the person: for a found listing we only show the service's own stated removal route, labelled as such.
+import { callRecipient } from "../../../shared/recipients/outbound.ts";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx.ts";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import type { Env } from "./shared";
@@ -103,6 +105,7 @@ export function classify(page: { status: number; contentType: string; body: stri
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 async function readCapped(res: Response): Promise<{ body: string; truncated: boolean }> {
+  const cutByWrapper = res.headers.get("x-recipient-truncated") === "1";
   if (!res.body) return { body: await res.text(), truncated: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -117,20 +120,23 @@ async function readCapped(res: Response): Promise<{ body: string; truncated: boo
   const all = new Uint8Array(Math.min(size, MAX_BYTES + 65_536));
   let off = 0;
   for (const c of chunks) { const n = Math.min(c.byteLength, all.length - off); all.set(c.subarray(0, n), off); off += n; if (off >= all.length) break; }
-  return { body: new TextDecoder("utf-8").decode(all.subarray(0, off)), truncated };
+  return { body: new TextDecoder("utf-8").decode(all.subarray(0, off)), truncated: truncated || cutByWrapper };
 }
 
 /** One check: a short redirect chain to the supplied address, nothing else. Never throws. */
-export async function checkPage(req: RecordsRequest, fetchImpl: FetchLike = fetch): Promise<RecordsResult> {
+export async function checkPage(req: RecordsRequest, fetchImpl?: FetchLike): Promise<RecordsResult> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
     let url = safeUrl(req.url);
     for (let hop = 0; url; hop++) {
-      const res = await fetchImpl(url.href, {
-        method: "GET", redirect: "manual", signal: ctl.signal,
-        headers: { Accept: "text/html,application/xhtml+xml,text/plain;q=0.9", "User-Agent": UA }, // no cookie, no referrer, nothing about the person
-      });
+      // MPC-9885: the one door (user_supplied: https only, no private ranges, one same-domain redirect, 1.5 MB cap with truncation). Only the pasted
+      // address goes out: no cookie, no referrer, nothing about the person, so `sent` is empty.
+      const res = await callRecipient("user-pasted-listing", {
+        url: url.href,
+        init: { method: "GET", redirect: "manual", signal: ctl.signal, headers: { Accept: "text/html,application/xhtml+xml,text/plain;q=0.9", "User-Agent": UA } },
+        sent: [],
+      }, workerRecipientContext(undefined, { fetchImpl: fetchImpl as typeof fetch | undefined, timeoutMs: TIMEOUT_MS + 1000, maxBytes: MAX_BYTES }));
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get("location");
         await res.body?.cancel().catch(() => undefined);
@@ -194,7 +200,7 @@ export function isRecordsCommand(env: Env, update: unknown): boolean {
 const lastCheck = new Map<string, number>();
 
 /** Never throws; logs counts only (kind, result, reason code), never the address, the host, the typed text or the page. */
-export async function handleRecordsCheck(env: Env, update: unknown, log: Logger, fetchImpl: FetchLike = fetch): Promise<void> {
+export async function handleRecordsCheck(env: Env, update: unknown, log: Logger, fetchImpl?: FetchLike): Promise<void> {
   const s = telegramSender(update);
   if (!s || !env.TELEGRAM_BOT_TOKEN) return;
   try {

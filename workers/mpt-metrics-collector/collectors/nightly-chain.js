@@ -1,3 +1,5 @@
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 // MPC-7557: reads the result of the nightly / weekly chain test (scripts/nightly-chain/run.mjs, GitHub Actions) and raises the usual Slack alert, naming the failed step.
 // No second alert path: the runner writes one counts-only row per run to mpt_raw_metrics; this daily collector (00:15 HKT, after the 23:30 HKT run) turns it into an alert.
 // It also catches a run that never reported: no nightly row in 30 hours means the job, its schedule or its credentials are broken, which a "failed step" alert cannot say.
@@ -9,7 +11,7 @@ export const EXPECTED_FROM = '2026-11-01'; // until then a missing first run is 
 
 async function latest(env, report) {
   const url = `${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?source=eq.nightly_chain&report=eq.${report}&order=captured_at.desc&limit=1&select=captured_at,status,error,payload`;
-  const res = await fetch(url, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+  const res = await callRecipient('supabase', { url: url, init: { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`nightly-chain: read failed: HTTP ${res.status}`);
   return (await res.json())[0] ?? null;
 }

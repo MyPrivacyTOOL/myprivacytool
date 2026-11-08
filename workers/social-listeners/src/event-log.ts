@@ -4,9 +4,10 @@
 //   out   every Bot API call made for the logged chat: {method, request, status, response}
 //   brain the core-brain answer used to pick the reply
 // Every write is fire-and-forget (ctx.waitUntil), has a 5s timeout and swallows errors: logging can never delay or fail the webhook.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { probeIds, probeMode, updateActor } from "./probe-reader";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
@@ -100,7 +101,7 @@ export async function resolveSession(env: Env, chatId: string, senderId: string,
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return fresh;
   try {
     const q = `chat_id=eq.${encodeURIComponent(chatId)}&sender_id=eq.${encodeURIComponent(senderId)}&direction=eq.in&select=session_id,created_at&order=created_at.desc&limit=1`;
-    const res = await fetch(`${base(env)}?${q}`, { headers: headers(env), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const res = await callRecipient("supabase", { url: `${base(env)}?${q}`, init: { headers: headers(env), signal: AbortSignal.timeout(TIMEOUT_MS) }, sent: ["username"] }, recipientCtx(env));
     if (!res.ok) return fresh;
     const rows: unknown = await res.json();
     if (!Array.isArray(rows)) return fresh;
@@ -150,12 +151,16 @@ function build(env: Env, update: unknown, log: Logger, ctx?: ExecutionContext): 
       // The bot token is only ever in a request URL, never in a body; scrub it from the serialized row anyway.
       let body = JSON.stringify(row);
       if (env.TELEGRAM_BOT_TOKEN) body = body.split(env.TELEGRAM_BOT_TOKEN).join("[redacted]");
-      const res = await fetch(base(env), {
-        method: "POST",
-        headers: headers(env, { "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" }), // ON CONFLICT DO NOTHING
-        body,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      const res = await callRecipient("supabase", {
+        url: base(env),
+        init: {
+          method: "POST",
+          headers: headers(env, { "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" }), // ON CONFLICT DO NOTHING
+          body,
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        },
+        sent: ["username", "name", "message_text", "phone"], // the raw update, untrimmed (a shared contact card carries a phone number)
+      }, recipientCtx(env));
       if (!res.ok) log.warn("event_log_save_failed", { status: res.status });
     } catch (err) {
       log.warn("event_log_save_failed", { error: err instanceof Error ? err.name : "unknown" });

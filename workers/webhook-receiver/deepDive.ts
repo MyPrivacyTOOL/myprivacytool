@@ -10,6 +10,8 @@
  *   resultsReply(env, wa_id)             called by the WhatsApp webhook when the person texts RESULTS or STATUS
  * Imported lazily from index.js so the Node-run security test never loads TypeScript.
  */
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 import { getConversationState, saveConversationState, stateStored } from './state-store.js';
 import { insertMptRow } from './supabase-client.js';
 import { corsFor, clip, timingSafeEqual, unauthorized } from './security.js';
@@ -24,8 +26,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // ── Providers, built from env. Unset = not configured = not_checked. Response shapes below are ASSUMPTIONS to confirm against
 //    the vendors' real docs before go-live; anything that does not match is thrown away as invalid, never defaulted.
-async function getJson(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<any> {
-  const res = await fetch(url, { headers, signal });
+// MPC-9885: each provider is its own registry key (osint-whatsapp-profile / osint-spam-registry / osint-breach-db), all switched OFF until the vendor
+// hosts are named; a refused call throws like any provider failure, so the deep dive reports that provider as not checked.
+type Send = (url: string, init: RequestInit) => Promise<Response>;
+async function getJson(send: Send, url: string, headers: Record<string, string>, signal: AbortSignal): Promise<any> {
+  const res = await send(url, { headers, signal });
   if (!res.ok) throw new Error(`provider ${res.status}`);
   return res.json();
 }
@@ -37,21 +42,25 @@ const count = (n: unknown, list: unknown): number => {
 
 export function providersFromEnv(env: Env): OsintProviders {
   const p: OsintProviders = {};
+  const rctx = workerRecipientContext(env as Record<string, unknown>);
+  const sendWhatsapp: Send = (url, init) => callRecipient('osint-whatsapp-profile', { url, init, sent: ['phone'] }, rctx);
+  const sendSpam: Send = (url, init) => callRecipient('osint-spam-registry', { url, init, sent: ['phone'] }, rctx);
+  const sendBreach: Send = (url, init) => callRecipient('osint-breach-db', { url, init, sent: ['phone'] }, rctx);
   if (env.RAPIDAPI_KEY && env.RAPIDAPI_WHATSAPP_HOST) {
     p.profileMetadata = async (wa, signal) => {
-      const j = await getJson(`https://${env.RAPIDAPI_WHATSAPP_HOST}${env.RAPIDAPI_WHATSAPP_PATH || '/profile'}?phone=${encodeURIComponent(wa)}`,
+      const j = await getJson(sendWhatsapp, `https://${env.RAPIDAPI_WHATSAPP_HOST}${env.RAPIDAPI_WHATSAPP_PATH || '/profile'}?phone=${encodeURIComponent(wa)}`,
         { 'x-rapidapi-key': env.RAPIDAPI_KEY!, 'x-rapidapi-host': env.RAPIDAPI_WHATSAPP_HOST! }, signal);
       // profile_pic_url: string = has a photo, null = none. Absent key = unknown (left undefined so validation rejects it).
       const pic = j && 'profile_pic_url' in j ? (typeof j.profile_pic_url === 'string' ? j.profile_pic_url.length > 0 : j.profile_pic_url === null ? false : undefined) : undefined;
       return { profile_pic_exists: pic as boolean, is_business: j?.is_business };
     };
   }
-  const keyed = (url?: string, key?: string): ProviderCall<any> | undefined => url && key
-    ? (wa, signal) => getJson(`${url}${url.includes('?') ? '&' : '?'}phone=${encodeURIComponent(wa)}`, { Authorization: `Bearer ${key}` }, signal)
+  const keyed = (send: Send, url?: string, key?: string): ProviderCall<any> | undefined => url && key
+    ? (wa, signal) => getJson(send, `${url}${url.includes('?') ? '&' : '?'}phone=${encodeURIComponent(wa)}`, { Authorization: `Bearer ${key}` }, signal)
     : undefined;
-  const spam = keyed(env.SPAM_API_URL, env.SPAM_API_KEY);
+  const spam = keyed(sendSpam, env.SPAM_API_URL, env.SPAM_API_KEY);
   if (spam) p.spamRegistry = async (wa, s) => { const j = await spam(wa, s); return { flag_count: count(j?.flags, j?.flags) }; };
-  const breach = keyed(env.BREACH_API_URL, env.BREACH_API_KEY);
+  const breach = keyed(sendBreach, env.BREACH_API_URL, env.BREACH_API_KEY);
   if (breach) p.breachDb = async (wa, s) => { const j = await breach(wa, s); return { breach_count: count(j?.breach_count, j?.breaches) }; };
   return p;
 }

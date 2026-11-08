@@ -536,53 +536,17 @@ describe('Mirror & Risk Engine - MPC-7252', () => {
     });
   });
 
-  describe('osintLookup: free provider (xposedornot)', () => {
-    const json = (status: number, body: unknown = {}) => new Response(JSON.stringify(body), { status });
-    const opts = (fetchImpl: typeof fetch) => ({ provider: 'xposedornot' as const, fetchImpl });
-
-    it('needs no key and parses breach names', async () => {
-      const fetchImpl = vi.fn(async () => json(200, { breaches: [['Adobe', 'Dropbox']], email: 'x' })) as unknown as typeof fetch;
-      const r = await osintLookup('user@example.com', 'email', opts(fetchImpl));
-      expect(r.status).toBe('checked');
-      expect(r.breaches.map((b) => b.name)).toEqual(['Adobe', 'Dropbox']);
-      expect(r.pasteCount).toBe(0);
-      expect(r.confidence).toBe('medium');
-      const [url, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as unknown as [string, RequestInit];
-      expect(url).toContain('api.xposedornot.com/v1/check-email/user%40example.com');
-      expect(JSON.stringify(init.headers)).not.toMatch(/api-key/i);
-    });
-
-    it('404 means checked with zero breaches', async () => {
-      const r = await osintLookup('user@example.com', 'email', opts((async () => json(404, { Error: 'Not found' })) as unknown as typeof fetch));
-      expect(r.status).toBe('checked');
-      expect(r.breachCount).toBe(0);
-    });
-
-    it.each([
-      ['429', () => json(429)],
-      ['500', () => json(500)],
-      ['unexpected body shape', () => json(200, { hello: 'world' })],
-      ['non-JSON body', () => new Response('<html>', { status: 200 })],
-    ])('%s => not_checked, never clean', async (_name, make) => {
-      const r = await osintLookup('user@example.com', 'email', opts((async () => make()) as unknown as typeof fetch));
+  describe('osintLookup: XposedOrNot is switched off (MPC-9886, decision B: no XposedOrNot without a licence)', () => {
+    it('refuses the provider before any request and never reports it clean', async () => {
+      const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch;
+      const r = await osintLookup('user@example.com', 'email', { provider: 'xposedornot', fetchImpl, skipCache: true });
       expect(r.status).toBe('not_checked');
+      expect(fetchImpl).not.toHaveBeenCalled();
     });
 
-    it('does not share cache entries with hibp', async () => {
-      const xon = vi.fn(async () => json(404)) as unknown as typeof fetch;
-      await osintLookup('user@example.com', 'email', opts(xon));
-      const hibp = vi.fn(async () => json(404)) as unknown as typeof fetch;
-      const r = await osintLookup('user@example.com', 'email', { apiKey: 'k', fetchImpl: hibp });
-      expect(r.cached).toBe(false);
-      expect(hibp).toHaveBeenCalled();
-    });
-
-    it('response lists breach names and invents no data types', async () => {
-      const lookup = await osintLookup('user@example.com', 'email', opts((async () => json(200, { breaches: [['Adobe']] })) as unknown as typeof fetch));
-      const res = generateRiskResponse(lookup);
-      expect(res.breach_names).toEqual(['Adobe']);
-      expect(res.exposure_types).toEqual([]);
-      expect(res.score).toBe(10);
+    it('the host is registered, and registered disabled', async () => {
+      const { recipientByKey } = await import('@/config/recipients');
+      expect(recipientByKey('xposedornot')).toMatchObject({ hosts: ['api.xposedornot.com'], enabled: false });
     });
   });
 

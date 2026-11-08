@@ -1,6 +1,7 @@
 // @vitest-environment node
 // MPC-8374: schema validation + Make.com hand-off for mpt-content-approval. Make.com and Slack are mocked; D1 is an in-memory fake.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 import worker, { process as processApproval, buildMakePayload, maskUrl, postToMake, scheduledTime, toHktIso, verifySlack } from './worker.js';
 import { validateMakePayload, isHktIso, isHttpsUrl, PLATFORMS } from './schema.js';
 
@@ -511,5 +512,19 @@ describe('fetch handler (POST /approve)', () => {
       const empty = new Request('https://x.test/approve', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-slack-request-timestamp': ts, 'x-slack-signature': `v0=${[...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('')}` }, body: '' });
       expect((await worker.fetch(empty, env, ctx())).status).toBe(200);
     });
+  });
+});
+
+describe('recipient registry (MPC-9885)', () => {
+  it('the Make hand-off and the Slack thread edits reach only registered hosts', async () => {
+    const spy = createFetchSpy({ respond: () => new Response('{"ok":true}') });
+    vi.stubGlobal('fetch', spy.fetch);
+    const db = fakeD1(); seed(db, sixDrafts());
+    const env = mkEnv(db);
+    expect((await postToMake(env, TASK, valid())).ok).toBe(true);
+    await processApproval(env, { action: 'reject', taskId: TASK, approver: 'chris', target: { ...target, blocks: [] } });
+    spy.assertAllRegistered();
+    expect(spy.calls[0].recipient).toBe('make-webhooks');
+    expect([...new Set(spy.calls.map((c) => c.host))].sort()).toEqual(['hook.eu1.make.com', 'slack.com']);
   });
 });

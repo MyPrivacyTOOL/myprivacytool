@@ -1,6 +1,7 @@
 // @vitest-environment node
 // MPC-8370: unit + integration tests for mpt-content-consumer. Anthropic, Slack, KV and D1 are all mocked; no network, no secrets.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 import consumer, { PLATFORMS, taskIdFor, guardrails, topicFor, resolveTopic, buildPrompt, parseDraft, slackBlocks, generateDailyPosts, warnOverdueReceipts } from './worker.js';
 
 const DATE = '2026-10-20';
@@ -383,5 +384,16 @@ describe('warnOverdueReceipts', () => {
     expect(await generateDailyPosts(failEnv, '2026-10-21', { topic: 'T' })).toBe('notified');
     expect(console.error).toHaveBeenCalledWith('receipt alert failed', 'Error: d1 read failed');
     expect(statuses(failEnv, 'notified')).toHaveLength(1);
+  });
+});
+
+describe('recipient registry (MPC-9885)', () => {
+  it('a draft cycle reaches only Anthropic and Slack, both registered', async () => {
+    const inner = globalThis.fetch;
+    const spy = createFetchSpy({ respond: (u, i) => inner(u, i) });
+    vi.stubGlobal('fetch', spy.fetch);
+    await generateDailyPosts(makeEnv(), DATE);
+    spy.assertAllRegistered();
+    expect(new Set(spy.calls.map((c) => c.host))).toEqual(new Set(['api.anthropic.com', 'slack.com']));
   });
 });

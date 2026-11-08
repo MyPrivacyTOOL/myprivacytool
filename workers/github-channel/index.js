@@ -25,7 +25,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function handle(request, env, deps = {}) {
-  const { fetchFn = fetch, now = () => Date.now() } = deps;
+  const { fetchFn = undefined, now = () => Date.now() } = deps;
   const url = new URL(request.url);
   const cors = corsHeaders(request, env);
 

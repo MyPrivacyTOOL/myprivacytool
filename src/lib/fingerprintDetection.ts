@@ -4,6 +4,7 @@
  * Detects various browser fingerprinting methods to help users
  * understand their privacy exposure.
  */
+import { recipientPeerConnection, webRtcAvailable } from '@/lib/recipientClient';
 
 // Types
 export interface FingerprintResult {
@@ -892,7 +893,7 @@ export function detectTorBrowser(): TorBrowserResult {
   const standardHeight = window.innerHeight === 1000 || screen.height === 1000;
   
   // 3. Check for disabled features
-  const noWebRTC = typeof RTCPeerConnection === 'undefined';
+  const noWebRTC = !webRtcAvailable();
   const noWebGL = !document.createElement('canvas').getContext('webgl');
   
   // 4. Timezone always UTC
@@ -1120,7 +1121,7 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
   
   try {
     // Check if RTCPeerConnection is available
-    if (typeof RTCPeerConnection === 'undefined') {
+    if (!webRtcAvailable()) {
       console.log('[FingerprintDetection] WebRTC disabled - good for privacy!');
       return {
         localIPs: [],
@@ -1142,7 +1143,8 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
       ],
     };
 
-    const pc = new RTCPeerConnection(config);
+    // MPC-9886: through the registry (crawl-visible). Same two Google STUN servers, same timing; the move inside the consent gate is MPC-9888.
+    const pc = await recipientPeerConnection('google-stun', config);
     
     // Create a data channel to trigger ICE gathering
     pc.createDataChannel('');

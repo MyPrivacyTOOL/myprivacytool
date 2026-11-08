@@ -10,7 +10,7 @@
 import ts from "typescript";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { entriesForHost, hostMatches, isLocalHost, isNonOutbound, registryKeys } from "./registry.mjs";
+import { entriesForHost, hostMatches, isLinkHost, isLocalHost, isNonOutbound, registryKeys } from "./registry.mjs";
 
 export const SCAN_ROOTS = ["src", "functions", "workers", "shared", "index.html", "public"];
 const SCAN_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".html", ".css"]);
@@ -20,9 +20,11 @@ const TEST_FILE = /(\.test\.|\.vitest\.|\.spec\.|\.d\.ts$)/;
 const MINIFIED = /\.min\.(js|css)$/;
 
 const WRAPPER_DIR = "shared/recipients/";
-export const isWrapperFile = (rel) => rel.startsWith(WRAPPER_DIR + "outbound.") || rel === WRAPPER_DIR + "fetch-spy.ts";
+// MPC-9886: src/lib/recipientClient.ts is the browser's thin front for the wrapper (adds the interim consent marker and own-origin handling); it forwards a key it is given, so the
+// literal-key rule is enforced at ITS call sites instead (recipientFetch / recipientScript / recipientPeerConnection are wrapper functions below).
+export const isWrapperFile = (rel) => rel.startsWith(WRAPPER_DIR + "outbound.") || rel === WRAPPER_DIR + "fetch-spy.ts" || rel === "src/lib/recipientClient.ts";
 
-const WRAPPER_FUNCS = new Set(["callRecipient", "fetchRecipient", "loadRecipientScript", "createPeerConnection"]);
+const WRAPPER_FUNCS = new Set(["callRecipient", "recipientFetcher", "fetchRecipient", "loadRecipientScript", "createPeerConnection", "recipientFetch", "recipientScript", "recipientPeerConnection"]);
 const CONSTRUCTOR_GLOBALS = new Set(["XMLHttpRequest", "WebSocket", "EventSource", "RTCPeerConnection", "webkitRTCPeerConnection", "mozRTCPeerConnection"]);
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "self", "global"]);
 const URL_RE = /\b(?:(https?|wss?):\/\/([^\s/?#"'`\\)<>]*)|(stuns?|turns?):([^\s/?#"'`\\,)<>]*))/gi;
@@ -45,6 +47,8 @@ export function urlsIn(text) {
 
 function urlFinding(file, line, scheme, host, registry, nonOutbound) {
   if (isLocalHost(host) || isNonOutbound(host, nonOutbound)) return null;
+  // Link hosts are accepted for BROWSER code only (MPC-9886): a Worker or Function that names one is a server-side call and stays a finding for MPC-9885.
+  if (/^(src\/|index\.html|public\/)/.test(file) && isLinkHost(host, nonOutbound)) return null;
   const owners = entriesForHost(registry, host);
   if (owners.length) return null;
   return { rule: "url-literal", file, line, detail: `${scheme}://${host}`, message: `${scheme}://${host} is not a registered recipient host` };

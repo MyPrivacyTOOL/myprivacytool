@@ -232,6 +232,8 @@ export async function osintLookup(
   if (inputType !== 'email') return notChecked(inputValue, inputType, 'unsupported_type');
   const provider: BreachProvider | undefined = options.provider ?? (options.apiKey ? 'hibp' : undefined);
   if (!provider) return notChecked(inputValue, inputType, 'no_provider');
+  // MPC-9886, decision B (Director, 2026-11-08): no XposedOrNot without a licence. The host is registered enabled:false; refuse before any request, cache or network.
+  if (provider === 'xposedornot') return notChecked(inputValue, inputType, 'provider_not_licensed');
   if (provider === 'hibp' && !options.apiKey) return notChecked(inputValue, inputType, 'no_api_key');
 
   if (!options.skipCache) {
@@ -244,7 +246,7 @@ export async function osintLookup(
   try {
     let breaches: HibpBreach[];
     let pastes: HibpPaste[] = [];
-    if (provider === 'xposedornot') {
+    if ((provider as BreachProvider) === 'xposedornot') { // unreachable while the licence gate above holds; kept so re-enabling is one line
       breaches = await xonCheckEmail(inputValue, fetchImpl);
     } else {
       const [rawBreaches, rawPastes] = await Promise.all([

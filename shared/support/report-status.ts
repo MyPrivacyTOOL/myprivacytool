@@ -1,4 +1,6 @@
 import type { ReportStatusReader } from "./tools";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 export interface ScansReaderConfig { baseUrl: string; serviceKey: string; fetchImpl?: typeof fetch; restPrefix?: string; timeoutMs?: number }
 
@@ -16,14 +18,16 @@ const PHRASES: Record<string, string> = {
  * (to be confirmed by the identity-flow decision in MPC-8530).
  */
 export class ScansReportStatusReader implements ReportStatusReader {
+  private f: typeof fetch;
   constructor(private c: ScansReaderConfig) {
     if (!/^https:\/\//.test(c.baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(c.baseUrl)) throw new Error("baseUrl must be https (or localhost for tests)");
     if (!c.serviceKey) throw new Error("serviceKey required");
+    this.f = recipientFetcher("supabase", [], workerRecipientContext(null, { fetchImpl: c.fetchImpl })); // subject id only: no personal data item
   }
   async statusFor(subjectId: string, _tenantId: string) {
     if (!/^[0-9a-f-]{36}$/i.test(subjectId)) return { found: false };
     const url = `${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/scans?user_id=eq.${encodeURIComponent(subjectId)}&select=report_status,report_sent_at,scan_date&order=scan_date.desc&limit=1`;
-    const res = await (this.c.fetchImpl ?? fetch)(url, { headers: { apikey: this.c.serviceKey, Authorization: `Bearer ${this.c.serviceKey}` }, signal: AbortSignal.timeout(this.c.timeoutMs ?? 5000) });
+    const res = await this.f(url, { headers: { apikey: this.c.serviceKey, Authorization: `Bearer ${this.c.serviceKey}` }, signal: AbortSignal.timeout(this.c.timeoutMs ?? 5000) });
     if (!res.ok) throw new Error(`scan status read failed: ${res.status}`);
     const rows = (await res.json()) as { report_status?: string; report_sent_at?: string | null }[];
     if (!Array.isArray(rows)) throw new Error("unexpected response");

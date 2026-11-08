@@ -15,7 +15,7 @@ assert.ok(script, 'found the inline gtag script in index.html');
 assert.ok(!/<script[^>]+src="https:\/\/www\.googletagmanager\.com/.test(html), 'index.html has no static googletagmanager script tag');
 
 const KEY = 'mpt_cookie_consent';
-function load({ host = 'www.myprivacytool.io', stored = null, storage = true } = {}) {
+function load({ host = 'www.myprivacytool.io', stored = null, storage = true, clientReady = true } = {}) {
   const appended = [];
   const listeners = [];
   const state = { stored };
@@ -24,8 +24,11 @@ function load({ host = 'www.myprivacytool.io', stored = null, storage = true } =
     document: { createElement: () => ({}), head: { appendChild: (el) => appended.push(el) } },
     Date, JSON,
   });
+  // MPC-9886: the tag is loaded through the recipient client (window.mptRecipients, /recipient-client.min.js), which the page gets deferred.
+  const recipients = { script: (key, src) => { appended.push({ key, src }); return Promise.resolve(); } };
+  if (clientReady) ctx.mptRecipients = recipients;
   ctx.window = ctx;
-  ctx.addEventListener = (type, fn) => { if (type === 'mpt:consent') listeners.push(fn); };
+  ctx.addEventListener = (type, fn) => { if (type === 'mpt:consent' || type === 'mpt:recipients-ready') listeners.push(fn); };
   ctx.localStorage = storage
     ? { getItem: (k) => (k === KEY ? state.stored : null) }
     : { getItem: () => { throw new Error('blocked'); } };
@@ -34,6 +37,7 @@ function load({ host = 'www.myprivacytool.io', stored = null, storage = true } =
     ctx, appended,
     choose(value) { state.stored = value; listeners.forEach((fn) => fn()); },
     disabled: () => ctx['ga-disable-G-1BWMDBJSPL'],
+    clientReady() { ctx.mptRecipients = recipients; listeners.forEach((fn) => fn()); },
     gtagScripts: () => appended.filter((e) => String(e.src).includes('googletagmanager.com/gtag/js')),
   };
 }
@@ -88,4 +92,13 @@ test('previews and localhost never send hits, even with consent', () => {
     assert.equal(p.gtagScripts().length, 0, host);
     assert.equal(p.disabled(), true, host);
   }
+});
+test('MPC-9886: goes through the registry key "ga4", and waits for the recipient client if it is not ready yet', () => {
+  const p = load({ stored: ACCEPT, clientReady: false });
+  assert.equal(p.gtagScripts().length, 0, 'nothing is requested before the client exists');
+  p.clientReady();
+  assert.equal(p.gtagScripts().length, 1);
+  assert.equal(p.gtagScripts()[0].key, 'ga4');
+  p.clientReady();
+  assert.equal(p.gtagScripts().length, 1, 'still once');
 });

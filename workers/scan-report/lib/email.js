@@ -1,4 +1,6 @@
 import { recordSend } from './emailSends.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { rcx } from './recipients.js';
 import { REPLY_SENTENCE, ALICE_COMING_SENTENCE, REPLY_PROMISE, SIGN_OFF_LINES } from '../../../shared/reply-wording.js';
 import { buildBrokerPanel, STATE_LABEL } from './brokerPanel.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, emailItems, tally, tallyLine, hexGroups, hexText, buildReportJson } from './reportHex.js';
@@ -270,15 +272,21 @@ ${unsubscribeLink && fixedLink ? `<table role="presentation" width="100%" cellpa
   return { ...tagged('scan-report', { subject, text, html }), report };
 }
 
-export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers, attachments }, fetchImpl = fetch) {
+// `items` = the personal-data item names this message carries (MPC-9885). Every message goes to the recipient's address; the report email also carries
+// the scan's findings and the IP values in its attached file, so its caller adds them. Declared, then checked against the registry entry for "resend".
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers, attachments, items = ['email'] }, fetchImpl = undefined, rctx = undefined) {
   if (!env.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
-  const res = await fetchImpl('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ from: env.EMAIL_FROM || 'MyPrivacyTOOL <hello@myprivacytool.io>', to: [to], reply_to: env.EMAIL_REPLY_TO || undefined, subject, html, text, headers: headers || undefined, attachments: attachments || undefined }),
-  });
+  const ctx = rcx(env, fetchImpl, rctx);
+  const res = await callRecipient('resend', {
+    url: 'https://api.resend.com/emails', sent: items,
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ from: env.EMAIL_FROM || 'MyPrivacyTOOL <hello@myprivacytool.io>', to: [to], reply_to: env.EMAIL_REPLY_TO || undefined, subject, html, text, headers: headers || undefined, attachments: attachments || undefined }),
+    },
+  }, ctx);
   if (!res.ok) return { sent: false, reason: `Resend HTTP ${res.status}: ${(await res.text()).slice(0, 150)}` };
   const j = await res.json().catch(() => ({}));
-  await recordSend(env, { messageId: j.id, idempotencyKey, to }, fetchImpl);   // MPC-7556: best effort, never throws
+  await recordSend(env, { messageId: j.id, idempotencyKey, to }, fetchImpl, ctx);   // MPC-7556: best effort, never throws
   return { sent: true, id: j.id || null };
 }

@@ -21,6 +21,7 @@ import {
   detectIndexedDB,
   detectCacheStorage,
 } from './storageDetection';
+import { recipientFetch } from './recipientClient';
 
 // Orientation data interface
 export interface OrientationData {
@@ -321,7 +322,7 @@ export async function captureDeviceData(): Promise<DeviceData> {
     // MPC-7350: IP and approximate location come from our own Worker (Cloudflare request data), not from
     // third-party lookup services, so no third party sees the visitor's IP for this feature.
     const base = (import.meta.env.VITE_WORKER_ENDPOINT || 'https://api.myprivacytool.io').replace(/\/+$/, '');
-    const response = await fetch(`${base}/whoami`);
+    const response = await recipientFetch('whoami', `${base}/whoami`, undefined, []);
     if (response.ok) {
       const data = await response.json();
       ip = data.ip || ip;

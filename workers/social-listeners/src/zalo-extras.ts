@@ -5,6 +5,8 @@
 // (/webhook/zalo?k=<ZALO_WEBHOOK_SECRET>), compared in constant time. Replacing it with Zalo's own signature is a follow-up once the scheme is confirmed.
 // Nothing is sent back to the person (the OA send-message API was not confirmed): the answer lists states and counts only, visible in Zalo's webhook log.
 // Off unless ZALO_EXTRAS=on; allow-listed Zalo user ids only (ZALO_PROBE_IDS). Not built: display name and photo, follower and last contact (user-detail API with a token), sensitive flag (Verify), shared contact details.
+import { recipientFetcher } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, readRawBody, timingSafeEqual } from "./shared";
 import { allowedId, filled, obj, toStates, type ExtraDef, type Obj } from "./extras-common";
@@ -47,16 +49,16 @@ export function zaloStates(event: unknown, detail: Obj | null = null) {
   }, dt.skipped);
 }
 
-export async function zaloLookup(userId: unknown, token: string | undefined, fetchImpl: typeof fetch = fetch): Promise<Obj | null> {
+export async function zaloLookup(userId: unknown, token: string | undefined, fetchImpl?: typeof fetch): Promise<Obj | null> {
   if (!token || typeof userId !== "string" || !/^[0-9]{5,30}$/.test(userId)) return null;
   try {
-    const r = await fetchImpl(`https://openapi.zalo.me/v3.0/oa/user/detail?data=${encodeURIComponent(JSON.stringify({ user_id: userId }))}`, { headers: { access_token: token }, signal: AbortSignal.timeout(4000) });
+    const r = await recipientFetcher("platform-replies", ["username"], workerRecipientContext(undefined, { fetchImpl }))(`https://openapi.zalo.me/v3.0/oa/user/detail?data=${encodeURIComponent(JSON.stringify({ user_id: userId }))}`, { headers: { access_token: token }, signal: AbortSignal.timeout(4000) });
     const j = r.ok ? obj(await r.json()) : null;
     return j && (j.error === 0 || j.error === undefined) ? obj(j.data) : null;
   } catch { return null; }
 }
 
-export async function handleZaloExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleZaloExtras(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.ZALO_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   const key = new URL(request.url).searchParams.get("k");

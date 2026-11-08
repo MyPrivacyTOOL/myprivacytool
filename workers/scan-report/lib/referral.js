@@ -78,7 +78,7 @@ export async function attachReferral(sb, { ref, userId, email, isNewUser }) {
 }
 
 // Called once the friend's report has been delivered. Credits the referrer and tells them. Never throws (the report is already sent).
-export async function completeReferral(env, sb, refereeUserId, fetchImpl = fetch, allowed = () => true) {
+export async function completeReferral(env, sb, refereeUserId, fetchImpl = undefined, allowed = () => true, rctx = undefined) {
   try {
     const row = (await sb.rpc('mpt_complete_referral', { p_referee_user_id: refereeUserId }))?.[0];
     if (!row) return { completed: false };
@@ -86,7 +86,7 @@ export async function completeReferral(env, sb, refereeUserId, fetchImpl = fetch
       const u = (await sb.select(`users?id=eq.${row.referrer_user_id}&select=email,email_opt_out_at,referral_code&limit=1`))[0];
       if (u && !u.email_opt_out_at && !(await suppressedAmong(sb, [u.email])).has(String(u.email).trim().toLowerCase()) && allowed(env, u.email) && referralTester(env, u.email)) {   // MPC-7555: the reward email is not transactional; it honours THE opt-out
         const mail = buildRewardEmail({ months: row.pro_months_earned, manageLink: u.referral_code ? await manageUrl(env, u.referral_code) : null, unsubscribeLink: await unsubscribePageUrl(env, u.email) });
-        const r = await sendEmail(env, { to: u.email, ...mail, idempotencyKey: `referral-reward-${refereeUserId}` }, fetchImpl);
+        const r = await sendEmail(env, { to: u.email, ...mail, idempotencyKey: `referral-reward-${refereeUserId}` }, fetchImpl, rctx);
         if (!r.sent) console.error('referral reward email not sent:', r.reason);
       }
     }
@@ -128,7 +128,7 @@ export async function handleReferralStatus(env, request, origin, json, deps) {
 
 // POST /api/referral/invite {code, token, emails:[up to 3]} -> {ok, sent, skipped}. One plain email each, no reminders.
 export async function handleReferralInvite(env, request, origin, json, deps) {
-  const { sb, allowed = () => true, fetchImpl = fetch } = deps;
+  const { sb, allowed = () => true, fetchImpl = undefined } = deps;
   const refused = await gate(env, request, origin, json, { ...deps, prefix: 'referral-invite:' });
   if (refused) return refused;
   const read = await readCappedJson(request, 2048);

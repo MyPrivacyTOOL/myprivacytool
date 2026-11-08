@@ -9,12 +9,14 @@ import { requestLifecycle } from './lib/lifecycle.js';
 import { makeLiveLink, makeLiveToken } from './lib/live.js';
 import { unsubscribeToken } from './lib/onboarding.js';
 import { signReceipt } from './lib/receipts.js';
+import { enableHibpForTests } from './test-support/hibp-on.mjs';
+enableHibpForTests();   // MPC-9885: hibp is enabled:false in the registry; this suite's breach results need it on
 
 let ok = true; const check = (c, m) => { process.stdout.write(`${c ? 'PASS' : 'FAIL'} ${m}\n`); if (!c) ok = false; };
 const trace = (m) => process.stdout.write(`TRACE ${m}\n`);
 
 // ---- sandbox: nothing here may reach a real database, queue or provider
-const TEST_DB_HOST = 'supabase.test.invalid';
+const TEST_DB_HOST = 'test-db.supabase.co';
 const STUB_HOSTS = ['api.resend.com', 'api.hubapi.com', 'cloudflare-dns.com', 'gravatar.com', 'libravatar.org', 'rdap.org', 'haveibeenpwned.com', TEST_DB_HOST];
 const realFetch = globalThis.fetch;
 const sandbox = (F) => { globalThis.fetch = async (u, o) => { const h = new URL(String(u)).host; if (!STUB_HOSTS.some((s) => h === s || h.endsWith(`.${s}`))) throw new Error(`NON-TEST HOST ${h}`); return F.f(u, o); }; };

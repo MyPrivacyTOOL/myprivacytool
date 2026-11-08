@@ -3,13 +3,14 @@
 // no getChat, no photo lookups (those are the baseline scan's separate, consented hexagons). Private chats and non-bot senders only.
 // The stored sender key is the HMAC key when TELEGRAM_ID_HMAC_KEY is set (src/sender-key.ts), else the plain id.
 // STOP / delete (any private sender, whatever the other switches say) erases the capture and core-brain's conversation row (eraseTelegramCapture).
+import { callRecipient } from "../../../shared/recipients/outbound";
 import { isDeleteCommandText } from "./delete-my-data";
 import type { Logger } from "./logger";
 import { telegramSender } from "./probe-reader";
 import { senderKey } from "./sender-key";
 import { rpc } from "./social";
 import type { Env } from "./shared";
-import { pick } from "./shared";
+import { pick, recipientCtx } from "./shared";
 import { cleanData } from "./x-hexagons";
 
 export const telegramCaptureEnabled = (env: Env): boolean => env.TELEGRAM_CAPTURE_HEXAGONS === "on";
@@ -47,9 +48,11 @@ export function telegramRecord(update: unknown): { id: string; handle?: string; 
 export async function consentConfirmed(env: Env, senderId: string): Promise<boolean> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return false;
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/conversation_states?channel=eq.telegram&sender_id=eq.${encodeURIComponent(senderId)}&order=updated_at.desc&limit=1&select=state`, {
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/conversation_states?channel=eq.telegram&sender_id=eq.${encodeURIComponent(senderId)}&order=updated_at.desc&limit=1&select=state`,
+      init: { headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` }, signal: AbortSignal.timeout(3000) },
+      sent: ["username"], // sender id in the filter
+    }, recipientCtx(env));
     if (!res.ok) return false;
     const rows = (await res.json().catch(() => [])) as { state?: unknown }[];
     return rows[0]?.state === "confirmed";
@@ -103,8 +106,10 @@ export async function replyCaptureErased(env: Env, update: unknown, ok: boolean,
   const chatId = pick(update, "message", "chat", "id");
   if (!env.TELEGRAM_BOT_TOKEN || (typeof chatId !== "number" && typeof chatId !== "string")) return;
   try {
-    await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text: ok ? DONE : FAILED }), signal: AbortSignal.timeout(5000),
-    });
+    await callRecipient("telegram", {
+      url: `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chatId, text: ok ? DONE : FAILED }), signal: AbortSignal.timeout(5000) },
+      sent: ["message_text", "username"], // the reply text and the chat id it goes to
+    }, recipientCtx(env));
   } catch { log.warn("telegram_capture_reply_failed"); }
 }

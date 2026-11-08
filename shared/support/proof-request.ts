@@ -1,5 +1,7 @@
 import type { CaseStore } from "./types";
 import { RestProofStore } from "./proof";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 /**
  * Requesting an identity proof (MPC-8530 decision D-3, approved by Chris 2026-10-27): the customer gives the email address of their account and,
@@ -87,10 +89,14 @@ export async function requestProof(d: ProofRequestDeps, input: { email: unknown;
 export interface ResendProofMailerConfig { apiKey: string; from: string; fetchImpl?: typeof fetch; timeoutMs?: number }
 /** Resend, same API contract as ResendNotifier. Throws unless Resend confirms with an id; the caller swallows it (no enumeration). */
 export class ResendProofMailer implements ProofMailer {
-  constructor(private c: ResendProofMailerConfig) { if (!c.apiKey || !c.from) throw new Error("apiKey and from required"); }
+  private f: typeof fetch;
+  constructor(private c: ResendProofMailerConfig) {
+    if (!c.apiKey || !c.from) throw new Error("apiKey and from required");
+    this.f = recipientFetcher("resend", ["email"], workerRecipientContext(null, { fetchImpl: c.fetchImpl }));
+  }
   async send(to: string, subject: string, text: string, idempotencyKey: string): Promise<void> {
     if (!EMAIL.test(to)) throw new Error("invalid address");
-    const res = await (this.c.fetchImpl ?? fetch)("https://api.resend.com/emails", {
+    const res = await this.f("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${this.c.apiKey}`, "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({ from: this.c.from, to: [to], subject, text }),

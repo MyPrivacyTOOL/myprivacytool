@@ -22,6 +22,8 @@ import { channelOsintConfigured, postChannelOsint, buildChannelOsintText, publis
 import { KPI_CRON, publishKpiDashboard } from './publishers/kpi-dashboard.js';
 import { withSubrequestBudget, INVOCATION_BUDGET, RESERVED_FOR_WRITE } from './lib/budget.js';
 import { DIGEST_CRON, digestConfigured, postDigest, buildDigestText, slack } from './publishers/slack-digest.js';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { recipientCtx } from './lib/recipient-ctx.js';
 
 export const COLLECTOR_VERSION = '1.0.0';
 export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot, edgeMachines, learningLoop, scanGap, nightlyChain, hubspotOptout, emailDelivery, channelOsint, metaAds, ...ga4Reports];
@@ -54,7 +56,7 @@ const SAFE = (msg, env) => {
 // Inserts one row or an array of rows in a single request. Workers allow a limited number of outbound calls per
 // invocation (50 on the free plan), so runAll() sends all rows together instead of one call per collector.
 async function insertRows(env, rows) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics`, init: {
     method: 'POST',
     headers: {
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -63,7 +65,7 @@ async function insertRows(env, rows) {
       Prefer: 'return=minimal',
     },
     body: JSON.stringify(rows),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`insert ${[rows].flat().map((r) => r.source).join(',')} failed: HTTP ${res.status}`);
 }
 
@@ -137,9 +139,10 @@ const configured = (env) => Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROL
 
 // One stage = one unit of the daily run. Collection stages store their own rows and raise their own alerts; publish stages are
 // independent so a Notion failure never affects collection.
-export async function runStage(stage, env, now = new Date()) {
-  if (stage.startsWith('publish_') && !notionConfigured(env)) return { skipped: 'NOTION_TOKEN not set' };
+export async function runStage(stage, baseEnv, now = new Date()) {
+  if (stage.startsWith('publish_') && !notionConfigured(baseEnv)) return { skipped: 'NOTION_TOKEN not set' };
   const body = async (scope) => {
+    const env = { ...baseEnv, __budget: scope.count }; // MPC-9885: every wrapper call of this stage is counted (lib/budget.js)
     if (COLLECTOR_GROUPS[stage]) return await runAll(env, COLLECTOR_GROUPS[stage], now, { scope });
     switch (stage) {
       case 'publish_notion': return await publishAll(env, now, { parts: ['daily', 'weekly'] });

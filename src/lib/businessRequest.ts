@@ -1,3 +1,5 @@
+import { recipientFetch } from "@/lib/recipientClient";
+
 // MPC-9825: queues a /business form submission for the staffed 48-hour results service (mpt-leads Worker, POST /business-request).
 // A request that is not queued is NOT acknowledged: the caller shows an error instead of promising a 48-hour clock that nothing is running.
 export interface BusinessRequestInput {
@@ -17,7 +19,7 @@ export async function queueBusinessRequest(input: BusinessRequestInput): Promise
   const base = (import.meta.env.VITE_WORKER_ENDPOINT || "https://api.myprivacytool.io").replace(/\/+$/, "");
   let res: Response;
   try {
-    res = await fetch(`${base}/business-request`, {
+    res = await recipientFetch("leads", `${base}/business-request`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -28,7 +30,7 @@ export async function queueBusinessRequest(input: BusinessRequestInput): Promise
         consent: input.consent,
         consent_source: input.consentSource,
       }),
-    });
+    }, ["email", "name"]);
   } catch {
     throw new Error("We could not send your request. Please try again, or email hello@myprivacytool.io.");
   }

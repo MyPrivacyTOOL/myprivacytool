@@ -4,7 +4,7 @@
 //   opts.onRequest(url, init, res, db)  return a response to replace the call (inject a fault), or nothing to carry on
 import { entitlementState, entitlementRpc } from './fake-entitlements.mjs';
 export function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [] }; const calls = []; let n = 0; const seenKeys = new Map(); const ent = entitlementState(); db.accounts = []; db.ent = ent;
+  const db = { scan_recipient_log: [], users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [] }; const calls = []; let n = 0; const seenKeys = new Map(); const ent = entitlementState(); db.accounts = []; db.ent = ent;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });

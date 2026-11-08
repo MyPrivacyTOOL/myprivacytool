@@ -8,11 +8,14 @@
 //   5 resolved host matches the entry's hosts  6 declared `sent` is a subset of its data items (after country exclusions)
 //   7 user_supplied: https only, no private ranges, no redirect to a new host, size and time caps
 // On a call that reaches the network it logs {key, items, at, status}; item NAMES only, never values.
-import recipientsData from "./recipients.json";
+import recipientsData from "./recipients.json" with { type: "json" };
 import {
   DATA_ITEMS, effectiveDataItems, enabledForCountry, findRecipient, flagIsOn, hostMatches, parseRegistry,
   type DataItem, type Recipient, type RecipientRegistry,
-} from "./registry";
+} from "./registry.ts";
+
+// Browser-only types, kept loose so this file compiles in Worker projects (no DOM lib) as well as the app.
+type DocLike = any; type ScriptEl = any; type RtcConfig = any; type RtcPeer = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export type RecipientErrorCode =
   | "UNKNOWN_KEY" | "DISABLED" | "FLAG_OFF" | "COUNTRY_DISABLED" | "CONSENT_REQUIRED" | "CONSENT_INVALID" | "BAD_URL"
@@ -65,6 +68,15 @@ export interface RecipientContext {
   /** Check 7 caps. */
   maxBytes?: number;
   timeoutMs?: number;
+  /**
+   * Check 4 policy. "enforce" (default): a post_click recipient needs a consent id. "pending_mpc_9887": the server-side consent store does not exist
+   * yet (MPC-9887), so Workers and Functions cannot be given a consent id without inventing one; check 4 is skipped, every other check still runs.
+   * workerRecipientContext() sets this from ONE constant (CONSENT_GATE_ACTIVE in worker-ctx.ts) that MPC-9887 flips. Never set it to anything
+   * else to get past a refusal.
+   */
+  consentGate?: "enforce" | "pending_mpc_9887";
+  /** Runs after every check passed and immediately before the network call (Workers use it to count subrequests against a budget). A throw aborts the call. */
+  beforeCall?: (key: string) => void | Promise<void>;
 }
 
 export interface RecipientRequest {
@@ -74,14 +86,40 @@ export interface RecipientRequest {
   sent: readonly DataItem[];
 }
 
-export const USER_SUPPLIED_MAX_BYTES = 1_000_000;
+export const USER_SUPPLIED_MAX_BYTES = 1_500_000;   // matches the page readers this key replaced (listingCheck, records-check): over the cap the body is TRUNCATED, not refused
 export const USER_SUPPLIED_TIMEOUT_MS = 8000;
-const MAX_REDIRECT_HOPS = 3;
+const MAX_REDIRECT_HOPS = 1;
+/** Response header set when a user_supplied body was cut at the cap (the caller decides what "too big to read in full" means for it). */
+export const TRUNCATED_HEADER = "x-recipient-truncated";
+
+const SECOND_LEVEL = new Set(["co", "com", "org", "net", "gov", "edu", "ac", "or", "ne"]);
+/** Approximate registrable domain (eTLD+1): last two labels, or three when the second-level label is a common one under a 2-letter country TLD (example.co.uk). No public-suffix list is bundled. */
+export function registrableDomain(hostname: string): string {
+  const labels = hostname.toLowerCase().replace(/\.$/, "").split(".");
+  if (labels.length <= 2) return labels.join(".");
+  const tld = labels[labels.length - 1], sld = labels[labels.length - 2];
+  return labels.slice(tld.length === 2 && SECOND_LEVEL.has(sld) ? -3 : -2).join(".");
+}
 
 let bundled: RecipientRegistry | null = null;
 const defaultRegistry = (): RecipientRegistry => (bundled ??= parseRegistry(recipientsData));
+/**
+ * TEST SEAM. Handler tests inject a fetchImpl but the registry is the bundled file; a test that needs a recipient in a different state (for example
+ * hibp enabled with a key) swaps the bundled registry here and restores it with the returned function. Production code never calls this.
+ */
+export function setBundledRegistryForTests(registry: RecipientRegistry | null): () => void {
+  const prev = bundled;
+  bundled = registry;
+  return () => { bundled = prev; };
+}
 
 const readFlag = (ctx: RecipientContext, name: string): unknown => (typeof ctx.flags === "function" ? ctx.flags(name) : ctx.flags?.[name]);
+
+/** localhost / 127.0.0.0/8 / ::1 only. Used to let a developer's own machine call its own dev server over http. */
+export const isLoopbackHost = (hostname: string): boolean => {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "localhost" || h === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+};
 
 /** Private, loopback, link-local, carrier-grade and reserved destinations, and internal-looking names. Literal-address check only: see PR note on DNS. */
 export function isPrivateOrInternalHost(hostname: string): boolean {
@@ -141,8 +179,8 @@ export async function checkRecipient(key: string, hostUrl: string, sent: readonl
   if (recipient.flag && !flagIsOn(readFlag(ctx, recipient.flag))) throw new RecipientError("FLAG_OFF", key, recipient.flag);
   // 3 country override
   if (!enabledForCountry(recipient, ctx.country)) throw new RecipientError("COUNTRY_DISABLED", key, String(ctx.country));
-  // 4 consent for post_click
-  if (recipient.phase === "post_click") {
+  // 4 consent for post_click (skipped only while the consent store is not built: ctx.consentGate, see RecipientContext)
+  if (recipient.phase === "post_click" && ctx.consentGate !== "pending_mpc_9887") {
     const id = typeof ctx.consentId === "string" ? ctx.consentId.trim() : "";
     if (!id) throw new RecipientError("CONSENT_REQUIRED", key);
     if (ctx.verifyConsent && !(await ctx.verifyConsent(id, ctx.scanId ?? null))) throw new RecipientError("CONSENT_INVALID", key);
@@ -158,7 +196,8 @@ export async function checkRecipient(key: string, hostUrl: string, sent: readonl
   } else {
     if (recipient.host_kind === "stun") {
       if (!/^stuns?:$/.test(url.protocol)) throw new RecipientError("WRONG_HOST_KIND", key, "stun entries accept stun: URLs only");
-    } else if (url.protocol !== "https:" && url.protocol !== "wss:") {
+    } else if (url.protocol !== "https:" && url.protocol !== "wss:" && !(url.protocol === "http:" && isLoopbackHost(url.hostname))) {
+      // MPC-9886: plain http only for a loopback host (vite dev, `vite preview`, the Playwright suite). A production host is https or refused.
       throw new RecipientError("BAD_URL", key, `protocol ${url.protocol}`);
     }
     if (!hostMatches(url.hostname, recipient.hosts)) throw new RecipientError("HOST_MISMATCH", key, url.hostname);
@@ -182,43 +221,55 @@ async function guarded(key: string, hostUrl: string, sent: readonly DataItem[], 
   }
 }
 
-async function capBody(key: string, res: Response, maxBytes: number): Promise<Response> {
+async function capBody(key: string, res: Response, maxBytes: number, truncate = false): Promise<Response> {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new RecipientError("RESPONSE_TOO_LARGE", key, `content-length ${declared}`);
+  if (!truncate && Number.isFinite(declared) && declared > maxBytes) throw new RecipientError("RESPONSE_TOO_LARGE", key, `content-length ${declared}`);
   if (!res.body) return res;
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let cut = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > maxBytes) { try { await reader.cancel(); } catch { /* ignore */ } throw new RecipientError("RESPONSE_TOO_LARGE", key, `more than ${maxBytes} bytes`); }
+    if (total > maxBytes) {
+      try { await reader.cancel(); } catch { /* ignore */ }
+      if (!truncate) throw new RecipientError("RESPONSE_TOO_LARGE", key, `more than ${maxBytes} bytes`);
+      chunks.push(value);
+      cut = true;
+      break;
+    }
     chunks.push(value);
   }
-  const body = new Uint8Array(total);
+  const all = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
   let off = 0;
-  for (const c of chunks) { body.set(c, off); off += c.byteLength; }
-  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+  for (const c of chunks) { all.set(c, off); off += c.byteLength; }
+  const body = cut ? all.subarray(0, maxBytes) : all;
+  const headers = new Headers(res.headers);
+  if (cut) headers.set(TRUNCATED_HEADER, "1");
+  return new Response(body, { status: res.status, statusText: res.statusText, headers });
 }
 
 async function fetchUserSupplied(key: string, first: URL, init: RequestInit | undefined, ctx: RecipientContext, doFetch: typeof fetch): Promise<Response> {
   const timeoutMs = ctx.timeoutMs ?? USER_SUPPLIED_TIMEOUT_MS;
   const maxBytes = ctx.maxBytes ?? USER_SUPPLIED_MAX_BYTES;
   const controller = new AbortController();
+  const callerSignal = init?.signal;
+  if (callerSignal) { if (callerSignal.aborted) controller.abort(); else callerSignal.addEventListener("abort", () => controller.abort(), { once: true }); }
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   try {
     let url = first;
     for (let hop = 0; ; hop++) {
       const res = await doFetch(url.toString(), { ...init, redirect: "manual", signal: controller.signal });
-      const isRedirect = res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400);
-      if (!isRedirect) return await capBody(key, res, maxBytes);
+      const isRedirect = (res.type as string) === "opaqueredirect" || (res.status >= 300 && res.status < 400);
+      if (!isRedirect) return await capBody(key, res, maxBytes, true);
       const location = res.headers.get("location");
       if (!location) throw new RecipientError("REDIRECT_BLOCKED", key, "redirect without a readable Location");
       let next: URL;
       try { next = new URL(location, url); } catch { throw new RecipientError("REDIRECT_BLOCKED", key, "bad Location"); }
-      if (next.hostname.toLowerCase() !== url.hostname.toLowerCase() || next.protocol !== "https:") throw new RecipientError("REDIRECT_BLOCKED", key, `to ${next.hostname}`);
+      if (registrableDomain(next.hostname) !== registrableDomain(url.hostname) || next.protocol !== "https:") throw new RecipientError("REDIRECT_BLOCKED", key, `to ${next.hostname}`);
       if (hop + 1 > MAX_REDIRECT_HOPS) throw new RecipientError("REDIRECT_BLOCKED", key, "too many redirects");
       url = next;
     }
@@ -237,6 +288,7 @@ export async function callRecipient(key: string, request: RecipientRequest, ctx:
   const entry = (status: RecipientLogStatus, extra: Partial<RecipientLogEntry> = {}): RecipientLogEntry =>
     ({ key, items: checked.items, at: nowIso(ctx), status, ...(ctx.scanId ? { scan_id: ctx.scanId } : {}), ...extra });
   try {
+    await ctx.beforeCall?.(key);
     const res = checked.recipient.host_kind === "user_supplied"
       ? await fetchUserSupplied(key, checked.url, request.init, ctx, doFetch)
       : await doFetch(checked.url.toString(), request.init);
@@ -248,9 +300,23 @@ export async function callRecipient(key: string, request: RecipientRequest, ctx:
   }
 }
 
+/**
+ * A fetch-shaped function bound to ONE registry key and ONE declared `sent` list, for code that takes an injected `fetchImpl` and calls it in many
+ * places (the Workers do). `recipientFetcher("resend", ["email"], ctx)(url, init)` is exactly `callRecipient("resend", { url, init, sent: ["email"] }, ctx)`.
+ * The CI scan requires the key to be a string literal, like every other wrapper call, and `sent` is declared at the call site, so conversion keeps
+ * each call's key and data items visible in the diff. `input` must be a string or URL: a Request object has no declared host to check.
+ */
+export function recipientFetcher(key: string, sent: readonly DataItem[], ctx: RecipientContext = {}): typeof fetch {
+  return ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : undefined;
+    if (url === undefined) return Promise.reject(new RecipientError("BAD_URL", key, "pass a URL string, not a Request"));
+    return callRecipient(key, { url, init, sent }, ctx);
+  }) as typeof fetch;
+}
+
 /** Browser flavour of callRecipient: the same checks, and credentials are never sent to a recipient unless the caller asks. */
 export function fetchRecipient(key: string, request: RecipientRequest, ctx: RecipientContext = {}): Promise<Response> {
-  return callRecipient(key, { ...request, init: { credentials: "omit", ...request.init } }, ctx);
+  return callRecipient(key, { ...request, init: { credentials: "omit", ...request.init } as RequestInit }, ctx);
 }
 
 export interface ScriptLoadOptions {
@@ -258,17 +324,17 @@ export interface ScriptLoadOptions {
   sent?: readonly DataItem[];
   attrs?: Record<string, string>;
   /** Injected in tests; defaults to globalThis.document. */
-  document?: Document;
+  document?: DocLike;
 }
 
 /** Browser: the only way to add a third-party <script>. Resolves when the script has loaded. */
-export async function loadRecipientScript(key: string, src: string, ctx: RecipientContext = {}, opts: ScriptLoadOptions = {}): Promise<HTMLScriptElement> {
+export async function loadRecipientScript(key: string, src: string, ctx: RecipientContext = {}, opts: ScriptLoadOptions = {}): Promise<ScriptEl> {
   const registry = ctx.registry ?? defaultRegistry();
   const declared = opts.sent ?? (findRecipient(registry, key) ? effectiveDataItems(findRecipient(registry, key)!, ctx.country) : []);
   const checked = await guarded(key, src, declared, ctx);
-  const doc = opts.document ?? (globalThis as { document?: Document }).document;
+  const doc = opts.document ?? (globalThis as { document?: DocLike }).document;
   if (!doc) throw new RecipientError("BAD_URL", key, "loadRecipientScript needs a document");
-  return await new Promise<HTMLScriptElement>((resolve, reject) => {
+  return await new Promise<ScriptEl>((resolve, reject) => {
     const el = doc.createElement("script");
     el.src = checked.url.toString();
     el.async = true;
@@ -281,14 +347,14 @@ export async function loadRecipientScript(key: string, src: string, ctx: Recipie
 
 export interface PeerConnectionOptions {
   /** Injected in tests; defaults to globalThis.RTCPeerConnection. */
-  RTCPeerConnectionImpl?: new (config?: RTCConfiguration) => RTCPeerConnection;
+  RTCPeerConnectionImpl?: new (config?: RtcConfig) => RtcPeer;
 }
 
 /**
  * Browser: the STUN path. `iceServers` may only name stun-kind hosts of the given key. An EMPTY iceServers list contacts nobody (host candidates
  * only), so it needs no consent and no checks: this is the pre-consent mode (design 2.4).
  */
-export async function createPeerConnection(key: string, config: RTCConfiguration = {}, ctx: RecipientContext = {}, opts: PeerConnectionOptions = {}): Promise<RTCPeerConnection> {
+export async function createPeerConnection(key: string, config: RtcConfig = {}, ctx: RecipientContext = {}, opts: PeerConnectionOptions = {}): Promise<RtcPeer> {
   const Impl = opts.RTCPeerConnectionImpl ?? (globalThis as { RTCPeerConnection?: PeerConnectionOptions["RTCPeerConnectionImpl"] }).RTCPeerConnection;
   if (!Impl) throw new RecipientError("BAD_URL", key, "RTCPeerConnection is not available");
   const servers = config.iceServers ?? [];

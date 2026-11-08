@@ -14,16 +14,15 @@ export class SubrequestBudgetError extends Error {
   constructor(label, limit) { super(`subrequest budget exceeded in ${label}: more than ${limit} outbound calls in one invocation`); this.name = 'SubrequestBudgetError'; }
 }
 
-// Runs fn with globalThis.fetch replaced by a counting wrapper, then restores it. Phases run one after another per invocation,
-// so a single module-level scope is enough. `ceiling()` lets a caller temporarily lower the limit (collectors leave room for the write).
+// Runs fn(scope) with a call counter at scope.count. The platform is not touched (MPC-9885: call sites go through the recipient wrapper);
+// runStage puts scope.count on env.__budget and lib/recipient-ctx.js passes it as the context's beforeCall, which runs after the wrapper's
+// checks and right before the network call: one count per wrapper call, refused with SubrequestBudgetError once `limit` is reached.
+// Phases run one after another per invocation. `scope.limit` can be lowered temporarily (collectors leave room for the write).
 export async function withSubrequestBudget(label, limit, fn) {
-  const original = globalThis.fetch;
   const scope = { label, limit, used: 0 };
-  globalThis.fetch = function countedFetch(...args) {
-    if (scope.used >= scope.limit) return Promise.reject(new SubrequestBudgetError(scope.label, scope.limit));
+  scope.count = () => {
+    if (scope.used >= scope.limit) throw new SubrequestBudgetError(scope.label, scope.limit);
     scope.used += 1;
-    return original.apply(this, args);
   };
-  try { return { value: await fn(scope), used: scope.used }; }
-  finally { globalThis.fetch = original; }
+  return { value: await fn(scope), used: scope.used };
 }

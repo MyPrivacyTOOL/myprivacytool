@@ -44,12 +44,12 @@ function setup(envOver: Record<string, unknown> = {}, o: { snaps?: any[] } = {})
     return Response.json({ ok: true });
   }));
   const brain = vi.fn(async () => Response.json({ ok: true, ignored: true }));
-  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc", CORE_BRAIN: { fetch: brain },
+  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc", CORE_BRAIN: { fetch: brain },
     PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_FIX_WIZARD: "on", TELEGRAM_DASHBOARD_LINKS: "on", ...envOver } as unknown as Env;
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(u) }), env);
   const msg = (text: string, uid: number) => ({ update_id: uid, message: { message_id: 7, date: 1700000000, text, from, chat: { id: ID, type: "private" } } });
   const cb = (data: string, uid: number) => ({ update_id: uid, callback_query: { id: `cbq${uid}`, from, data, message: { message_id: 55, chat: { id: ID, type: "private" } } } });
-  return { calls, logs, post, msg, cb, brain, writes: () => calls.filter((c) => c.method !== "GET" && c.url.includes("sb.test")) };
+  return { calls, logs, post, msg, cb, brain, writes: () => calls.filter((c) => c.method !== "GET" && c.url.includes("x.supabase.co")) };
 }
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -129,7 +129,7 @@ describe("fix wizard with hashing on", () => {
   it("a misconfigured key sends nothing to the database", async () => {
     const t = setup({ TELEGRAM_ID_HMAC_KEY: "short" });
     await t.post(t.msg("/fix", 31));
-    expect(t.calls.filter((c) => c.url.includes("sb.test"))).toHaveLength(0);
+    expect(t.calls.filter((c) => c.url.includes("x.supabase.co"))).toHaveLength(0);
   });
 });
 
