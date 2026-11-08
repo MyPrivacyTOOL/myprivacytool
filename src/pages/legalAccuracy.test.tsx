@@ -1,6 +1,8 @@
 // MPC-9828 (F8): a legal page must be true on the day it is read. Until F3 (accounts and Stripe billing) is live, no legal page may
 // state Stripe, accounts, billing, cancellation or refunds as a present fact; and no legal page carries a status marker.
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { renderPage } from "@/test/render";
 import { FEATURE_STATUS } from "@/config/featureStatus";
 import Privacy from "./Privacy";
@@ -16,6 +18,9 @@ const PAGES: Array<[string, () => JSX.Element]> = [
   ["/dpa", () => <DPA />],
   ["/acceptable-use", () => <AcceptableUse />],
 ];
+// vitest runs in mode "test", which does not load .env.production, so read the production switch from the file itself.
+const ACCOUNTS_LIVE = /^VITE_ACCOUNTS_ENABLED=true\s*$/m.test(readFileSync(resolve(process.cwd(), ".env.production"), "utf8"));
+const NO_ACCOUNTS = /(we|there) (do not|don't|have no|are no)[^.]{0,40}(user )?accounts?( today)?|no accounts? today|account data:? we hold none|no account to cancel/i;
 const FUTURE = /when paid plans open|before paid plans go live|planned|expect|not (yet )?open|not available today|none of it applies today|we hold none today|we do not have user accounts/i;
 const sentences = (t: string) => t.replace(/\s+/g, " ").split(/(?<=\.)\s+/);
 
@@ -62,5 +67,20 @@ describe("legal pages: Stripe and billing are never present tense before F3 is l
     renderPage(p === "/terms" ? <Terms /> : <Cookies />);
     const marks = [...document.querySelectorAll("[data-feature-status]")].map((e) => e.getAttribute("data-feature"));
     expect(marks.filter((m) => m !== "F8")).toEqual([]);
+  });
+});
+
+// MPC-9913 (ledger C21): while free accounts are live, no legal page may say there are no accounts or no account data.
+describe("legal pages: never say there are no accounts while free accounts are live", () => {
+  it.each(PAGES)("%s has no no-accounts sentence", (_p, el) => {
+    if (!ACCOUNTS_LIVE) return;
+    renderPage(el());
+    const hits = sentences(document.body.textContent ?? "").filter((x) => NO_ACCOUNTS.test(x));
+    expect(hits, `no-accounts sentence: "${hits[0]}"`).toEqual([]);
+  });
+  it("the pattern catches the old wording", () => {
+    for (const s of ["We have no accounts today.", "There are no user accounts today; the free scan needs none.", "We do not have user accounts today.", "Account Data: We hold none today.", "There is no subscription and no account to cancel."]) {
+      expect(NO_ACCOUNTS.test(s), s).toBe(true);
+    }
   });
 });

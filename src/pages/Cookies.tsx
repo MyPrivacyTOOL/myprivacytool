@@ -289,6 +289,12 @@ const Cookies = () => {
                   not sent to us unless you submit it
                 </li>
                 <li>
+                  <strong>Sign-in session:</strong> If you create or sign in to a
+                  free account, your browser keeps a sign-in session in local
+                  storage (key mpt_account_session) until you sign out. It is
+                  used only to keep you signed in
+                </li>
+                <li>
                   <strong>IndexedDB:</strong> Stores larger amounts of data for
                   offline functionality
                 </li>
