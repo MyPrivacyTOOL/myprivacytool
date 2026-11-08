@@ -60,6 +60,9 @@ echo "== schema assertions"
 psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 
 
+echo "== visit log, country policy and purge (MPC-9889)"
+psql_ "$TEST_URL" -At -f supabase/tests/visit-log.test.sql
+
 echo "== dashboard links and sessions (MPC-7893)"
 psql_ "$TEST_URL" -At -f supabase/tests/dashboard-links.test.sql
 

@@ -71,10 +71,7 @@ export default {
         "referrer",
         "utm",
         "country",
-        "device_profile",
-        "user_agent",
-        "page_load",
-        "city"
+        "device_profile"
       ],
       "purpose": "Traffic attribution only, kept apart from your scan and account and never joined to them.",
       "party": "first",
@@ -90,7 +87,7 @@ export default {
       "dpa_listed": true,
       "since": "2026-11-08",
       "until": null,
-      "note": "MPC-9885: shared/edge-capture/capture.ts writes ONE edge_visits row per request that serves both the visit log and the bot record: it also carries user_agent, the request path and host (page_load) and request.cf (city, region, coordinates, timezone, network); added user_agent, page_load, city. The query string (utm tags) is kept except credential-like values."
+      "note": "MPC-9889: person and unknown visits only (functions/_visit-log.ts). IP shaped by the country policy (raw / truncated / none) before it leaves the Worker; referrer host + path; utm tags; country; device class. No user agent, headers or request path: bots and AI go to machine-mirror. Same host also serves the policy read (mpt_visit_log_policy), which sends nothing."
     },
     {
       "key": "machine-mirror",
@@ -103,7 +100,9 @@ export default {
       "data_items": [
         "user_agent",
         "ip",
-        "page_load"
+        "page_load",
+        "country",
+        "city"
       ],
       "purpose": "Records which bots and AI crawlers visit, to classify automated traffic.",
       "party": "first",
@@ -118,7 +117,8 @@ export default {
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9889: bot and AI visits only (edge_visits). The row carries request.cf (country, city, network) and the header set for bot forensics; the raw IP window is cut by the retention tasks (MPC-9891)."
     },
     {
       "key": "scan-report",

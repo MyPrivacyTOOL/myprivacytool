@@ -271,6 +271,8 @@ jobs:
       - run: npm ci
       - name: Layer 1 - static scan against the registry and allowlist
         run: node scripts/registry-ci/check.mjs static
+      - name: Visit-log isolation (MPC-9889, rule 3)
+        run: node scripts/ci/check-visit-log-isolation.mjs
       - name: Layer 3 - fetch spy + scanner tests
         run: npx vitest run shared/recipients scripts/registry-ci
 

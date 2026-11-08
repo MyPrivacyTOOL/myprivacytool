@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "scan:secrets": "node scripts/ci/scan-secrets.mjs",
+    "check:visit-log": "node scripts/ci/check-visit-log-isolation.mjs",
     "check:registry": "node scripts/registry-ci/check.mjs",
     "check:registry:report": "node scripts/registry-ci/check.mjs --report",
     "test:registry-crawl": "playwright test -c playwright.registry.config.ts",
