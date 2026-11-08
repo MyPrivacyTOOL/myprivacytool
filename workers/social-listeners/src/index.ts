@@ -13,6 +13,7 @@ import { handleYoutubeExtras } from "./youtube-extras";
 import { handleLinkedInWebhook } from "./linkedin-webhook";
 import { handleTelegramWebhook } from "./telegram-webhook";
 import { handleXWebhook } from "./x-webhook";
+import { handleSyntheticRoundtrip } from "./synthetic-roundtrip";
 
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
@@ -30,6 +31,7 @@ export default {
     if (pathname === "/youtube/check") return handleYoutubeExtras(request, env);
     if (pathname === "/webhook/linkedin") return handleLinkedInWebhook(request, env);
     if (pathname === "/webhook/telegram") return handleTelegramWebhook(request, env, ctx);
+    if (pathname === "/synthetic/telegram-roundtrip") return handleSyntheticRoundtrip(request, env);
     if (pathname === "/") return Response.json({ worker: "social-listeners", ok: true });
     return new Response("Not Found", { status: 404 });
   },
