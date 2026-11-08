@@ -1,4 +1,4 @@
-// The Email lane, the dark web, WhatsApp and Facebook Messenger laid out for the climbing footprint trail (Chris, 2026-11-08: "these are the
+// The Email lane, breach and threat monitoring, WhatsApp and Facebook Messenger laid out for the climbing footprint trail (Chris, 2026-11-08: "these are the
 // most important"). Tiles come from the catalogue (shared/hexagon-registry/catalogue.js), the system of record for what is live, planned,
 // later or not planned. Each caption says the truth about the tile; a preview must never make a tile look closer than it is.
 import type { Sensitivity, TileState } from '@/lib/footprintTrail';
@@ -13,7 +13,7 @@ export interface ChannelGroup {
 
 export const CHANNEL_GROUPS: ChannelGroup[] = [
   { key: 'email', title: 'Email', rows: [2, 3, 2, 3, 2, 3, 2, 3, 1], story: 'How they reach us, then what the address and domain reveal, then attachments, then public traces.' },
-  { key: 'dark-web', title: 'Dark web', rows: [2, 3, 1], story: 'What leaked and since when, then where it circulates. Needs a data provider, so nothing runs yet.' },
+  { key: 'breach-threat', title: 'Breach and threat monitoring', rows: [2, 3, 1], story: 'What leaked and since when, then where it circulates. Needs a licensed data provider, so nothing runs yet.' },
   { key: 'whatsapp', title: 'WhatsApp', rows: [2, 3, 2, 3, 2, 3, 2, 3, 2], story: 'Owner decision: not planned today (outside the hexagon model for now; revisit after Telegram).' },
   { key: 'messenger', title: 'Facebook Messenger', rows: [3, 2, 3], story: 'Owner decision: not planned today (needs Meta platform partner approval).' },
 ];
@@ -29,8 +29,8 @@ export interface ChannelTile {
   caption?: string;
 }
 
-/** Dark web tiles are not in the catalogue yet (new hexagons stay outside it until approved), so they are listed here. */
-const DARK_WEB: ChannelTile[] = [
+/** Breach and threat monitoring tiles (named by Chris, 2026-11-08) are not in the catalogue yet (new hexagons stay outside it until approved), so they are listed here. */
+const BREACH_THREAT: ChannelTile[] = [
   { id: 'dw-first-seen', label: 'First seen', emoji: '📅', sensitivity: 'medium', today: 'notyet', caption: 'Coming soon' },
   { id: 'dw-what-leaked', label: 'What leaked', emoji: '🗂️', sensitivity: 'high', today: 'notyet', caption: 'Coming soon' },
   { id: 'dw-password', label: 'Password exposure', emoji: '🔑', sensitivity: 'high', today: 'notyet', caption: 'Free check, you start it' },
@@ -48,7 +48,7 @@ export function todayFor(h: Pick<CatalogueHexagon, 'status' | 'plan'>): { state:
 }
 
 export function channelTiles(key: string): ChannelTile[] {
-  if (key === 'dark-web') return DARK_WEB;
+  if (key === 'breach-threat') return BREACH_THREAT;
   return (HEXAGON_CATALOGUE as CatalogueHexagon[])
     .filter((h) => h.channel === key)
     .map((h) => {

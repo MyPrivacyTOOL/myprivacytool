@@ -109,7 +109,14 @@ describe('PathTrailPreview: the other seven groups', () => {
   });
 });
 
-describe('PathTrailPreview: email, dark web, WhatsApp and Messenger', () => {
+describe('PathTrailPreview: email, breach and threat monitoring, WhatsApp and Messenger', () => {
+  it('names the third group "Breach and threat monitoring" and never calls it dark web', () => {
+    render(<PathTrailPreview />);
+    const grid = screen.getByTestId('path-trail-channels');
+    expect(grid.textContent).toContain('Breach and threat monitoring');
+    expect(grid.textContent?.toLowerCase()).not.toContain('dark web');
+    expect(screen.getByText(/Email, breach and threat monitoring, WhatsApp/)).toBeTruthy();
+  });
   it('shows four groups with 21, 6, 22 and 8 tiles', () => {
     render(<PathTrailPreview />);
     const grid = screen.getByTestId('path-trail-channels');
