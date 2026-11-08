@@ -20,6 +20,6 @@ export const SAMPLE_LAST_RUNS = {
 
 export const SAMPLE_FINDINGS: Finding[] = [
   { id: "s1", foundAt: "2026-10-11T06:02:00Z", source: "breach_db", label: "ExampleShop (2026)", dataClasses: ["Email addresses", "Passwords"], severity: "high", status: "new", fingerprint: fingerprintFor("breach_db", "sample@example.com", "ExampleShop 2026") },
-  { id: "s2", foundAt: "2026-10-06T06:10:00Z", source: "dark_web", label: "Paste site listing", dataClasses: ["Email addresses"], severity: "medium", status: "seen", fingerprint: fingerprintFor("dark_web", "sample@example.com", "Paste site listing") },
+  { id: "s2", foundAt: "2026-10-06T06:10:00Z", source: "dark_web", label: "Sample listing (illustrative)", dataClasses: ["Email addresses"], severity: "medium", status: "seen", fingerprint: fingerprintFor("dark_web", "sample@example.com", "Paste site listing") },
   { id: "s3", foundAt: "2026-09-20T06:01:00Z", source: "social", label: "Public profile scraped", dataClasses: ["Names", "Usernames"], severity: "low", status: "resolved", fingerprint: fingerprintFor("social", "sample@example.com", "Public profile scraped") },
 ];
