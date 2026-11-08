@@ -262,6 +262,88 @@
       "until": null
     },
     {
+      "key": "github-channel",
+      "name": "GitHub connect channel (channels.myprivacytool.io)",
+      "hosts": [
+        "channels.myprivacytool.io"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Shows the GitHub profile you chose to connect, and disconnects it on request.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Until you disconnect"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: the site already called this host from src/lib/githubChannel.ts and it was missing from the registry. Same account as the rest of the platform; no third-party host added."
+    },
+    {
+      "key": "oauth-session",
+      "name": "Sign-in session (OAuth Worker)",
+      "hosts": [
+        "myprivacytool-oauth-poc.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Tells the site whether you are signed in (a Google sign-in you started), and signs you out.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Until you sign out"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: the site already called this host from src/lib/oauthSession.ts and it was missing from the registry. Only called when this browser holds the sign-in hint. No third-party host added."
+    },
+    {
+      "key": "deep-dive-api",
+      "name": "Deep-dive and ownership-check API (webhook-receiver Worker)",
+      "hosts": [
+        "myprivacytool-webhook-receiver.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "email",
+        "scan_result"
+      ],
+      "purpose": "Saves the answers you give about a finding and checks you own the address you want to look into.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Per the deep-dive and ownership-check retention rules"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "VITE_DEEP_DIVE_API_URL",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: src/lib/hexagonInteractionApi.ts and src/lib/possessionApi.ts call whatever VITE_DEEP_DIVE_API_URL names (unset = nothing is sent). The flag is that variable, so the entry is live only where the site build sets it. If the variable names any other host the wrapper refuses the call, by design: add that host here first."
+    },
+    {
       "key": "cloudflare-turnstile",
       "name": "Cloudflare Turnstile",
       "hosts": [
@@ -415,7 +497,7 @@
         "ip",
         "user_agent"
       ],
-      "purpose": "Web fonts on two static pages; being replaced by self-hosted fonts.",
+      "purpose": "Web fonts on /footprint and /hexagon-taxonomy. Ended 2026-11-08: both pages now serve their fonts from our own origin.",
       "party": "third",
       "retention": {
         "days": null,
@@ -428,9 +510,9 @@
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null,
-      "note": "until date to be set by the font self-hosting task (MPC-9886)",
-      "exception": "Existing pre-click call, to be removed by self-hosting (MPC-9886); disclosed until then"
+      "until": "2026-11-08",
+      "note": "Ended by MPC-9886: Inter, Fira Code, Bricolage Grotesque, IBM Plex Sans/Mono are self-hosted (latin subsets, SIL OFL 1.1). The registry crawl fails if either host is requested after the until date.",
+      "exception": "Ended 2026-11-08 (MPC-9886); kept so the history renders. No call site remains."
     },
     {
       "key": "supabase",
@@ -469,7 +551,7 @@
       "dpa_listed": true,
       "since": "2026-11-08",
       "until": null,
-      "note": "MPC-9885: webhook-receiver state-store.js keeps chat conversation state (24 h) whose keys and bodies carry phone, email, name and the platform user id (username); added phone, name, username. MPC-9885: mpt-leads saveBaseline sends SHA-256(email) as email_hash plus the scan scores; added email_hash. MPC-9885: partner-api monitors store the monitored value (email, phone, handle or a domain); added email_domain. MPC-9885: mpt-cairn-blackboard stores the investigation seed email and username and fact values (email, username; phone only if HASH_FACT_TYPES leaves it unhashed); username and phone were already listed (MPC-9885 other tasks). MPC-9885: social-listeners stores Telegram/X updates, probe captures and event-log rows (sender key, @username, name, message text; a shared contact adds a phone); added message_text. MPC-9885: shared/support rest-store.ts keeps support cases (message text and the sender's email, phone or handle); added message_text. MPC-9885: scan-report writes users/leads rows with the visitor IP and utm/referrer, and the listing inputs (name, phone, city, country); added utm, referrer, city, country."
+      "note": "MPC-9885: webhook-receiver state-store.js keeps chat conversation state (24 h) whose keys and bodies carry phone, email, name and the platform user id (username); added phone, name, username. MPC-9885: mpt-leads saveBaseline sends SHA-256(email) as email_hash plus the scan scores; added email_hash. MPC-9885: partner-api monitors store the monitored value (email, phone, handle or a domain); added email_domain. MPC-9885: mpt-cairn-blackboard stores the investigation seed email and username and fact values (email, username; phone only if HASH_FACT_TYPES leaves it unhashed); username and phone were already listed (MPC-9885 other tasks). MPC-9885: social-listeners stores Telegram/X updates, probe captures and event-log rows (sender key, @username, name, message text; a shared contact adds a phone); added message_text. MPC-9885: shared/support rest-store.ts keeps support cases (message text and the sender's email, phone or handle); added message_text. MPC-9885: scan-report writes users/leads rows with the visitor IP and utm/referrer, and the listing inputs (name, phone, city, country); added utm, referrer, city, country. MPC-9886: utm added because /HongKongSpam inserts its row (utm_source/medium/campaign, optional email) straight into Supabase from the browser."
     },
     {
       "key": "notion",
@@ -944,7 +1026,7 @@
       "data_items": [
         "password_hash_prefix"
       ],
-      "purpose": "Password check (off by default).",
+      "purpose": "Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password.",
       "party": "third",
       "retention": {
         "days": null,
@@ -952,12 +1034,13 @@
       },
       "consent_basis": "scan_consent",
       "phase": "post_click",
-      "enabled": false,
+      "enabled": true,
       "flag": "VITE_PASSWORD_CHECK",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9886: switched on in the registry because the Pages production build sets VITE_PASSWORD_CHECK=true (verified in the Cloudflare Pages project wwwmyprivacytool, 2026-11-08), i.e. the check is live. The flag still gates the feature."
     },
     {
       "key": "meta-graph",
@@ -1021,6 +1104,34 @@
       "since": "2026-11-08",
       "until": null,
       "note": "MPC-9885: switched ON because the channel handlers already call these hosts whenever their own switch is on (DISCORD_SCAN, LINE_EXTRAS, VIBER_EXTRAS, WECHAT_EXTRAS, ZALO_EXTRAS) plus an allow-list; the registry flag PLATFORM_REPLIES_ENABLED was read by no code. With every switch off nothing is called. MPC-9894 to confirm which channels are live before Privacy lists them."
+    },
+    {
+      "key": "xposedornot",
+      "name": "XposedOrNot (breach lookup)",
+      "hosts": [
+        "api.xposedornot.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Free community breach lookup, switched off: not used without a licence.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "reason": "Decision B (Director, 2026-11-08): no XposedOrNot without a licence. src/lib/osintLookup.ts refuses this provider before any request is made.",
+      "note": "Registered disabled by MPC-9886 so the host is known to CI and the wrapper; enabling it needs a licence decision."
     },
     {
       "key": "planned-licensed-people-data",

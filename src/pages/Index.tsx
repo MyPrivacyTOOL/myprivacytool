@@ -35,6 +35,7 @@ import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
+import { recipientScript } from '@/lib/recipientClient';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -174,18 +175,18 @@ const Index = () => {
   // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
+    let requested = false; // the wrapper adds the <script> a tick later; this stops a second consent event starting a second load
     const load = () => {
-      if (!hasConsent() || document.getElementById(scriptId)) return;
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
-      script.defer = true;
-      document.body.appendChild(script);
+      if (!hasConsent() || requested || document.getElementById(scriptId)) return;
+      requested = true;
+      // MPC-9886: through the registry ("hubspot", basis user_action). Same consent test as before.
+      void recipientScript('hubspot', 'https://js-na2.hsforms.net/forms/embed/246502821.js', { id: scriptId, defer: '' }).catch(() => { requested = false; });
     };
     load();
     const unsubscribe = onConsentChange(load);
     return () => {
       unsubscribe();
+      requested = false;
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };

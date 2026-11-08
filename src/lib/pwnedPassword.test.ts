@@ -1,5 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { checkPwnedPassword, countForSuffix, sha1Hex } from './pwnedPassword';
+
+// MPC-9886: the registry ships pwned-passwords as enabled:false (the feature is off). These tests exercise the client, so they run against a copy with it switched on;
+// the last test pins that the shipped registry refuses the call.
+vi.mock('../../shared/recipients/recipients.json', async (orig) => {
+  const m = (await orig()) as { default: { recipients: { key: string; enabled: boolean }[] } };
+  const d = structuredClone(m.default);
+  d.recipients.find((r) => r.key === 'pwned-passwords')!.enabled = true;
+  return { default: d };
+});
+beforeEach(() => { vi.stubEnv('VITE_PASSWORD_CHECK', 'true'); });
 
 // SHA-1("password") = 5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8
 const PW = 'password';

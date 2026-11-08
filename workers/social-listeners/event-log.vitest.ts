@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { logRetentionDays, loggedSender, optInIds, resolveSession } from "./src/event-log";
+import { logRetentionDays, loggedSender, optInIds, resolveSession, syntheticIds } from "./src/event-log";
 import worker from "./src/index";
 import type { Env } from "./src/shared";
 
@@ -53,6 +53,30 @@ const asOut = (r: LogRow): Out => r.payload as Out;
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 const ON = { PROBE_MODE: "on" };
+
+describe("CK-9912 synthetic ids", () => {
+  it("logs in, brain and out for a SYNTHETIC_IDS sender even in PROBE_MODE=all", async () => {
+    const { calls, post } = setup({ PROBE_MODE: "all", SYNTHETIC_IDS: "111" });
+    expect((await post(update())).status).toBe(200);
+    expect(byDirection(calls, "in")).toMatchObject([{ kind: "message", sender_id: "111" }]);
+    expect(byDirection(calls, "brain")).toHaveLength(1);
+    expect(byDirection(calls, "out").some((r) => r.kind === "sendMessage")).toBe(true);
+  });
+  it("logs nobody else: another sender in mode all, and no SYNTHETIC_IDS at all", async () => {
+    const other = setup({ PROBE_MODE: "all", SYNTHETIC_IDS: "999" });
+    await other.post(update());
+    expect(inserts(other.calls)).toEqual([]);
+    const none = setup({ PROBE_MODE: "all" });
+    await none.post(update());
+    expect(inserts(none.calls)).toEqual([]);
+  });
+  it("syntheticIds keeps numeric ids only; loggedSender is unchanged for everyone else", () => {
+    expect([...syntheticIds(asEnv({ SYNTHETIC_IDS: "1, x, 22" }))]).toEqual(["1", "22"]);
+    expect(loggedSender(asEnv({ PROBE_MODE: "all", SYNTHETIC_IDS: "111" }), update())).toBe("111");
+    expect(loggedSender(asEnv({ PROBE_MODE: "all", SYNTHETIC_IDS: "5" }), update())).toBeNull();
+    expect(loggedSender(asEnv({ PROBE_MODE: "off", SYNTHETIC_IDS: "5" }), update())).toBeNull();
+  });
+});
 
 describe("scope", () => {
   it("logs an allow-listed sender with a session id", async () => {

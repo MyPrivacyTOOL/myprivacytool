@@ -2,6 +2,7 @@
 // It asks the server which Telegram hexagons were checked and gets ids back, never values. The ids live in memory only: nothing is saved to storage,
 // sent anywhere or put in a URL. No valid session (or any error) means no Telegram claim at all.
 import { useEffect, useState } from 'react';
+import { recipientFetch } from '@/lib/recipientClient';
 
 export interface TelegramHandoff { ids: string[]; scanAt: string | null }
 const NONE: TelegramHandoff = { ids: [], scanAt: null };
@@ -21,7 +22,7 @@ export const isHandoffRequest = (search: string): boolean => new URLSearchParams
 
 let cached: Promise<TelegramHandoff> | null = null;
 function load(): Promise<TelegramHandoff> {
-  cached ??= fetch('/api/footprint', { credentials: 'same-origin', cache: 'no-store' })
+  cached ??= recipientFetch('cloudflare-edge', '/api/footprint', { credentials: 'same-origin', cache: 'no-store' }, ['page_load'])
     .then((r) => (r.ok ? r.json() : null))
     .then(parseHandoff)
     .catch(() => NONE);

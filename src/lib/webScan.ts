@@ -1,6 +1,7 @@
 import type { HexagonData } from "@/lib/deviceDetection";
 import { RECOGNISE_CONSENT_VERSION, activeSaveVersion } from "@/lib/saveConsent";
 import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.js";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-7470 (decision D12): the finished scan stays in THIS browser (sessionStorage) and is never sent anywhere until the visitor
 // reaches the contact step, gives an email address and ticks the separate "save my scan result" box. Only then is the full scan
@@ -235,7 +236,7 @@ export function reportStep(step: FunnelStep, seconds?: number): void {
     sent.add(`${scanNumber}:${step}`);
   }
   try {
-    void fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/web-scan/step`, {
+    void recipientFetch("scan-report", `${SCAN_API_URL.replace(/\/$/, "")}/api/web-scan/step`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       keepalive: true,
@@ -244,7 +245,7 @@ export function reportStep(step: FunnelStep, seconds?: number): void {
         step,
         ...(step === "results_time" ? { seconds: Math.min(MAX_RESULTS_SECONDS, Math.max(0, Math.round(seconds ?? 0))) } : {}),
       }),
-    }).catch(() => undefined);
+    }, []).catch(() => undefined);
   } catch {
     /* never affects the visitor */
   }

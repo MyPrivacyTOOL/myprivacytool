@@ -89,6 +89,7 @@
   @keyframes rise{to{opacity:1;transform:none}}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+<script src="/recipient-client.min.js" defer></script>
 <!-- Same consent-gated Google tag as index.html (Property 515216281 / G-1BWMDBJSPL). No request to googletagmanager.com
      until the visitor accepts analytics; the choice is the shared localStorage key mpt_cookie_consent. -->
 <script>
@@ -111,15 +112,17 @@
       var ok = allowed();
       window['ga-disable-' + GA_ID] = !ok;
       if (!ok || loaded) return;
+      // MPC-9886: the script load goes through the recipient registry (key "ga4", basis analytics_consent). The client (/recipient-client.min.js, deferred)
+      // announces itself with mpt:recipients-ready; until then nothing is requested and sync() simply runs again when it does. The consent test above is unchanged.
+      var r = window.mptRecipients;
+      if (!r) return;
       loaded = true;
-      var s = document.createElement('script');
-      s.async = true;
-      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
-      document.head.appendChild(s);
+      r.script('ga4', 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID).catch(function () {});
       gtag('js', new Date());
       gtag('config', GA_ID);
     }
     window.addEventListener('mpt:consent', sync);
+    window.addEventListener('mpt:recipients-ready', sync);
     window.__mptAnalyticsAllowed = allowed;
     sync();
   })();
@@ -329,10 +332,11 @@
       { name: 'consent_source', value: SOURCE_TAG }
     ];
     var m = document.cookie.match(/(?:^|;\s*)hubspotutk=([^;]+)/);
-    fetch('https://api.hsforms.com/submissions/v3/integration/submit/' + HUBSPOT_PORTAL_ID + '/' + HUBSPOT_FORM_ID, {
+    /* MPC-9886: through the recipient registry (key "hubspot"); if the client script did not load, the request fails like a network error and the visitor sees the usual retry message. */
+    (window.mptRecipients ? window.mptRecipients.fetch('hubspot', 'https://api.hsforms.com/submissions/v3/integration/submit/' + HUBSPOT_PORTAL_ID + '/' + HUBSPOT_FORM_ID, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fields: fields, context: { hutk: m ? decodeURIComponent(m[1]) : undefined, pageUri: location.href, pageName: document.title } })
-    }).then(function (res) {
+    }, ['email']) : Promise.reject(new Error('recipient client missing'))).then(function (res) {
       if (!res.ok) throw new Error('status ' + res.status);
       if (!pdfTracked) { pdfTracked = true; track('telegram_pdf_downloaded', {}); }
       gateMsg.innerHTML = 'Thanks. <a href="' + PDF_URL + '" download>Download the guide (PDF)</a>.';

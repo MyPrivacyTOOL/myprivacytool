@@ -2,6 +2,7 @@
 // Detects critical security issues that could expose user data
 
 import { parseIceCandidateAddress } from "./fingerprintDetection";
+import { recipientPeerConnection, webRtcAvailable } from '@/lib/recipientClient';
 
 export interface DNSLeakResult {
   isLeaking: boolean;
@@ -134,11 +135,13 @@ async function detectWebRTCLeak(): Promise<{ localIPs: string[], publicIP: strin
 
   try {
     // Check if WebRTC is available
-    if (typeof RTCPeerConnection === 'undefined') {
+    if (!webRtcAvailable()) {
       return result;
     }
 
-    const pc = new RTCPeerConnection({
+    // MPC-9886: routed through the registry so the crawl and the per-scan panel can see it. Behaviour is unchanged: the same Google STUN server is
+    // still used before the visitor presses anything. Moving this inside the consent gate (iceServers: [] until the click) is MPC-9888.
+    const pc = await recipientPeerConnection('google-stun', {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 

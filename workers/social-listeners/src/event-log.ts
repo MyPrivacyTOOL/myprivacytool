@@ -1,5 +1,5 @@
 // Telegram full event log (docs/channel-probe.md, "Full event log"). Runs ONLY when PROBE_MODE=on AND the sender is in PROBE_TELEGRAM_IDS or
-// PROBE_LOG_OPTIN_IDS. Mode "all" and "off" never reach it. Rows go to public.telegram_event_log (service_role only):
+// PROBE_LOG_OPTIN_IDS, or (CK-9912, any mode) the sender is in SYNTHETIC_IDS. Mode "all" and "off" otherwise never reach it. Rows go to public.telegram_event_log (service_role only):
 //   in    the raw update, untrimmed
 //   out   every Bot API call made for the logged chat: {method, request, status, response}
 //   brain the core-brain answer used to pick the reply
@@ -53,11 +53,20 @@ export function logRetentionDays(env: Env): number | null {
 
 /** The logged sender of an update, or null when this update must not be logged (mode not "on", bot, unlisted, not opted in). */
 export function loggedSender(env: Env, update: unknown): string | null {
+  // CK-9912: the synthetic check account is logged in every probe mode (the Worker runs PROBE_MODE=all, which never writes this log), so the CI round-trip check can read its reply back. Nobody else is affected.
+  const synthetic = syntheticIds(env);
+  if (synthetic.size > 0) {
+    const a = updateActor(update);
+    if (a && synthetic.has(a.id)) return a.id;
+  }
   if (probeMode(env) !== "on") return null;
   const actor = updateActor(update);
   if (!actor) return null;
   return probeIds(env).has(actor.id) || optInIds(env).has(actor.id) ? actor.id : null;
 }
+
+/** SYNTHETIC_IDS: comma-separated numeric Telegram ids of the owner's own synthetic-check account. Unset = nobody. */
+export const syntheticIds = (env: Env): Set<string> => idSet(env.SYNTHETIC_IDS);
 
 /** The chat an update belongs to. Updates with no chat (inline queries, ...) use the sender id, which is also their private chat id. */
 function chatIdOf(update: unknown, senderId: string): string {

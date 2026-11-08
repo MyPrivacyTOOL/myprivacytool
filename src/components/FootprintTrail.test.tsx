@@ -123,9 +123,10 @@ describe('PathTrailPreview: email, breach and threat monitoring, WhatsApp and Me
     expect(grid.querySelectorAll('figure')).toHaveLength(4);
     expect(grid.querySelectorAll('[role=img]')).toHaveLength(21 + 6 + 22 + 8);
   });
-  it('says today that WhatsApp and Messenger are not planned, and email has live tiles held', () => {
+  it('says today that Messenger is not planned, WhatsApp profile name is planned, and email has live tiles held', () => {
     render(<PathTrailPreview />);
-    expect(screen.getByLabelText('Profile name: Not checked yet, Not planned today')).toBeTruthy();
+    expect(screen.getByLabelText('Profile name: Not checked yet, Planned')).toBeTruthy();
+    expect(screen.getByLabelText('Gender: Not checked yet, Not planned today')).toBeTruthy();
     expect(screen.getByLabelText('Known breaches: we hold it, high risk')).toBeTruthy();
   });
   it('can pretend we hold everything, which draws the trail but keeps the same tiles', () => {

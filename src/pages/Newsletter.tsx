@@ -3,6 +3,7 @@ import { trackNewsletterSignup } from "@/lib/analytics";
 import { Shield, Mail, ArrowRight, Check, Lock } from "lucide-react";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { recipientFetch } from "@/lib/recipientClient";
 
 const SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV";
@@ -18,7 +19,7 @@ export default function Newsletter() {
     setErrorMsg("");
 
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/subscribers`, {
+      const res = await recipientFetch("supabase", `${SUPABASE_URL}/rest/v1/subscribers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -31,7 +32,7 @@ export default function Newsletter() {
           consent_given_at: new Date().toISOString(),
           consent_source: "newsletter_page",
         }),
-      });
+      }, ["email"]);
 
       if (res.ok || res.status === 201) {
         trackNewsletterSignup({ source: "newsletter_page" });

@@ -1,4 +1,6 @@
 // Minimal client for the HubSpot Forms API (public, unauthenticated submit endpoint).
+import { recipientFetch } from "@/lib/recipientClient";
+import type { DataItem } from "@/config/recipients";
 // Portal 246502821 (na2) — same portal as the newsletter embed on the home page.
 
 export const HUBSPOT_PORTAL_ID = "246502821";
@@ -29,7 +31,12 @@ export function consentFields(source: string): Record<string, string> {
 }
 
 export async function submitHubSpotForm({ formId, fields, pageName }: HubSpotSubmitOptions): Promise<void> {
-  const res = await fetch(
+  const names = Object.keys(fields);
+  const sent: DataItem[] = ["email"];
+  if (names.some((n) => /name/i.test(n))) sent.push("name");
+  if (names.some((n) => /phone/i.test(n))) sent.push("phone");
+  const res = await recipientFetch(
+    "hubspot",
     `https://api.hsforms.com/submissions/v3/integration/submit/${HUBSPOT_PORTAL_ID}/${formId}`,
     {
       method: "POST",
@@ -42,7 +49,8 @@ export async function submitHubSpotForm({ formId, fields, pageName }: HubSpotSub
           pageName: pageName ?? document.title,
         },
       }),
-    }
+    },
+    sent,
   );
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

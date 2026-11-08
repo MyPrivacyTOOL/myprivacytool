@@ -40,8 +40,15 @@ describe('captions tell the truth about each tile today', () => {
     expect(todayFor({ status: 'defined' }).state).toBe('held');
     expect(todayFor({ status: 'new' })).toEqual({ state: 'notyet', caption: 'Planned' });
   });
-  it('all WhatsApp and Messenger tiles are not planned today (owner decision MPC-8689)', () => {
-    for (const key of ['whatsapp', 'messenger']) for (const t of channelTiles(key)) expect(t.caption).toBe('Not planned today');
+  it('Messenger is all not planned today (owner decision MPC-8689)', () => {
+    for (const t of channelTiles('messenger')) expect(t.caption).toBe('Not planned today');
+  });
+  it('WhatsApp: the eight tiles Chris approved on 2026-11-08 are planned, the other 14 stay not planned', () => {
+    const eight = ['wa.phone', 'wa.profile_name', 'wa.username', 'wa.location_share', 'wa.contact_share', 'wa.message_time', 'wa.ad_referral', 'wa.media'];
+    const wa = channelTiles('whatsapp');
+    for (const id of eight) expect(wa.find((t) => t.id === id)?.caption).toBe('Planned');
+    expect(wa.filter((t) => t.caption === 'Not planned today')).toHaveLength(14);
+    expect(wa.find((t) => t.id === 'wa.other_apps')?.caption).toBe('Not planned today');
   });
   it('shows exactly the live email tiles as held today', () => {
     const held = channelTiles('email').filter((t) => t.today === 'held').map((t) => t.id);
