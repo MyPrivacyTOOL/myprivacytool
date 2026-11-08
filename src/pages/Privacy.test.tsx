@@ -188,3 +188,12 @@ describe("Privacy: answers about a hexagon (2.4A)", () => {
   });
 });
 
+
+// CK-9848: the retention period of the scans (report delivery) record is stated, and the sentence is pinned.
+describe("Privacy: report delivery record retention (CK-9848)", () => {
+  it("states 30 days now and 7 days from the Open Tracker release", () => {
+    renderPage(<Privacy />);
+    const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain("is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan");
+  });
+});
