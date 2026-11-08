@@ -9,6 +9,7 @@
 // Steps, each recorded with a server-side fact (database read, not only the HTTP answer):
 //   1 scan with the one-step tick (consent 2026-11-08-v1)   2 click-to-confirm returns a sign-in token   3 token signs in: account (free) + scan attached + consent carried + no IP column
 //   4 /me and open scan   5 sign-in by EMAIL LINK: the sign-in email is read back from the provider, its link is redeemed (the synthetic-mailbox path)   6 can(): free allowed, paid denied
+//   6b3-6l MPC-9816 (F2): Free sees the upgrade sentence and gets no export; Basic does not see it and downloads JSON and PDF;
 //   6b-6h MPC-9818 allowances: /me reports Free 1/month with 1 used; the SECOND scan (a later day, same month) is refused with the honest upgrade message and creates and sends nothing;
 //         a service-role bump to Basic (mpt_set_plan, the admin override) lets the same address scan again; Basic has the export capability
 //   7 delete: account, links, saved scan, request scan and sign-in identity are really gone   8 cleanup of the test user (guarded by isTestAddress)
@@ -99,6 +100,12 @@ export async function run(env, fetchImpl = fetch) {
     step('6b_me_shows_free_allowance', me2.status === 200 && me2.json?.entitlements?.tier === 'free' && me2.json.entitlements.scans?.limit === 1 && me2.json.entitlements.scans?.used === 1 && me2.json.entitlements.scans?.remaining === 0, { scans: me2.json?.entitlements?.scans });
     const c0 = await counted();
     step('6b2_first_scan_counted_once_and_confirmed', c0.length === 1 && c0[0].plan === 'free' && Boolean(c0[0].confirmed_at) && c0[0].scan_id === scanId, { rows: c0.length });
+    // MPC-9816 (F2): on Free the broker panel carries the one upgrade sentence (price from the plans table), and no export link is issued
+    const livePanel = async () => { const r = await fetchImpl(`${base}/api/scan/live`, { headers: { Origin: ORIGIN, Authorization: `Bearer ${key}` } }); return { status: r.status, json: await r.json().catch(() => ({})) }; };
+    const lp1 = await livePanel();
+    step('6b3_free_sees_upgrade_sentence_once', lp1.status === 200 && /^Your free report did not search data brokers for listings in your name\. Basic, \$\d+(\.\d\d)? a month, does that/.test(lp1.json?.broker_panel?.upgrade || '') && lp1.json.broker_panel.rows?.length === 9, { upgrade: lp1.json?.broker_panel?.upgrade });
+    const ex0 = await api('export', { scan_number: scanNumber, format: 'json' }, at);
+    step('6b4_free_gets_no_export_link', ex0.status === 403 && ex0.json?.code === 'export_requires_plan' && !ex0.json?.url, { http: ex0.status });
     // a later day of the same month: move the first request past the one-report-per-24h rule (a synthetic row, service role)
     await patch(`scans?id=eq.${scanId}`, { created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() });
     const userRow = (await sel(`users?email=eq.${encodeURIComponent(email)}&select=id`))[0];
@@ -120,6 +127,18 @@ export async function run(env, fetchImpl = fetch) {
     step('6g_counted_under_basic', cB.length === 2 && cB.some((r) => r.plan === 'basic'), { rows: cB.map((r) => r.plan) });
     const me3 = await api('me', undefined, at, 'GET'); const c3 = await api('can', { key: 'report.export_pdf' }, at);
     step('6h_basic_entitlements', me3.json?.entitlements?.tier === 'basic' && me3.json.entitlements.scans?.limit === 5 && c3.json?.allowed === true, { limit: me3.json?.entitlements?.scans?.limit, export_pdf: c3.json?.allowed });
+    // MPC-9816: Basic sees no upgrade sentence and can export a saved scan: PDF and JSON, by an expiring link
+    const lp2 = await livePanel();
+    step('6i_basic_sees_no_upgrade_sentence', lp2.status === 200 && lp2.json?.broker_panel?.upgrade === null, { upgrade: lp2.json?.broker_panel?.upgrade });
+    const exj = await api('export', { scan_number: scanNumber, format: 'json' }, at);
+    const dj = exj.json?.url ? await fetchImpl(exj.json.url) : null; const jj = dj ? await dj.json().catch(() => null) : null;
+    step('6j_basic_json_export', exj.status === 200 && dj?.status === 200 && jj?.schema_version === 1 && jj.scan_id === scanNumber && jj.tier_at_generation === 'basic' && Array.isArray(jj.brokers) && jj.brokers.length === 9 && Array.isArray(jj.hexagons) && jj.hexagons.length > 0
+      && !/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(JSON.stringify(jj)), { http: dj?.status, hexagons: jj?.hexagons?.length, brokers: jj?.brokers?.length, expires_at: exj.json?.expires_at });
+    const exp = await api('export', { scan_number: scanNumber, format: 'pdf' }, at);
+    const dp = exp.json?.url ? await fetchImpl(exp.json.url) : null; const pb = dp ? Buffer.from(await dp.arrayBuffer()) : null;
+    step('6k_basic_pdf_export', exp.status === 200 && dp?.status === 200 && dp.headers.get('content-type') === 'application/pdf' && pb?.subarray(0, 5).toString() === '%PDF-' && pb.length < 2 * 1024 * 1024, { http: dp?.status, bytes: pb?.length });
+    const forged = exj.json?.url ? await fetchImpl(exj.json.url.replace(/\.[A-Za-z0-9_-]{20,}$/, '.AAAAAAAAAAAAAAAAAAAAAAAA')) : null;
+    step('6l_forged_export_link_refused', forged?.status === 401, { http: forged?.status });
     // 7 delete really deletes
     const bad = await api('delete', {}, at);
     step('7a_delete_needs_confirmation', bad.status === 400, { http: bad.status });

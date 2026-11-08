@@ -4,6 +4,7 @@
 // the visitor pasted a page and we read that one page (lib/listingCheck.js); every other broker is "not checked" with the reason said in words.
 import { BROKER_SITES, guideFor } from './brokers.js';
 import { planName, sectionState } from './entitlements.js';
+import { upgradeSentence } from './paidReport.js';
 
 export const REGIONS = { spokeo: 'US', whitepages: 'US', beenverified: 'US', truthfinder: 'US', fastpeoplesearch: 'US', mylife: 'US', intelius: 'US', whitepages_au: 'Australia', truecaller: 'Phone directory' };
 
@@ -83,7 +84,7 @@ function defaultRow(def, pasteAvailable, included = false) {
  * The broker panel. `listings` is { pending, items } from loadListings (or null / absent when nothing was pasted or the visitor has not confirmed).
  * Always returns all shortlist brokers in registry order, then any other site the visitor pasted. Never throws.
  */
-export function buildBrokerPanel(listings, { pasteAvailable = true, entitlements = null } = {}) {
+export function buildBrokerPanel(listings, { pasteAvailable = true, entitlements = null, basicPrice = null } = {}) {
   const items = Array.isArray(listings?.items) ? listings.items : [];
   // MPC-9818: what this reader's plan has. No entitlements given = the Free reading (byte-identical to before). A Free reader still SEES the whole section, with the
   // honest paid-coverage note; the licensed check is never run for them, so there is nothing to hide, blur or truncate.
@@ -99,6 +100,7 @@ export function buildBrokerPanel(listings, { pasteAvailable = true, entitlements
   const others = items.filter((r) => r && !BROKER_SITES.some((d) => d.key === r.key)).map((r) => build(r, null));
   return { pending: listings?.pending === true, paste_available: pasteAvailable, intro: pasteAvailable ? PANEL_INTRO : PANEL_INTRO_NO_PASTE, rows, others, region_note: REGION_NOTE,
     coverage_note: sec.state === 'content' ? null : included ? COVERAGE_NOTE_INCLUDED : COVERAGE_NOTE,
+    upgrade: upgradeSentence(entitlements, basicPrice),   // MPC-9816: the one Free-to-Basic sentence (null for Basic and up)
     coverage: { state: sec.state, min_tier: sec.min_tier ?? null, min_plan: sec.min_tier ? planName(sec.min_tier) : null } };
 }
 

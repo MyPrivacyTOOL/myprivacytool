@@ -51,6 +51,7 @@ export default function BrokerPanel({ panel }: { panel: Panel }) {
       </ul>
       {panel.regionNote && <p className="mt-3 text-xs text-muted-foreground" data-testid="broker-region-note">{panel.regionNote}</p>}
       {panel.coverageNote && <p className="mt-1 text-xs text-muted-foreground">{panel.coverageNote}</p>}
+      {panel.upgrade && <p className="mt-3 text-sm text-foreground" data-testid="broker-upgrade">{panel.upgrade}</p>}
     </section>
   );
 }
