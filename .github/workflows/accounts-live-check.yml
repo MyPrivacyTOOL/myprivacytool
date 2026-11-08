@@ -1,0 +1,48 @@
+name: Accounts live check
+
+# MPC-9817: one synthetic end-to-end run of accounts and sign-in on the deployed system (scan with the one-step tick -> click-to-confirm -> signed in -> /me -> email-link
+# sign-in read back from the provider -> can() -> delete really deletes). Output: the job summary (JSON). On demand, and on a push to an `accounts-check/**` branch (the relay used
+# when workflows cannot be dispatched from a coding session). Same rules as report-delivery-proof: F1 synthetic Worker only (production Turnstile never bypassed),
+# testingnt69+acct-* alias only, throwaway signing key, test record erased at the end.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['accounts-check/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f1-live-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Accounts live check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+      RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set a throwaway signing key on the F1 synthetic Worker
+        working-directory: workers/scan-report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          key="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          printf '%s' "$key" | npx --yes wrangler@3 secret put UNSUBSCRIBE_SECRET --config wrangler.synthetic-f1.toml >/dev/null
+          echo "PROOF_KEY=$key" >> "$GITHUB_ENV"
+      - name: Run the check
+        env:
+          UNSUBSCRIBE_SECRET: ${{ env.PROOF_KEY }}
+        run: node scripts/accounts-live-check/run.mjs
