@@ -119,7 +119,7 @@ export default function PathTrailPreview() {
         })}
       </div>
 
-      <h3 className="mt-10 text-base font-semibold text-foreground">Email, dark web, WhatsApp and Facebook Messenger</h3>
+      <h3 className="mt-10 text-base font-semibold text-foreground">Email, breach and threat monitoring, WhatsApp and Facebook Messenger</h3>
       <p className="text-sm text-muted-foreground">
         Taken from the tile catalogue, so each caption says what is true today: live, planned, later, or not planned. WhatsApp and Messenger are marked
         not planned today by an earlier owner decision (MPC-8689); this picture does not change that.
