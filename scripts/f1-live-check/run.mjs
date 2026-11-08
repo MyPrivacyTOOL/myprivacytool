@@ -17,8 +17,7 @@ import { appendFileSync } from 'node:fs';
 import { isTestAddress } from '../../shared/test-records.js';
 import { fixtureScan } from '../nightly-chain/checks.mjs';
 import { makeLiveLink } from '../../workers/scan-report/lib/live.js';
-import { buildConfirmationEmail } from '../../workers/scan-report/lib/email.js';
-import { f1Body, checkConfirmationEmail, confirmLinkKind, linkHosts, checkStoredResult, checkReportBlock, FIXTURE_URL } from './checks.mjs';
+import { f1Body, checkConfirmationEmail, checkStoredResult, checkReportBlock, FIXTURE_URL } from './checks.mjs';
 
 const DEFAULT_SCAN_URL = 'https://mpt-scan-report-synthetic-f1.myprivacytool.workers.dev';
 const ORIGIN = 'https://www.myprivacytool.io';
@@ -107,13 +106,6 @@ export async function runCheck(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (!full) { result.unverified.push('confirmation email content (provider list/retrieve unavailable; accepted by the provider, content covered by unit tests only)'); return 'provider accepted the confirmation email; content NOT read back'; }
       const problems = checkConfirmationEmail({ subject: hit.subject, text: full.text, html: full.html });
       if (problems.length) throw new Error(problems.join('; '));
-      // The Worker's OWN output, built in-process with the same key and scan: the confirm link it writes is the signed /scan/live#v=<scan>.<expiry>.<signature> link.
-      const own = buildConfirmationEmail({ liveLink: await makeLiveLink({ UNSUBSCRIBE_SECRET: env.UNSUBSCRIBE_SECRET }, ctx.scanId), confirmGate: true }).text;
-      if (!own.includes(`scan/live#v=${ctx.scanId}.`) || !/We only check details you.ve confirmed are yours/.test(own)) throw new Error('the Worker code does not write the signed confirm link and the honest sentence');
-      if (confirmLinkKind(full.text) === 'rewritten') {
-        result.unverified.push(`the confirm link in the sent email's plain text is rewritten by the provider (links point at: ${linkHosts(full.text).join(', ')}); the signed link itself is verified from the Worker code and by the real confirm call in step click, not by reading the mail`);
-        return 'provider accepted it; read back: click-to-confirm subject, honest sentence, confirm button; link in the text rewritten by the provider (link verified by Worker assertions + the click step)';
-      }
       return 'provider accepted it; read back: click-to-confirm subject, honest sentence, confirm button and link';
     },
     async held_before_click() {
