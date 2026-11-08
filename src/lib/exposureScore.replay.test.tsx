@@ -140,6 +140,7 @@ describe('exposure-v1 replay across every consumer', () => {
     const stored: Record<string, unknown>[] = [];
     vi.stubGlobal('fetch', vi.fn(async (u: string, init?: RequestInit) => {
       const url = String(u);
+      if (url.includes('/auth/v1/user')) return new Response(JSON.stringify({ email: 'replay@example.com', email_confirmed_at: '2026-11-08T00:00:00Z' }), { status: 200 });   // MPC-9914: a baseline needs the confirmed owner's sign-in
       if (url.includes('mpt_score_baselines')) {
         if (init?.method === 'POST') { const b = JSON.parse(String(init.body)); stored.push(b); return new Response(JSON.stringify([{ ...b, created_at: '2026-10-26T00:00:00Z' }]), { status: 201 }); }
         return new Response('[]', { status: 200 });
@@ -147,7 +148,7 @@ describe('exposure-v1 replay across every consumer', () => {
       return new Response(JSON.stringify({ results: [], has_more: false }), { status: 200 });
     }));
     const env = { NOTION_TOKEN: 'n', LEADS_DB_ID: 'abc-def', SUPABASE_SERVICE_ROLE_KEY: 'k', HUBSPOT_TOKEN: 'h', RESEND_API_KEY: 'r', SLACK_BOT_TOKEN: 's', BASELINE_SCORE_VERSION_COLUMN: 'true' };
-    const res = await worker.fetch(new Request('https://x/webhook/leads', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify(posts[0]) }), env, { waitUntil: () => {} });
+    const res = await worker.fetch(new Request('https://x/webhook/leads', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io', Authorization: 'Bearer owner-token' }, body: JSON.stringify(posts[0]) }), env, { waitUntil: () => {} });
     const body = await res.json() as { baseline?: Record<string, unknown> };
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({ overall_score: EXPECTED.score, score_version: SCORE_VERSION, category_scores: { device: 100, fingerprint: 100, storage: 0, security: 0 } });
