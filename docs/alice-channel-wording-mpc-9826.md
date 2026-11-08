@@ -26,7 +26,7 @@ Sign-off (Chris, 2026-10-10): "Alice, MyPrivacyTOOL" then "Our AI guide. This em
 
 ## Channel states (`CHANNEL_STATUS` in `src/config/featureStatus.ts`)
 
-Web: live. Telegram: in build. Email: live. WhatsApp: planned. Messenger: planned. Instagram: planned.
+Web: live. Telegram: live (2026-11-08, MPC-9850). Email: live. WhatsApp: planned. Messenger: planned. Instagram: planned.
 
 Telegram stays "In build": the build session had no outbound route to api.telegram.org or the Worker, so no synthetic message could be round-tripped. The bot, webhook and reply path are built and unit-tested (`workers/social-listeners`). Flip one line when a live round-trip is recorded.
 
@@ -35,3 +35,5 @@ Telegram stays "In build": the build session had no outbound route to api.telegr
 `sendEmail()` sets `reply_to` from `EMAIL_REPLY_TO`, which is set in no wrangler file, no secret list and no doc. Replies therefore go to the From address, `hello@myprivacytool.io`. Nothing in the repo shows that mailbox is monitored (only `support@` is confirmed to arrive in a Gmail inbox, 2026-10-11). Not changed here: the reply path is not plainly broken, only unverified. A follow-up task checks it.
 
 Reply-to: hello@ → monitored (Chris, 2026-11-08). hello@myprivacytool.io forwards to his personal Gmail, which he reads (MPC-9849). Reply-to is no longer unverified; no routing change needed. F7a stays in_build until MPC-9850 (Telegram round-trip) is Done.
+
+Update 2026-11-08 (MPC-9850 / CK-9912): Telegram round-trip recorded (workflow run 42474106577: message in 11:04:30.98Z, reply out 11:04:37.51Z, 8080 ms from send, Telegram answered ok). Every sentence in the inventory above was re-checked against the code and Chris's hello@ confirmation: all true. CHANNEL_STATUS.telegram and F7a are `live`; the /start footnote now reads "Web, Email and Telegram work today".

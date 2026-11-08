@@ -20,7 +20,7 @@ export const FEATURE_STATUS: Record<FeatureId, FeatureState> = {
   // F6 Business and team scanning. LIVE test: an admin invites 3 employees, two authorise scans, admin sees a team summary with broker results.
   F6: "planned",
   // F7a Alice / channel wording. LIVE test: confirmation email and FAQ say the same about replies; each /start channel is true as worded.
-  F7a: "in_build",
+  F7a: "live",      // MPC-9850 / CK-9912 (2026-11-08): every sentence in docs/alice-channel-wording-mpc-9826.md checked true; Telegram round-trips (run 42474106577: in 11:04:30.98Z, reply out 11:04:37.51Z, 8080 ms); hello@ monitored (Chris, MPC-9849)
   // F7b Alice conversation. LIVE test: a reply to a real report email gets an Alice answer in the same thread; each channel round-trips a test message.
   F7b: "planned",
   // F8 Legal pages and policy accuracy. LIVE test: every sentence in Privacy 2.3, Cookies and Terms 6 is true of the code; /accessibility and /gdpr-rights render and are in the footer.
@@ -38,9 +38,7 @@ export type ChannelId = "web" | "telegram" | "email" | "whatsapp" | "messenger" 
 
 export const CHANNEL_STATUS: Record<ChannelId, FeatureState> = {
   web: "live",              // /scan runs in the browser today
-  // Telegram: the bot and webhook are built (workers/social-listeners) but a synthetic message could not be round-tripped from the build session
-  // (MPC-9826, 2026-11-08: no outbound route to api.telegram.org or the Worker from the sandbox). Stays in_build until that check is recorded.
-  telegram: "in_build",
+  telegram: "live",         // MPC-9850 / CK-9912 (2026-11-08): LIVE test passed on the deployed system, Telegram round-trip check run 42474106577 (message in -> reply out 8080 ms, budget 60000 ms)
   email: "live",            // the report email is sent; a reply reaches a person (not Alice: that is F7b, planned)
   whatsapp: "planned",      // adapter is a stub; /wa only redirects back to /start
   messenger: "planned",     // stub
