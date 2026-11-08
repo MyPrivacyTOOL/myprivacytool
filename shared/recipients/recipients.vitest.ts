@@ -21,17 +21,17 @@ const codeOf = async (p: Promise<unknown>) => { try { await p; return "no error"
 
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 11 first-party (8 from the Map + 3 added by MPC-9886) and 21 third-party/processor/platform live recipients", () => {
+  it("pins 11 first-party (8 from the Map + 3 added by MPC-9886) and 22 third-party/processor/platform live recipients", () => {
     expect(live.filter((r) => r.party === "first")).toHaveLength(11); // 8 from the Map + github-channel, oauth-session and deep-dive-api (MPC-9886: live browser calls that were missing from the registry)
-    expect(live.filter((r) => r.party !== "first")).toHaveLength(21);
+    expect(live.filter((r) => r.party !== "first")).toHaveLength(22); // 21 from the Map + pwned-passwords, live since VITE_PASSWORD_CHECK=true in production (MPC-9886)
   });
   it("has the user-pasted-listing structural entry, 4 known-host disabled entries and 6 planned disabled entries", () => {
     expect(registry.recipients.find((r) => r.key === "user-pasted-listing")?.host_kind).toBe("user_supplied");
-    for (const k of ["stripe", "pwned-passwords", "meta-graph", "platform-replies"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
+    for (const k of ["stripe", "xposedornot", "meta-graph", "platform-replies"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(6);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(43);
+    expect(registry.recipients).toHaveLength(44);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);
