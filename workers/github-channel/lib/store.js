@@ -2,10 +2,13 @@
  * Encrypted token storage over Supabase PostgREST (service role only; RLS blocks everyone else).
  * Plaintext tokens exist only in memory; every column written here is ciphertext.
  */
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../../shared/recipients/worker-ctx.ts';
 import { encryptToken, decryptToken, keyForVersion } from './encryption.js';
 
 async function sb(env, method, path, body, fetchFn, extra = {}) {
-  const res = await fetchFn(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+  // MPC-9885: rows are keyed by the provider's user id (username); the tokens are ciphertext.
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/${path}`, sent: ['username'], init: {
     method,
     headers: {
       apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -14,7 +17,7 @@ async function sb(env, method, path, body, fetchFn, extra = {}) {
       ...extra,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  } }, workerRecipientContext(env, { fetchImpl: fetchFn }));
   if (!res.ok) throw new Error(`supabase ${method} ${path.split('?')[0]} ${res.status}`);
   return res.status === 204 ? null : res.json().catch(() => null);
 }
@@ -25,7 +28,7 @@ const PROVIDER = 'github';
 // AAD binds a ciphertext to its provider, account and column, so a row copied to another account/provider fails to decrypt.
 const aad = (subjectId, column, provider = PROVIDER) => `${provider}:${subjectId}:${column}`;
 
-export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, provider = PROVIDER }, fetchFn = fetch) {
+export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, provider = PROVIDER }, fetchFn = undefined) {
   const version = Number(env.ENCRYPTION_KEY_VERSION || 1);
   const key = keyForVersion(env, version);
   const row = {
@@ -45,7 +48,7 @@ export async function saveToken(env, { subjectId, accessToken, refreshToken, sco
 }
 
 /** @returns {Promise<{accessToken: string, refreshToken: string|null}|null>} */
-export async function loadTokens(env, subjectId, fetchFn = fetch, provider = PROVIDER) {
+export async function loadTokens(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   const rows = await sb(env, 'GET',
     `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version&limit=1`,
     undefined, fetchFn);
@@ -59,11 +62,11 @@ export async function loadTokens(env, subjectId, fetchFn = fetch, provider = PRO
   };
 }
 
-export async function loadAccessToken(env, subjectId, fetchFn = fetch, provider = PROVIDER) {
+export async function loadAccessToken(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   return (await loadTokens(env, subjectId, fetchFn, provider))?.accessToken ?? null;
 }
 
-export function deleteToken(env, subjectId, fetchFn = fetch, provider = PROVIDER) {
+export function deleteToken(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   return sb(env, 'DELETE', `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}`,
     undefined, fetchFn, { Prefer: 'return=minimal' });
 }

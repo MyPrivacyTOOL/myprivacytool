@@ -3,22 +3,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
 import { proofSid, CONSENT_VERSION } from './pop.ts';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 import { getConversationState, saveConversationState, purgeExpiredState, STATE_TTL_MS } from './state-store.js';
 
 const ENV = { SUPABASE_SERVICE_ROLE_KEY: 'svc' };
 let reqs: { url: string; method: string; body: any; headers: any }[]; let status: number; let contentRange: string; let seed: Record<string, any>;
+let spy: ReturnType<typeof createFetchSpy>;
 let ledgerProof: any;   // MPC-8737: the PoP proof is a ledger row, read through the mpt_ledger_pop_check RPC
 
 beforeEach(() => {
   reqs = []; status = 200; contentRange = '*/0'; seed = {}; ledgerProof = null;
-  vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
+  // MPC-9885: every request goes through the registry spy; the stub below only answers.
+  spy = createFetchSpy({ respond: async (input: any, init: any = {}) => {
     reqs.push({ url: String(input), method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : undefined, headers: init.headers });
     if (String(input).includes('firestore.googleapis.com')) return new Response('', { status: 404 });
     if (String(input).includes('/rest/v1/rpc/mpt_ledger_pop_check')) return new Response(JSON.stringify({ proof: ledgerProof && ledgerProof.sid === JSON.parse(init.body).p_sid ? ledgerProof.proof : null, revoked_at_ms: null }));
     const key = decodeURIComponent(/key=eq\.([^&]+)/.exec(String(input))?.[1] ?? '');
     const body = init.method === 'DELETE' ? '' : seed[key] ? JSON.stringify([{ state: seed[key] }]) : '[]';
     return new Response(body, { status, headers: { 'Content-Range': contentRange } });
-  });
+  } });
+  vi.stubGlobal('fetch', spy.fetch);
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -43,6 +47,11 @@ describe('state store', () => {
     expect(saved?.body.key).toBe('telegram:7');
     expect(saved?.body.state.stage).toBe('awaiting_confirmation');
     expect(reqs.some((q) => q.url.includes('firestore.googleapis.com'))).toBe(false);
+    // MPC-9885: state went to Supabase and the reply to Telegram, both registered recipients.
+    // (the spy names the first registry entry that owns a host, and *.supabase.co is shared by several entries, so assert on hosts for Supabase)
+    expect(new Set(spy.calls.map((c) => c.host))).toEqual(new Set(['xmdmkumwxpgahmlweuug.supabase.co', 'api.telegram.org']));
+    expect(spy.calls.find((c) => c.host === 'api.telegram.org')?.recipient).toBe('telegram');
+    spy.assertAllRegistered();
   });
 });
 

@@ -9,6 +9,8 @@
 //   3. Bearer calls: /api/account/me, /link-scan, /delete, /refresh, /signout, /can. The bearer is the Supabase access token; it is checked against Supabase Auth on every call.
 // Everything answers 404 unless ACCOUNTS_ENABLED is exactly "true" (rollback = set "false" and redeploy). Needs migration 20261108120000_mpc_9817_accounts_and_signin.sql.
 import { shell, para, button, SIGN_OFF, sendEmail } from './email.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { rcx } from './recipients.js';
 
 export const accountsEnabled = (env) => env.ACCOUNTS_ENABLED === 'true';
 
@@ -28,8 +30,8 @@ const noEmail = (s) => String(s).replace(/\S+@\S+/g, '[email]');   // logs never
 
 // ---------------------------------------------------------------- Supabase Auth calls
 /** One-time magic-link token for an address (creates the auth user if there is none). Returns the hashed token or null. */
-export async function createSignInToken(env, email, fetchImpl = fetch) {
-  const res = await fetchImpl(`${base(env)}/auth/v1/admin/generate_link`, { method: 'POST', headers: svcHeaders(env), body: JSON.stringify({ type: 'magiclink', email }) });
+export async function createSignInToken(env, email, fetchImpl = undefined) {
+  const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/admin/generate_link`, sent: ['email'], init: { method: 'POST', headers: svcHeaders(env), body: JSON.stringify({ type: 'magiclink', email }) } }, rcx(env, fetchImpl));
   if (!res.ok) { console.error('account: generate_link failed', res.status); return null; }
   const j = await res.json().catch(() => ({}));
   const t = j.hashed_token || j.properties?.hashed_token;
@@ -37,18 +39,18 @@ export async function createSignInToken(env, email, fetchImpl = fetch) {
 }
 
 /** Redeems a magic-link token. Returns Supabase's session ({access_token, refresh_token, expires_at, user}) or null (wrong, used or expired). */
-export async function redeemSignInToken(env, tokenHash, fetchImpl = fetch) {
-  const res = await fetchImpl(`${base(env)}/auth/v1/verify`, { method: 'POST', headers: pubHeaders(env), body: JSON.stringify({ type: 'magiclink', token_hash: tokenHash }) });
+export async function redeemSignInToken(env, tokenHash, fetchImpl = undefined) {
+  const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/verify`, sent: [], init: { method: 'POST', headers: pubHeaders(env), body: JSON.stringify({ type: 'magiclink', token_hash: tokenHash }) } }, rcx(env, fetchImpl));
   if (!res.ok) return null;
   const j = await res.json().catch(() => null);
   return j && j.access_token && j.refresh_token && j.user?.id && j.user?.email ? j : null;
 }
 
 /** The user an access token belongs to, checked against Supabase Auth (signature, expiry, revocation). null when not valid. */
-export async function userFromBearer(env, request, fetchImpl = fetch) {
+export async function userFromBearer(env, request, fetchImpl = undefined) {
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token || token.length > 4096) return null;
-  const res = await fetchImpl(`${base(env)}/auth/v1/user`, { headers: { apikey: pubKey(env), Authorization: `Bearer ${token}` } });
+  const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/user`, sent: [], init: { headers: { apikey: pubKey(env), Authorization: `Bearer ${token}` } } }, rcx(env, fetchImpl));
   if (!res.ok) return null;
   const u = await res.json().catch(() => null);
   return u && UUID_RE.test(u.id || '') && typeof u.email === 'string' ? { id: u.id.toLowerCase(), email: u.email.toLowerCase(), token } : null;
@@ -95,7 +97,7 @@ const isScanNumber = (v) => typeof v === 'string' && UUID_RE.test(v);
 async function sha(s) { return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, '0')).join(''); }
 
 /** POST /api/account/signin {email, scan_number?} -> {sent:true}. Same answer for every address. */
-export async function handleSignIn(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, allowed, fetchImpl = fetch }) {
+export async function handleSignIn(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, allowed, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-signin:')) return json({ error: 'Too many requests' }, 429);
   const b = await bodyOf(request); if (!b) return json({ error: 'Invalid request' }, 400);
@@ -122,7 +124,7 @@ export async function handleSignIn(env, ctx, request, origin, json, { allowedOri
 }
 
 /** POST /api/account/verify {token_hash, scan_number?} -> {session, account}. Creates the account row, attaches the current scan. */
-export async function handleVerify(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = fetch }) {
+export async function handleVerify(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-verify:')) return json({ error: 'Too many requests' }, 429);
   const b = await bodyOf(request); if (!b) return json({ error: 'Invalid request' }, 400);
@@ -151,7 +153,7 @@ export async function completeSignIn(env, sb, session, scanNumber, method) {
 }
 
 /** GET|POST /api/account/me -> {account, scans}. */
-export async function handleMe(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = fetch }) {
+export async function handleMe(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-me:')) return json({ error: 'Too many requests' }, 429);
   const user = await userFromBearer(env, request, fetchImpl);
@@ -165,7 +167,7 @@ export async function handleMe(env, ctx, request, origin, json, { allowedOrigins
 }
 
 /** POST /api/account/scan {scan_number} -> {scan}: the saved result of one of the signed-in account's own scans. Same 404 for a scan that is not yours as for one that does not exist. */
-export async function handleOpenScan(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = fetch }) {
+export async function handleOpenScan(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-scan:')) return json({ error: 'Too many requests' }, 429);
   const user = await userFromBearer(env, request, fetchImpl);
@@ -178,7 +180,7 @@ export async function handleOpenScan(env, ctx, request, origin, json, { allowedO
 }
 
 /** POST /api/account/link-scan {scan_number}: claim a scan by its number; works only for a scan requested with the signed-in (proved) email. */
-export async function handleLinkScan(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = fetch }) {
+export async function handleLinkScan(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-link:')) return json({ error: 'Too many requests' }, 429);
   const user = await userFromBearer(env, request, fetchImpl);
@@ -192,7 +194,7 @@ export async function handleLinkScan(env, ctx, request, origin, json, { allowedO
 }
 
 /** POST /api/account/delete {confirm:"delete"}: deletes the account and ALL its scans (not an unlink), then the sign-in identity. */
-export async function handleDelete(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = fetch }) {
+export async function handleDelete(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-delete:')) return json({ error: 'Too many requests' }, 429);
   const user = await userFromBearer(env, request, fetchImpl);
@@ -200,7 +202,7 @@ export async function handleDelete(env, ctx, request, origin, json, { allowedOri
   const b = await bodyOf(request); if (!b || b.confirm !== 'delete') return json({ error: 'Confirmation required' }, 400);
   try {
     const r = await sb.rpc('mpt_delete_account', { p_account: user.id });
-    const res = await fetchImpl(`${base(env)}/auth/v1/admin/users/${user.id}`, { method: 'DELETE', headers: svcHeaders(env) });
+    const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/admin/users/${user.id}`, sent: [], init: { method: 'DELETE', headers: svcHeaders(env) } }, rcx(env, fetchImpl));
     const authGone = res.ok || res.status === 404;
     if (!authGone) console.error('account: auth user not removed', res.status);
     return json({ deleted: true, account_deleted: r.account_deleted === true, scans_deleted: r.web_scans_deleted ?? 0, sign_in_removed: authGone });
@@ -208,11 +210,11 @@ export async function handleDelete(env, ctx, request, origin, json, { allowedOri
 }
 
 /** POST /api/account/refresh {refresh_token} -> new session. */
-export async function handleRefresh(env, ctx, request, origin, json, { allowedOrigins, rateLimited, fetchImpl = fetch }) {
+export async function handleRefresh(env, ctx, request, origin, json, { allowedOrigins, rateLimited, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-refresh:')) return json({ error: 'Too many requests' }, 429);
   const b = await bodyOf(request); if (!b || typeof b.refresh_token !== 'string' || b.refresh_token.length > 512) return json({ error: 'Invalid request' }, 400);
-  const res = await fetchImpl(`${base(env)}/auth/v1/token?grant_type=refresh_token`, { method: 'POST', headers: pubHeaders(env), body: JSON.stringify({ refresh_token: b.refresh_token }) });
+  const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/token?grant_type=refresh_token`, sent: [], init: { method: 'POST', headers: pubHeaders(env), body: JSON.stringify({ refresh_token: b.refresh_token }) } }, rcx(env, fetchImpl));
   if (!res.ok) return json({ error: 'Not signed in' }, 401);
   const j = await res.json().catch(() => null);
   if (!j?.access_token || !j?.refresh_token) return json({ error: 'Not signed in' }, 401);
@@ -220,11 +222,11 @@ export async function handleRefresh(env, ctx, request, origin, json, { allowedOr
 }
 
 /** POST /api/account/signout: ends this session at Supabase Auth. */
-export async function handleSignOut(env, ctx, request, origin, json, { allowedOrigins, rateLimited, fetchImpl = fetch }) {
+export async function handleSignOut(env, ctx, request, origin, json, { allowedOrigins, rateLimited, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-signout:')) return json({ error: 'Too many requests' }, 429);
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  if (token && token.length <= 4096) await fetchImpl(`${base(env)}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: pubKey(env), Authorization: `Bearer ${token}` } }).catch(() => {});
+  if (token && token.length <= 4096) await callRecipient('supabase', { url: `${base(env)}/auth/v1/logout?scope=local`, sent: [], init: { method: 'POST', headers: { apikey: pubKey(env), Authorization: `Bearer ${token}` } } }, rcx(env, fetchImpl)).catch(() => {});
   return json({ signed_out: true });
 }
 
@@ -235,7 +237,7 @@ export async function can(sb, accountId, key) {
 }
 
 /** POST /api/account/can {key} */
-export async function handleCan(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = fetch }) {
+export async function handleCan(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
   const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
   if (await rateLimited(env, request, 'acct-can:')) return json({ error: 'Too many requests' }, 429);
   const user = await userFromBearer(env, request, fetchImpl);
@@ -245,7 +247,7 @@ export async function handleCan(env, ctx, request, origin, json, { allowedOrigin
 }
 
 /** For the click-to-confirm (MPC-9813): when this scan was requested with the one-step "keep my scan / create my free account" tick, returns the sign-in token so the confirm page signs the person in. null otherwise. */
-export async function accountTokenForConfirm(env, sb, scanId, email, fetchImpl = fetch) {
+export async function accountTokenForConfirm(env, sb, scanId, email, fetchImpl = undefined) {
   if (!accountsEnabled(env) || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
   try {
     const link = (await sb.select(`web_scan_contacts?contact_id=eq.${scanId}&channel=eq.email&account_requested_at=not.is.null&select=web_scan_id&limit=1`))?.[0];

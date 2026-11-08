@@ -2,6 +2,7 @@
 // MPC-7300: Vitest unit tests for the mpt-leads Worker (all outbound calls stubbed; no network, no secrets).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import worker from './worker.js';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 
 const ORIGIN = 'https://myprivacytool.io';
 const env = { NOTION_TOKEN: 'n', LEADS_DB_ID: 'abc-def', SUPABASE_SERVICE_ROLE_KEY: 'k', HUBSPOT_TOKEN: 'h', RESEND_API_KEY: 'r', SLACK_BOT_TOKEN: 's' };
@@ -351,5 +352,44 @@ describe('GET /whoami', () => {
   it('leaves every other GET path as 404', async () => {
     expect((await get('/anything-else')).status).toBe(404);
     expect((await get('/')).status).toBe(404);
+  });
+});
+
+// MPC-9885: every outbound call of this Worker is registered, enabled, and reaches the recipient it should.
+describe('recipient wrapper (fetch-spy)', () => {
+  const full = { ...env, TURNSTILE_SECRET_KEY: 't', HUNTER_API_KEY: 'hk', SUPABASE_URL: 'https://x.supabase.co' };
+  const spyFor = () => createFetchSpy({
+    respond: (url) => {
+      if (url.includes('turnstile')) return new Response(JSON.stringify({ success: true, hostname: 'myprivacytool.io' }), { status: 200 });
+      if (url.includes('mpt_score_baselines')) return new Response('[]', { status: 201 });
+      if (url.includes('/query')) return new Response(JSON.stringify({ results: [], has_more: false }), { status: 200 });
+      return new Response('{}', { status: 200 });
+    },
+  });
+  it('lead submit reaches turnstile, supabase, notion, slack, hubspot, hunter and resend only', async () => {
+    const spy = spyFor();
+    vi.stubGlobal('fetch', spy.fetch);
+    await post({ email: 'ciso@acme.com', name: 'A B', riskScore: 40, 'cf-turnstile-response': 'tok' }, { e: full });
+    // the spy names the first registry entry that owns a host; *.supabase.co is shared by several keys, so fold them into 'supabase'.
+    expect([...new Set(spy.calls.map((c) => (c.host.endsWith('.supabase.co') ? 'supabase' : c.recipient)))].sort()).toEqual(['cloudflare-turnstile', 'hubspot', 'hunter', 'notion', 'resend', 'slack', 'supabase']);
+    spy.assertAllRegistered();
+  });
+  it('the cron sweep and the retention purge reach only hubspot / hunter / notion', async () => {
+    const spy = createFetchSpy({ respond: (url) => new Response(JSON.stringify(url.includes('contacts/search') ? { results: [{ id: '1', properties: { email: 'a@acme.com' } }] } : { results: [{ id: 'p' }] }), { status: 200 }) });
+    vi.stubGlobal('fetch', spy.fetch);
+    await worker.scheduled({ scheduledTime: Date.UTC(2026, 10, 8, 19, 1) }, { ...full }, { waitUntil: (p) => p });
+    await new Promise((r) => setTimeout(r, 20));
+    const keys = new Set(spy.calls.map((c) => c.recipient));
+    expect(keys.has('hubspot')).toBe(true);
+    for (const k of keys) expect(['hubspot', 'hunter', 'notion', 'slack']).toContain(k);
+    spy.assertAllRegistered();
+  });
+  it('no Hunter key: the Hunter recipient is never called (flag HUNTER_API_KEY)', async () => {
+    const spy = spyFor();
+    vi.stubGlobal('fetch', spy.fetch);
+    const { HUNTER_API_KEY, ...noHunter } = full;
+    await post({ email: 'ciso@acme.com' }, { e: noHunter });
+    expect(spy.calls.some((c) => c.recipient === 'hunter')).toBe(false);
+    spy.assertAllRegistered();
   });
 });

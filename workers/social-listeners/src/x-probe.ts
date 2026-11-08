@@ -2,10 +2,11 @@
 // (PROBE_X_IDS numeric ids, or PROBE_X_HANDLES) is saved exactly as delivered, then the public lookups OSINT would use are saved raw:
 // the user object and the latest public posts. Rows go to public.channel_probe_captures (platform "x", 7 day expiry, service_role only).
 // Anyone not on the lists takes the normal path untouched. Mode off (the default) does nothing. Nothing here can change the webhook response.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { extractDms, selfId } from "./mirror-bot";
 import { probeMode } from "./probe-reader";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 /** Env plus the two allow-lists: PROBE_X_IDS (numeric X user ids) and PROBE_X_HANDLES (@handles, any case), both comma-separated. */
 export type XProbeEnv = Env & { PROBE_X_IDS?: string; PROBE_X_HANDLES?: string };
@@ -68,12 +69,16 @@ interface Answer { status: number; response: unknown; rate?: { limit: string | n
 async function save(env: Env, rows: Row[], log: Logger): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return log.warn("probe_storage_unconfigured");
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify(rows),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify(rows),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username", "name", "message_text"], // the raw X event and the public lookups, allow-listed accounts only
+    }, recipientCtx(env));
     if (!res.ok) log.warn("probe_save_failed", { status: res.status });
   } catch (err) {
     log.warn("probe_save_failed", { error: err instanceof Error ? err.name : "unknown" });
@@ -83,7 +88,7 @@ async function save(env: Env, rows: Row[], log: Logger): Promise<void> {
 /** One X API read with the app bearer token. Returns what X answered (errors included) so refusals are evidence too. Never throws, never logs the URL. */
 async function xGet(env: Env, path: string): Promise<Answer> {
   try {
-    const res = await fetch(`${X_API}${path}`, { headers: { Authorization: `Bearer ${env.X_BEARER_TOKEN}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const res = await callRecipient("x-api", { url: `${X_API}${path}`, init: { headers: { Authorization: `Bearer ${env.X_BEARER_TOKEN}` }, signal: AbortSignal.timeout(TIMEOUT_MS) }, sent: ["username"] }, recipientCtx(env)); // the user id in the path
     let response: unknown = null;
     try { response = await res.json(); } catch { /* non-JSON answer: keep null */ }
     const h = res.headers;

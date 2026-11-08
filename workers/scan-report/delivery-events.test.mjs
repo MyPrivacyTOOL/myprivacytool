@@ -10,7 +10,7 @@ import { emailHash, isOptedOut } from './lib/suppression.js';
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const SECRET = 'whsec_' + Buffer.from('delivery-events-test-secret').toString('base64');
-const env = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', RESEND_WEBHOOK_SECRET: SECRET, HUBSPOT_TOKEN: 'h', RECIPIENT_ALLOWLIST: '' };
+const env = { SUPABASE_URL: 'https://db.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', RESEND_WEBHOOK_SECRET: SECRET, HUBSPOT_TOKEN: 'h', RECIPIENT_ALLOWLIST: '' };
 const quiet = async (fn) => { const k = [console.log, console.warn, console.error]; console.log = console.warn = console.error = () => {}; try { return await fn(); } finally { [console.log, console.warn, console.error] = k; } };
 const nowS = () => Math.floor(Date.now() / 1000);
 async function deliver(F, event, { e = env, sign = true, ts = nowS() } = {}) {

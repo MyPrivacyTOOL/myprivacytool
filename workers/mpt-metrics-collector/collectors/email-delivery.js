@@ -6,6 +6,8 @@
 //   hard-bounce rate of 2 percent or more across the last 7 days, provided at least 20 emails were sent in the window (a rate on 3 emails is noise), OR
 //   one or more complaints in the last 7 days (at our volume a single complaint is already well above 0.08 percent, and each one also opts that address out).
 import { previousHkDay } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const MIN_SENDS = 20;
 export const BOUNCE_RATE_ALERT = 0.02;
@@ -14,11 +16,11 @@ const DAY_MS = 86400000;
 const num = (v) => Number(v) || 0;
 
 async function counts(env, from, to) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/mpt_email_delivery_counts`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/rpc/mpt_email_delivery_counts`, init: {
     method: 'POST',
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_from: from.toISOString(), p_to: to.toISOString() }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw Object.assign(new Error(`email-delivery: counts read failed: HTTP ${res.status}`), { status: res.status });
   return (await res.json()).map((r) => ({ email_type: r.email_type, sent: num(r.sent), delivered: num(r.delivered), bounced: num(r.bounced), bounced_hard: num(r.bounced_hard), complained: num(r.complained), clicked: num(r.clicked) }));
 }

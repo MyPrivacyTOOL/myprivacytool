@@ -2,8 +2,10 @@
 // Flow: "MIRROR" -> consent request -> "MIRROR YES" -> public profile scan -> educational mirror DM.
 // Retention: none. The consent step is stateless (the explicit "MIRROR YES" message is the consent), the scan result lives
 // only in memory for the length of one request, and logs carry event names only (no handles, ids or profile content).
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import { type Env, pick } from "./shared";
+import { type Env, pick, recipientCtx } from "./shared";
+import type { DataItem } from "../../../shared/recipients/registry";
 import { getUserAccessToken } from "./x-oauth";
 import { uploadDmVideo } from "./x-media";
 import { classifyTheme, recordXDm } from "./funnel";
@@ -229,17 +231,21 @@ export function buildMirrorMessage(p: XProfile): string {
   );
 }
 
-async function xFetch(env: Env, path: string, init: RequestInit & { token: string }): Promise<Response> {
+async function xFetch(env: Env, path: string, init: RequestInit & { token: string }, sent: readonly DataItem[]): Promise<Response> {
   const { token, ...rest } = init;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), X_TIMEOUT_MS);
   try {
-    return await fetch(`${X_API}${path}`, {
-      ...rest,
-      // A FormData body (media upload) needs the runtime to set its own multipart Content-Type.
-      headers: { Authorization: `Bearer ${token}`, ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(rest.headers ?? {}) },
-      signal: ctl.signal,
-    });
+    return await callRecipient("x-api", {
+      url: `${X_API}${path}`,
+      init: {
+        ...rest,
+        // A FormData body (media upload) needs the runtime to set its own multipart Content-Type.
+        headers: { Authorization: `Bearer ${token}`, ...(rest.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(rest.headers ?? {}) },
+        signal: ctl.signal,
+      },
+      sent, // declared by the caller: a lookup sends the user id, a DM also sends its text, a media chunk sends neither
+    }, recipientCtx(env));
   } finally {
     clearTimeout(timer);
   }
@@ -249,7 +255,7 @@ async function xFetch(env: Env, path: string, init: RequestInit & { token: strin
 export async function fetchPublicProfile(env: Env, userId: string): Promise<XProfile | null> {
   if (!env.X_BEARER_TOKEN || !/^\d+$/.test(userId)) return null;
   const fields = "name,username,description,location,url,created_at,protected,verified,profile_image_url,pinned_tweet_id,public_metrics";
-  const res = await xFetch(env, `/users/${userId}?user.fields=${fields}`, { method: "GET", token: env.X_BEARER_TOKEN });
+  const res = await xFetch(env, `/users/${userId}?user.fields=${fields}`, { method: "GET", token: env.X_BEARER_TOKEN }, ["username"]);
   if (!res.ok) return null;
   return ((await res.json()) as { data?: XProfile }).data ?? null;
 }
@@ -258,7 +264,7 @@ export async function fetchPublicProfile(env: Env, userId: string): Promise<XPro
 export async function fetchUsername(env: Env, userId: string): Promise<string | undefined> {
   if (!/^\d+$/.test(userId) || !env.X_BEARER_TOKEN) return undefined;
   try {
-    const res = await xFetch(env, `/users/${userId}?user.fields=username`, { method: "GET", token: env.X_BEARER_TOKEN });
+    const res = await xFetch(env, `/users/${userId}?user.fields=username`, { method: "GET", token: env.X_BEARER_TOKEN }, ["username"]);
     const u = res.ok ? ((await res.json()) as { data?: { username?: unknown } }).data?.username : undefined;
     return typeof u === "string" && /^\w{1,15}$/.test(u) ? u : undefined;
   } catch {
@@ -267,11 +273,11 @@ export async function fetchUsername(env: Env, userId: string): Promise<string | 
 }
 
 /** Calls X with the user-context token. Refreshes the token and retries once on 401. Null when no token can be had. */
-async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Promise<Response | null> {
+async function xUser(env: Env, log: Logger, path: string, init: RequestInit, sent: readonly DataItem[]): Promise<Response | null> {
   for (const force of [false, true]) {
     const token = await getUserAccessToken(env, log, force);
     if (!token) return null;
-    const res = await xFetch(env, path, { ...init, token });
+    const res = await xFetch(env, path, { ...init, token }, sent);
     if (res.status !== 401) return res;
   }
   return null;
@@ -281,7 +287,7 @@ async function xUser(env: Env, log: Logger, path: string, init: RequestInit): Pr
 export async function fetchFollowsUs(env: Env, userId: string, log: Logger): Promise<boolean | null> {
   if (!/^\d+$/.test(userId)) return null;
   try {
-    const res = await xUser(env, log, `/users/${userId}?user.fields=connection_status`, { method: "GET" });
+    const res = await xUser(env, log, `/users/${userId}?user.fields=connection_status`, { method: "GET" }, ["username"]);
     if (!res?.ok) return null;
     const cs = ((await res.json()) as { data?: { connection_status?: unknown } }).data?.connection_status;
     return Array.isArray(cs) ? cs.includes("followed_by") : null;
@@ -307,14 +313,14 @@ export async function sendXDm(env: Env, recipientId: string, text: string, log?:
   if (opts.video) {
     // An animated GIF autoplays and loops in the DM; if X refuses it, the same clip goes as a normal video, then as text alone.
     for (const category of ["dm_gif", "dm_video"] as const) {
-      const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init), category);
+      const mediaId = await uploadDmVideo(env, quiet, (p, init) => xUser(env, quiet, p, init, []), category);
       if (!mediaId) continue;
-      const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) });
+      const withVideo = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text, attachments: [{ media_id: mediaId }] }) }, ["message_text", "username"]);
       if (withVideo?.ok) return true;
       quiet.warn("x_dm_video_rejected", { status: withVideo?.status ?? 0, category });
     }
   }
-  const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) });
+  const res = await xUser(env, quiet, path, { method: "POST", body: JSON.stringify({ text }) }, ["message_text", "username"]);
   return Boolean(res?.ok);
 }
 
@@ -346,7 +352,7 @@ export async function isConsentPending(env: Env, senderId: string, selfId: strin
   if (!/^\d+$/.test(senderId) || !selfId) return false;
   if (!(await allowed(env, senderId, log))) return false;
   try {
-    const res = await xUser(env, log, `/dm_conversations/with/${senderId}/dm_events?max_results=5&event_types=MessageCreate&dm_event.fields=created_at,sender_id,text`, { method: "GET" });
+    const res = await xUser(env, log, `/dm_conversations/with/${senderId}/dm_events?max_results=5&event_types=MessageCreate&dm_event.fields=created_at,sender_id,text`, { method: "GET" }, ["username"]);
     if (!res?.ok) return false;
     const events = ((await res.json()) as { data?: { sender_id?: string; text?: string; created_at?: string }[] }).data ?? [];
     const mine = events.find((e) => String(e.sender_id) === selfId); // X lists newest first

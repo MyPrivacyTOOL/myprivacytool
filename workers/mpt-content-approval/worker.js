@@ -7,6 +7,8 @@
 //                  log every attempt to D1 (make_webhook_log + agent_execution_logs 'handed_off'/'failed' + publication_receipts), reply in thread.
 //                  A Make 2xx is HANDED OFF only. POST /receipt (HMAC-signed) is the only path to verified_published. GET /status reports stages.
 
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 import { SCHEMA_VERSION, PLATFORMS, LEGACY_PLATFORMS, validateMakePayload } from './schema.js';
 import { expectedCycleIds, watchdogReport, recordNotRouted, recordDrafted, recordApproved, recordHandedOff, recordHandoffFailure, applyReconciliation, handleReceipt, logRejectedReceipt, classifyCycle, sendable, rowsFor, parseRetryAfter, safeEqual as safeEqualReceipt } from './receipts.js';
 
@@ -133,7 +135,7 @@ export async function postToMake(env, taskId, payload, meta = {}) {
   const headers = { 'content-type': 'application/json' };
   if (env.MAKE_API_KEY) headers['x-make-apikey'] = env.MAKE_API_KEY; // only when the Make hook has an API-key check
   try {
-    const res = await fetch(env.MAKE_WEBHOOK_URL, { method: 'POST', headers, body, signal: AbortSignal.timeout(MAKE_TIMEOUT_MS) });
+    const res = await callRecipient('make-webhooks', { url: env.MAKE_WEBHOOK_URL, init: { method: 'POST', headers, body, signal: AbortSignal.timeout(MAKE_TIMEOUT_MS) }, sent: [] }, workerRecipientContext(env));
     const text = await res.text().catch(() => '');
     const error = res.ok ? null : `Make webhook ${res.status}`;
     meta.retryAfterS = parseRetryAfter(res.headers?.get?.('retry-after'));
@@ -148,11 +150,15 @@ export async function postToMake(env, taskId, payload, meta = {}) {
 
 async function reply(env, target, text) {
   if (!target?.channel || !target?.ts || !env.SLACK_BOT_TOKEN) return;
-  await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ channel: target.channel, thread_ts: target.ts, text }),
-  }).catch((e) => console.error('slack reply failed', e?.message));
+  await callRecipient('slack', {
+    url: 'https://slack.com/api/chat.postMessage',
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ channel: target.channel, thread_ts: target.ts, text }),
+    },
+    sent: [],
+  }, workerRecipientContext(env)).catch((e) => console.error('slack reply failed', e?.message));
 }
 
 const hktClock = (d) => new Date(d.getTime() + 8 * 3600e3).toISOString().slice(11, 16);
@@ -161,11 +167,15 @@ const hktClock = (d) => new Date(d.getTime() + 8 * 3600e3).toISOString().slice(1
 export async function markDecided(env, target, text) {
   if (!target?.channel || !target?.ts || !env.SLACK_BOT_TOKEN || !Array.isArray(target.blocks)) return;
   const blocks = [...target.blocks.filter((b) => b.type !== 'actions'), { type: 'section', text: { type: 'mrkdwn', text } }];
-  const res = await fetch('https://slack.com/api/chat.update', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ channel: target.channel, ts: target.ts, text, blocks }),
-  }).catch((e) => console.error('slack update failed', e?.message));
+  const res = await callRecipient('slack', {
+    url: 'https://slack.com/api/chat.update',
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ channel: target.channel, ts: target.ts, text, blocks }),
+    },
+    sent: [],
+  }, workerRecipientContext(env)).catch((e) => console.error('slack update failed', e?.message));
   // Slack answers 200 with { ok: false, error } when it refuses an edit; surface that instead of failing silently.
   const out = await res?.json?.().catch(() => null);
   if (out && out.ok === false) console.error('slack update refused', out.error);

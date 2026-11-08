@@ -410,9 +410,19 @@
       "host_kind": "pattern",
       "surface": "db",
       "data_items": [
+        "city",
+        "country",
         "email",
+        "email_domain",
+        "email_hash",
         "ip",
-        "scan_result"
+        "message_text",
+        "name",
+        "phone",
+        "referrer",
+        "scan_result",
+        "username",
+        "utm"
       ],
       "purpose": "Database that holds saved scans and sign-ups.",
       "party": "processor",
@@ -427,7 +437,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: webhook-receiver state-store.js keeps chat conversation state (24 h) whose keys and bodies carry phone, email, name and the platform user id (username); added phone, name, username. MPC-9885: mpt-leads saveBaseline sends SHA-256(email) as email_hash plus the scan scores; added email_hash. MPC-9885: partner-api monitors store the monitored value (email, phone, handle or a domain); added email_domain. MPC-9885: mpt-cairn-blackboard stores the investigation seed email and username and fact values (email, username; phone only if HASH_FACT_TYPES leaves it unhashed); username and phone were already listed (MPC-9885 other tasks). MPC-9885: social-listeners stores Telegram/X updates, probe captures and event-log rows (sender key, @username, name, message text; a shared contact adds a phone); added message_text. MPC-9885: shared/support rest-store.ts keeps support cases (message text and the sender's email, phone or handle); added message_text. MPC-9885: scan-report writes users/leads rows with the visitor IP and utm/referrer, and the listing inputs (name, phone, city, country); added utm, referrer, city, country."
     },
     {
       "key": "notion",
@@ -442,7 +453,12 @@
         "name",
         "phone",
         "country",
-        "ip"
+        "ip",
+        "city",
+        "device_profile",
+        "utm",
+        "referrer",
+        "username"
       ],
       "purpose": "Lead log.",
       "party": "third",
@@ -457,7 +473,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: the mpt-leads lead row (workers/mpt-leads/worker.js) also carries city, browser/OS/device (device_profile), UTM tags and the referrer URL; added city, device_profile, utm, referrer. MPC-9885: the Cairn Notion mirror (mpt-cairn-blackboard/notion-sync.js) copies fact values as stored, so usernames reach Notion; added username."
     },
     {
       "key": "resend",
@@ -468,7 +485,10 @@
       "host_kind": "fixed",
       "surface": "worker",
       "data_items": [
-        "email"
+        "email",
+        "ip",
+        "name",
+        "scan_result"
       ],
       "purpose": "Sends your report and follow-up email.",
       "party": "processor",
@@ -483,7 +503,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: the mpt-leads confirmation and alert emails greet the visitor by first name and the alert names the lead; added name. MPC-9885: scan-report report email carries the scan findings in the body and the IP values in its attached JSON file; added scan_result, ip."
     },
     {
       "key": "hubspot",
@@ -499,7 +520,8 @@
         "email",
         "name",
         "phone",
-        "scan_result"
+        "scan_result",
+        "username"
       ],
       "purpose": "CRM and newsletter.",
       "party": "third",
@@ -514,7 +536,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: webhook-receiver hubspot-client.js also sends the channel handle and platform user id (twitter_handle, platform_user_id); added username."
     },
     {
       "key": "github-commit-search",
@@ -772,6 +795,7 @@
         "openidconnect.googleapis.com",
         "www.googleapis.com",
         "github.com",
+        "api.github.com",
         "www.reddit.com",
         "oauth.reddit.com"
       ],
@@ -793,7 +817,8 @@
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: added api.github.com (workers/github-channel reads the connected account's own profile, repos, starred and events, and revokes the grant). The host is shared with github-commit-search and github-issues; each call declares its own key."
     },
     {
       "key": "slack",
@@ -806,7 +831,8 @@
       "data_items": [
         "country",
         "device_profile",
-        "utm"
+        "utm",
+        "referrer"
       ],
       "purpose": "Internal lead notification (no IP or email).",
       "party": "third",
@@ -821,7 +847,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: the mpt-leads lead notification quotes the referrer URL in its Other Info line; added referrer."
     },
     {
       "key": "user-pasted-listing",
@@ -859,7 +886,7 @@
       "data_items": [
         "plan_name"
       ],
-      "purpose": "Checkout (flag-gated; not live).",
+      "purpose": "Starts a paid-plan Checkout session (gated by CHECKOUT_ENABLED; answers 503 and sends nothing until it is set).",
       "party": "processor",
       "retention": {
         "days": null,
@@ -867,13 +894,13 @@
       },
       "consent_basis": "user_action",
       "phase": "post_click",
-      "enabled": false,
-      "flag": "STRIPE_ENABLED",
+      "enabled": true,
+      "flag": "CHECKOUT_ENABLED",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "reason": "Paid plans not live; Privacy and Cookies wrongly list Stripe as live (EXT-01 C20/C21)."
+      "note": "MPC-9885: the entry named a flag (STRIPE_ENABLED) that no code reads. functions/api/stripe-checkout.ts is gated by CHECKOUT_ENABLED, so the entry now says that and is enabled: with the switch off no call is made, exactly as before. The call sends the plan name only (price id and plan in the return URL); the customer's card and email are entered at checkout.stripe.com by the visitor. MPC-9894: Privacy/Cookies must say Stripe is used once checkout is switched on, and that it is currently off."
     },
     {
       "key": "pwned-passwords",
@@ -911,9 +938,10 @@
       "surface": "worker",
       "data_items": [
         "message_text",
-        "username"
+        "username",
+        "phone"
       ],
-      "purpose": "Meta channel adapters (stubs).",
+      "purpose": "Delivers WhatsApp replies (live) and Messenger replies (the Messenger adapter is still a stub that sends nothing until META_PAGE_ACCESS_KEY is set).",
       "party": "platform",
       "retention": {
         "days": null,
@@ -921,13 +949,13 @@
       },
       "consent_basis": "user_action",
       "phase": "post_click",
-      "enabled": false,
+      "enabled": true,
       "flag": null,
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "reason": "Adapters are stubs; nothing is sent."
+      "note": "MPC-9885: switched ON because webhook-receiver sendWhatsApp already calls graph.facebook.com whenever META_WHATSAPP_KEY and WHATSAPP_PHONE_NUMBER_ID are set (it was seeded off as 'stubs'). Both senders self-gate on their own secrets, so no flag. phone added (WhatsApp `to`). MPC-9894: Privacy/Cookies must say WhatsApp is live."
     },
     {
       "key": "platform-replies",
@@ -1169,12 +1197,12 @@
       "consent_basis": "service",
       "phase": "post_click",
       "enabled": true,
-      "flag": "CLOUDFLARE_API_TOKEN",
+      "flag": "CLOUDFLARE_ANALYTICS_TOKEN",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "note": "Added by MPC-9885. Read-only GraphQL; the request carries our API token and a date range."
+      "note": "Added by MPC-9885. Read-only GraphQL; the request carries our API token and a date range. MPC-9885: flag corrected to CLOUDFLARE_ANALYTICS_TOKEN, the secret the collector reads (it skips the call when unset); CLOUDFLARE_API_TOKEN is not set on that Worker."
     },
     {
       "key": "ga4-data-api",
@@ -1195,12 +1223,12 @@
       "consent_basis": "service",
       "phase": "post_click",
       "enabled": true,
-      "flag": "GA4_PROPERTY_ID",
+      "flag": "GA4_SERVICE_ACCOUNT_JSON",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "note": "Added by MPC-9885: collector reads aggregate reports with our service-account token. The tag that sends visitor data to GA4 is the separate `ga4` entry."
+      "note": "Added by MPC-9885: collector reads aggregate reports with our service-account token. The tag that sends visitor data to GA4 is the separate `ga4` entry. MPC-9885: flag corrected to GA4_SERVICE_ACCOUNT_JSON, the secret the collector requires (GA4_PROPERTY_ID is a constant in code, not an env var)."
     },
     {
       "key": "youtube-data-api",
@@ -1262,6 +1290,7 @@
       "surface": "worker",
       "data_items": [
         "email",
+        "name",
         "phone",
         "message_text",
         "username"
@@ -1280,7 +1309,7 @@
       "dpa_listed": true,
       "since": "2026-11-08",
       "until": null,
-      "note": "Added by MPC-9885: webhook-receiver firestore-client.js. Not in the Map's 29; MPC-9894 decides the DPA and Privacy wording."
+      "note": "Added by MPC-9885: webhook-receiver firestore-client.js. Not in the Map's 29; MPC-9894 decides the DPA and Privacy wording. Also added name (the state holds the channel display name)."
     },
     {
       "key": "x-api",
@@ -1304,12 +1333,12 @@
       "consent_basis": "user_action",
       "phase": "post_click",
       "enabled": true,
-      "flag": "X_BEARER_TOKEN",
+      "flag": null,
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "note": "Added by MPC-9885. `platform-replies` (the reply channels, flag-gated and off) keeps api.x.com too; this entry is the live account-level use."
+      "note": "Added by MPC-9885. `platform-replies` (the reply channels, flag-gated and off) keeps api.x.com too; this entry is the live account-level use. MPC-9885: flag is null, not X_BEARER_TOKEN: the DM, token-refresh and media-upload calls use the OAuth user token / consumer keys and ran without a bearer token, so a bearer flag would newly refuse them (the bearer-only lookups already skip themselves when it is unset)."
     },
     {
       "key": "make-webhooks",
@@ -1372,7 +1401,11 @@
       ],
       "host_kind": "pattern",
       "surface": "worker",
-      "data_items": [],
+      "data_items": [
+        "email",
+        "phone",
+        "username"
+      ],
       "purpose": "One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account.",
       "party": "first",
       "retention": {
@@ -1387,7 +1420,7 @@
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "note": "Added by MPC-9885. First party, so no outside recipient; registered so a workers.dev host is checked rather than exempt."
+      "note": "Added by MPC-9885. First party, so no outside recipient; registered so a workers.dev host is checked rather than exempt. MPC-9885: cairn-push.mjs and e2e.mjs send the seed email and fact values (email, raw phone, username) to the cairn bridge Worker, which hashes phones before storing; added email, phone, username."
     }
   ]
 }

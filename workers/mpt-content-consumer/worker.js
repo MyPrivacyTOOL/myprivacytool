@@ -5,6 +5,9 @@
 //   3. save the 6 drafts to D1 agent_execution_logs (one row per platform)
 //   4. post to Slack #mpt-content-approval with Approve All / Reject / Edit & Resubmit buttons (handled by mpt-content-approval)
 
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 export const PLATFORMS = ['x', 'linkedin', 'instagram', 'facebook', 'pinterest', 'youtube'];
 const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', pinterest: 'Pinterest', youtube: 'YouTube' };
 // Where each draft goes once approved, shown under the draft so the reviewer sees the destination and can open it.
@@ -102,11 +105,15 @@ export function parseDraft(platform, text) {
 }
 
 async function callLlm(env, prompt) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model: env.LLM_MODEL, max_tokens: 2000, system: prompt.system, messages: [{ role: 'user', content: prompt.user }] }),
-  });
+  const res = await callRecipient('anthropic', {
+    url: 'https://api.anthropic.com/v1/messages',
+    init: {
+      method: 'POST',
+      headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: env.LLM_MODEL, max_tokens: 2000, system: prompt.system, messages: [{ role: 'user', content: prompt.user }] }),
+    },
+    sent: [],
+  }, workerRecipientContext(env));
   if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const body = await res.json();
   return (body.content ?? []).filter((b) => b.type === 'text').map((b) => b.text).join('');
@@ -129,11 +136,15 @@ export function slackBlocks(taskId, topic, drafts) {
 }
 
 async function postSlack(env, topic, taskId, drafts) {
-  const res = await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({ channel: env.SLACK_CHANNEL, text: `MPT daily drafts ready for approval (${taskId})`, blocks: slackBlocks(taskId, topic, drafts), unfurl_links: false }),
-  });
+  const res = await callRecipient('slack', {
+    url: 'https://slack.com/api/chat.postMessage',
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ channel: env.SLACK_CHANNEL, text: `MPT daily drafts ready for approval (${taskId})`, blocks: slackBlocks(taskId, topic, drafts), unfurl_links: false }),
+    },
+    sent: [],
+  }, workerRecipientContext(env));
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.ok) throw new Error(`Slack post failed: ${body.error ?? res.status}`);
   return { channel: body.channel, ts: body.ts };
@@ -151,15 +162,19 @@ export async function warnOverdueReceipts(env, date, nowMs = Date.now()) {
   ).bind(new Date(nowMs - RECEIPT_OVERDUE_MS).toISOString(), new Date(nowMs - RECEIPT_ALERT_WINDOW_MS).toISOString(), taskIdFor(date)).all();
   if (!results.length) return 0;
   const lines = results.map((r) => `${r.content_id.replace('daily-posts-', '')}: ${PLATFORM_NAMES[r.platform] ?? r.platform}`);
-  const res = await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify({
-      channel: env.SLACK_CHANNEL,
-      text: `:warning: Receipts overdue: ${lines.join(', ')}. These posts were handed to Make more than 6 hours ago and never confirmed. They may be live. Check the platform and the Make run history (https://eu1.make.com/4179/scenarios/7817044/logs), and do not replay a run that already posted.`,
-      unfurl_links: false,
-    }),
-  });
+  const res = await callRecipient('slack', {
+    url: 'https://slack.com/api/chat.postMessage',
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        channel: env.SLACK_CHANNEL,
+        text: `:warning: Receipts overdue: ${lines.join(', ')}. These posts were handed to Make more than 6 hours ago and never confirmed. They may be live. Check the platform and the Make run history (https://eu1.make.com/4179/scenarios/7817044/logs), and do not replay a run that already posted.`,
+        unfurl_links: false,
+      }),
+    },
+    sent: [],
+  }, workerRecipientContext(env));
   const body = await res.json();
   if (!body.ok) throw new Error(`Slack alert failed: ${body.error}`);
   return results.length;

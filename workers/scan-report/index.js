@@ -13,6 +13,8 @@ import { addSuppression, emailHash, optOutEverywhere, suppressedAmong } from './
 import { buildMirrorReport } from './lib/mirror.js';
 import { turnstileBlocks } from './lib/turnstile.js';
 import { checkDeliverableDomain } from './lib/emailDomain.js';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext, flushQuietly } from './lib/recipients.js';
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { handleResendWebhook } from './lib/receipts.js';
@@ -142,7 +144,11 @@ export default {
       let live = null;
       if (!result.duplicate && result.scanId && env.SUPABASE_SERVICE_ROLE_KEY) {
         live = await makeLiveToken(env, result.scanId);
-        if (live) { const p = runLiveChecks(env, db(env), result.scanId, email); if (ctx?.waitUntil) ctx.waitUntil(p); }
+        if (live) {
+          const lctx = workerRecipientContext(env, { scanId: result.scanId });   // MPC-9885: the live checks belong to this scan
+          const p = runLiveChecks(env, db(env, undefined, lctx), result.scanId, email, undefined, lctx).finally(() => flushQuietly(lctx));
+          if (ctx?.waitUntil) ctx.waitUntil(p);
+        }
       }
       return json({ success: true, duplicate: result.duplicate, ...(result.replay ? { replay: true } : {}), scan_saved: saved.saved, ...(saved.saved ? { scan_number: saved.scanNumber } : {}), ...(live ? { live_token: live } : {}), ...(confirmGateEnabled(env) && !result.duplicate ? { confirm_required: true } : {}), ...(result.listingSaved ? { listing_saved: true } : {}) });
     } catch (e) {
@@ -155,7 +161,7 @@ export default {
     // MPC-7448: the HK Spam day-10 email shares the 5-minute trigger (the free plan allows only 5 crons per account). On its four daily
     // slots (01:05 to 04:05 UTC) that tick runs only the HK job, to keep within the 50-subrequest limit; the report and follow-up jobs
     // run on every other tick, so a report waits at most 5 minutes longer.
-    if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env, fetch, undefined, event?.scheduledTime ?? Date.now()).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
+    if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env, undefined, undefined, event?.scheduledTime ?? Date.now()).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
     else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
   },
 };
@@ -176,11 +182,11 @@ async function handleWebScanStep(env, request, origin, json) {
 }
 
 // MPC-7448: HK Spam day-10 email. Off unless HK_SPAM_ENABLED === 'true'; test inbox only unless HK_SPAM_EMAILS_LIVE === 'true'. See docs/hk-spam-day10-email-mpc-7448.md.
-export const runHkSpamJob = (env, fetchImpl = fetch, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
+export const runHkSpamJob = (env, fetchImpl = undefined, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
 
 // ------------------------------------------------------------------ submit path
-export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId, listing = null }, fetchImpl = fetch) {
-  const sb = db(env, fetchImpl);
+export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId, listing = null }, fetchImpl = undefined) {
+  let sb = db(env, fetchImpl);
   const now = new Date();
   const retainUntil = new Date(now.getTime() + 3 * 365 * 24 * 3600 * 1000).toISOString();
   const consent = { consent_given_at: now.toISOString(), consent_source: consentSource, ip_address: ip, retain_until: retainUntil };
@@ -207,6 +213,11 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
   const created = await requestScan(sb, user.id, email, now, keyed && requestId ? requestId : null, keyed);
   if (created.duplicate) return keyed && requestId && String(created.requestId || '').toLowerCase() === String(requestId).toLowerCase() ? replayOutcome(sb, created.scanId) : { duplicate: true, scanId: created.scanId };
   const scan = { id: created.scanId };
+  // MPC-9885: from here the scan id is known, so every recipient call is logged against it (names only) and written once at the end.
+  const rctx = workerRecipientContext(env, { fetchImpl, scanId: scan.id });
+  sb = db(env, fetchImpl, rctx);
+  let deferred = false;
+  try {
   // MPC-9813: mark the scan as waiting for the click BEFORE anything is saved or sent. Fails closed: if it cannot be marked, the request fails and nothing goes out.
   if (confirmGateEnabled(env)) await applyConfirmGate(sb, scan.id);
   // MPC-7471-F3: save the scan BEFORE the first email, so the email can show its number. Never throws; a failed save only means no number.
@@ -214,10 +225,14 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
     ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
     : { saved: false };
   const listingSaved = listing && saved.saved ? await storeListingInputs(sb, { webScanId: saved.scanNumber, scanId: scan.id, listing }) : false;
-  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl), confirm(env, sb, scan.id, email, fetchImpl, saved.scanNumber)];
-  const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e)))));
+  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl, rctx), confirm(env, sb, scan.id, email, fetchImpl, saved.scanNumber, undefined, rctx)];
+  const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e))))).then(() => flushQuietly(rctx));
+  deferred = true;
   if (ctx?.waitUntil) ctx.waitUntil(all); else await all;
   return { duplicate: false, scanId: scan.id, saved, listingSaved };
+  } finally {
+    if (!deferred) await flushQuietly(rctx);
+  }
 }
 
 // CK-8503 (G5): the one-scan-per-24h rule is decided inside the database (public.mpt_request_scan takes a per-user advisory lock, then checks and
@@ -254,13 +269,13 @@ async function replayOutcome(sb, scanId) {
   return { duplicate: true, replay: true, scanId, saved: scanNumber ? { saved: true, scanNumber } : { saved: false } };
 }
 
-async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
+async function syncHubSpot(env, email, consentSource, now, fetchImpl, rctx) {
   if (!env.HUBSPOT_TOKEN) return;
   const props = { email, lead_source_platform: env.HUBSPOT_LEAD_SOURCE || 'web_scan', consent_source: consentSource, consent_given_at: now.toISOString().slice(0, 10) };
-  const res = await fetchImpl('https://api.hubapi.com/crm/v3/objects/contacts/batch/upsert', {
+  const res = await callRecipient('hubspot', { url: 'https://api.hubapi.com/crm/v3/objects/contacts/batch/upsert', sent: ['email'], init: {
     method: 'POST', headers: { Authorization: `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ inputs: [{ idProperty: 'email', id: email, properties: props }] }),
-  });
+  } }, rctx ?? workerRecipientContext(env, { fetchImpl }));
   if (!res.ok) console.error('HubSpot upsert failed', res.status, (await res.text()).slice(0, 200));
 }
 
@@ -270,11 +285,11 @@ async function syncHubSpot(env, email, consentSource, now, fetchImpl) {
 const unsubLinks = async (env, email) => (env.UNSUBSCRIBE_SECRET ? { page: await unsubscribePageUrl(env, email), oneClick: await unsubscribeUrl(env, email) } : null);
 const unsubHeaders = (links) => (links ? { 'List-Unsubscribe': `<${links.oneClick}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined);
 
-async function confirm(env, sb, scanId, email, fetchImpl, scanNumber, gated = confirmGateEnabled(env)) {
+async function confirm(env, sb, scanId, email, fetchImpl, scanNumber, gated = confirmGateEnabled(env), rctx = undefined) {
   if (!recipientAllowed(env, email)) return console.warn('confirmation held: recipient not in allowlist');
   const links = await unsubLinks(env, email);
   const m = buildConfirmationEmail({ unsubscribeLink: links?.page, liveLink: await makeLiveLink(env, scanId), scanNumber, confirmGate: gated });   // MPC-8452: opening it proves the reader owns the inbox
-  const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(links) }, fetchImpl);
+  const r = await sendEmail(env, { to: email, ...m, idempotencyKey: `confirm-${scanId}`, headers: unsubHeaders(links) }, fetchImpl, rctx);
   if (r.sent) await sb.patch(`scans?id=eq.${scanId}`, { confirmation_sent_at: new Date().toISOString() });
   else console.error('confirmation not sent:', r.reason);
 }
@@ -320,7 +335,7 @@ async function resetStaleClaims(sb) {
   if (exhausted.length || retried.length) console.warn(`scan queue: reset ${retried.length} stale scan(s) to pending, failed ${exhausted.length} past the retry limit`);
 }
 
-export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
+export async function runReportJob(env, fetchImpl = undefined, limit = 5) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.error('scan queue: SUPABASE_SERVICE_ROLE_KEY is not set, nothing can be processed'); return { skipped: 'no supabase key' }; }
   const sb = db(env, fetchImpl);
   await resetStaleClaims(sb).catch((e) => console.error('scan queue: stale reset failed:', String(e)));
@@ -332,40 +347,44 @@ export async function runReportJob(env, fetchImpl = fetch, limit = 5) {
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
   }
   for (const job of queue) {
+    // MPC-9885: one context per scan; its recipient calls are written to scan_recipient_log in one INSERT in the finally below.
+    const rctx = workerRecipientContext(env, { fetchImpl, scanId: job.id });
+    const sbj = db(env, fetchImpl, rctx);
     try {
-      if (!job.confirmation_sent_at) await confirm(env, sb, job.id, job.email_scanned, fetchImpl, undefined, awaitsConfirm(job));     // catch up a missed confirmation
+      if (!job.confirmation_sent_at) await confirm(env, sbj, job.id, job.email_scanned, fetchImpl, undefined, awaitsConfirm(job), rctx);     // catch up a missed confirmation
       if (awaitsConfirm(job)) { out.waiting = (out.waiting || 0) + 1; continue; }   // MPC-9813: nothing is sent or checked before the click
       // MPC-9813: the claim itself refuses a scan that waits for the click, so a row marked a moment after this read cannot slip through.
-      const claimed = await sb.patch(`scans?id=eq.${job.id}&report_status=eq.${job.report_status}${confirmGateEnabled(env) ? '&or=(email_confirm_required.eq.false,email_confirmed_at.not.is.null)' : ''}`, { report_status: 'processing', report_claimed_at: new Date().toISOString(), report_attempts: job.report_attempts + 1 });
+      const claimed = await sbj.patch(`scans?id=eq.${job.id}&report_status=eq.${job.report_status}${confirmGateEnabled(env) ? '&or=(email_confirm_required.eq.false,email_confirmed_at.not.is.null)' : ''}`, { report_status: 'processing', report_claimed_at: new Date().toISOString(), report_attempts: job.report_attempts + 1 });
       if (!claimed.length) { console.log(`scan ${job.id}: already claimed by another run, skipping`); continue; }   // another run took it
       console.log(`scan ${job.id}: processing (attempt ${job.report_attempts + 1}/${MAX_ATTEMPTS})`);
-      const r = await processScan(env, sb, job, fetchImpl);
-      if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
-      else if (r.cancelled) { console.warn(`scan ${job.id}: cancelled before sending`); await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_attempts: job.report_attempts, report_last_error: r.cancelled }); out.cancelled++; }
+      const r = await processScan(env, sbj, job, fetchImpl, rctx);
+      if (r.held) { console.warn(`scan ${job.id}: held, back to pending (${r.held})`); await sbj.patch(`scans?id=eq.${job.id}`, { report_status: 'pending', report_attempts: job.report_attempts, report_last_error: r.held }); out.held++; }
+      else if (r.cancelled) { console.warn(`scan ${job.id}: cancelled before sending`); await sbj.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_attempts: job.report_attempts, report_last_error: r.cancelled }); out.cancelled++; }
       else { out.sent++; console.log(`scan ${job.id}: sent`); }
     } catch (e) {
       out.failed++;
       const attempts = job.report_attempts + 1;
       console.error(`report failed for scan ${job.id} (attempt ${attempts}):`, String(e));
-      await sb.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch((e2) => console.error(`scan ${job.id}: could not record failure (row may stay processing until the stale reset):`, String(e2)));
+      await sbj.patch(`scans?id=eq.${job.id}`, { report_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending', report_last_error: String(e).slice(0, 300) }).catch((e2) => console.error(`scan ${job.id}: could not record failure (row may stay processing until the stale reset):`, String(e2)));
     }
+    finally { await flushQuietly(rctx); }
   }
   const overdue = queue.filter((j) => new Date(j.report_due_at) < new Date()).length;
   if (overdue) console.error(`ALERT: ${overdue} report(s) past their 48h deadline`);
   return out;
 }
 
-async function processScan(env, sb, job, fetchImpl) {
+async function processScan(env, sb, job, fetchImpl, rctx) {
   const email = job.email_scanned;
-  const hibp = await checkBreaches(email, env, fetchImpl);
+  const hibp = await checkBreaches(email, env, fetchImpl, rctx);
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
   // MPC-9813: pages the person showed us, checked only after the click (this point is never reached before it). Reuses results the click already stored.
   const listings = listingCheckEnabled(env) && job.email_confirmed_at ? await runStoredListingChecks(env, sb, job.id, email, fetchImpl).then(() => loadListings(sb, job.id)) : null;
-  const emailHex = await runEmailHexagons(email, env, fetchImpl).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
+  const emailHex = await runEmailHexagons(email, env, fetchImpl, rctx).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
 
-  const emailExtras = await runEmailExtras(email, env, fetchImpl).catch((e) => { console.error('email extras failed:', String(e)); return []; });   // MPC-8689 pilot: off unless EMAIL_EXTRAS_ENABLED=true; stored only, never in the report email, the live view or the score
+  const emailExtras = await runEmailExtras(email, env, fetchImpl, rctx).catch((e) => { console.error('email extras failed:', String(e)); return []; });   // MPC-8689 pilot: off unless EMAIL_EXTRAS_ENABLED=true; stored only, never in the report email, the live view or the score
 
   const breaches = hibp.status === 'checked' ? hibp.breaches : [];
   const checked = new Set(hibp.status === 'checked' ? ['email'] : []);
@@ -399,7 +418,7 @@ async function processScan(env, sb, job, fetchImpl) {
   const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
   if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
   const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
-  const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
+  const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links), items: ['email', 'ip', 'scan_result'] }, fetchImpl, rctx);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {
     privacy_score: result.score, risk_level: result.risk_level, signals_found: result.signals_found,
@@ -407,8 +426,8 @@ async function processScan(env, sb, job, fetchImpl) {
     mirror_report: mirror, data_freshness: new Date().toISOString(), report_status: 'sent', report_sent_at: new Date().toISOString(), resend_message_id: sent.id, report_last_error: null,
   });
   await claimCohort(env, sb, job.user_id);
-  if (referralsEnabled(env)) await completeReferral(env, sb, job.user_id, fetchImpl, recipientAllowed);   // MPC-7645: this report finishing is what earns the friend who invited them a month of Pro
-  const hs = await pushScanActivity(env, { email, scanId: job.id, score: result.score, riskLevel: result.risk_level, signalsFound: result.signals_found, breachStatus: hibp.status, breachCount: breaches.length }, fetchImpl);
+  if (referralsEnabled(env)) await completeReferral(env, sb, job.user_id, fetchImpl, recipientAllowed, rctx);   // MPC-7645: this report finishing is what earns the friend who invited them a month of Pro
+  const hs = await pushScanActivity(env, { email, scanId: job.id, score: result.score, riskLevel: result.risk_level, signalsFound: result.signals_found, breachStatus: hibp.status, breachCount: breaches.length }, fetchImpl, rctx);
   if (hs.failed) console.error('HubSpot activity push failed:', hs.failed);
   return { sent: true, signals: inserted.length };
 }
@@ -438,7 +457,7 @@ async function claimCohort(env, sb, userId) {
 // ------------------------------------------------------------------ follow-up emails (MPC-7261)
 // Day 3 "next step" and day 7 "feedback" emails after the report. Off unless UNSUBSCRIBE_SECRET is set, so we never send
 // marketing-style mail without a working unsubscribe link. Stage is claimed before sending (at most once per stage).
-export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
+export async function runFollowUpJob(env, fetchImpl = undefined, limit = 20) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY || !env.UNSUBSCRIBE_SECRET) return { skipped: 'follow-ups need SUPABASE_SERVICE_ROLE_KEY and UNSUBSCRIBE_SECRET' };
   if (followupStateEnabled(env)) return runFollowUpJobV2(env, fetchImpl, limit);   // MPC-7554: state-driven, every user
   const sb = db(env, fetchImpl);
@@ -458,7 +477,7 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
       if (!claimed.length) continue;
       const links = await unsubLinks(env, job.email_scanned);
       const mail = buildFollowUpEmail({ stage, mirror: job.mirror_report, cohortNumber: user.cohort_number, unsubscribeLink: links.page });
-      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(links) }, fetchImpl);
+      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(links), items: ['email', 'scan_result'] }, fetchImpl);
       if (!r.sent) {                                   // release the stage so the next run retries (Resend key keeps it single-send)
         await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: job.followup_stage ?? 0 });
         throw new Error(`follow-up email not sent: ${r.reason}`);
@@ -472,7 +491,7 @@ export async function runFollowUpJob(env, fetchImpl = fetch, limit = 20) {
 // MPC-7554: follow-ups chosen by what was found for THIS address, for every user (no first-100 cohort gate). See lib/followup.js for the four states.
 // A report whose follow-ups can never be sent (unsubscribed, or "I have fixed this") is ended on the row (followup_stage = 2, followup_ended) so it leaves the queue
 // instead of being re-read every run. Each stage is still claimed before sending (at most once), with a Resend idempotency key.
-export async function runFollowUpJobV2(env, fetchImpl = fetch, limit = 20) {
+export async function runFollowUpJobV2(env, fetchImpl = undefined, limit = 20) {
   const sb = db(env, fetchImpl);
   const testMode = Boolean(String(env.RECIPIENT_ALLOWLIST || '').trim());
   const cutoff = new Date(Date.now() - FOLLOWUP_DELAYS_MS[0]).toISOString();
@@ -497,7 +516,7 @@ export async function runFollowUpJobV2(env, fetchImpl = fetch, limit = 20) {
       if (!claimed.length) continue;
       const links = await unsubLinks(env, job.email_scanned);
       const mail = buildFollowUpEmailV2({ stage, state, findings, fixedLink: await fixedUrl(env, job.id), unsubscribeLink: links.page, cohortNumber: user.cohort_number });
-      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(links) }, fetchImpl);
+      const r = await sendEmail(env, { to: job.email_scanned, ...mail, idempotencyKey: `followup-${job.id}-${stage}`, headers: unsubHeaders(links), items: ['email', 'scan_result'] }, fetchImpl);
       if (!r.sent) {                                   // release the stage so the next run retries (Resend key keeps it single-send)
         await sb.patch(`scans?id=eq.${job.id}`, { followup_stage: job.followup_stage ?? 0 });
         throw new Error(`follow-up email not sent: ${r.reason}`);

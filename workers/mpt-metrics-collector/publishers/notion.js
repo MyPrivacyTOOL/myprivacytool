@@ -5,6 +5,8 @@
 import { hkDate, hkDayStartOf } from '../lib/hk.js';
 import { learningLoopConfigured, publishLearningLoop } from './learning-loop.js';
 import { notesLine as emailNotesLine } from '../collectors/email-delivery.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const NOTION_VERSION = '2025-09-03';
 export const DEFAULT_DAILY_DS = '5bf43eae-1da1-438e-859d-56b241b5b1ac'; // Management & Data Analytics MPT Hub
@@ -36,11 +38,11 @@ export const notionConfigured = (env) => Boolean(env.NOTION_TOKEN && env.SUPABAS
 
 export async function notion(env, method, path, body) {
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`https://api.notion.com/v1${path}`, {
+    const res = await callRecipient('notion', { url: `https://api.notion.com/v1${path}`, init: {
       method,
       headers: { Authorization: `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
-    });
+    }, sent: [] }, recipientCtx(env));
     if (res.status === 429 && attempt < 2) { await new Promise((r) => setTimeout(r, Number(res.headers.get('retry-after') || 1) * 1000)); continue; }
     if (!res.ok) throw new Error(`notion ${method} ${path.split('?')[0]} failed: HTTP ${res.status}`);
     return res.json();
@@ -48,9 +50,9 @@ export async function notion(env, method, path, body) {
 }
 
 async function supa(env, path) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/${path}`, init: {
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read ${path.split('?')[0]} failed: HTTP ${res.status}`);
   return res.json();
 }

@@ -24,7 +24,7 @@ function setup(envOver: Record<string, unknown> = {}, opts: { rpcOk?: boolean; r
     return Response.json({ ok: true });
   }));
   const brain = vi.fn(async () => Response.json({ ignored: true }));
-  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_BASELINE_SCAN: "on", SUPABASE_URL: "https://db.test", SUPABASE_KEY: "svc-key", CORE_BRAIN: { fetch: brain }, ...envOver } as unknown as Env;
+  const env = { TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, PROBE_TELEGRAM_IDS: String(ID), TELEGRAM_BASELINE_SCAN: "on", SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc-key", CORE_BRAIN: { fetch: brain }, ...envOver } as unknown as Env;
   const post = (update: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(update) }), env);
   return { calls, logs, post, brain, env, sent: () => calls.filter((c) => c.url.includes("/sendMessage")), flags: () => calls.filter((c) => c.url.includes("/rpc/mpt_record_event_flag")) };
 }
@@ -113,9 +113,9 @@ describe("STOP deletes the flags", () => {
     vi.unstubAllGlobals(); vi.restoreAllMocks();
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => { const u = String(input instanceof Request ? input.url : input); calls.push(u); return u.includes("mpt_delete_event_flags") ? new Response("{}", { status: 404 }) : Response.json(0); }));
-    expect((await eraseSender({ SUPABASE_URL: "https://db.test", SUPABASE_KEY: "k" } as unknown as Env, String(ID), log)).failed).toBe(false);
+    expect((await eraseSender({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k" } as unknown as Env, String(ID), log)).failed).toBe(false);
     vi.unstubAllGlobals();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input instanceof Request ? input.url : input).includes("mpt_delete_event_flags") ? new Response("{}", { status: 500 }) : Response.json(0)));
-    expect((await eraseSender({ SUPABASE_URL: "https://db.test", SUPABASE_KEY: "k" } as unknown as Env, String(ID), log)).failed).toBe(true);
+    expect((await eraseSender({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k" } as unknown as Env, String(ID), log)).failed).toBe(true);
   });
 });

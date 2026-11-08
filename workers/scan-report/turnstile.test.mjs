@@ -42,7 +42,7 @@ check(logs.some((l) => /"action":"blocked_403"/.test(l)), 'log line: blocked_403
 const post = (body, e) => worker.fetch(new Request('https://x/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io', 'CF-Connecting-IP': '198.51.100.9' }, body: JSON.stringify(body) }), e, { waitUntil: () => {} });
 let touched = false; const realFetch = globalThis.fetch; globalThis.fetch = async () => { touched = true; return { ok: true, status: 200, json: async () => ({}) }; };
 console.warn = () => {};
-const blocked = await post({ email: 'someone@example.com', consent: true }, { ...env, TURNSTILE_ENFORCE: 'true', SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k' });
+const blocked = await post({ email: 'someone@example.com', consent: true }, { ...env, TURNSTILE_ENFORCE: 'true', SUPABASE_URL: 'https://db.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' });
 console.warn = warn; globalThis.fetch = realFetch;
 check(blocked.status === 403 && (await blocked.json()).error === 'Verification failed' && !touched, 'Worker: enforce + no token => 403, no database or email call');
 

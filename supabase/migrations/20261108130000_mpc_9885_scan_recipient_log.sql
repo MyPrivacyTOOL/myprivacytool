@@ -25,3 +25,5 @@ alter table public.scan_recipient_log enable row level security;
 alter table public.scan_recipient_log force row level security;
 revoke all on public.scan_recipient_log from anon, authenticated;
 grant select, insert, delete on public.scan_recipient_log to service_role;
+-- Append-only for the Workers: Supabase's default privileges also hand service_role update/truncate/references/trigger on a new table.
+revoke update, truncate, references, trigger on public.scan_recipient_log from service_role;

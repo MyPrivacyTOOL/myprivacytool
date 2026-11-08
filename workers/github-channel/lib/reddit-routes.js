@@ -29,7 +29,7 @@ export const redditConfigured = (env) => !!(env.REDDIT_CLIENT_ID && env.REDDIT_C
 const userAgent = (env) => env.REDDIT_USER_AGENT || DEFAULT_USER_AGENT;
 const creds = (env) => ({ clientId: env.REDDIT_CLIENT_ID, clientSecret: env.REDDIT_CLIENT_SECRET, userAgent: userAgent(env) });
 
-export async function handleReddit(request, url, env, { cors = {}, fetchFn = fetch, now = () => Date.now(), limiter } = {}) {
+export async function handleReddit(request, url, env, { cors = {}, fetchFn = undefined, now = () => Date.now(), limiter } = {}) {
   const { pathname } = url;
   const known = (pathname === '/oauth/reddit/start' && request.method === 'GET')
     || (pathname === '/oauth/reddit/callback' && request.method === 'GET')

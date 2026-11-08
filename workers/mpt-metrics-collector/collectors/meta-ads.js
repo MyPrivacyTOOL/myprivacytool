@@ -7,6 +7,8 @@
 // with payload.configured=false instead of an error, so an unfinished setup raises no alarm.
 // The untouched API response is stored in payload.raw; payload.summary is the derived view.
 import { previousDay } from './cloudflare-analytics.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 // UNVERIFIED default: Meta retires Graph versions after about two years; set META_GRAPH_VERSION if this one is rejected.
 export const DEFAULT_AD_ACCOUNT_ID = 'act_266295748910383';
@@ -27,9 +29,9 @@ export default {
     if (!/^(act_)?\d{5,20}$/.test(String(account).trim())) throw new Error('META_AD_ACCOUNT_ID is not a numeric ad account id');
     const version = env.META_GRAPH_VERSION || DEFAULT_GRAPH_VERSION;
     const params = new URLSearchParams({ fields: FIELDS, level: 'account', time_range: JSON.stringify({ since: day, until: day }) });
-    const res = await fetch(`https://graph.facebook.com/${version}/${accountPath(account)}/insights?${params}`, {
+    const res = await callRecipient('meta-ads-insights', { url: `https://graph.facebook.com/${version}/${accountPath(account)}/insights?${params}`, init: {
       headers: { Authorization: `Bearer ${env.META_ADS_KEY}` },
-    });
+    }, sent: [] }, recipientCtx(env));
     if (!res.ok) throw new Error(`meta ads insights: HTTP ${res.status}`); // body not echoed: it may repeat request details
     const raw = await res.json();
     const row = raw.data?.[0] ?? null; // no spend that day => Meta returns an empty list

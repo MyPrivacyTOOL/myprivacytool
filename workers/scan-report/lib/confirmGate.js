@@ -49,7 +49,7 @@ const reduce = (r) => ({
  * Reads the stored pages for a CONFIRMED scan once and keeps only the result fields. A scan that already has results is not read again.
  * Returns the stored results (an array, possibly empty) or null when there is nothing to check. Never throws.
  */
-export async function runStoredListingChecks(env, sb, scanId, email, fetchImpl = fetch) {
+export async function runStoredListingChecks(env, sb, scanId, email, fetchImpl = undefined) {
   try {
     const row = (await sb.select(`web_scan_listing_checks?scan_id=eq.${scanId}&select=id,full_name,city_region,phone,listing_urls,results&limit=1`))?.[0];
     if (!row) return null;

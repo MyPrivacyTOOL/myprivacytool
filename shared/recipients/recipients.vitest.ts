@@ -24,18 +24,18 @@ const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-
 
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 8 first-party and 20 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904)", () => {
+  it("pins 8 first-party and 22 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
     expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(8);
-    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(20);
+    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(22);
   });
   it("MPC-9885 added exactly these recipients, all enabled", () => {
     expect(registry.recipients.filter((r) => r.since === "2026-11-08" && r.note?.startsWith("Added by MPC-9885")).map((r) => r.key).sort()).toEqual([...MPC_9885_ADDED].sort());
     expect(MPC_9885_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
-  it("has the user-pasted-listing structural entry, 4 known-host disabled entries and 6 planned disabled entries", () => {
+  it("has the user-pasted-listing structural entry, 2 known-host disabled entries (stripe now flag-gated by CHECKOUT_ENABLED, meta-graph switched on by MPC-9885: WhatsApp replies are live) and 6 planned disabled entries", () => {
     expect(registry.recipients.find((r) => r.key === "user-pasted-listing")?.host_kind).toBe("user_supplied");
-    for (const k of ["stripe", "pwned-passwords", "meta-graph", "platform-replies"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
+    for (const k of ["pwned-passwords", "platform-replies"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(6);
     expect(planned.every((r) => !r.enabled)).toBe(true);
@@ -76,7 +76,7 @@ describe("validator", () => {
     expect(bad((d) => { d.recipients[0].hosts = ["*.example.com"]; }).join()).toMatch(/needs host_kind pattern/);
   });
   it("rejects pre_click for a third party without a named exception", () => expect(bad((d) => { delete d.recipients.find((r: any) => r.key === "cloudflare-turnstile").exception; }).join()).toMatch(/named exception/));
-  it("rejects a disabled entry with no flag and no reason", () => expect(bad((d) => { const r = d.recipients.find((x: any) => x.key === "meta-graph"); delete r.reason; }).join()).toMatch(/needs a reason/));
+  it("rejects a disabled entry with no flag and no reason", () => expect(bad((d) => { const r = d.recipients.find((x: any) => x.key === "hibp"); delete r.reason; r.flag = null; }).join()).toMatch(/needs a reason/));
   it("rejects bad enums, dates, retention and country codes", () => {
     const msg = bad((d) => { const r = d.recipients[0]; r.party = "friend"; r.since = "yesterday"; r.retention = { days: -1, text: "" }; r.country_overrides = { hk: {} }; }).join("\n");
     expect(msg).toMatch(/party must be/); expect(msg).toMatch(/since must be/); expect(msg).toMatch(/retention must be/); expect(msg).toMatch(/upper-case ISO/);
@@ -296,6 +296,6 @@ describe("fetchRecipient / loadRecipientScript / createPeerConnection", () => {
     const c = await checkRecipient("google-stun", "stun://stun.l.google.com", ["ip"], { consentId: "c" });
     expect(c.recipient.key).toBe("google-stun");
     expect(await codeOf(checkRecipient("hunter", "https://api.hunter.io/v2/x", ["email"], { consentId: "c" }))).toBe("FLAG_OFF");
-    expect(await codeOf(checkRecipient("stripe", "https://api.stripe.com/", ["plan_name"], { consentId: "c" }))).toBe("DISABLED");
+    expect(await codeOf(checkRecipient("pwned-passwords", "https://api.pwnedpasswords.com/", [], { consentId: "c" }))).toBe("DISABLED");
   });
 });

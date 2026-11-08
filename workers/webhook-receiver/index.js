@@ -12,6 +12,8 @@ import { generateFirstHexagon } from './first-hexagon.js';
 import { saveConversationState, getConversationState, purgeExpiredState } from './state-store.js';
 import { createHubSpotContact } from './hubspot-client.js';
 import { sendJson } from './send.js';
+import { recipientFetcher } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 import { recordEngagement } from './supabase-client.js';
 import {
   verifyTelegram, verifyMeta, verifyTwilio, verifySharedSecret, escapeHtml, escapeXml, clip,
@@ -133,7 +135,9 @@ async function handleTelegram(request, env) {
 
 async function sendTelegram(env, chatId, text) {
   const key = env.TELEGRAM_BOT_KEY;
-  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' });
+  // MPC-9885: the chat id identifies the person (username); the text can carry their name and handle (message_text).
+  const f = recipientFetcher('telegram', ['message_text', 'username'], workerRecipientContext(env));
+  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' }, f);
 }
 
 // ─── FACEBOOK MESSENGER ──────────────────────────────────────────────────────

@@ -6,13 +6,15 @@
 import { previousHkDay } from '../lib/hk.js';
 import { mergeDay, clicksFromGa4, scansFromGa4, CHANNEL_OSINT_MEDIUM, SCAN_COMPLETED_EVENT } from '../lib/channel-osint.js';
 import { runReport, yesterday } from './ga4.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 async function funnel(env, from, to) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/mpt_channel_osint_daily`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/rpc/mpt_channel_osint_daily`, init: {
     method: 'POST',
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_from: from.toISOString(), p_to: to.toISOString() }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`mpt_channel_osint_daily failed: HTTP ${res.status}`);
   const body = await res.json();
   if (!body || !Array.isArray(body.platforms)) throw new Error('mpt_channel_osint_daily returned an unexpected shape');

@@ -1,3 +1,5 @@
+import { callRecipient, type RecipientContext } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import type { Logger } from "./logger";
 
 export interface Env {
@@ -90,6 +92,19 @@ export interface Env {
   CORE_BRAIN_TOKEN?: string;
 }
 
+/** MPC-9885: the recipient context for this Worker's outbound calls, built once per env object (flags are read from it by name). No scan id: nothing here runs inside a web scan, so no log rows are written. */
+const recipientContexts = new WeakMap<object, RecipientContext>();
+let envlessContext: RecipientContext | undefined;
+export function recipientCtx(env?: Env): RecipientContext {
+  if (!env) return (envlessContext ??= workerRecipientContext(undefined));
+  let ctx = recipientContexts.get(env);
+  if (!ctx) {
+    ctx = workerRecipientContext(env as unknown as Record<string, unknown>);
+    recipientContexts.set(env, ctx);
+  }
+  return ctx;
+}
+
 export const MAX_BODY_BYTES = 1_000_000;
 const enc = new TextEncoder();
 
@@ -136,20 +151,22 @@ export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Lo
   // MPC-8601: core-brain is also reachable on its public workers.dev address, so it authenticates every caller,
   // service binding included. CORE_BRAIN_TOKEN must equal core-brain's WEBHOOK_SECRET.
   if (env.CORE_BRAIN_TOKEN) headers.Authorization = `Bearer ${env.CORE_BRAIN_TOKEN}`;
-  let target: { fetch(r: Request): Promise<Response> };
+  let send: (url: string, init: RequestInit) => Promise<Response>;
   let url: string;
   if (env.CORE_BRAIN) {
-    target = env.CORE_BRAIN;
+    const binding = env.CORE_BRAIN;
+    send = (u, init) => binding.fetch(new Request(u, init)); // service binding: never leaves Cloudflare, not a recipient
     url = "https://core-brain/ingest/social";
   } else if (env.CORE_BRAIN_URL) {
-    target = { fetch: (r) => fetch(r) };
+    // MPC-9885: core-brain's public workers.dev address. The envelope is the verified platform payload, passed through untouched (never inspected here).
+    send = (u, init) => callRecipient("internal-workers", { url: u, init, sent: [] }, recipientCtx(env));
     url = new URL("/ingest/social", env.CORE_BRAIN_URL).toString();
   } else {
     log.error("core_brain_unconfigured", { source: envelope.source });
     return null;
   }
   try {
-    const res = await target.fetch(new Request(url, { method: "POST", headers, body: JSON.stringify(envelope) }));
+    const res = await send(url, { method: "POST", headers, body: JSON.stringify(envelope) });
     if (res.status === 429) {
       log.warn("core_brain_rate_limited", { source: envelope.source });
       return RATE_LIMITED;

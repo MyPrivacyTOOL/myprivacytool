@@ -71,11 +71,11 @@ export function liveItems(rows, { verified = false } = {}) {
 const SIGNAL_DEFAULTS = { details: null, removal_status: 'not_started', removal_url: null, removal_instructions: null };
 
 /** Runs the fast email checks right after the request is accepted and writes them as signal rows. Never throws. Skips a scan that already has rows. */
-export async function runLiveChecks(env, sb, scanId, email, fetchImpl = fetch) {
+export async function runLiveChecks(env, sb, scanId, email, fetchImpl = undefined, rctx = undefined) {
   try {
     const have = await sb.select(`signals?scan_id=eq.${scanId}&signal_type=like.email-*&select=id&limit=1`);
     if (have.length) return { skipped: 'already has rows' };
-    const hex = await runEmailHexagons(email, env, fetchImpl);
+    const hex = await runEmailHexagons(email, env, fetchImpl, rctx);
     await sb.insertMany('signals', emailHexagonSignalRows(scanId, hex).map((r) => ({ ...SIGNAL_DEFAULTS, ...r })));
     return { wrote: hex.length };
   } catch (e) {

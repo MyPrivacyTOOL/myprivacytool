@@ -1,4 +1,6 @@
 import type { Channel, Identity, Verifier } from "./types";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 /** 32 random bytes, base64url. The plaintext exists only in the email sent to the account holder; only its hash is stored. */
 export function newProofToken(): string {
@@ -20,12 +22,14 @@ export interface ProofStoreConfig { baseUrl: string; serviceKey: string; fetchIm
  * Whoever wires it must answer identically whether or not the account exists (no account enumeration) and rate-limit per address.
  */
 export class RestProofStore {
+  private f: typeof fetch;
   constructor(private c: ProofStoreConfig) {
     if (!/^https:\/\//.test(c.baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(c.baseUrl)) throw new Error("baseUrl must be https (or localhost for tests)");
     if (!c.serviceKey) throw new Error("serviceKey required");
+    this.f = recipientFetcher("supabase", [], workerRecipientContext(null, { fetchImpl: c.fetchImpl })); // token hash and subject id only
   }
   private async rpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
-    const res = await (this.c.fetchImpl ?? fetch)(`${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/rpc/${fn}`, {
+    const res = await this.f(`${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/rpc/${fn}`, {
       method: "POST",
       headers: { apikey: this.c.serviceKey, Authorization: `Bearer ${this.c.serviceKey}`, "Content-Type": "application/json" },
       body: JSON.stringify(args), signal: AbortSignal.timeout(this.c.timeoutMs ?? 5000),

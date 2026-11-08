@@ -4,8 +4,9 @@
 // caller's OAuth 2.0 call is tried instead. Every failure returns null: the caller then sends the text alone.
 // Chunked v2 flow: POST /media/upload/initialize (JSON) -> POST /media/upload/:id/append (1 MB chunks) -> POST /media/upload/:id/finalize
 // (-> GET /media/upload?command=STATUS while X processes the video). The old POST /media/upload with command=INIT answers 400 "Missing media field".
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import { type Env, pick } from "./shared";
+import { type Env, pick, recipientCtx } from "./shared";
 
 // Silent copy of the clip: X plays an animated GIF (dm_gif) automatically and loops it, but only without a sound track.
 export const VIDEO_URL = "https://myprivacytool.io/media/alice-curtain-silent.mp4";
@@ -51,7 +52,7 @@ const idOf = (b: unknown): string | null => {
 };
 
 async function loadVideo(env: Env): Promise<Uint8Array | null> {
-  const res = await fetch(env.MEDIA_VIDEO_URL || VIDEO_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const res = await callRecipient("cloudflare-edge", { url: env.MEDIA_VIDEO_URL || VIDEO_URL, init: { signal: AbortSignal.timeout(TIMEOUT_MS) }, sent: [] }, recipientCtx(env)); // our own clip
   return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
 }
 
@@ -66,7 +67,11 @@ export async function uploadDmVideo(env: Env, log: Logger, oauth2Call: XUserCall
     ? async (path, init) => {
         const url = `https://api.x.com/2${path}`;
         try {
-          return await fetch(url, { ...init, headers: { ...(init.headers as Record<string, string> | undefined), Authorization: await oauth1Header(env, init.method ?? "GET", url) }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+          return await callRecipient("x-api", {
+            url,
+            init: { ...init, headers: { ...(init.headers as Record<string, string> | undefined), Authorization: await oauth1Header(env, init.method ?? "GET", url) }, signal: AbortSignal.timeout(TIMEOUT_MS) },
+            sent: [], // the clip only; the DM text is sent by the caller
+          }, recipientCtx(env));
         } catch {
           return null;
         }

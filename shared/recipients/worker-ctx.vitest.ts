@@ -23,7 +23,7 @@ describe("consent gate switch", () => {
   it("the pending policy skips ONLY check 4: host, items, disabled and flag checks still refuse", async () => {
     const ctx = workerRecipientContext({}, { fetchImpl: okFetch() });
     expect(await codeOf(callRecipient("resend", { url: "https://evil.example/emails", sent: ["email"] }, ctx))).toBe("HOST_MISMATCH");
-    expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["ip"] }, ctx))).toBe("DATA_ITEM_NOT_ALLOWED");
+    expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["password_hash_prefix"] }, ctx))).toBe("DATA_ITEM_NOT_ALLOWED");
     expect(await codeOf(callRecipient("hibp", { url: "https://haveibeenpwned.com/api/v3/x", sent: ["email"] }, ctx))).toBe("DISABLED");
     expect(await codeOf(callRecipient("hunter", { url: "https://api.hunter.io/v2/x", sent: ["email"] }, ctx))).toBe("FLAG_OFF");
     expect(await codeOf(callRecipient("hunter", { url: "https://api.hunter.io/v2/x", sent: ["email"] }, workerRecipientContext({ HUNTER_API_KEY: "k" }, { fetchImpl: okFetch() })))).toBe("no error");

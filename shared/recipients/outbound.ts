@@ -8,11 +8,14 @@
 //   5 resolved host matches the entry's hosts  6 declared `sent` is a subset of its data items (after country exclusions)
 //   7 user_supplied: https only, no private ranges, no redirect to a new host, size and time caps
 // On a call that reaches the network it logs {key, items, at, status}; item NAMES only, never values.
-import recipientsData from "./recipients.json";
+import recipientsData from "./recipients.json" with { type: "json" };
 import {
   DATA_ITEMS, effectiveDataItems, enabledForCountry, findRecipient, flagIsOn, hostMatches, parseRegistry,
   type DataItem, type Recipient, type RecipientRegistry,
-} from "./registry";
+} from "./registry.ts";
+
+// Browser-only types, kept loose so this file compiles in Worker projects (no DOM lib) as well as the app.
+type DocLike = any; type ScriptEl = any; type RtcConfig = any; type RtcPeer = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export type RecipientErrorCode =
   | "UNKNOWN_KEY" | "DISABLED" | "FLAG_OFF" | "COUNTRY_DISABLED" | "CONSENT_REQUIRED" | "CONSENT_INVALID" | "BAD_URL"
@@ -72,6 +75,8 @@ export interface RecipientContext {
    * else to get past a refusal.
    */
   consentGate?: "enforce" | "pending_mpc_9887";
+  /** Runs after every check passed and immediately before the network call (Workers use it to count subrequests against a budget). A throw aborts the call. */
+  beforeCall?: (key: string) => void | Promise<void>;
 }
 
 export interface RecipientRequest {
@@ -228,7 +233,7 @@ async function fetchUserSupplied(key: string, first: URL, init: RequestInit | un
     let url = first;
     for (let hop = 0; ; hop++) {
       const res = await doFetch(url.toString(), { ...init, redirect: "manual", signal: controller.signal });
-      const isRedirect = res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400);
+      const isRedirect = (res.type as string) === "opaqueredirect" || (res.status >= 300 && res.status < 400);
       if (!isRedirect) return await capBody(key, res, maxBytes);
       const location = res.headers.get("location");
       if (!location) throw new RecipientError("REDIRECT_BLOCKED", key, "redirect without a readable Location");
@@ -253,6 +258,7 @@ export async function callRecipient(key: string, request: RecipientRequest, ctx:
   const entry = (status: RecipientLogStatus, extra: Partial<RecipientLogEntry> = {}): RecipientLogEntry =>
     ({ key, items: checked.items, at: nowIso(ctx), status, ...(ctx.scanId ? { scan_id: ctx.scanId } : {}), ...extra });
   try {
+    await ctx.beforeCall?.(key);
     const res = checked.recipient.host_kind === "user_supplied"
       ? await fetchUserSupplied(key, checked.url, request.init, ctx, doFetch)
       : await doFetch(checked.url.toString(), request.init);
@@ -280,7 +286,7 @@ export function recipientFetcher(key: string, sent: readonly DataItem[], ctx: Re
 
 /** Browser flavour of callRecipient: the same checks, and credentials are never sent to a recipient unless the caller asks. */
 export function fetchRecipient(key: string, request: RecipientRequest, ctx: RecipientContext = {}): Promise<Response> {
-  return callRecipient(key, { ...request, init: { credentials: "omit", ...request.init } }, ctx);
+  return callRecipient(key, { ...request, init: { credentials: "omit", ...request.init } as RequestInit }, ctx);
 }
 
 export interface ScriptLoadOptions {
@@ -288,17 +294,17 @@ export interface ScriptLoadOptions {
   sent?: readonly DataItem[];
   attrs?: Record<string, string>;
   /** Injected in tests; defaults to globalThis.document. */
-  document?: Document;
+  document?: DocLike;
 }
 
 /** Browser: the only way to add a third-party <script>. Resolves when the script has loaded. */
-export async function loadRecipientScript(key: string, src: string, ctx: RecipientContext = {}, opts: ScriptLoadOptions = {}): Promise<HTMLScriptElement> {
+export async function loadRecipientScript(key: string, src: string, ctx: RecipientContext = {}, opts: ScriptLoadOptions = {}): Promise<ScriptEl> {
   const registry = ctx.registry ?? defaultRegistry();
   const declared = opts.sent ?? (findRecipient(registry, key) ? effectiveDataItems(findRecipient(registry, key)!, ctx.country) : []);
   const checked = await guarded(key, src, declared, ctx);
-  const doc = opts.document ?? (globalThis as { document?: Document }).document;
+  const doc = opts.document ?? (globalThis as { document?: DocLike }).document;
   if (!doc) throw new RecipientError("BAD_URL", key, "loadRecipientScript needs a document");
-  return await new Promise<HTMLScriptElement>((resolve, reject) => {
+  return await new Promise<ScriptEl>((resolve, reject) => {
     const el = doc.createElement("script");
     el.src = checked.url.toString();
     el.async = true;
@@ -311,14 +317,14 @@ export async function loadRecipientScript(key: string, src: string, ctx: Recipie
 
 export interface PeerConnectionOptions {
   /** Injected in tests; defaults to globalThis.RTCPeerConnection. */
-  RTCPeerConnectionImpl?: new (config?: RTCConfiguration) => RTCPeerConnection;
+  RTCPeerConnectionImpl?: new (config?: RtcConfig) => RtcPeer;
 }
 
 /**
  * Browser: the STUN path. `iceServers` may only name stun-kind hosts of the given key. An EMPTY iceServers list contacts nobody (host candidates
  * only), so it needs no consent and no checks: this is the pre-consent mode (design 2.4).
  */
-export async function createPeerConnection(key: string, config: RTCConfiguration = {}, ctx: RecipientContext = {}, opts: PeerConnectionOptions = {}): Promise<RTCPeerConnection> {
+export async function createPeerConnection(key: string, config: RtcConfig = {}, ctx: RecipientContext = {}, opts: PeerConnectionOptions = {}): Promise<RtcPeer> {
   const Impl = opts.RTCPeerConnectionImpl ?? (globalThis as { RTCPeerConnection?: PeerConnectionOptions["RTCPeerConnectionImpl"] }).RTCPeerConnection;
   if (!Impl) throw new RecipientError("BAD_URL", key, "RTCPeerConnection is not available");
   const servers = config.iceServers ?? [];

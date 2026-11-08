@@ -4,8 +4,9 @@
 // Rows go to public.channel_probe_captures (service_role only; 7 day expiry in "on", PROBE_RETENTION_DAYS in "all").
 // PROBE_MODE defaults to off; any other value counts as off.
 import type { EventLog } from "./event-log";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TELEGRAM_API = "https://api.telegram.org";
 const TIMEOUT_MS = 5000;
@@ -82,12 +83,16 @@ interface Row { platform: string; sender_id: string; kind: string; payload: unkn
 async function save(env: Env, rows: Row[], log: Logger): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return log.warn("probe_storage_unconfigured");
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify(rows),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify(rows),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username", "name", "message_text"], // the raw update and the Bot API lookups
+    }, recipientCtx(env));
     if (!res.ok) log.warn("probe_save_failed", { status: res.status });
   } catch (err) {
     log.warn("probe_save_failed", { error: err instanceof Error ? err.name : "unknown" });
@@ -103,12 +108,16 @@ async function telegram(env: Env, method: string, body: Record<string, unknown>,
 
 export async function call(env: Env, method: string, body: Record<string, unknown>): Promise<{ status: number; response: unknown }> {
   try {
-    const res = await fetch(`${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("telegram", {
+      url: `${TELEGRAM_API}/bot${env.TELEGRAM_BOT_TOKEN}/${method}`,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["message_text", "username"], // sendMessage text, or the chat / user id of a lookup
+    }, recipientCtx(env));
     let response: unknown = null;
     try { response = await res.json(); } catch { /* non-JSON answer: keep null */ }
     return { status: res.status, response };
@@ -135,10 +144,14 @@ async function recentlyLooked(env: Env, senderId: string): Promise<boolean> {
   try {
     const since = new Date(Date.now() - lookupHours(env) * HOUR_MS).toISOString();
     const q = `platform=eq.telegram&sender_id=eq.${encodeURIComponent(senderId)}&kind=eq.${encodeURIComponent("lookup:getChat")}&created_at=gte.${encodeURIComponent(since)}&select=id&limit=1`;
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures?${q}`, {
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/channel_probe_captures?${q}`,
+      init: {
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}` },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // sender id in the filter
+    }, recipientCtx(env));
     if (!res.ok) return false;
     const found = await res.json();
     return Array.isArray(found) && found.length > 0;

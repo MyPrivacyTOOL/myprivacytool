@@ -7,7 +7,7 @@
 //
 // What gets logged (scan_recipient_log): scan id, recipient key, data item NAMES, time, status, HTTP status, error code. Never a value, a URL or a
 // header. A call made outside a scan (no scanId: cron collectors, ops notifications, the content pipeline) writes no row; there is no scan to hang it on.
-import { callRecipient, type RecipientContext, type RecipientLogEntry } from "./outbound";
+import { callRecipient, type RecipientContext, type RecipientLogEntry } from "./outbound.ts";
 
 /**
  * Check 4 (consent id for post_click recipients). The server-side consent store is MPC-9887. Until it exists a Worker has no consent id to present and
@@ -30,6 +30,8 @@ export interface WorkerContextOptions {
   verifyConsent?: RecipientContext["verifyConsent"];
   /** Overrides the sink (tests). Pass `null` to disable logging. */
   sink?: RecipientLogSink | null;
+  /** Runs right before each network call (subrequest budget guards). See RecipientContext.beforeCall. */
+  beforeCall?: RecipientContext["beforeCall"];
 }
 
 export interface RecipientLogSink {
@@ -90,6 +92,7 @@ export function workerRecipientContext(env: Env, opts: WorkerContextOptions = {}
     ...(opts.scanId ? { scanId: opts.scanId } : {}),
     ...(opts.country ? { country: opts.country } : {}),
     ...(CONSENT_GATE_ACTIVE ? { consentId: opts.consentId ?? null, verifyConsent: opts.verifyConsent, consentGate: "enforce" as const } : { consentGate: "pending_mpc_9887" as const }),
+    ...(opts.beforeCall ? { beforeCall: opts.beforeCall } : {}),
     ...(sink ? { log: sink.log } : {}),
     flush: sink ? sink.flush : async () => 0,
   };

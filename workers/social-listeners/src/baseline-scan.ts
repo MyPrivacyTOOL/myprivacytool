@@ -5,10 +5,11 @@ import { ARRIVAL, TELEGRAM_EXTRA_HEXAGONS, TELEGRAM_HEXAGONS, type ArrivalId, ty
 import { BAND_LABEL, bandFor } from "../../../shared/hexagon-registry/score.js";
 import { footprintSummary, footprintLine } from "../../../shared/hexagon-registry/footprint.js";
 import { FOOTPRINT_CALLBACK, footprintLinksEnabled } from "./dashboard-link";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { call, probeIds, telegramSender } from "./probe-reader";
 import { redactStoredId, senderKey } from "./sender-key";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 export const SCAN_VERSION = "telegram-baseline-1";
 export const RISK_VERSION = "risk-count-1";
@@ -200,12 +201,16 @@ export function buildReport(update: unknown, chatAnswer: Answer, photosAnswer: A
 }
 
 async function post(env: Env, path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
-  return fetch(`${env.SUPABASE_URL!.replace(/\/+$/, "")}/rest/v1/${path}`, {
-    method: "POST",
-    headers: { apikey: env.SUPABASE_KEY!, authorization: `Bearer ${env.SUPABASE_KEY!}`, "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  return callRecipient("supabase", {
+    url: `${env.SUPABASE_URL!.replace(/\/+$/, "")}/rest/v1/${path}`,
+    init: {
+      method: "POST",
+      headers: { apikey: env.SUPABASE_KEY!, authorization: `Bearer ${env.SUPABASE_KEY!}`, "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    },
+    sent: ["username", "name", "scan_result"], // the profile snapshot: sender key, getChat answer, report
+  }, recipientCtx(env));
 }
 
 function retentionDays(env: Env): number {

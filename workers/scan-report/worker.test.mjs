@@ -8,6 +8,8 @@ import { checkBrokers } from './lib/brokers.js';
 import { buildConfirmationEmail, buildReportEmail, tagLinks } from './lib/email.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { buildFollowUpEmail, nextFollowUp, unsubscribeToken, verifyUnsubscribe } from './lib/onboarding.js';
+import { enableHibpForTests } from './test-support/hibp-on.mjs';
+enableHibpForTests();   // MPC-9885: hibp is enabled:false in the registry; this suite's breach results need it on
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const EMAIL = 'testingnt69@gmail.com';

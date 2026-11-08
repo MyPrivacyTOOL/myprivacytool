@@ -2,6 +2,10 @@ import { executeRiskAnalysis } from '../../src/lib/mirrorRiskOrchestrator';
 import type { BreachProvider, InputType } from '../../src/lib/osintLookup';
 import { OPENAPI } from './openapi';
 import { priceMonth } from './pricing';
+// MPC-9885: every Supabase call goes through the recipient wrapper with the data items that call really carries.
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import type { DataItem } from '../../shared/recipients/registry.ts';
+import { workerRecipientContext, type WorkerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 // MPC-7651: B2B partner API. Routes (all under /v1, JSON, Bearer API key except health and openapi.json):
 //   POST /v1/scan   GET /v1/report/:id   POST|GET /v1/monitors   DELETE /v1/monitors/:id   GET /v1/usage
@@ -58,7 +62,10 @@ async function limited(env: PartnerEnv, key: string): Promise<boolean> {
 /** One Supabase (PostgREST) row: the select lists above name its columns. */
 type Row = Record<string, unknown>;
 
-function sb(env: PartnerEnv) {
+/** What a monitored value is, as a data item. The partner chooses the type, so the declaration follows it. */
+const SUBJECT_ITEM: Record<string, DataItem> = { email: 'email', phone: 'phone', handle: 'username', domain: 'email_domain' };
+
+function sb(env: PartnerEnv, rctx: WorkerRecipientContext = workerRecipientContext(env as unknown as Record<string, unknown>)) {
   const base = `${env.SUPABASE_URL || DEFAULT_SUPABASE}/rest/v1`;
   const headers = (prefer?: string): Record<string, string> => ({
     apikey: env.SUPABASE_SERVICE_ROLE_KEY || '',
@@ -66,8 +73,12 @@ function sb(env: PartnerEnv) {
     'Content-Type': 'application/json',
     ...(prefer ? { Prefer: prefer } : {}),
   });
-  async function call(method: string, path: string, body?: unknown, prefer?: string): Promise<Row[]> {
-    const res = await fetch(`${base}/${path}`, { method, headers: headers(prefer), body: body === undefined ? undefined : JSON.stringify(body) });
+  async function call(method: string, path: string, body?: unknown, prefer?: string, sent: readonly DataItem[] = []): Promise<Row[]> {
+    const res = await callRecipient('supabase', {
+      url: `${base}/${path}`,
+      init: { method, headers: headers(prefer), body: body === undefined ? undefined : JSON.stringify(body) },
+      sent,
+    }, rctx);
     const text = await res.text();
     if (!res.ok) {
       console.error(`partner-api supabase ${method} ${path.split('?')[0]} ${res.status}: ${text.slice(0, 200)}`);
@@ -77,7 +88,7 @@ function sb(env: PartnerEnv) {
   }
   return {
     select: (path: string) => call('GET', path),
-    insert: (table: string, row: unknown) => call('POST', table, row, 'return=representation').then((r): Row => (Array.isArray(r) ? r[0] : (r as unknown as Row))),
+    insert: (table: string, row: unknown, sent: readonly DataItem[] = []) => call('POST', table, row, 'return=representation', sent).then((r): Row => (Array.isArray(r) ? r[0] : (r as unknown as Row))),
     patch: (path: string, row: unknown) => call('PATCH', path, row, 'return=representation'),
   };
 }
@@ -154,7 +165,7 @@ async function postScan(request: Request, env: PartnerEnv, db: ReturnType<typeof
     // Only a real check is billed: "not_checked" carries no score, so the partner gets nothing to pay for.
     billable: out.data.status === 'checked',
     result: out.data,
-  });
+  }, ['email_hash', 'scan_result']);   // value_sha256 is a SHA-256 of the subject (never the subject) + the scan result
   return json(scanView(row));
 }
 
@@ -189,7 +200,7 @@ async function postMonitor(request: Request, db: ReturnType<typeof sb>, who: Cal
   if (active.length >= MAX_ACTIVE_MONITORS) throw fail(429, 'monitor_limit', `At most ${MAX_ACTIVE_MONITORS} active monitors`);
   const row = await db.insert('partner_monitors', {
     partner_id: who.partnerId, input_type: subject.type, value: subject.value, reference: subject.reference, webhook_url: webhook, subject_consent: true,
-  });
+  }, [SUBJECT_ITEM[subject.type]]);   // the monitored value itself, stored until the monitor is deleted
   return json(monitorView(row), 201);
 }
 
@@ -225,7 +236,7 @@ export async function handlePartnerRequest(request: Request, env: PartnerEnv = {
     if (request.method === 'GET' && path === '/v1/openapi.json') return json(OPENAPI);
     if (!path.startsWith('/v1/')) throw fail(404, 'not_found', 'Not found');
 
-    const db = sb(env);
+    const db = sb(env, workerRecipientContext(env as unknown as Record<string, unknown>));   // one context per request
     const who = await authenticate(request, env, db);
     if (await limited(env, `key:${who.keyId}`)) throw fail(429, 'rate_limited', 'Too many requests', { 'Retry-After': '60' });
     // Best-effort, at most hourly: last_used_at helps support spot dead keys without a write on every call.
