@@ -1,5 +1,6 @@
 // MPC-9817: a stub of Supabase Auth + PostgREST rpc + Resend for the account tests (node test and Playwright). It applies the same rules as migration
 // 20261108120000 (the SQL itself is proved in supabase/tests/mpc-9817-accounts.test.sql). SYNTHETIC identities only (example.test). No network, no secrets.
+import { entitlementState, entitlementRpc } from './fake-entitlements.mjs';
 export const ORIGIN = 'https://myprivacytool.io';
 export const ME = 'zelda.test+9817@example.test', OTHER = 'other.test+9817@example.test';
 export const SCAN_ME = '11111111-1111-4111-8111-111111111111', SCAN_OTHER = '22222222-2222-4222-8222-222222222222', SCAN_NONE = '33333333-3333-4333-8333-333333333333';
@@ -8,7 +9,7 @@ export const SCANS_ID_ME = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export function stub() {
   const st = { authUsers: [], tokens: new Map(), sessions: new Map(), accounts: [], links: [], emails: [], webScans: new Map([[SCAN_ME, { created_at: '2026-11-08T01:00:00Z', hexagon_count: 5 }], [SCAN_OTHER, { created_at: '2026-11-08T02:00:00Z', hexagon_count: 5 }]]),
     contacts: [{ web_scan_id: SCAN_ME, email: ME, scans_id: SCANS_ID_ME, ver: '2026-11-08-v1', at: '2026-11-08T01:00:00Z', account_requested_at: '2026-11-08T01:00:00Z' }, { web_scan_id: SCAN_OTHER, email: OTHER, scans_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', ver: '2026-10-12-v1', at: '2026-11-08T02:00:00Z' }],
-    scanExpiry: new Map([[SCANS_ID_ME, '2026-11-15']]), calls: [], capabilities: new Map([['report.score', 'free']]) };
+    scanExpiry: new Map([[SCANS_ID_ME, '2026-11-15']]), calls: [], ent: entitlementState() };
   let n = 0; const rank = { free: 0, basic: 1, pro: 2, executive: 3 };
   const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
   const f = async (url, o = {}) => {
@@ -53,9 +54,11 @@ export function stub() {
       }
       if (fn === 'mpt_can') {
         const a = st.accounts.find((x) => x.id === body.p_account); if (!a) return res(200, { allowed: false, min_tier: null, reason: 'no_account' });
-        const min = st.capabilities.get(body.p_key); if (!min) return res(200, { allowed: false, min_tier: null, reason: 'unknown_capability' });
+        const min = st.ent.capabilities.get(body.p_key)?.min_tier; if (!min) return res(200, { allowed: false, min_tier: null, reason: 'unknown_capability' });
         return res(200, rank[a.plan] >= rank[min] ? { allowed: true, min_tier: min, reason: 'tier_ok' } : { allowed: false, min_tier: min, reason: 'tier_too_low' });
       }
+      const er = await entitlementRpc(st.ent, st.accounts, fn, body);   // MPC-9818: entitlements, allowances, plan override
+      if (er !== undefined) return er && er.__error ? res(er.__error, { code: '22023' }) : res(200, er);
       return res(404, {});
     }
     const q = url.match(/rest\/v1\/web_scan_contacts\?contact_id=eq\.([\w-]+)&channel=eq\.email&account_requested_at=not\.is\.null/);

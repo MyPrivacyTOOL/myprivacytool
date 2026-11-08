@@ -22,6 +22,18 @@ describe("developer docs match the Workers", () => {
     }
   });
 
+  // MPC-9914 (EXT-03): the hash is a key, not authentication; consent and ownership are enforced before any write.
+  it("lead-capture docs say consent is required and the email hash is not authentication", () => {
+    const e = ENDPOINTS.find((x) => x.id === "lead-capture")!;
+    const text = JSON.stringify(e);
+    expect(text).toMatch(/Consent required/);
+    expect(text).toMatch(/not authentication/);
+    expect(text).not.toMatch(/auth":"None\. The Worker/);
+    expect(e.request.fields.find((f) => f.name === "consent")?.required).toBe(true);
+    const src = read(e.source);
+    expect(src.indexOf("Consent required")).toBeLessThan(src.indexOf("const nr = await callRecipient('notion'"));
+  });
+
   it("uses the hosts declared in each wrangler.toml (workers.dev, or a custom domain)", () => {
     expect(read("workers/mpt-leads/wrangler.toml")).toContain('name = "mpt-leads"');
     expect(read("workers/scan-report/wrangler.toml")).toContain('name = "mpt-scan-report"');

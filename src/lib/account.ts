@@ -9,7 +9,9 @@ export const accountsEnabled = (): boolean => import.meta.env.VITE_ACCOUNTS_ENAB
 const KEY = "mpt_account_session";
 export interface Session { accessToken: string; refreshToken: string; expiresAt: number | null }
 export interface AccountScan { scanNumber: string; createdAt: string; hexagonCount: number }
-export interface Me { email: string; plan: string; createdAt: string | null; scans: AccountScan[] }
+// MPC-9818: what the plan has. `allowance` = scans this month (limit null = unlimited, no cap); `olderKept` = saved scans a Free plan does not list (kept, not deleted).
+export interface Allowance { limit: number | null; used: number; remaining: number | null; resetsAt: string | null }
+export interface Me { email: string; plan: string; createdAt: string | null; scans: AccountScan[]; allowance: Allowance | null; olderKept: number }
 
 export function loadSession(): Session | null {
   try {
@@ -57,6 +59,12 @@ export async function redeemSignIn(tokenHash: string, scanNumber?: string | null
   return { ok: true, scanAttached: (r.json?.scan_attached as boolean | null | undefined) ?? null };
 }
 
+const readAllowance = (raw: unknown): Allowance | null => {
+  const x = raw as { limit?: unknown; used?: unknown; remaining?: unknown; resets_at?: unknown } | null | undefined;
+  if (!x || typeof x !== "object" || typeof x.used !== "number") return null;
+  return { limit: typeof x.limit === "number" ? x.limit : null, used: x.used, remaining: typeof x.remaining === "number" ? x.remaining : null, resetsAt: typeof x.resets_at === "string" ? x.resets_at : null };
+};
+
 /** Loads the account, refreshing the session once if the access token has expired. null = not signed in. */
 export async function loadMe(): Promise<Me | "error" | null> {
   let s = loadSession();
@@ -75,6 +83,7 @@ export async function loadMe(): Promise<Me | "error" | null> {
   const scans = Array.isArray(r.json?.scans) ? (r.json!.scans as Record<string, unknown>[]) : [];
   return {
     email: a.email, plan: typeof a.plan === "string" ? a.plan : "free", createdAt: typeof a.created_at === "string" ? a.created_at : null,
+    allowance: readAllowance((r.json?.entitlements as { scans?: unknown } | undefined)?.scans), olderKept: Number((r.json?.history as { older_kept?: unknown } | undefined)?.older_kept ?? 0) || 0,
     scans: scans.flatMap((x) => (typeof x.scan_number === "string" ? [{ scanNumber: x.scan_number, createdAt: String(x.created_at ?? ""), hexagonCount: Number(x.hexagon_count ?? 0) }] : [])),
   };
 }

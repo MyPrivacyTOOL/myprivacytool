@@ -50,3 +50,8 @@ positives. Rollback: set `TURNSTILE_ENFORCE = "false"` and merge (the deploy wor
 The custom domain is declared in `wrangler.toml` (`routes`, `custom_domain = true`); `wrangler deploy` keeps its DNS record and
 certificate. The site posts to it via the Pages variable `VITE_WORKER_ENDPOINT` (production). To go back to `workers.dev`, set that
 variable to `https://mpt-leads.myprivacytool.workers.dev` and redeploy the site.
+
+## Consent and baseline ownership (MPC-9914, EXT-03)
+
+- `consent` must be explicitly truthy. It is checked right after the email and the watchdog health check, before the bot check and before **any** write or send (Supabase, Notion, HubSpot, Slack, Resend). Missing consent returns `400 {"error":"Consent required"}` and stores nothing.
+- A request that sends a `riskScore` (a baseline write/read) must carry `Authorization: Bearer <Supabase access token>` of the confirmed owner of that email: no valid token is `401`, a token for a different address is `403`; nothing is written either way. The SHA-256 of an email is only the row key, never authentication.
