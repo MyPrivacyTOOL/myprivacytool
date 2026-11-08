@@ -12,7 +12,10 @@
     "timeNeeded": "5 minutes",
     "processingTime": "Can take up to 21 days to take full effect after registration",
     "difficulty": "Easy",
-    "requirements": ["A Singapore phone number you control", "Ability to receive an SMS or phone call on that number if using SMS or phone registration"],
+    "requirements": [
+      "A Singapore phone number you control",
+      "Ability to receive an SMS or phone call on that number if using SMS or phone registration"
+    ],
     "steps": [
       "Go to dnc.gov.sg, the Personal Data Protection Commission's official DNC Registry site, and choose Register.",
       "Enter your Singapore mobile, home or office number and choose which types of messages to block: voice calls, text messages (SMS, MMS, WhatsApp and similar apps) or fax.",
@@ -36,7 +39,9 @@
     "timeNeeded": "5 minutes",
     "processingTime": "Protection starts on the 10th working day after registration",
     "difficulty": "Easy",
-    "requirements": ["A Hong Kong telephone or mobile number you control"],
+    "requirements": [
+      "A Hong Kong telephone or mobile number you control"
+    ],
     "steps": [
       "Decide which registers you need. Hong Kong operates three under the Unsolicited Electronic Messages Ordinance (Cap. 593): pre-recorded telephone messages, short messages (SMS/MMS) and fax messages.",
       "Register through the Office of the Communications Authority (OFCA) at dnc.gov.hk, or call the registration hotline 1835 000 from the number you want to register.",
@@ -60,7 +65,10 @@
     "timeNeeded": "10 minutes per company",
     "processingTime": "Company must comply without charge once you ask; there is no fixed public processing window, so follow up in writing",
     "difficulty": "Medium",
-    "requirements": ["The name of the company sending marketing", "Your name and the contact details they hold (phone, email, address)"],
+    "requirements": [
+      "The name of the company sending marketing",
+      "Your name and the contact details they hold (phone, email, address)"
+    ],
     "steps": [
       "Identify the company using your data (check the sender of the call, SMS or email, or the privacy notice you received).",
       "Send a written request (email or letter) to the company's data protection or privacy officer stating: you are exercising your right under section 35G of the Personal Data (Privacy) Ordinance to stop your personal data being used in direct marketing, and, if applicable, section 35L to stop it being provided to others for their direct marketing.",
@@ -84,7 +92,10 @@
     "timeNeeded": "5 minutes",
     "processingTime": "Telemarketers have 30 days from registration to stop calling",
     "difficulty": "Easy",
-    "requirements": ["An Australian phone number for personal or domestic use", "An email address to confirm registration"],
+    "requirements": [
+      "An Australian phone number for personal or domestic use",
+      "An email address to confirm registration"
+    ],
     "steps": [
       "Go to donotcall.gov.au and choose to register your numbers. Use only the official government site; the register is free and you should never pay to join.",
       "Enter the Australian number(s) you want to register and your email address.",
@@ -108,7 +119,10 @@
     "timeNeeded": "15 minutes",
     "processingTime": "Depends on your telco; Thryv can only act once your provider passes the request on",
     "difficulty": "Medium",
-    "requirements": ["Your phone account details with your telco (for residential listings)", "Business name and phone number (for business listings)"],
+    "requirements": [
+      "Your phone account details with your telco (for residential listings)",
+      "Business name and phone number (for business listings)"
+    ],
     "steps": [
       "Check whether you are listed. Online residential search was discontinued in November 2025, so public online residential results are no longer shown, but data may still exist in directory data.",
       "For a residential listing, contact your landline or mobile provider (for example Telstra 13 22 00, Optus 133 937, TPG 13 14 23) and ask for the number to be made silent / removed from the directory. White Pages cannot change residential details without your provider sending the request.",
@@ -132,7 +146,9 @@
     "timeNeeded": "10 minutes",
     "processingTime": "Allow at least 45 days for processing",
     "difficulty": "Easy",
-    "requirements": ["Your name and postal address exactly as they appear on the mail you receive"],
+    "requirements": [
+      "Your name and postal address exactly as they appear on the mail you receive"
+    ],
     "steps": [
       "Go to adma.com.au/about-regulatory and scroll down to the \"Do Not Mail For Consumers\" section.",
       "Complete the consumer form with your full name and postal address, including every name variation and address variation that appears on the mail you receive.",
@@ -155,7 +171,10 @@
     "timeNeeded": "10 minutes",
     "processingTime": "Usually within 24 hours; can take longer under heavy load",
     "difficulty": "Medium",
-    "requirements": ["The phone number to unlist, with country code", "Access to the phone to receive a verification OTP if requested"],
+    "requirements": [
+      "The phone number to unlist, with country code",
+      "Access to the phone to receive a verification OTP if requested"
+    ],
     "steps": [
       "If you have a Truecaller account, deactivate it first in the app (Settings > Privacy Center > Deactivate).",
       "Go to truecaller.com/unlisting in a browser. Truecaller warns that unlisting can't be reversed.",
@@ -179,7 +198,10 @@
     "timeNeeded": "10 minutes",
     "processingTime": "Typically 24 to 48 hours after email confirmation",
     "difficulty": "Easy",
-    "requirements": ["The URL of your Spokeo profile", "An email address (a disposable or alias address works)"],
+    "requirements": [
+      "The URL of your Spokeo profile",
+      "An email address (a disposable or alias address works)"
+    ],
     "steps": [
       "Search for yourself on spokeo.com by name, phone number or email and open your full profile.",
       "Copy the profile URL from your browser's address bar.",
@@ -204,7 +226,10 @@
     "timeNeeded": "10 minutes",
     "processingTime": "Often within hours, and up to 24 to 72 hours",
     "difficulty": "Medium",
-    "requirements": ["The URL of your Whitepages listing", "A phone that can receive an automated verification call"],
+    "requirements": [
+      "The URL of your Whitepages listing",
+      "A phone that can receive an automated verification call"
+    ],
     "steps": [
       "Search for yourself on whitepages.com and open your listing. The URL contains your name, city, state and a unique ID.",
       "Copy that URL and go to whitepages.com/suppression-requests.",
@@ -229,7 +254,10 @@
     "timeNeeded": "10 minutes",
     "processingTime": "Up to 48 hours after email confirmation",
     "difficulty": "Easy",
-    "requirements": ["A valid email address you can open to confirm", "Your name and state of residence to find your record"],
+    "requirements": [
+      "A valid email address you can open to confirm",
+      "Your name and state of residence to find your record"
+    ],
     "steps": [
       "Go to truthfinder.com/opt-out. It redirects to the PeopleConnect Suppression Center (suppression.peopleconnect.us), the company that runs TruthFinder's opt-outs.",
       "Under Step 1, enter your email address, tick the box agreeing to the Terms of Use and Privacy Policy, and click Continue.",
@@ -253,7 +281,10 @@
     "timeNeeded": "10 minutes",
     "processingTime": "Within 72 hours after email confirmation",
     "difficulty": "Easy",
-    "requirements": ["An email address", "Your name plus city or state to find the record"],
+    "requirements": [
+      "An email address",
+      "Your name plus city or state to find the record"
+    ],
     "steps": [
       "Go to fastpeoplesearch.com/removal and pass the browser check if shown. If you see an \"Access denied\" or \"Sorry, you have been blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
       "Enter your email address, tick the box confirming you are the subject of the record, complete the reCAPTCHA and select Begin Removal Process.",
@@ -278,7 +309,10 @@
     "timeNeeded": "10 minutes",
     "processingTime": "24 to 72 hours after email verification",
     "difficulty": "Easy",
-    "requirements": ["Your name and state", "An email address (a disposable or alias address helps avoid follow-up marketing)"],
+    "requirements": [
+      "Your name and state",
+      "An email address (a disposable or alias address helps avoid follow-up marketing)"
+    ],
     "steps": [
       "Go to beenverified.com/app/optout/search. If you see an \"Access denied\" or \"Sorry, you have been blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
       "Enter your name and state and click Search.",
@@ -297,25 +331,28 @@
     "countryName": "United States",
     "region": "US",
     "type": "People-search site",
-    "optOutUrl": "https://www.mylife.com/ccpa/index.pubview",
-    "optOutUrlLabel": "mylife.com/ccpa",
-    "summary": "Ask MyLife to remove or hide your public profile with its privacy request form, then confirm by email.",
+    "optOutUrl": "https://www.mylife.com/privacyrequest",
+    "optOutUrlLabel": "mylife.com/privacyrequest",
+    "summary": "Submit MyLife's single opt-out form to request deletion of your profile and opt out of the sale of your information, then verify your email.",
     "timeNeeded": "10 minutes",
-    "processingTime": "Up to 45 days; MyLife may ask you to verify your identity",
+    "processingTime": "MyLife says only that requests are processed within the legally required time frames; no number of days is stated",
     "difficulty": "Medium",
     "requirements": [
-      "The address of your MyLife profile page (or your name and city to find it)",
-      "An email address you can open"
+      "Your name, state, city and postal code",
+      "Your birth year (MyLife uses it to find the right profile)",
+      "An email address you can open",
+      "Optional: middle initial, maiden or alias name, and the address of your profile page"
     ],
     "steps": [
-      "Open the MyLife privacy request page at mylife.com/ccpa. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
-      "Choose the request to delete or remove your information (not just to see it) and enter your name, city and the email address you can open.",
-      "Add the address of your profile page if the form asks which listing is yours.",
-      "Submit the form, then open the email from MyLife and follow its confirmation link. MyLife may ask for more details to confirm it is you.",
+      "Open the MyLife Opt-Out Form at mylife.com/privacyrequest. It is one form that requests both deletion and opting out of the sale of your information; there is no separate choice to make. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
+      "Choose your state, then enter your first and last name, your city and postal code, and your birth year.",
+      "Enter the email address you can open. MyLife uses it to confirm the deletion and will also unsubscribe that address and delete any account registered with it. Use the Verify Email button next to the field.",
+      "Optional but helpful: add your middle initial, any maiden or alias name, and the address of your profile page (the form links to a \"Find your profile listing\" search).",
+      "Tick the \"I'm not a robot\" box, then press Submit.",
       "Come back after a few days and search for your name on mylife.com to confirm the profile no longer shows."
     ],
     "relistingWarning": "MyLife rebuilds profiles from public and commercial records, so a profile can return. Check again every few months and re-submit.",
-    "lastVerified": "2026-11-07"
+    "lastVerified": "2026-11-08"
   },
   {
     "slug": "intelius",
@@ -326,22 +363,22 @@
     "type": "People-search site",
     "optOutUrl": "https://www.intelius.com/opt-out",
     "optOutUrlLabel": "intelius.com/opt-out",
-    "summary": "Suppress your Intelius listing with its opt-out request, then confirm by email.",
+    "summary": "Use the PeopleConnect Suppression Center (Intelius's opt-out page sends you there) to suppress your Intelius listing, then verify by email. The same tool covers TruthFinder, InstantCheckmate and USSearch.",
     "timeNeeded": "10 minutes",
-    "processingTime": "Within a few days after email confirmation",
+    "processingTime": "Not stated by Intelius on the opt-out page",
     "difficulty": "Medium",
     "requirements": [
-      "Your name and state to find your record",
-      "An email address you can open"
+      "An email address you can open",
+      "Your name and state may be asked for after you follow the emailed link"
     ],
     "steps": [
-      "Open intelius.com/opt-out. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
-      "Search for your record using your name and state, and select the listing that is you.",
-      "Enter an email address you can open and submit the opt-out request.",
-      "Open the email from Intelius and click its confirmation link. Intelius may ask for more details to confirm it is you.",
+      "Open intelius.com/opt-out. It sends you to the PeopleConnect Suppression Center (suppression.peopleconnect.us), which runs Intelius's opt-outs. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
+      "Step 1: enter an email address you can open.",
+      "Tick the box agreeing to the Terms of Use and Privacy Policy and to receive transactional emails about the tool, then press Continue.",
+      "Open the verification email and click its link to carry on. Follow the steps shown after the link; they are not visible until you have verified your email.",
       "Come back after a few days and search for your name to confirm the listing no longer shows."
     ],
-    "relistingWarning": "Intelius updates its records from public and commercial sources, so a listing can return. Check again every few months and re-submit.",
-    "lastVerified": "2026-11-07"
+    "relistingWarning": "Intelius updates its records from public and commercial sources, so a listing can return. The Suppression Center affects name-search results on the PeopleConnect sites, not other data they hold, and reports found by phone, address or email may still appear. Check again every few months and re-submit.",
+    "lastVerified": "2026-11-08"
   }
 ]

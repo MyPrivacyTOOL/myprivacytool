@@ -55,7 +55,7 @@ FastPeopleSearch (US): NOT CHECKED
 MyLife (US): NOT CHECKED
   Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
   Confidence: none, nothing was checked
-  How to remove it: https://www.mylife.com/ccpa/index.pubview (10 minutes)
+  How to remove it: https://www.mylife.com/privacyrequest (10 minutes)
 
 Intelius (US): NOT CHECKED
   Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.
