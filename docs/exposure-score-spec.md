@@ -1,6 +1,6 @@
 # Exposure score, bands and coverage: specification `exposure-v1` (MPC-7471-F4)
 
-Status: see the PR. Chris approved four concepts (D-a to D-d, 2026-10-13, recorded in the task's Approval_Notes) and, on 2026-10-26, replied "approved" to the wording, the O-1 finding and the baseline migration. The weights, severity map and registry mapping were proposed unchanged and went through that same reply; they stay marked PROPOSED in code comments until the Notion record says otherwise.
+Status: see the PR. Chris approved four concepts (D-a to D-d, 2026-10-13, recorded in the task's Approval_Notes) and, on 2026-10-26, replied "approved" to the wording, the O-1 finding and the baseline migration. The weights, severity map and registry mapping were proposed unchanged and went through that same reply; the weights were approved as v1 interim on 2026-11-08 (MPC-9792, label `WEIGHTS_LABEL`); the severity map and registry mapping stay marked PROPOSED.
 
 Code: `shared/hexagon-registry/score.js` (types `score.d.ts`, tests `score.test.mjs`). The page reaches it through `src/lib/exposureScore.ts`. Nothing in this change alters what the scan detects.
 

@@ -27,7 +27,10 @@ export const BANDS = Object.freeze([
 // DRAFT wording, not approved (Chris approves the final text before merge). "exposure" because the score says how much is revealed, not how likely harm is.
 export const BAND_LABEL = Object.freeze({ low: 'Low exposure', medium: 'Medium exposure', high: 'High exposure' });
 
-/** PROPOSED weights in whole percent; they are the figures both old formulas already used. Sum is exactly 100 (tested). Needs Chris's approval. */
+/** Weights label published with the weights. v1 is an interim set: approved by the director on 2026-11-08 (MPC-9792), to be revisited once real scan data exists. Changing any weight means a new label here and a new SCORE_VERSION. */
+export const WEIGHTS_LABEL = 'weights v1 (interim, approved 2026-11-08)';
+
+/** Weights in whole percent (v1 interim, approved 2026-11-08); they are the figures both old formulas already used. Sum is exactly 100 (tested). */
 export const CATEGORY_WEIGHTS = Object.freeze({
   device: 5, privacy: 5, language: 5, orientation: 5, fingerprint: 25, storage: 10, social: 20, security: 15, behavior: 10,
 });
