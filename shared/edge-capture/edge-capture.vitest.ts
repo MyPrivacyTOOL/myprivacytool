@@ -3,6 +3,7 @@
 // The retention cut is tested against a real Postgres in supabase/tests/schema.test.sql. All rows here are made up.
 import { describe, expect, it, vi } from "vitest";
 import { classify, treatAsPerson } from "./classify";
+import { createFetchSpy } from "../recipients/fetch-spy";
 import { buildVisit, captureEnabled, captureVisit, cleanQuery, cleanReferrer, redactSecretPath, recordVisit, safeCf, type CaptureEnv } from "./capture";
 import { RULES, RULESET_VERSION, type RequestFacts } from "./ruleset";
 import { onRequest } from "../../functions/_middleware";
@@ -158,6 +159,12 @@ describe("store failure and no delay", () => {
     expect(url).toBe("https://store.supabase.co/rest/v1/edge_visits");
     expect(init.headers.authorization).toBe("Bearer service-key");
     expect(JSON.parse(init.body)).toMatchObject({ path: "/p", class: "person", rule: "R8" });
+  });
+  it("MPC-9885: the row goes to the visit-log recipient, and the fetch spy finds every call registered", async () => {
+    const spy = createFetchSpy();
+    expect(await captureVisit(env, req("https://x.test/p"), 200, spy.fetch)).toBe(true);
+    expect(spy.calls.map((c) => c.recipient)).toEqual(["visit-log"]);
+    spy.assertAllRegistered();
   });
   it("store down (network error), store error (500), missing config: false, never throws", async () => {
     expect(await captureVisit(env, req("https://x.test/"), 200, vi.fn().mockRejectedValue(new Error("down")))).toBe(false);

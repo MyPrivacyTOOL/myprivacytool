@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { handleData, handleFootprintData, handleFootprintLanding, handleFootprintRedeem, handleRedeem } from "./handlers";
 import { FOOTPRINT_COOKIE, SESSION_COOKIE, sha256Hex } from "./crypto";
+import { createFetchSpy } from "../recipients/fetch-spy";
 import { supabaseStore } from "./store";
 import type { DashboardStore, Read, SessionRow, SnapshotRow } from "./store";
 
@@ -164,5 +165,13 @@ describe("Supabase store", () => {
     expect(urls[2]).toContain("scope=eq.footprint");
     expect(urls[3]).toContain("select=*");
     expect(urls[3]).not.toContain("scope=eq");
+  });
+  it("MPC-9885: every store call reaches the supabase recipient and the fetch spy finds it registered", async () => {
+    const spy = createFetchSpy({ respond: () => new Response("[]") });
+    const store = supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "k" }, spy.fetch)!;
+    await store.session("c".repeat(64));
+    await store.latestDeepJob("sender-1");
+    expect(spy.calls.map((c) => c.recipient)).toEqual(["supabase", "supabase"]);
+    spy.assertAllRegistered();
   });
 });
