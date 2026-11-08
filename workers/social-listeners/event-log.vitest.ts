@@ -9,7 +9,7 @@ interface LogRow { direction: "in" | "out" | "brain"; kind: string; sender_id: s
 interface Out { method: string; request: unknown; status: number; response: unknown }
 
 const TOKEN = "123:SECRET-BOT-TOKEN";
-const LOG_URL = "https://sb.test/rest/v1/telegram_event_log";
+const LOG_URL = "https://x.supabase.co/rest/v1/telegram_event_log";
 const asEnv = (o: object) => o as unknown as Env;
 const update = (id = 1, from = 111) => ({
   update_id: id,
@@ -40,7 +40,7 @@ function setup(envOver: Record<string, unknown> = {}, opts: Opts = {}) {
     if (url.includes("/getUserProfilePhotos")) return Response.json({ ok: true, result: { total_count: 0, photos: [] } });
     return Response.json({ ok: true, result: { message_id: 99 } });
   }));
-  const env = asEnv({ TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc", CORE_BRAIN: { fetch: brain }, ...envOver });
+  const env = asEnv({ TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc", CORE_BRAIN: { fetch: brain }, ...envOver });
   const post = (u: unknown) => worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(u) }), env);
   return { calls, brain, post, stored: () => [...stored.values()] };
 }
@@ -108,7 +108,7 @@ describe("scope", () => {
   it("mode off does nothing", async () => {
     const { calls, brain, post } = setup({ PROBE_TELEGRAM_IDS: "111", PROBE_LOG_OPTIN_IDS: "111" });
     expect((await post(update())).status).toBe(200);
-    expect(calls.some((c) => c.url.includes("supabase") || c.url.includes("sb.test"))).toBe(false);
+    expect(calls.some((c) => c.url.includes("supabase") || c.url.includes("x.supabase.co"))).toBe(false);
     expect(brain).toHaveBeenCalledTimes(1);
   });
   it("logs every update type updateActor supports, untrimmed, with a chat id (the sender id when the update has no chat)", async () => {
@@ -215,7 +215,7 @@ describe("dedupe", () => {
 describe("sessions", () => {
   const prefix = "111:111:";
   it("starts at 1, continues within 30 minutes, rolls over after 30 minutes of silence", async () => {
-    const env = asEnv({ SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc" });
+    const env = asEnv({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc" });
     const now = Date.parse("2026-10-15T12:00:00Z");
     const withPrev = (ageMin: number, session_id = `${prefix}3`) => {
       vi.stubGlobal("fetch", vi.fn(async () => Response.json([{ session_id, created_at: new Date(now - ageMin * 60_000).toISOString() }])));
@@ -241,7 +241,7 @@ describe("sessions", () => {
   });
   it("fails open to a new session when the lookup errors or the old id is unreadable", async () => {
     const now = 1_800_000_000_000;
-    const env = asEnv({ SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc" });
+    const env = asEnv({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc" });
     const fresh = `${prefix}${Math.floor(now / 1000)}`;
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
     expect(await resolveSession(env, "111", "111", now)).toBe(fresh);
@@ -293,11 +293,12 @@ describe("failures never break the webhook", () => {
     void _p;
     const waited: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => { waited.push(p); }, passThroughOnException: () => undefined } as unknown as ExecutionContext;
-    const env = asEnv({ TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "svc", CORE_BRAIN: { fetch: rest.brain }, ...ON, PROBE_LOG_OPTIN_IDS: "111" });
+    const env = asEnv({ TELEGRAM_WEBHOOK_SECRET: "s", TELEGRAM_BOT_TOKEN: TOKEN, SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "svc", CORE_BRAIN: { fetch: rest.brain }, ...ON, PROBE_LOG_OPTIN_IDS: "111" });
     const res = await worker.fetch(new Request("https://x/webhook/telegram", { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": "s" }, body: JSON.stringify(update()) }), env, ctx);
     expect(res.status).toBe(200);
     expect(waited.length).toBeGreaterThan(0);
-    await Promise.all(waited);
+    // The "out" write is queued by the reply while it runs, so keep waiting until nothing new is queued (the wrapper adds a few microtask hops).
+    for (let n = -1; n !== waited.length;) { n = waited.length; await Promise.all(waited); }
     expect(rest.calls.filter((c) => c.url === LOG_URL).length).toBeGreaterThanOrEqual(3); // in, brain, out
   });
 });

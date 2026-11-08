@@ -2,7 +2,8 @@
 // POST /synthetic/telegram-roundtrip with X-Telegram-Bot-Api-Secret-Token = TELEGRAM_WEBHOOK_SECRET. The Worker builds a "/start scan" private-chat update from the
 // FIRST id in the SYNTHETIC_IDS secret (the owner's own test account), runs it through the normal webhook handler (core-brain, real Bot API sendMessage), then reads
 // telegram_event_log for that update_id and returns in / brain / out timestamps. The id is never read from captured data, never sent anywhere else, and never returned.
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import { syntheticIds } from "./event-log";
 import { handleTelegramWebhook, verifyTelegramSecret } from "./telegram-webhook";
 
@@ -46,7 +47,7 @@ export async function handleSyntheticRoundtrip(request: Request, env: Env, sleep
   let verdict = evaluate([]);
   const deadline = sentAt + BUDGET_MS;
   do {
-    const r = await fetch(`${base}?update_id=eq.${updateId}&select=created_at,direction,kind,payload&order=created_at.asc`, { headers, signal: AbortSignal.timeout(5000) }).catch(() => null);
+    const r = await callRecipient("supabase", { url: `${base}?update_id=eq.${updateId}&select=created_at,direction,kind,payload&order=created_at.asc`, init: { headers, signal: AbortSignal.timeout(5000) }, sent: [] }, recipientCtx(env)).catch(() => null);
     if (r?.ok) verdict = evaluate((await r.json()) as LogRow[]);
     if (verdict.pass) break;
     await sleep(2000);

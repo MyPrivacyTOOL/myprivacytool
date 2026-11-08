@@ -5,6 +5,8 @@
 // as input (from commentThreads.list, run by the operator) and only calls channels.list. Whether an API key alone is enough for channels.list is not stated in the docs; a non-200 answer is
 // "not checked". Off unless YOUTUBE_EXTRAS=on; only allow-listed channel ids (YOUTUBE_PROBE_CHANNEL_IDS). Nothing stored, nothing posted to YouTube; the answer carries states and counts, no values.
 // Not built: liked videos playlist (Verify).
+import { callRecipient } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, readRawBody, timingSafeEqual } from "./shared";
 import { allowedId, filled, obj, toStates, type ExtraDef, type ExtraState, type Obj } from "./extras-common";
@@ -36,18 +38,19 @@ export function youtubeStates(comment: unknown, channel: Obj | null): ExtraState
   return toStates(YOUTUBE_EXTRA_HEXAGONS, returned, skipped);
 }
 
-export async function lookupChannel(channelId: string, apiKey: string | undefined, fetchImpl: typeof fetch = fetch): Promise<Obj | null> {
+export async function lookupChannel(channelId: string, apiKey: string | undefined, fetchImpl?: typeof fetch): Promise<Obj | null> {
   if (!apiKey) return null;
   try {
     const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,topicDetails,brandingSettings&id=${encodeURIComponent(channelId)}&key=${encodeURIComponent(apiKey)}`;
-    const r = await fetchImpl(url, { signal: AbortSignal.timeout(5000) });
+    const rctx = workerRecipientContext({ YOUTUBE_API_KEY: apiKey }, { fetchImpl });
+    const r = await callRecipient("youtube-data-api", { url, init: { signal: AbortSignal.timeout(5000) }, sent: ["username"] }, rctx); // sent: the commenter's channel id
     if (!r.ok) return null;
     const items = obj(await r.json())?.items;
     return Array.isArray(items) ? obj(items[0]) : null;
   } catch { return null; }
 }
 
-export async function handleYoutubeExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleYoutubeExtras(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.YOUTUBE_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   if (!env.YOUTUBE_EXTRAS_SECRET || !timingSafeEqual(request.headers.get("X-Extras-Secret"), env.YOUTUBE_EXTRAS_SECRET)) { log.warn("secret_invalid"); return new Response("Unauthorized", { status: 401 }); }

@@ -96,7 +96,7 @@ const errText = (e) => String((e && e.message) || e);
 
 // POST /api/deep-research/start
 export async function handleDeepResearchStart(env, request, origin, json, deps) {
-  const { sb, allowed = () => true, fetchImpl = fetch } = deps;
+  const { sb, allowed = () => true, fetchImpl = undefined } = deps;
   const refused = await gate(env, request, origin, json, { ...deps, prefix: 'deep-start:' });
   if (refused) return refused;
   const { body, refused: bad } = await readBody(request, 2048, json);

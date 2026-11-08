@@ -107,10 +107,10 @@ check(slackPosts.length === 1, 'duplicate delivery is a no-op');
 // ---- approval worker ----
 const taskId = 'daily-posts-2026-10-20';
 const makeCalls = [];
-const aenv = { AGENT_LOGS: env.AGENT_LOGS, MAKE_WEBHOOK_URL: 'https://hook.example/x', APPROVAL_API_TOKEN: 'tok', SLACK_SIGNING_SECRET: 'sign', SLACK_BOT_TOKEN: 'xoxb', SLACK_APPROVER: 'chris', DEFAULT_ASSET_URL: 'https://cdn.example.com/default.png' };
+const aenv = { AGENT_LOGS: env.AGENT_LOGS, MAKE_WEBHOOK_URL: 'https://hook.eu1.make.com/x', APPROVAL_API_TOKEN: 'tok', SLACK_SIGNING_SECRET: 'sign', SLACK_BOT_TOKEN: 'xoxb', SLACK_APPROVER: 'chris', DEFAULT_ASSET_URL: 'https://cdn.example.com/default.png' };
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
-  if (String(url).startsWith('https://hook.example')) { makeCalls.push(JSON.parse(init.body)); return new Response('Accepted'); }
+  if (String(url).startsWith('https://hook.eu1.make.com')) { makeCalls.push(JSON.parse(init.body)); return new Response('Accepted'); }
   return realFetch(url, init);
 };
 const post = (body, headers = {}) => new Request('https://a.example/approve', { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });

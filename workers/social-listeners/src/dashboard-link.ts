@@ -3,10 +3,11 @@
 // The link carries only a random UUID; the database keeps only its SHA-256, the page redeems it on a button press (shared/dashboard/handlers.ts).
 // Asking for a link never runs a scan, a DEEP check or anything else. Never logs the link, the UUID or the sender's data.
 import { LINK_MINUTES, sha256Hex } from "../../../shared/dashboard/crypto";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { senderFilter, senderIds } from "./sender-key";
 import { call, probeIds, telegramSender } from "./probe-reader";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 const MAX_LINKS_PER_HOUR = 5;
@@ -27,12 +28,16 @@ export function isDashboardCommand(env: Env, update: unknown): boolean {
 
 async function rest(env: Env, method: string, path: string, body?: unknown, prefer?: string): Promise<{ ok: boolean; rows: Record<string, unknown>[] }> {
   try {
-    const res = await fetch(`${env.SUPABASE_URL!.replace(/\/+$/, "")}/rest/v1/${path}`, {
-      method,
-      headers: { apikey: env.SUPABASE_KEY!, authorization: `Bearer ${env.SUPABASE_KEY!}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL!.replace(/\/+$/, "")}/rest/v1/${path}`,
+      init: {
+        method,
+        headers: { apikey: env.SUPABASE_KEY!, authorization: `Bearer ${env.SUPABASE_KEY!}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // sender key filter; the link row holds only a hash
+    }, recipientCtx(env));
     const rows = res.ok && method === "GET" ? ((await res.json().catch(() => [])) as Record<string, unknown>[]) : [];
     return { ok: res.ok, rows };
   } catch {

@@ -24,7 +24,7 @@ const WRAPPER_DIR = "shared/recipients/";
 // literal-key rule is enforced at ITS call sites instead (recipientFetch / recipientScript / recipientPeerConnection are wrapper functions below).
 export const isWrapperFile = (rel) => rel.startsWith(WRAPPER_DIR + "outbound.") || rel === WRAPPER_DIR + "fetch-spy.ts" || rel === "src/lib/recipientClient.ts";
 
-const WRAPPER_FUNCS = new Set(["callRecipient", "fetchRecipient", "loadRecipientScript", "createPeerConnection", "recipientFetch", "recipientScript", "recipientPeerConnection"]);
+const WRAPPER_FUNCS = new Set(["callRecipient", "recipientFetcher", "fetchRecipient", "loadRecipientScript", "createPeerConnection", "recipientFetch", "recipientScript", "recipientPeerConnection"]);
 const CONSTRUCTOR_GLOBALS = new Set(["XMLHttpRequest", "WebSocket", "EventSource", "RTCPeerConnection", "webkitRTCPeerConnection", "mozRTCPeerConnection"]);
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "self", "global"]);
 const URL_RE = /\b(?:(https?|wss?):\/\/([^\s/?#"'`\\)<>]*)|(stuns?|turns?):([^\s/?#"'`\\,)<>]*))/gi;

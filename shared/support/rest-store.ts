@@ -1,3 +1,6 @@
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
+import type { DataItem } from "../recipients/registry";
 import type { ActionReceipt, CaseMessage, CaseStore, Channel, DeliveryStatus, InboundEvent, SupportCase } from "./types";
 
 export interface RestStoreConfig {
@@ -44,15 +47,16 @@ const CASE_COLS: Record<string, string> = {
  * Atomic intake and dedupe live in the SQL functions of supabase/migrations/20261027140000_mpc_8528_support_cases.sql.
  */
 export class RestCaseStore implements CaseStore {
-  private f: typeof fetch;
+  private rctx: ReturnType<typeof workerRecipientContext>;
   constructor(private c: RestStoreConfig) {
     if (!/^https:\/\//.test(c.baseUrl) && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(c.baseUrl)) throw new Error("baseUrl must be https (or localhost for tests)");
     if (!c.serviceKey) throw new Error("serviceKey required");
-    this.f = c.fetchImpl ?? fetch;
+    this.rctx = workerRecipientContext(null, { fetchImpl: c.fetchImpl });
   }
 
-  private async call(method: string, path: string, body?: unknown, prefer?: string): Promise<unknown> {
-    const res = await this.f(`${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/${path}`, {
+  // `sent` names the personal-data items in the request (MPC-9885): message text, and the sender's address or handle.
+  private async call(method: string, path: string, body?: unknown, prefer?: string, sent: readonly DataItem[] = []): Promise<unknown> {
+    const res = await recipientFetcher("supabase", sent, this.rctx)(`${this.c.baseUrl.replace(/\/$/, "")}${this.c.restPrefix ?? "/rest/v1"}/${path}`, {
       method,
       headers: {
         apikey: this.c.serviceKey, Authorization: `Bearer ${this.c.serviceKey}`, "Content-Type": "application/json",
@@ -71,11 +75,16 @@ export class RestCaseStore implements CaseStore {
     return rows[0] ?? null;
   }
 
+  private static senderItems(ev: InboundEvent): DataItem[] {
+    const sender: DataItem | null = !ev.senderHandle ? null : ev.channel === "email" ? "email" : ev.channel === "sms" || ev.channel === "whatsapp" || ev.channel === "voice" ? "phone" : ev.channel === "web" ? null : "username";
+    return sender ? ["message_text", sender] : ["message_text"];
+  }
+
   async createCaseFromEvent(ev: InboundEvent, init: { ref: string; policyVersion: string; now: string }) {
     const r = (await this.call("POST", "rpc/support_create_case_from_event", {
       p_channel: ev.channel, p_event_id: ev.providerEventId, p_thread_key: ev.threadKey ?? null, p_sender: ev.senderHandle ?? null,
       p_text: ev.text, p_ref: init.ref, p_policy: init.policyVersion,
-    })) as { case?: Row; duplicate?: boolean };
+    }, undefined, RestCaseStore.senderItems(ev))) as { case?: Row; duplicate?: boolean };
     if (!r?.case || typeof r.duplicate !== "boolean") throw new Error("unexpected intake response");
     return { case: toCase(r.case), duplicate: r.duplicate };
   }
@@ -84,7 +93,7 @@ export class RestCaseStore implements CaseStore {
     return r ? toCase(r) : null;
   }
   async appendInbound(caseId: string, ev: InboundEvent) {
-    const dup = await this.call("POST", "rpc/support_append_inbound", { p_case_id: caseId, p_event_id: ev.providerEventId, p_text: ev.text });
+    const dup = await this.call("POST", "rpc/support_append_inbound", { p_case_id: caseId, p_event_id: ev.providerEventId, p_text: ev.text }, undefined, ["message_text"]);
     if (typeof dup !== "boolean") throw new Error("unexpected append response");
     return { duplicate: dup };
   }
@@ -98,7 +107,7 @@ export class RestCaseStore implements CaseStore {
     return toCase(rows[0]);
   }
   async addOutbound(caseId: string, text: string, author: "ai" | "system", now: string) {
-    const rows = (await this.call("POST", "support_messages", { case_id: caseId, direction: "outbound", author, body: text, delivery: "queued", created_at: now }, "return=representation")) as Row[];
+    const rows = (await this.call("POST", "support_messages", { case_id: caseId, direction: "outbound", author, body: text, delivery: "queued", created_at: now }, "return=representation", ["message_text"])) as Row[];
     if (!Array.isArray(rows) || !rows[0]) throw new Error("outbound not stored");
     return toMessage(rows[0]);
   }

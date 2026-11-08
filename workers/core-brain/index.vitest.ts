@@ -2,6 +2,7 @@
 // MPC-8601: core-brain webhook. Qwen and Supabase are stubbed through global fetch; no network.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./index";
+import { createFetchSpy } from "../../shared/recipients/fetch-spy";
 
 const env = {
   SUPABASE_URL: "https://proj.supabase.co",
@@ -545,5 +546,18 @@ describe("rate limiting (MPC-7257)", () => {
     expect(out).toContain("rate_limited");
     expect(out).not.toContain("sender-777");
     expect(out).not.toContain("my secret text");
+  });
+});
+
+// MPC-9885: every outbound call reaches a registered recipient.
+describe("recipient wrapper (fetch-spy)", () => {
+  it("Qwen and Supabase calls are registered; keys are dashscope and supabase", async () => {
+    const spy = createFetchSpy({ respond: (u) => new Response(u.includes("dashscope") ? JSON.stringify({ choices: [{ message: { content: '{"intent":"scan","confidence":0.9}' } }] }) : "[]", { status: 200 }) });
+    vi.stubGlobal("fetch", spy.fetch);
+    const e = { ...env, QWEN_API_KEY: "q" };
+    await worker.fetch(new Request("https://brain.test/webhook", { method: "POST", headers: { "x-mpt-webhook-secret": e.WEBHOOK_SECRET }, body: JSON.stringify(msg("scan me")) }), e);
+    const keys = new Set(spy.calls.map((c) => (c.host.endsWith(".supabase.co") ? "supabase" : c.recipient)));
+    expect([...keys].sort()).toEqual(["dashscope", "supabase"]);
+    spy.assertAllRegistered();
   });
 });

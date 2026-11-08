@@ -13,6 +13,8 @@
  * a proof that could not be written or read is NOT "missing", it is an outage, and the caller fails closed.
  */
 import { SUPABASE_DEFAULT_URL } from './supabase-client.js';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 type Env = Record<string, any>;
 
@@ -24,11 +26,12 @@ const ledgerConfigured = (env: Env) => !!env.SUPABASE_SERVICE_ROLE_KEY;
 async function rpc(env: Env, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; body?: any }> {
   if (!ledgerConfigured(env)) return { ok: false };
   try {
-    const res = await fetch(`${env.SUPABASE_URL || SUPABASE_DEFAULT_URL}/rest/v1/rpc/${fn}`, {
+    // MPC-9885: the proven wa_id (a phone number) travels in the RPC arguments; the session is identified by an HMAC.
+    const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL || SUPABASE_DEFAULT_URL}/rest/v1/rpc/${fn}`, sent: ['phone'], init: {
       method: 'POST',
       headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(args),
-    });
+    } }, workerRecipientContext(env));
     if (!res.ok) return { ok: false };
     return { ok: true, body: await res.json() };
   } catch {

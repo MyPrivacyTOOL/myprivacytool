@@ -7,7 +7,7 @@ const ID = "11111111-2222-3333-4444-555555555555";
 function mk(rows: unknown, status = 200) {
   const calls: { url: string; headers: Record<string, string> }[] = [];
   const fetchImpl = (async (url: string, init: RequestInit) => { calls.push({ url, headers: init.headers as Record<string, string> }); return new Response(JSON.stringify(rows), { status }); }) as typeof fetch;
-  return { calls, lookup: new RestAccountLookup({ baseUrl: "https://x.test", serviceKey: "k", fetchImpl }) };
+  return { calls, lookup: new RestAccountLookup({ baseUrl: "https://x.supabase.co", serviceKey: "k", fetchImpl }) };
 }
 
 describe("RestAccountLookup", () => {
@@ -41,13 +41,13 @@ describe("RestAccountLookup", () => {
   });
   it("refuses an insecure base url and a missing key", () => {
     expect(() => new RestAccountLookup({ baseUrl: "http://example.com", serviceKey: "k" })).toThrow();
-    expect(() => new RestAccountLookup({ baseUrl: "https://x.test", serviceKey: "" })).toThrow();
+    expect(() => new RestAccountLookup({ baseUrl: "https://x.supabase.co", serviceKey: "" })).toThrow();
   });
   it("plugs into requestProof: a database failure looks exactly like no account (same answer, no mail)", async () => {
     const { requestProof } = await import("./index");
     const { MemoryCaseStore } = await import("./memory-store");
     const pending: Promise<unknown>[] = []; const sent: string[] = [];
-    const deps = (rows: unknown, status: number) => ({ store: new MemoryCaseStore(), accounts: mk(rows, status).lookup, issuer: { issue: async () => ({ token: "T".repeat(43), id: "p" }) }, mailer: { send: async (to: string) => { sent.push(to); } }, defer: (p: Promise<unknown>) => { pending.push(p); }, verifyUrl: "https://x.test/v", now: () => new Date("2026-10-27T00:00:00Z") });
+    const deps = (rows: unknown, status: number) => ({ store: new MemoryCaseStore(), accounts: mk(rows, status).lookup, issuer: { issue: async () => ({ token: "T".repeat(43), id: "p" }) }, mailer: { send: async (to: string) => { sent.push(to); } }, defer: (p: Promise<unknown>) => { pending.push(p); }, verifyUrl: "https://x.supabase.co/v", now: () => new Date("2026-10-27T00:00:00Z") });
     const hit = await requestProof(deps([{ id: ID, email: "a@example.invalid" }], 200), { email: "a@example.invalid" });
     const miss = await requestProof(deps([], 200), { email: "b@example.invalid" });
     const down = await requestProof(deps({}, 500), { email: "c@example.invalid" });

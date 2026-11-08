@@ -4,6 +4,8 @@
 // and a rate is shown only when its group has at least 5 scans. Re-running a week updates the same page. A page this publisher did not create is left alone.
 import { MARKER, notion, addDays } from './notion.js';
 import { hkDayStartOf } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const MIN_GROUP = 5;
 export const TITLE = (weekOf) => `Learning loop: week of ${weekOf}`;
@@ -79,7 +81,7 @@ export function learningLoopBlocks(lines) {
 }
 
 async function supa(env, path) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/${path}`, init: { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read ${path.split('?')[0]} failed: HTTP ${res.status}`);
   return res.json();
 }

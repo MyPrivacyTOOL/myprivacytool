@@ -1,4 +1,6 @@
 // Cloudflare Pages Function: POST /api/stripe-checkout  { plan: "basic" | "pro" | "executive" }  ->  { url }  (MPC-7626 follow-up)
+import { callRecipient } from "../../shared/recipients/outbound.ts";
+import { workerRecipientContext } from "../../shared/recipients/worker-ctx.ts";
 // Creates a Stripe Checkout Session (subscription mode) and returns its hosted URL. OFF unless the Pages variable
 // CHECKOUT_ENABLED is 1/true/on/yes; until then it answers 503 and nothing is sent to Stripe. Needs STRIPE_SECRET_KEY and one
 // price id per plan (STRIPE_PRICE_BASIC / _PRO / _EXECUTIVE). The browser never sends a price or amount, only the plan name.
@@ -62,11 +64,11 @@ export const onRequestPost = async ({ request, env }: Ctx): Promise<Response> =>
 
   let res: Response;
   try {
-    res = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: form,
-    });
+    res = await callRecipient("stripe", {
+      url: "https://api.stripe.com/v1/checkout/sessions",
+      init: { method: "POST", headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" }, body: form },
+      sent: ["plan_name"],
+    }, workerRecipientContext(env as Record<string, unknown>));
   } catch {
     return json({ error: "stripe_unreachable" }, 502);
   }

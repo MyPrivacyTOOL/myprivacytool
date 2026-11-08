@@ -50,7 +50,7 @@ function backend(opts: { noRecord?: boolean } = {}) {
 }
 
 const env = () => ({
-  X_CONSUMER_SECRET: "xs", SUPABASE_URL: "https://db.test", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs",
+  X_CONSUMER_SECRET: "xs", SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs",
   X_USER_ACCESS_TOKEN: "ut", X_BEARER_TOKEN: "bt", CORE_BRAIN: { fetch: vi.fn(async () => new Response("ok")) },
 });
 const post = (payload: object, e: object, over: Partial<{ body: string; sig: string | null }> = {}) => {

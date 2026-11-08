@@ -4,10 +4,11 @@
 import { describe, expect, it } from "vitest";
 import { handleData, handleFootprintData, handleFootprintLanding, handleFootprintRedeem, handleRedeem } from "./handlers";
 import { FOOTPRINT_COOKIE, SESSION_COOKIE, sha256Hex } from "./crypto";
+import { createFetchSpy } from "../recipients/fetch-spy";
 import { supabaseStore } from "./store";
 import type { DashboardStore, Read, SessionRow, SnapshotRow } from "./store";
 
-const ENV = { DASHBOARD_ENABLED: "1", FOOTPRINT_HANDOFF: "1", SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "svc" };
+const ENV = { DASHBOARD_ENABLED: "1", FOOTPRINT_HANDOFF: "1", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "svc" };
 const TOKEN = "3f6c9f0e-5d0a-4c1e-9b0e-0a1b2c3d4e5f";
 const ORIGIN = "https://myprivacytool.io";
 const hexes = [
@@ -154,7 +155,7 @@ describe("Supabase store", () => {
     const bodies: string[] = [];
     const urls: string[] = [];
     const fake = (async (url: string, init?: { body?: string }) => { urls.push(String(url)); if (init?.body) bodies.push(init.body); return new Response("true"); }) as unknown as typeof fetch;
-    const store = supabaseStore({ SUPABASE_URL: "https://x.test", SUPABASE_SERVICE_KEY: "k" }, fake)!;
+    const store = supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "k" }, fake)!;
     await store.redeem("a".repeat(64), "b".repeat(64));
     await store.redeem("a".repeat(64), "b".repeat(64), "footprint");
     expect(JSON.parse(bodies[0])).not.toHaveProperty("p_scope");
@@ -164,5 +165,14 @@ describe("Supabase store", () => {
     expect(urls[2]).toContain("scope=eq.footprint");
     expect(urls[3]).toContain("select=*");
     expect(urls[3]).not.toContain("scope=eq");
+  });
+  it("MPC-9885: every store call reaches a supabase host and the fetch spy finds it registered", async () => {
+    const spy = createFetchSpy({ respond: () => new Response("[]") });
+    const store = supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "k" }, spy.fetch)!;
+    await store.session("c".repeat(64));
+    await store.latestDeepJob("sender-1");
+    // The spy resolves a host to the first registry entry that owns it (visit-log shares *.supabase.co), so assert the host, not the key.
+    expect(spy.calls.map((c) => c.host)).toEqual(["x.supabase.co", "x.supabase.co"]);
+    spy.assertAllRegistered();
   });
 });

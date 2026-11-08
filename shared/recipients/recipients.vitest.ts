@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import data from "./recipients.json";
 import { canonicalJson, registryHash, sha256Hex } from "./canonical.js";
 import { DATA_ITEMS, effectiveDataItems, enabledForCountry, flagIsOn, hostMatches, parseRegistry, validateRegistry, type Recipient, type RecipientRegistry } from "./registry";
-import { RecipientError, callRecipient, checkRecipient, createPeerConnection, fetchRecipient, isPrivateOrInternalHost, loadRecipientScript, type RecipientLogEntry } from "./outbound";
+import { RecipientError, callRecipient, checkRecipient, createPeerConnection, fetchRecipient, isPrivateOrInternalHost, loadRecipientScript, registrableDomain, TRUNCATED_HEADER, USER_SUPPLIED_MAX_BYTES, type RecipientLogEntry } from "./outbound";
 
 const registry = parseRegistry(data);
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -19,19 +19,27 @@ const ok = () => new Response("{}", { status: 200 });
 const ctxOf = (r: Recipient, extra = {}) => ({ registry: regOf(r), consentId: "c-1", fetchImpl: vi.fn(async () => ok()) as unknown as typeof fetch, ...extra });
 const codeOf = async (p: Promise<unknown>) => { try { await p; return "no error"; } catch (e) { return e instanceof RecipientError ? e.code : `other: ${e}`; } };
 
+/** Recipients MPC-9885 added because a Worker already called their host (see each entry's note). The Map's 29 are pinned without them. */
+const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-data-api", "meta-ads-insights", "firestore", "x-api", "make-webhooks", "github-issues", "github-extras", "internal-workers"];
+
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 12 first-party (8 from the Map + account-service from MPC-9817 + 3 added by MPC-9886) and 22 third-party/processor/platform live recipients", () => {
-    expect(live.filter((r) => r.party === "first")).toHaveLength(12); // 8 from the Map + account-service (MPC-9817) + github-channel, oauth-session and deep-dive-api (MPC-9886: live browser calls that were missing from the registry)
-    expect(live.filter((r) => r.party !== "first")).toHaveLength(22); // 21 from the Map + pwned-passwords, live since VITE_PASSWORD_CHECK=true in production (MPC-9886)
+  it("pins 12 first-party (8 + account-service MPC-9817 + 3 MPC-9886) and 24 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus pwned-password MPC-9886, meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
+    expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
+    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(12);
+    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(24);
   });
-  it("has the user-pasted-listing structural entry, 4 known-host disabled entries and 6 planned disabled entries", () => {
+  it("MPC-9885 added exactly these recipients, all enabled", () => {
+    expect(registry.recipients.filter((r) => r.since === "2026-11-08" && r.note?.startsWith("Added by MPC-9885")).map((r) => r.key).sort()).toEqual([...MPC_9885_ADDED].sort());
+    expect(MPC_9885_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
+  });
+  it("has the user-pasted-listing structural entry, 1 known-host disabled entry (platform-replies on like stripe now flag-gated by CHECKOUT_ENABLED, meta-graph switched on by MPC-9885: WhatsApp replies are live) and 9 planned disabled entries", () => {
     expect(registry.recipients.find((r) => r.key === "user-pasted-listing")?.host_kind).toBe("user_supplied");
-    for (const k of ["stripe", "xposedornot", "meta-graph", "platform-replies"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
+    for (const k of ["xposedornot"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
     const planned = registry.recipients.filter((r) => r.planned);
-    expect(planned).toHaveLength(6);
+    expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(45);
+    expect(registry.recipients).toHaveLength(59);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);
@@ -68,7 +76,7 @@ describe("validator", () => {
     expect(bad((d) => { d.recipients[0].hosts = ["*.example.com"]; }).join()).toMatch(/needs host_kind pattern/);
   });
   it("rejects pre_click for a third party without a named exception", () => expect(bad((d) => { delete d.recipients.find((r: any) => r.key === "cloudflare-turnstile").exception; }).join()).toMatch(/named exception/));
-  it("rejects a disabled entry with no flag and no reason", () => expect(bad((d) => { const r = d.recipients.find((x: any) => x.key === "meta-graph"); delete r.reason; }).join()).toMatch(/needs a reason/));
+  it("rejects a disabled entry with no flag and no reason", () => expect(bad((d) => { const r = d.recipients.find((x: any) => x.key === "hibp"); delete r.reason; r.flag = null; }).join()).toMatch(/needs a reason/));
   it("rejects bad enums, dates, retention and country codes", () => {
     const msg = bad((d) => { const r = d.recipients[0]; r.party = "friend"; r.since = "yesterday"; r.retention = { days: -1, text: "" }; r.country_overrides = { hk: {} }; }).join("\n");
     expect(msg).toMatch(/party must be/); expect(msg).toMatch(/since must be/); expect(msg).toMatch(/retention must be/); expect(msg).toMatch(/upper-case ISO/);
@@ -199,16 +207,30 @@ describe("check 7: user_supplied", () => {
     const loop = vi.fn(async () => new Response(null, { status: 302, headers: { location: "/again" } }));
     expect(await codeOf(call("https://www.example.org/a", {}, loop as unknown as typeof fetch))).toBe("REDIRECT_BLOCKED");
   });
+  it("follows ONE redirect inside the same registrable domain, no more (MPC-9885)", async () => {
+    let n = 0;
+    const sibling = vi.fn(async () => (n++ === 0 ? new Response(null, { status: 301, headers: { location: "https://www.example.org/b" } }) : ok()));
+    expect(await codeOf(call("https://example.org/a", {}, sibling as unknown as typeof fetch))).toBe("no error");
+    let m = 0;
+    const two = vi.fn(async () => (m++ < 2 ? new Response(null, { status: 301, headers: { location: "/next" } }) : ok()));
+    expect(await codeOf(call("https://example.org/a", {}, two as unknown as typeof fetch))).toBe("REDIRECT_BLOCKED");
+    expect(registrableDomain("a.b.example.co.uk")).toBe("example.co.uk");
+    expect(registrableDomain("www.example.org")).toBe("example.org");
+    expect(registrableDomain("example.org")).toBe("example.org");
+  });
+  it("truncates an over-cap user_supplied body instead of throwing, and says so in a header", async () => {
+    const big = vi.fn(async () => new Response("y".repeat(5000), { headers: { "content-length": "5000" } }));
+    const res = await call("https://www.example.org/a", { maxBytes: 1000 }, big as unknown as typeof fetch);
+    expect((await res.text()).length).toBe(1000);
+    expect(res.headers.get(TRUNCATED_HEADER)).toBe("1");
+    expect(USER_SUPPLIED_MAX_BYTES).toBe(1_500_000);
+  });
   it("passes redirect: manual to fetch", async () => {
     const f = vi.fn(async (_u: string, init?: RequestInit) => { expect(init?.redirect).toBe("manual"); return ok(); });
     await call("https://www.example.org/a", {}, f as unknown as typeof fetch);
     expect(f).toHaveBeenCalled();
   });
-  it("caps response size (declared and streamed)", async () => {
-    const declared = vi.fn(async () => new Response("x", { headers: { "content-length": "5000" } }));
-    expect(await codeOf(call("https://www.example.org/a", { maxBytes: 1000 }, declared as unknown as typeof fetch))).toBe("RESPONSE_TOO_LARGE");
-    const streamed = vi.fn(async () => new Response("y".repeat(5000)));
-    expect(await codeOf(call("https://www.example.org/a", { maxBytes: 1000 }, streamed as unknown as typeof fetch))).toBe("RESPONSE_TOO_LARGE");
+  it("leaves a body under the cap untouched", async () => {
     const res = await call("https://www.example.org/a", { maxBytes: 1000 }, vi.fn(async () => new Response("hello")) as unknown as typeof fetch);
     expect(await res.text()).toBe("hello");
   });
@@ -288,6 +310,6 @@ describe("fetchRecipient / loadRecipientScript / createPeerConnection", () => {
     const c = await checkRecipient("google-stun", "stun://stun.l.google.com", ["ip"], { consentId: "c" });
     expect(c.recipient.key).toBe("google-stun");
     expect(await codeOf(checkRecipient("hunter", "https://api.hunter.io/v2/x", ["email"], { consentId: "c" }))).toBe("FLAG_OFF");
-    expect(await codeOf(checkRecipient("stripe", "https://api.stripe.com/", ["plan_name"], { consentId: "c" }))).toBe("DISABLED");
+    expect(await codeOf(checkRecipient("xposedornot", "https://api.xposedornot.com/", [], { consentId: "c" }))).toBe("DISABLED");
   });
 });

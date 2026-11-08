@@ -11,6 +11,8 @@
 //   not_listed  ONLY when the page loaded normally and shows none of them, or the site says the page no longer exists (404/410)
 //   not_checked everything else, with a reason: fetch_blocked | timeout | no_identifiers | not_a_listing_page. NEVER not_listed.
 // Only the result fields are stored. The page text is never stored or logged.
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../../shared/recipients/worker-ctx.ts';
 import { BROKER_SITES } from './brokers.js';
 
 export const LISTING_URL_MAX = 3;
@@ -184,6 +186,7 @@ export function classifyPage(page, ids) {
 }
 
 async function readCapped(res) {
+  const cutByWrapper = res.headers?.get?.('x-recipient-truncated') === '1';
   if (!res.body || typeof res.body.getReader !== 'function') return { body: await res.text(), truncated: false };
   const reader = res.body.getReader();
   const chunks = []; let size = 0; let truncated = false;
@@ -196,20 +199,23 @@ async function readCapped(res) {
   const all = new Uint8Array(Math.min(size, MAX_BYTES + 65_536));
   let off = 0;
   for (const c of chunks) { const n = Math.min(c.byteLength, all.length - off); all.set(c.subarray(0, n), off); off += n; if (off >= all.length) break; }
-  return { body: new TextDecoder('utf-8').decode(all.subarray(0, off)), truncated };
+  return { body: new TextDecoder('utf-8').decode(all.subarray(0, off)), truncated: truncated || cutByWrapper };
 }
 
 /** One page: a short redirect chain to the supplied address, nothing else. Never throws. */
-export async function checkPage(rawUrl, ids, fetchImpl = fetch) {
+export async function checkPage(rawUrl, ids, fetchImpl = undefined) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), PAGE_TIMEOUT_MS);
   try {
     let url = safeUrl(rawUrl);
     for (let hop = 0; url; hop++) {
-      const res = await fetchImpl(url.href, {
-        method: 'GET', redirect: 'manual', signal: ctl.signal,
-        headers: { Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9', 'User-Agent': UA },   // no cookie, no referrer, nothing about the person
-      });
+      // MPC-9885: the one door. user-pasted-listing is host_kind user_supplied (https only, no private ranges, one same-domain redirect, 1.5 MB cap with truncation).
+      // The request carries only the pasted address: no cookie, no referrer, nothing about the person, so `sent` is empty.
+      const res = await callRecipient('user-pasted-listing', {
+        url: url.href,
+        init: { method: 'GET', redirect: 'manual', signal: ctl.signal, headers: { Accept: 'text/html,application/xhtml+xml,text/plain;q=0.9', 'User-Agent': UA } },
+        sent: [],
+      }, workerRecipientContext(null, { fetchImpl, timeoutMs: PAGE_TIMEOUT_MS + 1000, maxBytes: MAX_BYTES }));
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get('location');
         await res.body?.cancel?.().catch(() => undefined);
@@ -237,7 +243,7 @@ const NOT_CHECKED = (reason, note) => ({ state: 'not_checked', match: null, conf
  * The contract's BrokerResult for each pasted page, in the order pasted. `ids` = the CONFIRMED identifiers: { email, full_name, city_region, phone }.
  * Never throws; one page failing never affects another. The whole step is bounded by TOTAL_BUDGET_MS: pages not finished by then are not_checked / timeout.
  */
-export async function checkListingPages(urls, ids, { fetchImpl = fetch, now = () => new Date() } = {}) {
+export async function checkListingPages(urls, ids, { fetchImpl = undefined, now = () => new Date() } = {}) {
   const usable = Boolean(ids.full_name || ids.phone);   // an email address alone is never on a listing page: ask for a name or phone rather than guess
   const stamp = () => now().toISOString();
   const one = async (raw) => {

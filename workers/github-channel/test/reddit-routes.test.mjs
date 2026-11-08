@@ -21,7 +21,7 @@ const baseEnv = () => {
   return {
     GITHUB_CLIENT_ID: 'gcid', GITHUB_CLIENT_SECRET: 'gsec', STATE_SIGNING_KEY: 's'.repeat(32),
     ENCRYPTION_KEY: 'c3'.repeat(32), ENCRYPTION_KEY_VERSION: '1',
-    SUPABASE_URL: 'https://sb.test', SUPABASE_SERVICE_ROLE_KEY: 'srk',
+    SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'srk',
     REDIRECT_URI: 'https://w.test/oauth/github/callback',
     ALLOWED_ORIGIN: 'https://app.test', SUCCESS_REDIRECT: 'https://app.test/connect/github',
     REDDIT_CLIENT_ID: 'rcid', REDDIT_CLIENT_SECRET: 'rsec', REDDIT_REDIRECT_URI: 'https://w.test/oauth/reddit/callback',
@@ -45,7 +45,7 @@ function fakeNetwork({ refreshResponse } = {}) {
       return ok({ access_token: ACCESS, refresh_token: REFRESH, expires_in: 3600, scope: 'identity read history' });
     }
     if (u === 'https://www.reddit.com/api/v1/revoke_token') { seen.revokeCalls.push(String(init.body)); return new Response(null, { status: 204 }); }
-    if (u.startsWith('https://sb.test/rest/v1/channel_tokens')) {
+    if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
       if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
       const key = () => `${/provider=eq\.([^&]+)/.exec(u)[1]}|${decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])}`;
       if (init.method === 'GET') return ok(rows.has(key()) ? [rows.get(key())] : []);
@@ -244,7 +244,7 @@ test('logs never contain tokens, handles or Reddit content', async () => {
 
 test('connect failure at the store step revokes the freshly issued Reddit token and reports the stage', async () => {
   const env = baseEnv(); const net = fakeNetwork();
-  const failing = async (u, init) => (String(u).startsWith('https://sb.test') ? new Response('{}', { status: 500 }) : net.fetchFn(u, init));
+  const failing = async (u, init) => (String(u).startsWith('https://x.supabase.co') ? new Response('{}', { status: 500 }) : net.fetchFn(u, init));
   const state = 'st'; const cookie = await sign({ state, exp: clock.t + 1000 }, env.STATE_SIGNING_KEY);
   const res = await handle(new Request(`https://w.test/oauth/reddit/callback?code=c&state=${state}`, { headers: { Cookie: `mpt_rd_oauth=${cookie}` } }), env, { fetchFn: failing, now, limiter: noLimit });
   const loc = new URL(res.headers.get('Location'));

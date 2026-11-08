@@ -5,6 +5,7 @@
 // Not built: the four "If they email us" checks need an inbound Email Worker that does not exist yet; subdomains and WKD are Tier 3 queued jobs; PGP key servers and
 // web archive are held for an owner decision.
 import { CHECK_TIMEOUT_MS, PERSONAL_DOMAINS, ROLE_WORDS, dohQuery, splitEmail } from './emailHexagons.js';
+import { rcx } from './recipients.js';
 
 export const EMAIL_EXTRA_HEXAGONS = {
   'email.alias': { label: 'Plus-address or alias', source: 'Analysed inside our Worker (nothing sent out)', services: [] },
@@ -64,11 +65,11 @@ async function withDns(id, email, timeoutMs, fn) {
     clearTimeout(timer);
   }
 }
-export function checkSaasRecords(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+export function checkSaasRecords(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, rctx = undefined } = {}) {
   const id = 'email.saas_records';
   return withDns(id, email, timeoutMs, async (domain, signal) => {
     if (PERSONAL_DOMAINS.has(domain) || DISPOSABLE.has(domain)) return result(id, 'clear'); // a shared domain says nothing about this person
-    const txt = await dohQuery(domain, 'TXT', fetchImpl, signal);
+    const txt = await dohQuery(domain, 'TXT', fetchImpl, signal, rctx);
     if (txt.nx) return result(id, 'clear');
     const tools = [...new Set(txt.answers.map((t) => t.replace(/^"|"$/g, '').replace(/"\s*"/g, '')).flatMap((t) => SAAS_TXT.filter(([re]) => re.test(t)).map(([, name]) => name)))];
     return tools.length ? result(id, 'found', { value: `${domain} publishes records for: ${tools.join(', ')}. This shows which services the organisation signed up to.` }) : result(id, 'clear');
@@ -76,11 +77,11 @@ export function checkSaasRecords(email, fetchImpl = fetch, { timeoutMs = CHECK_T
 }
 
 // ---- mail transport protection (MTA-STS and TLS reporting; domain only)
-export function checkMailProtection(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+export function checkMailProtection(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, rctx = undefined } = {}) {
   const id = 'email.mail_protection';
   return withDns(id, email, timeoutMs, async (domain, signal) => {
     if (PERSONAL_DOMAINS.has(domain) || DISPOSABLE.has(domain)) return result(id, 'clear'); // managed by the provider, not by this person
-    const [sts, rpt] = await Promise.all([dohQuery(`_mta-sts.${domain}`, 'TXT', fetchImpl, signal), dohQuery(`_smtp._tls.${domain}`, 'TXT', fetchImpl, signal)]);
+    const [sts, rpt] = await Promise.all([dohQuery(`_mta-sts.${domain}`, 'TXT', fetchImpl, signal, rctx), dohQuery(`_smtp._tls.${domain}`, 'TXT', fetchImpl, signal, rctx)]);
     const has = (r, re) => r.answers.some((t) => re.test(t.replace(/"/g, '')));
     const mta = has(sts, /^v=STSv1/i), tls = has(rpt, /^v=TLSRPTv1/i);
     return result(id, 'found', { value: `Mail sent to ${domain}: MTA-STS (forces encrypted delivery) ${mta ? 'published' : 'not found'}; TLS reporting ${tls ? 'published' : 'not found'}.` });
@@ -88,8 +89,9 @@ export function checkMailProtection(email, fetchImpl = fetch, { timeoutMs = CHEC
 }
 
 // ---- run all (never throws, never exceeds the budget)
-export async function runEmailExtras(email, env = {}, fetchImpl = fetch) {
+export async function runEmailExtras(email, env = {}, fetchImpl = undefined, rctx = undefined) {
   if (!emailExtrasEnabled(env)) return [];
+  const ctx = rcx(env, fetchImpl, rctx);
   const budget = Number(env.EMAIL_HEXAGON_TIMEOUT_MS) || CHECK_TIMEOUT_MS;
   const guard = (id, p) => Promise.race([
     Promise.resolve(p).catch((e) => notChecked(id, `check failed: ${String(e).slice(0, 100)}`)),
@@ -98,8 +100,8 @@ export async function runEmailExtras(email, env = {}, fetchImpl = fetch) {
   return Promise.all([
     guard('email.alias', checkAlias(email)),
     guard('email.address_type', checkAddressType(email)),
-    guard('email.saas_records', checkSaasRecords(email, fetchImpl, { timeoutMs: budget })),
-    guard('email.mail_protection', checkMailProtection(email, fetchImpl, { timeoutMs: budget })),
+    guard('email.saas_records', checkSaasRecords(email, fetchImpl, { timeoutMs: budget, rctx: ctx })),
+    guard('email.mail_protection', checkMailProtection(email, fetchImpl, { timeoutMs: budget, rctx: ctx })),
   ]);
 }
 

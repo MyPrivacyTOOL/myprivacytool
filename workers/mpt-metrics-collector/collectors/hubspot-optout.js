@@ -3,6 +3,8 @@
 // stops too, whichever door the person used. Daily, read-only on HubSpot (hubspotRead refuses anything but contact/deal searches), idempotent on the database.
 // Only SHA-256 hashes are written; the payload and the error text carry counts, never an address.
 import { hubspotRead, HUBSPOT_PORTAL_ID } from './hubspot.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 const MAX_PAGES = 10;   // 100 contacts per page; Workers free plan allows 50 subrequests per run, the other collectors need the rest
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -31,11 +33,11 @@ export default {
     let recorded = 0;
     if (hashes.size) {
       // ignore-duplicates: an address already recorded is left alone; return=representation tells us how many rows were genuinely new.
-      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/email_suppressions?on_conflict=email_hash`, {
+      const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/email_suppressions?on_conflict=email_hash`, init: {
         method: 'POST',
         headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' },
         body: JSON.stringify([...hashes].map((email_hash) => ({ email_hash, source: 'hubspot_optout' }))),
-      });
+      }, sent: ['email_hash'] }, recipientCtx(env));
       if (!res.ok) throw new Error(`hubspot-optout: suppression write failed: HTTP ${res.status}`);
       recorded = (await res.json()).length;
     }

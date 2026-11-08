@@ -6,10 +6,12 @@ import { reportState, loadFindings, buildFollowUpEmailV2, fixedToken, verifyFixe
 import { checkEmail } from './lib/renderChecks.js';
 import { unsubscribeToken } from './lib/onboarding.js';
 import { emailHash } from './lib/suppression.js';
+import { enableHibpForTests } from './test-support/hibp-on.mjs';
+enableHibpForTests();   // MPC-9885: hibp is enabled:false in the registry; this suite's breach results need it on
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const A = 'followup+a@example.com';
-const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 's3cret', RECIPIENT_ALLOWLIST: '' };
+const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_URL: 'https://db.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 's3cret', RECIPIENT_ALLOWLIST: '' };
 const ON = { ...env, FOLLOWUP_STATE_ENABLED: 'true' };
 const quiet = async (fn) => { const k = [console.log, console.warn, console.error]; console.log = console.warn = console.error = () => {}; try { return await fn(); } finally { [console.log, console.warn, console.error] = k; } };
 const sends = (F) => F.calls.filter((c) => c.url.includes('api.resend.com'));

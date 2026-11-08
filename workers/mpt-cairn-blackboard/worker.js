@@ -14,7 +14,9 @@
 //   3. Worker bundle size: bcrypt adds an npm dependency and binary bloat; HMAC-SHA256 uses the native Web Crypto API (zero overhead).
 // The choice does not reduce security for this use case; it optimizes for platform constraints and data characteristics.
 
-import { notionConfigured, syncSession, reconcile } from './notion-sync.js';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { notionConfigured, syncSession, reconcile, factItems } from './notion-sync.js';
 
 export const BRIDGE_VERSION = '1.1.0';
 
@@ -60,17 +62,22 @@ async function hmacHex(pepper, text) {
 }
 
 // PostgREST call. Secret keys go in the apikey header only (not Authorization: Bearer). Errors carry the status code only, never the body.
-async function sb(env, path, { method = 'GET', body, prefer, headers = {} } = {}) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
-    method,
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      'content-type': 'application/json',
-      ...(prefer ? { Prefer: prefer } : {}),
-      ...headers,
+// `sent` names the personal-data items the request body carries (MPC-9885); reads and id-only updates send none.
+async function sb(env, path, { method = 'GET', body, prefer, headers = {}, sent = [] } = {}) {
+  const res = await callRecipient('supabase', {
+    url: `${env.SUPABASE_URL}/rest/v1/${path}`,
+    init: {
+      method,
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        'content-type': 'application/json',
+        ...(prefer ? { Prefer: prefer } : {}),
+        ...headers,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+    sent,
+  }, workerRecipientContext(env));
   if (!res.ok) throw new Error(`supabase ${method} ${path.split('?')[0]} failed: HTTP ${res.status}`);
   return res;
 }
@@ -193,7 +200,7 @@ async function startSession(env, sessionId, p) {
     started_at: new Date().toISOString(),
     cairn_project_id: str(p.cairn_project_id, 200),
   };
-  const res = await sb(env, 'cairn_sessions?on_conflict=session_id&select=session_id', { method: 'POST', body: row, prefer: 'resolution=ignore-duplicates,return=representation' });
+  const res = await sb(env, 'cairn_sessions?on_conflict=session_id&select=session_id', { method: 'POST', body: row, prefer: 'resolution=ignore-duplicates,return=representation', sent: row.seed_username ? ['email', 'username'] : ['email'] });
   const created = (await res.json()).length === 1;
   return json({ success: true, session_id: sessionId, created, timestamp: new Date().toISOString() });
 }
@@ -231,7 +238,7 @@ async function writeFacts(env, sessionId, session, p) {
   const existing = await countRows(env, 'cairn_facts', `session_id=eq.${session.id}`);
   if (existing + rows.length > session.max_facts) return fail(422, 'max_facts_exceeded', `session allows ${session.max_facts} facts; it already has ${existing}`);
   // ignore-duplicates makes a caller retry of the same batch safe.
-  const res = await sb(env, 'cairn_facts?on_conflict=fact_id&select=fact_id', { method: 'POST', body: rows, prefer: 'resolution=ignore-duplicates,return=representation' });
+  const res = await sb(env, 'cairn_facts?on_conflict=fact_id&select=fact_id', { method: 'POST', body: rows, prefer: 'resolution=ignore-duplicates,return=representation', sent: factItems(rows) });
   const written = await res.json();
   const total = await countRows(env, 'cairn_facts', `session_id=eq.${session.id}`);
   await sb(env, `cairn_sessions?id=eq.${session.id}`, { method: 'PATCH', body: { facts_discovered: total }, prefer: 'return=minimal' });

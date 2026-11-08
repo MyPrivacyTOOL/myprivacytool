@@ -1,8 +1,9 @@
 // MPC-7628 / MPC-7641: counts X DMs in the Channel OSINT funnel without keeping anything about the person.
 // One row per inbound DM in public.interaction_log via mpt_brain_record: channel "x", NO sender id (log-only), NO message text,
 // just an intent bucket and an event key, kept 90 days. This is why the Mirror can still promise to store nothing about you.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 export type FunnelIntent = "scan" | "help" | "unknown";
 
@@ -21,20 +22,24 @@ export function classifyTheme(text: string): string {
 export async function recordXDm(env: Env, intent: FunnelIntent, key: string, log: Logger): Promise<void> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return;
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_brain_record`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        p_channel: "x",
-        p_sender_id: null,
-        p_intent: intent,
-        p_intent_source: "rules",
-        p_response_key: key,
-        p_new_state: null,
-        p_trust_floor: 0,
-      }),
-      signal: AbortSignal.timeout(3000),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_brain_record`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_channel: "x",
+          p_sender_id: null,
+          p_intent: intent,
+          p_intent_source: "rules",
+          p_response_key: key,
+          p_new_state: null,
+          p_trust_floor: 0,
+        }),
+        signal: AbortSignal.timeout(3000),
+      },
+      sent: [], // a count by intent label: no sender id, no text
+    }, recipientCtx(env));
     if (!res.ok) log.warn("funnel_record_failed", { status: res.status });
   } catch (err) {
     log.warn("funnel_record_failed", { error: err instanceof Error ? err.name : "unknown" });

@@ -2,8 +2,8 @@
 // `spy.fetch` instead of a hand-rolled mock and, at the end, `spy.assertAllRegistered()` fails if ANY call went to a host that is not in
 // shared/recipients/recipients.json, or to a recipient that is switched off (enabled:false). `spy.calls` is the list of hosts contacted so a test
 // can also assert WHICH recipient was reached. It never touches the network: it answers from `respond` (default: 200 {}).
-import recipientsData from "./recipients.json";
-import { hostMatches, type Recipient, type RecipientRegistry } from "./registry";
+import recipientsData from "./recipients.json" with { type: "json" };
+import { hostMatches, type Recipient, type RecipientRegistry } from "./registry.ts";
 
 export interface SpyCall { url: string; host: string; method: string; recipient: string | null; enabled: boolean | null }
 export interface FetchSpyOptions {

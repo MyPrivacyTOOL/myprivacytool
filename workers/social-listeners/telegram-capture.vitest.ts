@@ -31,7 +31,7 @@ beforeEach(() => { contacts = new Map(); calls = []; consent = "confirmed"; stub
 afterEach(() => vi.unstubAllGlobals());
 
 const brain = () => ({ fetch: vi.fn(async () => Response.json({ ok: true, ignored: true })) });
-const env = (over: object = {}, b = brain()) => ({ TELEGRAM_WEBHOOK_SECRET: "tg", SUPABASE_URL: "https://db.test", SUPABASE_KEY: "k", CORE_BRAIN: b, ...over });
+const env = (over: object = {}, b = brain()) => ({ TELEGRAM_WEBHOOK_SECRET: "tg", SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", CORE_BRAIN: b, ...over });
 const update = (id: number, text: string, from: object = {}, chat: object = { id: 7, type: "private" }) =>
   ({ update_id: id, message: { message_id: 1, date: 1_793_000_000, text, chat, from: { id: 7, is_bot: false, first_name: "Ann", last_name: "Lee", username: "ann7", language_code: "en", ...from } } });
 const send = (u: object, e: object) => worker.fetch(new Request("https://w/webhook/telegram", { method: "POST", body: JSON.stringify(u), headers: { "X-Telegram-Bot-Api-Secret-Token": "tg" } }), e as never);

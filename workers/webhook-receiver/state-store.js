@@ -18,6 +18,8 @@
  * supabase-client.js: a missing key or a database error is logged and never throws into a webhook reply.
  */
 import { SUPABASE_DEFAULT_URL } from './supabase-client.js';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 export const STATE_TTL_MS = 24 * 3600 * 1000;
 const TABLE = 'mpt_conversation_state';
@@ -28,6 +30,11 @@ const headers = (env, extra = {}) => ({
   Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
   ...extra,
 });
+
+// MPC-9885: every call goes to Supabase through the recipient wrapper. Written state carries the channel's phone / email / display name / user id and
+// scan findings; reads and deletes carry only the row key (which embeds the phone, email or user id).
+const STATE_ITEMS = ['email', 'name', 'phone', 'username', 'scan_result'];
+const KEY_ITEMS = ['email', 'phone', 'username'];
 
 /** True when state can be read and written. */
 export const stateStored = (env) => !!env.SUPABASE_SERVICE_ROLE_KEY;
@@ -44,11 +51,11 @@ export async function saveConversationState(env, key, state) {
   const now = Date.now();
   const expiresAt = typeof state.expires_at === 'number' ? state.expires_at : now + STATE_TTL_MS;
   try {
-    const res = await fetch(`${base(env)}?on_conflict=key`, {
+    const res = await callRecipient('supabase', { url: `${base(env)}?on_conflict=key`, sent: STATE_ITEMS, init: {
       method: 'POST',
       headers: headers(env, { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify({ key, state, expires_at: new Date(expiresAt).toISOString(), updated_at: new Date(now).toISOString() }),
-    });
+    } }, workerRecipientContext(env));
     if (!res.ok) console.error(`Supabase ${TABLE} save failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   } catch (err) {
     console.error(`Supabase ${TABLE} save error:`, err);
@@ -63,7 +70,7 @@ export async function getConversationState(env, key) {
   if (!stateStored(env)) return null;
   try {
     const q = `key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=state&limit=1`;
-    const res = await fetch(`${base(env)}?${q}`, { headers: headers(env) });
+    const res = await callRecipient('supabase', { url: `${base(env)}?${q}`, sent: KEY_ITEMS, init: { headers: headers(env) } }, workerRecipientContext(env));
     if (!res.ok) {
       console.error(`Supabase ${TABLE} get failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
       return null;
@@ -82,10 +89,10 @@ export async function getConversationState(env, key) {
 export async function purgeExpiredState(env) {
   if (!stateStored(env)) return -1;
   try {
-    const res = await fetch(`${base(env)}?expires_at=lt.${encodeURIComponent(new Date().toISOString())}`, {
+    const res = await callRecipient('supabase', { url: `${base(env)}?expires_at=lt.${encodeURIComponent(new Date().toISOString())}`, sent: [], init: {
       method: 'DELETE',
       headers: headers(env, { Prefer: 'count=exact,return=minimal' }),
-    });
+    } }, workerRecipientContext(env));
     if (!res.ok) {
       console.error(`Supabase ${TABLE} purge failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
       return -1;
@@ -109,11 +116,11 @@ export async function insertStateIfAbsent(env, key, state, ttlMs) {
   if (!stateStored(env)) return { ok: false };
   const now = Date.now();
   try {
-    const res = await fetch(`${base(env)}?on_conflict=key`, {
+    const res = await callRecipient('supabase', { url: `${base(env)}?on_conflict=key`, sent: STATE_ITEMS, init: {
       method: 'POST',
       headers: headers(env, { 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=representation' }),
       body: JSON.stringify({ key, state, expires_at: new Date(now + ttlMs).toISOString(), updated_at: new Date(now).toISOString() }),
-    });
+    } }, workerRecipientContext(env));
     if (!res.ok) return { ok: false };
     const rows = await res.json();
     return { ok: true, inserted: Array.isArray(rows) && rows.length === 1 };
@@ -127,11 +134,11 @@ export async function putStateStrict(env, key, state, ttlMs) {
   if (!stateStored(env)) return false;
   const now = Date.now();
   try {
-    const res = await fetch(`${base(env)}?on_conflict=key`, {
+    const res = await callRecipient('supabase', { url: `${base(env)}?on_conflict=key`, sent: STATE_ITEMS, init: {
       method: 'POST',
       headers: headers(env, { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify({ key, state, expires_at: new Date(now + Math.min(ttlMs, STATE_TTL_MS)).toISOString(), updated_at: new Date(now).toISOString() }),
-    });
+    } }, workerRecipientContext(env));
     return res.ok;
   } catch {
     return false;
@@ -143,7 +150,7 @@ export async function getStateStrict(env, key) {
   if (!stateStored(env)) return { ok: false };
   try {
     const q = `key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=state&limit=1`;
-    const res = await fetch(`${base(env)}?${q}`, { headers: headers(env) });
+    const res = await callRecipient('supabase', { url: `${base(env)}?${q}`, sent: KEY_ITEMS, init: { headers: headers(env) } }, workerRecipientContext(env));
     if (!res.ok) return { ok: false };
     const rows = await res.json();
     return { ok: true, state: rows?.[0]?.state ?? null };
@@ -160,7 +167,7 @@ export async function takeState(env, key) {
   if (!stateStored(env)) return { ok: false };
   try {
     const q = `key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`;
-    const res = await fetch(`${base(env)}?${q}`, { method: 'DELETE', headers: headers(env, { Prefer: 'return=representation' }) });
+    const res = await callRecipient('supabase', { url: `${base(env)}?${q}`, sent: KEY_ITEMS, init: { method: 'DELETE', headers: headers(env, { Prefer: 'return=representation' }) } }, workerRecipientContext(env));
     if (!res.ok) return { ok: false };
     const rows = await res.json();
     return { ok: true, state: Array.isArray(rows) && rows.length ? rows[0].state ?? null : null };

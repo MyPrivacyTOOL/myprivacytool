@@ -4,6 +4,8 @@
 // secret, raw body)). Off unless LINE_EXTRAS=on; allow-listed ids only (LINE_PROBE_IDS).
 // Not built: display name and photo, status message and app language (they need GET /v2/bot/profile/{userId}, whose field names I could not confirm in the docs read), LINE Login email and
 // LINE Profile+ (the person must sign in). The reply endpoint (POST /v2/bot/message/reply) is only confirmed indirectly (the validate endpoint sits beside it); it is the one unverified step.
+import { recipientFetcher } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, readRawBody, timingSafeEqual } from "./shared";
 import { allowedId, b64, extrasReply, filled, hmac, obj, toStates, type ExtraDef, type Obj } from "./extras-common";
@@ -35,7 +37,7 @@ export async function verifyLineSignature(signature: string | null, rawBody: str
   return timingSafeEqual(signature, b64(await hmac("SHA-256", env.LINE_CHANNEL_SECRET, rawBody)));
 }
 
-export async function handleLineExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleLineExtras(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.LINE_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   const raw = await readRawBody(request);
@@ -53,7 +55,7 @@ export async function handleLineExtras(request: Request, env: Env, fetchImpl: ty
     log.info("replied", { seen: states.filter((s) => s.state === "returned").length }); // counts only
     if (env.LINE_CHANNEL_ACCESS_TOKEN && typeof e.replyToken === "string") {
       try {
-        await fetchImpl("https://api.line.me/v2/bot/message/reply", {
+        await recipientFetcher("platform-replies", ["message_text"], workerRecipientContext(undefined, { fetchImpl }))("https://api.line.me/v2/bot/message/reply", {
           method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env.LINE_CHANNEL_ACCESS_TOKEN}` },
           body: JSON.stringify({ replyToken: e.replyToken, messages: [{ type: "text", text: extrasReply("LINE", LINE_EXTRA_HEXAGONS, states) }] }), signal: AbortSignal.timeout(5000),
         });

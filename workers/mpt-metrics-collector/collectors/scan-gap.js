@@ -5,6 +5,8 @@
 // Counts only. Email addresses pass through memory to be matched and are never stored, logged or put in the alert text.
 import { hubspotRead } from './hubspot.js';
 import { previousHkDay } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const SCAN_FORM_ID = '22ee30ae-6cf9-419b-aa46-b656b0e7b1bf';   // the HubSpot "Start Scan" form shared by /start and /scan
 export const SCAN_SOURCE_TAG = 'scan-page';
@@ -43,7 +45,7 @@ async function acceptedAddresses(env, emails, start) {
   const since = new Date(start.getTime() - DEDUPE_MS).toISOString();
   const list = emails.map((e) => `"${e.replace(/"/g, '')}"`).join(',');
   const url = `${env.SUPABASE_URL}/rest/v1/scans?email_scanned=in.(${encodeURIComponent(list)})&source=eq.web_scan&created_at=gte.${encodeURIComponent(since)}&select=email_scanned&limit=1000`;
-  const res = await fetch(url, { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } });
+  const res = await callRecipient('supabase', { url, init: { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } }, sent: ['email'] }, recipientCtx(env));
   if (!res.ok) throw new Error(`scan-gap: scans read failed: HTTP ${res.status}`);
   return new Set((await res.json()).map((r) => norm(r.email_scanned)));
 }

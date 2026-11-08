@@ -15,7 +15,11 @@ const jwt = (role: string) => {
   const head = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role, exp: Math.floor(Date.now() / 1000) + 600 })}`;
   return `${head}.${createHmac("sha256", SECRET).update(head).digest("base64url")}`;
 };
-const store = (role = "service_role") => new RestCaseStore({ baseUrl: URL_ ?? "http://localhost:0", serviceKey: jwt(role), restPrefix: "" });
+// MPC-9885: the stores now go through the recipient wrapper, which only accepts a registered https host. They are given a registry-valid
+// base URL and this fetchImpl forwards the request to the throwaway PostgREST on localhost (same path, headers and body).
+const FAKE_BASE = "https://itest.supabase.co";
+const toLocal: typeof fetch = ((input: RequestInfo | URL, init?: RequestInit) => fetch(String(input).replace(FAKE_BASE, (URL_ ?? "").replace(/\/$/, "")), init)) as typeof fetch;
+const store = (role = "service_role") => new RestCaseStore({ baseUrl: FAKE_BASE, serviceKey: jwt(role), restPrefix: "", fetchImpl: toLocal });
 const now = new Date().toISOString();
 const ev = (o: Partial<InboundEvent> = {}): InboundEvent => ({ channel: "web", providerEventId: `it-${randomUUID()}`, text: "I can't find my report", senderHandle: "visitor-1", receivedAt: now, ...o });
 const init = () => ({ ref: newCaseRef(), policyVersion: "it-test", now });
@@ -141,7 +145,7 @@ run("RestCaseStore against PostgREST + Postgres", () => {
   });
 
   describe("identity proofs on real Postgres", () => {
-    const pstore = () => new RestProofStore({ baseUrl: URL_ ?? "http://localhost:0", serviceKey: jwt("service_role"), restPrefix: "" });
+    const pstore = () => new RestProofStore({ baseUrl: FAKE_BASE, serviceKey: jwt("service_role"), restPrefix: "", fetchImpl: toLocal });
     const verifiedPolicy: SupportPolicy = {
       version: "it-proof-policy", maxToolCallsPerTurn: 1, modelBudget: APPROVED_MODEL_BUDGET,
       tools: { get_case_status: { approvedPolicyVersion: "it-only", requiredIdentity: "verified", maxCallsPerHour: 5, maxCostUnitsPerDay: 5, timeoutMs: 3000 } },

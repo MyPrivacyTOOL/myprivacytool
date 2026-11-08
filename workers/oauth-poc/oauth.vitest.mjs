@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import worker, { callback } from './index.js';
 import * as g from './google.js';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 
 const env = { GOOGLE_CLIENT_ID: 'cid', GOOGLE_CLIENT_SECRET: 'sec', STATE_SIGNING_KEY: 'k'.repeat(32), REDIRECT_URI: 'https://x.test/oauth/google/callback' };
 const res = (b, status = 200) => new Response(JSON.stringify(b), { status });
@@ -139,5 +140,26 @@ describe('callback', () => {
     vi.stubGlobal('fetch', async () => res({}, 400));
     const r = await cb('state=good&code=c', await good());
     expect(r.status).toBe(502);
+  });
+});
+
+// MPC-9885: the Google and Supabase calls of the session-mode callback reach registered recipients.
+describe('recipient wrapper (fetch-spy)', () => {
+  it('session callback reaches oauth-providers and supabase only', async () => {
+    const spy = createFetchSpy({
+      respond: (u) => {
+        if (u.includes('tokeninfo')) return res({ aud: 'cid', scope: 'openid email profile', expires_in: 3000 });
+        if (u.includes('userinfo')) return res({ sub: '1', email: 'a@b.co', email_verified: true });
+        if (u.includes('rpc/')) return res('uid-1');
+        if (u.endsWith('/token')) return res({ access_token: 'AT' });
+        return res({});
+      },
+    });
+    const e = { ...env, SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' };
+    const cookie = await cookieFor({ state: 's', verifier: 'v', mode: 'session', exp: Date.now() + 60000 });
+    const req = new Request('https://x.test/cb?state=s&code=c', { headers: { Cookie: cookie } });
+    await callback(req, new URL(req.url), e, spy.fetch);
+    expect([...new Set(spy.calls.map((c) => (c.host.endsWith('.supabase.co') ? 'supabase' : c.recipient)))].sort()).toEqual(['oauth-providers', 'supabase']);
+    spy.assertAllRegistered();
   });
 });

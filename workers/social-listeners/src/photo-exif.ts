@@ -1,10 +1,11 @@
 // MPC-7891 measurement A (test-only, PROBE_MODE=on, allow-listed senders): does a profile photo as Telegram serves it carry EXIF / GPS metadata?
 // "/photoexif" downloads the sender's own profile photos (largest size, at most MAX_PHOTOS), looks only at the JPEG header segments and replies
 // with yes/no counts. Photo bytes are never stored or logged; the download URL (which holds the bot token) is never logged or returned.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { call, telegramSender } from "./probe-reader";
 import { baselineSender } from "./baseline-scan";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const MAX_PHOTOS = 3;
 const MAX_BYTES = 5_000_000;
@@ -64,7 +65,7 @@ function tiffHasGps(b: Uint8Array, tiff: number, end: number): boolean {
 
 async function download(env: Env, filePath: string): Promise<Uint8Array | null> {
   try {
-    const res = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const res = await callRecipient("telegram", { url: `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${filePath}`, init: { signal: AbortSignal.timeout(TIMEOUT_MS) }, sent: [] }, recipientCtx(env)); // a file path Telegram gave us
     if (!res.ok) return null;
     const buf = new Uint8Array(await res.arrayBuffer());
     return buf.length <= MAX_BYTES ? buf : null;
