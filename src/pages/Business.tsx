@@ -9,6 +9,7 @@ import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackBusinessLead } from "@/lib/analytics";
+import { queueBusinessRequest } from "@/lib/businessRequest";
 
 // HubSpot form "Business Inquiry" (portal 246502821). Form GUIDs are public (they ship in
 // every embed). Override per environment with VITE_HUBSPOT_BUSINESS_FORM_ID. The form defines a
@@ -22,6 +23,7 @@ const Business = () => {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [consent, setConsent] = useState(false);
+  const [ref, setRef] = useState("");
   const submitted = status === "success";
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,6 +33,16 @@ const Business = () => {
     setErrorMsg("");
     const [firstname, ...rest] = form.name.trim().split(/\s+/);
     try {
+      // MPC-9825: queue first. The 48-hour clock starts when this row exists; if it cannot be written the visitor sees an error and nothing is promised.
+      const queued = await queueBusinessRequest({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        company: form.company.trim(),
+        size: form.size,
+        consent,
+        consentSource: "business_page",
+      });
+      setRef(queued.ref);
       await submitHubSpotForm({
         formId: FORM_ID,
         fields: {
@@ -97,7 +109,8 @@ const Business = () => {
               >
                 <h2 className="text-xl font-bold mb-2">Get a Free Company Audit</h2>
                 <p className="text-muted-foreground text-sm mb-6">
-                  We'll scan your team and send an exposure report within 48 hours.<FeatureStatus feature="F6" />
+                  We'll send you a team exposure summary within 48 hours of your request. Today a person prepares it by hand from each consenting employee's free browser and email scan and any listings you show us; data-broker coverage is{" "}
+                  <FeatureStatus feature="F1" state="planned" className="ml-0" />.
                 </p>
                 <Input
                   placeholder="Your name"
@@ -143,7 +156,7 @@ const Business = () => {
                   {status === "loading" ? "Sending..." : "Talk to us"}
                 </Button>
                 <p className="text-muted-foreground text-xs text-center">
-                  No payment required. Results in 48 hours.<FeatureStatus feature="F6" />
+                  No payment required. Results in 48 hours.
                 </p>
                 <p className="text-muted-foreground text-xs text-center">
                   We use your details only to prepare and send your audit. See our{" "}
@@ -155,9 +168,10 @@ const Business = () => {
                 <div className="text-brand text-4xl mb-4">✓</div>
                 <h3 className="text-xl font-bold mb-2">Request received</h3>
                 <p className="text-muted-foreground text-sm">
-                  We'll run your company audit and send results to{" "}
-                  <span className="text-foreground">{form.email}</span> within 48 hours.<FeatureStatus feature="F6" />
+                  We'll send your team summary to{" "}
+                  <span className="text-foreground">{form.email}</span> within 48 hours.
                 </p>
+                {ref && <p className="text-muted-foreground text-xs mt-3">Your reference: <span className="text-foreground font-mono">{ref}</span></p>}
               </div>
             )}
           </div>

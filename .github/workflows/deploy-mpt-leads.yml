@@ -44,7 +44,7 @@ jobs:
         run: node scripts/ci/check-env.mjs --require CLOUDFLARE_API_TOKEN,CLOUDFLARE_ACCOUNT_ID --worker workers/mpt-leads
 
       - name: Test Worker (stubbed fetch)
-        run: node workers/mpt-leads/worker.test.mjs
+        run: node workers/mpt-leads/worker.test.mjs && node workers/mpt-leads/business-requests.test.mjs && node shared/business/sla.test.mjs
 
       - name: Snapshot secret names before deploy
         env:
