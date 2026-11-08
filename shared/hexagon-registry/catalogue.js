@@ -1959,9 +1959,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.user_id",
@@ -1993,9 +1991,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.username",
@@ -2010,9 +2006,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.message_time",
@@ -2027,9 +2021,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/reference/messages",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.message_text",
@@ -2095,9 +2087,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.reply_context",
@@ -2248,9 +2238,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://developers.facebook.com/docs/whatsapp/business-scoped-user-ids",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.location_share",
@@ -2265,9 +2253,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "OK",
   "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved."
  },
  {
   "id": "wa.flow_answers",
@@ -2299,9 +2285,7 @@ export const HEXAGON_CATALOGUE = [
   "status": "new",
   "access": "Verify",
   "source": "https://www.twilio.com/docs/messaging/guides/webhook-request",
-  "plan": "not_planned",
-  "plan_decision": 1,
-  "plan_reason": "WhatsApp is outside the hexagon model for now; revisit after Telegram is proven"
+  "note": "Approved as planned by Chris on 2026-11-08, superseding decision 1 of MPC-8689 for these eight WhatsApp hexagons only. Conditions: only what WhatsApp sends when a person messages us or what they choose to share (no probing, no scraping, no lookups on other apps); needs a WhatsApp Business account; consent wording and the Privacy Policy first; nothing shown to visitors as coming until the wording is approved; no spend approved. Access is Verify: not built until a probe on our own test account confirms what WhatsApp returns."
  },
  {
   "id": "wa.other_apps",
