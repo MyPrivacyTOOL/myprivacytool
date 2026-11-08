@@ -2,8 +2,9 @@
 // Extracted unchanged from worker.test.mjs (MPC-6677..8452) so lifecycle.test.mjs can reuse it. Two opt-in hooks, both off by default:
 //   opts.resendIdempotent  the same Idempotency-Key returns the first message id and counts as one email (what Resend does)
 //   opts.onRequest(url, init, res, db)  return a response to replace the call (inject a fault), or nothing to carry on
+import { entitlementState, entitlementRpc } from './fake-entitlements.mjs';
 export function fake(opts = {}) {
-  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [] }; const calls = []; let n = 0; const seenKeys = new Map();
+  const db = { users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [] }; const calls = []; let n = 0; const seenKeys = new Map(); const ent = entitlementState(); db.accounts = []; db.ent = ent;
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -25,6 +26,12 @@ export function fake(opts = {}) {
       r.status = 'completed'; const u = db.users.find((x) => x.id === r.referrer_user_id); u.pro_months_earned = (u.pro_months_earned || 0) + 1; return res(200, [{ referrer_user_id: u.id, rewarded: true, pro_months_earned: u.pro_months_earned }]);
     }
     if (url.includes('/rpc/claim_onboarding_cohort')) { if (opts.rpcFail) return res(500, 'x'); const u = db.users.find((x) => x.id === JSON.parse(o.body).p_user_id); if (!u.cohort_number) { const n = Math.max(0, ...db.users.map((x) => x.cohort_number || 0)) + 1; if (n > 100) return res(200, null); u.cohort_number = n; } return res(200, u.cohort_number); }
+    { const er = url.match(/rest\/v1\/rpc\/(mpt_consume_scan|mpt_confirm_scan_consumption|mpt_get_entitlements|mpt_set_plan)$/);   // MPC-9818: same rules as the SQL functions
+      if (er) {
+        if (opts.noAllowanceRpc) return res(404, { code: 'PGRST202' });   // migration not applied yet
+        if (opts.allowanceRpcFail) return res(500, 'x');
+        const out = await entitlementRpc(ent, db.accounts, er[1], JSON.parse(o.body)); return out && out.__error ? res(out.__error, { code: '22023' }) : res(200, out);
+      } }
     if (url.includes('/rpc/mpt_request_scan')) {   // CK-8503: same rules as the SQL function; atomic here because nothing awaits between the check and the insert
       if (opts.noDedupeRpc) return res(404, { code: 'PGRST202', message: 'Could not find the function public.mpt_request_scan' });   // migration not applied yet
       const a = JSON.parse(o.body); const since = Date.now() - 24 * 3600 * 1000;

@@ -9,6 +9,7 @@
 //   3. Bearer calls: /api/account/me, /link-scan, /delete, /refresh, /signout, /can. The bearer is the Supabase access token; it is checked against Supabase Auth on every call.
 // Everything answers 404 unless ACCOUNTS_ENABLED is exactly "true" (rollback = set "false" and redeploy). Needs migration 20261108120000_mpc_9817_accounts_and_signin.sql.
 import { shell, para, button, SIGN_OFF, sendEmail } from './email.js';
+import { getEntitlements, limitHistory, sectionState } from './entitlements.js';
 
 export const accountsEnabled = (env) => env.ACCOUNTS_ENABLED === 'true';
 
@@ -163,9 +164,13 @@ export async function handleMe(env, ctx, request, origin, json, { allowedOrigins
   if (!user) return json({ error: 'Not signed in' }, 401);
   try {
     const account = await sb.rpc('mpt_ensure_account', { p_user: user.id, p_email: user.email, p_scan: null });
-    const scans = await sb.rpc('mpt_list_account_scans', { p_account: user.id });
+    const all = (await sb.rpc('mpt_list_account_scans', { p_account: user.id })) || [];
+    // MPC-9818: what the plan has. Free sees the latest saved scan; Basic and up see every scan inside retention. Nothing is deleted: the older scans are kept (cancellation is not deletion).
+    const ent = await getEntitlements(sb, { accountId: user.id });
+    const shown = limitHistory(all, ent);
     return json({ account: { email: account.email, plan: account.plan, created_at: account.created_at, keep_scans: account.keep_scans },
-      scans: (scans || []).map((s) => ({ scan_number: s.scan_number, created_at: s.created_at, hexagon_count: s.hexagon_count })) });
+      scans: shown.scans.map((s) => ({ scan_number: s.scan_number, created_at: s.created_at, hexagon_count: s.hexagon_count })), history: shown.history,
+      entitlements: { tier: ent.tier, capabilities: ent.capabilities, limits: ent.limits, scans: ent.scans } });
   } catch (e) { console.error('account: me failed', noEmail(String(e.status || e))); return json({ error: 'Unavailable' }, 503); }
 }
 
@@ -178,7 +183,14 @@ export async function handleOpenScan(env, ctx, request, origin, json, { allowedO
   const b = await bodyOf(request); if (!b || !isScanNumber(b.scan_number)) return json({ error: 'Invalid request' }, 400);
   try {
     const scan = await sb.rpc('mpt_get_account_scan', { p_account: user.id, p_web_scan: b.scan_number.toLowerCase() });
-    return scan ? json({ scan }) : json({ error: 'Not found' }, 404);
+    if (!scan) return json({ error: 'Not found' }, 404);
+    // MPC-9818: read access follows the CURRENT plan. A Free account opens its latest scan only; an older one is kept, not deleted, and opens again on Basic and up.
+    const hist = sectionState(await getEntitlements(sb, { accountId: user.id }), 'report.history_full');
+    if (!hist.allowed) {
+      const all = (await sb.rpc('mpt_list_account_scans', { p_account: user.id })) || [];
+      if (all.length > 1 && all[0]?.scan_number !== scan.scan_number) return json({ error: 'Older scans are kept. They open on a paid plan.', code: 'history_requires_plan', min_tier: hist.min_tier }, 403);
+    }
+    return json({ scan });
   } catch (e) { console.error('account: open failed', noEmail(String(e.status || e))); return json({ error: 'Unavailable' }, 503); }
 }
 

@@ -19,6 +19,7 @@ import { handleResendWebhook } from './lib/receipts.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
+import { allowanceEnabled, consumeScan, dropRefusedScan, getEntitlements, refusalBody } from './lib/entitlements.js';
 import { handleSignIn, handleVerify, handleMe, handleLinkScan, handleDelete, handleRefresh, handleSignOut, handleCan, handleOpenScan } from './lib/accounts.js';
 import { handleDeepResearchStart, handleDeepResearchVerify, handleDeepResearchResults, handleDeepResearchDelete } from './lib/deepResearch.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
@@ -133,6 +134,7 @@ export default {
         requestId: rid.requestId,
         listing: listing.inputs ?? null,
       });
+      if (result.refused) return json(refusalBody(result.refused), 429);   // MPC-9818: honest refusal, the same words everywhere (lib/entitlements.js)
       // MPC-7470: the scan is saved and linked to this contact, with the consent record, inside handleScan, BEFORE the first email goes out, so that email can carry the scan number.
       // Not for a repeat request within 24h (no new report, so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer
       // to the email request. A replay of the SAME request (same request_id) reports the original outcome instead.
@@ -207,6 +209,10 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
   const created = await requestScan(sb, user.id, email, now, keyed && requestId ? requestId : null, keyed);
   if (created.duplicate) return keyed && requestId && String(created.requestId || '').toLowerCase() === String(requestId).toLowerCase() ? replayOutcome(sb, created.scanId) : { duplicate: true, scanId: created.scanId };
   const scan = { id: created.scanId };
+  // MPC-9818: the monthly allowance of the plan that owns this address (an account's plan, otherwise Free). Counted BEFORE anything is saved or sent, so a refused
+  // request costs nothing and creates nothing: the just-made request row is removed. A repeat within 24h (above) never reaches here, so it never counts twice.
+  const allowance = await consumeScan(env, sb, { scanId: scan.id, email, confirmed: !confirmGateEnabled(env) });
+  if (allowance.allowed === false) { await dropRefusedScan(sb, scan.id); return { refused: allowance }; }
   // MPC-9813: mark the scan as waiting for the click BEFORE anything is saved or sent. Fails closed: if it cannot be marked, the request fails and nothing goes out.
   if (confirmGateEnabled(env)) await applyConfirmGate(sb, scan.id);
   // MPC-7471-F3: save the scan BEFORE the first email, so the email can show its number. Never throws; a failed save only means no number.
@@ -361,6 +367,7 @@ async function processScan(env, sb, job, fetchImpl) {
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
+  const entitlements = await getEntitlements(sb, { email });   // MPC-9818: the plan that owns this address decides which gated sections are built (never throws: a fault reads as Free)
   // MPC-9813: pages the person showed us, checked only after the click (this point is never reached before it). Reuses results the click already stored.
   const listings = listingCheckEnabled(env) && job.email_confirmed_at ? await runStoredListingChecks(env, sb, job.id, email, fetchImpl).then(() => loadListings(sb, job.id)) : null;
   const emailHex = await runEmailHexagons(email, env, fetchImpl).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
@@ -398,7 +405,7 @@ async function processScan(env, sb, job, fetchImpl) {
   // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
   const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
   if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
-  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), entitlements, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links) }, fetchImpl);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {

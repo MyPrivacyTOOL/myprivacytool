@@ -46,6 +46,8 @@ EMAIL_CONFIRM_GATE_ENABLED = "true"
 LISTING_CHECK_ENABLED = "true"
 # MPC-9817: accounts and sign-in, for the synthetic live check (testingnt69+ aliases only: the allowlist above still applies).
 ACCOUNTS_ENABLED = "true"
+# MPC-9818: scan allowances, for the synthetic live check (Free account's second scan refused, service-role bump to Basic allows).
+SCAN_ALLOWANCE_ENABLED = "true"
 
 [observability]
 enabled = true

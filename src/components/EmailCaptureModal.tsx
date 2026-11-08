@@ -161,7 +161,7 @@ export default function EmailCaptureModal({
       setTurnstileToken('');
       setTries((n) => n + 1);
       setStatus('error');
-      setErrorMsg(err instanceof ReportRequestError && err.kind === 'rate_limited' ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE);
+      setErrorMsg(err instanceof ReportRequestError && err.kind === 'allowance' && err.detail ? err.detail : err instanceof ReportRequestError && err.kind === 'rate_limited' ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE);
     } finally {
       submitting.current = false;
     }

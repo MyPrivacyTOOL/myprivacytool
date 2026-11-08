@@ -79,7 +79,8 @@ select pg_temp.assert(pg_temp.try_as('authenticated', $q$select public.mpt_get_a
 
 -- ===== can(): Free values only; unknown denied =====
 select pg_temp.assert((public.mpt_can('00000000-0000-0000-0000-00000000a001', 'report.score')->>'allowed')::boolean, 'free account can a free capability');
-select pg_temp.assert(not (public.mpt_can('00000000-0000-0000-0000-00000000a001', 'report.export_pdf')->>'allowed')::boolean and public.mpt_can('00000000-0000-0000-0000-00000000a001', 'report.export_pdf')->>'reason' = 'unknown_capability', 'a paid capability is not wired yet (MPC-9818): denied as unknown');
+select pg_temp.assert(not (public.mpt_can('00000000-0000-0000-0000-00000000a001', 'report.export_pdf')->>'allowed')::boolean and public.mpt_can('00000000-0000-0000-0000-00000000a001', 'report.export_pdf')->>'reason' = 'tier_too_low', 'a paid capability (wired by MPC-9818) is denied to a Free account as tier_too_low');
+select pg_temp.assert(public.mpt_can('00000000-0000-0000-0000-00000000a001', 'report.not_a_real_key')->>'reason' = 'unknown_capability', 'an unknown key is still denied as unknown_capability');
 select pg_temp.assert(public.mpt_can('00000000-0000-0000-0000-0000000000ee', 'report.score')->>'reason' = 'no_account', 'no account => denied');
 insert into public.capability_min_tier (key, min_tier) values ('test.basic_only', 'basic');
 select pg_temp.assert(public.mpt_can('00000000-0000-0000-0000-00000000a001', 'test.basic_only')->>'reason' = 'tier_too_low', 'free is below a basic capability');

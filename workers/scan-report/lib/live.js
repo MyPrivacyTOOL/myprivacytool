@@ -7,6 +7,7 @@
 import { EMAIL_HEXAGONS, emailHexagonSignalRows, enabledEmailHexagonIds, runEmailHexagons } from './emailHexagons.js';
 import { confirmGateEnabled, listingCheckEnabled, loadListings } from './confirmGate.js';
 import { buildBrokerPanel } from './brokerPanel.js';
+import { getEntitlements } from './entitlements.js';
 
 export const LIVE_TTL_MS = 15 * 60 * 1000;
 export const VERIFY_TTL_MS = 7 * 24 * 3600 * 1000;   // the email link: possession of it proves the reader controls the inbox the scan was requested for
@@ -103,7 +104,7 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
     const gate = confirmGateEnabled(env);   // MPC-9813: the columns exist only once the migration is applied, so they are read only while the gate is on
     const [rows, scan] = await Promise.all([
       sb.select(`signals?scan_id=eq.${scanId}&signal_type=like.email-*&select=signal_type,check_status${verified ? ',details' : ''}`),
-      sb.select(`scans?id=eq.${scanId}&select=report_status${gate ? ',email_confirm_required,email_confirmed_at' : ''}&limit=1`),
+      sb.select(`scans?id=eq.${scanId}&select=report_status${verified ? ',email_scanned' : ''}${gate ? ',email_confirm_required,email_confirmed_at' : ''}&limit=1`),
     ]);
     const items = liveItems(rows, { verified });
     const confirmRequired = gate && Boolean(scan[0]?.email_confirm_required);
@@ -111,7 +112,10 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
     // The pages the person showed us: evidence and detail are shown only to the reader of the email link, and only once they confirmed the address.
     const listings = verified && confirmed && listingCheckEnabled(env) ? await loadListings(sb, scanId) : null;
     // MPC-9814: the broker panel is part of every scan's result, pasted page or not. Pages the visitor showed us appear in it only for the reader of the email link.
-    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env) });
+    // MPC-9818: the reader's plan decides the paid-coverage state. Only the reader of the email link (who proved the inbox) is looked up by email; anyone else sees the Free reading.
+    const owner = verified ? scan[0]?.email_scanned : null;
+    const entitlements = owner ? await getEntitlements(sb, { email: owner }) : null;
+    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements });
     return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified,
       ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}), broker_panel });
   } catch (e) {

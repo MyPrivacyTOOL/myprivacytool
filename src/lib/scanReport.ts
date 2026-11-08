@@ -11,7 +11,9 @@ import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan
 // MPC-7535: the Worker's answer is never swallowed. A refusal or a network failure throws a ReportRequestError, and the page then shows an honest
 // message instead of the thank-you screen (the visitor must not be promised a report that was never requested).
 export class ReportRequestError extends Error {
-  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network", readonly status: number) {
+  // MPC-9818: kind "allowance" = the month's scan allowance for this address is used. `detail` is the Worker's own plain-text explanation (what happened, when it resets, what the
+  // next plan includes), shown to the visitor as is. It is never a price: prices live in the plans data.
+  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network" | "allowance", readonly status: number, readonly detail?: string) {
     super(`scan-report ${status || "no response"}`);
   }
 }
@@ -71,6 +73,10 @@ export async function requestScanReport(
     if (res.status === 400) {
       const refused = (await res.json().catch(() => null)) as { code?: unknown } | null;
       if (refused?.code === "bad_email_domain") throw new ReportRequestError("bad_email", 400);
+    }
+    if (res.status === 429) {
+      const refused = (await res.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
+      if (refused?.code === "scan_allowance_exhausted" && typeof refused.message === "string") throw new ReportRequestError("allowance", 429, refused.message.slice(0, 500));
     }
     throw new ReportRequestError(res.status === 429 ? "rate_limited" : res.status >= 500 ? "server" : "rejected", res.status);
   }
