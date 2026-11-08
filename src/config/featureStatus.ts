@@ -12,7 +12,7 @@ export const FEATURE_STATUS: Record<FeatureId, FeatureState> = {
   // F2 Paid Exposure Report. LIVE test: a signed-in Basic+ account opens the full report; Free sees the free report with an upgrade prompt.
   F2: "planned",
   // F3 Accounts and Stripe billing. LIVE test: sign in, pay in Stripe Checkout, plan active in account settings, cancel and refund per Terms section 6.
-  F3: "planned",
+  F3: "in_build",   // MPC-9817 (2026-11-08): accounts and email-link sign-in are live (live check run 42455686419 attempt 4); Stripe checkout (MPC-9819) and plan state (MPC-9818) are not, so F3 is not live
   // F4 Removal requests. LIVE test: an authorised account submits a removal to one broker and a re-check moves it to confirmed / still-listed.
   F4: "planned",
   // F5 Dark-web and breach monitoring. LIVE test: a paid, verified account sees breaches in the report and gets an alert email on a new breach.
