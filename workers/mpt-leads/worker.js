@@ -156,7 +156,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
     };
@@ -252,6 +252,14 @@ export default {
         });
       }
 
+      // MPC-9914 (EXT-03): consent is checked BEFORE anything is written or sent anywhere (Supabase, Notion, HubSpot, Slack, Resend).
+      // Without it the request stops here with an honest 400 and nothing is stored. The flag used to only set HubSpot properties.
+      if (!consented) {
+        return new Response(JSON.stringify({ error: 'Consent required', message: 'We have not saved anything. Tick the consent box to share your email with us, then try again.' }), {
+          status: 400, headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+
       // MPC-8368: bot check. Runs after the watchdog health check (which has no browser and no token) and before any write.
       const tsInfo = {};
       const ts = await turnstileState(env, request, turnstileToken, tsInfo, rctx);
@@ -268,6 +276,17 @@ export default {
           action: enforce ? 'blocked_403' : 'allowed_report_only',
         }));
         if (enforce) return reject(403, 'Verification failed');
+      }
+
+      // MPC-9914 (EXT-03): the baseline is owned by a proved email. A bare email (or its SHA-256) is a key, never authentication.
+      // A request that asks for a baseline (it sends a riskScore) must carry the Supabase access token of the signed-in, confirmed person
+      // whose email it is (checked after the bot check, still before any write). No token: 401. A token for a different address: 403. Either way nothing is written.
+      let baselineOwner = false;
+      if (riskScore !== null && riskScore !== '') {
+        const proof = await provedEmailFromBearer(env, request, rctx);
+        if (!proof) return reject(401, 'Sign in with your confirmed email to save or read a baseline');
+        if (proof !== email.toLowerCase()) return reject(403, 'This sign-in does not belong to that email');
+        baselineOwner = true;
       }
 
       // Capture technical metadata from the request
@@ -287,7 +306,7 @@ export default {
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
-      const baseline = await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION, rctx);
+      const baseline = !baselineOwner ? null : await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION, rctx);
 
       // 1. Save to Notion
       const properties = {
@@ -630,6 +649,8 @@ async function sweepPending(env) {
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
 const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+// The public publishable key (not a secret; the same one scan-report's accounts use). Supabase Auth needs an apikey on /auth/v1/user.
+const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV';
 // MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
 const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
 async function recordEngagement(env, sessionId, flags, rctx = workerRecipientContext(env)) {
@@ -661,6 +682,24 @@ async function recordEngagement(env, sessionId, flags, rctx = workerRecipientCon
     console.error('Supabase mpt_user_engagement insert error:', supabaseHost(env), String(err));
     return false;
   }
+}
+
+// MPC-9914 (EXT-03): the confirmed email behind a Bearer access token, checked against Supabase Auth (signature, expiry, revocation),
+// lower-cased; null when there is no token, it is not valid, or the address was never confirmed. Same check as scan-report's accounts.
+async function provedEmailFromBearer(env, request, rctx) {
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token || token.length > 4096) return null;
+  try {
+    const res = await callRecipient('supabase', {
+      url: `${(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '')}/auth/v1/user`,
+      init: { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } },
+      sent: [],
+    }, rctx);
+    if (!res.ok) return null;
+    const u = await res.json();
+    if (!u || typeof u.email !== 'string' || !(u.email_confirmed_at || u.confirmed_at)) return null;
+    return u.email.trim().toLowerCase();
+  } catch (_) { return null; }
 }
 
 // MPC-7173: baseline snapshot. Keyed by SHA-256(lower-cased email); stores only scores, never the email.
