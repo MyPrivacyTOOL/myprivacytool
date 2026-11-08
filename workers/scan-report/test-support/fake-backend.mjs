@@ -98,6 +98,8 @@ export function fake(opts = {}) {
     const rq = q.get('request_id')?.replace('eq.', ''); if (rq) rows = rows.filter((x) => x.request_id === rq);   // MPC-7471-F3
     const cid = q.get('contact_id')?.replace('eq.', ''); if (cid) rows = rows.filter((x) => x.contact_id === decodeURIComponent(cid));   // MPC-7471-F3
     const cs = q.get('check_status')?.replace('eq.', ''); if (cs) rows = rows.filter((x) => x.check_status === cs);   // MPC-7554
+    const wsid = q.get('web_scan_id')?.replace('eq.', ''); if (wsid && t === 'web_scan_contacts') rows = rows.filter((x) => x.web_scan_id === wsid);   // MPC-9893
+    const chn = q.get('channel')?.replace('eq.', ''); if (chn && t === 'web_scan_contacts') rows = rows.filter((x) => x.channel === chn);
     const sc = q.get('scan_id')?.replace('eq.', ''); if (sc) rows = rows.filter((x) => x.scan_id === sc);   // like PostgREST: a read by scan_id returns that scan's rows only
     if (t === 'scans' && q.get('or')) rows = rows.filter((x) => x.report_status === 'pending');
     // MPC-9813: the gated queue read (and=(or(pending...),or(email_confirm_required.eq.false,email_confirmed_at.not.is.null,confirmation_sent_at.is.null))): same rule as the SQL filter

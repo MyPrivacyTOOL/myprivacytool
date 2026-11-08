@@ -30,6 +30,7 @@ import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
 import { markScanStarted, rememberCompletedScan, trackResults, writeFootprintScan } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
+import ScanRecipientsPanel from '@/components/ScanRecipientsPanel';   // MPC-9893
 import WelcomeBack from '@/components/WelcomeBack';
 import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
@@ -346,6 +347,7 @@ const Index = () => {
               <WelcomeBack hexagons={hexagons} />
               <TelegramHandoffNotice />
               <ScanNumberNotice />
+              <ScanRecipientsPanel />
             </>
           )}
         </section>

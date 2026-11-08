@@ -34,6 +34,7 @@ const AcceptableUse = lazy(() => import("./pages/AcceptableUse"));
 const DPA = lazy(() => import("./pages/DPA"));
 const DataDeletion = lazy(() => import("./pages/DataDeletion"));
 const Trust = lazy(() => import("./pages/Trust"));
+const WhatWeSee = lazy(() => import("./pages/WhatWeSee"));   // MPC-9893
 // MPC-9829: two legal pages that existed but were never routed (live /accessibility and /gdpr-rights rendered the 404 page).
 const Accessibility = lazy(() => import("./pages/Accessibility"));
 const GDPRRights = lazy(() => import("./pages/GDPRRights"));
@@ -100,6 +101,7 @@ const App = () => (
             <Route path="/dpa" element={<DPA />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/trust" element={<Trust />} />
+            <Route path="/what-we-see" element={<WhatWeSee />} />
             <Route path="/accessibility" element={<Accessibility />} />
             <Route path="/gdpr-rights" element={<GDPRRights />} />
             {/* Guides */}
