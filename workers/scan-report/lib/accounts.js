@@ -12,6 +12,10 @@ import { shell, para, button, SIGN_OFF, sendEmail } from './email.js';
 import { callRecipient } from '../../../shared/recipients/outbound.ts';
 import { rcx } from './recipients.js';
 import { getEntitlements, limitHistory, sectionState } from './entitlements.js';
+import { withinRetention, buildExportDocument, stripIps, renderPdf, makeExportToken, readExportToken, isFormat, breachGate, PDF_MAX_BYTES, JSON_MAX_BYTES } from './paidReport.js';
+import { liveItems } from './live.js';
+import { buildBrokerPanel } from './brokerPanel.js';
+import { listingCheckEnabled, loadListings } from './confirmGate.js';
 
 export const accountsEnabled = (env) => env.ACCOUNTS_ENABLED === 'true';
 
@@ -166,7 +170,7 @@ export async function handleMe(env, ctx, request, origin, json, { allowedOrigins
   if (!user) return json({ error: 'Not signed in' }, 401);
   try {
     const account = await sb.rpc('mpt_ensure_account', { p_user: user.id, p_email: user.email, p_scan: null });
-    const all = (await sb.rpc('mpt_list_account_scans', { p_account: user.id })) || [];
+    const all = withinRetention((await sb.rpc('mpt_list_account_scans', { p_account: user.id })) || [], env);   // MPC-9816: history = scans inside retention (config, 12 months)
     // MPC-9818: what the plan has. Free sees the latest saved scan; Basic and up see every scan inside retention. Nothing is deleted: the older scans are kept (cancellation is not deletion).
     const ent = await getEntitlements(sb, { accountId: user.id });
     const shown = limitHistory(all, ent);
@@ -185,7 +189,7 @@ export async function handleOpenScan(env, ctx, request, origin, json, { allowedO
   const b = await bodyOf(request); if (!b || !isScanNumber(b.scan_number)) return json({ error: 'Invalid request' }, 400);
   try {
     const scan = await sb.rpc('mpt_get_account_scan', { p_account: user.id, p_web_scan: b.scan_number.toLowerCase() });
-    if (!scan) return json({ error: 'Not found' }, 404);
+    if (!scan || !withinRetention([scan], env).length) return json({ error: 'Not found' }, 404);   // MPC-9816: outside retention = absent
     // MPC-9818: read access follows the CURRENT plan. A Free account opens its latest scan only; an older one is kept, not deleted, and opens again on Basic and up.
     const hist = sectionState(await getEntitlements(sb, { accountId: user.id }), 'report.history_full');
     if (!hist.allowed) {
@@ -272,4 +276,63 @@ export async function accountTokenForConfirm(env, sb, scanId, email, fetchImpl =
     const token = await createSignInToken(env, email, fetchImpl);
     return token ? { token_hash: token, scan_number: link.web_scan_id } : null;
   } catch (e) { console.error('account: confirm token failed', noEmail(String(e.status || e))); return null; }
+}
+
+// ---------------------------------------------------------------- MPC-9816: PDF / JSON export of one saved scan
+/** The export document for one of this account's own scans, as it is shown on screen (same sections, same "not checked" rows). null = not found / outside retention. */
+export async function loadExportDocument(env, sb, accountId, scanNumber) {
+  const scan = await sb.rpc('mpt_get_account_scan', { p_account: accountId, p_web_scan: scanNumber });
+  if (!scan || !withinRetention([scan], env).length) return null;
+  const ent = await getEntitlements(sb, { accountId });
+  const link = (await sb.select(`account_scans?account_id=eq.${accountId}&web_scan_id=eq.${scanNumber}&select=scans_id&limit=1`))?.[0];
+  const sid = link?.scans_id || null;
+  const rows = sid ? await sb.select(`signals?scan_id=eq.${sid}&select=signal_type,check_status,details`) : [];
+  const items = liveItems((rows || []).filter((r) => String(r.signal_type).startsWith('email-')), { verified: true });
+  const bRows = (rows || []).filter((r) => String(r.signal_type).startsWith('breach:'));
+  const gate = breachGate(env, ent);
+  const notChecked = bRows.find((r) => r.signal_type === 'breach:not_checked');
+  const found = bRows.filter((r) => !['breach:not_checked', 'breach:none'].includes(r.signal_type));
+  const breach = !gate.allowed ? { state: 'not_checked', not_checked_reason: 'Not checked on the free report. Check any address yourself at https://haveibeenpwned.com/.' }
+    : notChecked ? { state: 'not_checked', not_checked_reason: String(notChecked.details || 'could not be checked').slice(0, 200) }
+    : found.length ? { state: 'found', count: found.length, names: found.map((r) => String(r.signal_type).slice(7, 87)) } : bRows.length ? { state: 'clear' } : { state: 'not_checked', not_checked_reason: 'no breach check was recorded for this scan' };
+  const listings = sid && listingCheckEnabled(env) ? await loadListings(sb, sid).catch(() => null) : null;
+  const panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements: ent });
+  return buildExportDocument({ scanNumber, tier: ent.tier, web: { id: scan.scan_number, created_at: scan.created_at, hexagons: scan.results }, emailItems: items, panel, breach });
+}
+
+/** POST /api/account/export {scan_number, format: "pdf"|"json"} -> {url, expires_at}. Basic and up only: Free gets no link. */
+export async function handleExportIssue(env, ctx, request, origin, json, { allowedOrigins, rateLimited, sb, fetchImpl = undefined }) {
+  const g = guard(env, request, origin, json, allowedOrigins); if (g) return g;
+  if (await rateLimited(env, request, 'acct-export:')) return json({ error: 'Too many requests' }, 429);
+  const user = await userFromBearer(env, request, fetchImpl);
+  if (!user) return json({ error: 'Not signed in' }, 401);
+  const b = await bodyOf(request); if (!b || !isScanNumber(b.scan_number) || !isFormat(b.format)) return json({ error: 'Invalid request' }, 400);
+  try {
+    const ent = await getEntitlements(sb, { accountId: user.id });
+    const sec = sectionState(ent, b.format === 'pdf' ? 'report.export_pdf' : 'report.export_json');
+    if (!sec.allowed) return json({ error: 'Export is part of a paid plan.', code: 'export_requires_plan', min_tier: sec.min_tier }, 403);
+    const scan = await sb.rpc('mpt_get_account_scan', { p_account: user.id, p_web_scan: b.scan_number.toLowerCase() });
+    if (!scan || !withinRetention([scan], env).length) return json({ error: 'Not found' }, 404);
+    const t = await makeExportToken(env, user.id, b.scan_number.toLowerCase(), b.format);
+    if (!t) return json({ error: 'Unavailable' }, 503);
+    return json({ url: `${new URL(request.url).origin}/api/export?t=${t.token}`, expires_at: t.expires_at, format: b.format });
+  } catch (e) { console.error('account: export issue failed', noEmail(String(e.status || e))); return json({ error: 'Unavailable' }, 503); }
+}
+
+/** GET /api/export?t=<token>: the file. The signed token is bound to one account, one scan and one format, and expires. Re-checks the plan at download time. */
+export async function handleExportDownload(env, request, json, { sb }) {
+  if (!accountsEnabled(env) || !env.SUPABASE_SERVICE_ROLE_KEY) return new Response('Not found', { status: 404 });
+  const t = await readExportToken(env, new URL(request.url).searchParams.get('t'));
+  if (!t) return json({ error: 'Invalid or expired' }, 401);
+  try {
+    const ent = await getEntitlements(sb, { accountId: t.accountId });
+    if (!sectionState(ent, t.format === 'pdf' ? 'report.export_pdf' : 'report.export_json').allowed) return json({ error: 'Export is part of a paid plan.', code: 'export_requires_plan' }, 403);
+    const doc = await loadExportDocument(env, sb, t.accountId, t.scanNumber);
+    if (!doc) return json({ error: 'Not found' }, 404);
+    const clean = stripIps(doc);
+    const name = `my-exposure-report-${t.scanNumber.slice(0, 8)}`;
+    const body = t.format === 'json' ? new TextEncoder().encode(JSON.stringify(clean, null, 2)) : renderPdf(clean);
+    if (body.length > (t.format === 'json' ? JSON_MAX_BYTES : PDF_MAX_BYTES)) return json({ error: 'Too large' }, 413);
+    return new Response(body, { status: 200, headers: { 'Content-Type': t.format === 'json' ? 'application/json' : 'application/pdf', 'Content-Disposition': `attachment; filename="${name}.${t.format}"`, 'Cache-Control': 'private, no-store' } });
+  } catch (e) { console.error('export: failed', noEmail(String(e.status || e))); return json({ error: 'Unavailable' }, 503); }
 }

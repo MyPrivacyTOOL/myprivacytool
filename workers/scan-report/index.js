@@ -23,7 +23,8 @@ import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
 import { allowanceEnabled, consumeScan, dropRefusedScan, getEntitlements, refusalBody } from './lib/entitlements.js';
-import { handleSignIn, handleVerify, handleMe, handleLinkScan, handleDelete, handleRefresh, handleSignOut, handleCan, handleOpenScan } from './lib/accounts.js';
+import { handleSignIn, handleVerify, handleMe, handleLinkScan, handleDelete, handleRefresh, handleSignOut, handleCan, handleOpenScan, handleExportIssue, handleExportDownload } from './lib/accounts.js';
+import { breachGate, loadBasicPrice } from './lib/paidReport.js';
 import { handleDeepResearchStart, handleDeepResearchVerify, handleDeepResearchResults, handleDeepResearchDelete } from './lib/deepResearch.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
@@ -87,11 +88,12 @@ export default {
     if (url.pathname.startsWith('/api/account/') && (request.method === 'POST' || request.method === 'GET')) {
       const ctx2 = { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed };
       const acct = { '/api/account/signin': handleSignIn, '/api/account/verify': handleVerify, '/api/account/me': handleMe, '/api/account/link-scan': handleLinkScan, '/api/account/scan': handleOpenScan,
-        '/api/account/delete': handleDelete, '/api/account/refresh': handleRefresh, '/api/account/signout': handleSignOut, '/api/account/can': handleCan }[url.pathname];
+        '/api/account/delete': handleDelete, '/api/account/refresh': handleRefresh, '/api/account/signout': handleSignOut, '/api/account/can': handleCan, '/api/account/export': handleExportIssue }[url.pathname];
       if (acct && (request.method === 'POST' || url.pathname === '/api/account/me')) return acct(env, ctx, request, origin, json, ctx2);
     }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
+    if (request.method === 'GET' && url.pathname === '/api/export') return handleExportDownload(env, request, json, { sb: db(env) });   // MPC-9816
     if (url.pathname === '/api/fixed') return handleFixed(env, request, url, { sb: db(env) });
     if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env), optOut: (addr, source) => optOutEverywhere(db(env), addr, source), pushHubspot: (addr) => pushEmailOptOut(env, { email: addr }) });   // MPC-7556: hard bounce / complaint -> THE opt-out
     // MPC-9887: the scan consent store. One consent per scan id; POST records it, GET asks whether a journey already has one. First-party, pre-click.
@@ -399,11 +401,14 @@ export async function runReportJob(env, fetchImpl = undefined, limit = 5) {
 
 async function processScan(env, sb, job, fetchImpl, rctx) {
   const email = job.email_scanned;
-  const hibp = await checkBreaches(email, env, fetchImpl, rctx);
-  if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
-  if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
-  const brokers = await checkBrokers(email, env);
   const entitlements = await getEntitlements(sb, { email });   // MPC-9818: the plan that owns this address decides which gated sections are built (never throws: a fault reads as Free)
+  // MPC-9816: the gate sits where the work is done. A Free address never triggers the breach lookup (a third-party cost): the section is NOT CHECKED, said so, never "clear".
+  const gate = breachGate(env, entitlements);
+  const hibp = gate.allowed ? await checkBreaches(email, env, fetchImpl, rctx) : { status: 'not_checked', reason: 'Not checked on the free report', gated: true };
+  if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
+  if (hibp.status !== 'checked' && !hibp.gated && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
+  const brokers = await checkBrokers(email, env);
+  const basicPrice = await loadBasicPrice(sb);
   // MPC-9813: pages the person showed us, checked only after the click (this point is never reached before it). Reuses results the click already stored.
   const listings = listingCheckEnabled(env) && job.email_confirmed_at ? await runStoredListingChecks(env, sb, job.id, email, fetchImpl).then(() => loadListings(sb, job.id)) : null;
   const emailHex = await runEmailHexagons(email, env, fetchImpl, rctx).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
@@ -418,7 +423,7 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   const rows = [
     ...breaches.map((b) => ({ scan_id: job.id, category: 'email', signal_type: `breach:${clip(b.Name, 80)}`, severity: breachRisk(b) >= 8 ? 'high' : 'medium', data_source: 'Have I Been Pwned', check_status: 'found', details: clip(`${b.BreachDate || ''} exposed: ${(b.DataClasses || []).join(', ')}`, 500), removal_status: 'manual_only' })),
     ...(hibp.status === 'checked' && breaches.length === 0 ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:none', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'clear' }] : []),
-    ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
+    ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: hibp.gated ? 'Not checked (paid coverage)' : 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
     ...emailHexagonSignalRows(job.id, emailHex),
     ...emailExtraSignalRows(job.id, emailExtras),
     ...brokers.map((b) => ({ scan_id: job.id, category: 'broker', signal_type: `${b.key}_profile`, severity: 'high', data_source: b.name, check_status: 'not_checked', details: clip(b.reason, 300), removal_status: 'manual_only', removal_url: b.removal_url, removal_instructions: b.steps ? b.steps.join('\n') : null })),
@@ -441,7 +446,7 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
   const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
   if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
-  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), entitlements, webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice, breachGated: Boolean(hibp.gated), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links), items: ['email', 'ip', 'scan_result'] }, fetchImpl, rctx);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {

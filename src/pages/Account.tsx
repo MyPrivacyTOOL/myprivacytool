@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Seo from "@/components/Seo";
 import { Button } from "@/components/ui/button";
-import { accountsEnabled, claimScan, deleteAccount, loadMe, openScan, requestSignIn, signOut, type Me, type SavedHexagon } from "@/lib/account";
+import { accountsEnabled, claimScan, deleteAccount, loadMe, issueExport, openScan, requestSignIn, signOut, type Me, type SavedHexagon } from "@/lib/account";
 import { getScanNumber } from "@/lib/webScan";
 
 // MPC-9817: the minimal account page. Email, plan (read-only), your scans (number, date, open), claim a scan by its number, sign out, and
@@ -39,7 +39,9 @@ const allowanceLine = (a: NonNullable<Me["allowance"]>) => {
   return `${a.used} of ${a.limit} used this month${reset ? `, resets ${reset}` : ""}`;
 };
 
-const ScanRow = ({ scan }: { scan: Me["scans"][number] }) => {
+const ScanRow = ({ scan, canExport }: { scan: Me["scans"][number]; canExport: boolean }) => {
+  const [exportMsg, setExportMsg] = useState("");
+  const download = async (f: "pdf" | "json") => { setExportMsg(""); const u = await issueExport(scan.scanNumber, f); if (u) window.location.assign(u); else setExportMsg("The download could not be prepared. Try again."); };
   const [rows, setRows] = useState<SavedHexagon[] | null | "loading">(null);
   const open = async () => { setRows("loading"); setRows((await openScan(scan.scanNumber)) ?? []); };
   return (
@@ -49,8 +51,12 @@ const ScanRow = ({ scan }: { scan: Me["scans"][number] }) => {
           <p className="text-sm font-medium text-foreground">Scan {scan.scanNumber}</p>
           <p className="text-xs text-muted-foreground">{scan.createdAt ? new Date(scan.createdAt).toISOString().slice(0, 10) : ""} · {scan.hexagonCount} results</p>
         </div>
-        {rows === null && <Button variant="outline" size="sm" onClick={open}>Open</Button>}
+        <div className="flex gap-2">
+          {rows === null && <Button variant="outline" size="sm" onClick={open}>Open</Button>}
+          {canExport && <><Button variant="outline" size="sm" onClick={() => download("pdf")} data-testid="export-pdf">Download PDF</Button><Button variant="outline" size="sm" onClick={() => download("json")} data-testid="export-json">Download JSON</Button></>}
+        </div>
       </div>
+      {exportMsg && <p className="mt-2 text-xs text-muted-foreground" role="status">{exportMsg}</p>}
       {rows === "loading" && <p className="mt-2 text-xs text-muted-foreground">Opening...</p>}
       {Array.isArray(rows) && (rows.length ? (
         <ul className="mt-2 space-y-1 text-xs text-foreground" data-testid="scan-results">
@@ -109,7 +115,7 @@ const Account = () => {
               </dl>
               <section aria-labelledby="scans-h">
                 <h2 id="scans-h" className="mb-2 text-xl font-semibold text-foreground">Your scans</h2>
-                {me.scans.length ? <ul className="space-y-2" data-testid="scan-list">{me.scans.map((s) => <ScanRow key={s.scanNumber} scan={s} />)}</ul>
+                {me.scans.length ? <ul className="space-y-2" data-testid="scan-list">{me.scans.map((s) => <ScanRow key={s.scanNumber} scan={s} canExport={me.canExport} />)}</ul>
                   : <p className="text-sm text-muted-foreground" data-testid="no-scans">No scans in this account yet.</p>}
                 {me.olderKept > 0 && <p className="mt-3 text-sm text-muted-foreground" data-testid="older-kept">{me.olderKept === 1 ? "1 older scan is" : `${me.olderKept} older scans are`} saved and not deleted. Your plan lists your latest scan; a paid plan lists them all.</p>}
                 <form onSubmit={doClaim} className="mt-4 flex flex-wrap items-end gap-2">

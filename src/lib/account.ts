@@ -11,7 +11,7 @@ export interface Session { accessToken: string; refreshToken: string; expiresAt:
 export interface AccountScan { scanNumber: string; createdAt: string; hexagonCount: number }
 // MPC-9818: what the plan has. `allowance` = scans this month (limit null = unlimited, no cap); `olderKept` = saved scans a Free plan does not list (kept, not deleted).
 export interface Allowance { limit: number | null; used: number; remaining: number | null; resetsAt: string | null }
-export interface Me { email: string; plan: string; createdAt: string | null; scans: AccountScan[]; allowance: Allowance | null; olderKept: number }
+export interface Me { email: string; plan: string; createdAt: string | null; scans: AccountScan[]; allowance: Allowance | null; olderKept: number; canExport: boolean }
 
 export function loadSession(): Session | null {
   try {
@@ -83,7 +83,7 @@ export async function loadMe(): Promise<Me | "error" | null> {
   const scans = Array.isArray(r.json?.scans) ? (r.json!.scans as Record<string, unknown>[]) : [];
   return {
     email: a.email, plan: typeof a.plan === "string" ? a.plan : "free", createdAt: typeof a.created_at === "string" ? a.created_at : null,
-    allowance: readAllowance((r.json?.entitlements as { scans?: unknown } | undefined)?.scans), olderKept: Number((r.json?.history as { older_kept?: unknown } | undefined)?.older_kept ?? 0) || 0,
+    allowance: readAllowance((r.json?.entitlements as { scans?: unknown } | undefined)?.scans), canExport: (r.json?.entitlements as { capabilities?: Record<string, unknown> } | undefined)?.capabilities?.["report.export_pdf"] === true, olderKept: Number((r.json?.history as { older_kept?: unknown } | undefined)?.older_kept ?? 0) || 0,
     scans: scans.flatMap((x) => (typeof x.scan_number === "string" ? [{ scanNumber: x.scan_number, createdAt: String(x.created_at ?? ""), hexagonCount: Number(x.hexagon_count ?? 0) }] : [])),
   };
 }
@@ -118,4 +118,12 @@ export async function openScan(scanNumber: string): Promise<SavedHexagon[] | nul
   const res = (r.json?.scan as { results?: unknown } | undefined)?.results;
   if (r.status !== 200 || !Array.isArray(res)) return null;
   return (res as Record<string, unknown>[]).map((h) => ({ label: String(h.label ?? h.id ?? "").slice(0, 120), value: String(h.value ?? "").slice(0, 300), confidence: typeof h.confidence === "number" ? h.confidence : null }));
+}
+
+/** MPC-9816: asks for an expiring download link for one of the account's own scans (Basic and up). null = not allowed or unavailable. */
+export async function issueExport(scanNumber: string, format: "pdf" | "json"): Promise<string | null> {
+  const s = loadSession(); if (!s) return null;
+  const r = await call("export", { scan_number: scanNumber, format }, s.accessToken);
+  const url = r.json?.url;
+  return r.status === 200 && typeof url === "string" && url.startsWith("https://") ? url : null;
 }

@@ -115,6 +115,8 @@ CONSENT_GATE_ENFORCED = "false"
 # (public.plan_scan_allowance, public.capability_min_tier), not here. Needs migration 20261108140000_mpc_9818_entitlements_and_scan_allowances.sql (applied before this was switched on).
 # Anything but the exact string "true" is off; "false" + redeploy is the rollback (counted rows stay, nothing is refused). While the function is missing (HTTP 404) nothing is enforced.
 SCAN_ALLOWANCE_ENABLED = "true"
+# MPC-9816: a Free address never triggers the breach lookup (third-party cost): the breach section is NOT CHECKED. "false" + redeploy is the rollback.
+BREACH_GATE_ENABLED = "true"
 
 [observability]
 enabled = true

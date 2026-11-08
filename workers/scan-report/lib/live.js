@@ -8,6 +8,7 @@ import { EMAIL_HEXAGONS, emailHexagonSignalRows, enabledEmailHexagonIds, runEmai
 import { confirmGateEnabled, listingCheckEnabled, loadListings } from './confirmGate.js';
 import { buildBrokerPanel } from './brokerPanel.js';
 import { getEntitlements } from './entitlements.js';
+import { loadBasicPrice } from './paidReport.js';
 
 export const LIVE_TTL_MS = 15 * 60 * 1000;
 export const VERIFY_TTL_MS = 7 * 24 * 3600 * 1000;   // the email link: possession of it proves the reader controls the inbox the scan was requested for
@@ -16,11 +17,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const enc = new TextEncoder();
 const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-async function sign(secret, message) {
+export async function sign(secret, message) {
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return b64u(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
 }
-const sameString = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+export const sameString = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
 
 /** `${scanId}.${expiresAtMs}.${signature}`, or null when UNSUBSCRIBE_SECRET is not set (feature off). */
 export async function makeLiveToken(env, scanId, now = Date.now()) {
@@ -115,7 +116,7 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
     // MPC-9818: the reader's plan decides the paid-coverage state. Only the reader of the email link (who proved the inbox) is looked up by email; anyone else sees the Free reading.
     const owner = verified ? scan[0]?.email_scanned : null;
     const entitlements = owner ? await getEntitlements(sb, { email: owner }) : null;
-    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements });
+    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice: await loadBasicPrice(sb) });
     return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified,
       ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}), broker_panel });
   } catch (e) {

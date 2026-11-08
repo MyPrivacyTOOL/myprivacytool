@@ -75,6 +75,8 @@ Truecaller (Phone directory): NOT CHECKED
 Hong Kong and Singapore: we know of no people-search site there that we can lawfully read, so nothing is checked for you in those places. The guides are still yours to use: they cover the do-not-call registers and your legal opt-out rights.
 Paid coverage that checks these sites for you is coming. It is not live yet.
 
+Your free report did not search data brokers for listings in your name. Basic does that, with proof and a removal guide for each listing, and keeps every report for you. (In build)
+
 More removal guides: https://myprivacytool.io/opt-out?utm_source=email&utm_medium=email&utm_campaign=scan-report
 
 Questions about this report? Read the FAQ: https://myprivacytool.io/faq?utm_source=email&utm_medium=email&utm_campaign=scan-report
