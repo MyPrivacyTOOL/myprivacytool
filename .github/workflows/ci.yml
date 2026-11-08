@@ -252,10 +252,78 @@ jobs:
         run: |
           node scripts/ci/check-env.mjs --worker workers/mpt-leads --worker workers/oauth-poc --worker workers/scan-report --worker workers/mirror-risk --worker workers/partner-api
 
+  registry-scan:
+    # MPC-9884 (Open Tracker design 1.4) layers 1 and 3, BLOCKING: no outbound host outside shared/recipients/recipients.json.
+    #  - Layer 1: TypeScript-compiler-API scan of src/ functions/ workers/ shared/ index.html public/ + CSS for unregistered URL literals,
+    #    fetch/XMLHttpRequest/WebSocket/EventSource/sendBeacon/RTCPeerConnection/importScripts outside shared/recipients/outbound.*, and wrapper
+    #    calls without a literal registry key. Existing findings are in shared/recipients/ci-allowlist.json (each "pending MPC-9885/9886"); the list is a
+    #    ratchet: a new finding fails, and so does an entry whose call site is gone (delete it).
+    #  - Layer 3: the Worker/Function fetch spy (shared/recipients/fetch-spy.ts) and the scanner's own tests.
+    name: Registry scan + fetch spy (outbound hosts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Layer 1 - static scan against the registry and allowlist
+        run: node scripts/registry-ci/check.mjs static
+      - name: Layer 3 - fetch spy + scanner tests
+        run: npx vitest run shared/recipients scripts/registry-ci
+
+  registry-crawl:
+    # MPC-9884 layer 2, BLOCKING: crawl of the built site (every sitemap route pre-click, then the scan action post-click) with a patched
+    # RTCPeerConnection recording iceServers. Fails on an unregistered host, a non-first-party host pre-click (Turnstile excepted), or an enabled:false host.
+    name: Registry crawl of the built site (Playwright)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Crawl the production build
+        run: npm run test:registry-crawl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: registry-crawl
+          path: test-results/registry-crawl.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+  registry-hygiene:
+    # MPC-9884 layer 4: schema valid, registry hash reproduces the Supabase seed, allowlist entries no older than 14 days (all FAIL);
+    # DPA.tsx lists every dpa_listed entry and every enabled entry has a call site (WARNINGS until MPC-9894 / MPC-9885-6 land).
+    # The live table-vs-file hash compare needs credentials this workflow does not have: it runs nightly in sync-recipients.yml.
+    name: Registry hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/registry-ci/check.mjs hygiene
+
   ci-gate:
     name: CI gate
     if: always()
-    needs: [unit, lint, db, support-rest, build, pages-functions, e2e, pipeline-guards]
+    needs: [unit, lint, db, support-rest, build, pages-functions, e2e, pipeline-guards, registry-scan, registry-crawl, registry-hygiene]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded
