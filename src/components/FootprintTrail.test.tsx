@@ -109,6 +109,28 @@ describe('PathTrailPreview: the other seven groups', () => {
   });
 });
 
+describe('PathTrailPreview: email, dark web, WhatsApp and Messenger', () => {
+  it('shows four groups with 21, 6, 22 and 8 tiles', () => {
+    render(<PathTrailPreview />);
+    const grid = screen.getByTestId('path-trail-channels');
+    expect(grid.querySelectorAll('figure')).toHaveLength(4);
+    expect(grid.querySelectorAll('[role=img]')).toHaveLength(21 + 6 + 22 + 8);
+  });
+  it('says today that WhatsApp and Messenger are not planned, and email has live tiles held', () => {
+    render(<PathTrailPreview />);
+    expect(screen.getByLabelText('Profile name: Not checked yet, Not planned today')).toBeTruthy();
+    expect(screen.getByLabelText('Known breaches: we hold it, high risk')).toBeTruthy();
+  });
+  it('can pretend we hold everything, which draws the trail but keeps the same tiles', () => {
+    const { container } = render(<PathTrailPreview />);
+    const before = screen.getByTestId('path-trail-channels').querySelectorAll('[role=img]').length;
+    fireEvent.click(screen.getByLabelText(/Pretend we hold everything/));
+    expect(screen.getByTestId('path-trail-channels').querySelectorAll('[role=img]')).toHaveLength(before);
+    expect(screen.getByTestId('path-trail-channels').querySelectorAll('ellipse').length).toBeGreaterThan(40);
+    expect(container).toBeTruthy();
+  });
+});
+
 describe('PathTrailPreview', () => {
   it('says it is a preview with example data and always shows Web and Email', () => {
     render(<PathTrailPreview />);

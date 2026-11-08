@@ -3,6 +3,7 @@ import FootprintTrail, { type TrailTile } from './FootprintTrail';
 import type { Sensitivity, TileState } from '@/lib/footprintTrail';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 import { TRAIL_GROUPS } from '@/config/pathTrailGroups';
+import { CHANNEL_GROUPS, channelTiles } from '@/config/pathTrailChannels';
 
 // Preview of the climbing footprint trail (design: Notion MPC-9546 strategy page, "Design direction, final version"). Shown on the unlisted
 // /deep-research page only when the path-trail switch is on (src/config/pathTrail.ts, or ?path=1). It draws SAMPLE states for the Browser
@@ -35,6 +36,7 @@ function stateFor(scenario: Scenario, id: string): TileState {
 export default function PathTrailPreview() {
   const [scenario, setScenario] = useState<Scenario>('scan');
   const [signedUp, setSignedUp] = useState(false);
+  const [pretendAll, setPretendAll] = useState(false);
 
   const tiles: TrailTile[] = useMemo(() => {
     const byId = new Map((HEXAGONS as RegistryHex[]).map((h) => [h.id, h]));
@@ -112,6 +114,35 @@ export default function PathTrailPreview() {
               <figcaption className="mb-1 text-sm font-semibold text-foreground">{g.group}</figcaption>
               <p className="mb-2 text-xs text-muted-foreground">{g.story}</p>
               <FootprintTrail tiles={groupTiles} rows={g.rows} ariaLabel={`${g.group}, example: ${SCENARIOS.find((s) => s.id === scenario)?.label}`} />
+            </figure>
+          );
+        })}
+      </div>
+
+      <h3 className="mt-10 text-base font-semibold text-foreground">Email, dark web, WhatsApp and Facebook Messenger</h3>
+      <p className="text-sm text-muted-foreground">
+        Taken from the tile catalogue, so each caption says what is true today: live, planned, later, or not planned. WhatsApp and Messenger are marked
+        not planned today by an earlier owner decision (MPC-8689); this picture does not change that.
+      </p>
+      <label className="mt-2 flex items-center gap-2 text-sm text-foreground">
+        <input type="checkbox" checked={pretendAll} onChange={(e) => setPretendAll(e.target.checked)} />
+        Pretend we hold everything (to see the trail)
+      </label>
+      <div className="mt-4 grid gap-8 sm:grid-cols-2 lg:grid-cols-3" data-testid="path-trail-channels">
+        {CHANNEL_GROUPS.map((g) => {
+          const tiles: TrailTile[] = channelTiles(g.key).map((t) => ({
+            id: t.id,
+            label: t.label.replace(/^If they email us: /, ''),
+            emoji: t.emoji,
+            sensitivity: t.sensitivity,
+            state: pretendAll ? 'held' : t.today,
+            caption: pretendAll ? undefined : t.caption,
+          }));
+          return (
+            <figure key={g.key} className="min-w-0">
+              <figcaption className="mb-1 text-sm font-semibold text-foreground">{g.title}</figcaption>
+              <p className="mb-2 text-xs text-muted-foreground">{g.story}</p>
+              <FootprintTrail tiles={tiles} rows={g.rows} ariaLabel={`${g.title}, ${pretendAll ? 'example if we held everything' : 'as it is today'}`} />
             </figure>
           );
         })}
