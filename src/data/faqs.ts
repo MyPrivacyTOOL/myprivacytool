@@ -119,6 +119,10 @@ export const FAQS: { q: string; a: string }[] = [
     a: "When anyone loads a page we keep a log entry: time, page, the program name the visitor reported, IP address, country and network, and a few technical headers. We sort visits into person, other bot, AI crawler or unknown. For bots and AI crawlers we keep the full entry. If you were wrongly sorted as a bot, contact us and we will delete it.",
   },
   {
+    q: "How long do you keep the record of my report?",
+    a: "The delivery record for a scan is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan.",
+  },
+  {
     q: "What happens to my IP address?",
     a: "For ordinary visits, the IP address is removed from the log after 30 days; the rest of the entry stays without it. If you save a scan, the IP address is part of the saved result for 12 months. It is never written into your report email body.",
   },
