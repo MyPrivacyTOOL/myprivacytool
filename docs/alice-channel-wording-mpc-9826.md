@@ -33,3 +33,5 @@ Telegram stays "In build": the build session had no outbound route to api.telegr
 ## Reply-to finding
 
 `sendEmail()` sets `reply_to` from `EMAIL_REPLY_TO`, which is set in no wrangler file, no secret list and no doc. Replies therefore go to the From address, `hello@myprivacytool.io`. Nothing in the repo shows that mailbox is monitored (only `support@` is confirmed to arrive in a Gmail inbox, 2026-10-11). Not changed here: the reply path is not plainly broken, only unverified. A follow-up task checks it.
+
+Reply-to: hello@ → monitored (Chris, 2026-11-08). hello@myprivacytool.io forwards to his personal Gmail, which he reads (MPC-9849). Reply-to is no longer unverified; no routing change needed. F7a stays in_build until MPC-9850 (Telegram round-trip) is Done.
