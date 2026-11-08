@@ -5,6 +5,8 @@
 // "sha256=" + HMAC-SHA256(webhook secret, payload) in hex. Off unless GITHUB_EXTRAS=on; only allow-listed logins (GITHUB_PROBE_LOGINS). Nothing is stored or posted back: the response
 // carries counts of what was seen (no values) and is visible only in the repository's webhook delivery log.
 // Not built: commit name and email (Verify) and private account details (the person must sign in).
+import { callRecipient } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, hex, readRawBody, timingSafeEqual } from "./shared";
 import { allowedId, filled, hmac, obj, toStates, type ExtraDef, type ExtraState, type Obj } from "./extras-common";
@@ -51,14 +53,14 @@ export async function verifyGithubSignature(header: string | null, rawBody: stri
 }
 
 const GH = { accept: "application/vnd.github+json", "user-agent": "MyPrivacyTOOL-extras" };
-async function getJson(url: string, fetchImpl: typeof fetch): Promise<unknown | null> {
+async function getJson(url: string, rctx: ReturnType<typeof workerRecipientContext>): Promise<unknown | null> {
   try {
-    const r = await fetchImpl(url, { headers: GH, signal: AbortSignal.timeout(5000) });
+    const r = await callRecipient("github-extras", { url, init: { headers: GH, signal: AbortSignal.timeout(5000) }, sent: ["username"] }, rctx);
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
 
-export async function handleGithubExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleGithubExtras(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.GITHUB_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   const raw = await readRawBody(request);
@@ -70,7 +72,8 @@ export async function handleGithubExtras(request: Request, env: Env, fetchImpl: 
   if (request.headers.get("X-GitHub-Event") === "ping") return Response.json({ ok: true });
   const login = obj(payload.sender)?.login;
   if (typeof login !== "string" || !/^[A-Za-z0-9-]{1,39}$/.test(login) || !allowedId(env.GITHUB_PROBE_LOGINS, login)) { log.info("not_allowed"); return Response.json({ ok: true, checked: false }); }
-  const [user, events] = await Promise.all([getJson(`https://api.github.com/users/${login}`, fetchImpl), getJson(`https://api.github.com/users/${login}/events/public`, fetchImpl)]);
+  const rctx = workerRecipientContext(env, { fetchImpl });
+  const [user, events] = await Promise.all([getJson(`https://api.github.com/users/${login}`, rctx), getJson(`https://api.github.com/users/${login}/events/public`, rctx)]);
   const states = githubStates(payload, obj(user), Array.isArray(events) ? events : null);
   const seen = states.filter((s) => s.state === "returned").length;
   log.info("checked", { seen }); // counts only

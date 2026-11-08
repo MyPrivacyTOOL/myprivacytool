@@ -20,26 +20,26 @@ const ctxOf = (r: Recipient, extra = {}) => ({ registry: regOf(r), consentId: "c
 const codeOf = async (p: Promise<unknown>) => { try { await p; return "no error"; } catch (e) { return e instanceof RecipientError ? e.code : `other: ${e}`; } };
 
 /** Recipients MPC-9885 added because a Worker already called their host (see each entry's note). The Map's 29 are pinned without them. */
-const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-data-api", "meta-ads-insights", "firestore", "x-api", "make-webhooks", "github-issues", "internal-workers"];
+const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-data-api", "meta-ads-insights", "firestore", "x-api", "make-webhooks", "github-issues", "github-extras", "internal-workers"];
 
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 8 first-party and 22 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
+  it("pins 8 first-party and 23 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
     expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(8);
-    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(22);
+    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(23);
   });
   it("MPC-9885 added exactly these recipients, all enabled", () => {
     expect(registry.recipients.filter((r) => r.since === "2026-11-08" && r.note?.startsWith("Added by MPC-9885")).map((r) => r.key).sort()).toEqual([...MPC_9885_ADDED].sort());
     expect(MPC_9885_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
-  it("has the user-pasted-listing structural entry, 2 known-host disabled entries (stripe now flag-gated by CHECKOUT_ENABLED, meta-graph switched on by MPC-9885: WhatsApp replies are live) and 6 planned disabled entries", () => {
+  it("has the user-pasted-listing structural entry, 1 known-host disabled entry (platform-replies on like stripe now flag-gated by CHECKOUT_ENABLED, meta-graph switched on by MPC-9885: WhatsApp replies are live) and 6 planned disabled entries", () => {
     expect(registry.recipients.find((r) => r.key === "user-pasted-listing")?.host_kind).toBe("user_supplied");
-    for (const k of ["pwned-passwords", "platform-replies"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
+    for (const k of ["pwned-passwords"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(6);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(50);
+    expect(registry.recipients).toHaveLength(51);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);

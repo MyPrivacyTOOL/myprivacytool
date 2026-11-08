@@ -8,6 +8,7 @@ import { YOUTUBE_EXTRA_HEXAGONS, commentAuthorChannelId, handleYoutubeExtras, lo
 import { GITHUB_EXTRA_IDS, YOUTUBE_EXTRA_IDS } from "../../shared/hexagon-registry/channels.js";
 import { HEXAGON_CATALOGUE } from "../../shared/hexagon-registry/catalogue.js";
 import type { Env } from "./src/shared";
+import { createFetchSpy } from "../../shared/recipients/fetch-spy";
 
 afterEach(() => { vi.restoreAllMocks(); });
 const st = (l: { id: string; state: string }[]) => Object.fromEntries(l.map((x) => [x.id, x.state]));
@@ -124,5 +125,21 @@ describe("YouTube", () => {
     expect(await (await post({ comment: comment({ authorChannelId: { value: "UC" + "b".repeat(22) } }) }, env(), none as any)).json()).toEqual({ ok: true, checked: false });
     await post({ comment: comment() }, env({ YOUTUBE_PROBE_CHANNEL_IDS: undefined }), none as any);
     expect(none).not.toHaveBeenCalled();
+  });
+});
+
+describe("recipient registry (MPC-9885)", () => {
+  it("GitHub lookups go through the wrapper (github-extras, youtube-data-api) to registered, enabled hosts", async () => {
+    const CH = "UC" + "a".repeat(22);
+    const gh = createFetchSpy({ respond: () => Response.json({}) });
+    const raw = JSON.stringify({ action: "created", sender: { login: "octo-test", id: 7 }, comment: { body: "x" } });
+    await handleGithubExtras(new Request("https://x/webhook/github-extras", { method: "POST", body: raw, headers: { "X-Hub-Signature-256": "sha256=" + createHmac("sha256", "s").update(raw).digest("hex"), "X-GitHub-Event": "issue_comment" } }),
+      { GITHUB_EXTRAS: "on", GITHUB_WEBHOOK_SECRET: "s", GITHUB_PROBE_LOGINS: "octo-test" } as unknown as Env, gh.fetch);
+    expect(gh.calls.map((c) => c.host)).toEqual(["api.github.com", "api.github.com"]); // the spy names the first registry owner of a shared host; the wrapper itself checked the key
+    gh.assertAllRegistered();
+    const yt = createFetchSpy({ respond: () => Response.json({ items: [{}] }) });
+    await lookupChannel(CH, "key1", yt.fetch);
+    expect(yt.calls.map((c) => c.host)).toEqual(["www.googleapis.com"]);
+    yt.assertAllRegistered();
   });
 });

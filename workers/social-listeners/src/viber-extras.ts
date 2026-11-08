@@ -4,6 +4,8 @@
 // (message.contact phone_number). Signature: X-Viber-Content-Signature = HMAC-SHA256(auth token, JSON body), hex. Off unless VIBER_EXTRAS=on; allow-listed ids only (VIBER_PROBE_IDS).
 // B lookups (confirmed against the same docs): get_user_details (primary_device_os, device_type, viber_version, mcc, mnc; two calls per user per 12 hours) and get_online
 // (online_status 0 online, 1 offline, 2 undisclosed, 3 try later, 4 unavailable; last_online). They need VIBER_AUTH_TOKEN and a subscribed user; any failure is not_checked.
+import { recipientFetcher } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, hex, readRawBody, timingSafeEqual } from "./shared";
 import { allowedId, extrasReply, filled, hmac, obj, toStates, type ExtraDef, type Obj } from "./extras-common";
@@ -69,19 +71,19 @@ export async function verifyViberSignature(signature: string | null, rawBody: st
 
 async function viberPost(path: string, body: unknown, token: string, fetchImpl: typeof fetch): Promise<Obj | null> {
   try {
-    const r = await fetchImpl(`https://chatapi.viber.com/pa/${path}`, { method: "POST", headers: { "content-type": "application/json", "X-Viber-Auth-Token": token }, body: JSON.stringify(body), signal: AbortSignal.timeout(4000) });
+    const r = await recipientFetcher("platform-replies", ["username"], workerRecipientContext(undefined, { fetchImpl }))(`https://chatapi.viber.com/pa/${path}`, { method: "POST", headers: { "content-type": "application/json", "X-Viber-Auth-Token": token }, body: JSON.stringify(body), signal: AbortSignal.timeout(4000) });
     const j = r.ok ? obj(await r.json()) : null;
     return j && j.status === 0 ? j : null;
   } catch { return null; }
 }
-export async function viberLookup(userId: unknown, token: string | undefined, fetchImpl: typeof fetch = fetch): Promise<ViberLookups> {
+export async function viberLookup(userId: unknown, token: string | undefined, fetchImpl?: typeof fetch): Promise<ViberLookups> {
   if (!token || typeof userId !== "string") return { details: null, online: null };
   const [d, o] = await Promise.all([viberPost("get_user_details", { id: userId }, token, fetchImpl), viberPost("get_online", { ids: [userId] }, token, fetchImpl)]);
   const users = Array.isArray(o?.users) ? o.users : [];
   return { details: obj(d?.user), online: obj(users[0]) };
 }
 
-export async function handleViberExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleViberExtras(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   if (env.VIBER_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   const raw = await readRawBody(request);
@@ -100,7 +102,7 @@ export async function handleViberExtras(request: Request, env: Env, fetchImpl: t
   if (cb.event === "conversation_started") return Response.json({ sender: { name: "MyPrivacyTOOL" }, type: "text", text }); // answered in the callback, no token needed
   if (env.VIBER_AUTH_TOKEN) {
     try {
-      await fetchImpl("https://chatapi.viber.com/pa/send_message", {
+      await recipientFetcher("platform-replies", ["username", "message_text"], workerRecipientContext(undefined, { fetchImpl }))("https://chatapi.viber.com/pa/send_message", {
         method: "POST", headers: { "content-type": "application/json", "X-Viber-Auth-Token": env.VIBER_AUTH_TOKEN },
         body: JSON.stringify({ receiver: person?.id, type: "text", sender: { name: "MyPrivacyTOOL" }, text }), signal: AbortSignal.timeout(5000),
       });

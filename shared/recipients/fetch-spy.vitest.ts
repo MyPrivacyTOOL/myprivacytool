@@ -19,8 +19,8 @@ describe("createFetchSpy", () => {
   });
   it("fails on a known host whose recipient is enabled:false", async () => {
     const spy = createFetchSpy();
-    await spy.fetch("https://api.x.com/2/tweets");
-    expect(() => spy.assertAllRegistered()).toThrow(/platform-replies.*enabled:false/);
+    await spy.fetch("https://api.pwnedpasswords.com/range/ABCDE");
+    expect(() => spy.assertAllRegistered()).toThrow(/pwned-passwords.*enabled:false/);
   });
   it("fails on a relative or malformed URL (host cannot be proven)", async () => {
     const spy = createFetchSpy();

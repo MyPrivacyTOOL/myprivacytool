@@ -70,7 +70,10 @@
         "referrer",
         "utm",
         "country",
-        "device_profile"
+        "device_profile",
+        "user_agent",
+        "page_load",
+        "city"
       ],
       "purpose": "Traffic attribution only, kept apart from your scan and account and never joined to them.",
       "party": "first",
@@ -85,7 +88,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9885: shared/edge-capture/capture.ts writes ONE edge_visits row per request that serves both the visit log and the bot record: it also carries user_agent, the request path and host (page_load) and request.cf (city, region, coordinates, timezone, network); added user_agent, page_load, city. The query string (utm tags) is kept except credential-like values."
     },
     {
       "key": "machine-mirror",
@@ -975,7 +979,7 @@
         "message_text",
         "username"
       ],
-      "purpose": "Channel replies (flag and allow-list gated).",
+      "purpose": "Replies and lookups on the secondary chat/social channels (Discord, LINE, Viber, WeChat, Zalo); each channel runs only when its own switch is on and the sender is allow-listed.",
       "party": "platform",
       "retention": {
         "days": null,
@@ -983,13 +987,13 @@
       },
       "consent_basis": "user_action",
       "phase": "post_click",
-      "enabled": false,
-      "flag": "PLATFORM_REPLIES_ENABLED",
+      "enabled": true,
+      "flag": null,
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "reason": "Flag and allow-list gated; flags not individually verified."
+      "note": "MPC-9885: switched ON because the channel handlers already call these hosts whenever their own switch is on (DISCORD_SCAN, LINE_EXTRAS, VIBER_EXTRAS, WECHAT_EXTRAS, ZALO_EXTRAS) plus an allow-list; the registry flag PLATFORM_REPLIES_ENABLED was read by no code. With every switch off nothing is called. MPC-9894 to confirm which channels are live before Privacy lists them."
     },
     {
       "key": "planned-licensed-people-data",
@@ -1238,8 +1242,10 @@
       ],
       "host_kind": "fixed",
       "surface": "worker",
-      "data_items": [],
-      "purpose": "Reads our own YouTube channel statistics for the metrics collector; sends no visitor data.",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Reads our own YouTube channel statistics for the metrics collector (no visitor data), and, when YOUTUBE_EXTRAS is on, the public channel of an allow-listed commenter (their channel id).",
       "party": "third",
       "retention": {
         "days": null,
@@ -1253,7 +1259,7 @@
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "note": "Added by MPC-9885."
+      "note": "Added by MPC-9885. MPC-9885: username added for workers/social-listeners/src/youtube-extras.ts (channels.list with the commenter's channel id). MPC-9894: Privacy must mention it."
     },
     {
       "key": "meta-ads-insights",
@@ -1392,6 +1398,33 @@
       "since": "2026-11-08",
       "until": null,
       "note": "Added by MPC-9885: shared/support/github-issue-intake.ts. Shares the host with `github-commit-search`; different purpose and data."
+    },
+    {
+      "key": "github-extras",
+      "name": "GitHub public profile (extras check)",
+      "hosts": [
+        "api.github.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Reads the public profile and public events of an allow-listed GitHub account that opened an issue, comment or pull request on our repository (no credential sent).",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "GITHUB_EXTRAS",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: workers/social-listeners/src/github-extras.ts. Shares the host with `github-commit-search`; the handler is off unless GITHUB_EXTRAS=on. MPC-9894: Privacy must mention it."
     },
     {
       "key": "internal-workers",
