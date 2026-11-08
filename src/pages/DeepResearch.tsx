@@ -16,6 +16,8 @@ import { DEEP_HEXAGONS, type DeepHexagon } from "@/config/deepResearch";
 import PasswordCheck from "@/components/PasswordCheck";
 import DeepResearchVerify from "@/components/DeepResearchVerify";
 import { passwordCheckEnabled } from "@/lib/pwnedPassword";
+import PathTrailPreview from "@/components/PathTrailPreview";
+import { pathTrailEnabled } from "@/config/pathTrail";
 
 // Deep Research suite (MPC-9546). Unlisted on purpose (noindex, not in the sitemap or nav) until launch.
 // No-spend phase: free checks run for real; anything that needs a paid provider opens a "Coming soon" popup.
@@ -83,6 +85,8 @@ export default function DeepResearch() {
         </ol>
 
         <DeepResearchVerify />
+
+        {pathTrailEnabled() && <PathTrailPreview />}
 
         <Dialog open={popup !== null} onOpenChange={(open) => !open && setPopup(null)}>
           <DialogContent>
