@@ -1,5 +1,6 @@
 // @vitest-environment node
 // MPC-9884: tests for the scanner itself (layer 1), the allowlist ratchet and the hygiene checks (layer 4). Each rule has a case that must FAIL and one that must PASS.
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { applyAllowlist, buildAllowlist, entryAgeDays, formatAllowlist, ownerTask, validateAllowlist } from "./allowlist.mjs";
 import { callSiteCheck, dpaCheck, runHygiene, seedCheck } from "./hygiene.mjs";
@@ -142,5 +143,23 @@ describe("hygiene", () => {
     const ok = await runHygiene({ registry, allowlist: { schema_version: 1, entries: [] }, today: "2026-11-08", root: process.cwd(), seenHosts: new Set(), seenKeys: new Set() });
     expect(ok.failures).toEqual([]);
     expect(ok.warnings.length).toBeGreaterThan(0);
+  });
+});
+
+describe("check.mjs CLI modes", () => {
+  const run = (...a) => spawnSync(process.execPath, ["scripts/registry-ci/check.mjs", ...a], { encoding: "utf8" });
+  it("`hygiene` runs ONLY layer 4 (it must not fail on a static finding) and `static` runs ONLY layer 1", () => {
+    const h = run("hygiene");
+    expect(h.stdout).toContain("[hygiene]");
+    expect(h.stdout).not.toContain("[static]");
+    const s = run("static");
+    expect(s.stdout).toContain("[static]");
+    expect(s.stdout).not.toContain("[hygiene]");
+  });
+  it("`--today` does not swallow the mode and expiry is judged on that date", () => {
+    const late = run("hygiene", "--today", "2026-12-31");
+    expect(late.status).toBe(1);
+    expect(late.stdout + late.stderr).toMatch(/older than 14 days/);
+    expect(late.stdout).not.toContain("[static]");
   });
 });

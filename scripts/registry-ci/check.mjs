@@ -16,7 +16,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const todayArg = args.indexOf("--today");
 const today = todayArg >= 0 ? args[todayArg + 1] : new Date().toISOString().slice(0, 10);
-const mode = args.find((a) => !a.startsWith("--") && a !== args[todayArg + 1]) ?? "all";
+const mode = args.find((a, i) => !a.startsWith("--") && !(todayArg >= 0 && i === todayArg + 1)) ?? "all";
 
 const registry = loadRegistry();
 const nonOutbound = loadNonOutbound();
