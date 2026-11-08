@@ -404,7 +404,7 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
   if (hibp.status !== 'checked' && !hibp.gated && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
-  const basicPrice = await loadBasicPrice(sb);
+  const basicPrice = await loadBasicPrice();
   // MPC-9813: pages the person showed us, checked only after the click (this point is never reached before it). Reuses results the click already stored.
   const listings = listingCheckEnabled(env) && job.email_confirmed_at ? await runStoredListingChecks(env, sb, job.id, email, fetchImpl).then(() => loadListings(sb, job.id)) : null;
   const emailHex = await runEmailHexagons(email, env, fetchImpl, rctx).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
