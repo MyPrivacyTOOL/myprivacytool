@@ -1,22 +1,34 @@
-// @vitest-environment node
-// MPC-9850: the verdict logic of the synthetic Telegram round-trip.
-import { describe, it, expect } from "vitest";
-import { evaluate, run } from "./telegram-roundtrip.mjs";
+import { describe, expect, it, vi } from "vitest";
+import { run } from "./telegram-roundtrip.mjs";
 
-const rows = (over = {}) => [
-  { direction: "in", kind: "message", created_at: "t1", payload: {} },
-  { direction: "brain", kind: "core-brain", created_at: "t2", payload: { outcome: "ok" } },
-  { direction: "out", kind: "sendMessage", created_at: "t3", payload: { status: 200, response: { ok: true }, request: { text: "hi" } }, ...over },
-];
+const answer = (status, body) => async () => new Response(JSON.stringify(body), { status });
+const go = (env, fetchImpl) => { const lines = []; return run({ env, fetchImpl, log: (l) => lines.push(l) }).then((code) => ({ code, out: lines.join("\n") })); };
 
-describe("telegram round-trip verdict", () => {
-  it("passes only with in + brain + an ok sendMessage", () => expect(evaluate(rows()).pass).toBe(true));
-  it("fails when Telegram refuses the reply", () => expect(evaluate(rows({ payload: { status: 400, response: { ok: false, description: "chat not found" } } })).pass).toBe(false));
-  it("fails with no reply row", () => expect(evaluate(rows().slice(0, 2)).pass).toBe(false));
-  it("fails when the update was never logged", () => expect(evaluate([]).problems[0]).toMatch(/no inbound row/));
-});
-
-describe("telegram round-trip run", () => {
-  it("is NOT CONFIGURED (2), never a pass, without secrets", async () => expect(await run({ env: {}, log: () => {} })).toBe(2));
-  it("is NOT CONFIGURED when no synthetic id can be resolved", async () => expect(await run({ env: { TELEGRAM_WEBHOOK_SECRET: "s", SUPABASE_SERVICE_ROLE_KEY: "k" }, log: () => {} })).toBe(2));
+describe("telegram-roundtrip (Worker-side sender)", () => {
+  it("is NOT CONFIGURED without the webhook secret and never calls out", async () => {
+    const f = vi.fn();
+    expect((await go({}, f)).code).toBe(2);
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("is NOT CONFIGURED when the Worker has no SYNTHETIC_IDS", async () => {
+    const r = await go({ TELEGRAM_WEBHOOK_SECRET: "s" }, answer(503, { error: "SYNTHETIC_IDS is not set" }));
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("SYNTHETIC_IDS");
+  });
+  it("sends only the secret header and no id", async () => {
+    const f = vi.fn(answer(200, { pass: true, ms: 1200, sent_at: "t0", in_at: "t1", brain_at: "t2", out_at: "t3", update_id: 1 }));
+    const r = await go({ TELEGRAM_WEBHOOK_SECRET: "s" }, f);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("PASS");
+    expect(f.mock.calls[0][1].headers).toEqual({ "X-Telegram-Bot-Api-Secret-Token": "s" });
+    expect(f.mock.calls[0][1].body).toBeUndefined();
+  });
+  it("FAILs and prints the problems when a row is missing", async () => {
+    const r = await go({ TELEGRAM_WEBHOOK_SECRET: "s" }, answer(200, { pass: false, problems: ["no sendMessage row: no reply was sent"], ms: null }));
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("no sendMessage row");
+  });
+  it("FAILs on 401", async () => {
+    expect((await go({ TELEGRAM_WEBHOOK_SECRET: "s" }, answer(401, {}))).code).toBe(1);
+  });
 });

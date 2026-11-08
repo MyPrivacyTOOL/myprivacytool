@@ -24,12 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Round-trip /start scan
+      - name: Round-trip /start scan (sender is inside the Worker)
         env:
           TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SYNTHETIC_TELEGRAM_ID: ${{ secrets.SYNTHETIC_TELEGRAM_ID }}
         run: node scripts/ci/telegram-roundtrip.mjs

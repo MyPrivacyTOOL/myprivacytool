@@ -1,87 +1,27 @@
-// MPC-9850: synthetic Telegram round-trip against the DEPLOYED system, run from CI (the build sandbox cannot reach api.telegram.org or the Worker).
-// A Bot API client can never message a bot (only a user session can), so the inbound half is the same signed request Telegram itself makes: a POST to the
-// Worker's /webhook/telegram with X-Telegram-Bot-Api-Secret-Token = TELEGRAM_WEBHOOK_SECRET and a "/start scan" private-chat message from an id on
-// PROBE_TELEGRAM_IDS (our own test account; never a real person's id). The outbound half is real: the Worker calls the Bot API sendMessage, and the
-// full event log (public.telegram_event_log, PROBE_MODE=on, allow-listed sender) records the update (in), the core-brain answer (brain) and the sendMessage call
-// with Telegram's answer (out). PASS needs all three, and Telegram answering ok to sendMessage, within 60 s. Tokens and secrets are never printed.
-// Env: TELEGRAM_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and either SYNTHETIC_TELEGRAM_ID or CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID (reads the
-// plain-text PROBE_TELEGRAM_IDS binding and uses its first id). Exit 0 PASS, 1 FAIL, 2 NOT CONFIGURED (names the missing credential).
+// MPC-9850 / CK-9912: synthetic Telegram round-trip against the DEPLOYED system, run from CI (the build sandbox cannot reach api.telegram.org or the Worker).
+// The sender lives inside the social-listeners Worker: POST /synthetic/telegram-roundtrip (auth: X-Telegram-Bot-Api-Secret-Token = TELEGRAM_WEBHOOK_SECRET). The Worker
+// sends a "/start scan" update as the FIRST id in its SYNTHETIC_IDS secret (the owner's own test account), runs it through the normal webhook (core-brain, real Bot API
+// reply), reads telegram_event_log and answers with in / brain / out timestamps. CI holds no Telegram id. Exit 0 PASS, 1 FAIL, 2 NOT CONFIGURED.
 import { pathToFileURL } from "node:url";
 
-export const WEBHOOK_URL = "https://social-listeners.myprivacytool.workers.dev/webhook/telegram";
+export const ENDPOINT = "https://social-listeners.myprivacytool.workers.dev/synthetic/telegram-roundtrip";
 export const BUDGET_MS = 60_000;
 
-/** Pure verdict over the event-log rows of one update. */
-export function evaluate(rows) {
-  const by = (d, k) => rows.find((r) => r.direction === d && r.kind === k);
-  const inn = by("in", "message");
-  const brain = by("brain", "core-brain");
-  const out = by("out", "sendMessage");
-  const problems = [];
-  if (!inn) problems.push("no inbound row: the Worker did not log the update (PROBE_MODE not on, or sender not on PROBE_TELEGRAM_IDS)");
-  if (!brain) problems.push("no brain row: core-brain did not answer");
-  else if (brain.payload?.outcome && brain.payload.outcome !== "ok") problems.push(`core-brain outcome: ${brain.payload.outcome}`);
-  if (!out) problems.push("no sendMessage row: no reply was sent");
-  else if (out.payload?.status !== 200 || out.payload?.response?.ok !== true) problems.push(`Telegram refused the reply (status ${out.payload?.status}, ${String(out.payload?.response?.description ?? "").slice(0, 80)})`);
-  return { pass: problems.length === 0, problems, inn, brain, out };
-}
-
-export async function resolveSenderId(env, fetchImpl = fetch) {
-  const given = (env.SYNTHETIC_TELEGRAM_ID ?? "").trim();
-  if (/^\d{4,15}$/.test(given)) return given;
-  // NEVER infer an id from channel_probe_captures: under PROBE_MODE=all that table holds real users (MPC-9850 run 2-3 picked one). The id must be given explicitly or be a readable plain_text binding.
-  if (!env.CLOUDFLARE_API_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) return null;
-  const res = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/social-listeners/settings`, { headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` } });
-  const b = ((await res.json().catch(() => ({}))).result?.bindings ?? []).find((x) => x.name === "PROBE_TELEGRAM_IDS");
-  const id = b?.type === "plain_text" ? String(b.text ?? "").split(",").map((s) => s.trim()).find((s) => /^\d{4,15}$/.test(s)) : undefined;
-  return id ?? null;
-}
-
-/** Names and counts only, never values: why might no row appear? */
-async function diagnose({ env, fetchImpl, sb, key, log }) {
-  const h = { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" };
-  for (const [t, q] of [["telegram_event_log", "select=created_at&order=created_at.desc"], ["channel_probe_captures", "select=created_at&platform=eq.telegram&order=created_at.desc"]]) {
-    const r = await fetchImpl(`${sb}/rest/v1/${t}?${q}`, { headers: h }).catch(() => null);
-    const body = r ? await r.json().catch(() => []) : [];
-    log(`diag ${t}: HTTP ${r?.status ?? "n/a"}, total rows ${r?.headers.get("content-range")?.split("/")[1] ?? "?"}, newest ${body[0]?.created_at ?? "none"}`);
-  }
-  if (env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
-    const r = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/social-listeners/settings`, { headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` } }).catch(() => null);
-    const bs = ((await r?.json().catch(() => ({})))?.result?.bindings ?? []);
-    const pm = bs.find((b) => b.name === "PROBE_MODE");
-    log(`diag Worker bindings (names:type): ${bs.map((b) => `${b.name}:${b.type}`).filter((x) => /PROBE|TELEGRAM|LOG/.test(x)).join(", ") || "none read"}`);
-    log(`diag PROBE_MODE is ${pm ? (pm.type === "plain_text" ? `plain_text "${pm.text}"` : pm.type) : "NOT BOUND"}`);
-  }
-}
-
-export async function run({ env = process.env, fetchImpl = fetch, log = console.log, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+export async function run({ env = process.env, fetchImpl = fetch, log = console.log } = {}) {
   const secret = env.TELEGRAM_WEBHOOK_SECRET ?? "";
-  const sb = (env.SUPABASE_URL || "https://xmdmkumwxpgahmlweuug.supabase.co").replace(/\/$/, "");
-  const key = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  for (const [n, v] of [["TELEGRAM_WEBHOOK_SECRET", secret], ["SUPABASE_SERVICE_ROLE_KEY", key]]) if (!v) { log(`NOT CONFIGURED: GitHub secret ${n} is not set`); return 2; }
-  const id = await resolveSenderId(env, fetchImpl);
-  if (!id) { log("NOT CONFIGURED: no synthetic sender id. PROBE_TELEGRAM_IDS on the Worker is not a readable plain-text binding; set repo variable/secret SYNTHETIC_TELEGRAM_ID to a numeric id already on PROBE_TELEGRAM_IDS."); return 2; }
-
-  const updateId = 2_000_000_000 + Math.floor(Math.random() * 900_000_000);
-  const sentAt = new Date();
-  const update = { update_id: updateId, message: { message_id: 1, date: Math.floor(sentAt / 1000), chat: { id: Number(id), type: "private" }, from: { id: Number(id), is_bot: false, first_name: "MPT synthetic check" }, text: "/start scan", entities: [{ offset: 0, length: 6, type: "bot_command" }] } };
-  const res = await fetchImpl(env.WEBHOOK_URL || WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json", "X-Telegram-Bot-Api-Secret-Token": secret }, body: JSON.stringify(update) });
-  log(`webhook POST update_id=${updateId} sent ${sentAt.toISOString()} -> HTTP ${res.status}`);
-  if (!res.ok) { log(`FAIL: Worker answered ${res.status}${res.status === 401 ? " (secret mismatch: re-run the deploy)" : ""}`); return 1; }
-
-  let verdict;
-  const deadline = Date.now() + BUDGET_MS;
-  do {
-    await sleep(3000);
-    const r = await fetchImpl(`${sb}/rest/v1/telegram_event_log?update_id=eq.${updateId}&select=created_at,direction,kind,payload&order=created_at.asc`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    if (!r.ok) { log(`FAIL: event log read HTTP ${r.status}`); return 1; }
-    verdict = evaluate(await r.json());
-  } while (!verdict.pass && Date.now() < deadline && !(verdict.out && verdict.brain && verdict.inn));
-  for (const [label, row] of [["message in", verdict.inn], ["core-brain", verdict.brain], ["reply out", verdict.out]]) if (row) log(`${label.padEnd(10)} ${row.created_at}`);
-  if (verdict.out?.payload?.request?.text) log(`reply text (first 90 chars): ${String(verdict.out.payload.request.text).slice(0, 90).replace(/\s+/g, " ")}`);
-  if (verdict.pass) { const ms = new Date(verdict.out.created_at) - sentAt; log(`PASS: message in -> reply out in ${ms} ms (budget ${BUDGET_MS} ms), Telegram answered ok`); return ms <= BUDGET_MS ? 0 : 1; }
-  for (const p of verdict.problems) log(`FAIL: ${p}`);
-  await diagnose({ env, fetchImpl, sb, key, log });
+  if (!secret) { log("NOT CONFIGURED: GitHub secret TELEGRAM_WEBHOOK_SECRET is not set"); return 2; }
+  const res = await fetchImpl(env.ENDPOINT_URL || ENDPOINT, { method: "POST", headers: { "X-Telegram-Bot-Api-Secret-Token": secret }, signal: AbortSignal.timeout(BUDGET_MS + 15_000) }).catch((e) => ({ ok: false, status: 0, text: async () => String(e?.name ?? "error") }));
+  if (res.status === 503) { log(`NOT CONFIGURED: ${(await res.json().catch(() => ({}))).error ?? "Worker secret missing"}`); return 2; }
+  if (res.status === 401) { log("FAIL: Worker answered 401 (TELEGRAM_WEBHOOK_SECRET mismatch)"); return 1; }
+  if (!res.ok) { log(`FAIL: Worker answered ${res.status}`); return 1; }
+  const v = await res.json().catch(() => null);
+  if (!v) { log("FAIL: unreadable answer"); return 1; }
+  log(`sent       ${v.sent_at} (update_id ${v.update_id})`);
+  for (const [l, k] of [["message in", "in_at"], ["core-brain", "brain_at"], ["reply out", "out_at"]]) if (v[k]) log(`${l.padEnd(10)} ${v[k]}`);
+  if (v.reply_text_start) log(`reply text (first 90 chars): ${v.reply_text_start}`);
+  if (v.pass) { log(`PASS: message in -> reply out in ${v.ms} ms (budget ${BUDGET_MS} ms), Telegram answered ok`); return 0; }
+  for (const p of v.problems ?? []) log(`FAIL: ${p}`);
+  if (v.ms !== null && v.ms > BUDGET_MS) log(`FAIL: reply took ${v.ms} ms (budget ${BUDGET_MS} ms)`);
   return 1;
 }
 

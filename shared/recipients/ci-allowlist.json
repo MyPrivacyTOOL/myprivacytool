@@ -171,6 +171,7 @@
     {"rule":"forbidden-api","file":"workers/social-listeners/src/event-extras.ts","line":62,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885"},
     {"rule":"forbidden-api","file":"workers/social-listeners/src/event-log.ts","line":94,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885"},
     {"rule":"forbidden-api","file":"workers/social-listeners/src/event-log.ts","line":144,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885"},
+    {"rule":"forbidden-api","file":"workers/social-listeners/src/synthetic-roundtrip.ts","line":49,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885 (CK-9912: first-party Supabase read of telegram_event_log, same as event-log.ts)"},
     {"rule":"forbidden-api","file":"workers/social-listeners/src/fix-wizard.ts","line":50,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885"},
     {"rule":"url-literal","file":"workers/social-listeners/src/fix-wizard.ts","line":265,"detail":"https://t.me","added":"2026-11-08","note":"pending MPC-9885"},
     {"rule":"forbidden-api","file":"workers/social-listeners/src/funnel.ts","line":24,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885"},
