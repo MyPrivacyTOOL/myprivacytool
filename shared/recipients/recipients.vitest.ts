@@ -22,6 +22,9 @@ const codeOf = async (p: Promise<unknown>) => { try { await p; return "no error"
 /** Recipients MPC-9885 added because a Worker already called their host (see each entry's note). The Map's 29 are pinned without them. */
 const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-data-api", "meta-ads-insights", "firestore", "x-api", "make-webhooks", "github-issues", "github-extras", "internal-workers"];
 
+/** MPC-9915: added after the MPC-9885 sweep; read-only Google Ads API for the metrics collector. Kept out of the seed pins below. */
+const MPC_9915_ADDED = ["google-ads-api"];
+
 describe("bundler-safe module", () => {
   it("recipients.data.js is exactly the generated copy of recipients.json (run `npm run recipients:module`)", async () => {
     const mod = (await import("./recipients.data.js")).default;
@@ -34,7 +37,8 @@ describe("seed (MPC-9883, design 1.5)", () => {
   it("pins 12 first-party (8 + account-service MPC-9817 + 3 MPC-9886) and 24 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus pwned-password MPC-9886, meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
     expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(12);
-    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(24);
+    expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_9915_ADDED.includes(r.key))).toHaveLength(24);
+    expect(MPC_9915_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
   it("MPC-9885 added exactly these recipients, all enabled", () => {
     expect(registry.recipients.filter((r) => r.since === "2026-11-08" && r.note?.startsWith("Added by MPC-9885")).map((r) => r.key).sort()).toEqual([...MPC_9885_ADDED].sort());
@@ -46,7 +50,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(59);
+    expect(registry.recipients).toHaveLength(60);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);

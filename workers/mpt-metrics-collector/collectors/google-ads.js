@@ -4,6 +4,9 @@
 // Secrets (Worker secrets, names only): GOOGLE_ADS_OAUTH_CLIENT_ID, GOOGLE_ADS_OAUTH_CLIENT_SECRET, GOOGLE_ADS_REFRESH_TOKEN.
 // Nothing here is scheduled yet. Response bodies are never echoed into errors: they may repeat request details.
 
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
+
 export const DEFAULT_CUSTOMER_ID = '6271312111'; // MyPrivacyTOOL client account 627-131-2111 (read directly, no login-customer-id needed)
 export const DEFAULT_API_VERSION = 'v24'; // v22 is deprecated and v21/v20 return 404 (checked 2026-11-09); override with GOOGLE_ADS_API_VERSION
 export const REQUIRED = ['GOOGLE_ADS_OAUTH_CLIENT_ID', 'GOOGLE_ADS_OAUTH_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN'];
@@ -11,7 +14,7 @@ export const REQUIRED = ['GOOGLE_ADS_OAUTH_CLIENT_ID', 'GOOGLE_ADS_OAUTH_CLIENT_
 export const missing = (env) => REQUIRED.filter((k) => !env[k]);
 
 export async function accessToken(env) {
-  const res = await fetch('https://oauth2.googleapis.com/token', {
+  const res = await callRecipient('google-ads-api', { url: 'https://oauth2.googleapis.com/token', init: {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -20,7 +23,7 @@ export async function accessToken(env) {
       client_secret: env.GOOGLE_ADS_OAUTH_CLIENT_SECRET,
       refresh_token: env.GOOGLE_ADS_REFRESH_TOKEN,
     }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`google ads oauth token: HTTP ${res.status}`);
   const j = await res.json();
   if (!j.access_token) throw new Error('google ads oauth token: no access_token in response');
@@ -31,11 +34,11 @@ export async function accessToken(env) {
 export async function searchStream(env, query, token) {
   const customer = String(env.GOOGLE_ADS_CUSTOMER_ID || DEFAULT_CUSTOMER_ID).replace(/\D/g, '');
   const version = env.GOOGLE_ADS_API_VERSION || DEFAULT_API_VERSION;
-  const res = await fetch(`https://googleads.googleapis.com/${version}/customers/${customer}/googleAds:searchStream`, {
+  const res = await callRecipient('google-ads-api', { url: `https://googleads.googleapis.com/${version}/customers/${customer}/googleAds:searchStream`, init: {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ query }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`google ads searchStream ${version}: HTTP ${res.status}`);
   const batches = await res.json();
   return (Array.isArray(batches) ? batches : [batches]).flatMap((b) => b.results ?? []);
