@@ -19,6 +19,7 @@ import { handleResendWebhook } from './lib/receipts.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
+import { handleSignIn, handleVerify, handleMe, handleLinkScan, handleDelete, handleRefresh, handleSignOut, handleCan, handleOpenScan } from './lib/accounts.js';
 import { handleDeepResearchStart, handleDeepResearchVerify, handleDeepResearchResults, handleDeepResearchDelete } from './lib/deepResearch.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
@@ -78,6 +79,13 @@ export default {
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // MPC-9813: the click-to-confirm. Authorised by the signed link in the confirmation email. 404 unless EMAIL_CONFIRM_GATE_ENABLED is "true".
     if (request.method === 'POST' && url.pathname === '/api/scan/confirm') return handleConfirm(env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
+    // MPC-9817: accounts and sign-in (email link, no password). All answer 404 unless ACCOUNTS_ENABLED is "true". See lib/accounts.js.
+    if (url.pathname.startsWith('/api/account/') && (request.method === 'POST' || request.method === 'GET')) {
+      const ctx2 = { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed };
+      const acct = { '/api/account/signin': handleSignIn, '/api/account/verify': handleVerify, '/api/account/me': handleMe, '/api/account/link-scan': handleLinkScan, '/api/account/scan': handleOpenScan,
+        '/api/account/delete': handleDelete, '/api/account/refresh': handleRefresh, '/api/account/signout': handleSignOut, '/api/account/can': handleCan }[url.pathname];
+      if (acct && (request.method === 'POST' || url.pathname === '/api/account/me')) return acct(env, ctx, request, origin, json, ctx2);
+    }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
     if (url.pathname === '/api/fixed') return handleFixed(env, request, url, { sb: db(env) });

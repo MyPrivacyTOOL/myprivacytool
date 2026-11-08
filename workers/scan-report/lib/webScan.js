@@ -9,7 +9,9 @@
 // Wording versions of the tick-box label the visitor saw. The site sends the version with the request; an unknown version
 // (for example a stale cached page with different wording) is rejected, so every stored consent record names text we can show.
 // Add a new entry here whenever the label in src/lib/saveConsent.ts changes.
-export const SAVE_CONSENT_VERSIONS = ['2026-10-12-v1'];
+export const SAVE_CONSENT_VERSIONS = ['2026-10-12-v1', '2026-11-08-v1'];
+// MPC-9817: the wording of the one-step tick "Keep my scan and create my free account". A request that carries one of these versions asks for an account as well (acted on only while ACCOUNTS_ENABLED is "true").
+export const ACCOUNT_CONSENT_VERSIONS = ['2026-11-08-v1'];
 // MPC-7494: versions of the SEPARATE "Recognise this device" tick box wording (src/lib/saveConsent.ts, RECOGNISE_CONSENT_LABEL). The Worker rejects a version it does not know.
 export const RECOGNISE_CONSENT_VERSIONS = ['2026-10-12-v1'];
 
@@ -168,6 +170,8 @@ export async function saveWebScanForContact(env, sb, { hexagons, contactId, vers
   }
   try {
     await sb.insert('web_scan_contacts', { web_scan_id: scanNumber, channel: 'email', contact_id: contactId, save_consent_at: now.toISOString(), save_consent_version: version,
+      // MPC-9817: the one-step tick. The account itself is created only when the click-to-confirm email proves the inbox (MPC-9813); this just records that it was asked for.
+      ...(env.ACCOUNTS_ENABLED === 'true' && ACCOUNT_CONSENT_VERSIONS.includes(version) ? { account_requested_at: now.toISOString() } : {}),
       // MPC-7494: only when the visitor ticked the separate recognise box (a known wording version); otherwise the link carries no recognition consent.
       ...(RECOGNISE_CONSENT_VERSIONS.includes(recogniseVersion) ? { recognise_consent_at: now.toISOString(), recognise_consent_version: recogniseVersion } : {}) });
     await recordEvent(sb, scanNumber, 'contact_given');   // MPC-7493

@@ -97,6 +97,12 @@ EMAIL_DOMAIN_CHECK = "true"
 EMAIL_CONFIRM_GATE_ENABLED = "true"
 LISTING_CHECK_ENABLED = "true"
 
+# MPC-9817 (F3, accounts and sign-in only): passwordless accounts through Supabase Auth, driven from this Worker (lib/accounts.js): POST /api/account/{signin,verify,me,scan,
+# link-scan,delete,refresh,signout,can}. The sign-in email is ours (confirm-gate style); the browser never talks to Supabase Auth. The one-step tick ("Keep my scan and create
+# my free account", consent version 2026-11-08-v1) is acted on at the click-to-confirm. Needs migration 20261108120000_mpc_9817_accounts_and_signin.sql (applied before this
+# was switched on). Anything but the exact string "true" is off and every route answers 404; "false" is the rollback (existing accounts are untouched). No Stripe, no allowances.
+ACCOUNTS_ENABLED = "true"
+
 [observability]
 enabled = true
 

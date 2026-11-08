@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import BrokerPanel from "@/components/BrokerPanel";
-import { confirmEmail, fetchLive, type BrokerPanel as Panel, type LiveItem, type LiveKind, type LiveStatus } from "@/lib/liveScan";
+import { confirmEmailResult, fetchLive, type BrokerPanel as Panel, type LiveItem, type LiveKind, type LiveStatus } from "@/lib/liveScan";
 
 // MPC-8452: what happens on the thank-you screen. Alice draws back the curtain, and the checks appear behind it one by one as the Worker finishes them.
 // Nothing is invented: each line is a real check result. Only what was checked and whether it found something is shown, never the value; the detail
@@ -43,6 +43,7 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
   const [confirmed, setConfirmed] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [confirmFailed, setConfirmFailed] = useState(false);
+  const [accountLink, setAccountLink] = useState<string | null>(null); // MPC-9817: one-step tick: the click also opens the free account
   const [panel, setPanel] = useState<Panel | null>(null);
 
   useEffect(() => {
@@ -82,9 +83,9 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
     if (confirming) return;
     setConfirming(true);
     setConfirmFailed(false);
-    const ok = await confirmEmail(token);
+    const r = await confirmEmailResult(token);
     setConfirming(false);
-    if (ok) setConfirmed(true); else setConfirmFailed(true);
+    if (r.confirmed) { setConfirmed(true); if (r.account) setAccountLink(`/account/verify#t=${encodeURIComponent(r.account.tokenHash)}&n=${encodeURIComponent(r.account.scanNumber)}`); } else setConfirmFailed(true);
   };
 
   const found = items.filter(isFinding).length;
@@ -122,6 +123,12 @@ export default function LiveScanPanel({ token, kind = "stream" }: { token: strin
             {confirming ? "Confirming…" : "Yes, this is my email"}
           </button>
           {confirmFailed && <p role="alert" className="mt-2 text-xs text-foreground">We could not confirm just now. Please press the button again in a moment.</p>}
+        </div>
+      )}
+      {accountLink && (
+        <div className="mt-3 rounded-md border border-border bg-background px-3 py-3 text-center" data-testid="account-ready">
+          <p className="text-sm text-foreground">Confirmed. Your free account is ready, with this scan kept in it. There is no password.</p>
+          <a href={accountLink} className="mt-2 inline-block rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open my account</a>
         </div>
       )}
       {waiting && kind !== "verified" && <p className="mt-3 text-center text-xs text-muted-foreground" data-testid="confirm-note">{CONFIRM_LINE}</p>}
