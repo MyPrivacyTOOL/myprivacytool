@@ -1,0 +1,42 @@
+name: Sync recipients registry
+
+# MPC-9883 (Open Tracker rule 6): mirrors shared/recipients/recipients.json into public.recipients_registry on merge to main, and every night
+# compares the table's hash with the file's and fails on drift. The file is authoritative; the table is a mirror.
+# Secrets (values never printed): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Until they exist the job fails loudly rather than green-skipping.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - shared/recipients/recipients.json
+      - shared/recipients/canonical.js
+      - scripts/sync-recipients.mjs
+      - .github/workflows/sync-recipients.yml
+  schedule:
+    - cron: "41 19 * * *"   # 03:41 HKT, nightly drift check
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-recipients
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sync (push and manual runs)
+        if: github.event_name != 'schedule'
+        run: node scripts/sync-recipients.mjs
+      - name: Drift check (always, after a sync and on the nightly schedule)
+        run: node scripts/sync-recipients.mjs --check

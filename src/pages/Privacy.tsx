@@ -601,6 +601,12 @@ const Privacy = () => {
                   address you used
                 </li>
                 <li>
+                  <strong>Report Delivery Record:</strong> The delivery record
+                  for a scan (the email address you gave and the status of your
+                  report) is kept 30 days, then deleted; from the Open Tracker
+                  release this becomes 7 days unless you keep your scan
+                </li>
+                <li>
                   <strong>Server Request Logs:</strong> The log of page requests
                   (see section 2.3) keeps full entries for bots and AI crawlers.
                   For people and requests we could not place, the IP address is
