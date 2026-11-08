@@ -67,6 +67,23 @@ describe('the journey view', () => {
   });
 });
 
+describe('no data', () => {
+  it('draws "checked, nothing found" as a clear hexagon with a black foot, and never green', () => {
+    const t: TrailTile[] = [{ id: 'a', label: 'A', state: 'clear' }, { id: 'b', label: 'B', state: 'held', depth: 1 }];
+    const { container } = render(<FootprintTrail tiles={t} ariaLabel="Two" />);
+    const hex = Array.from(container.querySelectorAll('polygon'));
+    expect(hex[0].getAttribute('fill')).toBe('none');
+    expect(hex[0].getAttribute('stroke')).not.toMatch(/^#(1e7a40|9bd3ad)/);
+    const blackFoot = Array.from(container.querySelectorAll('g[transform*="rotate"]')).some((g) => g.getAttribute('fill') === '#111111');
+    expect(blackFoot).toBe(true);
+  });
+  it('keeps "not checked yet" white with no foot, so it is not mistaken for "nothing found"', () => {
+    const { container } = render(<FootprintTrail tiles={[{ id: 'a', label: 'A', state: 'notyet' }]} ariaLabel="One" />);
+    expect(container.querySelector('polygon')?.getAttribute('fill')).toBe('#ffffff');
+    expect(container.querySelectorAll('g[transform*="rotate"]').length).toBe(0);
+  });
+});
+
 describe('green depth', () => {
   it('lets a tile we certainly hold be dark green whatever the prints do', () => {
     const t: TrailTile[] = [{ id: 'a', label: 'A', state: 'held', depth: 1 }, { id: 'b', label: 'B', state: 'held', depth: 0 }];
@@ -74,6 +91,21 @@ describe('green depth', () => {
     const fills = Array.from(container.querySelectorAll('polygon')).map((x) => x.getAttribute('fill'));
     expect(fills[0]).toBe('#5cbf7f');
     expect(fills[1]).toBe('#e6f6ea');
+  });
+});
+
+describe('PathTrailPreview: the other seven groups', () => {
+  it('shows all seven groups with every tile', () => {
+    render(<PathTrailPreview />);
+    const grid = screen.getByTestId('path-trail-groups');
+    expect(grid.querySelectorAll('figure')).toHaveLength(7);
+    // 12 + 3 + 5 + 5 + 5 + 6 + 6 tiles
+    expect(grid.querySelectorAll('[role=img]')).toHaveLength(42);
+  });
+  it('shows the no-data states in the samples: a clear hexagon, and a tile that cannot be checked here', () => {
+    render(<PathTrailPreview />);
+    expect(screen.getByLabelText('Mixed Content: Checked, nothing found')).toBeTruthy();
+    expect(screen.getByLabelText("Motion Sensors: Can't check from here")).toBeTruthy();
   });
 });
 

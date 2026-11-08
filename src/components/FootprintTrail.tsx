@@ -129,9 +129,10 @@ export default function FootprintTrail({ tiles, ariaLabel, trail = true, rows, c
           const op = stateOpacity(t.state);
           const depth = t.depth ?? greenDepth(counts[i]);
           const held = t.state === 'held' || t.state === 'deleting';
-          const light = t.state === 'clear' || t.state === 'origin';
+          // Chris, 2026-11-08: green with red feet = we hold data; a CLEAR (unfilled) hexagon with a black foot = we checked and hold nothing.
+          const light = t.state === 'origin';
           const fill = held ? mixColour(GREEN_LIGHT, GREEN_DARK, depth)
-            : light ? GREEN_LIGHT : t.state === 'cant' ? `url(#hatch-${hatch})` : t.state === 'want' ? 'none' : '#ffffff';
+            : light ? GREEN_LIGHT : t.state === 'cant' ? `url(#hatch-${hatch})` : t.state === 'want' || t.state === 'clear' ? 'none' : '#ffffff';
           const stroke = held ? mixColour(GREEN_LIGHT_STROKE, GREEN_DARK_STROKE, depth) : light ? GREEN_LIGHT_STROKE : t.state === 'want' ? PURPLE : GREY;
           const dash = t.state === 'cant' ? '3 6' : t.state === 'want' ? '4 7' : undefined;
           return (

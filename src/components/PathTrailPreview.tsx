@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import FootprintTrail, { type TrailTile } from './FootprintTrail';
 import type { Sensitivity, TileState } from '@/lib/footprintTrail';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
+import { TRAIL_GROUPS } from '@/config/pathTrailGroups';
 
 // Preview of the climbing footprint trail (design: Notion MPC-9546 strategy page, "Design direction, final version"). Shown on the unlisted
 // /deep-research page only when the path-trail switch is on (src/config/pathTrail.ts, or ?path=1). It draws SAMPLE states for the Browser
@@ -90,6 +91,30 @@ export default function PathTrailPreview() {
       </div>
       <div className="mt-3 max-w-lg">
         <FootprintTrail tiles={tiles} ariaLabel={`Browser Fingerprint, example: ${SCENARIOS.find((s) => s.id === scenario)?.label}`} />
+      </div>
+
+      <h3 className="mt-10 text-base font-semibold text-foreground">The other seven groups</h3>
+      <p className="text-sm text-muted-foreground">
+        Same rules in every group. The order of tiles inside a group is a proposal. Where a tile shows a clear hexagon with a black foot, we checked and hold nothing;
+        a hatched tile cannot be checked from this device.
+      </p>
+      <div className="mt-4 grid gap-8 sm:grid-cols-2 lg:grid-cols-3" data-testid="path-trail-groups">
+        {TRAIL_GROUPS.map((g) => {
+          const byId = new Map((HEXAGONS as RegistryHex[]).map((h) => [h.id, h]));
+          const groupTiles: TrailTile[] = g.order.flatMap((id) => {
+            const h = byId.get(id);
+            if (!h) return [];
+            const state: TileState = scenario === 'first' ? 'notyet' : g.sample?.[id] ?? 'held';
+            return [{ id, label: h.label, emoji: h.artwork?.emoji ?? undefined, sensitivity: h.truth?.sensitivity, state }];
+          });
+          return (
+            <figure key={g.group} className="min-w-0">
+              <figcaption className="mb-1 text-sm font-semibold text-foreground">{g.group}</figcaption>
+              <p className="mb-2 text-xs text-muted-foreground">{g.story}</p>
+              <FootprintTrail tiles={groupTiles} rows={g.rows} ariaLabel={`${g.group}, example: ${SCENARIOS.find((s) => s.id === scenario)?.label}`} />
+            </figure>
+          );
+        })}
       </div>
     </section>
   );
