@@ -7,7 +7,7 @@ import { fake } from "../workers/scan-report/test-support/fake-backend.mjs";
 
 const EMAIL = "e2e-allowance+mpc9818@example.com";
 const ORIGIN = "https://myprivacytool.io";   // the Worker only accepts the production origins
-const ENV = { SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false", SCAN_ALLOWANCE_ENABLED: "true" };
+const ENV = { SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false", SCAN_ALLOWANCE_ENABLED: "true" };
 
 test.describe("scan allowance (Free: 1 a month)", () => {
   async function wireWorker(page: import("@playwright/test").Page) {

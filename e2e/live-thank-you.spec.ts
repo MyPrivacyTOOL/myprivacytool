@@ -12,7 +12,7 @@ import { makeLiveLink } from "../workers/scan-report/lib/live.js";
 const EMAIL = "e2e-live+mpc8452@example.com";
 const ORIGIN = "https://myprivacytool.io";   // the Worker only accepts the production origins
 const ENV = {
-  SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "",
+  SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "",
   UNSUBSCRIBE_SECRET: "e2e-secret", EMAIL_GITHUB_COMMITS_ENABLED: "true",
   EMAIL_DOMAIN_CHECK: "false",   // MPC-8453: the stubbed DNS answers nothing, so the new domain check would refuse the test address; popup-report.spec.ts switches it off the same way
 };

@@ -16,8 +16,9 @@ const EMAIL = "zelda.quillfeather+mpc9813@example.test";
 const FIXTURE_URL = "https://www.spokeo.com/Zelda-Quillfeather/Texas/Austin/p0000000000-synthetic";
 const FIXTURE_HTML = readFileSync(new URL("./fixtures-data/listing-page-synthetic.html", import.meta.url), "utf8");
 const ENV = {
-  EMAIL_DOMAIN_CHECK: "false", SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HIBP_API_KEY: "p", HIBP_MIN_INTERVAL_MS: "0",
+  EMAIL_DOMAIN_CHECK: "false", SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HIBP_API_KEY: "p", HIBP_MIN_INTERVAL_MS: "0",
   RECIPIENT_ALLOWLIST: "", UNSUBSCRIBE_SECRET: "e2e-secret", WEB_SCAN_SAVE_ENABLED: "true", EMAIL_CONFIRM_GATE_ENABLED: "true", LISTING_CHECK_ENABLED: "true",
+  ALLOW_PARTIAL_REPORT: "true",   // as in production (wrangler.toml): HIBP is switched off in the registry since MPC-9885, so breaches read "not checked" and the report still goes out
 };
 
 function backend() {
