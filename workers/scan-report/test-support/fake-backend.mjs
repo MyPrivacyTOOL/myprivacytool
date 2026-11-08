@@ -3,7 +3,7 @@
 //   opts.resendIdempotent  the same Idempotency-Key returns the first message id and counts as one email (what Resend does)
 //   opts.onRequest(url, init, res, db)  return a response to replace the call (inject a fault), or nothing to carry on
 export function fake(opts = {}) {
-  const db = { scan_recipient_log: [], users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [] }; const calls = []; let n = 0; const seenKeys = new Map();
+  const db = { scan_recipient_log: [], users: [], leads: [], scans: [], signals: [], hexagon_scores: [], email_suppressions: [], email_sends: [], subscribers: [], web_scans: [], web_scan_contacts: [], web_scan_events: [], web_scan_returns: [], referrals: [], web_scan_listing_checks: [], scan_consents: [] }; const calls = []; let n = 0; const seenKeys = new Map();
   const f = async (url, o = {}) => {
     url = String(url); calls.push({ url, method: o.method || 'GET', body: o.body, headers: o.headers });
     const res = (status, body) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body });
@@ -54,7 +54,10 @@ export function fake(opts = {}) {
     if (o.method === 'DELETE' && q.get('email')) { const v = decodeURIComponent(q.get('email').replace(/^(eq|ilike)\./, '')).replace(/\\(.)/g, '$1').toLowerCase(); db[t] = db[t].filter((x) => String(x.email).toLowerCase() !== v); return res(204); }   // CK-7721 fix 3
     if (o.method === 'DELETE') { const id = q.get('id')?.replace('eq.', ''); const sid = q.get('scan_id')?.replace('eq.', ''); db[t] = db[t].filter((x) => (sid ? x.scan_id !== sid : x.id !== id)); return res(204); }
     if (o.method === 'POST') { const rows = [].concat(JSON.parse(o.body)).map((x) => ({ id: `id${++n}`, report_status: 'pending', report_attempts: 0, created_at: new Date().toISOString(), ...x }));
-      if (t === 'web_scans' || t === 'scans') rows.forEach((x) => { x.id = crypto.randomUUID(); });   // production ids are uuids (MPC-8452 checks the shape)
+      const given = [].concat(JSON.parse(o.body)).map((x) => x.id);
+      if (t === 'web_scans' || t === 'scans') rows.forEach((x, i) => { x.id = given[i] ?? crypto.randomUUID(); });   // production ids are uuids (MPC-8452 checks the shape); MPC-9887: a web scan may arrive with the id its consent was given under
+      if (t === 'web_scans' && rows.some((x) => db.web_scans.some((w) => w.id === x.id))) return res(409, { code: '23505' });
+      if (t === 'scan_consents') { rows.forEach((x) => { x.id = crypto.randomUUID(); x.consented_at ??= new Date().toISOString(); }); if (db.scan_consents.some((c) => c.scan_id === rows[0].scan_id)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_contacts') { if (opts.linkFail) return res(500, 'x'); const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_contacts.some((c) => c.web_scan_id === x.web_scan_id && c.channel === x.channel && c.contact_id === x.contact_id)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_events') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id)) return res(409, { code: '23503' }); if (db.web_scan_events.some((c) => c.web_scan_id === x.web_scan_id && c.step === x.step)) return res(409, { code: '23505' }); }
       if (t === 'web_scan_returns') { const x = rows[0]; if (!db.web_scans.some((w) => w.id === x.web_scan_id) || !db.web_scans.some((w) => w.id === x.previous_scan_id)) return res(409, { code: '23503' }); }

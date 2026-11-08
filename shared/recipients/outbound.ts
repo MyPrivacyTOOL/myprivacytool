@@ -69,12 +69,12 @@ export interface RecipientContext {
   maxBytes?: number;
   timeoutMs?: number;
   /**
-   * Check 4 policy. "enforce" (default): a post_click recipient needs a consent id. "pending_mpc_9887": the server-side consent store does not exist
-   * yet (MPC-9887), so Workers and Functions cannot be given a consent id without inventing one; check 4 is skipped, every other check still runs.
-   * workerRecipientContext() sets this from ONE constant (CONSENT_GATE_ACTIVE in worker-ctx.ts) that MPC-9887 flips. Never set it to anything
-   * else to get past a refusal.
+   * Check 4 policy. "enforce" (default): a post_click recipient needs a consent id that the verifier accepts. "none": no consent applies to this
+   * call, and check 4 is skipped; every other check still runs. workerRecipientContext() (worker-ctx.ts) decides which: "enforce" for a call made
+   * inside a scan once the gate is switched on (CONSENT_GATE_ENFORCED) or the scan carries a consent id; "none" for work that is not on a visitor's
+   * behalf (cron collectors, ops notifications) and for the reads of the consent store itself. Never set it to "none" to get past a refusal.
    */
-  consentGate?: "enforce" | "pending_mpc_9887";
+  consentGate?: "enforce" | "none";
   /** Runs after every check passed and immediately before the network call (Workers use it to count subrequests against a budget). A throw aborts the call. */
   beforeCall?: (key: string) => void | Promise<void>;
 }
@@ -179,8 +179,8 @@ export async function checkRecipient(key: string, hostUrl: string, sent: readonl
   if (recipient.flag && !flagIsOn(readFlag(ctx, recipient.flag))) throw new RecipientError("FLAG_OFF", key, recipient.flag);
   // 3 country override
   if (!enabledForCountry(recipient, ctx.country)) throw new RecipientError("COUNTRY_DISABLED", key, String(ctx.country));
-  // 4 consent for post_click (skipped only while the consent store is not built: ctx.consentGate, see RecipientContext)
-  if (recipient.phase === "post_click" && ctx.consentGate !== "pending_mpc_9887") {
+  // 4 consent for post_click (skipped only when ctx.consentGate is "none", see RecipientContext)
+  if (recipient.phase === "post_click" && ctx.consentGate !== "none") {
     const id = typeof ctx.consentId === "string" ? ctx.consentId.trim() : "";
     if (!id) throw new RecipientError("CONSENT_REQUIRED", key);
     if (ctx.verifyConsent && !(await ctx.verifyConsent(id, ctx.scanId ?? null))) throw new RecipientError("CONSENT_INVALID", key);

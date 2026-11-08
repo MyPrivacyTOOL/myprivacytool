@@ -103,6 +103,12 @@ LISTING_CHECK_ENABLED = "true"
 # was switched on). Anything but the exact string "true" is off and every route answers 404; "false" is the rollback (existing accounts are untouched). No Stripe, no allowances.
 ACCOUNTS_ENABLED = "true"
 
+# MPC-9887: the server-side consent gate. POST /api/consent stores one consent per scan id (public.scan_consents, migration 20261108140000_mpc_9887_scan_consents.sql,
+# applied before this was merged). A consent_id sent with POST /api/scan is always checked against the store. "false" = a scan WITHOUT a consent id is still accepted,
+# because no visitor holds one until the consent block (MPC-9888) ships; MPC-9888 sets this to "true" in the same change, after the report queue has drained.
+# Only the exact string "true" enforces. When it is "true", every post_click call made for a scan is refused (CONSENT_REQUIRED / CONSENT_INVALID) unless the scan's consent is in the store.
+CONSENT_GATE_ENFORCED = "false"
+
 [observability]
 enabled = true
 

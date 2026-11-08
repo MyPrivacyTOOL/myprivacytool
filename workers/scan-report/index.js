@@ -15,6 +15,7 @@ import { turnstileBlocks } from './lib/turnstile.js';
 import { checkDeliverableDomain } from './lib/emailDomain.js';
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext, flushQuietly } from './lib/recipients.js';
+import { handleConsent, gateScanRequest, consentEnforced } from './lib/consent.js';
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { handleResendWebhook } from './lib/receipts.js';
@@ -92,6 +93,8 @@ export default {
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
     if (url.pathname === '/api/fixed') return handleFixed(env, request, url, { sb: db(env) });
     if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env), optOut: (addr, source) => optOutEverywhere(db(env), addr, source), pushHubspot: (addr) => pushEmailOptOut(env, { email: addr }) });   // MPC-7556: hard bounce / complaint -> THE opt-out
+    // MPC-9887: the scan consent store. One consent per scan id; POST records it, GET asks whether a journey already has one. First-party, pre-click.
+    if (url.pathname === '/api/consent' && (request.method === 'POST' || request.method === 'GET')) return handleConsent(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -105,6 +108,10 @@ export default {
       const email = clip(b.email, 255).trim().toLowerCase();
       if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
+      // MPC-9887 (the server-side gate, design 2.3): the scan consent recorded by POST /api/consent. A consent_id that is not in scan_consents is always refused;
+      // a request with none is refused only once CONSENT_GATE_ENFORCED is "true" (set with the consent block, MPC-9888). Checked before anything is stored or sent.
+      const gate = await gateScanRequest(env, b, db(env));
+      if (gate.refuse) return json({ error: gate.refuse.error, code: gate.refuse.code }, gate.refuse.status);
       // MPC-8430: bot check before anything is stored or sent (no-op until TURNSTILE_SECRET_KEY is set; blocks only when TURNSTILE_ENFORCE = "true").
       if (await turnstileBlocks(env, request, b['cf-turnstile-response'], origin)) return json({ error: 'Verification failed' }, 403);
       // MPC-8453: refuse an address whose domain cannot receive mail (typo or made-up domain) before anything is stored or sent. Fails open; EMAIL_DOMAIN_CHECK = "false" turns it off.
@@ -134,6 +141,7 @@ export default {
         save: save.hexagons ? save : null,
         requestId: rid.requestId,
         listing: listing.inputs ?? null,
+        scanConsent: gate.consent,
       });
       // MPC-7470: the scan is saved and linked to this contact, with the consent record, inside handleScan, BEFORE the first email goes out, so that email can carry the scan number.
       // Not for a repeat request within 24h (no new report, so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer
@@ -145,7 +153,7 @@ export default {
       if (!result.duplicate && result.scanId && env.SUPABASE_SERVICE_ROLE_KEY) {
         live = await makeLiveToken(env, result.scanId);
         if (live) {
-          const lctx = workerRecipientContext(env, { scanId: result.scanId });   // MPC-9885: the live checks belong to this scan
+          const lctx = workerRecipientContext(env, { scanId: result.scanId, consentId: result.consentId });   // MPC-9885: the live checks belong to this scan
           const p = runLiveChecks(env, db(env, undefined, lctx), result.scanId, email, undefined, lctx).finally(() => flushQuietly(lctx));
           if (ctx?.waitUntil) ctx.waitUntil(p);
         }
@@ -185,7 +193,7 @@ async function handleWebScanStep(env, request, origin, json) {
 export const runHkSpamJob = (env, fetchImpl = undefined, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
 
 // ------------------------------------------------------------------ submit path
-export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId, listing = null }, fetchImpl = undefined) {
+export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId, listing = null, scanConsent = null }, fetchImpl = undefined) {
   let sb = db(env, fetchImpl);
   const now = new Date();
   const retainUntil = new Date(now.getTime() + 3 * 365 * 24 * 3600 * 1000).toISOString();
@@ -214,22 +222,24 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
   if (created.duplicate) return keyed && requestId && String(created.requestId || '').toLowerCase() === String(requestId).toLowerCase() ? replayOutcome(sb, created.scanId) : { duplicate: true, scanId: created.scanId };
   const scan = { id: created.scanId };
   // MPC-9885: from here the scan id is known, so every recipient call is logged against it (names only) and written once at the end.
-  const rctx = workerRecipientContext(env, { fetchImpl, scanId: scan.id });
+  const rctx = workerRecipientContext(env, { fetchImpl, scanId: scan.id, consentId: scanConsent?.id });   // MPC-9887: post_click calls of this scan are checked against scan_consents
   sb = db(env, fetchImpl, rctx);
   let deferred = false;
   try {
+  // MPC-9887: remember which consent covers this scan, so the report job (a later cron tick, no request) can present it to the wrapper. Fails closed like the confirm mark below.
+  if (scanConsent) await sb.patch(`scans?id=eq.${scan.id}`, { consent_id: scanConsent.id });
   // MPC-9813: mark the scan as waiting for the click BEFORE anything is saved or sent. Fails closed: if it cannot be marked, the request fails and nothing goes out.
   if (confirmGateEnabled(env)) await applyConfirmGate(sb, scan.id);
   // MPC-7471-F3: save the scan BEFORE the first email, so the email can show its number. Never throws; a failed save only means no number.
   const saved = save?.hexagons
-    ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
+    ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber, scanConsent })
     : { saved: false };
   const listingSaved = listing && saved.saved ? await storeListingInputs(sb, { webScanId: saved.scanNumber, scanId: scan.id, listing }) : false;
   const side = [syncHubSpot(env, email, consentSource, now, fetchImpl, rctx), confirm(env, sb, scan.id, email, fetchImpl, saved.scanNumber, undefined, rctx)];
   const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e))))).then(() => flushQuietly(rctx));
   deferred = true;
   if (ctx?.waitUntil) ctx.waitUntil(all); else await all;
-  return { duplicate: false, scanId: scan.id, saved, listingSaved };
+  return { duplicate: false, scanId: scan.id, saved, listingSaved, consentId: scanConsent?.id };
   } finally {
     if (!deferred) await flushQuietly(rctx);
   }
@@ -312,7 +322,7 @@ async function nextReportJobs(env, sb, limit) {
     const gate = confirmGateEnabled(env);
     const pending = `or(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))`;
     const page = await sb.select(
-      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at,created_at${gate ? ',email_confirm_required,email_confirmed_at' : ''},users(email_opt_out_at)` +
+      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at,created_at,consent_id${gate ? ',email_confirm_required,email_confirmed_at' : ''},users(email_opt_out_at)` +
       (gate ? `&and=(${pending},or(email_confirm_required.eq.false,email_confirmed_at.not.is.null,confirmation_sent_at.is.null))` : `&or=(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))`) +
       `&report_attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc,id.asc&limit=${size}&offset=${offset}`);
     for (const job of page) {
@@ -347,8 +357,15 @@ export async function runReportJob(env, fetchImpl = undefined, limit = 5) {
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
   }
   for (const job of queue) {
+    // MPC-9887: with the consent gate on, a scan that has no consent on record cannot have a report built (every post_click call would be refused). Take it out of the queue
+    // with the reason on the row instead of letting each attempt fail half way. Written through the plain client: this write is ours, not a call made on the visitor's behalf.
+    if (consentEnforced(env) && !job.consent_id) {
+      await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_last_error: 'consent: no consent on record for this scan' }).catch((e) => console.error(`could not mark scan ${job.id} (no consent):`, String(e)));
+      out.failed++;
+      continue;
+    }
     // MPC-9885: one context per scan; its recipient calls are written to scan_recipient_log in one INSERT in the finally below.
-    const rctx = workerRecipientContext(env, { fetchImpl, scanId: job.id });
+    const rctx = workerRecipientContext(env, { fetchImpl, scanId: job.id, consentId: job.consent_id });
     const sbj = db(env, fetchImpl, rctx);
     try {
       if (!job.confirmation_sent_at) await confirm(env, sbj, job.id, job.email_scanned, fetchImpl, undefined, awaitsConfirm(job), rctx);     // catch up a missed confirmation
