@@ -14,7 +14,7 @@ export interface ChannelGroup {
 export const CHANNEL_GROUPS: ChannelGroup[] = [
   { key: 'email', title: 'Email', rows: [2, 3, 2, 3, 2, 3, 2, 3, 1], story: 'How they reach us, then what the address and domain reveal, then attachments, then public traces.' },
   { key: 'breach-threat', title: 'Breach and threat monitoring', rows: [2, 3, 1], story: 'What leaked and since when, then where it circulates. Needs a licensed data provider, so nothing runs yet.' },
-  { key: 'whatsapp', title: 'WhatsApp', rows: [2, 3, 2, 3, 2, 3, 2, 3, 2], story: 'Owner decision: not planned today (outside the hexagon model for now; revisit after Telegram).' },
+  { key: 'whatsapp', title: 'WhatsApp', rows: [2, 3, 2, 3, 2, 3, 2, 3, 2], story: 'Chris, 2026-11-08: eight tiles are planned (what arrives with a message, or what the person shares). The other 14 stay not planned.' },
   { key: 'messenger', title: 'Facebook Messenger', rows: [3, 2, 3], story: 'Owner decision: not planned today (needs Meta platform partner approval).' },
 ];
 

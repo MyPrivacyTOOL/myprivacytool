@@ -57,15 +57,25 @@ assert.ok(raw.filter((i) => i.decision).every((i) => i.decision_reason && i.deci
 assert.equal(channelOfHexagon('tg.username'), 'TG');
 console.log('catalogue.test.mjs ok');
 
-// Owner decisions batch 1 (2026-10-29): 162 unbuilt hexagons carry a plan (160 not planned, 2 approved for later) with a decision number and reason. Six earlier drops and holds keep their own
+// Owner decisions batch 1 (2026-10-29): 162 unbuilt hexagons carried a plan (160 not planned, 2 approved for later) with a decision number and reason. On 2026-11-08 Chris moved EIGHT WhatsApp hexagons
+// back to open (planned), superseding decision 1 for them only, so 154 carry a plan now (152 not planned, 2 later) and the open list below grows by those eight. Six earlier drops and holds keep their own
 // `decision` fields untouched, and the 9 still open are exactly these (Telegram edits and blocked-bot were built as extras in #649).
 const planned = HEXAGON_CATALOGUE.filter((i) => i.plan);
-assert.equal(planned.length, 162);
-assert.equal(planned.filter((i) => i.plan === 'not_planned').length, 160);
+assert.equal(planned.length, 154);
+assert.equal(planned.filter((i) => i.plan === 'not_planned').length, 152);
 assert.deepEqual(planned.filter((i) => i.plan === 'later').map((i) => i.id).sort(), ['email.inbound_client', 'email.inbound_sender']);
 assert.ok(planned.every((i) => i.status === 'new' && !EXTRA_HEXAGON_IDS.includes(i.id) && i.plan_decision >= 1 && i.plan_decision <= 11 && i.plan_reason), 'planned rows are unbuilt, have a decision and a reason');
 assert.ok(planned.every((i) => !raw.find((r) => r.id === i.id).decision), 'an earlier recorded drop or hold is never overwritten');
 assert.deepEqual(HEXAGON_CATALOGUE.filter((i) => i.status === 'new' && !EXTRA_HEXAGON_IDS.includes(i.id) && !i.plan && !raw.find((r) => r.id === i.id).decision).map((i) => i.id).sort(),
-  ['kk.linked_at', 'line.language', 'line.name_photo', 'line.status', 'tg.miniapp_biometric', 'tg.miniapp_device', 'tg.miniapp_location', 'tg.miniapp_photo', 'tg.passport']);
+  ['kk.linked_at', 'line.language', 'line.name_photo', 'line.status', 'tg.miniapp_biometric', 'tg.miniapp_device', 'tg.miniapp_location', 'tg.miniapp_photo', 'tg.passport',
+   'wa.ad_referral', 'wa.contact_share', 'wa.location_share', 'wa.media', 'wa.message_time', 'wa.phone', 'wa.profile_name', 'wa.username']);
 assert.ok(HEXAGON_CATALOGUE.filter((i) => i.status === 'defined').every((i) => !i.plan), 'defined rows are never marked');
+// 2026-11-08: the eight approved WhatsApp hexagons record why, "Number on other apps" stays removed for good, and Messenger is unchanged.
+const WA_EIGHT = ['wa.phone', 'wa.profile_name', 'wa.username', 'wa.location_share', 'wa.contact_share', 'wa.message_time', 'wa.ad_referral', 'wa.media'];
+for (const id of WA_EIGHT) { const h = HEXAGON_CATALOGUE.find((i) => i.id === id); assert.ok(h && !h.plan && h.status === 'new' && /2026-11-08/.test(h.note) && /MPC-8689/.test(h.note), id + ' is open with the decision recorded'); }
+assert.equal(HEXAGON_CATALOGUE.find((i) => i.id === 'wa.media').access, 'Verify');
+assert.equal(HEXAGON_CATALOGUE.find((i) => i.id === 'wa.other_apps').plan, 'not_planned');
+assert.equal(HEXAGON_CATALOGUE.find((i) => i.id === 'wa.other_apps').plan_decision, 10);
+assert.equal(HEXAGON_CATALOGUE.filter((i) => i.channel === 'whatsapp' && i.plan === 'not_planned').length, 14);
+assert.ok(HEXAGON_CATALOGUE.filter((i) => i.channel === 'messenger').every((i) => i.plan === 'not_planned'), 'Messenger is unchanged');
 console.log('catalogue.test.mjs decisions ok');
