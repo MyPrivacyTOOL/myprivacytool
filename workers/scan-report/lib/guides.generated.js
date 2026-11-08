@@ -332,25 +332,28 @@ export default [
     "countryName": "United States",
     "region": "US",
     "type": "People-search site",
-    "optOutUrl": "https://www.mylife.com/ccpa/index.pubview",
-    "optOutUrlLabel": "mylife.com/ccpa",
-    "summary": "Ask MyLife to remove or hide your public profile with its privacy request form, then confirm by email.",
+    "optOutUrl": "https://www.mylife.com/privacyrequest",
+    "optOutUrlLabel": "mylife.com/privacyrequest",
+    "summary": "Submit MyLife's single opt-out form to request deletion of your profile and opt out of the sale of your information, then verify your email.",
     "timeNeeded": "10 minutes",
-    "processingTime": "Up to 45 days; MyLife may ask you to verify your identity",
+    "processingTime": "MyLife says only that requests are processed within the legally required time frames; no number of days is stated",
     "difficulty": "Medium",
     "requirements": [
-      "The address of your MyLife profile page (or your name and city to find it)",
-      "An email address you can open"
+      "Your name, state, city and postal code",
+      "Your birth year (MyLife uses it to find the right profile)",
+      "An email address you can open",
+      "Optional: middle initial, maiden or alias name, and the address of your profile page"
     ],
     "steps": [
-      "Open the MyLife privacy request page at mylife.com/ccpa. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
-      "Choose the request to delete or remove your information (not just to see it) and enter your name, city and the email address you can open.",
-      "Add the address of your profile page if the form asks which listing is yours.",
-      "Submit the form, then open the email from MyLife and follow its confirmation link. MyLife may ask for more details to confirm it is you.",
+      "Open the MyLife Opt-Out Form at mylife.com/privacyrequest. It is one form that requests both deletion and opting out of the sale of your information; there is no separate choice to make. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
+      "Choose your state, then enter your first and last name, your city and postal code, and your birth year.",
+      "Enter the email address you can open. MyLife uses it to confirm the deletion and will also unsubscribe that address and delete any account registered with it. Use the Verify Email button next to the field.",
+      "Optional but helpful: add your middle initial, any maiden or alias name, and the address of your profile page (the form links to a \"Find your profile listing\" search).",
+      "Tick the \"I'm not a robot\" box, then press Submit.",
       "Come back after a few days and search for your name on mylife.com to confirm the profile no longer shows."
     ],
     "relistingWarning": "MyLife rebuilds profiles from public and commercial records, so a profile can return. Check again every few months and re-submit.",
-    "lastVerified": "2026-11-07"
+    "lastVerified": "2026-11-08"
   },
   {
     "slug": "intelius",
@@ -361,22 +364,22 @@ export default [
     "type": "People-search site",
     "optOutUrl": "https://www.intelius.com/opt-out",
     "optOutUrlLabel": "intelius.com/opt-out",
-    "summary": "Suppress your Intelius listing with its opt-out request, then confirm by email.",
+    "summary": "Use the PeopleConnect Suppression Center (Intelius's opt-out page sends you there) to suppress your Intelius listing, then verify by email. The same tool covers TruthFinder, InstantCheckmate and USSearch.",
     "timeNeeded": "10 minutes",
-    "processingTime": "Within a few days after email confirmation",
+    "processingTime": "Not stated by Intelius on the opt-out page",
     "difficulty": "Medium",
     "requirements": [
-      "Your name and state to find your record",
-      "An email address you can open"
+      "An email address you can open",
+      "Your name and state may be asked for after you follow the emailed link"
     ],
     "steps": [
-      "Open intelius.com/opt-out. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
-      "Search for your record using your name and state, and select the listing that is you.",
-      "Enter an email address you can open and submit the opt-out request.",
-      "Open the email from Intelius and click its confirmation link. Intelius may ask for more details to confirm it is you.",
+      "Open intelius.com/opt-out. It sends you to the PeopleConnect Suppression Center (suppression.peopleconnect.us), which runs Intelius's opt-outs. If you see an \"Access denied\" or \"blocked\" page, the site is rejecting your network: turn off any VPN or proxy and try again from your normal home or mobile connection.",
+      "Step 1: enter an email address you can open.",
+      "Tick the box agreeing to the Terms of Use and Privacy Policy and to receive transactional emails about the tool, then press Continue.",
+      "Open the verification email and click its link to carry on. Follow the steps shown after the link; they are not visible until you have verified your email.",
       "Come back after a few days and search for your name to confirm the listing no longer shows."
     ],
-    "relistingWarning": "Intelius updates its records from public and commercial sources, so a listing can return. Check again every few months and re-submit.",
-    "lastVerified": "2026-11-07"
+    "relistingWarning": "Intelius updates its records from public and commercial sources, so a listing can return. The Suppression Center affects name-search results on the PeopleConnect sites, not other data they hold, and reports found by phone, address or email may still appear. Check again every few months and re-submit.",
+    "lastVerified": "2026-11-08"
   }
 ];
