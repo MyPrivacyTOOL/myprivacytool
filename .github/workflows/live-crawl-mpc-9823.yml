@@ -1,0 +1,39 @@
+name: live-crawl-mpc-9823
+on:
+  push:
+    branches: ['live-crawl/**']
+permissions:
+  contents: read
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Crawl
+        run: |
+          mkdir c && cd c && npm init -y >/dev/null && npm i playwright@1.49.1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
+          cat > crawl.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const base = 'https://www.myprivacytool.io';
+          const routes = ['/', '/report', '/pricing', '/monitoring', '/acceptable-use', '/deep-research', '/faq', '/privacy', '/terms'];
+          const b = await chromium.launch();
+          for (const r of routes) {
+            const p = await b.newPage();
+            let status = 'ERR';
+            try {
+              const resp = await p.goto(base + r, { waitUntil: 'networkidle', timeout: 45000 });
+              status = resp.status();
+              await p.waitForTimeout(1500);
+              const text = await p.evaluate(() => document.body.innerText);
+              const desc = await p.evaluate(() => document.querySelector('meta[name=description]')?.content || '');
+              const dark = [...(text + ' ' + desc).matchAll(/.{0,50}dark.?web.{0,50}/gi)].map(m => m[0].replace(/\s+/g, ' '));
+              const bm = /Breach monitoring \(monthly re-check, email alert\)/.test(text);
+              console.log(JSON.stringify({ r, status, darkWebHits: dark, breachMonitoringWording: bm, descDark: /dark.?web/i.test(desc), desc: r === '/acceptable-use' ? desc : undefined }));
+            } catch (e) { console.log(JSON.stringify({ r, status, error: String(e).slice(0, 120) })); }
+            await p.close();
+          }
+          await b.close();
+          JS
+          node crawl.mjs
