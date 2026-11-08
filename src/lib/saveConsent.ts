@@ -6,6 +6,17 @@ export const SAVE_CONSENT_LABEL =
   "Save my scan result with my email, including technical details from my browser such as my IP address, so my report can show it.";
 export const SAVE_CONSENT_VERSION = "2026-10-12-v1";
 
+// MPC-9817: the same tick box, in one step, when accounts are on: "Keep my scan / create my free account". It is a NEW wording, so it has its own version
+// (also in SAVE_CONSENT_VERSIONS and ACCOUNT_CONSENT_VERSIONS in the Worker, which creates the account only after the click-to-confirm email proves the inbox).
+// It tells the person plainly that the saved result includes browser details such as the IP address (unchanged from the box above) and that the account has no password.
+// Used only while VITE_ACCOUNTS_ENABLED is exactly "true"; otherwise the original box above is shown, word for word.
+export const ACCOUNT_CONSENT_LABEL =
+  "Keep my scan and create my free account with this email. My scan result, including technical details from my browser such as my IP address, is kept in my account until I delete it. There is no password: I sign in with an email link.";
+export const ACCOUNT_CONSENT_VERSION = "2026-11-08-v1";
+export const accountsFlagOn = (): boolean => import.meta.env.VITE_ACCOUNTS_ENABLED === "true";
+export const activeSaveLabel = (): string => (accountsFlagOn() ? ACCOUNT_CONSENT_LABEL : SAVE_CONSENT_LABEL);
+export const activeSaveVersion = (): string => (accountsFlagOn() ? ACCOUNT_CONSENT_VERSION : SAVE_CONSENT_VERSION);
+
 // MPC-7494: the SEPARATE, optional, unticked box for being recognised on a later visit. It is its own consent, not part of the save box above, and it can be
 // ticked only together with the save box. Wording from docs/policy-wording-mpc-7491.md; needs Chris's written approval. Shown word for word; the version
 // travels with the request. A new wording needs a new version here AND in RECOGNISE_CONSENT_VERSIONS in workers/scan-report/lib/webScan.js.

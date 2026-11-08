@@ -121,16 +121,22 @@ export function readBrokerPanel(raw: unknown): BrokerPanel | null {
   return { pending: p.pending === true, pasteAvailable: p.paste_available !== false, intro: p.intro.slice(0, 500), rows, others, regionNote: str(p.region_note, 600) ?? "", coverageNote: str(p.coverage_note, 300) ?? "" };
 }
 
-/** MPC-9813: the click-to-confirm. POST /api/scan/confirm with the key from the email link (header, never the URL). true = the Worker confirmed the address. */
-export async function confirmEmail(token: string): Promise<boolean> {
+/** MPC-9813: the click-to-confirm. POST /api/scan/confirm with the key from the email link (header, never the URL). confirmed = the Worker confirmed the address.
+ *  MPC-9817: when the scan was requested with the one-step "keep my scan / create my free account" tick, the same click carries a one-time sign-in token (account). */
+export async function confirmEmailResult(token: string): Promise<{ confirmed: boolean; account?: { tokenHash: string; scanNumber: string } }> {
   const base = resolveScanApiUrl();
-  if (!base) return false;
+  if (!base) return { confirmed: false };
   try {
     const res = await fetch(`${base}/api/scan/confirm`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return false;
-    const b = (await res.json().catch(() => null)) as { confirmed?: unknown } | null;
-    return b?.confirmed === true;
+    if (!res.ok) return { confirmed: false };
+    const b = (await res.json().catch(() => null)) as { confirmed?: unknown; account?: { token_hash?: unknown; scan_number?: unknown } } | null;
+    if (b?.confirmed !== true) return { confirmed: false };
+    const a = b.account;
+    return typeof a?.token_hash === "string" && typeof a?.scan_number === "string" ? { confirmed: true, account: { tokenHash: a.token_hash, scanNumber: a.scan_number } } : { confirmed: true };
   } catch {
-    return false;
+    return { confirmed: false };
   }
+}
+export async function confirmEmail(token: string): Promise<boolean> {
+  return (await confirmEmailResult(token)).confirmed;
 }

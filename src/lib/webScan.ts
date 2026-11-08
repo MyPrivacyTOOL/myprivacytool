@@ -1,5 +1,5 @@
 import type { HexagonData } from "@/lib/deviceDetection";
-import { RECOGNISE_CONSENT_VERSION, SAVE_CONSENT_VERSION } from "@/lib/saveConsent";
+import { RECOGNISE_CONSENT_VERSION, activeSaveVersion } from "@/lib/saveConsent";
 import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.js";
 
 // MPC-7470 (decision D12): the finished scan stays in THIS browser (sessionStorage) and is never sent anywhere until the visitor
@@ -182,7 +182,7 @@ export function scanSaveFields(opts: { recognise?: boolean } = {}): Record<strin
   return {
     scan,
     save_consent: true,
-    save_consent_version: SAVE_CONSENT_VERSION,
+    save_consent_version: activeSaveVersion(),
     // MPC-7494: the separate recognise consent, only when its box was ticked (and recognition is on); never implied by the save box.
     ...(opts.recognise === true && recognitionEnabled() ? { recognise_consent: true, recognise_consent_version: RECOGNISE_CONSENT_VERSION } : {}),
     ...(scanStartedAt !== null ? { started_ms: Math.min(MAX_SCAN_MS, Math.max(0, Math.round(Date.now() - scanStartedAt))) } : {}),

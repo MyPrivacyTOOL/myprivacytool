@@ -11,6 +11,7 @@
 import { readVerifyToken } from './live.js';
 import { checkListingPages } from './listingCheck.js';
 import { guideFor } from './brokers.js';
+import { accountTokenForConfirm } from './accounts.js';
 
 export const confirmGateEnabled = (env) => env.EMAIL_CONFIRM_GATE_ENABLED === 'true';
 export const listingCheckEnabled = (env) => env.LISTING_CHECK_ENABLED === 'true' && confirmGateEnabled(env);
@@ -102,7 +103,9 @@ export async function handleConfirm(env, ctx, request, origin, json, { allowedOr
       const job = runStoredListingChecks(env, sb, scanId, scan.email_scanned);
       if (ctx?.waitUntil) ctx.waitUntil(job); else await job;
     }
-    return json({ confirmed: true });
+    // MPC-9817: the one-step "keep my scan / create my free account" tick. The click proves the inbox, so it is also the sign-in: hand back a one-time token for the page to redeem.
+    const account = await accountTokenForConfirm(env, sb, scanId, scan.email_scanned);
+    return json({ confirmed: true, ...(account ? { account } : {}) });
   } catch (e) {
     console.error('confirm failed:', String(e).replace(/\S+@\S+/g, '[email]'));
     return json({ error: 'Unavailable' }, 503);

@@ -23,7 +23,7 @@ const AcceptableUse = () => {
                 1. Purpose
               </h2>
               <p className="text-muted-foreground">
-                This Acceptable Use Policy ("Policy") sets out what you may and may not do when using MyPrivacyTOOL's website and services (the "Services"). MyPrivacyTOOL is an online privacy scanning and monitoring service that helps people check their personal data exposure across data breaches and the dark web. It applies to all users. Only the free scan is available today; when paid plans open, it will also apply to users on the planned Basic ($7.99/mo), Pro ($14.99/mo) and Executive ($49.99/mo) plans. It forms part of, and should be read with, our Terms of Service.
+                This Acceptable Use Policy ("Policy") sets out what you may and may not do when using MyPrivacyTOOL's website and services (the "Services"). MyPrivacyTOOL is an online privacy scanning and monitoring service that helps people check their personal data exposure across known data breaches. It applies to all users. Only the free scan is available today; when paid plans open, it will also apply to users on the planned Basic ($7.99/mo), Pro ($14.99/mo) and Executive ($49.99/mo) plans. It forms part of, and should be read with, our Terms of Service.
               </p>
             </section>
 
