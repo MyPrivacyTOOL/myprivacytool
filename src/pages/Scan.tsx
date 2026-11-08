@@ -109,7 +109,7 @@ const Scan = () => {
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
         console.error("Scan report request failed", kind, status);
         trackReportFailed("scan_page", kind, status);
-        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        setErrorMsg(reportErr instanceof ReportRequestError && reportErr.kind === "allowance" && reportErr.detail ? reportErr.detail : kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
         setTsToken(""); // a Turnstile token is single use: get a fresh one for the retry
         setTsReset((n) => n + 1);
         return;

@@ -9,9 +9,12 @@
 // Steps, each recorded with a server-side fact (database read, not only the HTTP answer):
 //   1 scan with the one-step tick (consent 2026-11-08-v1)   2 click-to-confirm returns a sign-in token   3 token signs in: account (free) + scan attached + consent carried + no IP column
 //   4 /me and open scan   5 sign-in by EMAIL LINK: the sign-in email is read back from the provider, its link is redeemed (the synthetic-mailbox path)   6 can(): free allowed, paid denied
+//   6b-6h MPC-9818 allowances: /me reports Free 1/month with 1 used; the SECOND scan (a later day, same month) is refused with the honest upgrade message and creates and sends nothing;
+//         a service-role bump to Basic (mpt_set_plan, the admin override) lets the same address scan again; Basic has the export capability
 //   7 delete: account, links, saved scan, request scan and sign-in identity are really gone   8 cleanup of the test user (guarded by isTestAddress)
 // LIMIT: no real inbox is read. "Provider accepted" and read-back from the provider API are the receipt evidence; inbox placement is not provable here.
 import { pathToFileURL } from 'node:url';
+import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { isTestAddress } from '../../shared/test-records.js';
 import { fixtureScan } from '../nightly-chain/checks.mjs';
@@ -28,6 +31,7 @@ export async function run(env, fetchImpl = fetch) {
   const sb = String(env.SUPABASE_URL).replace(/\/$/, '');
   const H = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' };
   const sel = async (p) => { const r = await fetchImpl(`${sb}/rest/v1/${p}`, { headers: H }); if (!r.ok) throw new Error(`db read ${r.status} ${p.split('?')[0]}`); return r.json(); };
+  const patch = async (p, row) => { const r = await fetchImpl(`${sb}/rest/v1/${p}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(row) }); if (!r.ok) throw new Error(`db patch ${r.status} ${p.split('?')[0]}`); };
   const rpc = async (fn, a) => { const r = await fetchImpl(`${sb}/rest/v1/rpc/${fn}`, { method: 'POST', headers: H, body: JSON.stringify(a) }); if (!r.ok) throw new Error(`rpc ${fn} ${r.status}`); return r.json(); };
   const api = async (path, body, token, method = 'POST') => {
     const r = await fetchImpl(`${base}/api/account/${path}`, { method, headers: { Origin: ORIGIN, ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}) });
@@ -87,7 +91,35 @@ export async function run(env, fetchImpl = fetch) {
     step('5d_link_works_once', again.status === 401, { http: again.status });
     // 6 can()
     const c1 = await api('can', { key: 'report.score' }, at), c2 = await api('can', { key: 'report.export_pdf' }, at);
-    step('6_can_free_only', c1.json?.allowed === true && c2.json?.allowed === false && c2.json?.reason === 'unknown_capability', { free: c1.json, paid: c2.json });
+    step('6_can_free_only', c1.json?.allowed === true && c2.json?.allowed === false && c2.json?.reason === 'tier_too_low' && c2.json?.min_tier === 'basic', { free: c1.json, paid: c2.json });
+    // 6b-6h MPC-9818: the scan allowance, on the deployed system (Free 1 a month, then a service-role bump to Basic)
+    const subjectKey = createHash('sha256').update(email.toLowerCase()).digest('hex');
+    const counted = async () => (await sel(`scan_consumption?subject_key=eq.${subjectKey}&select=scan_id,plan,confirmed_at`));
+    const me2 = await api('me', undefined, at, 'GET');
+    step('6b_me_shows_free_allowance', me2.status === 200 && me2.json?.entitlements?.tier === 'free' && me2.json.entitlements.scans?.limit === 1 && me2.json.entitlements.scans?.used === 1 && me2.json.entitlements.scans?.remaining === 0, { scans: me2.json?.entitlements?.scans });
+    const c0 = await counted();
+    step('6b2_first_scan_counted_once_and_confirmed', c0.length === 1 && c0[0].plan === 'free' && Boolean(c0[0].confirmed_at) && c0[0].scan_id === scanId, { rows: c0.length });
+    // a later day of the same month: move the first request past the one-report-per-24h rule (a synthetic row, service role)
+    await patch(`scans?id=eq.${scanId}`, { created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() });
+    const userRow = (await sel(`users?email=eq.${encodeURIComponent(email)}&select=id`))[0];
+    const scansBefore = (await sel(`scans?user_id=eq.${userRow?.id}&select=id`)).length;
+    const postScan = async () => { const r = await fetchImpl(`${base}/api/scan`, { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, consent: true, consent_source: 'synthetic_accounts', utm_source: 'synthetic', utm_medium: 'accounts-check', utm_campaign: 'mpc-9818', 'cf-turnstile-response': 'XXXX.DUMMY.TOKEN.XXXX' }) }); return { status: r.status, json: await r.json().catch(() => ({})) }; };
+    const second = await postScan();
+    const msg = String(second.json?.message || '');
+    step('6c_second_free_scan_refused_with_upgrade_message', second.status === 429 && second.json?.code === 'scan_allowance_exhausted' && second.json?.plan === 'free' && second.json?.limit === 1
+      && /^You've used this month's free scan\. Sign up for 5 a month on Basic\./.test(msg) && /Your allowance comes back on \d+ [A-Z][a-z]+\./.test(msg) && !/\$|hurry|fair.use/i.test(msg), { http: second.status, code: second.json?.code, message: msg });
+    const scansAfter = (await sel(`scans?user_id=eq.${userRow?.id}&select=id`)).length;
+    step('6d_refused_scan_created_nothing', scansAfter === scansBefore && (await counted()).length === 1, { scans_before: scansBefore, scans_after: scansAfter });
+    const bump = await rpc('mpt_set_plan', { p_account: userId, p_plan: 'basic', p_reason: 'MPC-9818 synthetic live check' });
+    step('6e_service_role_bump_to_basic', bump?.changed === true && bump.plan === 'basic', bump);
+    const logRow = (await sel(`account_plan_log?account_id=eq.${userId}&select=old_plan,new_plan,reason`))[0];
+    step('6e2_plan_change_logged', logRow?.old_plan === 'free' && logRow.new_plan === 'basic', logRow);
+    const third = await postScan();
+    step('6f_basic_account_scans_again', third.status === 200 && third.json?.success === true && third.json?.duplicate === false, { http: third.status, duplicate: third.json?.duplicate });
+    const cB = await counted();
+    step('6g_counted_under_basic', cB.length === 2 && cB.some((r) => r.plan === 'basic'), { rows: cB.map((r) => r.plan) });
+    const me3 = await api('me', undefined, at, 'GET'); const c3 = await api('can', { key: 'report.export_pdf' }, at);
+    step('6h_basic_entitlements', me3.json?.entitlements?.tier === 'basic' && me3.json.entitlements.scans?.limit === 5 && c3.json?.allowed === true, { limit: me3.json?.entitlements?.scans?.limit, export_pdf: c3.json?.allowed });
     // 7 delete really deletes
     const bad = await api('delete', {}, at);
     step('7a_delete_needs_confirmation', bad.status === 400, { http: bad.status });
@@ -105,7 +137,7 @@ export async function run(env, fetchImpl = fetch) {
     out.ok = true;
   } catch (e) { out.ok = false; out.error = String(e.message).replace(/\S+@\S+/g, '[email]').slice(0, 300); }
   finally {
-    try { if (isTestAddress(email)) { await rpc('mpt_dsar_erase', { p_email: email }); if (userId) await fetchImpl(`${sb}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers: H }).catch(() => {}); out.cleanup = 'test user removed'; } } catch { out.cleanup = 'CLEANUP FAILED'; }
+    try { if (isTestAddress(email)) { await fetchImpl(`${sb}/rest/v1/scan_consumption?subject_key=eq.${createHash('sha256').update(email.toLowerCase()).digest('hex')}`, { method: 'DELETE', headers: H }).catch(() => {}); await rpc('mpt_dsar_erase', { p_email: email }); if (userId) await fetchImpl(`${sb}/auth/v1/admin/users/${userId}`, { method: 'DELETE', headers: H }).catch(() => {}); out.cleanup = 'test user removed'; } } catch { out.cleanup = 'CLEANUP FAILED'; }
   }
   return out;
 }
