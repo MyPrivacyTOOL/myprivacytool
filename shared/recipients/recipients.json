@@ -996,7 +996,7 @@
       "data_items": [
         "password_hash_prefix"
       ],
-      "purpose": "Password check (off by default).",
+      "purpose": "Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password.",
       "party": "third",
       "retention": {
         "days": null,
@@ -1004,12 +1004,13 @@
       },
       "consent_basis": "scan_consent",
       "phase": "post_click",
-      "enabled": false,
+      "enabled": true,
       "flag": "VITE_PASSWORD_CHECK",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9886: switched on in the registry because the Pages production build sets VITE_PASSWORD_CHECK=true (verified in the Cloudflare Pages project wwwmyprivacytool, 2026-11-08), i.e. the check is live. The flag still gates the feature."
     },
     {
       "key": "meta-graph",
@@ -1072,6 +1073,34 @@
       "since": "2026-11-08",
       "until": null,
       "reason": "Flag and allow-list gated; flags not individually verified."
+    },
+    {
+      "key": "xposedornot",
+      "name": "XposedOrNot (breach lookup)",
+      "hosts": [
+        "api.xposedornot.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Free community breach lookup, switched off: not used without a licence.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "reason": "Decision B (Director, 2026-11-08): no XposedOrNot without a licence. src/lib/osintLookup.ts refuses this provider before any request is made.",
+      "note": "Registered disabled by MPC-9886 so the host is known to CI and the wrapper; enabling it needs a licence decision."
     },
     {
       "key": "planned-licensed-people-data",
