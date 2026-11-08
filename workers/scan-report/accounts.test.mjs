@@ -115,6 +115,23 @@ const real = globalThis.fetch;
   } finally { globalThis.fetch = real; }
 }
 
+// ---- both token types redeem: a first-time address gets a 'signup' token, a returning one a 'magiclink' token (found live: MPC-9817 run 42455686419, "One-time token not found")
+{
+  const S = stub(); globalThis.fetch = S.f;
+  try {
+    for (const [label, pre] of [['first-time address (signup token)', false], ['returning address (magiclink token)', true]]) {
+      const addr = pre ? 'returning.test+9817@example.test' : 'firsttime.test+9817@example.test';
+      if (pre) S.st.authUsers.push({ id: crypto.randomUUID(), email: addr });
+      S.st.emails.length = 0;
+      await run(S, post('/api/account/signin', { email: addr }));
+      const tok = S.st.emails[0].text.match(/#t=([A-Za-z0-9_-]+)/)[1];
+      const r = await run(S, post('/api/account/verify', { token_hash: tok }));
+      const j = await r.json();
+      check(r.status === 200 && j.account?.email === addr, `verify works for a ${label}`);
+    }
+  } finally { globalThis.fetch = real; }
+}
+
 // ---- the email itself
 {
   const m = buildSignInEmail({ link: 'https://myprivacytool.io/account/verify#t=abcdefghijklmnop' });
