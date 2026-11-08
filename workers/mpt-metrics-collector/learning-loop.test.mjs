@@ -2,7 +2,7 @@
 import learningLoop, { GRACE_HOURS } from './collectors/learning-loop.js';
 import { runAll } from './worker.js';
 import { publishAll } from './publishers/notion.js';
-import { publishLearningLoop, learningLoopLines, sumGa4Events, shown, rate, MIN_GROUP, TITLE } from './publishers/learning-loop.js';
+import { publishLearningLoop, learningLoopLines, learningAggregateLines, sumGa4Events, shown, rate, MIN_GROUP, TITLE } from './publishers/learning-loop.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const PARENT = '3f628547eaa7814082b4fc9cd266ae1f';
 const env = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'sekret', NOTION_TOKEN: 'ntn_secret', NOTION_LEARNING_LOOP_PARENT_PAGE_ID: PARENT };
@@ -21,7 +21,7 @@ const PAYLOAD = {
   returns: { returned_total: 4, within_7_days: 3, within_30_days: 4 },
 };
 
-let rpcCalls, inserts, pages, blocks, rawRows, ga4Rows;
+let rpcCalls, inserts, pages, blocks, rawRows, ga4Rows; let aggCalls = [], aggRows = [], aggFail = false;
 const reset = () => { rpcCalls = []; inserts = []; pages = []; blocks = {}; rawRows = [{ payload: PAYLOAD }]; ga4Rows = []; };
 const ga4Day = (day, started, completed, requested, captured = '2026-10-12T00:00:00Z') => ({ period_start: day, captured_at: captured, payload: { rows: [{ dimensionValues: [{ value: 'scan_started' }], metricValues: [{ value: String(started) }] }, { dimensionValues: [{ value: 'privacy_scan_completed' }], metricValues: [{ value: String(completed) }] }, { dimensionValues: [{ value: 'report_requested' }], metricValues: [{ value: String(requested) }] }, { dimensionValues: [{ value: 'page_view' }], metricValues: [{ value: '999' }] }] } });
 const json = (b, status = 200) => ({ ok: status < 400, status, headers: new Headers(), json: async () => b });
@@ -31,6 +31,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (url.endsWith('/rest/v1/mpt_raw_metrics') && opts.method === 'POST') { inserts.push(...[].concat(body)); return { ok: true, status: 201 }; }
   if (url.includes('/rest/v1/mpt_raw_metrics') && url.includes('source=eq.ga4')) return json(ga4Rows);
   if (url.includes('/rest/v1/mpt_raw_metrics')) return json(rawRows);
+  if (url.includes('/rest/v1/rpc/mpt_learning_aggregate_week')) { aggCalls.push(url); return aggFail ? json({}, 500) : json(aggRows); }
   if (url.includes('/rest/v1/')) return json([]);
   const kids = /\/v1\/blocks\/([^/?]+)\/children/.exec(url);
   if (kids && (opts.method || 'GET') === 'GET') return json({ results: kids[1] === PARENT ? pages.map((p) => ({ id: p.id, type: 'child_page', child_page: { title: p.title } })) : (blocks[kids[1]] ?? []), has_more: false });
@@ -115,6 +116,37 @@ check(!all.some((x) => x.kind === 'learning-loop'), 'publishAll: not on other da
   check(g.action === 'created' && /scans completed 8/.test(JSON.stringify(pages[0].written)), 'publish: a week with GA4 events but no saved scans still gets its page');
   reset(); rawRows = []; ga4Rows = [];
   check((await publishLearningLoop(env, '2026-10-05', monday)).action === 'skipped_no_data' && pages.length === 0, 'publish: nothing from either source => nothing written');
+}
+
+// ---- MPC-9892: the anonymised aggregate section (counters only; every number floored at 5)
+{
+  const AGG = [
+    { dimension: 'scan', key: 'web_scan_saved', n: 42 },
+    ...['scan_started', 'scan_finished', 'results_viewed'].map((k, i) => ({ dimension: 'funnel_step', key: k, n: 42 - i * 10 })),
+    { dimension: 'funnel_step', key: 'contact_step_opened', n: 3 }, { dimension: 'funnel_step', key: 'contact_given', n: 0 },
+    { dimension: 'hexagon_result', key: 'location:found', n: 30 }, { dimension: 'hexagon_result', key: 'location:not_found', n: 4 }, { dimension: 'hexagon_result', key: 'location:not_checked', n: 8 },
+    { dimension: 'hexagon_result', key: 'rare:found', n: 2 }, { dimension: 'hexagon_result', key: 'rare:not_checked', n: 1 },
+    { dimension: 'bot_family', key: 'ai:claudebot', n: 120 }, { dimension: 'bot_family', key: 'bot:curl', n: 2 },
+    { dimension: 'country_bucket', key: 'hk', n: 17 }, { dimension: 'country_bucket', key: 'uk', n: 1 },
+    { dimension: 'tile_event', key: 'location:shown', n: 20 }, { dimension: 'tile_event', key: 'location:not_me', n: 3 }, { dimension: 'tile_event', key: 'rare:shown', n: 2 },
+  ];
+  const text = learningAggregateLines(AGG).join('\n');
+  check(/Saved scans counted: 42/.test(text) && /scan started 42, scan finished 32, results viewed 22, contact step opened <5, contact given 0/.test(text), 'aggregate: counts shown, funnel cells under 5 read "<5", zero stays 0');
+  check(/location: found 30, not found <5, not checked 8/.test(text), 'aggregate: hexagon result cells are floored per cell');
+  check(!/rare/.test(text.split('Bot and AI')[0]) && !/rare: shown/.test(text), 'aggregate: a hexagon seen fewer than 5 times is not listed at all (no tile row either)');
+  check(/claudebot \(ai\) 120, curl \(bot\) <5/.test(text), 'aggregate: bot / AI families listed with the floor');
+  check(/hk 17, uk <5, eu 0, north america 0, other 0/.test(text), 'aggregate: coarse country buckets with the floor');
+  check(/location: shown 20, yes me 0, not me <5/.test(text), 'aggregate: tile prompts floored');
+  check(!/\b[1-4]\b(?!\d)/.test(text.replace(/top \d+|the (ten|\d+)\b|15 most|ten /gi, '')) , 'aggregate: no printed count of 1 to 4 anywhere');
+  check(!/[0-9a-f]{8}-[0-9a-f]{4}|\d+\.\d+\.\d+\.\d+|@|mozilla/i.test(text), 'aggregate: no scan number, address, email or user agent can appear');
+  check(/nothing has been counted for this week yet/.test(learningAggregateLines([]).join('')), 'aggregate: an empty week says so');
+  reset(); aggRows = AGG; aggCalls = []; aggFail = false;
+  const pub = await publishLearningLoop(env, '2026-10-05', monday);
+  check(pub.action === 'created' && aggCalls.length === 1 && /p_from=2026-10-05&p_to=2026-10-11/.test(aggCalls[0]) && /Saved scans counted: 42/.test(JSON.stringify(pages[0].written)), 'publish: reads the Monday-Sunday week of counters and writes them to the page');
+  reset(); aggRows = []; aggFail = true; aggCalls = [];
+  const pub2 = await publishLearningLoop(env, '2026-10-05', monday);
+  check(pub2.action === 'created' && /Anonymised aggregate: not available/.test(JSON.stringify(pages[0].written)), 'publish: if the counters cannot be read the page still publishes, with one line saying so');
+  aggFail = false; aggRows = [];
 }
 check(MIN_GROUP === 5, 'minimum group size is 5');
 process.exit(ok ? 0 : 1);

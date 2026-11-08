@@ -273,6 +273,8 @@ jobs:
         run: node scripts/registry-ci/check.mjs static
       - name: Visit-log isolation (MPC-9889, rule 3)
         run: node scripts/ci/check-visit-log-isolation.mjs
+      - name: Learning aggregate SQL lint (MPC-9892, no per-scan inserts, fixed columns)
+        run: node scripts/ci/check-learning-aggregate-sql.mjs
       - name: Layer 3 - fetch spy + scanner tests
         run: npx vitest run shared/recipients scripts/registry-ci
 

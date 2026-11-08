@@ -63,6 +63,27 @@ psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 echo "== visit log, country policy and purge (MPC-9889)"
 psql_ "$TEST_URL" -At -f supabase/tests/visit-log.test.sql
 
+echo "== anonymised learning aggregate: schema, hooks, vocabularies (MPC-9892)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9892-learning-aggregate.test.sql
+
+# MPC-9892 canary proof (design 4.5, proof 2): seed one scan with a unique email, IP, scan number and user agent, run the deletion job,
+# then grep a dump of the WHOLE database and the job log for each canary. Zero hits allowed. Step 1 commits (throwaway database only).
+echo "== canary: nothing identifying survives the deletion job (MPC-9892)"
+canary_dir=$(mktemp -d)
+psql_ "$TEST_URL" -f supabase/tests/mpc-9892-canary-seed.sql
+before=$(pg_dump "$TEST_URL" --no-owner | grep -c -e 'canary-9892-zqx7' -e '198\.51\.100\.219' -e '9892c0de-ca9a-4c4e-8a11-000000009892' -e 'CanaryAgent-9892-QZ' -e 'canary-ua-token' || true)
+[ "$before" -ge 4 ] || { echo "::error::canary seed is not visible in the dump before the job ($before hits): the test would prove nothing"; exit 1; }
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9892-canary-run.sql > "$canary_dir/job.log" 2>&1
+pg_dump "$TEST_URL" --no-owner > "$canary_dir/db.sql"
+for c in 'canary-9892-zqx7' '198\.51\.100\.219' '9892c0de-ca9a-4c4e-8a11-000000009892' 'CanaryAgent-9892-QZ' 'canary-ua-token' 'example\.invalid'; do
+  hits=$(cat "$canary_dir/db.sql" "$canary_dir/job.log" | grep -c -e "$c" || true)
+  [ "$hits" -eq 0 ] || { echo "::error::canary '$c' survived the deletion job: $hits hit(s) in the database dump or job log"; exit 1; }
+  echo "   canary $c: 0 hits in whole-database dump + job log"
+done
+grep -q 'ai:claudebot' "$canary_dir/job.log" && grep -q 'location:found' "$canary_dir/job.log" || { echo "::error::the job did not count the canary rows (no counters in the log)"; exit 1; }
+echo "   counters written, identity gone (seed visible before: $before hits)"
+rm -rf "$canary_dir"
+
 echo "== dashboard links and sessions (MPC-7893)"
 psql_ "$TEST_URL" -At -f supabase/tests/dashboard-links.test.sql
 
