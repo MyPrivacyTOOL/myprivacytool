@@ -71,6 +71,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/telegram-event-flags.test.sql
 
 echo "== Deep Research findings and verification gate (MPC-9549)"
 psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
 # Real concurrency: 8 separate connections try to redeem ONE link at the same moment. Exactly one may win.
 psql_ "$TEST_URL" -c "insert into public.profile_snapshots (id, sender_id, update_id, status, scan_version, risk_version, consent, get_chat, photos, expires_at) values ('00000000-0000-0000-0000-0000000000c1', '333', 1, 'complete', 'telegram-baseline-1', 'risk-count-1', '{}', '{}', '{}', now() + interval '90 days')" \
   -c "insert into public.dashboard_links (token_hash, sender_id, snapshot_id, expires_at) values (repeat('e',64), '333', '00000000-0000-0000-0000-0000000000c1', now() + interval '15 minutes')"
@@ -254,6 +255,11 @@ psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
 echo "== accounts and sign-in (MPC-9817)"
 psql_ "$TEST_URL" -f supabase/migrations/20261108120000_mpc_9817_accounts_and_signin.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9817-accounts.test.sql
+
+# MPC-9818: entitlements as data (20 rows) and monthly scan allowances. Applied by the loop above; applied again to prove it is idempotent, then the assertions.
+echo "== entitlements and scan allowances (MPC-9818)"
+psql_ "$TEST_URL" -f supabase/migrations/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9818-entitlements.test.sql
 
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

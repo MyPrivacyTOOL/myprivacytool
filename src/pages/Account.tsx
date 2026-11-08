@@ -32,6 +32,13 @@ const SignedOut = ({ onSent }: { onSent: () => void }) => {
   );
 };
 
+// MPC-9818: the allowance in words. Unlimited says so and nothing more (no fair-use text); a limited plan says what is used and when it resets.
+const allowanceLine = (a: NonNullable<Me["allowance"]>) => {
+  if (a.limit === null) return "Unlimited scans";
+  const reset = a.resetsAt ? new Date(a.resetsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" }) : null;
+  return `${a.used} of ${a.limit} used this month${reset ? `, resets ${reset}` : ""}`;
+};
+
 const ScanRow = ({ scan }: { scan: Me["scans"][number] }) => {
   const [rows, setRows] = useState<SavedHexagon[] | null | "loading">(null);
   const open = async () => { setRows("loading"); setRows((await openScan(scan.scanNumber)) ?? []); };
@@ -98,11 +105,13 @@ const Account = () => {
               <dl className="grid grid-cols-[8rem_1fr] gap-y-2 text-sm">
                 <dt className="text-muted-foreground">Email</dt><dd className="text-foreground" data-testid="account-email">{me.email}</dd>
                 <dt className="text-muted-foreground">Plan</dt><dd className="text-foreground" data-testid="account-plan">{PLAN_NAMES[me.plan] ?? me.plan} <Link to="/pricing" className="ml-2 text-xs underline">See plans</Link></dd>
+                {me.allowance && <><dt className="text-muted-foreground">Scans</dt><dd className="text-foreground" data-testid="account-allowance">{allowanceLine(me.allowance)}</dd></>}
               </dl>
               <section aria-labelledby="scans-h">
                 <h2 id="scans-h" className="mb-2 text-xl font-semibold text-foreground">Your scans</h2>
                 {me.scans.length ? <ul className="space-y-2" data-testid="scan-list">{me.scans.map((s) => <ScanRow key={s.scanNumber} scan={s} />)}</ul>
                   : <p className="text-sm text-muted-foreground" data-testid="no-scans">No scans in this account yet.</p>}
+                {me.olderKept > 0 && <p className="mt-3 text-sm text-muted-foreground" data-testid="older-kept">{me.olderKept === 1 ? "1 older scan is" : `${me.olderKept} older scans are`} saved and not deleted. Your plan lists your latest scan; a paid plan lists them all.</p>}
                 <form onSubmit={doClaim} className="mt-4 flex flex-wrap items-end gap-2">
                   <div className="grow">
                     <label htmlFor="claim" className="block text-xs text-muted-foreground">Add an earlier scan by its number (it must have been requested with {me.email})</label>

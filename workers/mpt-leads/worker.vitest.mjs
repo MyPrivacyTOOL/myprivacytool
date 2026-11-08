@@ -20,14 +20,26 @@ beforeEach(() => {
     const u = String(url);
     calls.push({ url: u, method: opts.method || 'GET', body: opts.body, headers: opts.headers });
     for (const [needle, fn] of Object.entries(handlers)) if (u.includes(needle)) return fn(u, opts);
+    if (u.includes('/auth/v1/user')) { // MPC-9914: fake Supabase Auth. "ok:<email>" = confirmed sign-in; "unconfirmed:<email>"; anything else invalid.
+      const t = String(opts.headers?.Authorization || '').replace('Bearer ', '');
+      if (t.startsWith('ok:')) return ok({ email: t.slice(3), email_confirmed_at: '2026-11-08T00:00:00Z' });
+      if (t.startsWith('unconfirmed:')) return ok({ email: t.slice(12) });
+      return ok({}, 401);
+    }
     if (u.includes('/query')) return ok({ results: [{}, {}], has_more: false });
     return ok({});
   });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-async function post(body, { headers = {}, e = env, raw } = {}) {
+// MPC-9914: tests send consent by default and, when a riskScore is sent, a confirmed-email Bearer for the body's own email. { auth: null } sends none; { consent: false } omits consent.
+async function post(body, { headers = {}, e = env, raw, auth, consent = true } = {}) {
   const waits = [];
+  if (!raw && body && typeof body === 'object') {
+    if (consent && !('consent' in body)) body = { consent: true, ...body };
+    const a = auth === undefined ? (body.riskScore !== undefined && body.email ? 'ok:' + String(body.email).toLowerCase() : null) : auth;
+    if (a) headers = { ...headers, Authorization: 'Bearer ' + a };
+  }
   const req = new Request('https://x/webhook/leads', {
     method: 'POST',
     headers: raw ? headers : { 'content-type': 'application/json', Origin: ORIGIN, ...headers },
@@ -259,9 +271,59 @@ describe('consent', () => {
     await post({ email: 'a@b.co', consent });
     expect(props().consent_source).toBe('landing_page');
   });
-  it.each([[false], ['false'], [undefined], ['yes']])('does not treat %j as consent', async (consent) => {
-    await post({ email: 'a@b.co', consent });
-    expect(props()).not.toHaveProperty('consent_given_at');
+  // MPC-9914 (EXT-03): without consent the request is refused with an honest 400 BEFORE anything is written or sent.
+  it.each([[false], ['false'], [undefined], ['yes']])('%j is not consent: 400, nothing written to any recipient', async (consent) => {
+    const res = await post({ email: 'a@b.co', name: 'N', riskScore: 10, consent }, { consent: false });
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toBe('Consent required');
+    expect(json.message).toMatch(/not saved anything/);
+    expect(calls).toHaveLength(0);
+  });
+  it('a missing consent field is refused too, even with a failing bot check (no siteverify call, no writes)', async () => {
+    const res = await post({ email: 'a@b.co', 'cf-turnstile-response': 'x' }, { consent: false });
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+  it('form-encoded posts without consent are refused as well', async () => {
+    const fd = new FormData(); fd.set('email', 'f@f.co');
+    const res = await post(null, { raw: fd, headers: { Origin: ORIGIN } });
+    expect(res.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+// MPC-9914 (EXT-03): a baseline belongs to a proved email. The SHA-256 of an address is a key, never authentication.
+describe('baseline ownership', () => {
+  const nothingWritten = () => calls.filter((c) => !c.url.includes('/auth/v1/user'));
+  it('riskScore with no Bearer: 401 and nothing written (no lead, no engagement, no baseline)', async () => {
+    const res = await post({ email: 'v@v.co', riskScore: 10 }, { auth: null });
+    expect(res.status).toBe(401);
+    expect(nothingWritten()).toHaveLength(0);
+  });
+  it('an invalid or unconfirmed Bearer: 401, nothing written', async () => {
+    for (const auth of ['garbage', 'unconfirmed:v@v.co']) {
+      calls = [];
+      expect((await post({ email: 'v@v.co', riskScore: 10 }, { auth })).status).toBe(401);
+      expect(nothingWritten()).toHaveLength(0);
+    }
+  });
+  it("someone else's valid sign-in cannot touch the victim's baseline: 403, nothing written", async () => {
+    const res = await post({ email: 'victim@v.co', riskScore: 10 }, { auth: 'ok:attacker@v.co' });
+    expect(res.status).toBe(403);
+    expect(nothingWritten()).toHaveLength(0);
+    expect(to('mpt_score_baselines')).toHaveLength(0);
+  });
+  it('the confirmed owner (any letter case) writes and reads their baseline', async () => {
+    handlers['mpt_score_baselines'] = (u, o) => ok(o.method === 'POST' ? [{ overall_score: 10, created_at: '2026-11-08T00:00:00Z' }] : []);
+    const res = await post({ email: 'Own@V.co', riskScore: 10 }, { auth: 'ok:own@v.co' });
+    expect(res.status).toBe(200);
+    expect((await res.json()).baseline.is_first).toBe(true);
+  });
+  it('a consented lead with no riskScore needs no sign-in and gets no baseline', async () => {
+    const res = await post({ email: 'plain@v.co' });
+    expect(res.status).toBe(200);
+    expect(to('mpt_score_baselines')).toHaveLength(0);
   });
 });
 
@@ -361,6 +423,7 @@ describe('recipient wrapper (fetch-spy)', () => {
   const spyFor = () => createFetchSpy({
     respond: (url) => {
       if (url.includes('turnstile')) return new Response(JSON.stringify({ success: true, hostname: 'myprivacytool.io' }), { status: 200 });
+      if (url.includes('/auth/v1/user')) return new Response(JSON.stringify({ email: 'ciso@acme.com', email_confirmed_at: '2026-11-08T00:00:00Z' }), { status: 200 });   // MPC-9914: the baseline needs a proved email
       if (url.includes('mpt_score_baselines')) return new Response('[]', { status: 201 });
       if (url.includes('/query')) return new Response(JSON.stringify({ results: [], has_more: false }), { status: 200 });
       return new Response('{}', { status: 200 });

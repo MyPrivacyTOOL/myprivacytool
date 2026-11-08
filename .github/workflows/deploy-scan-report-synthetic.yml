@@ -16,6 +16,7 @@ on:
       - '.github/workflows/deploy-scan-report-synthetic.yml'
       - '.github/workflows/f1-live-check.yml'
       - 'scripts/f1-live-check/**'
+      - 'shared/recipients/**'   # MPC-9885: the Workers bundle the recipient wrapper, so a change to it must redeploy them
   workflow_dispatch:
 
 concurrency:

@@ -103,6 +103,19 @@ LISTING_CHECK_ENABLED = "true"
 # was switched on). Anything but the exact string "true" is off and every route answers 404; "false" is the rollback (existing accounts are untouched). No Stripe, no allowances.
 ACCOUNTS_ENABLED = "true"
 
+# MPC-9887: the server-side consent gate. POST /api/consent stores one consent per scan id (public.scan_consents, migration 20261108150000_mpc_9887_scan_consents.sql,
+# applied before this was merged). A consent_id sent with POST /api/scan is always checked against the store. "false" = a scan WITHOUT a consent id is still accepted,
+# because no visitor holds one until the consent block (MPC-9888) ships; MPC-9888 sets this to "true" in the same change, after the report queue has drained.
+# Only the exact string "true" enforces. When it is "true", every post_click call made for a scan is refused (CONSENT_REQUIRED / CONSENT_INVALID) unless the scan's consent is in the store.
+CONSENT_GATE_ENFORCED = "false"
+
+# MPC-9818 (F3): monthly scan allowances per plan, decided by Chris 2026-11-07: Free 1 / Basic 5 / Pro 25 / Executive unlimited (no cap, no fair-use text). POST /api/scan counts the scan
+# against the plan that owns the confirmed address (an account's plan, otherwise Free) BEFORE anything is saved or sent, and a refused request creates and sends nothing (HTTP 429, code
+# scan_allowance_exhausted, with an honest message that says when the allowance resets and what the next plan includes). The numbers and the 20 entitlement rows live in the database
+# (public.plan_scan_allowance, public.capability_min_tier), not here. Needs migration 20261108140000_mpc_9818_entitlements_and_scan_allowances.sql (applied before this was switched on).
+# Anything but the exact string "true" is off; "false" + redeploy is the rollback (counted rows stay, nothing is refused). While the function is missing (HTTP 404) nothing is enforced.
+SCAN_ALLOWANCE_ENABLED = "true"
+
 [observability]
 enabled = true
 

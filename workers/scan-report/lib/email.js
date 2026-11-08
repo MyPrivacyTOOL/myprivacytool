@@ -210,13 +210,13 @@ const brokerRowText = (r) => [
 const brokerSectionText = (panel) => [
   'BROKER SITES', panel.intro, '',
   ...[...panel.rows, ...panel.others].flatMap((r) => [...brokerRowText(r), '']),
-  panel.region_note, panel.coverage_note, '',
+  panel.region_note, ...(panel.coverage_note ? [panel.coverage_note] : []), '',
 ];
 const STATE_COLOR = { listed: '#991b1b', not_listed: '#166534', not_checked: '#6b7280' };
 const brokerCardHtml = (r) => `<div style="margin:0 0 8px 0;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:14px;line-height:20px;color:#374151"><strong style="font-size:15px;color:#111827">${esc(r.name)}</strong>${r.region ? ` <span style="font-size:12px;color:#6b7280">${esc(r.region)}</span>` : ''} <strong style="font-size:12px;color:${STATE_COLOR[r.state]}">&middot; ${esc(STATE_LABEL[r.state].toUpperCase())}</strong><br>${esc(r.text)}<br><span style="font-size:13px;color:#6b7280">${esc(confText(r))}</span>${r.evidence_url ? `<br><a href="${esc(r.evidence_url)}" style="color:${BRAND}">Evidence: the page</a>` : ''}${(r.also || []).filter((a) => a.evidence_url).map((a) => `<br><a href="${esc(a.evidence_url)}" style="color:${BRAND}">Also read (${esc(STATE_LABEL[a.state].toLowerCase())})</a>`).join('')}${r.guide ? `<br><a href="${esc(guideUrl(r) || guideSite(r))}" style="color:${BRAND}">How to remove it</a>${r.guide.timeNeeded ? ` <span style="font-size:13px;color:#6b7280">(${esc(r.guide.timeNeeded)})</span>` : ''}` : `<br><span style="font-size:13px;color:#6b7280">${esc(r.no_guide_text)}</span>`}</div>`;
-const brokerSectionHtml = (panel) => `${h2('Broker sites')}${para(esc(panel.intro))}${[...panel.rows, ...panel.others].map(brokerCardHtml).join('')}${para(esc(panel.region_note))}${para(esc(panel.coverage_note))}`;
+const brokerSectionHtml = (panel) => `${h2('Broker sites')}${para(esc(panel.intro))}${[...panel.rows, ...panel.others].map(brokerCardHtml).join('')}${para(esc(panel.region_note))}${panel.coverage_note ? para(esc(panel.coverage_note)) : ''}`;
 
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], listings = null, pasteAvailable = true, webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], listings = null, pasteAvailable = true, entitlements = null, webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -225,7 +225,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   const noteScore = s.score === null
     ? 'No privacy score yet: we only score what we actually checked, and we will not invent a number.'
     : `Partial score, based only on the checks that ran (${s.categories_checked.join(', ') || 'none'}). Everything marked NOT CHECKED below is not in it.`;
-  const panel = buildBrokerPanel(listings, { pasteAvailable });
+  const panel = buildBrokerPanel(listings, { pasteAvailable, entitlements });
   const breachRows = breachStatus === 'checked' ? breaches.slice(0, MAX_BREACH_ROWS) : [];
   const breachMore = breachStatus === 'checked' ? Math.max(0, breaches.length - MAX_BREACH_ROWS) : 0;
   const part1Intro = webScan

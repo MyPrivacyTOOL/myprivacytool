@@ -22,7 +22,7 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const to = (n) => calls.filter((c) => c.url.includes(n));
 async function post(body, e = env) {
   const waits = [];
-  const r = await worker.fetch(new Request('https://x/', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify(body) }), e, { waitUntil: (p) => waits.push(p) });
+  const r = await worker.fetch(new Request('https://x/', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify('consent' in body ? body : { consent: true, ...body }) }), e, { waitUntil: (p) => waits.push(p) });
   await Promise.all(waits); return r;
 }
 
