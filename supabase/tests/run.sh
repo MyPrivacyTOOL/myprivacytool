@@ -96,6 +96,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/telegram-event-flags.test.sql
 echo "== Deep Research findings and verification gate (MPC-9549)"
 psql_ "$TEST_URL" -At -f supabase/tests/deep-research.test.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9887-scan-consents.test.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9890-free-record-deletion.test.sql
 # Real concurrency: 8 separate connections try to redeem ONE link at the same moment. Exactly one may win.
 psql_ "$TEST_URL" -c "insert into public.profile_snapshots (id, sender_id, update_id, status, scan_version, risk_version, consent, get_chat, photos, expires_at) values ('00000000-0000-0000-0000-0000000000c1', '333', 1, 'complete', 'telegram-baseline-1', 'risk-count-1', '{}', '{}', '{}', now() + interval '90 days')" \
   -c "insert into public.dashboard_links (token_hash, sender_id, snapshot_id, expires_at) values (repeat('e',64), '333', '00000000-0000-0000-0000-0000000000c1', now() + interval '15 minutes')"
