@@ -111,7 +111,7 @@ async function finishScan(page: Page) {
 const fill = async (page: Page, email: string, { save }: { save: boolean }) => {
   await page.getByPlaceholder("your@email.com").fill(email);
   await page.getByLabel(/email me my results and occasional privacy tips/i).check();
-  const saveBox = page.getByLabel(/save my scan result with my email/i);
+  const saveBox = page.getByLabel(/(save my scan result with my email|keep my scan and create my free account)/i);   // MPC-9817: the production build carries the one-step wording while VITE_ACCOUNTS_ENABLED is on
   await expect(saveBox).not.toBeChecked();                     // unticked by default
   if (save) await saveBox.check();
 };
@@ -137,7 +137,7 @@ test.describe("post-scan popup -> report pipeline (stubbed API, real Worker code
     const t = be.tables;
     expect([t.users.length, t.leads.length, t.scans.length, t.web_scans.length, t.web_scan_contacts.length]).toEqual([1, 1, 1, 1, 1]);
     expect(t.web_scan_contacts[0]).toMatchObject({ channel: "email", contact_id: t.scans[0].id, web_scan_id: t.web_scans[0].id });
-    expect(t.web_scan_contacts[0].save_consent_version).toBe("2026-10-12-v1");
+    expect(t.web_scan_contacts[0].save_consent_version).toBe("2026-11-08-v1")   // MPC-9817: the one-step wording version (the build in this test has the accounts flag on);
     expect(t.scans[0].request_id).toBe(seen[0].sent.request_id);
     expect(shown).toBe(t.web_scans[0].id);                     // the popup shows the stored scan's id, not one made in the browser
     expect(be.mails).toHaveLength(1);

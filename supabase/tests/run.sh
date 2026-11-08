@@ -250,5 +250,10 @@ psql_ "$TEST_URL" -f "$BROKERS"
 psql_ "$TEST_URL" -f "$BROKERS"   # idempotent
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-8689-brokers-rows.test.sql
 
+# MPC-9817: accounts and sign-in. The migration is applied by the loop above; applied again here to prove it is idempotent, then the assertions (RLS, no IP column, consent carry, link/claim, 7-day exit, can(), real delete).
+echo "== accounts and sign-in (MPC-9817)"
+psql_ "$TEST_URL" -f supabase/migrations/20261108120000_mpc_9817_accounts_and_signin.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9817-accounts.test.sql
+
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

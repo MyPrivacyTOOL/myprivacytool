@@ -12,6 +12,7 @@ export const KEY_TYPES = [
   ['referral-invite-', 'referral-invite', 'REF-invite', 'referral'], ['referral-reward-', 'referral-reward', 'REF-reward', 'referral'],
   ['hk-spam-test-', 'hk-spam-test', 'HK-day10-test', 'hk-spam'], ['hk-spam-day', 'hk-spam-day10', 'HK-day10', 'hk-spam'],
   ['deep-research-code-', 'deep-research-code', 'SYS-deep-research-code', 'any'],
+  ['signin-', 'account-signin', 'SYS-account-signin', 'any'],   // MPC-9817
 ];
 export function emailTypeFromKey(key) {
   const k = String(key || '');

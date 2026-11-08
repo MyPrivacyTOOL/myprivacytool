@@ -48,6 +48,8 @@ const Monitoring = lazy(() => import("./pages/Monitoring"));
 const ScanResults = lazy(() => import("./pages/ScanResults"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
 const VerifyReport = lazy(() => import("./pages/VerifyReport"));
+const Account = lazy(() => import("./pages/Account"));
+const AccountVerify = lazy(() => import("./pages/AccountVerify"));
 const DeviceDemo = lazy(() => import("./pages/DeviceDemo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -122,6 +124,9 @@ const App = () => (
             <Route path="/hong-kong-spam" element={<Navigate to="/HongKongSpam" replace />} />
             {/* MPC-8281: check a signed report. Noindex and unlinked until signed reports are switched on. */}
             <Route path="/verify-report" element={<VerifyReport />} />
+            {/* MPC-9817: accounts and sign-in (email link). Off unless VITE_ACCOUNTS_ENABLED is "true"; noindex. */}
+            <Route path="/account" element={<Account />} />
+            <Route path="/account/verify" element={<AccountVerify />} />
             {/* MPC-DEMO: Device orientation & motion sensor test page. Noindex, staging only. */}
             <Route path="/device-demo" element={<DeviceDemo />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
