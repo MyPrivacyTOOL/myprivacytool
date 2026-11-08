@@ -110,6 +110,28 @@ export function rememberCompletedScan(hexagons: HexagonData[]): void {
   }
 }
 
+/**
+ * MPC-9898: the visitor's own values for /footprint/, written to localStorage "mpt_footprint_scan" as {"values":{"<hexagon id>":{"ex","conf"}}}.
+ * It stays in this browser (nothing is sent) and /footprint/ reads it to drop the Sample marker. Only hexagons with a real value are written;
+ * an empty or unreadable scan removes the key so the page stays labelled sample.
+ */
+export const FOOTPRINT_SCAN_KEY = "mpt_footprint_scan";
+export function writeFootprintScan(hexagons: HexagonData[]): void {
+  try {
+    const values: Record<string, { ex: string; conf: number }> = {};
+    for (const h of hexagons.slice(0, 500)) {
+      const id = text(h.id, 64);
+      const ex = text(h.value, 200).trim();
+      if (!/^[a-z0-9][a-z0-9_-]*$/i.test(id) || !ex || /^(unknown|not detected|n\/a)\b/i.test(ex)) continue;
+      values[id] = { ex, conf: Number.isFinite(h.confidence) ? Math.min(100, Math.max(0, Math.round(h.confidence))) : 0 };
+    }
+    if (Object.keys(values).length > 0) localStorage.setItem(FOOTPRINT_SCAN_KEY, JSON.stringify({ values }));
+    else localStorage.removeItem(FOOTPRINT_SCAN_KEY);
+  } catch {
+    /* storage blocked or full: /footprint/ simply stays labelled sample */
+  }
+}
+
 /** The scan kept in this browser for the contact step, or null (arrived without a scan, storage blocked, nothing valid stored). */
 export function pendingScan(): Record<string, unknown>[] | null {
   try {

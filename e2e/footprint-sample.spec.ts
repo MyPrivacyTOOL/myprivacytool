@@ -29,3 +29,13 @@ test("a malformed saved scan is ignored and the page stays labelled sample", asy
   await page.goto("/footprint/");
   await expect(page.getByTestId("sample-banner")).toBeVisible();
 });
+
+// MPC-9898: the scan writes the visitor's values, so /footprint/ after a real scan in the same browser drops the Sample marker.
+test("a completed scan on the home page writes mpt_footprint_scan and /footprint/ then shows real values", async ({ page }) => {
+  await page.goto("/");
+  await expect.poll(async () => page.evaluate(() => localStorage.getItem("mpt_footprint_scan")), { timeout: 30_000 }).not.toBeNull();
+  const saved = JSON.parse((await page.evaluate(() => localStorage.getItem("mpt_footprint_scan")))!);
+  expect(Object.keys(saved.values).length).toBeGreaterThan(0);
+  await page.goto("/footprint/");
+  await expect(page.getByTestId("sample-banner")).toBeHidden();
+});

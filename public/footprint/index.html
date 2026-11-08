@@ -343,7 +343,7 @@ const NS='http://www.w3.org/2000/svg';
 const VALID_STATE=new Set(['found','ask','told','risk','confirmed','fixed','false']);
 const isExposure=it=>EXPOSURE.has(it.id)||it.exposure;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-/* MPC-9831: values from a real saved scan. Reads localStorage 'mpt_footprint_scan' = {"values":{"<hexagon id>":{"ex":"...","conf":0-100}}} (nothing writes it yet; this page only reads).
+/* MPC-9831: values from a real saved scan. Reads localStorage 'mpt_footprint_scan' = {"values":{"<hexagon id>":{"ex":"...","conf":0-100}}} (written by the scan, MPC-9898; this page only reads).
    An item with a real value shows it and loses the sample marker. With none, every example value is marked sample and the banner shows. */
 const REAL=(function(){try{const o=JSON.parse(localStorage.getItem('mpt_footprint_scan')||'null'),v=o&&o.values,out={};
   if(v&&typeof v==='object')Object.keys(v).forEach(k=>{const x=v[k];if(x&&typeof x.ex==='string'&&x.ex)out[k]={ex:x.ex.slice(0,200),conf:Math.max(0,Math.min(100,Number(x.conf)||0))}});return out}catch(e){return {}}})();
