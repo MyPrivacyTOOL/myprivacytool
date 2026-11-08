@@ -22,6 +22,7 @@ import {
   type RecipientRegistry,
 } from "@/config/recipients";
 import { isLoopbackHost } from "../../shared/recipients/outbound";
+import { recordRecipient } from "@/lib/recipientLog";
 
 /** Interim marker, see the header. MPC-9888 deletes this constant when the real consent id exists. */
 export const INTERIM_CONSENT_ID = "interim-pre-gate:mpc-9886";
@@ -45,12 +46,15 @@ function withOwnHost(key: string, host: string, registry: RecipientRegistry): Re
 const buildFlag = (name: string): unknown => (import.meta.env as Record<string, unknown>)[name];
 
 export function browserContext(extra: Partial<RecipientContext> = {}): RecipientContext {
-  return { consentId: INTERIM_CONSENT_ID, flags: buildFlag, ...extra };
+  // MPC-9893: every browser call also lands in the in-tab record the per-scan "who saw what" panel renders (item names only, memory only).
+  return { consentId: INTERIM_CONSENT_ID, flags: buildFlag, log: recordRecipient, ...extra };
 }
 
 export interface RecipientFetchOptions {
   /** Tests and dependency-injected callers pass their own fetch. */
   fetchImpl?: typeof fetch;
+  /** MPC-9893: do not add this call to the in-tab "who saw what" record. Only the panel's own read of that record uses it, so the panel does not list itself. */
+  silent?: boolean;
 }
 
 /**
@@ -68,7 +72,7 @@ export function recipientFetch(key: string, url: string, init: RequestInit | und
   return fetchRecipient(
     key,
     { url: abs, init: { credentials: "same-origin", ...init }, sent },
-    browserContext({ ...(own ? { registry: withOwnHost(key, host, RECIPIENTS) } : {}), ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}) }),
+    browserContext({ ...(own ? { registry: withOwnHost(key, host, RECIPIENTS) } : {}), ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}), ...(opts.silent ? { log: undefined } : {}) }),
   );
 }
 

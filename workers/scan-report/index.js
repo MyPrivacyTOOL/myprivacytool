@@ -16,6 +16,7 @@ import { checkDeliverableDomain } from './lib/emailDomain.js';
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext, flushQuietly } from './lib/recipients.js';
 import { handleConsent, gateScanRequest, consentEnforced } from './lib/consent.js';
+import { handleScanRecipients } from './lib/scanRecipients.js';   // MPC-9893
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { handleResendWebhook } from './lib/receipts.js';
@@ -81,6 +82,8 @@ export default {
     if (request.method === 'POST' && url.pathname === '/api/deep-research/results') return handleDeepResearchResults(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/deep-research/delete') return handleDeepResearchDelete(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
+    // MPC-9893: the per-scan "who saw what" panel reads this scan's scan_recipient_log rows (names only). Read-only, authorised by the scan number.
+    if (request.method === 'GET' && url.pathname === '/api/scan/recipients') return handleScanRecipients(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // MPC-9813: the click-to-confirm. Authorised by the signed link in the confirmation email. 404 unless EMAIL_CONFIRM_GATE_ENABLED is "true".
     if (request.method === 'POST' && url.pathname === '/api/scan/confirm') return handleConfirm(env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });

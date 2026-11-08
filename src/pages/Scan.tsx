@@ -15,6 +15,7 @@ import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 import LiveScanPanel from "@/components/LiveScanPanel";
 import ShareButtons from "@/components/ShareButtons";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
+import ScanRecipientsPanel from "@/components/ScanRecipientsPanel";   // MPC-9893
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
@@ -180,6 +181,7 @@ const Scan = () => {
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
       <ScanNumberNotice />
+      <ScanRecipientsPanel />
       {liveToken && <LiveScanPanel token={liveToken} />}
     </div>
   );
