@@ -278,3 +278,19 @@ describe("funnel steps (MPC-7493, under D12)", () => {
     expect(() => reportStep("results_viewed")).not.toThrow();
   });
 });
+
+describe("writeFootprintScan (MPC-9898: the visitor's values for /footprint/)", () => {
+  beforeEach(() => localStorage.clear());
+  const hx = (id: string, value: string, confidence = 80) => ({ id, label: id, value, icon: "x", confidence, risk: "low" }) as unknown as HexagonData;
+  it("writes real values only, keyed by hexagon id", async () => {
+    const { writeFootprintScan, FOOTPRINT_SCAN_KEY } = await import("./webScan");
+    writeFootprintScan([hx("location", "Wan Chai, Hong Kong", 88), hx("browser", "Unknown browser"), hx("os", "")]);
+    expect(JSON.parse(localStorage.getItem(FOOTPRINT_SCAN_KEY)!)).toEqual({ values: { location: { ex: "Wan Chai, Hong Kong", conf: 88 } } });
+  });
+  it("leaves the key absent when nothing is real", async () => {
+    const { writeFootprintScan, FOOTPRINT_SCAN_KEY } = await import("./webScan");
+    localStorage.setItem(FOOTPRINT_SCAN_KEY, "{}");
+    writeFootprintScan([hx("os", "")]);
+    expect(localStorage.getItem(FOOTPRINT_SCAN_KEY)).toBeNull();
+  });
+});

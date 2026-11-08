@@ -28,7 +28,7 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
-import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
+import { markScanStarted, rememberCompletedScan, trackResults, writeFootprintScan } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
 import WelcomeBack from '@/components/WelcomeBack';
 import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
@@ -57,6 +57,7 @@ const Index = () => {
     if (loading || hexagons.length === 0 || scanRemembered.current) return;
     scanRemembered.current = true;
     rememberCompletedScan(hexagons);
+    writeFootprintScan(hexagons); // MPC-9898: the visitor's own values for /footprint/ (this browser only)
   }, [loading, hexagons]);
 
   // MPC-7493: funnel steps for a saved scan. The scan starts when the page opens; once the results are on screen we report "results viewed" and the
@@ -373,7 +374,7 @@ const Index = () => {
               Get clean before you go agentic
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
-              Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" />
+              Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" state="in_build" />
             </p>
             <Button asChild>
               <Link to="/journey">See your journey</Link>

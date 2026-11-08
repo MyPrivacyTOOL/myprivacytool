@@ -56,7 +56,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         </ul>
         
         <h2>What You Can Do Right Now</h2>
-        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 54 vectors for you, then give you step-by-step removal instructions for each one.<FeatureStatus feature="F9" /></p>
+        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 54 vectors for you, then give you step-by-step removal instructions for each one.<FeatureStatus feature="F9" state="in_build" /></p>
         
         <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough, so ongoing monitoring and regular removal rounds help keep your footprint small.</p>
       </div>
