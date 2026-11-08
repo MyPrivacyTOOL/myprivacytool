@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import data from "./recipients.json";
 import { canonicalJson, registryHash, sha256Hex } from "./canonical.js";
 import { DATA_ITEMS, effectiveDataItems, enabledForCountry, flagIsOn, hostMatches, parseRegistry, validateRegistry, type Recipient, type RecipientRegistry } from "./registry";
-import { RecipientError, callRecipient, checkRecipient, createPeerConnection, fetchRecipient, isPrivateOrInternalHost, loadRecipientScript, type RecipientLogEntry } from "./outbound";
+import { RecipientError, callRecipient, checkRecipient, createPeerConnection, fetchRecipient, isPrivateOrInternalHost, loadRecipientScript, registrableDomain, TRUNCATED_HEADER, USER_SUPPLIED_MAX_BYTES, type RecipientLogEntry } from "./outbound";
 
 const registry = parseRegistry(data);
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -33,13 +33,13 @@ describe("seed (MPC-9883, design 1.5)", () => {
     expect(registry.recipients.filter((r) => r.since === "2026-11-08" && r.note?.startsWith("Added by MPC-9885")).map((r) => r.key).sort()).toEqual([...MPC_9885_ADDED].sort());
     expect(MPC_9885_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
-  it("has the user-pasted-listing structural entry, 1 known-host disabled entry (platform-replies on like stripe now flag-gated by CHECKOUT_ENABLED, meta-graph switched on by MPC-9885: WhatsApp replies are live) and 6 planned disabled entries", () => {
+  it("has the user-pasted-listing structural entry, 1 known-host disabled entry (platform-replies on like stripe now flag-gated by CHECKOUT_ENABLED, meta-graph switched on by MPC-9885: WhatsApp replies are live) and 9 planned disabled entries", () => {
     expect(registry.recipients.find((r) => r.key === "user-pasted-listing")?.host_kind).toBe("user_supplied");
     for (const k of ["pwned-passwords"]) expect(registry.recipients.find((r) => r.key === k)?.enabled).toBe(false);
     const planned = registry.recipients.filter((r) => r.planned);
-    expect(planned).toHaveLength(6);
+    expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(51);
+    expect(registry.recipients).toHaveLength(54);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);
@@ -207,16 +207,30 @@ describe("check 7: user_supplied", () => {
     const loop = vi.fn(async () => new Response(null, { status: 302, headers: { location: "/again" } }));
     expect(await codeOf(call("https://www.example.org/a", {}, loop as unknown as typeof fetch))).toBe("REDIRECT_BLOCKED");
   });
+  it("follows ONE redirect inside the same registrable domain, no more (MPC-9885)", async () => {
+    let n = 0;
+    const sibling = vi.fn(async () => (n++ === 0 ? new Response(null, { status: 301, headers: { location: "https://www.example.org/b" } }) : ok()));
+    expect(await codeOf(call("https://example.org/a", {}, sibling as unknown as typeof fetch))).toBe("no error");
+    let m = 0;
+    const two = vi.fn(async () => (m++ < 2 ? new Response(null, { status: 301, headers: { location: "/next" } }) : ok()));
+    expect(await codeOf(call("https://example.org/a", {}, two as unknown as typeof fetch))).toBe("REDIRECT_BLOCKED");
+    expect(registrableDomain("a.b.example.co.uk")).toBe("example.co.uk");
+    expect(registrableDomain("www.example.org")).toBe("example.org");
+    expect(registrableDomain("example.org")).toBe("example.org");
+  });
+  it("truncates an over-cap user_supplied body instead of throwing, and says so in a header", async () => {
+    const big = vi.fn(async () => new Response("y".repeat(5000), { headers: { "content-length": "5000" } }));
+    const res = await call("https://www.example.org/a", { maxBytes: 1000 }, big as unknown as typeof fetch);
+    expect((await res.text()).length).toBe(1000);
+    expect(res.headers.get(TRUNCATED_HEADER)).toBe("1");
+    expect(USER_SUPPLIED_MAX_BYTES).toBe(1_500_000);
+  });
   it("passes redirect: manual to fetch", async () => {
     const f = vi.fn(async (_u: string, init?: RequestInit) => { expect(init?.redirect).toBe("manual"); return ok(); });
     await call("https://www.example.org/a", {}, f as unknown as typeof fetch);
     expect(f).toHaveBeenCalled();
   });
-  it("caps response size (declared and streamed)", async () => {
-    const declared = vi.fn(async () => new Response("x", { headers: { "content-length": "5000" } }));
-    expect(await codeOf(call("https://www.example.org/a", { maxBytes: 1000 }, declared as unknown as typeof fetch))).toBe("RESPONSE_TOO_LARGE");
-    const streamed = vi.fn(async () => new Response("y".repeat(5000)));
-    expect(await codeOf(call("https://www.example.org/a", { maxBytes: 1000 }, streamed as unknown as typeof fetch))).toBe("RESPONSE_TOO_LARGE");
+  it("leaves a body under the cap untouched", async () => {
     const res = await call("https://www.example.org/a", { maxBytes: 1000 }, vi.fn(async () => new Response("hello")) as unknown as typeof fetch);
     expect(await res.text()).toBe("hello");
   });

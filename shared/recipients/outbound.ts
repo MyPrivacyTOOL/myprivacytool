@@ -86,9 +86,20 @@ export interface RecipientRequest {
   sent: readonly DataItem[];
 }
 
-export const USER_SUPPLIED_MAX_BYTES = 1_000_000;
+export const USER_SUPPLIED_MAX_BYTES = 1_500_000;   // matches the page readers this key replaced (listingCheck, records-check): over the cap the body is TRUNCATED, not refused
 export const USER_SUPPLIED_TIMEOUT_MS = 8000;
-const MAX_REDIRECT_HOPS = 3;
+const MAX_REDIRECT_HOPS = 1;
+/** Response header set when a user_supplied body was cut at the cap (the caller decides what "too big to read in full" means for it). */
+export const TRUNCATED_HEADER = "x-recipient-truncated";
+
+const SECOND_LEVEL = new Set(["co", "com", "org", "net", "gov", "edu", "ac", "or", "ne"]);
+/** Approximate registrable domain (eTLD+1): last two labels, or three when the second-level label is a common one under a 2-letter country TLD (example.co.uk). No public-suffix list is bundled. */
+export function registrableDomain(hostname: string): string {
+  const labels = hostname.toLowerCase().replace(/\.$/, "").split(".");
+  if (labels.length <= 2) return labels.join(".");
+  const tld = labels[labels.length - 1], sld = labels[labels.length - 2];
+  return labels.slice(tld.length === 2 && SECOND_LEVEL.has(sld) ? -3 : -2).join(".");
+}
 
 let bundled: RecipientRegistry | null = null;
 const defaultRegistry = (): RecipientRegistry => (bundled ??= parseRegistry(recipientsData));
@@ -203,30 +214,42 @@ async function guarded(key: string, hostUrl: string, sent: readonly DataItem[], 
   }
 }
 
-async function capBody(key: string, res: Response, maxBytes: number): Promise<Response> {
+async function capBody(key: string, res: Response, maxBytes: number, truncate = false): Promise<Response> {
   const declared = Number(res.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new RecipientError("RESPONSE_TOO_LARGE", key, `content-length ${declared}`);
+  if (!truncate && Number.isFinite(declared) && declared > maxBytes) throw new RecipientError("RESPONSE_TOO_LARGE", key, `content-length ${declared}`);
   if (!res.body) return res;
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let cut = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > maxBytes) { try { await reader.cancel(); } catch { /* ignore */ } throw new RecipientError("RESPONSE_TOO_LARGE", key, `more than ${maxBytes} bytes`); }
+    if (total > maxBytes) {
+      try { await reader.cancel(); } catch { /* ignore */ }
+      if (!truncate) throw new RecipientError("RESPONSE_TOO_LARGE", key, `more than ${maxBytes} bytes`);
+      chunks.push(value);
+      cut = true;
+      break;
+    }
     chunks.push(value);
   }
-  const body = new Uint8Array(total);
+  const all = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
   let off = 0;
-  for (const c of chunks) { body.set(c, off); off += c.byteLength; }
-  return new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+  for (const c of chunks) { all.set(c, off); off += c.byteLength; }
+  const body = cut ? all.subarray(0, maxBytes) : all;
+  const headers = new Headers(res.headers);
+  if (cut) headers.set(TRUNCATED_HEADER, "1");
+  return new Response(body, { status: res.status, statusText: res.statusText, headers });
 }
 
 async function fetchUserSupplied(key: string, first: URL, init: RequestInit | undefined, ctx: RecipientContext, doFetch: typeof fetch): Promise<Response> {
   const timeoutMs = ctx.timeoutMs ?? USER_SUPPLIED_TIMEOUT_MS;
   const maxBytes = ctx.maxBytes ?? USER_SUPPLIED_MAX_BYTES;
   const controller = new AbortController();
+  const callerSignal = init?.signal;
+  if (callerSignal) { if (callerSignal.aborted) controller.abort(); else callerSignal.addEventListener("abort", () => controller.abort(), { once: true }); }
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   try {
@@ -234,12 +257,12 @@ async function fetchUserSupplied(key: string, first: URL, init: RequestInit | un
     for (let hop = 0; ; hop++) {
       const res = await doFetch(url.toString(), { ...init, redirect: "manual", signal: controller.signal });
       const isRedirect = (res.type as string) === "opaqueredirect" || (res.status >= 300 && res.status < 400);
-      if (!isRedirect) return await capBody(key, res, maxBytes);
+      if (!isRedirect) return await capBody(key, res, maxBytes, true);
       const location = res.headers.get("location");
       if (!location) throw new RecipientError("REDIRECT_BLOCKED", key, "redirect without a readable Location");
       let next: URL;
       try { next = new URL(location, url); } catch { throw new RecipientError("REDIRECT_BLOCKED", key, "bad Location"); }
-      if (next.hostname.toLowerCase() !== url.hostname.toLowerCase() || next.protocol !== "https:") throw new RecipientError("REDIRECT_BLOCKED", key, `to ${next.hostname}`);
+      if (registrableDomain(next.hostname) !== registrableDomain(url.hostname) || next.protocol !== "https:") throw new RecipientError("REDIRECT_BLOCKED", key, `to ${next.hostname}`);
       if (hop + 1 > MAX_REDIRECT_HOPS) throw new RecipientError("REDIRECT_BLOCKED", key, "too many redirects");
       url = next;
     }

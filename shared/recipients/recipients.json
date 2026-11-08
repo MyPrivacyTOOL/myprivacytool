@@ -1454,6 +1454,87 @@
       "since": "2026-11-08",
       "until": null,
       "note": "Added by MPC-9885. First party, so no outside recipient; registered so a workers.dev host is checked rather than exempt. MPC-9885: cairn-push.mjs and e2e.mjs send the seed email and fact values (email, raw phone, username) to the cairn bridge Worker, which hashes phones before storing; added email, phone, username."
+    },
+    {
+      "key": "osint-whatsapp-profile",
+      "name": "WhatsApp profile metadata provider (RapidAPI, paid tier)",
+      "hosts": [],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "phone"
+      ],
+      "purpose": "Deep dive: whether the WhatsApp number has a profile photo or is a business account.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (vendor not yet named)"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "planned": true,
+      "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
+      "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
+    },
+    {
+      "key": "osint-spam-registry",
+      "name": "Phone spam-registry provider (paid tier)",
+      "hosts": [],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "phone"
+      ],
+      "purpose": "Deep dive: how many spam flags a phone number has.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (vendor not yet named)"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "planned": true,
+      "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
+      "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
+    },
+    {
+      "key": "osint-breach-db",
+      "name": "Phone breach-database provider (paid tier)",
+      "hosts": [],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "phone"
+      ],
+      "purpose": "Deep dive: how many breach records contain a phone number.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (vendor not yet named)"
+      },
+      "consent_basis": "scan_consent",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "planned": true,
+      "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
+      "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
     }
   ]
 }

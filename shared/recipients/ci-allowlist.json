@@ -49,7 +49,6 @@
     {"rule":"forbidden-api","file":"src/pages/TelegramDashboard.tsx","line":132,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"forbidden-api","file":"src/pages/Unsubscribe.tsx","line":32,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"forbidden-api","file":"src/pages/Unsubscribe.tsx","line":50,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9886"},
-    {"rule":"forbidden-api","file":"workers/webhook-receiver/deepDive.ts","line":28,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9885"},
     {"rule":"crawl-preclick-third-party","file":"(crawl)","line":0,"detail":"stun:stun.l.google.com","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"crawl-preclick-third-party","file":"(crawl)","line":0,"detail":"stun:stun1.l.google.com","added":"2026-11-08","note":"pending MPC-9886"}
   ]

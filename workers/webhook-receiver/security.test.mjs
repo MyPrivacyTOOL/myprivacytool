@@ -1,8 +1,6 @@
 // Run: node workers/webhook-receiver/security.test.mjs  (no network, no secrets)
 import { createHmac } from 'node:crypto';
-// MPC-9885: index.js imports the TypeScript recipient wrapper; let plain Node load it (test-only hook).
-import '../lib/node-ts-hooks.mjs';
-const { default: worker } = await import('./index.js');
+import worker from './index.js';
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({}), text: async () => '' });
 const env = { TELEGRAM_WEBHOOK_SECRET: 'tg', META_APP_SECRET: 'meta', TWILIO_AUTH_TOKEN: 'tw', EMAIL_WEBHOOK_SECRET: 'em', META_VERIFY_KEY: 'vk' };

@@ -32,6 +32,9 @@ export interface WorkerContextOptions {
   sink?: RecipientLogSink | null;
   /** Runs right before each network call (subrequest budget guards). See RecipientContext.beforeCall. */
   beforeCall?: RecipientContext["beforeCall"];
+  /** user_supplied caps (check 7); defaults are in outbound.ts. */
+  timeoutMs?: number;
+  maxBytes?: number;
 }
 
 export interface RecipientLogSink {
@@ -92,6 +95,8 @@ export function workerRecipientContext(env: Env, opts: WorkerContextOptions = {}
     ...(opts.scanId ? { scanId: opts.scanId } : {}),
     ...(opts.country ? { country: opts.country } : {}),
     ...(CONSENT_GATE_ACTIVE ? { consentId: opts.consentId ?? null, verifyConsent: opts.verifyConsent, consentGate: "enforce" as const } : { consentGate: "pending_mpc_9887" as const }),
+    ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
+    ...(opts.maxBytes ? { maxBytes: opts.maxBytes } : {}),
     ...(opts.beforeCall ? { beforeCall: opts.beforeCall } : {}),
     ...(sink ? { log: sink.log } : {}),
     flush: sink ? sink.flush : async () => 0,

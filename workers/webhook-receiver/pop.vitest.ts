@@ -9,6 +9,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
+import { osintProvidersOn } from './test-support/osint-providers-on.ts';
+
+osintProvidersOn();
 import { checkPossession, proofSid, CONSENT_VERSION, MAX_WRONG_CODES, CHALLENGE_TTL_MS, VERIFY_PROMPT } from './pop.ts';
 
 const SECRET = 'dd-secret';

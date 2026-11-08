@@ -166,12 +166,13 @@ describe("Supabase store", () => {
     expect(urls[3]).toContain("select=*");
     expect(urls[3]).not.toContain("scope=eq");
   });
-  it("MPC-9885: every store call reaches the supabase recipient and the fetch spy finds it registered", async () => {
+  it("MPC-9885: every store call reaches a supabase host and the fetch spy finds it registered", async () => {
     const spy = createFetchSpy({ respond: () => new Response("[]") });
     const store = supabaseStore({ SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "k" }, spy.fetch)!;
     await store.session("c".repeat(64));
     await store.latestDeepJob("sender-1");
-    expect(spy.calls.map((c) => c.recipient)).toEqual(["supabase", "supabase"]);
+    // The spy resolves a host to the first registry entry that owns it (visit-log shares *.supabase.co), so assert the host, not the key.
+    expect(spy.calls.map((c) => c.host)).toEqual(["x.supabase.co", "x.supabase.co"]);
     spy.assertAllRegistered();
   });
 });
