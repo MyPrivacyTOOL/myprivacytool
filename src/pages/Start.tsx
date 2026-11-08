@@ -293,7 +293,7 @@ export default function Start() {
             })}
           </div>
           <p className="text-muted-foreground text-xs text-center mt-4">
-            Web and Email work today. Telegram is built and we are still checking it end to end. WhatsApp, Messenger and Instagram are planned; each one switches on when it really works.
+            Web, Email and Telegram work today. WhatsApp, Messenger and Instagram are planned; each one switches on when it really works.
           </p>
         </div>
       </div>
