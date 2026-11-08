@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPersonKey, learningEventsEnabled, recordAnswer, recordShown, resetShownForTests, PERSON_KEY_STORAGE } from './events';
 
 const tile = { hexagonId: 'location', tileKind: 'our_guess', confidence: 0.95 };
-const on = { enabled: true, consent: true, base: 'https://api.example', personKey: 'abcdefghijklmnop' };
+const on = { enabled: true, consent: true, base: 'https://myprivacytool-webhook-receiver.myprivacytool.workers.dev', personKey: 'abcdefghijklmnop' };
 const ok = () => vi.fn(async () => new Response('{}', { status: 202 }));
 
 beforeEach(() => resetShownForTests());
@@ -29,7 +29,7 @@ describe('sending', () => {
     const f = ok();
     expect(await recordAnswer({ ...tile, source: 'web-scan' }, 'not_me', { ...on, fetchImpl: f })).toBe(true);
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('https://api.example/api/learning/event');
+    expect(url).toBe('https://myprivacytool-webhook-receiver.myprivacytool.workers.dev/api/learning/event');
     const body = JSON.parse(String(init.body));
     expect(Object.keys(body).sort()).toEqual(['answer', 'confidence_at_display', 'config_version', 'event_type', 'hexagon_id', 'person_key', 'scan_window', 'source', 'tile_kind']);
     expect(body).toMatchObject({ event_type: 'answer', answer: 'not_me', hexagon_id: 'location', person_key: 'abcdefghijklmnop', config_version: 0, confidence_at_display: 0.95 });
@@ -71,7 +71,7 @@ describe('getPersonKey', () => {
 
 // The real consent gate (not an injected flag): only "Accept analytics" in the cookie banner lets an event out.
 describe('consent gate wiring', () => {
-  const base = { enabled: true, base: 'https://api.example', personKey: 'abcdefghijklmnop' };
+  const base = { enabled: true, base: 'https://myprivacytool-webhook-receiver.myprivacytool.workers.dev', personKey: 'abcdefghijklmnop' };
   afterEach(() => window.localStorage.clear());
   const choose = (analytics: boolean) => window.localStorage.setItem('mpt_cookie_consent', JSON.stringify({ v: 1, analytics, at: new Date().toISOString() }));
 

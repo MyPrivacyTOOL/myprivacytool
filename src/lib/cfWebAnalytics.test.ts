@@ -7,9 +7,10 @@ describe("loadCfWebAnalytics", () => {
     expect(loadCfWebAnalytics("  ")).toBe(false);
     expect(document.querySelector("script[data-cf-beacon]")).toBeNull();
   });
-  it("injects the beacon once when a token is set", () => {
+  it("injects the beacon once when a token is set", async () => {
     expect(loadCfWebAnalytics("tok123")).toBe(true);
-    expect(loadCfWebAnalytics("tok123")).toBe(false);
+    expect(loadCfWebAnalytics("tok123")).toBe(false); // second call in the gap before the wrapper adds the tag (MPC-9886)
+    await new Promise((r) => setTimeout(r, 0));
     const s = document.querySelectorAll("script[data-cf-beacon]");
     expect(s).toHaveLength(1);
     expect(JSON.parse(s[0].getAttribute("data-cf-beacon")!)).toEqual({ token: "tok123" });

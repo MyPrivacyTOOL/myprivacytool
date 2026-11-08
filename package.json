@@ -9,7 +9,7 @@
     "check:registry:report": "node scripts/registry-ci/check.mjs --report",
     "test:registry-crawl": "playwright test -c playwright.registry.config.ts",
     "dev": "vite",
-    "prebuild": "node scripts/sync-plans.mjs",
+    "prebuild": "node scripts/sync-plans.mjs && node scripts/build-recipient-client.mjs",
     "build": "vite build",
     "postbuild": "node scripts/prerender-meta.mjs && node scripts/generate-hexagon-pages.mjs && node scripts/generate-guide-pages.mjs && node scripts/generate-sitemap.mjs && node scripts/generate-feed.mjs && node scripts/write-version.mjs",
     "build:dev": "vite build --mode development",

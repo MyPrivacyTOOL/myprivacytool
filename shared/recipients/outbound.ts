@@ -83,6 +83,12 @@ const defaultRegistry = (): RecipientRegistry => (bundled ??= parseRegistry(reci
 
 const readFlag = (ctx: RecipientContext, name: string): unknown => (typeof ctx.flags === "function" ? ctx.flags(name) : ctx.flags?.[name]);
 
+/** localhost / 127.0.0.0/8 / ::1 only. Used to let a developer's own machine call its own dev server over http. */
+export const isLoopbackHost = (hostname: string): boolean => {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "localhost" || h === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+};
+
 /** Private, loopback, link-local, carrier-grade and reserved destinations, and internal-looking names. Literal-address check only: see PR note on DNS. */
 export function isPrivateOrInternalHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
@@ -158,7 +164,8 @@ export async function checkRecipient(key: string, hostUrl: string, sent: readonl
   } else {
     if (recipient.host_kind === "stun") {
       if (!/^stuns?:$/.test(url.protocol)) throw new RecipientError("WRONG_HOST_KIND", key, "stun entries accept stun: URLs only");
-    } else if (url.protocol !== "https:" && url.protocol !== "wss:") {
+    } else if (url.protocol !== "https:" && url.protocol !== "wss:" && !(url.protocol === "http:" && isLoopbackHost(url.hostname))) {
+      // MPC-9886: plain http only for a loopback host (vite dev, `vite preview`, the Playwright suite). A production host is https or refused.
       throw new RecipientError("BAD_URL", key, `protocol ${url.protocol}`);
     }
     if (!hostMatches(url.hostname, recipient.hosts)) throw new RecipientError("HOST_MISMATCH", key, url.hostname);

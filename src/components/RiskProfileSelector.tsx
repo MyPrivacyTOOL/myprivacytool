@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Shield, Briefcase, Heart, Zap, ChevronRight, AlertTriangle, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { bandFor, BAND_LABEL } from '../../shared/hexagon-registry/score.js';
+import { recipientFetch } from '@/lib/recipientClient';
 
 export type RiskProfile = 'professional' | 'parent' | 'activist' | 'general';
 
@@ -82,7 +83,7 @@ export default function RiskProfileSelector({
       // Call the Worker to save the risk profile to Supabase
       const WORKER_ENDPOINT = import.meta.env.VITE_WORKER_ENDPOINT || 'https://api.myprivacytool.io';
       
-      const res = await fetch(WORKER_ENDPOINT, {
+      const res = await recipientFetch('leads', WORKER_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,7 +92,7 @@ export default function RiskProfileSelector({
           action: 'save_risk_profile',
           ts: Date.now(),
         }),
-      });
+      }, ['email']);
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       

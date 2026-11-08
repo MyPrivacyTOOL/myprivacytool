@@ -5,6 +5,7 @@
 // request data via GET /whoami-extra), exact device model (client hints) and clock offset. Not built: reverse DNS (would show the visitor's IP to a third-party DNS
 // resolver, which MPC-7350 rules out) and the four permission-prompt checks (GPS, camera and microphone names, notifications, contacts and clipboard), which need new prompts.
 import { WEB_EXTRA_IDS } from '../../shared/hexagon-registry/channels.js';
+import { recipientFetch } from '@/lib/recipientClient';
 
 export type ExtraStatus = 'found' | 'clear' | 'not_checked';
 export interface WebExtra { id: string; label: string; status: ExtraStatus; value?: string; reason?: string }
@@ -65,11 +66,11 @@ export async function deviceModel(ua: UaData | null | undefined): Promise<WebExt
   }
 }
 
-export async function collectWebExtras(fetchImpl: typeof fetch = fetch, env: ExtraEnv = {}): Promise<WebExtra[]> {
+export async function collectWebExtras(fetchImpl?: typeof fetch, env: ExtraEnv = {}): Promise<WebExtra[]> {
   let edge: EdgeExtra | null = null;
   try {
     const base = (import.meta.env.VITE_WORKER_ENDPOINT || 'https://api.myprivacytool.io').replace(/\/+$/, '');
-    const res = await fetchImpl(`${base}/whoami-extra`, { cache: 'no-store' });
+    const res = await recipientFetch('whoami', `${base}/whoami-extra`, { cache: 'no-store' }, [], fetchImpl ? { fetchImpl } : {});
     if (res.ok) edge = (await res.json()) as EdgeExtra;
   } catch { /* edge stays null: every edge hexagon says not checked */ }
   const dev = env.deviceTimeZone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined);
