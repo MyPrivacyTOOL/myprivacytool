@@ -31,7 +31,7 @@ describe("developer docs match the Workers", () => {
     expect(text).not.toMatch(/auth":"None\. The Worker/);
     expect(e.request.fields.find((f) => f.name === "consent")?.required).toBe(true);
     const src = read(e.source);
-    expect(src.indexOf("Consent required")).toBeLessThan(src.indexOf("api.notion.com/v1/pages"));
+    expect(src.indexOf("Consent required")).toBeLessThan(src.indexOf("const nr = await callRecipient('notion'"));
   });
 
   it("uses the hosts declared in each wrangler.toml (workers.dev, or a custom domain)", () => {
