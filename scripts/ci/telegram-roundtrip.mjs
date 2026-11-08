@@ -29,6 +29,14 @@ export function evaluate(rows) {
 export async function resolveSenderId(env, fetchImpl = fetch) {
   const given = (env.SYNTHETIC_TELEGRAM_ID ?? "").trim();
   if (/^\d{4,15}$/.test(given)) return given;
+  // PROBE_TELEGRAM_IDS is a secret binding (unreadable), but the Worker writes channel_probe_captures ONLY for senders on that allow-list, so the newest sender there is an allow-listed id.
+  const sb = (env.SUPABASE_URL || "https://xmdmkumwxpgahmlweuug.supabase.co").replace(/\/$/, "");
+  if (env.SUPABASE_SERVICE_ROLE_KEY) {
+    const h = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` };
+    const r = await fetchImpl(`${sb}/rest/v1/channel_probe_captures?platform=eq.telegram&select=sender_id&order=created_at.desc&limit=1`, { headers: h }).catch(() => null);
+    const sid = r?.ok ? String(((await r.json().catch(() => []))[0] ?? {}).sender_id ?? "") : "";
+    if (/^\d{4,15}$/.test(sid)) return sid;
+  }
   if (!env.CLOUDFLARE_API_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) return null;
   const res = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/social-listeners/settings`, { headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` } });
   const b = ((await res.json().catch(() => ({}))).result?.bindings ?? []).find((x) => x.name === "PROBE_TELEGRAM_IDS");
