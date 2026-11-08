@@ -42,6 +42,9 @@ export default tseslint.config(
       ],
       "no-restricted-syntax": ["error",
         { selector: "ImportExpression > Literal[value=/^https?:/]", message: "Dynamic import() of a remote URL is an outbound call. (MPC-9884)" },
+        // MPC-9889 (Open Tracker rule 3): the visit_log schema is reachable from functions/_visit-log.ts and the purge job only. Authoritative gate: scripts/ci/check-visit-log-isolation.mjs.
+        { selector: "Literal[value=/\\bvisit_log\\b/]", message: "The visit_log schema is private to functions/_visit-log.ts and the purge job; nothing else may name it. (MPC-9889)" },
+        { selector: "TemplateElement[value.raw=/\\bvisit_log\\b/]", message: "The visit_log schema is private to functions/_visit-log.ts and the purge job; nothing else may name it. (MPC-9889)" },
         { selector: "CallExpression[callee.name=/^(callRecipient|fetchRecipient|loadRecipientScript|createPeerConnection|recipientFetch|recipientScript|recipientPeerConnection)$/][arguments.0.type!='Literal']", message: "A recipient wrapper call must pass a string-literal registry key that exists in shared/recipients/recipients.json. (MPC-9884)" },
       ],
     },
