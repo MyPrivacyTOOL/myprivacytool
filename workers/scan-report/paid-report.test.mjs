@@ -8,6 +8,8 @@ import { buildReportEmail } from './lib/email.js';
 import { handleExportIssue, handleExportDownload, loadExportDocument } from './lib/accounts.js';
 import { fake } from './test-support/fake-backend.mjs';
 import { seedRows, RANK } from './test-support/fake-entitlements.mjs';
+import PLANS from './lib/plans.generated.js';
+import { readFileSync } from 'node:fs';
 import { enableHibpForTests } from './test-support/hibp-on.mjs';
 enableHibpForTests();
 
@@ -22,6 +24,7 @@ const entFor = (tier, override = {}) => {
 };
 const ENV_ON = { BREACH_GATE_ENABLED: 'true' };
 
+check(JSON.stringify(PLANS) === JSON.stringify(JSON.parse(readFileSync(new URL('../../src/data/plans.generated.json', import.meta.url), 'utf8'))), 'the Worker plans module equals src/data/plans.generated.json (AT-2: one price source)');
 // ---- AT-9 / AT-8: the gate is data
 check(seedRows().filter((r) => r.cost === 'third_party').every((r) => r.min_tier !== 'free'), 'AT-9: every third_party-cost capability is above free');
 check(breachGate(ENV_ON, entFor('free')).allowed === false && breachGate(ENV_ON, entFor('basic')).allowed === true, 'breach gate: Free denied, Basic allowed');
@@ -55,7 +58,7 @@ check(breachGate({}, entFor('free')).allowed === true, 'switch off (BREACH_GATE_
 {
   const ENV = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HIBP_API_KEY: 'h', HIBP_MIN_INTERVAL_MS: '0', RECIPIENT_ALLOWLIST: '', SCAN_ALLOWANCE_ENABLED: 'true', UNSUBSCRIBE_SECRET: 's', BREACH_GATE_ENABLED: 'true', ALLOW_PARTIAL_REPORT: 'false' };
   const run = async (plan) => {
-    const F = fake(); globalThis.fetch = F.f; F.db.plans = [{ slug: 'basic', monthly_price_cents: 799 }];
+    const F = fake(); globalThis.fetch = F.f;
     const email = `${plan}.person@example.test`; F.db.accounts.push({ id: '60000000-0000-4000-8000-000000000001', email, plan });
     const w = [];
     await worker.fetch(new Request('https://x.test/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', Origin: 'https://myprivacytool.io' }, body: JSON.stringify({ email, consent: true }) }), ENV, { waitUntil: (p) => w.push(p) }); await Promise.all(w);

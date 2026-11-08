@@ -116,7 +116,7 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
     // MPC-9818: the reader's plan decides the paid-coverage state. Only the reader of the email link (who proved the inbox) is looked up by email; anyone else sees the Free reading.
     const owner = verified ? scan[0]?.email_scanned : null;
     const entitlements = owner ? await getEntitlements(sb, { email: owner }) : null;
-    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice: await loadBasicPrice(sb) });
+    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice: await loadBasicPrice() });
     return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified,
       ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}), broker_panel });
   } catch (e) {

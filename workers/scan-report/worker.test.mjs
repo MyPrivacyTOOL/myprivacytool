@@ -60,9 +60,8 @@ check(recipientAllowed(env, 'Testing.NT69+abc@gmail.com') && !recipientAllowed(e
 
 let F = fake(); await handleScan(env, null, input, F.f);
 check(F.db.users.length === 1 && F.db.leads.length === 1 && F.db.scans.length === 1, 'submit writes user, lead, scan');
-check(F.db.users[0].consent_source === 'scan_page' && F.db.users[0].ip_address === '1.2.3.4' && new Date(F.db.users[0].retain_until) > new Date(Date.now() + 3 * 364 * 864e5), 'consent_given_at, source, ip, 3y retention stored');
-const hs = JSON.parse(F.calls.find((c) => c.url.includes('hubapi')).body).inputs[0].properties;
-check(hs.lead_source_platform === 'web_scan' && hs.email === EMAIL, 'HubSpot contact carries lead_source_platform=web_scan');
+check(F.db.users[0].consent_source === 'scan_page' && F.db.users[0].ip_address === undefined && F.db.leads[0].ip_address === undefined && new Date(F.db.users[0].retain_until) > new Date(Date.now() + 3 * 364 * 864e5), 'consent_given_at, source, 3y retention stored; NO ip address on users or leads (MPC-9890)');
+check(!F.calls.some((c) => c.url.includes('hubapi')), 'no HubSpot contact is created for a user who has not signed up (MPC-9890)');
 const sends = F.calls.filter((c) => c.url.includes('resend'));
 check(sends.length === 1 && sends[0].headers['Idempotency-Key'].startsWith('confirm-') && F.db.scans[0].confirmation_sent_at, 'exactly one confirmation, idempotency key, timestamp saved');
 const again = await handleScan(env, null, input, F.f);

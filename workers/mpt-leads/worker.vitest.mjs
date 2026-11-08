@@ -111,7 +111,8 @@ describe('Notion + enrichment', () => {
     expect(res.status).toBe(200);
     const p = JSON.parse(to('api.notion.com/v1/pages')[0].body).properties;
     expect(p.Name.title[0].text.content).toBe('Ann Lee');
-    expect(p['IP Address'].rich_text[0].text.content).toBe('1.2.3.4');
+    expect(p['IP Address']).toBeUndefined();   // MPC-9890: the IP address is no longer written to the Notion lead log
+    expect(JSON.stringify(p)).not.toContain('1.2.3.4');
     expect(p.Device.select.name).toBe('Mobile');
     expect(p.OS.rich_text[0].text.content).toBe('iOS');
     expect(p.Browser.rich_text[0].text.content).toBe('Safari');

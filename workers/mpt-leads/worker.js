@@ -316,7 +316,7 @@ export default {
         Source: { select: { name: 'Landing Page' } },
       };
       if (phone)        properties['Phone']        = { phone_number: phone };
-      if (ip)           properties['IP Address']   = { rich_text: [{ text: { content: ip } }] };
+      // MPC-9890 (Open Tracker rule 3): the IP address is no longer written to the Notion lead log. `ip` is still read for the bot check only.
       if (country)      properties['Country']      = { rich_text: [{ text: { content: country } }] };
       if (city)         properties['City']         = { rich_text: [{ text: { content: city } }] };
       if (browser)      properties['Browser']      = { rich_text: [{ text: { content: browser } }] };
@@ -328,7 +328,7 @@ export default {
       if (utm_content)  properties['UTM Content']  = { rich_text: [{ text: { content: utm_content } }] };
       if (referrer)     properties['Referrer']     = { url: referrer };
 
-      // MPC-9885: the lead row carries the contact fields, ip, country/city, browser/os/device, utm tags and referrer (read from `properties` above).
+      // MPC-9885: the lead row carries the contact fields, country/city, browser/os/device, utm tags and referrer (read from `properties` above).
       const nr = await callRecipient('notion', {
         url: 'https://api.notion.com/v1/pages',
         init: {
@@ -340,7 +340,7 @@ export default {
           },
           body: JSON.stringify({ parent: { database_id: env.LEADS_DB_ID }, properties })
         },
-        sent: ['email', 'name', 'phone', 'ip', 'country', 'city', 'device_profile', 'utm', 'referrer'],
+        sent: ['email', 'name', 'phone', 'country', 'city', 'device_profile', 'utm', 'referrer'],
       }, rctx);
 
       if (!nr.ok) {

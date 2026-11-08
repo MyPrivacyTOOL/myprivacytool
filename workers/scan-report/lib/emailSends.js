@@ -13,6 +13,7 @@ export const KEY_TYPES = [
   ['hk-spam-test-', 'hk-spam-test', 'HK-day10-test', 'hk-spam'], ['hk-spam-day', 'hk-spam-day10', 'HK-day10', 'hk-spam'],
   ['deep-research-code-', 'deep-research-code', 'SYS-deep-research-code', 'any'],
   ['signin-', 'account-signin', 'SYS-account-signin', 'any'],   // MPC-9817
+  ['deletion-', 'deletion-countdown', 'SYS-deletion-countdown', 'web-scan'], ['deleted-', 'deletion-done', 'SYS-deletion-done', 'web-scan'],   // MPC-9890
 ];
 export function emailTypeFromKey(key) {
   const k = String(key || '');
