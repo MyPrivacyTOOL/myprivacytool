@@ -45,6 +45,7 @@ That is the two-part test: what the message delivers, then what a public lookup 
 ## Full event log
 **Mode `on` only.** A complete record of one conversation, for allow-listed or opted-in accounts. Mode `all` never writes to it (no message-content, outbound or brain logging there) and mode `off` does nothing.
 
+- **Synthetic check account (CK-9912):** the Worker secret `SYNTHETIC_IDS` (comma-separated numeric ids; the owner's own test account only) is logged here in **every** mode, including `all`, so the CI Telegram round-trip check (`.github/workflows/telegram-roundtrip.yml`) can read message in, core-brain and reply out. Unset = nobody. Everyone else is exactly as described below. Rollback: delete the secret.
 - **Who:** `PROBE_MODE=on` AND the sender (any update type `updateActor` supports, never a bot) is in `PROBE_TELEGRAM_IDS` or `PROBE_LOG_OPTIN_IDS` (comma-separated numeric Telegram ids). Anyone else is not logged and costs no extra call.
 - **Table:** `public.telegram_event_log` (migration `20261015170000_telegram_event_log.sql`, service_role only, RLS enabled and forced). Columns: `id, created_at, platform, direction, kind, sender_id, chat_id, update_id, session_id, payload, expires_at`.
   - `direction = 'in'`: the raw update, untrimmed (`kind` = update type, e.g. `message`).

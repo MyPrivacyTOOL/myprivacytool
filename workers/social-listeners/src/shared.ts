@@ -58,6 +58,8 @@ export interface Env {
   PROBE_RETENTION_DAYS?: string;
   /** Full event log (mode "on" only): comma-separated numeric Telegram ids of people who opted in, logged in addition to PROBE_TELEGRAM_IDS. */
   PROBE_LOG_OPTIN_IDS?: string;
+  /** MPC-9850 / CK-9912: comma-separated numeric Telegram ids of the SYNTHETIC check account (the owner's own test account). Only these ids get the full event log in ANY probe mode; everyone else is unchanged. Secret, never in the repo. */
+  SYNTHETIC_IDS?: string;
   /** Full event log: days until a row expires (default 90, clamped 1-365), or "forever" for no expiry. */
   PROBE_LOG_RETENTION_DAYS?: string;
   /** MPC-7891 Telegram baseline scan: "on" runs it for senders in PROBE_TELEGRAM_IDS after the consent Y; anything else (default) is off. */
