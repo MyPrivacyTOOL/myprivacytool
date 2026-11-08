@@ -18,7 +18,7 @@ import {
   type FindingStatus,
 } from "@/lib/monitoring";
 
-const SOURCE_LABEL = { breach_db: "Breach database", dark_web: "Dark web", social: "Social media" } as const;
+const SOURCE_LABEL = { breach_db: "Breach database", dark_web: "Other source (not offered)", social: "Social media" } as const;
 const fmt = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
 
 const Monitoring = () => {

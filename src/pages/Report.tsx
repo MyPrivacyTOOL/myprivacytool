@@ -34,7 +34,7 @@ const Report = () => {
         { text: "Detailed data per broker — exactly what they hold", feature: "F1" },
         { text: "One-click removal requests", feature: "F4" },
         { text: "Monthly re-scan (brokers re-add you)", feature: "F4" },
-        { text: "Dark web monitoring", feature: "F5" },
+        { text: "Breach monitoring (monthly re-check, email alert)", feature: "F5" },
         { text: "Priority email support" },
       ] as { text: string; feature?: FeatureId }[],
       cta: "Get Full Report",
@@ -161,7 +161,7 @@ const Report = () => {
                 ["Exact data fields per broker", "—", "✓", "F1"],
                 ["Automated removal requests", "—", "✓", "F4"],
                 ["Monthly re-scan", "—", "✓", "F4"],
-                ["Dark web monitoring", "—", "✓", "F5"],
+                ["Breach monitoring (monthly re-check, email alert)", "—", "✓", "F5"],
                 ["Removal confirmation", "—", "✓", "F4"],
               ].map(([feature, free, paid, fid]) => (
                 <tr key={feature} className="border-b border-surface-border hover:bg-muted">
