@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "_about": "MPC-9884: hosts that appear in code but are never contacted by a visitor's browser or by our servers. Kept SMALL on purpose: XML/JSON-LD namespaces and reserved example names. A host that is actually fetched belongs in recipients.json, not here. Every line needs a reason. link_properties are object keys whose URL value is a citation or a navigation link shown to a person (a documentation source, an href), not a request; an <a href> in JSX is exempt for the same reason.",
+  "hosts": [
+    {
+      "host": "www.w3.org",
+      "reason": "XML / SVG / XHTML namespace URIs and spec links; identifiers, never fetched"
+    },
+    {
+      "host": "schema.org",
+      "reason": "JSON-LD @context and itemtype identifiers; never fetched by the page"
+    },
+    {
+      "host": "www.sitemaps.org",
+      "reason": "sitemap XML namespace identifier"
+    },
+    {
+      "host": "purl.org",
+      "reason": "Dublin Core / RSS namespace identifier"
+    },
+    {
+      "host": "*.example.com",
+      "reason": "RFC 2606 reserved example name"
+    },
+    {
+      "host": "example.com",
+      "reason": "RFC 2606 reserved example name"
+    },
+    {
+      "host": "example.org",
+      "reason": "RFC 2606 reserved example name"
+    }
+  ],
+  "link_properties": [
+    "source",
+    "sourceUrl",
+    "docs",
+    "docsUrl",
+    "documentation",
+    "reference",
+    "learnMore",
+    "href"
+  ]
+}
