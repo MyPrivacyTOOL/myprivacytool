@@ -13,12 +13,31 @@ export function f1Body(email, hexagons) {
 }
 
 /** Problems with the confirmation email as sent (empty list = fine). */
+/**
+ * Where the confirm link in the sent plain text points. The Worker writes `https://<site>/scan/live#v=<token>` right after the honest sentence. The mail provider can
+ * rewrite links in what it hands back (click tracking), and then the fragment is gone from the text although the Worker wrote it. So:
+ *   'direct'    the link is the Worker's own `.../scan/live#v=` link;
+ *   'rewritten' there is an https link in that place but it is not the Worker's (provider rewrite: the Worker's own output is then asserted in-process by run.mjs);
+ *   'missing'   no link follows the sentence.
+ */
+export function confirmLinkKind(text) {
+  const t = String(text || '');
+  if (/scan\/live#v=/.test(t)) return 'direct';
+  return /If you did not ask for this, ignore this email and nothing happens:\s*\n\s*https:\/\/\S+/.test(t) ? 'rewritten' : 'missing';
+}
+
+/** Hosts of the https links in a text, for a failure message that says what was actually there (no paths, no tokens). */
+export function linkHosts(text) {
+  return [...new Set((String(text || '').match(/https:\/\/[^\s\/"'<>]+/g) || []).map((u) => u.slice(8)))].slice(0, 6);
+}
+
+/** Problems with the click-to-confirm email as the provider returns it (subject, plain text, HTML). A rewritten link is not a problem here; a missing one is. */
 export function checkConfirmationEmail({ subject, text, html }) {
   const p = [];
   if (!/Confirm your email/i.test(subject || '')) p.push(`subject is not the click-to-confirm one: "${String(subject).slice(0, 80)}"`);
   if (!/We only check details you.ve confirmed are yours/.test(text || '')) p.push('plain text lacks the honest sentence');
   if (!/Confirm this is my email/.test(html || '')) p.push('HTML lacks the "Confirm this is my email" button');
-  if (!/scan\/live#v=/.test(text || '')) p.push('plain text lacks the confirm link');
+  if (confirmLinkKind(text) === 'missing') p.push(`plain text lacks the confirm link (links in the text point at: ${linkHosts(text).join(', ') || 'none'})`);
   return p;
 }
 

@@ -1,5 +1,5 @@
 // MPC-9813: the pure checks and the not-configured path of the automated live check. No network.  Run: node scripts/f1-live-check/f1-live-check.test.mjs
-import { checkConfirmationEmail, checkStoredResult, checkReportBlock, f1Body, FIXTURE_URL } from './checks.mjs';
+import { confirmLinkKind, linkHosts, checkConfirmationEmail, checkStoredResult, checkReportBlock, f1Body, FIXTURE_URL } from './checks.mjs';
 import { runCheck, summary, STEPS } from './run.mjs';
 import { isTestAddress } from '../../shared/test-records.js';
 
@@ -16,6 +16,13 @@ check(checkReportBlock({ text: 'BROKER SITES\nSpokeo (US): LISTED\n  We found a 
 check(checkReportBlock({ text: 'BROKER SITES\nSpokeo (US): NOT CHECKED\n  Not checked. We don\'t search broker sites for you.\n' + FIXTURE_URL, html: '<h2>Broker sites</h2>' }).length > 0, 'a broker section where the page is not Listed fails');
 check(checkReportBlock({ text: 'nothing', html: '' }).length >= 3, 'a report without the block fails');
 check(checkConfirmationEmail({ subject: 'Confirm your email to get your privacy report', text: "We only check details you’ve confirmed are yours. https://www.myprivacytool.io/scan/live#v=abc", html: 'Confirm this is my email' }).length === 0, 'a correct confirmation email passes');
+const SENT = 'First, confirm this is your email. We only check details you’ve confirmed are yours. Until you press the confirm button.\nIf you did not ask for this, ignore this email and nothing happens:\n';
+check(confirmLinkKind(SENT + 'https://www.myprivacytool.io/scan/live#v=abc.123.sig') === 'direct', 'a direct confirm link is recognised');
+check(confirmLinkKind(SENT + 'https://track.example-links.net/ls/click?upn=XYZ') === 'rewritten', 'a provider-rewritten link in the same place is recognised, not mistaken for the Worker link');
+check(confirmLinkKind(SENT) === 'missing' && confirmLinkKind('') === 'missing', 'no link after the sentence is missing');
+check(checkConfirmationEmail({ subject: 'Confirm your email to get your privacy report', text: SENT + 'https://track.example-links.net/ls/click?upn=XYZ', html: 'Confirm this is my email' }).length === 0, 'a rewritten link passes the email check (asserted from the Worker code in run.mjs)');
+check(checkConfirmationEmail({ subject: 'Confirm your email to get your privacy report', text: SENT, html: 'Confirm this is my email' }).some((x) => /lacks the confirm link/.test(x)), 'a missing link still fails, naming where the links point');
+check(linkHosts('see https://a.example/x?t=1 and https://b.example/y') .join() === 'a.example,b.example', 'link hosts are listed without paths or tokens');
 check(checkConfirmationEmail({ subject: 'Your privacy scan is starting', text: '', html: '' }).length >= 3, 'the old confirmation email fails');
 const body = f1Body('testingnt69+f1-x@gmail.com', []);
 check(body.listing.urls[0] === FIXTURE_URL && body.listing.full_name === 'Zelda Quillfeather' && body['cf-turnstile-response'] === 'XXXX.DUMMY.TOKEN.XXXX', 'request body carries the synthetic identity, the fixture page and only the public test token');
