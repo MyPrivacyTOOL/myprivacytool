@@ -146,6 +146,33 @@
       "until": null
     },
     {
+      "key": "account-service",
+      "name": "Account sign-in and your saved scans",
+      "hosts": [
+        "mpt-scan-report.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Emails you a sign-in link and keeps the scans you choose to keep in your account until you delete it.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Kept until you delete your account; deleting it removes the account and every scan in it"
+      },
+      "consent_basis": "user_action",
+      "phase": "pre_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "MPC-9817. You type your own address into the sign-in form and press the button; the sign-in email itself goes out through the resend entry and the login through the supabase entry."
+    },
+    {
       "key": "leads",
       "name": "Lead and newsletter capture",
       "hosts": [

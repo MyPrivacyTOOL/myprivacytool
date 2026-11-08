@@ -15,11 +15,11 @@ export function stub() {
     url = String(url); const body = o.body ? JSON.parse(o.body) : undefined; st.calls.push({ url, method: o.method || 'GET', body, headers: o.headers });
     if (url.includes('api.resend.com')) { st.emails.push(body); return res(200, { id: `msg_${++n}` }); }
     if (url.endsWith('/auth/v1/admin/generate_link')) {
-      let u = st.authUsers.find((x) => x.email === body.email); if (!u) { u = { id: crypto.randomUUID(), email: body.email }; st.authUsers.push(u); }
-      const t = `tok${++n}_${'x'.repeat(24)}`; st.tokens.set(t, u.id); return res(200, { id: u.id, email: u.email, hashed_token: t, action_link: 'https://not-used' });
+      let u = st.authUsers.find((x) => x.email === body.email); let type = 'magiclink'; if (!u) { u = { id: crypto.randomUUID(), email: body.email }; st.authUsers.push(u); type = 'signup'; }   // like Supabase: a first-time address gets a signup token
+      const t = `tok${++n}_${'x'.repeat(24)}`; st.tokens.set(t, { uid: u.id, type }); return res(200, { id: u.id, email: u.email, hashed_token: t, action_link: 'https://not-used' });
     }
     if (url.endsWith('/auth/v1/verify')) {
-      const uid = st.tokens.get(body.token_hash); if (!uid || body.type !== 'magiclink') return res(403, { msg: 'invalid' });
+      const tk = st.tokens.get(body.token_hash); if (!tk || body.type !== tk.type) return res(403, { msg: 'One-time token not found' }); const uid = tk.uid;
       st.tokens.delete(body.token_hash);   // one time
       const u = st.authUsers.find((x) => x.id === uid); const at = `at_${++n}`, rt = `rt_${n}`; st.sessions.set(at, uid);
       return res(200, { access_token: at, refresh_token: rt, expires_at: 9999999999, user: { id: u.id, email: u.email } });

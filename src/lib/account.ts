@@ -1,3 +1,4 @@
+import { fetchRecipient, type DataItem } from "@/config/recipients";
 import { resolveScanApiUrl } from "@/lib/webScan";
 
 // MPC-9817: the client for the Worker's account routes (workers/scan-report/lib/accounts.js). Passwordless: an emailed link, then a session.
@@ -23,13 +24,19 @@ export function clearSession(): void { try { localStorage.removeItem(KEY); } cat
 const toSession = (x: { access_token?: unknown; refresh_token?: unknown; expires_at?: unknown } | undefined): Session | null =>
   x && typeof x.access_token === "string" && typeof x.refresh_token === "string" ? { accessToken: x.access_token, refreshToken: x.refresh_token, expiresAt: typeof x.expires_at === "number" ? x.expires_at : null } : null;
 
+// Every call goes through the recipient wrapper (Open Tracker rule 6): the "account-service" entry in shared/recipients/recipients.json. Only the sign-in request carries an
+// item of personal data (the address the person typed); the other calls carry the session token and, at most, a scan number the person already holds.
 async function call(path: string, body: unknown, token?: string, method = "POST"): Promise<{ status: number; json: Record<string, unknown> | null }> {
   const base = resolveScanApiUrl();
   if (!base) return { status: 0, json: null };
   try {
-    const res = await fetch(`${base}/api/account/${path}`, {
-      method, headers: { ...(method === "POST" ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      ...(method === "POST" ? { body: JSON.stringify(body ?? {}) } : {}),
+    const sent: DataItem[] = path === "signin" ? ["email"] : [];
+    const res = await fetchRecipient("account-service", {
+      url: `${base}/api/account/${path}`, sent,
+      init: {
+        method, headers: { ...(method === "POST" ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        ...(method === "POST" ? { body: JSON.stringify(body ?? {}) } : {}),
+      },
     });
     return { status: res.status, json: (await res.json().catch(() => null)) as Record<string, unknown> | null };
   } catch { return { status: 0, json: null }; }
