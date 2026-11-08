@@ -8,7 +8,7 @@ export type FeatureId = "F1" | "F2" | "F3" | "F4" | "F5" | "F6" | "F7a" | "F7b" 
 
 export const FEATURE_STATUS: Record<FeatureId, FeatureState> = {
   // F1 Broker lookup. LIVE test: a submitted scan lists >=5 real brokers (listed / not listed / not checked) with evidence link and opt-out guide.
-  F1: "in_build",   // MPC-9813: confirm gate + "show us your listing" check shipped; stays in_build until the LIVE test passes (needs MPC-9814: /start wording, /ai-access-check)
+  F1: "live",       // MPC-9814 (2026-11-08, director decision A): the F1 live check passed 13/13 on d5fd0d2 (run 42448559567); MyLife/Intelius guide spot-check is MPC-9897 and is not a gate
   // F2 Paid Exposure Report. LIVE test: a signed-in Basic+ account opens the full report; Free sees the free report with an upgrade prompt.
   F2: "planned",
   // F3 Accounts and Stripe billing. LIVE test: sign in, pay in Stripe Checkout, plan active in account settings, cancel and refund per Terms section 6.
