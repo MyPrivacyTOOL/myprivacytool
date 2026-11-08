@@ -381,7 +381,8 @@ describe('recipient wrapper (fetch-spy)', () => {
     await new Promise((r) => setTimeout(r, 20));
     const keys = new Set(spy.calls.map((c) => c.recipient));
     expect(keys.has('hubspot')).toBe(true);
-    for (const k of keys) expect(['hubspot', 'hunter', 'notion', 'slack']).toContain(k);
+    // 'visit-log' is the spy's name for any *.supabase.co host (first registry owner of the pattern): the Business-queue sweep (MPC-9825) reads and writes Supabase.
+    for (const k of keys) expect(['hubspot', 'hunter', 'notion', 'slack', 'visit-log']).toContain(k);
     spy.assertAllRegistered();
   });
   it('no Hunter key: the Hunter recipient is never called (flag HUNTER_API_KEY)', async () => {

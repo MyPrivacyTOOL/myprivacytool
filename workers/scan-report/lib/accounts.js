@@ -38,12 +38,17 @@ export async function createSignInToken(env, email, fetchImpl = undefined) {
   return typeof t === 'string' && TOKEN_RE.test(t) ? t : null;
 }
 
-/** Redeems a magic-link token. Returns Supabase's session ({access_token, refresh_token, expires_at, user}) or null (wrong, used or expired). */
+/** Redeems a one-time sign-in token. Returns Supabase's session ({access_token, refresh_token, expires_at, user}) or null (wrong, used or expired).
+ *  The token's type depends on the person: generate_link makes a 'signup' token for an address with no auth user yet (it creates the user) and a 'magiclink' token for
+ *  one that already exists. The browser only carries the hash, so each type is tried in turn; a miss ("One-time token not found") consumes nothing. */
 export async function redeemSignInToken(env, tokenHash, fetchImpl = undefined) {
-  const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/verify`, sent: [], init: { method: 'POST', headers: pubHeaders(env), body: JSON.stringify({ type: 'magiclink', token_hash: tokenHash }) } }, rcx(env, fetchImpl));
-  if (!res.ok) return null;
-  const j = await res.json().catch(() => null);
-  return j && j.access_token && j.refresh_token && j.user?.id && j.user?.email ? j : null;
+  for (const type of ['magiclink', 'signup', 'email']) {
+    const res = await callRecipient('supabase', { url: `${base(env)}/auth/v1/verify`, sent: [], init: { method: 'POST', headers: pubHeaders(env), body: JSON.stringify({ type, token_hash: tokenHash }) } }, rcx(env, fetchImpl));
+    if (!res.ok) continue;
+    const j = await res.json().catch(() => null);
+    if (j && j.access_token && j.refresh_token && j.user?.id && j.user?.email) return j;
+  }
+  return null;
 }
 
 /** The user an access token belongs to, checked against Supabase Auth (signature, expiry, revocation). null when not valid. */

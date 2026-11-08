@@ -24,9 +24,9 @@ const MPC_9885_ADDED = ["anthropic", "cloudflare-api", "ga4-data-api", "youtube-
 
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 8 first-party and 23 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
+  it("pins 9 first-party (8 + account-service, MPC-9817) and 23 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
-    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(8);
+    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(9);
     expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(23);
   });
   it("MPC-9885 added exactly these recipients, all enabled", () => {
@@ -39,7 +39,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(54);
+    expect(registry.recipients).toHaveLength(55);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);

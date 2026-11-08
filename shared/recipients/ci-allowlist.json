@@ -24,7 +24,7 @@
     {"rule":"url-literal","file":"src/components/VoiceDebugPanel.tsx","line":2169,"detail":"https://amiunique.org","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"url-literal","file":"src/components/VoiceDebugPanel.tsx","line":2176,"detail":"https://browserleaks.com","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"url-literal","file":"src/data/developerDocs.ts","line":41,"detail":"https://channels.myprivacytool.io","added":"2026-11-08","note":"pending MPC-9886"},
-    {"rule":"forbidden-api","file":"src/lib/account.ts","line":30,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9886"},
+    {"rule":"forbidden-api","file":"src/lib/businessRequest.ts","line":20,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"forbidden-api","file":"src/lib/deviceDetection.ts","line":324,"detail":"fetch","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"forbidden-api","file":"src/lib/fingerprintDetection.ts","line":1145,"detail":"RTCPeerConnection","added":"2026-11-08","note":"pending MPC-9886"},
     {"rule":"url-literal","file":"src/lib/githubChannel.ts","line":8,"detail":"https://channels.myprivacytool.io","added":"2026-11-08","note":"pending MPC-9886"},

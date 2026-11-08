@@ -2,6 +2,7 @@ import { enrichAndScore, HIGH_PRIORITY_THRESHOLD } from './lead-scoring.js';
 // MPC-9885: every outbound call goes through the recipient wrapper (key + declared data items). rctx is built once per request/job.
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { createBusinessRequest, markLate, postDigest, sendDelayNotices } from './business-requests.js';   // MPC-9825
 // MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
 import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 
@@ -138,6 +139,10 @@ export async function purgeOldLeads(env, now = new Date(), fetchImpl = undefined
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweepPending(env).catch((e) => console.error('Sweep error:', String(e))));
+    // MPC-9825: Business 48-hour queue. Late sweep on every tick; the digest once a day on the 00:00 UTC tick (08:00 HKT).
+    ctx.waitUntil(markLate(env, new Date(event.scheduledTime ?? Date.now())).catch((e) => console.error('Business late sweep error:', String(e))));
+    ctx.waitUntil(sendDelayNotices(env, new Date(event.scheduledTime ?? Date.now())).catch((e) => console.error('Business delay notice error:', String(e))));
+    { const bt = new Date(event.scheduledTime ?? Date.now()); if (bt.getUTCHours() === 0 && bt.getUTCMinutes() < 5) ctx.waitUntil(postDigest(env, bt).catch((e) => console.error('Business digest error:', String(e)))); }
     // The cron runs every 5 minutes; the retention purge runs once a day, on the 19:00 UTC tick (03:00 HKT).
     const t = new Date(event.scheduledTime ?? Date.now());
     if (t.getUTCHours() === 19 && t.getUTCMinutes() < 5) ctx.waitUntil(purgeOldLeads(env, t).catch((e) => console.error('Lead purge error:', String(e))));
@@ -184,6 +189,14 @@ export default {
     if (origin && !allow.includes(origin)) return reject(403, 'Forbidden origin');
     if (Number(request.headers.get('content-length') || 0) > MAX_BODY_BYTES) return reject(413, 'Payload too large');
     if (await rateLimited(env, request)) return reject(429, 'Too many requests');
+
+    // MPC-9825: the /business form queues a staffed 48-hour request here (own route; the lead path below is unchanged). Same Origin check and rate limit as above.
+    if (new URL(request.url).pathname === '/business-request') {
+      let input; try { input = await request.json(); } catch (_) { return reject(400, 'Invalid request'); }
+      if (!input || typeof input !== 'object') return reject(400, 'Invalid request');
+      const out = await createBusinessRequest(env, input);
+      return new Response(JSON.stringify(out.body), { status: out.status, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
 
     try {
       const rctx = workerRecipientContext(env);   // MPC-9885: one context per request
