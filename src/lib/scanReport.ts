@@ -1,5 +1,6 @@
 import { getReferralCode } from "@/lib/referral";
 import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-6677: scan-report Worker (confirmation email + 48h report).
 // MPC-7385: defaults to the production Worker (SCAN_API_URL, src/lib/webScan.ts), like the other Worker endpoints in this app, so the site no longer
@@ -45,7 +46,7 @@ export async function requestScanReport(
   const ref = getReferralCode(); // MPC-7645: a friend's code, only while the referral switch is on
   let res: Response;
   try {
-    res = await fetch(`${base}/api/scan`, {
+    res = await recipientFetch("scan-report", `${base}/api/scan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -63,7 +64,7 @@ export async function requestScanReport(
         utm_content: q.get("utm_content") ?? "",
         referrer: document.referrer,
       }),
-    });
+    }, ["email", "utm", "referrer", ...(saveScan ? (["scan_result"] as const) : [])]);
   } catch {
     throw new ReportRequestError("network", 0);
   }

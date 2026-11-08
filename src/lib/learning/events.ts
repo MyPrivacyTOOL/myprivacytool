@@ -9,6 +9,7 @@
 // the answer. NEVER the finding's value. Sending never throws and never changes what the visitor sees.
 import { hasConsent } from '@/lib/cookieConsent';
 import type { Answer } from '@/lib/learning/aggregate';
+import { recipientFetch } from '@/lib/recipientClient';
 
 export const PERSON_KEY_STORAGE = 'mpt_learning_person';
 export const CONFIG_VERSION = 0;
@@ -71,12 +72,12 @@ async function send(body: Record<string, unknown>, d: Deps): Promise<boolean> {
   const personKey = d.personKey === undefined ? getPersonKey() : d.personKey;
   if (!personKey) return false;
   try {
-    const res = await (d.fetchImpl ?? fetch)(`${base}/api/learning/event`, {
+    const res = await recipientFetch('learning-events', `${base}/api/learning/event`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...body, person_key: personKey, scan_window: SCAN_WINDOW, config_version: CONFIG_VERSION }),
       keepalive: true,
-    });
+    }, ['page_load'], d.fetchImpl ? { fetchImpl: d.fetchImpl } : {});
     return res.ok;
   } catch {
     return false;

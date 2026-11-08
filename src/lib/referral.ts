@@ -1,4 +1,5 @@
 import { DEFAULT_SCAN_API_URL, resolveScanApiUrl } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-7645: referral programme ("Invite 3 friends"). OFF unless VITE_REFERRALS_ENABLED is exactly "true"; the Worker has its own switch
 // (REFERRALS_ENABLED), and everything here is inert while either is off. Rules and go-live steps: docs/referral-program-mpc-7645.md.
@@ -65,7 +66,7 @@ export type ReferralStatus = {
 
 const api = () => resolveScanApiUrl() || DEFAULT_SCAN_API_URL;
 const post = (path: string, body: unknown) =>
-  fetch(`${api()}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  recipientFetch("scan-report", `${api()}${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }, ["email"]);
 const credentials = ({ code, token }: ManageLink) => ({ code, token }); // the A/B label in the link is never sent back
 
 export async function fetchReferralStatus(link: ManageLink): Promise<ReferralStatus | "invalid" | "error"> {

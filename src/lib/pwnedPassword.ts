@@ -1,4 +1,5 @@
 // MPC-9776: free, browser-only password exposure check using the Pwned Passwords range API (k-anonymity).
+import { recipientFetch } from '@/lib/recipientClient';
 // The password is hashed (SHA-1) in the browser; ONLY the first 5 hex characters of the hash are sent. The full hash and the
 // password never leave the page, are never stored, logged or sent to analytics. Matching happens locally. Free, no key.
 // https://haveibeenpwned.com/API/v3#PwnedPasswords
@@ -24,7 +25,7 @@ export function countForSuffix(body: string, suffix: string): number {
   return 0;
 }
 
-export async function checkPwnedPassword(password: string, fetchImpl: typeof fetch = fetch): Promise<PwnedResult> {
+export async function checkPwnedPassword(password: string, fetchImpl?: typeof fetch): Promise<PwnedResult> {
   if (!password) return { status: 'error', reason: 'empty' };
   let hash: string;
   try { hash = await sha1Hex(password); } catch { return { status: 'error', reason: 'hashing unavailable' }; }
@@ -33,13 +34,13 @@ export async function checkPwnedPassword(password: string, fetchImpl: typeof fet
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetchImpl(RANGE_URL + prefix, {
+    const res = await recipientFetch('pwned-passwords', RANGE_URL + prefix, {
       method: 'GET',
       headers: { 'Add-Padding': 'true' },   // pad responses so their size does not reveal which range matched
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
       signal: ctrl.signal,
-    });
+    }, ['password_hash_prefix'], fetchImpl ? { fetchImpl } : {});
     if (!res.ok) return { status: 'error', reason: `HTTP ${res.status}` };
     return { status: 'checked', count: countForSuffix(await res.text(), suffix) };
   } catch {

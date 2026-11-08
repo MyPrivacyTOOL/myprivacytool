@@ -81,3 +81,9 @@
 /downloads/*
   X-Robots-Tag: noindex, nofollow, noarchive
   Cache-Control: public, max-age=86400
+
+# MPC-9886: self-hosted fonts for /footprint and /hexagon-taxonomy. Filenames never change, so cache them for a year.
+/footprint/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+/hexagon-taxonomy/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

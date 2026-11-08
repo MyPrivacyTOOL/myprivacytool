@@ -258,6 +258,88 @@
       "until": null
     },
     {
+      "key": "github-channel",
+      "name": "GitHub connect channel (channels.myprivacytool.io)",
+      "hosts": [
+        "channels.myprivacytool.io"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "username"
+      ],
+      "purpose": "Shows the GitHub profile you chose to connect, and disconnects it on request.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Until you disconnect"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: the site already called this host from src/lib/githubChannel.ts and it was missing from the registry. Same account as the rest of the platform; no third-party host added."
+    },
+    {
+      "key": "oauth-session",
+      "name": "Sign-in session (OAuth Worker)",
+      "hosts": [
+        "myprivacytool-oauth-poc.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "email"
+      ],
+      "purpose": "Tells the site whether you are signed in (a Google sign-in you started), and signs you out.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Until you sign out"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: the site already called this host from src/lib/oauthSession.ts and it was missing from the registry. Only called when this browser holds the sign-in hint. No third-party host added."
+    },
+    {
+      "key": "deep-dive-api",
+      "name": "Deep-dive and ownership-check API (webhook-receiver Worker)",
+      "hosts": [
+        "myprivacytool-webhook-receiver.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "browser",
+      "data_items": [
+        "email",
+        "scan_result"
+      ],
+      "purpose": "Saves the answers you give about a finding and checks you own the address you want to look into.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Per the deep-dive and ownership-check retention rules"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "VITE_DEEP_DIVE_API_URL",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Registered by MPC-9886: src/lib/hexagonInteractionApi.ts and src/lib/possessionApi.ts call whatever VITE_DEEP_DIVE_API_URL names (unset = nothing is sent). The flag is that variable, so the entry is live only where the site build sets it. If the variable names any other host the wrapper refuses the call, by design: add that host here first."
+    },
+    {
       "key": "cloudflare-turnstile",
       "name": "Cloudflare Turnstile",
       "hosts": [
@@ -411,7 +493,7 @@
         "ip",
         "user_agent"
       ],
-      "purpose": "Web fonts on two static pages; being replaced by self-hosted fonts.",
+      "purpose": "Web fonts on /footprint and /hexagon-taxonomy. Ended 2026-11-08: both pages now serve their fonts from our own origin.",
       "party": "third",
       "retention": {
         "days": null,
@@ -424,9 +506,9 @@
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null,
-      "note": "until date to be set by the font self-hosting task (MPC-9886)",
-      "exception": "Existing pre-click call, to be removed by self-hosting (MPC-9886); disclosed until then"
+      "until": "2026-11-08",
+      "note": "Ended by MPC-9886: Inter, Fira Code, Bricolage Grotesque, IBM Plex Sans/Mono are self-hosted (latin subsets, SIL OFL 1.1). The registry crawl fails if either host is requested after the until date.",
+      "exception": "Ended 2026-11-08 (MPC-9886); kept so the history renders. No call site remains."
     },
     {
       "key": "supabase",
@@ -438,6 +520,7 @@
       "surface": "db",
       "data_items": [
         "email",
+        "utm",
         "ip",
         "scan_result"
       ],
@@ -454,7 +537,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9886: utm added because /HongKongSpam inserts its row (utm_source/medium/campaign, optional email) straight into Supabase from the browser."
     },
     {
       "key": "notion",

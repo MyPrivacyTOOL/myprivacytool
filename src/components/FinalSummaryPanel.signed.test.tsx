@@ -41,7 +41,7 @@ describe('signed report button', () => {
     await waitFor(() => expect(clicks.some((n) => n.endsWith('.signed.json'))).toBe(true));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('/api/report-download');
+    expect(new URL(url).pathname).toBe('/api/report-download'); // absolute since MPC-9886
     expect(JSON.parse(String(init.body)).report.hexagons[0].id).toBe('device');
   });
 

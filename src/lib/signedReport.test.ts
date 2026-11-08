@@ -9,7 +9,7 @@ describe('signed report client', () => {
     let seen: { url: string; body: string } | undefined;
     const f = (async (url: string, init: RequestInit) => { seen = { url, body: String(init.body) }; return new Response(JSON.stringify(signed)); }) as unknown as typeof fetch;
     expect(await requestSignedJson({ a: 1 }, f)).toEqual(signed);
-    expect(seen?.url).toBe('/api/report-download');
+    expect(new URL(seen!.url).pathname).toBe('/api/report-download'); // the wrapper hands fetch an absolute URL (MPC-9886)
     expect(JSON.parse(seen!.body)).toEqual({ report: { a: 1 } });
   });
   it('sends a PDF as base64 and returns the detached signature', async () => {

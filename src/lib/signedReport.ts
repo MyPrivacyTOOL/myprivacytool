@@ -1,4 +1,5 @@
 // Client for the signed report endpoints (MPC-8281). The server signs; nothing here ever holds a key.
+import { recipientFetch } from '@/lib/recipientClient';
 // Server: functions/api/report-download.ts and functions/api/verify-report.ts. Shapes: shared/signed-report/.
 
 export type SignedReportErrorCode = 'level2_required' | 'unavailable' | 'too_large' | 'failed';
@@ -21,10 +22,11 @@ export function signedReportMessage(code: SignedReportErrorCode): string {
   }
 }
 
-async function post(path: string, body: unknown, fetchImpl: typeof fetch): Promise<unknown> {
+// Same-origin Pages Function: the report is signed in memory and returned, nothing is stored (functions/api/report-download.ts), so no data item is declared.
+async function post(path: string, body: unknown, fetchImpl: typeof fetch | undefined): Promise<unknown> {
   let res: Response;
   try {
-    res = await fetchImpl(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    res = await recipientFetch('cloudflare-edge', path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, [], fetchImpl ? { fetchImpl } : {});
   } catch {
     throw new SignedReportError('unavailable');
   }
@@ -44,7 +46,7 @@ async function post(path: string, body: unknown, fetchImpl: typeof fetch): Promi
 export interface SignedJsonFile { report: unknown; signature: { value: string; public_key: string; signed_at: string; issuer: string } }
 export interface PdfSignature { sha256: string; value: string; public_key: string; signed_at: string; issuer: string }
 
-export async function requestSignedJson(report: unknown, fetchImpl: typeof fetch = fetch): Promise<SignedJsonFile> {
+export async function requestSignedJson(report: unknown, fetchImpl?: typeof fetch): Promise<SignedJsonFile> {
   const out = (await post('/api/report-download', { report }, fetchImpl)) as SignedJsonFile;
   if (!out || !out.signature || typeof out.signature.value !== 'string') throw new SignedReportError('failed');
   return out;
@@ -58,7 +60,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-export async function requestPdfSignature(pdf: Uint8Array, fetchImpl: typeof fetch = fetch): Promise<PdfSignature> {
+export async function requestPdfSignature(pdf: Uint8Array, fetchImpl?: typeof fetch): Promise<PdfSignature> {
   const out = (await post('/api/report-download', { pdf_base64: bytesToBase64(pdf) }, fetchImpl)) as { signature?: PdfSignature };
   if (!out?.signature || typeof out.signature.value !== 'string') throw new SignedReportError('failed');
   return out.signature;
