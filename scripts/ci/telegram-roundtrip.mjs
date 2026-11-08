@@ -44,6 +44,23 @@ export async function resolveSenderId(env, fetchImpl = fetch) {
   return id ?? null;
 }
 
+/** Names and counts only, never values: why might no row appear? */
+async function diagnose({ env, fetchImpl, sb, key, log }) {
+  const h = { apikey: key, Authorization: `Bearer ${key}`, Prefer: "count=exact", Range: "0-0" };
+  for (const [t, q] of [["telegram_event_log", "select=created_at&order=created_at.desc"], ["channel_probe_captures", "select=created_at&platform=eq.telegram&order=created_at.desc"]]) {
+    const r = await fetchImpl(`${sb}/rest/v1/${t}?${q}`, { headers: h }).catch(() => null);
+    const body = r ? await r.json().catch(() => []) : [];
+    log(`diag ${t}: HTTP ${r?.status ?? "n/a"}, total rows ${r?.headers.get("content-range")?.split("/")[1] ?? "?"}, newest ${body[0]?.created_at ?? "none"}`);
+  }
+  if (env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID) {
+    const r = await fetchImpl(`https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/social-listeners/settings`, { headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` } }).catch(() => null);
+    const bs = ((await r?.json().catch(() => ({})))?.result?.bindings ?? []);
+    const pm = bs.find((b) => b.name === "PROBE_MODE");
+    log(`diag Worker bindings (names:type): ${bs.map((b) => `${b.name}:${b.type}`).filter((x) => /PROBE|TELEGRAM|LOG/.test(x)).join(", ") || "none read"}`);
+    log(`diag PROBE_MODE is ${pm ? (pm.type === "plain_text" ? `plain_text "${pm.text}"` : pm.type) : "NOT BOUND"}`);
+  }
+}
+
 export async function run({ env = process.env, fetchImpl = fetch, log = console.log, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
   const secret = env.TELEGRAM_WEBHOOK_SECRET ?? "";
   const sb = (env.SUPABASE_URL || "https://xmdmkumwxpgahmlweuug.supabase.co").replace(/\/$/, "");
@@ -71,6 +88,7 @@ export async function run({ env = process.env, fetchImpl = fetch, log = console.
   if (verdict.out?.payload?.request?.text) log(`reply text (first 90 chars): ${String(verdict.out.payload.request.text).slice(0, 90).replace(/\s+/g, " ")}`);
   if (verdict.pass) { const ms = new Date(verdict.out.created_at) - sentAt; log(`PASS: message in -> reply out in ${ms} ms (budget ${BUDGET_MS} ms), Telegram answered ok`); return ms <= BUDGET_MS ? 0 : 1; }
   for (const p of verdict.problems) log(`FAIL: ${p}`);
+  await diagnose({ env, fetchImpl, sb, key, log });
   return 1;
 }
 
