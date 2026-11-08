@@ -7,8 +7,12 @@
 import { HEX_RATIO, HEX_GAP } from './honeycomb';
 
 export type Sensitivity = 'low' | 'medium' | 'high';
-/** What we know about one tile. Only a deleted tile ever disappears. */
-export type TileState = 'notyet' | 'clear' | 'cant' | 'held' | 'deleting' | 'gone';
+/**
+ * What we know about one tile. Only a deleted tile ever disappears.
+ * 'origin' is where the visitor came from (shown lightly); 'want' is something we do not know and cannot guess, shown as a transparent
+ * dashed hexagon with dotted footprints leading to it (where we hope the visitor will go).
+ */
+export type TileState = 'notyet' | 'clear' | 'cant' | 'held' | 'deleting' | 'gone' | 'origin' | 'want';
 export type PrintLevel = 'none' | Sensitivity;
 
 export const MIN_HW = 84;
@@ -47,26 +51,29 @@ export function rowLengths(count: number): number[] {
   return rows;
 }
 
-export function trailLayout(count: number, containerWidth: number): TrailLayout {
+export function trailLayout(count: number, containerWidth: number, rows?: number[]): TrailLayout {
   const available = containerWidth > 0 ? containerWidth : FALLBACK_WIDTH;
   // Three tiles side by side (the widest row) plus two gaps fill the width.
   const hw = Math.max(MIN_HW, Math.min(MAX_HW, Math.floor((available - 2 * HEX_GAP) / 3)));
   const hh = hw * HEX_RATIO;
   const step = hw + HEX_GAP;
   const rowH = hh * 0.75 + HEX_GAP;
-  const rowLens = rowLengths(count);
-  const rows = rowLens.length;
+  const rowLens = rows && rows.reduce((a, b) => a + b, 0) === count ? rows : rowLengths(count);
+  const explicit = rowLens === rows;
+  const rows_ = rowLens.length;
   const top = hw * 0.55; // room above for prints leaving the honeycomb
   const centres: { x: number; y: number }[] = [];
   rowLens.forEach((n, r) => {
     // A row of 3 starts at the left edge; a row of 2 is shifted half a tile to nestle in.
-    const wide = n === 3 || (r % 2 === 1);
+    // With explicit rows the position follows the row's size (3 wide, 2 nested, 1 centred); otherwise the 2-3-2-3 pattern decides.
+    const wide = explicit ? n === 3 : n === 3 || (r % 2 === 1);
     for (let c = 0; c < n; c++) {
-      centres.push({ x: hw / 2 + (wide ? c * step : step / 2 + c * step), y: top + (rows - 1 - r) * rowH + hh / 2 });
+      const x = explicit && n === 1 ? step : wide ? c * step : step / 2 + c * step;
+      centres.push({ x: hw / 2 + x, y: top + (rows_ - 1 - r) * rowH + hh / 2 });
     }
   });
   const yEnd = top - hw * 0.1;
-  const yStart = top + (rows - 1) * rowH + hh + hw * 0.35;
+  const yStart = top + (rows_ - 1) * rowH + hh + hw * 0.35;
   return {
     hw, hh, compact: hw < COMPACT_BELOW, centres, rowLens,
     width: 2 * step + hw,
@@ -76,8 +83,8 @@ export function trailLayout(count: number, containerWidth: number): TrailLayout 
 }
 
 /** The centre line of the trail: one smooth meander, always climbing (y strictly decreases). */
-export function trailCurve(layout: TrailLayout, points = 240): { x: number; y: number }[] {
-  const amp = layout.hw * 0.76;
+export function trailCurve(layout: TrailLayout, points = 240, ampFactor = 0.76): { x: number; y: number }[] {
+  const amp = layout.hw * ampFactor;
   const out: { x: number; y: number }[] = [];
   for (let i = 0; i <= points; i++) {
     const t = i / points;
@@ -99,7 +106,7 @@ export interface Print {
 }
 
 /** Walk the curve and drop a print every `spacing` pixels, left then right, with a wide stance. */
-export function trailPrints(layout: TrailLayout, curve = trailCurve(layout)): Print[] {
+export function trailPrints(layout: TrailLayout, curve = trailCurve(layout, 240, layout.rowLens.length <= 3 ? 0.5 : 0.76)): Print[] {
   const spacing = layout.hw * (64 / 170);
   const stance = layout.hw * (21 / 170);
   const prints: Print[] = [];
@@ -131,18 +138,19 @@ export function trailPrints(layout: TrailLayout, curve = trailCurve(layout)): Pr
   return prints;
 }
 
-const RANK: Record<Sensitivity, number> = { low: 0, medium: 1, high: 2 };
+const RANK: Record<PrintLevel, number> = { none: -0.5, low: 0, medium: 1, high: 2 };
 const NAME: Sensitivity[] = ['low', 'medium', 'high'];
 
 /** Risk of the data under a print: the highest sensitivity of the (up to two) tiles it touches. Off the honeycomb: no data, so black. */
-export function printLevel(print: Print, sensitivities: (Sensitivity | undefined)[]): PrintLevel {
+export function printLevel(print: Print, sensitivities: (PrintLevel | undefined)[]): PrintLevel {
   if (print.tile < 0) return 'none';
   let best = -1;
   for (const i of print.near) {
     const s = sensitivities[i];
-    if (s && RANK[s] > best) best = RANK[s];
+    if (s !== undefined && RANK[s] > best) best = RANK[s];
   }
-  return best < 0 ? 'low' : NAME[best];
+  if (best === -1) return 'low'; // nothing known about the tiles under it: assume a little risk rather than none
+  return best === -0.5 ? 'none' : NAME[best];
 }
 
 /** How many prints land on each tile. */
@@ -179,7 +187,7 @@ export const GREEN_DARK_STROKE = '#1e7a40';
 
 /** Whether the trail should step on a tile at all: only tiles we hold data for. */
 export function trailTouches(state: TileState): boolean {
-  return state === 'held' || state === 'deleting';
+  return state === 'held' || state === 'deleting' || state === 'origin';
 }
 
 /** Opacity of a tile (and the prints on it): a deleting tile fades, a gone tile is not drawn. */

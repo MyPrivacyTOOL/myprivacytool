@@ -104,6 +104,34 @@ describe('states', () => {
   });
 });
 
+describe('the journey shape (1, 2, 3 tiles, bottom to top)', () => {
+  const l = trailLayout(6, 768, [1, 2, 3]);
+  it('uses the rows it is given, bottom row first', () => expect(l.rowLens).toEqual([1, 2, 3]));
+  it('centres the origin tile under the pair, and the pair under the three', () => {
+    const [origin, a, b, x, y, z] = l.centres;
+    expect(origin.x).toBeCloseTo((a.x + b.x) / 2, 0);
+    expect(a.x).toBeCloseTo((x.x + y.x) / 2, 0);
+    expect(b.x).toBeCloseTo((y.x + z.x) / 2, 0);
+    expect(origin.y).toBeGreaterThan(a.y);
+    expect(a.y).toBeGreaterThan(x.y);
+  });
+  it('ignores rows that do not add up to the tile count', () => expect(trailLayout(6, 768, [1, 2]).rowLens).toEqual([2, 3, 1]));
+  it('still climbs, with a narrower sway than the group view', () => {
+    const c = trailCurve(l, 240, 0.5);
+    for (let i = 1; i < c.length; i++) expect(c[i].y).toBeLessThan(c[i - 1].y);
+  });
+  it('colours a print black when the tiles under it carry no risk, and the highest risk otherwise', () => {
+    const pr = (near: number[]) => ({ x: 0, y: 0, angle: -1, left: false, tile: near[0], near });
+    expect(printLevel(pr([0]), ['none'])).toBe('none');
+    expect(printLevel(pr([0, 1]), ['none', 'low'])).toBe('low');
+    expect(printLevel(pr([0, 1]), ['none', 'high'])).toBe('high');
+  });
+  it('steps on where they came from, but not on what we do not know', () => {
+    expect(trailTouches('origin')).toBe(true);
+    expect(trailTouches('want')).toBe(false);
+  });
+});
+
 describe('the two tiles every visitor has', () => {
   it('always returns Web and Email', () => {
     expect(baseLanes({ webScan: false, emailSignedUp: false }).map((l) => l.id)).toEqual(['web', 'email']);

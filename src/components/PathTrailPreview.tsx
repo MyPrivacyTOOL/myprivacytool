@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import FootprintTrail, { type TrailTile } from './FootprintTrail';
-import { baseLanes } from '@/lib/footprintTrail';
 import type { Sensitivity, TileState } from '@/lib/footprintTrail';
 import { HEXAGONS } from '../../shared/hexagon-registry/registry.js';
 
@@ -45,7 +44,19 @@ export default function PathTrailPreview() {
     });
   }, [scenario]);
 
-  const lanes: TrailTile[] = baseLanes({ webScan: true, emailSignedUp: signedUp }).map((l) => ({ id: l.id, label: l.label, emoji: l.emoji, state: l.state }));
+  // The journey, bottom to top: where they came from (the registry's "How You Found Us"), the two tiles every visitor has, then what we do not
+  // know and cannot guess. Nothing is asked or collected here; the dotted footprints only show where a visitor could choose to go next.
+  const journey: TrailTile[] = useMemo(() => {
+    const ref = (HEXAGONS as RegistryHex[]).find((h) => h.id === 'referrer');
+    return [
+      { id: 'origin', label: ref?.label ?? 'How You Found Us', emoji: ref?.artwork?.emoji ?? '📣', state: 'origin', level: 'none', caption: 'an ad on Facebook, Instagram or YouTube' },
+      { id: 'web', label: 'Web', emoji: '🌐', state: 'held', level: 'low', depth: 1, caption: 'you looked at the site' },
+      { id: 'email', label: 'Email', emoji: '✉️', state: signedUp ? 'held' : 'notyet', level: 'low', depth: 1, caption: signedUp ? 'you signed up' : undefined },
+      { id: 'first-name', label: 'First name', emoji: '🪪', state: 'want' },
+      { id: 'username', label: 'Username', emoji: '🏷️', state: 'want' },
+      { id: 'mobile', label: 'Mobile number', emoji: '📱', state: 'want' },
+    ];
+  }, [signedUp]);
 
   return (
     <section className="mt-12 rounded-lg border border-border p-5" aria-labelledby="path-preview-heading" data-testid="path-trail-preview">
@@ -55,14 +66,17 @@ export default function PathTrailPreview() {
         black is no risk, then dark red, brighter red, brightest red. Dark green is where the trail stepped.
       </p>
 
-      <h3 className="mt-6 text-base font-semibold text-foreground">Always two tiles</h3>
-      <p className="text-sm text-muted-foreground">If you look at the site we have Web. If you sign up we have Email.</p>
+      <h3 className="mt-6 text-base font-semibold text-foreground">The journey</h3>
+      <p className="text-sm text-muted-foreground">
+        Always two tiles: if you look at the site we have Web, and if you sign up we have Email. Below them, where you came from, shown lightly.
+        Above them, what we do not know and cannot guess, as transparent hexagons. Dotted footprints show where you could choose to go next. Nothing is asked or collected here.
+      </p>
       <label className="mt-2 flex items-center gap-2 text-sm text-foreground">
         <input type="checkbox" checked={signedUp} onChange={(e) => setSignedUp(e.target.checked)} />
         Pretend I signed up to the newsletter
       </label>
       <div className="mt-3 max-w-md">
-        <FootprintTrail tiles={lanes} ariaLabel="Web and Email: the two tiles every visitor has" />
+        <FootprintTrail tiles={journey} rows={[1, 2, 3]} ariaLabel="The journey: where you came from, Web and Email, and what we do not know yet" />
       </div>
 
       <h3 className="mt-8 text-base font-semibold text-foreground">Browser Fingerprint</h3>
