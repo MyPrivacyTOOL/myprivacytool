@@ -4,14 +4,16 @@
  *
  * OFF unless the Worker secret/variable LEARNING_EVENTS_ENABLED is exactly "true": otherwise the route answers 404 as if it did not exist.
  * (The site has its own switch, VITE_LEARNING_EVENTS; both must be on before anything is collected.)
- * Browser-origin only (CORS), a tiny body, strict validation, and the row holds NO finding value, account, phone or email:
- * person_key is a random id the browser makes. Writing is best effort: the visitor always gets 202 and a storage failure is logged, never shown.
+ * Browser-origin only (CORS), a tiny body, strict validation. MPC-9892 (Open Tracker design 4.5): NO PERSON KEY. The server increments an
+ * anonymous daily counter (public.mpt_learning_count_tile_event -> learning_aggregate_daily) and stores no row: no person key, scan window,
+ * finding value, account, phone or email. A person_key sent by an older cached page is ignored, never read or stored. Writing is best effort:
+ * the visitor always gets 202 and a storage failure is logged, never shown.
  * Rate limited per client address with the Cloudflare RATE_LIMITER binding (30 a minute; see wrangler.toml). Like the other Workers it fails open
  * if the binding is absent or errors, so tests/local runs work; the wrangler.toml syntax is pinned by workers/ratelimit-config.vitest.mjs.
- * NOT done here, and required before this is switched on in production: the Privacy Policy wording, and applying the migration
- * (supabase/migrations/20261019180000_hexagon_learning_events.sql).
+ * Required before this is switched on in production: the Privacy Policy wording, and the migration
+ * supabase/migrations/20261108210000_mpc_9892_learning_aggregate.sql.
  */
-import { insertMptRow } from './supabase-client.js';
+import { callMptRpc } from './supabase-client.js';
 import { corsFor } from './security.js';
 import { isKnownHexagonId } from '../../shared/hexagon-registry/registry.js';
 
@@ -19,46 +21,24 @@ type RateLimiter = { limit(opts: { key: string }): Promise<{ success: boolean }>
 type Env = Record<string, string | undefined> & { RATE_LIMITER?: RateLimiter };
 
 const MAX_BODY_BYTES = 2048;
-const PERSON_KEY_RE = /^[A-Za-z0-9_-]{16,64}$/;
-const SCAN_WINDOW_RE = /^[A-Za-z0-9_-]{1,32}$/;
-const SOURCES = new Set(['web-scan']);
-const TILE_KINDS = new Set([
-  'clear', 'needs_fixing', 'our_guess', 'seen_low_risk', 'you_told_us', 'you_confirmed', 'device_agrees', 'guess_wrong',
-  'not_checked', 'couldnt_check', 'cant_check_here',
-]);
 const ANSWERS = new Set(['yes_me', 'not_me', 'disputed', 'kept']);
 
-export interface LearningRow {
+/** What is counted: one tile event. Nothing else in the body is read. */
+export interface LearningEvent {
   event_type: 'shown' | 'answer';
-  person_key: string;
-  scan_window: string;
   hexagon_id: string;
-  source: string;
-  tile_kind: string | null;
-  confidence_at_display: number | null;
-  config_version: number;
   answer: string | null;
 }
 
-/** Returns the row to store, or null for anything that is not exactly the shape we accept. Nothing outside these fields is ever kept. */
-export function validateLearningEvent(input: unknown): LearningRow | null {
+/** Returns the event to count, or null for anything that is not exactly the shape we accept. Only these three fields are ever read. */
+export function validateLearningEvent(input: unknown): LearningEvent | null {
   if (!input || typeof input !== 'object') return null;
   const b = input as Record<string, unknown>;
   if (b.event_type !== 'shown' && b.event_type !== 'answer') return null;
-  if (typeof b.person_key !== 'string' || !PERSON_KEY_RE.test(b.person_key)) return null;
-  if (typeof b.scan_window !== 'string' || !SCAN_WINDOW_RE.test(b.scan_window)) return null;
   if (typeof b.hexagon_id !== 'string' || !isKnownHexagonId(b.hexagon_id)) return null;
-  const source = b.source ?? 'web-scan';
-  if (typeof source !== 'string' || !SOURCES.has(source)) return null;
-  const tile = b.tile_kind ?? null;
-  if (tile !== null && (typeof tile !== 'string' || !TILE_KINDS.has(tile))) return null;
-  const conf = b.confidence_at_display ?? null;
-  if (conf !== null && (typeof conf !== 'number' || !Number.isFinite(conf) || conf < 0 || conf > 1)) return null;
-  const version = b.config_version ?? 0;
-  if (!Number.isInteger(version) || version < 0 || version > 100000) return null;
   const answer = b.answer ?? null;
   if (b.event_type === 'answer' ? typeof answer !== 'string' || !ANSWERS.has(answer) : answer !== null) return null;
-  return { event_type: b.event_type as LearningRow['event_type'], person_key: b.person_key, scan_window: b.scan_window, hexagon_id: b.hexagon_id, source, tile_kind: tile, confidence_at_display: conf, config_version: version, answer: answer as string | null };
+  return { event_type: b.event_type as LearningEvent['event_type'], hexagon_id: b.hexagon_id, answer: answer as string | null };
 }
 
 async function limited(env: Env, request: Request): Promise<boolean> {
@@ -83,7 +63,7 @@ export async function handleLearningEvent(request: Request, env: Env): Promise<R
   try { body = JSON.parse(text); } catch { /* falls through to bad_request */ }
   const row = validateLearningEvent(body);
   if (!row) return new Response(JSON.stringify({ error: 'bad_request' }), { status: 400, headers });
-  const ok = await insertMptRow(env, 'mpt_hexagon_events', row);   // best effort: a duplicate 'shown' or a down database is logged, not shown
-  if (!ok) console.warn('learning event not stored');
+  const ok = await callMptRpc(env, 'mpt_learning_count_tile_event', { p_hexagon_id: row.hexagon_id, p_event: row.event_type, p_answer: row.answer });   // best effort: a down database is logged, not shown
+  if (!ok) console.warn('learning event not counted');
   return new Response(JSON.stringify({ ok: true }), { status: 202, headers });
 }
