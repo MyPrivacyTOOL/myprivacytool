@@ -65,6 +65,13 @@ export interface RecipientContext {
   /** Check 7 caps. */
   maxBytes?: number;
   timeoutMs?: number;
+  /**
+   * Check 4 policy. "enforce" (default): a post_click recipient needs a consent id. "pending_mpc_9887": the server-side consent store does not exist
+   * yet (MPC-9887), so Workers and Functions cannot be given a consent id without inventing one; check 4 is skipped, every other check still runs.
+   * workerRecipientContext() sets this from ONE constant (CONSENT_GATE_ACTIVE in worker-ctx.ts) that MPC-9887 flips. Never set it to anything
+   * else to get past a refusal.
+   */
+  consentGate?: "enforce" | "pending_mpc_9887";
 }
 
 export interface RecipientRequest {
@@ -80,6 +87,15 @@ const MAX_REDIRECT_HOPS = 3;
 
 let bundled: RecipientRegistry | null = null;
 const defaultRegistry = (): RecipientRegistry => (bundled ??= parseRegistry(recipientsData));
+/**
+ * TEST SEAM. Handler tests inject a fetchImpl but the registry is the bundled file; a test that needs a recipient in a different state (for example
+ * hibp enabled with a key) swaps the bundled registry here and restores it with the returned function. Production code never calls this.
+ */
+export function setBundledRegistryForTests(registry: RecipientRegistry | null): () => void {
+  const prev = bundled;
+  bundled = registry;
+  return () => { bundled = prev; };
+}
 
 const readFlag = (ctx: RecipientContext, name: string): unknown => (typeof ctx.flags === "function" ? ctx.flags(name) : ctx.flags?.[name]);
 
@@ -141,8 +157,8 @@ export async function checkRecipient(key: string, hostUrl: string, sent: readonl
   if (recipient.flag && !flagIsOn(readFlag(ctx, recipient.flag))) throw new RecipientError("FLAG_OFF", key, recipient.flag);
   // 3 country override
   if (!enabledForCountry(recipient, ctx.country)) throw new RecipientError("COUNTRY_DISABLED", key, String(ctx.country));
-  // 4 consent for post_click
-  if (recipient.phase === "post_click") {
+  // 4 consent for post_click (skipped only while the consent store is not built: ctx.consentGate, see RecipientContext)
+  if (recipient.phase === "post_click" && ctx.consentGate !== "pending_mpc_9887") {
     const id = typeof ctx.consentId === "string" ? ctx.consentId.trim() : "";
     if (!id) throw new RecipientError("CONSENT_REQUIRED", key);
     if (ctx.verifyConsent && !(await ctx.verifyConsent(id, ctx.scanId ?? null))) throw new RecipientError("CONSENT_INVALID", key);
@@ -246,6 +262,20 @@ export async function callRecipient(key: string, request: RecipientRequest, ctx:
     await emit(ctx, entry("failed", { code: isRecipientError(e) ? e.code : "NETWORK" }));
     throw e;
   }
+}
+
+/**
+ * A fetch-shaped function bound to ONE registry key and ONE declared `sent` list, for code that takes an injected `fetchImpl` and calls it in many
+ * places (the Workers do). `recipientFetcher("resend", ["email"], ctx)(url, init)` is exactly `callRecipient("resend", { url, init, sent: ["email"] }, ctx)`.
+ * The CI scan requires the key to be a string literal, like every other wrapper call, and `sent` is declared at the call site, so conversion keeps
+ * each call's key and data items visible in the diff. `input` must be a string or URL: a Request object has no declared host to check.
+ */
+export function recipientFetcher(key: string, sent: readonly DataItem[], ctx: RecipientContext = {}): typeof fetch {
+  return ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : undefined;
+    if (url === undefined) return Promise.reject(new RecipientError("BAD_URL", key, "pass a URL string, not a Request"));
+    return callRecipient(key, { url, init, sent }, ctx);
+  }) as typeof fetch;
 }
 
 /** Browser flavour of callRecipient: the same checks, and credentials are never sent to a recipient unless the caller asks. */

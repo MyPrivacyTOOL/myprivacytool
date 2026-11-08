@@ -22,7 +22,7 @@ const MINIFIED = /\.min\.(js|css)$/;
 const WRAPPER_DIR = "shared/recipients/";
 export const isWrapperFile = (rel) => rel.startsWith(WRAPPER_DIR + "outbound.") || rel === WRAPPER_DIR + "fetch-spy.ts";
 
-const WRAPPER_FUNCS = new Set(["callRecipient", "fetchRecipient", "loadRecipientScript", "createPeerConnection"]);
+const WRAPPER_FUNCS = new Set(["callRecipient", "recipientFetcher", "fetchRecipient", "loadRecipientScript", "createPeerConnection"]);
 const CONSTRUCTOR_GLOBALS = new Set(["XMLHttpRequest", "WebSocket", "EventSource", "RTCPeerConnection", "webkitRTCPeerConnection", "mozRTCPeerConnection"]);
 const GLOBAL_OBJECTS = new Set(["globalThis", "window", "self", "global"]);
 const URL_RE = /\b(?:(https?|wss?):\/\/([^\s/?#"'`\\)<>]*)|(stuns?|turns?):([^\s/?#"'`\\,)<>]*))/gi;

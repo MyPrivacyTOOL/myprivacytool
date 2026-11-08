@@ -29,6 +29,58 @@
     {
       "host": "example.org",
       "reason": "RFC 2606 reserved example name"
+    },
+    {
+      "host": "x.com",
+      "reason": "Link shown to the approver in the content queue (compose page); never fetched"
+    },
+    {
+      "host": "www.linkedin.com",
+      "reason": "Link shown to the approver in the content queue; never fetched"
+    },
+    {
+      "host": "www.instagram.com",
+      "reason": "Link shown to the approver in the content queue; never fetched"
+    },
+    {
+      "host": "www.facebook.com",
+      "reason": "Link shown to the approver in the content queue; never fetched"
+    },
+    {
+      "host": "www.pinterest.com",
+      "reason": "Link shown to the approver in the content queue; never fetched"
+    },
+    {
+      "host": "studio.youtube.com",
+      "reason": "Link shown to the approver in the content queue; never fetched"
+    },
+    {
+      "host": "www.notion.so",
+      "reason": "Link to the leads database in a Slack notification; never fetched"
+    },
+    {
+      "host": "wa.me",
+      "reason": "WhatsApp deep link handed to the visitor; opening it sends nothing from us"
+    },
+    {
+      "host": "t.me",
+      "reason": "Telegram share link handed to the visitor; never fetched by us"
+    },
+    {
+      "host": "ns.adobe.com",
+      "reason": "XMP XML namespace identifier matched in photo metadata; never fetched"
+    },
+    {
+      "host": "myaccount.google.com",
+      "reason": "Google account settings page shown as a guided step to the visitor; never fetched"
+    },
+    {
+      "host": "self.internal",
+      "reason": "Cloudflare service-binding placeholder host (env.SELF.fetch); the call never leaves the Worker runtime"
+    },
+    {
+      "host": "www.spokeo.com",
+      "reason": "Opt-out page named in prose shown to the visitor; never fetched"
     }
   ],
   "link_properties": [
@@ -39,6 +91,7 @@
     "documentation",
     "reference",
     "learnMore",
-    "href"
+    "href",
+    "optOutUrl"
   ]
 }

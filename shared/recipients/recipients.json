@@ -587,12 +587,13 @@
       },
       "consent_basis": "scan_consent",
       "phase": "post_click",
-      "enabled": true,
+      "enabled": false,
       "flag": "HIBP_API_KEY",
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "reason": "Not live: no HIBP_API_KEY is set and the Privacy page says breach checks are not performed (MPC-9823). Stays off until MPC-9904 ships the paid-key check, the DPA entry and the copy."
     },
     {
       "key": "gravatar",
@@ -1124,6 +1125,269 @@
       "until": null,
       "reason": "Planned, disabled until added to registry and policy before switch-on (rule 7). Nothing planned; ipify and ipapi.co exist only as a false policy claim.",
       "planned": true
+    },
+    {
+      "key": "anthropic",
+      "name": "Anthropic API (content drafting)",
+      "hosts": [
+        "api.anthropic.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Drafts our own marketing posts from our own prompts in the content pipeline; no visitor data is sent.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (not verified in MPC-9885; MPC-9894 confirms before the DPA copy)"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "ANTHROPIC_API_KEY",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: the content-consumer Worker already called this host. Sends prompts only."
+    },
+    {
+      "key": "cloudflare-api",
+      "name": "Cloudflare API (analytics reads)",
+      "hosts": [
+        "api.cloudflare.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own zone traffic totals for the metrics collector; sends no visitor data.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "CLOUDFLARE_API_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. Read-only GraphQL; the request carries our API token and a date range."
+    },
+    {
+      "key": "ga4-data-api",
+      "name": "Google Analytics Data API (reports)",
+      "hosts": [
+        "analyticsdata.googleapis.com",
+        "oauth2.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own GA4 report totals for the metrics collector; sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "GA4_PROPERTY_ID",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: collector reads aggregate reports with our service-account token. The tag that sends visitor data to GA4 is the separate `ga4` entry."
+    },
+    {
+      "key": "youtube-data-api",
+      "name": "YouTube Data API (channel stats)",
+      "hosts": [
+        "www.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own YouTube channel statistics for the metrics collector; sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "YOUTUBE_API_KEY",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885."
+    },
+    {
+      "key": "meta-ads-insights",
+      "name": "Meta Marketing API (ad insights)",
+      "hosts": [
+        "graph.facebook.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own ad account totals for the metrics collector; read-only, sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "META_ADS_KEY",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. Separate from `meta-graph` (Messenger/Instagram/WhatsApp, still stubs and switched off)."
+    },
+    {
+      "key": "firestore",
+      "name": "Google Firestore (conversation state)",
+      "hosts": [
+        "firestore.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "phone",
+        "message_text",
+        "username"
+      ],
+      "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side (document ids carry the channel user id, phone or email)"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "FIRESTORE_SA_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": true,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: webhook-receiver firestore-client.js. Not in the Map's 29; MPC-9894 decides the DPA and Privacy wording."
+    },
+    {
+      "key": "x-api",
+      "name": "X (Twitter) API",
+      "hosts": [
+        "api.x.com",
+        "upload.twitter.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "username",
+        "message_text"
+      ],
+      "purpose": "Reads and posts on our own X account (mirror replies, media upload, channel probes).",
+      "party": "platform",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "X_BEARER_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. `platform-replies` (the reply channels, flag-gated and off) keeps api.x.com too; this entry is the live account-level use."
+    },
+    {
+      "key": "make-webhooks",
+      "name": "Make.com webhooks (content hand-off)",
+      "hosts": [
+        "*.make.com"
+      ],
+      "host_kind": "pattern",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Hands approved marketing posts to our Make scenario for publishing; carries post text only, no visitor data.",
+      "party": "processor",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "MAKE_WEBHOOK_URL",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: host is built from the MAKE_WEBHOOK_URL secret (hook.eu1.make.com today); the wrapper checks it at runtime."
+    },
+    {
+      "key": "github-issues",
+      "name": "GitHub Issues (support intake)",
+      "hosts": [
+        "api.github.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "message_text"
+      ],
+      "purpose": "Opens an issue in our private repository when a support case needs engineering.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "user_action",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "SUPPORT_GITHUB_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885: shared/support/github-issue-intake.ts. Shares the host with `github-commit-search`; different purpose and data."
+    },
+    {
+      "key": "internal-workers",
+      "name": "Our own Workers (service-to-service)",
+      "hosts": [
+        "*.myprivacytool.workers.dev"
+      ],
+      "host_kind": "pattern",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "One of our Workers calling another of our Workers (cairn bridge, core brain, scan report); stays inside our own Cloudflare account.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Not stored by the call itself"
+      },
+      "consent_basis": "service",
+      "phase": "pre_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-08",
+      "until": null,
+      "note": "Added by MPC-9885. First party, so no outside recipient; registered so a workers.dev host is checked rather than exempt."
     }
   ]
 }
