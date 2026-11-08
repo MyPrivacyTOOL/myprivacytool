@@ -1373,6 +1373,32 @@
       "note": "Added by MPC-9885: collector reads aggregate reports with our service-account token. The tag that sends visitor data to GA4 is the separate `ga4` entry. MPC-9885: flag corrected to GA4_SERVICE_ACCOUNT_JSON, the secret the collector requires (GA4_PROPERTY_ID is a constant in code, not an env var)."
     },
     {
+      "key": "google-ads-api",
+      "name": "Google Ads API (account reads)",
+      "hosts": [
+        "googleads.googleapis.com",
+        "oauth2.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own Google Ads account configuration (conversion actions, later aggregate campaign stats) for the metrics collector; read-only, sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "GOOGLE_ADS_REFRESH_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-09",
+      "until": null,
+      "note": "Added by MPC-9915. OAuth refresh-token exchange plus GoogleAdsService searchStream only; never a mutate call. Offline conversion upload (Stage C, gclid + timestamp) is a separate decision and would need its own data_items and consent gate (MPC-9882)."
+    },
+    {
       "key": "youtube-data-api",
       "name": "YouTube Data API (channel stats)",
       "hosts": [
