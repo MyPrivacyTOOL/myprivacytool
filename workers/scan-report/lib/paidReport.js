@@ -2,6 +2,7 @@
 // Rules kept here: the gate sits where the work is done (callers ask `sectionState` BEFORE running a paid check); a Free reader sees the section in an honest
 // "not checked" state, never a blurred or masked paid result; every value carries source and confidence; no IP values in an export body; no price is typed here.
 import { sectionState } from './entitlements.js';
+import PLANS from './plans.generated.js';
 import { sign, sameString } from './live.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, tally } from './reportHex.js';
 
@@ -21,12 +22,11 @@ export function withinRetention(scans, env, now = Date.now()) {
 }
 
 // ---- the Free -> Basic upgrade moment (spec s2) --------------------------------------------------------------------------------------
-export async function loadBasicPrice(sb) {
-  try {
-    const c = (await sb.select('plans?slug=eq.basic&select=monthly_price_cents&limit=1'))?.[0]?.monthly_price_cents;
-    if (!Number.isInteger(c) || c <= 0) return null;
-    const d = c / 100; return `$${Number.isInteger(d) ? d : d.toFixed(2)}`;
-  } catch { return null; }
+/** "$7.99" for the Basic plan, from the plans data (src/data/plans.generated.json via lib/plans.generated.js). Never typed here. null if the plan is missing. */
+export async function loadBasicPrice() {
+  const c = PLANS.find((x) => x.slug === 'basic')?.monthly_price_cents;
+  if (!Number.isInteger(c) || c <= 0) return null;
+  const d = c / 100; return `$${Number.isInteger(d) ? d : d.toFixed(2)}`;
 }
 
 /** The one upgrade sentence, or null for a reader whose plan already has licensed broker coverage (Basic and up). Carries the "In build" marker until that source is live. */
