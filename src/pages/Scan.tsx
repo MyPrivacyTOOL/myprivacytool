@@ -99,7 +99,7 @@ const Scan = () => {
     setChoice(true);   // pressing the button also counts as the analytics choice for a visitor who never scanned (design 8.1)
     setSubmitting(false);
     if (!tsToken) {
-      const ts = await loadTurnstile();   // the script loads now, at the click
+      const ts = await Promise.race([loadTurnstile(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000))]);   // the script loads now, at the click; a blocked or slow script never holds the form
       if (ts) {
         setTsArmed(true);
         setErrorMsg("");

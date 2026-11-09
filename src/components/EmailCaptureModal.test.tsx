@@ -1,5 +1,6 @@
 // MPC-7471-F3: the post-scan popup asks the SAME report pipeline as /scan (POST /api/scan on the scan-report Worker), with the separate optional save box.
 // Every test stubs fetch: nothing here can reach a real Worker or send an email.
+vi.unmock("@/lib/turnstile");   // MPC-9888: this file drives the real loader through a stubbed window.turnstile
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
