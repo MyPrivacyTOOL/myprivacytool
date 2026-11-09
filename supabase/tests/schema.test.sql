@@ -442,7 +442,7 @@ select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_cut_edge_visit_
 select pg_temp.assert(pg_temp.try_as('authenticated', $$select public.mpt_cut_edge_visit_ips(true)$$) = '42501', 'mpt_cut_edge_visit_ips: authenticated must not execute');
 select pg_temp.assert(pg_temp.try_as('service_role', $$insert into public.edge_visits (path, method, class, rule, ruleset_version) values ('/', 'GET', 'robot', 'R8', 'v')$$) = '23514', 'edge_visits: class must be one of the four');
 select pg_temp.assert((select relforcerowsecurity from pg_class where oid = 'public.edge_visits'::regclass) and (select relforcerowsecurity from pg_class where oid = 'public.edge_visit_retention'::regclass), 'edge visit tables: RLS forced');
-select pg_temp.assert((select ip_days from public.edge_visit_retention) = 30, 'edge_visit_retention: default 30 days');
+select pg_temp.assert((select ip_days from public.edge_visit_retention) = 7, 'edge_visit_retention: 7 days (MPC-9891, design decision 4)');
 -- made-up rows: 40 days old (older than the 30-day default) and 5 days old, one per class; documentation-range IPs only
 insert into public.edge_visits (seen_at, path, method, status, user_agent, ip, class, rule, ruleset_version) values
   (now() - interval '40 days', '/', 'GET', 200, 'ExampleBrowser/1.0', '192.0.2.10', 'person',  'R8', 'test'),
@@ -460,6 +460,14 @@ select pg_temp.assert((select ip from public.edge_visits where ip is not null an
 select pg_temp.assert((select count(*) from public.edge_visits where ip is null and ip_cut_at is not null and user_agent is not null and path = '/' and rule is not null) = 2, 'edge ip cut: the rest of a cut row stays');
 update public.edge_visit_retention set ip_days = 3;
 select pg_temp.assert((select (public.mpt_cut_edge_visit_ips(false)->>'ips_cut')::int) = 1, 'edge ip cut: reads the retention setting (3 days cuts the 5-day-old person row)');
+-- MPC-9891: machine-mirror retention: bot and ai rows lose the IP after the raw window and the full header copies after 30 days
+update public.edge_visits set all_headers = '{"x":"example"}'::jsonb, cf = '{"y":"example"}'::jsonb where class in ('bot','ai');
+create temp table mm_dry as select public.mpt_machine_mirror_retention(true) as j;
+select pg_temp.assert((select (j->>'ips_cut')::int = 2 and (j->>'headers_dropped')::int = 2 and (j->>'dry_run')::boolean from mm_dry) and (select count(*) from public.edge_visits where class in ('bot','ai') and ip is not null) = 2, 'machine mirror: dry run counts and changes nothing');
+create temp table mm_run as select public.mpt_machine_mirror_retention(false) as j;
+select pg_temp.assert((select (j->>'ips_cut')::int = 2 and (j->>'headers_dropped')::int = 2 from mm_run), 'machine mirror: cuts the old bot and ai IPs and headers');
+select pg_temp.assert((select count(*) from public.edge_visits where class in ('bot','ai') and (ip is not null or all_headers is not null or cf is not null)) = 0 and (select count(*) from public.edge_visits where class in ('bot','ai') and user_agent is not null and rule is not null) = 2, 'machine mirror: user agent and rule stay');
+select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_machine_mirror_retention(true)$$) = '42501', 'machine mirror: anon must not execute');
 reset role;
 
 -- ===== MPC-7493: learning loop: web_scan_events, web_scan_returns, mpt_learning_loop (service_role only; aggregates only) =====
