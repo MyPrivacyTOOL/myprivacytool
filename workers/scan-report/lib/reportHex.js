@@ -118,7 +118,7 @@ export function hexRow(h) {
   const art = h.art ? `<img src="${SITE}/email/hex/${esc(h.art)}" width="32" height="32" alt="" style="display:block;border:0">` : `<span style="font-size:30px;line-height:30px;color:${on ? BRAND : '#9ca3af'}">${on ? '⬢' : '⬡'}</span>`;
   const note = h.status === 'found'
     ? `<div style="margin-top:3px;font-size:13px;line-height:19px;color:#111827">${esc(shown(h))}${h.estimate ? ' <i style="color:#6b7280">(our estimate, not measured)</i>' : ''}</div><div style="margin-top:3px;font-size:12px;line-height:18px;color:#374151"><b>Change:</b> ${esc(changeFor(h))} <a href="${guideUrl(h, { html: true })}" style="color:${BRAND}">Guide</a></div>`
-    : h.id === 'email-breaches' && h.status === 'not_checked' ? `<div style="margin-top:3px;font-size:12px;line-height:18px;color:#6b7280">We have not checked your email against known data breaches. <a href="https://haveibeenpwned.com" style="color:${BRAND}">Check it yourself, free</a>.</div>` : '';
+    : h.id === 'email-breaches' && h.status === 'not_checked' ? `<div style="margin-top:3px;font-size:12px;line-height:18px;color:#6b7280">We have not checked your email against known data breaches: breach lookups are a paid feature. <a href="https://haveibeenpwned.com" style="color:${BRAND}">Check it yourself, free here</a>.</div>` : '';
   return `<tr><td width="40" align="center" valign="top" style="padding:7px 0 7px 6px">${art}</td><td valign="top" style="padding:7px 8px;border-bottom:1px solid #f3f4f6;font-size:14px;line-height:20px;color:#111827">${esc(h.emoji)} <b>${esc(h.label)}</b> <span style="font-size:10px;font-weight:700;color:${fg};background:${bg};padding:1px 6px;border-radius:9px;white-space:nowrap">${esc(statusTag(h))}</span>${note}</td></tr>`;
 };
 
@@ -142,7 +142,7 @@ export function hexText(hexes) {
     const rows = hexes.filter((h) => h.category === c).sort((a, b) => ORDER[a.status] - ORDER[b.status]);
     return ['', `${(GROUPS[c] || c).toUpperCase()}`, ...rows.flatMap((h) => {
       const head = `${h.status === 'not_checked' ? '⬡' : '⬢'} ${h.label} [${statusTag(h)}]`;
-      if (h.status !== 'found') return [h.id === 'email-breaches' && h.status === 'not_checked' ? `${head}\n  We have not checked your email against known data breaches. Check it yourself, free: https://haveibeenpwned.com` : head];
+      if (h.status !== 'found') return [h.id === 'email-breaches' && h.status === 'not_checked' ? `${head}\n  We have not checked your email against known data breaches: breach lookups are a paid feature. Check it yourself, free here: https://haveibeenpwned.com` : head];
       return [`${head}\n  ${shown(h)}${h.estimate ? ' (our estimate, not measured)' : ''}\n  Change: ${changeFor(h)} Guide: ${guideUrl(h)}`];
     })];
   });

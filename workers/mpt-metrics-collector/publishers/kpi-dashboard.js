@@ -5,6 +5,8 @@
 import { notion } from './notion.js';
 import { hkDate, hkDayStartOf } from '../lib/hk.js';
 import { buildScorecard } from '../lib/kpi.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const DASHBOARD_PAGE_ID = '3f528547-eaa7-8102-917e-dbc1acc368ee'; // MPT Dashboard under MyPrivacyTOOL
 export const KPI_MARKER = '[mpt-metrics-collector KPI scorecard]';
@@ -42,10 +44,10 @@ export function buildBlocks(card, readAt) {
 }
 
 async function supa(env, path, count = false) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/${path}`, init: {
     method: count ? 'HEAD' : 'GET',
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, ...(count ? { Prefer: 'count=exact' } : {}) },
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read ${path.split('?')[0]} failed: HTTP ${res.status}`);
   if (!count) return res.json();
   const n = Number(/\/(\d+)$/.exec(res.headers.get('content-range') ?? '')?.[1]);

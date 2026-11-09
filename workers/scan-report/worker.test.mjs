@@ -8,6 +8,8 @@ import { checkBrokers } from './lib/brokers.js';
 import { buildConfirmationEmail, buildReportEmail, tagLinks } from './lib/email.js';
 import { buildMirrorReport } from './lib/mirror.js';
 import { buildFollowUpEmail, nextFollowUp, unsubscribeToken, verifyUnsubscribe } from './lib/onboarding.js';
+import { enableHibpForTests } from './test-support/hibp-on.mjs';
+enableHibpForTests();   // MPC-9885: hibp is enabled:false in the registry; this suite's breach results need it on
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const EMAIL = 'testingnt69@gmail.com';
@@ -34,17 +36,17 @@ check((await checkBreaches('a@b.co', { HIBP_API_KEY: 'k', HIBP_MIN_INTERVAL_MS: 
 // ---- brokers never guess
 const br = await checkBrokers(EMAIL, {});
 check(br.length === 5 && br.every((b) => b.status === 'not_checked'), 'all 5 brokers reported not_checked');
-check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spokeo.com') && br.find((b) => b.key === 'mylife').removal_url === null, 'removal links only from verified guides');
+check(br.find((b) => b.key === 'spokeo').removal_url.startsWith('https://www.spokeo.com') && br.find((b) => b.key === 'mylife').removal_url.startsWith('https://www.mylife.com') && br.find((b) => b.key === 'intelius').removal_url.startsWith('https://www.intelius.com') && br.every((b) => b.removal_url && b.steps?.length), 'removal links only from written guides; MPC-9813 wrote MyLife and Intelius, so all five have one');
 
 // ---- emails stay honest
 const conf = buildConfirmationEmail();
 // MPC-7469: the first email promises exactly what the report delivers (browser findings replayed + what the email address reveals) and nothing else.
 const confAll = conf.text + '\n' + conf.html.replace(/<[^>]+>/g, ' ').replace(/&rsquo;/g, '’');
-check(conf.subject === 'Your privacy scan is starting' && /I’m Alice, MyPrivacyTOOL’s AI guide/.test(conf.text) && /Your browser findings, replayed/.test(conf.text) && /What your email address reveals/.test(conf.text) && /within a few minutes/.test(conf.text) && /A real person on our team can step in/.test(conf.text) && /We never sell your data/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 2 && /honest status/.test(conf.text), 'confirmation: promises exactly two things (browser findings replayed, what the email address reveals), Alice, two hexagons, reply invitation, footer');
+check(conf.subject === 'Your privacy scan is starting' && /I’m Alice, MyPrivacyTOOL’s AI guide/.test(conf.text) && /Your browser findings, replayed/.test(conf.text) && /What your email address reveals/.test(conf.text) && /within a few minutes/.test(conf.text) && /a person on the MyPrivacyTOOL team will read it and answer, with Alice’s help/.test(conf.text) && /\(coming\)/.test(conf.text) && /We never sell your data/.test(conf.text) && conf.html.includes('/email/alice/alice-wave.gif') && conf.html.includes('mailto:hello@myprivacytool.io?subject=Hexagon') && (conf.html.match(/\/email\/hex\/[a-z_]+-empty\.png/g) || []).length === 2 && /honest status/.test(conf.text), 'confirmation: promises exactly two things (browser findings replayed, what the email address reveals), Alice, two hexagons, reply invitation, footer');
 check(!/username|phone number|physical address|addresses|people-search|open-source|publicly available|open web|paid tools|private databases|search databases|scattered|8 areas|image tiles|AI Bot|ANY Social Network|20\+|46 data|AI-platform|privacy score from 0/i.test(confAll) && !/48/.test(confAll), 'confirmation: blocks the old over-promises (username, phone, address, people-search and public-data searches, 8 areas, 48 hours)');
-check(/Talk soon,\nAlice\nYour Dedicated MyPrivacyTOOL AI/.test(conf.text) && /<strong>Alice<\/strong><br>Your Dedicated MyPrivacyTOOL AI/.test(conf.html) && !/The MyPrivacyTOOL team/.test(conf.text + conf.html), 'confirmation email signs off as Alice, not the team');
+check(/Talk soon,\nAlice, MyPrivacyTOOL\nOur AI guide\. This email was written with AI assistance\./.test(conf.text) && /<strong>Alice, MyPrivacyTOOL<\/strong><br>Our AI guide\. This email was written with AI assistance\./.test(conf.html) && !/The MyPrivacyTOOL team/.test(conf.text + conf.html), 'confirmation email signs off as Alice, not the team');
 const rep = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: br });
-check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /have not searched these sites/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
+check(/No privacy score yet/.test(rep.text) && !/\/100/.test(rep.text) && rep.subject === 'Your MyPrivacyTOOL privacy report' && /haveibeenpwned\.com/.test(rep.text) && /have not checked your email/i.test(rep.text) && /we don't search broker sites for you/i.test(rep.text), 'free report: no score, self-check HIBP link, says plainly what was not checked');
 const rep2 = buildReportEmail({ scan: computeScore([], new Set(['email'])), breaches: [], breachStatus: 'checked', brokers: br });
 check(/Partial score/.test(rep2.text) && rep2.subject.includes('(partial)'), 'with HIBP: partial score labelled');
 check(/Alice looks behind the digital curtain/.test(rep.text) && rep.html.includes('/email/alice/alice-peek.gif') && /AI guide/.test(rep.html), 'report email: Alice hero, tagline and image');
@@ -58,9 +60,8 @@ check(recipientAllowed(env, 'Testing.NT69+abc@gmail.com') && !recipientAllowed(e
 
 let F = fake(); await handleScan(env, null, input, F.f);
 check(F.db.users.length === 1 && F.db.leads.length === 1 && F.db.scans.length === 1, 'submit writes user, lead, scan');
-check(F.db.users[0].consent_source === 'scan_page' && F.db.users[0].ip_address === '1.2.3.4' && new Date(F.db.users[0].retain_until) > new Date(Date.now() + 3 * 364 * 864e5), 'consent_given_at, source, ip, 3y retention stored');
-const hs = JSON.parse(F.calls.find((c) => c.url.includes('hubapi')).body).inputs[0].properties;
-check(hs.lead_source_platform === 'web_scan' && hs.email === EMAIL, 'HubSpot contact carries lead_source_platform=web_scan');
+check(F.db.users[0].consent_source === 'scan_page' && F.db.users[0].ip_address === undefined && F.db.leads[0].ip_address === undefined && new Date(F.db.users[0].retain_until) > new Date(Date.now() + 3 * 364 * 864e5), 'consent_given_at, source, 3y retention stored; NO ip address on users or leads (MPC-9890)');
+check(!F.calls.some((c) => c.url.includes('hubapi')), 'no HubSpot contact is created for a user who has not signed up (MPC-9890)');
 const sends = F.calls.filter((c) => c.url.includes('resend'));
 check(sends.length === 1 && sends[0].headers['Idempotency-Key'].startsWith('confirm-') && F.db.scans[0].confirmation_sent_at, 'exactly one confirmation, idempotency key, timestamp saved');
 const again = await handleScan(env, null, input, F.f);
@@ -151,7 +152,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const brk = await checkBrokers(EMAIL, {});
   const free = buildMirrorReport({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk });
   check(free.score === null && free.coverage.checked === 0 && free.coverage.total === 8 && free.hexagons.every((h) => h.status === 'not_checked' && h.score === null), 'mirror: nothing checked => no score, every hexagon not_checked');
-  check(free.next_steps[0].id === 'check-breaches' && free.next_steps.some((s) => s.id === 'opt-out-spokeo') && !free.next_steps.some((s) => s.id === 'opt-out-mylife'), 'mirror: HIBP self-check first; opt-out steps only where a verified guide exists');
+  check(free.next_steps[0].id === 'check-breaches' && free.next_steps.some((s) => s.id === 'opt-out-spokeo') && free.next_steps.some((s) => s.id === 'opt-out-mylife') && free.next_steps.some((s) => s.id === 'opt-out-intelius'), 'mirror: HIBP self-check first; an opt-out step for each broker that has a written guide (all five since MPC-9813)');
   const hit = buildMirrorReport({ scan: computeScore([{ category: 'email', risk: 7, ageDays: 0 }], new Set(['email'])), breaches: [{ Name: 'Acme', DataClasses: ['Passwords'] }], breachStatus: 'checked', brokers: brk });
   check(hit.score === 90 && hit.partial && hit.findings[0].title === 'Acme' && hit.next_steps[0].id === 'change-passwords' && hit.hexagons.find((h) => h.category === 'email').score === 90, 'mirror: breach found => finding + change-passwords step, checked hexagon scored');
   const repM = buildReportEmail({ scan: computeScore([], new Set()), breaches: [], breachStatus: 'not_checked', brokers: brk, webScan: null });
@@ -164,7 +165,7 @@ check((await call({ email: EMAIL, consent: true })).status === 200, 'valid submi
   const f2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: 'https://x/u' });
   check(/Change the password/.test(f1.text) && /first 100/.test(f1.text) && /not yet checked/.test(f1.text) && f1.html.includes('https://x/u') && f1.text.includes('https://x/u'), 'follow-up 1: next steps from the mirror, cohort line, unsubscribe in text + html');
   check(/Reply to this email/.test(f2.text) && !/first 100/.test(f2.text) && !/removed|we will remove|automatic/i.test(f1.text + f2.text.replace('remove you', '')), 'follow-up 2: feedback ask; no cohort line outside cohort; no fulfilment claims');
-  check(/\nAlice\nYour Dedicated MyPrivacyTOOL AI\n/.test(f1.text) && /\nAlice\nYour Dedicated MyPrivacyTOOL AI\n/.test(f2.text) && f1.html.includes('<strong>Alice</strong>') && !/The MyPrivacyTOOL team/.test(f1.text + f2.text + f1.html + f2.html), 'follow-up emails sign off as Alice, not the team');
+  check(/\nAlice, MyPrivacyTOOL\nOur AI guide\. This email was written with AI assistance\.\n/.test(f1.text) && /\nAlice, MyPrivacyTOOL\nOur AI guide\. This email was written with AI assistance\.\n/.test(f2.text) && f1.html.includes('<strong>Alice, MyPrivacyTOOL</strong>') && !/The MyPrivacyTOOL team/.test(f1.text + f2.text + f1.html + f2.html), 'follow-up emails sign off as Alice, not the team');
   const UNSUB = 'https://myprivacytool.io/unsubscribe?e=a%40b.co&t=abc';
   const g1 = buildFollowUpEmail({ stage: 1, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });
   const g2 = buildFollowUpEmail({ stage: 2, mirror: hit, cohortNumber: null, unsubscribeLink: UNSUB });

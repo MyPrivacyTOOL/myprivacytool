@@ -3,6 +3,8 @@
 // Idempotent: a re-run for the same day replaces that page's content. Pages without MARKER are never touched.
 import { notion } from './notion.js';
 import { hkDayStartOf } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const STRATEGY_PAGE_ID = '3f628547-eaa7-8140-82b4-fc9cd266ae1f'; // MPT > Inbound Funnels (the Mirror) strategy page
 export const MIRROR_MARKER = '[mpt-metrics-collector machine mirror]';
@@ -67,9 +69,9 @@ async function findExisting(env, title) {
 
 async function supaRow(env, day) {
   const from = hkDayStartOf(day).toISOString();
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?source=eq.edge&report=eq.machine_daily&status=eq.ok&period_start=eq.${encodeURIComponent(from)}&order=captured_at.desc&limit=1&select=payload`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/mpt_raw_metrics?source=eq.edge&report=eq.machine_daily&status=eq.ok&period_start=eq.${encodeURIComponent(from)}&order=captured_at.desc&limit=1&select=payload`, init: {
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` },
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`supabase read machine_daily failed: HTTP ${res.status}`);
   return (await res.json())[0]?.payload ?? null;
 }

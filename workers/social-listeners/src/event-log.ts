@@ -1,12 +1,13 @@
 // Telegram full event log (docs/channel-probe.md, "Full event log"). Runs ONLY when PROBE_MODE=on AND the sender is in PROBE_TELEGRAM_IDS or
-// PROBE_LOG_OPTIN_IDS. Mode "all" and "off" never reach it. Rows go to public.telegram_event_log (service_role only):
+// PROBE_LOG_OPTIN_IDS, or (CK-9912, any mode) the sender is in SYNTHETIC_IDS. Mode "all" and "off" otherwise never reach it. Rows go to public.telegram_event_log (service_role only):
 //   in    the raw update, untrimmed
 //   out   every Bot API call made for the logged chat: {method, request, status, response}
 //   brain the core-brain answer used to pick the reply
 // Every write is fire-and-forget (ctx.waitUntil), has a 5s timeout and swallows errors: logging can never delay or fail the webhook.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { probeIds, probeMode, updateActor } from "./probe-reader";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
@@ -52,11 +53,20 @@ export function logRetentionDays(env: Env): number | null {
 
 /** The logged sender of an update, or null when this update must not be logged (mode not "on", bot, unlisted, not opted in). */
 export function loggedSender(env: Env, update: unknown): string | null {
+  // CK-9912: the synthetic check account is logged in every probe mode (the Worker runs PROBE_MODE=all, which never writes this log), so the CI round-trip check can read its reply back. Nobody else is affected.
+  const synthetic = syntheticIds(env);
+  if (synthetic.size > 0) {
+    const a = updateActor(update);
+    if (a && synthetic.has(a.id)) return a.id;
+  }
   if (probeMode(env) !== "on") return null;
   const actor = updateActor(update);
   if (!actor) return null;
   return probeIds(env).has(actor.id) || optInIds(env).has(actor.id) ? actor.id : null;
 }
+
+/** SYNTHETIC_IDS: comma-separated numeric Telegram ids of the owner's own synthetic-check account. Unset = nobody. */
+export const syntheticIds = (env: Env): Set<string> => idSet(env.SYNTHETIC_IDS);
 
 /** The chat an update belongs to. Updates with no chat (inline queries, ...) use the sender id, which is also their private chat id. */
 function chatIdOf(update: unknown, senderId: string): string {
@@ -91,7 +101,7 @@ export async function resolveSession(env: Env, chatId: string, senderId: string,
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return fresh;
   try {
     const q = `chat_id=eq.${encodeURIComponent(chatId)}&sender_id=eq.${encodeURIComponent(senderId)}&direction=eq.in&select=session_id,created_at&order=created_at.desc&limit=1`;
-    const res = await fetch(`${base(env)}?${q}`, { headers: headers(env), signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const res = await callRecipient("supabase", { url: `${base(env)}?${q}`, init: { headers: headers(env), signal: AbortSignal.timeout(TIMEOUT_MS) }, sent: ["username"] }, recipientCtx(env));
     if (!res.ok) return fresh;
     const rows: unknown = await res.json();
     if (!Array.isArray(rows)) return fresh;
@@ -141,12 +151,16 @@ function build(env: Env, update: unknown, log: Logger, ctx?: ExecutionContext): 
       // The bot token is only ever in a request URL, never in a body; scrub it from the serialized row anyway.
       let body = JSON.stringify(row);
       if (env.TELEGRAM_BOT_TOKEN) body = body.split(env.TELEGRAM_BOT_TOKEN).join("[redacted]");
-      const res = await fetch(base(env), {
-        method: "POST",
-        headers: headers(env, { "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" }), // ON CONFLICT DO NOTHING
-        body,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+      const res = await callRecipient("supabase", {
+        url: base(env),
+        init: {
+          method: "POST",
+          headers: headers(env, { "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" }), // ON CONFLICT DO NOTHING
+          body,
+          signal: AbortSignal.timeout(TIMEOUT_MS),
+        },
+        sent: ["username", "name", "message_text", "phone"], // the raw update, untrimmed (a shared contact card carries a phone number)
+      }, recipientCtx(env));
       if (!res.ok) log.warn("event_log_save_failed", { status: res.status });
     } catch (err) {
       log.warn("event_log_save_failed", { error: err instanceof Error ? err.name : "unknown" });

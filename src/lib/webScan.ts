@@ -1,6 +1,7 @@
 import type { HexagonData } from "@/lib/deviceDetection";
-import { RECOGNISE_CONSENT_VERSION, SAVE_CONSENT_VERSION } from "@/lib/saveConsent";
+import { RECOGNISE_CONSENT_VERSION, activeSaveVersion } from "@/lib/saveConsent";
 import { captureStatus, isEstimate } from "../../shared/hexagon-registry/status.js";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-7470 (decision D12): the finished scan stays in THIS browser (sessionStorage) and is never sent anywhere until the visitor
 // reaches the contact step, gives an email address and ticks the separate "save my scan result" box. Only then is the full scan
@@ -110,6 +111,28 @@ export function rememberCompletedScan(hexagons: HexagonData[]): void {
   }
 }
 
+/**
+ * MPC-9898: the visitor's own values for /footprint/, written to localStorage "mpt_footprint_scan" as {"values":{"<hexagon id>":{"ex","conf"}}}.
+ * It stays in this browser (nothing is sent) and /footprint/ reads it to drop the Sample marker. Only hexagons with a real value are written;
+ * an empty or unreadable scan removes the key so the page stays labelled sample.
+ */
+export const FOOTPRINT_SCAN_KEY = "mpt_footprint_scan";
+export function writeFootprintScan(hexagons: HexagonData[]): void {
+  try {
+    const values: Record<string, { ex: string; conf: number }> = {};
+    for (const h of hexagons.slice(0, 500)) {
+      const id = text(h.id, 64);
+      const ex = text(h.value, 200).trim();
+      if (!/^[a-z0-9][a-z0-9_-]*$/i.test(id) || !ex || /^(unknown|not detected|n\/a)\b/i.test(ex)) continue;
+      values[id] = { ex, conf: Number.isFinite(h.confidence) ? Math.min(100, Math.max(0, Math.round(h.confidence))) : 0 };
+    }
+    if (Object.keys(values).length > 0) localStorage.setItem(FOOTPRINT_SCAN_KEY, JSON.stringify({ values }));
+    else localStorage.removeItem(FOOTPRINT_SCAN_KEY);
+  } catch {
+    /* storage blocked or full: /footprint/ simply stays labelled sample */
+  }
+}
+
 /** The scan kept in this browser for the contact step, or null (arrived without a scan, storage blocked, nothing valid stored). */
 export function pendingScan(): Record<string, unknown>[] | null {
   try {
@@ -160,7 +183,7 @@ export function scanSaveFields(opts: { recognise?: boolean } = {}): Record<strin
   return {
     scan,
     save_consent: true,
-    save_consent_version: SAVE_CONSENT_VERSION,
+    save_consent_version: activeSaveVersion(),
     // MPC-7494: the separate recognise consent, only when its box was ticked (and recognition is on); never implied by the save box.
     ...(opts.recognise === true && recognitionEnabled() ? { recognise_consent: true, recognise_consent_version: RECOGNISE_CONSENT_VERSION } : {}),
     ...(scanStartedAt !== null ? { started_ms: Math.min(MAX_SCAN_MS, Math.max(0, Math.round(Date.now() - scanStartedAt))) } : {}),
@@ -213,7 +236,7 @@ export function reportStep(step: FunnelStep, seconds?: number): void {
     sent.add(`${scanNumber}:${step}`);
   }
   try {
-    void fetch(`${SCAN_API_URL.replace(/\/$/, "")}/api/web-scan/step`, {
+    void recipientFetch("scan-report", `${SCAN_API_URL.replace(/\/$/, "")}/api/web-scan/step`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       keepalive: true,
@@ -222,7 +245,7 @@ export function reportStep(step: FunnelStep, seconds?: number): void {
         step,
         ...(step === "results_time" ? { seconds: Math.min(MAX_RESULTS_SECONDS, Math.max(0, Math.round(seconds ?? 0))) } : {}),
       }),
-    }).catch(() => undefined);
+    }, []).catch(() => undefined);
   } catch {
     /* never affects the visitor */
   }

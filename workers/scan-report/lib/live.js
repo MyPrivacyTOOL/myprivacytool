@@ -5,6 +5,10 @@
 // Access is a short-lived stream token (HMAC with UNSUBSCRIBE_SECRET, nothing stored). It is NOT the scan number, which is shown to the visitor
 // as the deletion handle. The token goes in the URL query of a read-only GET; it expires after LIVE_TTL_MS.
 import { EMAIL_HEXAGONS, emailHexagonSignalRows, enabledEmailHexagonIds, runEmailHexagons } from './emailHexagons.js';
+import { confirmGateEnabled, listingCheckEnabled, loadListings } from './confirmGate.js';
+import { buildBrokerPanel } from './brokerPanel.js';
+import { getEntitlements } from './entitlements.js';
+import { loadBasicPrice } from './paidReport.js';
 
 export const LIVE_TTL_MS = 15 * 60 * 1000;
 export const VERIFY_TTL_MS = 7 * 24 * 3600 * 1000;   // the email link: possession of it proves the reader controls the inbox the scan was requested for
@@ -13,11 +17,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const enc = new TextEncoder();
 const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-async function sign(secret, message) {
+export async function sign(secret, message) {
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return b64u(await crypto.subtle.sign('HMAC', key, enc.encode(message)));
 }
-const sameString = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+export const sameString = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
 
 /** `${scanId}.${expiresAtMs}.${signature}`, or null when UNSUBSCRIBE_SECRET is not set (feature off). */
 export async function makeLiveToken(env, scanId, now = Date.now()) {
@@ -69,11 +73,11 @@ export function liveItems(rows, { verified = false } = {}) {
 const SIGNAL_DEFAULTS = { details: null, removal_status: 'not_started', removal_url: null, removal_instructions: null };
 
 /** Runs the fast email checks right after the request is accepted and writes them as signal rows. Never throws. Skips a scan that already has rows. */
-export async function runLiveChecks(env, sb, scanId, email, fetchImpl = fetch) {
+export async function runLiveChecks(env, sb, scanId, email, fetchImpl = undefined, rctx = undefined) {
   try {
     const have = await sb.select(`signals?scan_id=eq.${scanId}&signal_type=like.email-*&select=id&limit=1`);
     if (have.length) return { skipped: 'already has rows' };
-    const hex = await runEmailHexagons(email, env, fetchImpl);
+    const hex = await runEmailHexagons(email, env, fetchImpl, rctx);
     await sb.insertMany('signals', emailHexagonSignalRows(scanId, hex).map((r) => ({ ...SIGNAL_DEFAULTS, ...r })));
     return { wrote: hex.length };
   } catch (e) {
@@ -98,12 +102,23 @@ export async function handleLive(env, request, origin, json, { allowedOrigins, l
   if (!scanId) return json({ error: 'Invalid or expired' }, 401);
   const verified = Boolean(verifiedScan);
   try {
+    const gate = confirmGateEnabled(env);   // MPC-9813: the columns exist only once the migration is applied, so they are read only while the gate is on
     const [rows, scan] = await Promise.all([
       sb.select(`signals?scan_id=eq.${scanId}&signal_type=like.email-*&select=signal_type,check_status${verified ? ',details' : ''}`),
-      sb.select(`scans?id=eq.${scanId}&select=report_status&limit=1`),
+      sb.select(`scans?id=eq.${scanId}&select=report_status${verified ? ',email_scanned' : ''}${gate ? ',email_confirm_required,email_confirmed_at' : ''}&limit=1`),
     ]);
     const items = liveItems(rows, { verified });
-    return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified });
+    const confirmRequired = gate && Boolean(scan[0]?.email_confirm_required);
+    const confirmed = !confirmRequired || Boolean(scan[0]?.email_confirmed_at);
+    // The pages the person showed us: evidence and detail are shown only to the reader of the email link, and only once they confirmed the address.
+    const listings = verified && confirmed && listingCheckEnabled(env) ? await loadListings(sb, scanId) : null;
+    // MPC-9814: the broker panel is part of every scan's result, pasted page or not. Pages the visitor showed us appear in it only for the reader of the email link.
+    // MPC-9818: the reader's plan decides the paid-coverage state. Only the reader of the email link (who proved the inbox) is looked up by email; anyone else sees the Free reading.
+    const owner = verified ? scan[0]?.email_scanned : null;
+    const entitlements = owner ? await getEntitlements(sb, { email: owner }) : null;
+    const broker_panel = buildBrokerPanel(listings, { pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice: await loadBasicPrice() });
+    return json({ items, done: items.length >= enabledEmailHexagonIds(env).length, report_sent: scan[0]?.report_status === 'sent', verified,
+      ...(gate ? { confirm_required: confirmRequired, confirmed } : {}), ...(listings ? { listings } : {}), broker_panel });
   } catch (e) {
     console.error('live read failed:', String(e).replace(/\S+@\S+/g, '[email]'));
     return json({ error: 'Unavailable' }, 503);

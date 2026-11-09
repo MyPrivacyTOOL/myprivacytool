@@ -4,6 +4,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderPage, jsonResponse } from "@/test/render";
 import Start from "./Start";
+import { CHANNEL_STATUS } from "@/config/featureStatus";
 
 beforeEach(() => { window.scrollTo = vi.fn() as unknown as typeof window.scrollTo; });
 afterEach(() => vi.unstubAllGlobals());
@@ -48,11 +49,36 @@ describe("Start", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
-  it('routes "Not now" to the scan and lists the messaging channels', async () => {
+  it('routes "Not now" to the scan', async () => {
     const user = userEvent.setup();
     renderPage(<Start />);
     await user.click(screen.getByRole("button", { name: /not now/i }));
     expect(screen.getByRole("link", { name: /check my exposure/i })).toHaveAttribute("href", "/scan");
-    for (const n of ["WhatsApp", "Telegram", "Messenger", "Instagram", "Email"]) expect(screen.getByRole("link", { name: new RegExp(`^${n}`) })).toBeInTheDocument();
+  });
+
+  // MPC-9826: every channel card takes its state from CHANNEL_STATUS; a channel that is not live is never a link.
+  it("shows six channel cards whose state and markers come from CHANNEL_STATUS", () => {
+    const { container } = renderPage(<Start />);
+    const names: Record<string, string> = { web: "Web", telegram: "Telegram", email: "Email", whatsapp: "WhatsApp", messenger: "Messenger", instagram: "Instagram" };
+    expect(Object.keys(CHANNEL_STATUS).sort()).toEqual(Object.keys(names).sort());
+    for (const [id, name] of Object.entries(names)) {
+      const state = CHANNEL_STATUS[id as keyof typeof CHANNEL_STATUS];
+      const marker = container.querySelector(`[data-channel="${id}"]`);
+      if (state === "live") {
+        expect(marker).toBeNull();
+        expect(screen.getByRole("link", { name: new RegExp(`^${name}`) })).toBeInTheDocument();
+      } else {
+        expect(marker).toHaveAttribute("data-feature-status", state);
+        expect(marker).toHaveTextContent(state === "planned" ? "Planned" : "In build");
+      }
+      if (state === "planned") {
+        expect(screen.queryByRole("link", { name: new RegExp(`^${name}`) })).toBeNull();
+        expect(container.querySelector(`[data-channel-card="${id}"]`)).toHaveAttribute("aria-disabled", "true");
+      }
+    }
+  });
+
+  it("states the six channels exactly as Chris decided (MPC-9826, 2026-11-07)", () => {
+    expect(CHANNEL_STATUS).toEqual({ web: "live", telegram: "live", email: "live", whatsapp: "planned", messenger: "planned", instagram: "planned" });
   });
 });

@@ -4,9 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MPT Digital Footprint</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@500&display=swap">
+<script src="/recipient-client.min.js"></script>
+<!-- MPC-9886: fonts are self-hosted (OFL, latin subset, /footprint/fonts/); no request goes to fonts.googleapis.com or fonts.gstatic.com. -->
+<style>
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(/footprint/fonts/inter-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url(/footprint/fonts/inter-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url(/footprint/fonts/inter-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:700;font-display:swap;src:url(/footprint/fonts/inter-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Fira Code';font-style:normal;font-weight:500;font-display:swap;src:url(/footprint/fonts/fira-code-latin-500-normal.woff2) format('woff2')}
+</style>
 <style>
 /* Layout: the website's own hexagon (src/components/Hexagon.tsx) packed into a beehive over matrix rain.
    Colours are the brand tokens from src/index.css. Unknown cells are not drawn: the rain shows through. */
@@ -145,6 +151,12 @@ g.cell.s-scan .bd{stroke-width:3;opacity:1;animation:pulse 1s ease-in-out infini
 .panel .acts{display:flex;gap:8px;flex-wrap:wrap}
 .panel .tag{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .panel .ex{color:var(--muted);font-size:14px}
+/* MPC-9831: sample-data marker. Pill matches the site status pill (FeatureStatus, #729): rounded-full, 1px border, xs semibold. */
+.smp-banner{margin:0 0 12px;padding:10px 14px;border:1px solid var(--told);border-radius:12px;background:var(--told-bg);color:var(--fg);font-weight:600;font-size:15px}
+.smp-banner a{color:inherit;text-decoration:underline}
+.smp-banner[hidden]{display:none}
+.smp-pill{display:inline-flex;align-items:center;margin-left:8px;padding:2px 8px;border:1px solid var(--told);border-radius:9999px;background:var(--told-bg);color:var(--fg);font:600 12px/1 var(--body);white-space:nowrap;vertical-align:middle}
+g.cell[data-sample="1"] .val{font-style:italic;text-decoration:underline dotted}
 .panel dl{margin:12px 0 0;display:grid;gap:8px;font-size:14px;color:var(--muted);max-width:62ch}
 .panel dt{font:600 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .panel dd{margin:0}
@@ -220,6 +232,7 @@ body:not(.pre) .sub{display:none}
     </div>
     <button id="theme" class="icon corner" title="Switch between white and dark"></button>
   </header>
+  <div id="sampleBanner" class="smp-banner" role="note" data-testid="sample-banner">Sample data — <a href="/scan">run your free scan</a> to see your own</div>
 
   <div class="views">
     <div class="modectl" role="group" aria-label="Layout">
@@ -296,6 +309,8 @@ body:not(.pre) .sub{display:none}
 </div>
 
 <script>
+/* MPC-9886: every outbound request goes through the recipient registry (client built from src/lib/recipientClient.ts). Both calls below fetch static files from this site. */
+const rfetch=(u,o)=>window.mptRecipients?window.mptRecipients.fetch('cloudflare-edge',u,o,['page_load']):Promise.reject(new Error('recipient client missing'));
 const themeBtn=document.getElementById('theme');
 const zIn=document.getElementById('zIn'),zOut=document.getElementById('zOut'),STAGE=document.getElementById('stage');
 const ICON_MOON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>';
@@ -336,11 +351,16 @@ const NS='http://www.w3.org/2000/svg';
 const VALID_STATE=new Set(['found','ask','told','risk','confirmed','fixed','false']);
 const isExposure=it=>EXPOSURE.has(it.id)||it.exposure;
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* MPC-9831: values from a real saved scan. Reads localStorage 'mpt_footprint_scan' = {"values":{"<hexagon id>":{"ex":"...","conf":0-100}}} (written by the scan, MPC-9898; this page only reads).
+   An item with a real value shows it and loses the sample marker. With none, every example value is marked sample and the banner shows. */
+const REAL=(function(){try{const o=JSON.parse(localStorage.getItem('mpt_footprint_scan')||'null'),v=o&&o.values,out={};
+  if(v&&typeof v==='object')Object.keys(v).forEach(k=>{const x=v[k];if(x&&typeof x.ex==='string'&&x.ex)out[k]={ex:x.ex.slice(0,200),conf:Math.max(0,Math.min(100,Number(x.conf)||0))}});return out}catch(e){return {}}})();
+const HAS_REAL=Object.keys(REAL).length>0;
 function clean(raw,o){
   const s=v=>v==null?'':String(v);
   return {id:s(raw.id)||('hx-'+o),label:s(raw.label||raw.id||('Item '+(o+1))),group:s(raw.group||'Other'),box:s(raw.box||BOX_OF[raw.id]||raw.group||'Other'),cat:s(raw.cat),
-    emoji:s(raw.emoji)||'⬡',ex:s(raw.ex),conf:Number(raw.conf)||0,risk:s(raw.risk),sens:['high','medium','low'].includes(raw.sens)?raw.sens:'low',
-    ch:s(raw.channel||'Web'),cap:s(raw.cap),val:s(raw.val),exposure:!!raw.exposure,state:s(raw.state),slug:s(raw.slug),_o:o}}
+    emoji:s(raw.emoji)||'⬡',ex:s(raw.ex),conf:Number(raw.conf)||0,real:false,risk:s(raw.risk),sens:['high','medium','low'].includes(raw.sens)?raw.sens:'low',
+    ch:s(raw.channel||'Web'),cap:s(raw.cap),val:s(raw.val),exposure:!!raw.exposure,state:s(raw.state),slug:s(raw.slug),_o:o,...(REAL[s(raw.id)]?{ex:REAL[s(raw.id)].ex,conf:REAL[s(raw.id)].conf,real:true}:{})}}
 const cmp=(a,b)=>{for(let i=0;i<a.length;i++)if(a[i]!==b[i])return a[i]-b[i];return 0};
 function rankKey(it){const demo=START_ORDER.indexOf(it.id);if(demo>=0)return [0,demo,0,0,0];
   return [1,(it.state==='risk'||it.state==='ask')?0:1,isExposure(it)?0:1,{high:0,medium:1,low:2}[it.sens],it._o]}
@@ -460,6 +480,7 @@ const TEST=/[?&]test\b/.test(location.search);
 function synth(){const spec=[['Email',18,'📧'],['Phone',14,'📱'],['Social',12,'💬'],['Apps',10,'🧩'],['Devices',6,'📟'],['Accounts',4,'🔑']],out=[];
   spec.forEach(([c,n,e])=>{for(let i=0;i<n;i++)out.push({id:'test-'+c+i,channel:c,label:c+' '+(i+1),group:c,box:c,emoji:e,ex:'test value',conf:40+(i*7)%55,sens:['high','medium','low'][i%3],cap:'Synthetic test data',val:'Test only'})});return out}
 build(TEST?REG.concat(synth()):REG);
+if(HAS_REAL)document.getElementById('sampleBanner').hidden=true;
 if(TEST)document.querySelector('.cap').textContent='TEST DATA · channels below are synthetic';
 
 function reset(){
@@ -476,6 +497,7 @@ function set(i,s,celebrate){
 function updateCell(g,i){const s=st[i],it=ITEMS[i];
   if(s==='none'){const o=i>=PRIM;g.querySelector('.emo').textContent=o?it.emoji:'';g.querySelector('.lbl').textContent=o?it.ch.toUpperCase():'';return}
   const q=sel=>g.querySelector(sel);
+  if(it.ex&&!it.real&&!(TEST&&it.id.indexOf('test-')===0))g.setAttribute('data-sample','1');else g.removeAttribute('data-sample');
   if(s==='scan'){q('.emo').textContent='🔍';q('.lbl').textContent='SCANNING...';q('.val').textContent='Data Point Revealed';q('.cnf').textContent='';return}
   let c=it.conf;if(c&&(s==='confirmed'||s==='fixed'))c=Math.min(c+5,99);
   q('.emo').textContent=it.emoji;q('.lbl').textContent=it.label.toUpperCase();q('.val').textContent=trunc(it.ex||'');q('.cnf').textContent=c?c+'%':''}
@@ -483,7 +505,7 @@ function paint(){
   const cells=grid.querySelectorAll('g.cell');
   for(let i=0;i<cells.length;i++){const g=cells[i],sig=st[i]+(i===sel?'*':'');if(g._s===sig)continue;g._s=sig;
     g.setAttribute('class','cell s-'+st[i]+(i===sel?' sel':'')+(i>=PRIM&&st[i]==='none'?' chx':''));
-    g.setAttribute('aria-label',st[i]==='none'?'Unknown data point, tap to scan':ITEMS[i].label+': '+STATES[st[i]]);
+    g.setAttribute('aria-label',st[i]==='none'?'Unknown data point, tap to scan':ITEMS[i].label+': '+STATES[st[i]]+(ITEMS[i].ex&&!ITEMS[i].real?', sample value':''));
     updateCell(g,i);
     const old=g.querySelector('title');if(old)old.remove();
     if(st[i]!=='none'){const t=document.createElementNS(NS,'title');t.textContent=ITEMS[i].label;g.prepend(t)}}
@@ -524,7 +546,7 @@ function showPanel(){
   if(s==='none'){title=mode==='boxes'?it.label:'Unknown';tag=mode==='boxes'?`${it.group} · Not checked yet`:'Hidden in the rain';body='MPT has not looked at this spot yet. A deep scan checks it. If it is routine it shows up for you to confirm. If it is sensitive it asks you first.';acts=`<button class="violet" data-a="scan">Run deep scan</button>`}
   else{
     extra=`<dl><div><dt>What we capture</dt><dd>${esc(it.cap)}</dd></div><div><dt>Why it matters</dt><dd>${esc(it.val)}</dd></div>${(s==='ask'||s==='risk')&&it.risk?`<div><dt>Risk</dt><dd>${esc(cleanRisk(it))}</dd></div>`:''}</dl>`;
-    const ex=it.ex?`<div class="ex">Example value: <b>${esc(it.ex)}</b>${it.conf?' · confidence '+it.conf+'%':''}</div>`:'';
+    const ex=it.ex?`<div class="ex">${it.real?'Your value':'Example value'}: <b>${esc(it.ex)}</b>${it.conf?' · confidence '+it.conf+'%':''}${it.real?'':'<span class="smp-pill" data-testid="sample-pill">Sample</span>'}</div>`:'';
     if(s==='found'){body=`We found this about you without asking. Is it accurate?`;acts=`<button class="primary" data-a="confirm">Confirm</button><button data-a="no">Not me</button>`}
     else if(s==='ask'){body=`We think this is you. Is it?`;acts=`<button class="violet" data-a="yes">Yes, that's me</button><button data-a="no">No, not me</button>`}
     else if(s==='risk'){body='Confirmed exposure. Fix it, then mark it done.';acts=`<button class="primary" data-a="fixed">I fixed it</button>`}
@@ -629,7 +651,7 @@ function applyCurtain(c){
   else{vidEl.removeAttribute('src');vidEl.load()}
   openBtn.textContent=CUR.buttonLabel||'Open the curtain';
   if(CUR.dataset&&!datasetLoaded){datasetLoaded=true;
-    fetch(CUR.dataset,{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d)&&d.length&&d.length<=5000){build(mergeDataset(d));reset()}}).catch(()=>{})}
+    rfetch(CUR.dataset,{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d)&&d.length&&d.length<=5000){build(mergeDataset(d));reset()}}).catch(()=>{})}
 }
 /* MPC-8689: a dataset item with the same id as a built-in item keeps the built-in emoji, example and confidence and only supplies the fields it carries (the approved risk tier);
    every other item is added. So the 54 web hexagons stay as they are and the other channels join them. */
@@ -650,7 +672,7 @@ function doOpen(){curtainOpen=true;document.body.classList.remove('pre');syncHel
   autoZoom=setTimeout(()=>setView('zoom',1300),CUR.zoomDelayMs)}
 function closeCurtain(){window.rainSetActive(false);armIdle();curtainOpen=false;opening=false;document.body.classList.add('pre');syncHelp();if(sel<0)showPanel();clearTimeout(autoZoom);curtainEl.classList.remove('open','playing');grid.inert=true;
   vidEl.pause();vidEl.hidden=true;if(CUR.image)imgEl.hidden=false;setView('overview',600)}
-fetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
+rfetch('curtain.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(c=>{if(c)applyCurtain(c)}).catch(()=>{});
 document.getElementById('openCurtain').onclick=openCurtain;
 /* Help: three yes-steps that end on the curtain button. */
 const helpBtn=document.getElementById('helpBtn'),helpBox=document.getElementById('helpbox'),helpGo=document.getElementById('helpGo');

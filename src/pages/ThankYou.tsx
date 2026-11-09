@@ -20,7 +20,7 @@ interface SourceCopy {
 const COPY: Record<string, SourceCopy> = {
   start: {
     title: "You're on the list.",
-    body: "Thanks. We'll email you when your free privacy report is ready. We only use your email for that, and you can unsubscribe at any time.",
+    body: "Thanks. We'll send you product updates. This does not send a report: to get your free privacy report, run the scan on the scan page. We only use your email for updates, and you can unsubscribe at any time.",
   },
   "ai-access-check": {
     title: "You're on the waitlist.",

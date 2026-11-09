@@ -6,10 +6,11 @@ import { RISK_VERSION, SCAN_VERSION, scanAllowed } from "./baseline-scan";
 import { deleteReply, eraseSender } from "./delete-my-data";
 import { DRAFT_BANNER, type Guide, guideFor, listedGuides } from "./fix-guides";
 import { type BaselineRow, type Outcome, RECHECK_VERSION, type Recheck, type Summary, issueOutcome, recheckFrom, summarise, comparable } from "./fix-recheck";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { call } from "./probe-reader";
 import { type SenderIds, senderFilter, senderIds } from "./sender-key";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
@@ -47,10 +48,14 @@ export const isFixWizardUpdate = (env: Env, update: unknown): boolean => {
 async function rest(env: Env, method: string, path: string, body?: unknown, prefer?: string): Promise<{ ok: boolean; rows: Record<string, unknown>[] }> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return { ok: false, rows: [] };
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/${path}`, {
-      method, headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/${path}`,
+      init: {
+        method, headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", ...(prefer ? { Prefer: prefer } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username", "scan_result"], // sender key filter; fix-list progress on the saved snapshot
+    }, recipientCtx(env));
     let rows: Record<string, unknown>[] = [];
     try { const j = await res.json(); rows = Array.isArray(j) ? j : []; } catch { /* empty body */ }
     return { ok: res.ok, rows };

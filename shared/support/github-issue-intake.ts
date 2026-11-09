@@ -1,5 +1,7 @@
 import type { DefectHandoff } from "../../src/lib/supportDefectHandoff";
 import type { EngineeringIntake } from "./engineering-intake";
+import { recipientFetcher } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
 
 // MPC-8529: one concrete EngineeringIntake: a GitHub issue in a configured repository, for human engineering review.
 // NOT ACTIVATED: nothing constructs this, and creating issues needs a token, a named repository and approval. The payload is already
@@ -21,17 +23,19 @@ export interface GithubIssueIntakeConfig {
 const REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 
 export class GithubIssueIntake implements EngineeringIntake {
-  private f: typeof fetch;
+  private rctx: ReturnType<typeof workerRecipientContext>;
   private label: string;
   constructor(private c: GithubIssueIntakeConfig) {
     if (!REPO.test(c.repo)) throw new Error("repo must be owner/repo");
     if (!c.token) throw new Error("token required");
-    this.f = c.fetchImpl ?? fetch;
+    // The flag is the token itself: this class cannot be built without one, so the old code never skipped the call.
+    this.rctx = workerRecipientContext({ SUPPORT_GITHUB_TOKEN: c.token }, { fetchImpl: c.fetchImpl });
     this.label = c.label ?? "support-defect";
   }
 
   private async call(method: string, path: string, body?: unknown): Promise<unknown> {
-    const res = await this.f(`https://api.github.com/repos/${this.c.repo}/${path}`, {
+    // Reads send nothing; creating an issue sends the sanitised defect summary (message_text).
+    const res = await recipientFetcher("github-issues", body === undefined ? [] : ["message_text"], this.rctx)(`https://api.github.com/repos/${this.c.repo}/${path}`, {
       method,
       headers: { Authorization: `Bearer ${this.c.token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json", "User-Agent": "mpt-support-followup" },
       body: body === undefined ? undefined : JSON.stringify(body),

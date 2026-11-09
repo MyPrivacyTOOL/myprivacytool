@@ -34,6 +34,7 @@ const AcceptableUse = lazy(() => import("./pages/AcceptableUse"));
 const DPA = lazy(() => import("./pages/DPA"));
 const DataDeletion = lazy(() => import("./pages/DataDeletion"));
 const Trust = lazy(() => import("./pages/Trust"));
+const WhatWeSee = lazy(() => import("./pages/WhatWeSee"));   // MPC-9893
 // MPC-9829: two legal pages that existed but were never routed (live /accessibility and /gdpr-rights rendered the 404 page).
 const Accessibility = lazy(() => import("./pages/Accessibility"));
 const GDPRRights = lazy(() => import("./pages/GDPRRights"));
@@ -48,6 +49,8 @@ const Monitoring = lazy(() => import("./pages/Monitoring"));
 const ScanResults = lazy(() => import("./pages/ScanResults"));
 const HongKongSpam = lazy(() => import("./pages/HongKongSpam"));
 const VerifyReport = lazy(() => import("./pages/VerifyReport"));
+const Account = lazy(() => import("./pages/Account"));
+const AccountVerify = lazy(() => import("./pages/AccountVerify"));
 const DeviceDemo = lazy(() => import("./pages/DeviceDemo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -98,6 +101,7 @@ const App = () => (
             <Route path="/dpa" element={<DPA />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/trust" element={<Trust />} />
+            <Route path="/what-we-see" element={<WhatWeSee />} />
             <Route path="/accessibility" element={<Accessibility />} />
             <Route path="/gdpr-rights" element={<GDPRRights />} />
             {/* Guides */}
@@ -122,6 +126,9 @@ const App = () => (
             <Route path="/hong-kong-spam" element={<Navigate to="/HongKongSpam" replace />} />
             {/* MPC-8281: check a signed report. Noindex and unlinked until signed reports are switched on. */}
             <Route path="/verify-report" element={<VerifyReport />} />
+            {/* MPC-9817: accounts and sign-in (email link). Off unless VITE_ACCOUNTS_ENABLED is "true"; noindex. */}
+            <Route path="/account" element={<Account />} />
+            <Route path="/account/verify" element={<AccountVerify />} />
             {/* MPC-DEMO: Device orientation & motion sensor test page. Noindex, staging only. */}
             <Route path="/device-demo" element={<DeviceDemo />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

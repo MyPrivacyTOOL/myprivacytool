@@ -1,10 +1,17 @@
 import { recordSend } from './emailSends.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { rcx } from './recipients.js';
+import { REPLY_SENTENCE, ALICE_COMING_SENTENCE, REPLY_PROMISE, SIGN_OFF_LINES } from '../../../shared/reply-wording.js';
+import { buildBrokerPanel, STATE_LABEL } from './brokerPanel.js';
+import { BREACH_FREE_TEXT } from './paidReport.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, normaliseHexagons, emailItems, tally, tallyLine, hexGroups, hexText, buildReportJson } from './reportHex.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const SITE = 'https://myprivacytool.io';
 // Sign-off for the scan, report and follow-up emails: Alice, the AI guide, not an anonymous team.
-export const SIGN_OFF = ['Alice', 'Your Dedicated MyPrivacyTOOL AI'];
+// MPC-9826: "Alice, MyPrivacyTOOL" with the AI assistance disclosed (shared/reply-wording.js).
+export { REPLY_PROMISE, REPLY_SENTENCE, ALICE_COMING_SENTENCE };
+export const SIGN_OFF = SIGN_OFF_LINES;
 
 // MPC-7406 follow-up: shared HTML shell for the transactional emails. Table layout with inline styles only (mail apps strip <style>
 // and scripts), 600px max width, system fonts, light/dark safe colours. The plain-text parts are unchanged.
@@ -79,8 +86,10 @@ const CONFIRMATION_PARTS = [
   { key: 'device', label: 'Your browser findings' },
   { key: 'email', label: 'What your email address reveals' },
 ];
-export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber } = {}) {
-  const subject = 'Your privacy scan is starting';
+// MPC-9813: with the confirm gate on, this email is the click-to-confirm. The report and every check that uses details about the person wait for the button.
+const CONFIRM_LINE = 'We only check details you’ve confirmed are yours.';
+export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber, confirmGate = false } = {}) {
+  const subject = confirmGate ? 'Confirm your email to get your privacy report' : 'Your privacy scan is starting';
   // MPC-7471-F3: the same number, wording and deletion guidance as the report (MPC-7488), only when a scan was really saved with this request.
   const scanNumberLine = scanNumber ? `Your scan number: ${scanNumber}. Quote this number if you want this scan deleted.` : '';
   const text = [
@@ -88,7 +97,7 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber }
     '',
     'Hi,',
     '',
-    'I’m Alice, MyPrivacyTOOL’s AI guide. From now on I’m your personal point of contact for your privacy concerns.',
+    'I’m Alice, MyPrivacyTOOL’s AI guide. My aim is to be your personal point of contact for your privacy concerns (coming). Today I guide you through your report, and the team behind me answers your replies.',
     '',
     'You asked us to look at your privacy exposure, so we’re starting right now.',
     '',
@@ -96,18 +105,19 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber }
     '',
     'My job is to show you what you look like from the outside: what’s exposed, what it means for you, and what to change first.',
     '',
-    ...(liveLink ? ['Watch it live: open your results page and I’ll show each result as I find it. Keep this link private: anyone who has it can see your results:', liveLink, ''] : []),
+    ...(confirmGate && liveLink ? [`First, confirm this is your email. ${CONFIRM_LINE} Until you press the confirm button on this page, I send no report and run no checks that use your details. Keep this link private: anyone who has it can see your results. If you did not ask for this, ignore this email and nothing happens:`, liveLink, ''] : []),
+    ...(!confirmGate && liveLink ? ['Watch it live: open your results page and I’ll show each result as I find it. Keep this link private: anyone who has it can see your results:', liveLink, ''] : []),
     ...(scanNumberLine ? [scanNumberLine, ''] : []),
     'Here’s what happens next.',
     '',
-    'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
+    confirmGate ? 'Once you have confirmed, your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:' : 'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:',
     '',
     '  1. Your browser findings, replayed. The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.',
     '  2. What your email address reveals. New hexagons about the one new thing you gave us: your email address.',
     '',
     'Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won’t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.',
     '',
-    'This email is now our open channel. You can reply anytime with a question, or simply reply with the name of either hexagon below, and we’ll continue the conversation right here. A real person on our team can step in whenever you ask.',
+    `${REPLY_PROMISE} You can reply with a question, or with the name of either hexagon below.`,
     '',
     'Your report, in two hexagons:',
     ...CONFIRMATION_PARTS.map((p) => `  ${HEX_OFF} ${p.label}`),
@@ -122,19 +132,20 @@ export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber }
   const html = shell(subject, 'Your report is on its way: your browser findings, plus what your email address reveals.',
     `${aliceHero('Your privacy scan is starting', 'wave')}
 ${para('Hi,')}
-${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. From now on I&rsquo;m your personal point of contact for your privacy concerns.')}
+${para('I&rsquo;m Alice, MyPrivacyTOOL&rsquo;s AI guide. My aim is to be your personal point of contact for your privacy concerns (coming). Today I guide you through your report, and the team behind me answers your replies.')}
 ${para('You asked us to look at your privacy exposure, so we&rsquo;re starting right now.')}
 ${para('MyPrivacyTOOL is a growing suite of AI tools for the places you communicate. We&rsquo;re starting with two things: your browser and your email address. More channels will follow over time.')}
 ${para('My job is to show you what you look like from the outside: what&rsquo;s exposed, what it means for you, and what to change first.')}
-${liveLink ? para('<strong>Watch it live.</strong> Open your results page and I&rsquo;ll show each result as I find it. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
+${confirmGate && liveLink ? para(`<strong>First, confirm this is your email.</strong> ${esc(CONFIRM_LINE)} Until you press the confirm button on the page this opens, I send no report and run no checks that use your details. Keep this link private: anyone who has it can see your results. If you did not ask for this, ignore this email and nothing happens.`) + button(liveLink, 'Confirm this is my email') : ''}
+${!confirmGate && liveLink ? para('<strong>Watch it live.</strong> Open your results page and I&rsquo;ll show each result as I find it. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
 ${scanNumberLine ? para(esc(scanNumberLine)) : ''}
 ${h2('Here&rsquo;s what happens next.')}
-${para('Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
+${para(confirmGate ? 'Once you have confirmed, your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:' : 'Your report usually arrives within a few minutes. If a check has to be retried, it can take a little longer. It has two parts:')}
 <ol style="margin:0 0 16px 0;padding-left:20px;font-size:15px;line-height:23px;color:#374151">
 <li style="margin-bottom:6px"><strong>Your browser findings, replayed.</strong> The hexagons that lit up when you ran the web scan on our site, this time with what each one actually found.</li>
 <li><strong>What your email address reveals.</strong> New hexagons about the one new thing you gave us: your email address.</li></ol>
 ${para('Every hexagon shows its honest status: found (with the real value), checked and clear, or not checked. I won&rsquo;t present a guess as a fact about you. If we have no web scan from you, the report says so and still shows what your email address reveals.')}
-${para('This email is now our open channel. You can reply anytime with a question, or simply click either hexagon below, and we&rsquo;ll continue the conversation right here. A real person on our team can step in whenever you ask.')}
+${para(`${esc(REPLY_PROMISE)} You can reply with a question, or click either hexagon below to email us about it.`)}
 ${para('<strong>Your report, in two hexagons.</strong>')}
 <table role="presentation" width="67%" align="center" cellpadding="0" cellspacing="0" style="width:67%;margin:6px auto 14px auto"><tr>${tiles.join('')}</tr></table>
 ${para(`Talk soon,<br><strong>${SIGN_OFF[0]}</strong><br>${SIGN_OFF[1]}`)}`, unsubscribeLink);
@@ -183,12 +194,30 @@ ${para('To have your data deleted, write to privacy@myprivacytool.io.')}`, null,
 
 export const BRIDGE = 'You saw what your browser gives away. Now look at what one email address gives away.';
 const MAX_BREACH_ROWS = 10;
-// US people-search removal guides stay out of the main body unless a finding makes them relevant: a name in the address, or a breach that
-// exposed names, phone numbers or physical addresses.
-const brokersRelevant = (emailHexes, breaches) => emailHexes.some((h) => h.id === 'email-name' && h.status === 'found')
-  || breaches.some((b) => (b.DataClasses || []).some((c) => /^(names|phone numbers|physical addresses)$/i.test(String(c))));
+// MPC-9814: the broker section. ALWAYS shown, for every scan, with all shortlist brokers in registry order (lib/brokerPanel.js owns the wording).
+// A site is listed / not listed only when the person pasted a page and we read it; every other site is "not checked", said in words, with its guide.
+// Kept small on purpose: one compact card per site, links to the guides instead of their steps, so the HTML stays well under the 100 KB rule.
+const dots = (n) => '\u25CF'.repeat(n) + '\u25CB'.repeat(3 - n);
+const confText = (r) => (r.confidence_word ? `Confidence: ${r.confidence_word} ${dots(r.confidence_level)}` : 'Confidence: none, nothing was checked');
+const guideUrl = (r) => r.guide?.optOutUrl || null;
+const guideSite = (r) => (r.guide?.slug ? `${SITE}/opt-out-guides/${r.guide.slug}` : null);
+const brokerRowText = (r) => [
+  `${r.name}${r.region ? ` (${r.region})` : ''}: ${STATE_LABEL[r.state].toUpperCase()}`,
+  `  ${r.text}`, `  ${confText(r)}`,
+  ...(r.evidence_url ? [`  Evidence (the page): ${r.evidence_url}`] : []),
+  ...((r.also || []).filter((a) => a.evidence_url).map((a) => `  Also read (${STATE_LABEL[a.state].toLowerCase()}): ${a.evidence_url}`)),
+  ...(r.guide ? [`  How to remove it: ${guideUrl(r) || guideSite(r)}${r.guide.timeNeeded ? ` (${r.guide.timeNeeded})` : ''}`] : [`  ${r.no_guide_text}`]),
+];
+const brokerSectionText = (panel) => [
+  'BROKER SITES', panel.intro, '',
+  ...[...panel.rows, ...panel.others].flatMap((r) => [...brokerRowText(r), '']),
+  panel.region_note, ...(panel.coverage_note ? [panel.coverage_note] : []), ...(panel.upgrade ? ['', panel.upgrade] : []), '',
+];
+const STATE_COLOR = { listed: '#991b1b', not_listed: '#166534', not_checked: '#6b7280' };
+const brokerCardHtml = (r) => `<div style="margin:0 0 8px 0;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-size:14px;line-height:20px;color:#374151"><strong style="font-size:15px;color:#111827">${esc(r.name)}</strong>${r.region ? ` <span style="font-size:12px;color:#6b7280">${esc(r.region)}</span>` : ''} <strong style="font-size:12px;color:${STATE_COLOR[r.state]}">&middot; ${esc(STATE_LABEL[r.state].toUpperCase())}</strong><br>${esc(r.text)}<br><span style="font-size:13px;color:#6b7280">${esc(confText(r))}</span>${r.evidence_url ? `<br><a href="${esc(r.evidence_url)}" style="color:${BRAND}">Evidence: the page</a>` : ''}${(r.also || []).filter((a) => a.evidence_url).map((a) => `<br><a href="${esc(a.evidence_url)}" style="color:${BRAND}">Also read (${esc(STATE_LABEL[a.state].toLowerCase())})</a>`).join('')}${r.guide ? `<br><a href="${esc(guideUrl(r) || guideSite(r))}" style="color:${BRAND}">How to remove it</a>${r.guide.timeNeeded ? ` <span style="font-size:13px;color:#6b7280">(${esc(r.guide.timeNeeded)})</span>` : ''}` : `<br><span style="font-size:13px;color:#6b7280">${esc(r.no_guide_text)}</span>`}</div>`;
+const brokerSectionHtml = (panel) => `${h2('Broker sites')}${para(esc(panel.intro))}${[...panel.rows, ...panel.others].map(brokerCardHtml).join('')}${para(esc(panel.region_note))}${panel.coverage_note ? para(esc(panel.coverage_note)) : ''}${panel.upgrade ? para(esc(panel.upgrade)) : ''}`;
 
-export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
+export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = [], listings = null, pasteAvailable = true, entitlements = null, basicPrice = null, breachGated = false, webScan = null, emailChecks = [], unsubscribeLink, referral = null, liveLink = null, fixedLink = null }) {
   const s = scan;
   const web = webScan ? normaliseHexagons(WEB_HEXAGONS, webScan.hexagons) : [];
   const emailHexes = normaliseHexagons(EMAIL_HEXAGONS, emailItems({ breachStatus, breaches, extra: emailChecks }));
@@ -197,7 +226,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   const noteScore = s.score === null
     ? 'No privacy score yet: we only score what we actually checked, and we will not invent a number.'
     : `Partial score, based only on the checks that ran (${s.categories_checked.join(', ') || 'none'}). Everything marked NOT CHECKED below is not in it.`;
-  const showBrokers = brokersRelevant(emailHexes, breaches);
+  const panel = buildBrokerPanel(listings, { pasteAvailable, entitlements, basicPrice });
   const breachRows = breachStatus === 'checked' ? breaches.slice(0, MAX_BREACH_ROWS) : [];
   const breachMore = breachStatus === 'checked' ? Math.max(0, breaches.length - MAX_BREACH_ROWS) : 0;
   const part1Intro = webScan
@@ -206,20 +235,18 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   // MPC-7488: the visitor's scan number, so they can quote it to have the saved scan deleted. Only when a saved scan is in this report.
   const scanNumberLine = webScan?.id ? `Your scan number: ${webScan.id}. Quote this number if you want this scan deleted.` : '';
   const subject = s.score === null ? 'Your MyPrivacyTOOL privacy report' : `Your MyPrivacyTOOL privacy report: ${s.score}/100${s.partial ? ' (partial)' : ''}`;
-  const brokerLines = brokers.map((b) => (!b.removal_url && !b.steps ? `${b.name}\n  We have not yet written a verified removal guide for ${b.name}.`
-    : `${b.name}  (${b.time_needed || 'a few minutes'}; ${b.processing_time || 'timing varies'})\n  Official opt-out page: ${b.removal_url}\n${b.steps ? b.steps.map((st, i) => `   ${i + 1}. ${st}`).join('\n') : ''}`));
   const text = [
     s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100 (${s.risk_level} exposure)`, ALICE_TAGLINE, '', noteScore, '',
     'PART 1: YOUR WEB SCAN, REPLAYED', part1Intro, ...(scanNumberLine ? [scanNumberLine] : []), ...(webScan ? hexText(web) : []), '',
     BRIDGE, '',
     'PART 2: YOUR EMAIL ADDRESS', `${tallyLine(et, 'hexagons')}.`, ...hexText(emailHexes),
+    ...(breachGated ? [BREACH_FREE_TEXT] : []),
     ...breachRows.map((b) => `  - ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`), ...(breachMore ? [`  ...and ${breachMore} more (all of them are in the attached JSON file)`] : []), '',
     'The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.', '',
-    ...(showBrokers ? ['PEOPLE-SEARCH SITES', 'A finding above makes these relevant. We have not searched these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.', '', ...brokerLines.flatMap((l) => [l, ''])]
-      : [`US people-search removal guides (we have not searched these sites for you): ${SITE}/opt-out`, '']),
+    ...brokerSectionText(panel),
     `More removal guides: ${SITE}/opt-out`, '',
     `Questions about this report? Read the FAQ: ${SITE}/faq`, '',
-    'This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.',
+    `${REPLY_PROMISE} You can also reply to ask us to delete your data.`,
     ...(liveLink ? ['', `Keep an eye on your results: open this page and new findings appear as we find them. Keep this link private: anyone who has it can see your results: ${liveLink}`] : []),
     ...(referral ? ['', referral.text] : []),
     // MPC-7554: with the follow-up state on, "I have fixed this" stops the follow-ups for this report only; unsubscribing stops everything non-transactional.
@@ -228,25 +255,18 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
   ].join('\n');
   const headline = s.score === null ? 'Your privacy report' : `Your privacy score: ${s.score}/100`;
   const box = (t) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 14px;font-size:14px;line-height:21px;color:#14532d">${t}</td></tr></table>`;
-  const brokerCards = brokers.map((b) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px 0"><tr><td style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px">
-<div style="font-size:15px;font-weight:700;color:#111827">${esc(b.name)}</div>
-${b.removal_url ? `<div style="margin:6px 0 4px 0;font-size:13px;color:#6b7280">${esc(b.time_needed || '')}${b.time_needed && b.processing_time ? ' &middot; ' : ''}${esc(b.processing_time || '')}</div>
-${b.steps ? `<ol style="margin:8px 0 10px 0;padding-left:20px;font-size:14px;line-height:21px;color:#374151">${b.steps.map((st) => `<li style="margin-bottom:4px">${esc(st)}</li>`).join('')}</ol>` : ''}${button(b.removal_url, 'Open the official opt-out page')}`
-    : `<div style="margin-top:6px;font-size:14px;color:#6b7280">We have not yet written a verified removal guide for ${esc(b.name)}.</div>`}
-</td></tr></table>`).join('');
   const html = shell(subject, s.score === null ? 'No score yet: we only show what we actually checked.' : `Your score: ${s.score}/100`,
     `${aliceHero(`${headline}${s.score === null ? '' : ` <span style="font-size:14px;font-weight:500;color:#6b7280">(${esc(s.risk_level)} exposure)</span>`}`, 'peek')}
 ${box(esc(noteScore))}
 ${h2('Part 1: your web scan, replayed')}${para(esc(part1Intro))}${scanNumberLine ? para(esc(scanNumberLine)) : ''}${webScan ? hexGroups(web) : ''}
 <div style="margin:26px 0 0 0;padding:14px 16px;border-left:4px solid ${BRAND};background:#f9fafb;font-size:16px;line-height:24px;font-weight:600;color:#111827">${esc(BRIDGE)}</div>
-${h2('Part 2: your email address')}${para(esc(`${tallyLine(et, 'hexagons')}.`))}${hexGroups(emailHexes)}
+${h2('Part 2: your email address')}${para(esc(`${tallyLine(et, 'hexagons')}.`))}${hexGroups(emailHexes)}${breachGated ? para(esc(BREACH_FREE_TEXT)) : ''}
 ${breachRows.length ? `<ul style="margin:10px 0 12px 0;padding-left:20px;font-size:13px;line-height:19px;color:#374151">${breachRows.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}${breachMore ? `<li>&hellip;and ${breachMore} more (all of them are in the attached file)</li>` : ''}</ul>` : ''}
 ${para('<strong>The full data is attached.</strong> The JSON file holds every hexagon with its full value and the technical detail that did not fit here, so you can open it, search it and analyse it yourself.')}
-${showBrokers ? `${h2('People-search sites')}${para('A finding above makes these relevant. We have <strong>not searched</strong> these sites for you, so we cannot say whether you are listed. Search for yourself, then use the official page to remove each listing.')}${brokerCards}`
-    : para(`US people-search removal guides: <a href="${SITE}/opt-out" style="color:${BRAND}">see them on the site</a>. We have not searched these sites for you.`)}
+${brokerSectionHtml(panel)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para(`Questions about this report? <a href="${SITE}/faq" style="color:${BRAND}">Read the FAQ</a>.`)}
-${para('This email is our open channel. Reply anytime with a question and we will continue the conversation right here, or reply to ask us to delete your data.')}
+${para(`${esc(REPLY_PROMISE)} You can also reply to ask us to delete your data.`)}
 ${liveLink ? para('<strong>Keep an eye on your results.</strong> Open your results page and new findings appear as we find them. Keep this link private: anyone who has it can see your results.') + button(liveLink, 'Watch my results live') : ''}
 ${referral ? referral.html : ''}
 ${unsubscribeLink && fixedLink ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 20px 0"><tr><td style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;font-size:14px;line-height:21px;color:#14532d"><strong>Fixed what is in this report?</strong> Press <a href="${esc(fixedLink)}" style="color:${BRAND};font-weight:600">I have fixed this</a> and we will stop the follow-up emails about it. Or <a href="${esc(unsubscribeLink)}" style="color:${BRAND};font-weight:600">unsubscribe from all our emails</a>.</td></tr></table>`
@@ -254,15 +274,21 @@ ${unsubscribeLink && fixedLink ? `<table role="presentation" width="100%" cellpa
   return { ...tagged('scan-report', { subject, text, html }), report };
 }
 
-export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers, attachments }, fetchImpl = fetch) {
+// `items` = the personal-data item names this message carries (MPC-9885). Every message goes to the recipient's address; the report email also carries
+// the scan's findings and the IP values in its attached file, so its caller adds them. Declared, then checked against the registry entry for "resend".
+export async function sendEmail(env, { to, subject, html, text, idempotencyKey, headers, attachments, items = ['email'] }, fetchImpl = undefined, rctx = undefined) {
   if (!env.RESEND_API_KEY) return { sent: false, reason: 'RESEND_API_KEY not configured' };
-  const res = await fetchImpl('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ from: env.EMAIL_FROM || 'MyPrivacyTOOL <hello@myprivacytool.io>', to: [to], reply_to: env.EMAIL_REPLY_TO || undefined, subject, html, text, headers: headers || undefined, attachments: attachments || undefined }),
-  });
+  const ctx = rcx(env, fetchImpl, rctx);
+  const res = await callRecipient('resend', {
+    url: 'https://api.resend.com/emails', sent: items,
+    init: {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ from: env.EMAIL_FROM || 'MyPrivacyTOOL <hello@myprivacytool.io>', to: [to], reply_to: env.EMAIL_REPLY_TO || undefined, subject, html, text, headers: headers || undefined, attachments: attachments || undefined }),
+    },
+  }, ctx);
   if (!res.ok) return { sent: false, reason: `Resend HTTP ${res.status}: ${(await res.text()).slice(0, 150)}` };
   const j = await res.json().catch(() => ({}));
-  await recordSend(env, { messageId: j.id, idempotencyKey, to }, fetchImpl);   // MPC-7556: best effort, never throws
+  await recordSend(env, { messageId: j.id, idempotencyKey, to }, fetchImpl, ctx);   // MPC-7556: best effort, never throws
   return { sent: true, id: j.id || null };
 }

@@ -6,6 +6,8 @@ interface UnknownDeviceHeroProps {
   spotlightLabel: string;
   /** False when the target hexagon is not on the page (e.g. the honeycomb dashboard view). */
   canJump?: boolean;
+  /** Full-screen presentation: no card chrome, larger type. */
+  fullscreen?: boolean;
 }
 
 /**
@@ -13,7 +15,7 @@ interface UnknownDeviceHeroProps {
  * this is. Being hard to identify is good news for the visitor — and the
  * honest alternative to guessing — so we say so and point at what we CAN see.
  */
-export default function UnknownDeviceHero({ spotlightId, spotlightLabel, canJump = true }: UnknownDeviceHeroProps) {
+export default function UnknownDeviceHero({ spotlightId, spotlightLabel, canJump = true, fullscreen = false }: UnknownDeviceHeroProps) {
   const jump = () => {
     const el = document.getElementById(`hexagon-${spotlightId}`);
     if (!el) return;
@@ -22,14 +24,16 @@ export default function UnknownDeviceHero({ spotlightId, spotlightLabel, canJump
   };
 
   return (
-    <div className="w-full max-w-[280px] sm:max-w-xs mx-auto">
-      <div className="relative rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-card border border-surface-border text-center space-y-3"
-        style={{ background: 'hsl(var(--surface) / var(--surface-alpha))' }}>
+    <div className={fullscreen ? 'w-full max-w-md mx-auto' : 'w-full max-w-[280px] sm:max-w-xs mx-auto'}>
+      <div className={fullscreen
+          ? 'relative text-center space-y-4'
+          : 'relative rounded-xl sm:rounded-2xl p-5 sm:p-8 shadow-card border border-surface-border text-center space-y-3'}
+        style={{ background: fullscreen ? 'transparent' : 'hsl(var(--surface) / var(--surface-alpha))' }}>
         <div className="text-muted-foreground text-xs sm:text-sm font-medium uppercase tracking-wider">
           Your Device
         </div>
-        <div className="text-4xl sm:text-5xl select-none" aria-hidden="true">🕶️</div>
-        <div className="text-foreground font-semibold text-base sm:text-lg">
+        <div className={fullscreen ? 'text-7xl sm:text-8xl select-none' : 'text-4xl sm:text-5xl select-none'} aria-hidden="true">🕶️</div>
+        <div className={fullscreen ? 'text-foreground font-semibold text-2xl sm:text-3xl' : 'text-foreground font-semibold text-base sm:text-lg'}>
           We can’t be certain what you’re using
         </div>
         <p className="text-muted-foreground text-xs sm:text-sm">

@@ -1063,15 +1063,15 @@ export default function VoiceAI({ hexagonData, tile, confirmedCount, totalCount 
     } else if (confirmedCount >= 23 && confirmedCount < 40) {
       newMessage = `Deep fingerprint analysis complete! I've mapped 12 fingerprinting methods. Your complete technical profile reveals how uniquely trackable you are.`;
     } else if (confirmedCount >= 40 && confirmedCount < 46) {
-      // Behavior tracking wave
+      // Behavior tracking wave (40 and 46 are wave boundaries in the reveal order, not a hexagon total)
       newMessage = `🖱️ Behavioral tracking active! I'm now analyzing your mouse movements, typing patterns, clicks, and scrolls. This is the most insidious form of tracking—it cannot be blocked.`;
       trackVoiceAIMessage('behavior_wave');
-    } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= 46) {
+    } else if (confirmedCount >= 44 && confirmedCount < totalCount && totalCount >= HEXAGON_COUNT) {
       newMessage = `Behavioral analysis nearly complete. Your interaction patterns create a signature that can help recognise you, even in private browsing.`;
-    } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < 46) {
+    } else if (confirmedCount >= totalCount - 1 && confirmedCount > 0 && totalCount < HEXAGON_COUNT) {
       newMessage = `Almost there! I now have a complete picture of your digital shadow.`;
-    } else if (confirmedCount === totalCount && totalCount >= 46) {
-      // Final comprehensive summary for full 46 hexagons
+    } else if (confirmedCount === totalCount && totalCount >= HEXAGON_COUNT) {
+      // Final comprehensive summary once every hexagon in the registry (HEXAGON_COUNT) is confirmed
       newMessage = `COMPLETE! I've analyzed all ${HEXAGON_COUNT} aspects of your digital shadow across ${HEXAGON_GROUP_COUNT} categories. Your behavioral patterns, fingerprints, stored data, connected accounts, and security status have all been mapped. This comprehensive profile is what the surveillance economy knows about you. Every click, scroll, and keystroke—they see it all.`;
       trackVoiceAIMessage('full_scan_complete');
     } else if (confirmedCount === totalCount && totalCount > 0) {

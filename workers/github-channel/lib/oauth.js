@@ -3,6 +3,11 @@
  * Scope is read:user only (MPC-115 decision D): public profile, public repos and starred repos need no more.
  */
 import { b64url, fromB64url } from './encoding.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../../shared/recipients/worker-ctx.ts';
+
+// MPC-9885: the injected fetchFn (tests) is handed to the wrapper; undefined falls back to the global fetch there.
+const rctx = (fetchFn) => workerRecipientContext(null, { fetchImpl: fetchFn });
 
 export const AUTH_URL = 'https://github.com/login/oauth/authorize';
 export const TOKEN_URL = 'https://github.com/login/oauth/access_token';
@@ -55,14 +60,14 @@ export async function buildAuthUrl({ clientId, redirectUri, state, verifier }) {
   return u.toString();
 }
 
-export async function exchangeCode({ code, verifier, clientId, clientSecret, redirectUri }, fetchFn = fetch) {
-  const res = await fetchFn(TOKEN_URL, {
+export async function exchangeCode({ code, verifier, clientId, clientSecret, redirectUri }, fetchFn = undefined) {
+  const res = await callRecipient('oauth-providers', { url: TOKEN_URL, sent: [], init: {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: clientId, client_secret: clientSecret, code, redirect_uri: redirectUri, code_verifier: verifier,
     }),
-  });
+  } }, rctx(fetchFn));
   const data = await res.json().catch(() => ({}));
   // GitHub returns 200 with an `error` field on failure. Never echo the body (may hold secrets).
   if (!res.ok || data.error || !data.access_token) throw new Error(`token exchange failed${data.error ? `: ${data.error}` : ''}`);
@@ -70,8 +75,8 @@ export async function exchangeCode({ code, verifier, clientId, clientSecret, red
 }
 
 /** Revoke MPT's OAuth grant for the user at GitHub (DELETE /applications/{client_id}/grant). */
-export async function revokeGrant({ accessToken, clientId, clientSecret }, fetchFn = fetch) {
-  const res = await fetchFn(`https://api.github.com/applications/${clientId}/grant`, {
+export async function revokeGrant({ accessToken, clientId, clientSecret }, fetchFn = undefined) {
+  const res = await callRecipient('oauth-providers', { url: `https://api.github.com/applications/${clientId}/grant`, sent: [], init: {
     method: 'DELETE',
     headers: {
       Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
@@ -80,7 +85,7 @@ export async function revokeGrant({ accessToken, clientId, clientSecret }, fetch
       'User-Agent': 'myprivacytool-github-channel',
     },
     body: JSON.stringify({ access_token: accessToken }),
-  });
+  } }, rctx(fetchFn));
   return res.status === 204 || res.status === 404; // 404 = already revoked
 }
 
@@ -88,14 +93,14 @@ export async function revokeGrant({ accessToken, clientId, clientSecret }, fetch
  * Exchange a refresh token for a new access token (GitHub "expiring user tokens"). Refresh tokens ROTATE:
  * each use returns a new refresh token and invalidates the old one, so the result must be saved.
  */
-export async function refreshAccessToken({ refreshToken, clientId, clientSecret }, fetchFn = fetch) {
-  const res = await fetchFn(TOKEN_URL, {
+export async function refreshAccessToken({ refreshToken, clientId, clientSecret }, fetchFn = undefined) {
+  const res = await callRecipient('oauth-providers', { url: TOKEN_URL, sent: [], init: {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken,
     }),
-  });
+  } }, rctx(fetchFn));
   const data = await res.json().catch(() => ({}));
   const err = new Error(`token refresh failed${data.error ? `: ${data.error}` : ''}`);
   if (!res.ok || data.error || !data.access_token) throw err;

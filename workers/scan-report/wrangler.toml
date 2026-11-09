@@ -30,6 +30,11 @@ HK_SPAM_ENABLED = "true"
 # Rollback: set "false" (test mode) or HK_SPAM_ENABLED = "false" and merge, or Actions -> Rollback Worker -> mpt-scan-report. Sends already made cannot be undone.
 HK_SPAM_EMAILS_LIVE = "true"
 
+# MPC-9890: a free user's record is deleted 7 days after the report is delivered (Open Tracker, Chris 2026-11-08): countdown emails at T-24 h and T-4 h, a "done" email at T-0,
+# one-click Keep (/api/keep), HubSpot contact deleted. The deadline and the deletion are in Supabase (migration 20261108210000). Anything but "true" runs none of it from this
+# Worker (the hourly pg_cron backstop in the migration still deletes records more than an hour overdue). Rollback: "false" and merge.
+FREE_RECORD_DELETION_ENABLED = "true"
+
 # MPC-8452 Tier 2: search public GitHub commits for the visitor's address. This is the only check that sends the PLAIN address to a third party. ON since
 # 2026-10-26 on the owner's instruction, after the Privacy page sentence for it went live (PR 528). Only the exact string "true" runs it; "false" is the rollback.
 # Set the Worker secret GITHUB_SEARCH_TOKEN (a GitHub token with no scopes) because the unauthenticated search allows about 10 requests a minute. See docs/osint-list-mpc-8452.md.
@@ -58,11 +63,11 @@ RECOGNITION_ENABLED = "true"
 REFERRALS_ENABLED = "true"
 
 # MPC-9546/9549: Deep Research ownership check + own results list (lib/deepResearch.js, routes /api/deep-research/{start,verify,results,delete}).
-# OFF. Anything but the exact string "true" does nothing: all four routes answer 404. Turn on only after: (1) the Worker SECRET DEEP_RESEARCH_HMAC_KEY is set
-# (`wrangler secret put DEEP_RESEARCH_HMAC_KEY`, a long random value, never in this file; deliberately NOT in EXPECTED_SECRETS.txt while the flag is off),
-# (2) Chris has approved the page wording and the code email (buildCodeEmail), and (3) the site flag VITE_DEEP_RESEARCH is also on. Retention is 90 days (Chris, 2026-11-07).
-# Rollback: set "false". Codes already sent cannot be recalled; they expire in 10 minutes.
-DEEP_RESEARCH_ENABLED = "false"
+# ON since 2026-11-07 on Chris's instruction ("switch it on now"). Anything but the exact string "true" does nothing: all four routes answer 404.
+# Needs the Worker SECRET DEEP_RESEARCH_HMAC_KEY (set 2026-11-07; without it the routes answer 503). The site has a matching flag, VITE_DEEP_RESEARCH (a Cloudflare Pages
+# build variable): the form only shows when BOTH are on. Retention is 90 days (Chris, 2026-11-07).
+# Rollback: set "false" and merge (routes 404 again). Codes already sent cannot be recalled; they expire in 10 minutes.
+DEEP_RESEARCH_ENABLED = "true"
 # Tester mode: set the Worker SECRET REFERRALS_TEST_RECIPIENTS (comma separated addresses, `wrangler secret put`, never in this file) to limit the programme to
 # those addresses while it is tested: the invite block, invite page, invitations (to listed addresses only) and reward emails. Everyone else is unchanged.
 # Delete the secret to open the programme to every user. Order matters: set the secret BEFORE setting REFERRALS_ENABLED = "true".
@@ -87,6 +92,37 @@ FOLLOWUP_STATE_ENABLED = "false"
 EMAIL_DOMAIN_CHECK = "true"
 
 # Secrets (wrangler secret put NAME, never in repo/chat): see EXPECTED_SECRETS.txt
+
+# MPC-9813 (F1 broker lookup, Chris Decision 7, 2026-11-07). Both need migration 20261107140000_mpc_9813_confirm_gate_and_listing_check.sql (applied on merge by deploy-supabase.yml).
+#  EMAIL_CONFIRM_GATE_ENABLED  "true": a new scan waits for the click-to-confirm in the confirmation email. No report is sent and no check that uses details about
+#                              the person runs before it. Scans created before this switch are unaffected. Fails closed: if a scan cannot be marked as waiting, the request fails.
+#  LISTING_CHECK_ENABLED       "true" (needs the gate): the optional name / place / phone / up to 3 "page that lists you" addresses are accepted with a saved scan, stored with it
+#                              (same 12-month retention and scan-number deletion), and the pages are read after the click. No broker site is ever searched.
+# Anything but the exact string "true" is off. Rollback: set "false" and redeploy (scans already marked keep waiting only while the gate is on).
+EMAIL_CONFIRM_GATE_ENABLED = "true"
+LISTING_CHECK_ENABLED = "true"
+
+# MPC-9817 (F3, accounts and sign-in only): passwordless accounts through Supabase Auth, driven from this Worker (lib/accounts.js): POST /api/account/{signin,verify,me,scan,
+# link-scan,delete,refresh,signout,can}. The sign-in email is ours (confirm-gate style); the browser never talks to Supabase Auth. The one-step tick ("Keep my scan and create
+# my free account", consent version 2026-11-08-v1) is acted on at the click-to-confirm. Needs migration 20261108120000_mpc_9817_accounts_and_signin.sql (applied before this
+# was switched on). Anything but the exact string "true" is off and every route answers 404; "false" is the rollback (existing accounts are untouched). No Stripe, no allowances.
+ACCOUNTS_ENABLED = "true"
+
+# MPC-9887: the server-side consent gate. POST /api/consent stores one consent per scan id (public.scan_consents, migration 20261108150000_mpc_9887_scan_consents.sql,
+# applied before this was merged). A consent_id sent with POST /api/scan is always checked against the store. "false" = a scan WITHOUT a consent id is still accepted,
+# because no visitor holds one until the consent block (MPC-9888) ships; MPC-9888 sets this to "true" in the same change, after the report queue has drained.
+# Only the exact string "true" enforces. When it is "true", every post_click call made for a scan is refused (CONSENT_REQUIRED / CONSENT_INVALID) unless the scan's consent is in the store.
+CONSENT_GATE_ENFORCED = "false"
+
+# MPC-9818 (F3): monthly scan allowances per plan, decided by Chris 2026-11-07: Free 1 / Basic 5 / Pro 25 / Executive unlimited (no cap, no fair-use text). POST /api/scan counts the scan
+# against the plan that owns the confirmed address (an account's plan, otherwise Free) BEFORE anything is saved or sent, and a refused request creates and sends nothing (HTTP 429, code
+# scan_allowance_exhausted, with an honest message that says when the allowance resets and what the next plan includes). The numbers and the 20 entitlement rows live in the database
+# (public.plan_scan_allowance, public.capability_min_tier), not here. Needs migration 20261108140000_mpc_9818_entitlements_and_scan_allowances.sql (applied before this was switched on).
+# Anything but the exact string "true" is off; "false" + redeploy is the rollback (counted rows stay, nothing is refused). While the function is missing (HTTP 404) nothing is enforced.
+SCAN_ALLOWANCE_ENABLED = "true"
+# MPC-9816: a Free address never triggers the breach lookup (third-party cost): the breach section is NOT CHECKED. "false" + redeploy is the rollback.
+BREACH_GATE_ENABLED = "true"
+
 [observability]
 enabled = true
 

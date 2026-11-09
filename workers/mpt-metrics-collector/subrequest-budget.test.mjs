@@ -6,6 +6,9 @@
 // of an invocation, and a service-binding call to the Worker itself starts a fresh invocation with a fresh count), feeding it a
 // deliberately heavy data set, and fails if any invocation goes over the stated budget or if anything is left unstored/unpublished.
 import crypto from 'node:crypto';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { recipientCtx } from './lib/recipient-ctx.js';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy.ts';
 import worker, { COLLECTORS, COLLECTOR_GROUPS as COLLECT_PHASES, STAGES as DAILY_ORDER, runStage } from './worker.js';
 import { INVOCATION_BUDGET, PLATFORM_LIMIT, RESERVED_FOR_WRITE } from './lib/budget.js';
 import { SCAN_FORM_ID, SCAN_SOURCE_TAG } from './collectors/scan-gap.js';
@@ -37,6 +40,7 @@ const makeWorld = ({ now }) => {
   world.fetch = async (url, o = {}) => {
     url = String(url);
     const inv = world.current;
+    (inv.hosts ??= []).push(new URL(url).hostname); // MPC-9885: for the recipient-registry check below
     inv.calls += 1; inv.urls.push(url.replace(/\?.*$/, '').replace(/https?:\/\/[^/]+/, ''));
     if (inv.calls > PLATFORM_LIMIT) throw new Error('Too many subrequests by single Worker invocation.');
     const m = o.method ?? 'GET';
@@ -156,13 +160,24 @@ check(['table_counts', 'nightly_chain_status', 'email_delivery_daily', 'scan_rep
 check(split.notionWrites >= 20, `the publishers ran and wrote to Notion (${split.notionWrites} writes, including block replacement)`);
 check(JSON.stringify(split.inserted).includes('@') === false, 'stored rows carry counts only, no email address');
 
+// ---- 2b. MPC-9885: every host the daily run contacted is a registered recipient, and the expected recipients were reached ----------------
+{
+  const spy = createFetchSpy();
+  for (const inv of split.invocations) for (const h of inv.hosts ?? []) await spy.fetch(`https://${h}/`);
+  let registered = true; try { spy.assertAllRegistered(); } catch (e) { registered = false; console.log(String(e.message)); }
+  check(registered, 'every outbound host of the daily run is in the recipient registry and enabled');
+  // Hosts can be shared by several registry keys (the spy reports the first), so the expected recipient is checked by its host.
+  const hosts = new Set(spy.calls.map((c) => c.host));
+  for (const [k, h] of [['supabase', 'x.supabase.co'], ['cloudflare-api', 'api.cloudflare.com'], ['ga4-data-api', 'analyticsdata.googleapis.com'], ['ga4-data-api', 'oauth2.googleapis.com'], ['youtube-data-api', 'www.googleapis.com'], ['hubspot', 'api.hubapi.com'], ['notion', 'api.notion.com'], ['slack', 'slack.com']]) check(hosts.has(h), `the daily run reached recipient ${k} (${h})`);
+}
+
 // ---- 3. a runaway collector is stopped by the guard, not by the platform -------------------------------------------------------------
 {
   const world = makeWorld({ now: NOW.getTime() }); world.mirrorDay = '2026-11-01';
   const original = globalThis.fetch; globalThis.fetch = world.fetch;
   const inv = { calls: 0, urls: [] }; world.current = inv;
   const runPhase = runStage;
-  const greedy = { source: 'greedy', report: 'r', async collect(env) { for (let i = 0; i < 100; i++) await fetch('https://x.supabase.co/rest/v1/other'); return { payload: {} }; } };
+  const greedy = { source: 'greedy', report: 'r', async collect(env) { for (let i = 0; i < 100; i++) await callRecipient('supabase', { url: 'https://x.supabase.co/rest/v1/other', sent: [] }, recipientCtx(env)); return { payload: {} }; } };
   const phasesMap = COLLECT_PHASES;
   phasesMap.__test = [greedy, COLLECTORS[0]];
   const out = await silence(() => runStage('__test', baseEnv(), NOW));

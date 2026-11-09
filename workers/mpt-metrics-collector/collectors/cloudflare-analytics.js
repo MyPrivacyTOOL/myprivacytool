@@ -1,4 +1,6 @@
 import { previousHkDay } from '../lib/hk.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 // Cloudflare GraphQL Analytics pull: a cross-check on GA4 (which undercounts behind consent banners and ad blockers).
 // Zone: requests + unique visitors for myprivacytool.io. Workers: invocations + errors for the MPT Workers.
@@ -44,11 +46,11 @@ export function previousDay(now = new Date()) {
 }
 
 async function graphql(env, query, variables) {
-  const res = await fetch(ENDPOINT, {
+  const res = await callRecipient('cloudflare-api', { url: ENDPOINT, init: {
     method: 'POST',
     headers: { Authorization: `Bearer ${env.CLOUDFLARE_ANALYTICS_TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = await res.json();
   if (body.errors?.length) throw new Error(`GraphQL: ${body.errors.map((e) => e.message).join('; ')}`);

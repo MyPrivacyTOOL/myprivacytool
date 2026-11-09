@@ -45,7 +45,7 @@ describe("TelegramDashboard", () => {
     expect(screen.getByRole("link", { name: "Run a full scan on the website" }).getAttribute("href")).toBe("/scan");
     expect(f).toHaveBeenCalledTimes(1);
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/dashboard");
+    expect(new URL(url).pathname).toBe("/api/dashboard"); // absolute since MPC-9886 (the wrapper resolves it)
     expect(init.cache).toBe("no-store");
   });
 

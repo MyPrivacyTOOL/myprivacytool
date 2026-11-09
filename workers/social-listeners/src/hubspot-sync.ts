@@ -2,8 +2,9 @@
 // (the Cloudflare free plan is at its cron limit). Uses a dedicated private-app token (HUBSPOT_SOCIAL_TOKEN) that can only touch
 // contacts. The contact carries the X user id, public @handle, whether they follow us, and what they did last: never message text.
 // Skipped silently when the token is not set. Every failure is logged by name and never blocks a reply.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const API = "https://api.hubapi.com";
 const MISSING = (v?: string) => !v || v === "placeholder";
@@ -25,12 +26,16 @@ export function resetHubSpotCache(): void {
 export const hubspotEnabled = (env: Env): boolean => !MISSING(env.HUBSPOT_SOCIAL_TOKEN);
 
 const call = (env: Env, path: string, method: string, body?: unknown): Promise<Response> =>
-  fetch(`${API}${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${env.HUBSPOT_SOCIAL_TOKEN}`, "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(4000),
-  });
+  callRecipient("hubspot", {
+    url: `${API}${path}`,
+    init: {
+      method,
+      headers: { Authorization: `Bearer ${env.HUBSPOT_SOCIAL_TOKEN}`, "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(4000),
+    },
+    sent: ["username", "name"], // X user id and public @handle (also the contact's first name)
+  }, recipientCtx(env));
 
 /** Creates the custom contact properties once per isolate. An existing property (409) is fine. False when it cannot be done. */
 async function ensureProperties(env: Env, log: Logger): Promise<boolean> {
@@ -74,12 +79,16 @@ export async function syncToHubSpot(env: Env, c: HubSpotContact, log: Logger): P
     if (!res.ok) return void log.warn("hubspot_sync_failed", { status: res.status });
     log.info(existing ? "hubspot_contact_updated" : "hubspot_contact_created");
     if (env.SUPABASE_URL && env.SUPABASE_KEY) {
-      await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/social_contacts?platform=eq.x&platform_user_id=eq.${c.userId}`, {
-        method: "PATCH",
-        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify({ hubspot_synced_at: new Date().toISOString() }),
-        signal: AbortSignal.timeout(3000),
-      });
+      await callRecipient("supabase", {
+        url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/social_contacts?platform=eq.x&platform_user_id=eq.${c.userId}`,
+        init: {
+          method: "PATCH",
+          headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ hubspot_synced_at: new Date().toISOString() }),
+          signal: AbortSignal.timeout(3000),
+        },
+        sent: ["username"], // X user id in the filter
+      }, recipientCtx(env));
     }
   } catch (err) {
     log.warn("hubspot_sync_failed", { error: err instanceof Error ? err.message.slice(0, 40) : "unknown" });

@@ -1,6 +1,6 @@
 // Continuous monitoring logic for Pro and Executive plans (MPC-7649). Pure functions only: the schedule, the
 // "is this exposure new" test, who gets alerted and how, and the dashboard numbers. The Worker that calls the
-// breach / dark web providers and sends the messages is not built yet; it will use these same functions so the
+// breach providers and sends the messages is not built yet; it will use these same functions so the
 // dashboard and the alerts cannot disagree.
 
 export type MonitorKind = "daily_breach" | "weekly_darkweb" | "monthly_report";
@@ -41,7 +41,7 @@ export const KIND_INTERVAL_DAYS: Record<MonitorKind, number> = {
 
 export const KIND_LABEL: Record<MonitorKind, string> = {
   daily_breach: "Daily breach check",
-  weekly_darkweb: "Weekly dark web scan",
+  weekly_darkweb: "Monthly breach re-check",
   monthly_report: "Monthly report",
 };
 

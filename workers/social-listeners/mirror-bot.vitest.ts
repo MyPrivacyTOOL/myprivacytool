@@ -173,12 +173,12 @@ describe("rate limit, retry and tagging (MPC-7628)", () => {
   it("retries the DM once with a refreshed token after a 401", async () => {
     let first = true;
     const f = vi.spyOn(globalThis, "fetch").mockImplementation(async (u: unknown) => {
-      if (String(u).startsWith("https://sb.test")) return Response.json([]);
+      if (String(u).startsWith("https://x.supabase.co")) return Response.json([]);
       if (String(u).includes("oauth2/token")) return Response.json({ access_token: "fresh", refresh_token: "r2", expires_in: 7200 });
       if (first && String(u).includes("/dm_conversations/")) { first = false; return new Response("expired", { status: 401 }); }
       return new Response("{}");
     });
-    const e = { ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", X_CLIENT_ID: "c", X_CLIENT_SECRET: "s", X_REFRESH_TOKEN: "boot" };
+    const e = { ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", X_CLIENT_ID: "c", X_CLIENT_SECRET: "s", X_REFRESH_TOKEN: "boot" };
     await post(dm("77", "MIRROR"), e);
     await new Promise((x) => setTimeout(x, 20));
     const dms = calls(f).filter((c) => String(c[0]).includes("/dm_conversations/"));
@@ -398,7 +398,7 @@ describe("branding, welcome and simple Y (MPC-7628)", () => {
 
 describe("Channel OSINT funnel counting (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 20));
-  const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
+  const e = () => ({ ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k" });
   /** Fake X + Supabase: the RPC bodies are what we assert on. */
   function fake(history: { sender_id: string; text: string; created_at: string }[] = []) {
     const rpc: Record<string, unknown>[] = [];
@@ -507,7 +507,7 @@ describe("OAuth 1.0a signing for the clip upload (MPC-7628)", () => {
 
 describe("X activity feed for the CRM (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 20));
-  const e = () => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k" });
+  const e = () => ({ ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k" });
   function fake(followedBy = true) {
     const touch: Record<string, unknown>[] = [];
     const erase: Record<string, unknown>[] = [];
@@ -598,7 +598,7 @@ describe("X activity feed for the CRM (MPC-7628)", () => {
 
 describe("HubSpot sync of the X feed (MPC-7628)", () => {
   const settle = () => new Promise((r) => setTimeout(r, 30));
-  const e = (extra: object = {}) => ({ ...env(), SUPABASE_URL: "https://sb.test", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs-token", ...extra });
+  const e = (extra: object = {}) => ({ ...env(), SUPABASE_URL: "https://x.supabase.co", SUPABASE_KEY: "k", HUBSPOT_SOCIAL_TOKEN: "hs-token", ...extra });
   /** Fake X, Supabase and HubSpot. `existing` = the HubSpot contact id returned by search. */
   function fake(opts: { existing?: string; propertyStatus?: number } = {}) {
     const hs: { method: string; path: string; body: unknown; auth: string }[] = [];

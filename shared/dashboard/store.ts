@@ -1,5 +1,8 @@
 // MPC-7893: the dashboard's view of Supabase. The same tables the bot writes (profile_snapshots, deep_jobs, deep_osint_results), read with the
 // service key held by the Pages Function; the browser never sees the key or a table. Tests inject an in-memory store.
+import { recipientFetcher, type RecipientContext } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
+import type { DataItem } from "../recipients/registry";
 
 export interface SessionRow { sender_id: string; snapshot_id: string; /** MPC-8689: absent = dashboard (rows from before the scope column). */ scope?: string }
 export interface SnapshotRow {
@@ -44,29 +47,32 @@ const BASELINE_COLUMNS = `${SNAPSHOT_COLUMNS},get_chat,photos,consent,consent_at
 const TIMEOUT_MS = 5000;
 const enc = encodeURIComponent;
 
-export function supabaseStore(env: DashboardEnv, fetchImpl: typeof fetch = fetch): DashboardStore | null {
+export function supabaseStore(env: DashboardEnv, fetchImpl: typeof fetch | undefined = undefined, rctx?: RecipientContext): DashboardStore | null {
   const key = env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
   if (!env.SUPABASE_URL || !key) return null;
   const base = env.SUPABASE_URL.replace(/\/+$/, "") + "/rest/v1/";
   const headers = { apikey: key, authorization: `Bearer ${key}`, "content-type": "application/json" };
-  async function get<T>(path: string): Promise<Read<T[]>> {
+  // MPC-9885: every call is the "supabase" recipient. Reads filtered by sender_id carry the platform user id in the URL ("username"); the rest carry only hashes and ids.
+  const ctx = rctx ?? workerRecipientContext(env as Record<string, unknown>, { fetchImpl });
+  const toDb = (sent: readonly DataItem[]) => recipientFetcher("supabase", sent, ctx);
+  async function get<T>(path: string, sent: readonly DataItem[] = []): Promise<Read<T[]>> {
     try {
-      const res = await fetchImpl(base + path, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      const res = await toDb(sent)(base + path, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
       if (!res.ok) return { ok: false };
       return { ok: true, value: (await res.json()) as T[] };
     } catch {
       return { ok: false };
     }
   }
-  const first = async <T>(path: string): Promise<Read<T | null>> => {
-    const r = await get<T>(path);
+  const first = async <T>(path: string, sent: readonly DataItem[] = []): Promise<Read<T | null>> => {
+    const r = await get<T>(path, sent);
     return r.ok ? { ok: true, value: r.value[0] ?? null } : { ok: false };
   };
   const nowIso = () => new Date().toISOString();
   return {
     async redeem(tokenHash, sessionHash, scope = "dashboard") {
       try {
-        const res = await fetchImpl(base + "rpc/mpt_redeem_dashboard_link", {
+        const res = await toDb([])(base + "rpc/mpt_redeem_dashboard_link", {
           method: "POST", headers, signal: AbortSignal.timeout(TIMEOUT_MS),
           body: JSON.stringify({ p_token_hash: tokenHash, p_session_hash: sessionHash, p_session_minutes: 30, ...(scope === "dashboard" ? {} : { p_scope: scope }) }),
         });
@@ -81,11 +87,11 @@ export function supabaseStore(env: DashboardEnv, fetchImpl: typeof fetch = fetch
       ? `dashboard_sessions?select=sender_id,snapshot_id,scope&session_hash=eq.${enc(h)}&scope=eq.footprint&revoked_at=is.null&expires_at=gt.${enc(nowIso())}&limit=1`
       : `dashboard_sessions?select=*&session_hash=eq.${enc(h)}&revoked_at=is.null&expires_at=gt.${enc(nowIso())}&limit=1`),
     // The sender filter is the access check: a session for one sender can never read another sender's row, whatever id is asked for.
-    snapshot: (id, sender) => first<SnapshotRow>(`profile_snapshots?select=${BASELINE_COLUMNS}&id=eq.${enc(id)}&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&limit=1`),
-    laterSnapshot: (sender, after) => first<SnapshotRow>(`profile_snapshots?select=${SNAPSHOT_COLUMNS}&sender_id=eq.${enc(sender)}&status=eq.complete&created_at=gt.${enc(after)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`),
-    latestDeepJob: (sender) => first<DeepJobRow>(`deep_jobs?select=id,created_at,status,detector_version,finished_at,expires_at&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`),
+    snapshot: (id, sender) => first<SnapshotRow>(`profile_snapshots?select=${BASELINE_COLUMNS}&id=eq.${enc(id)}&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&limit=1`, ["username"]),
+    laterSnapshot: (sender, after) => first<SnapshotRow>(`profile_snapshots?select=${SNAPSHOT_COLUMNS}&sender_id=eq.${enc(sender)}&status=eq.complete&created_at=gt.${enc(after)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`, ["username"]),
+    latestDeepJob: (sender) => first<DeepJobRow>(`deep_jobs?select=id,created_at,status,detector_version,finished_at,expires_at&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}&order=created_at.desc&limit=1`, ["username"]),
     eventFlags: async (sender) => {
-      const r = await get<{ flag: string }>(`telegram_event_flags?select=flag&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}`);
+      const r = await get<{ flag: string }>(`telegram_event_flags?select=flag&sender_id=eq.${enc(sender)}&expires_at=gt.${enc(nowIso())}`, ["username"]);
       return r.ok ? { ok: true, value: r.value.map((x) => x.flag) } : r;
     },
     deepResults: (jobId) => get<DeepResultRow>(`deep_osint_results?select=source,site_name,status,observed_at,detector_version,limitation&job_id=eq.${enc(jobId)}&order=site_name.asc`),

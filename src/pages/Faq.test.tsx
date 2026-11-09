@@ -24,7 +24,8 @@ describe("FAQ", () => {
     const text = flat(document.body.textContent ?? "");
     expect(text).toContain("Network tab");
     expect(text).toContain("Our source code is public to read at https://github.com/MyPrivacyTOOL/myprivacytool");
-    expect(text).toContain("read aloud by your own device's voice. There is no chat, and nothing you do with her voice is sent to us.");
+    expect(text).toContain("read aloud by your own device's voice, and nothing you do with her voice is sent to us.");
+    expect(text).toContain("There is no live chat with her on the site today.");
     expect(text).toContain("kept for 12 months".replace("kept", "we keep it"));
     expect(text).toContain("write to privacy@myprivacytool.io");
     expect(text).not.toMatch(/open[- ]source/i);
@@ -39,5 +40,14 @@ describe("Thank-you page trust line", () => {
       </MemoryRouter>,
     );
     expect(flat(document.body.textContent ?? "")).toContain(`aren't stored on our servers, ${EXCEPTION}`);
+  });
+});
+
+// CK-9848: the FAQ states the retention of the scan delivery record.
+describe("FAQ: report delivery record retention (CK-9848)", () => {
+  it("states 30 days now and 7 days from the Open Tracker release", () => {
+    renderPage(<Faq />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("The delivery record for a scan is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan.");
   });
 });

@@ -5,6 +5,8 @@
  */
 import { createRateLimiter } from './rate-limit.js';
 import { DEFAULT_USER_AGENT } from './reddit-oauth.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../../shared/recipients/worker-ctx.ts';
 
 const API = 'https://oauth.reddit.com';
 const sharedLimiter = createRateLimiter(); // one per isolate, so concurrent requests also share the budget
@@ -16,19 +18,20 @@ export class RedditAdapterError extends Error {
 const subName = (s) => (typeof s === 'string' ? s : s?.display_name ?? s?.name ?? 'unknown');
 
 export class RedditAdapter {
-  constructor({ token, userAgent = DEFAULT_USER_AGENT, fetchFn = fetch, limiter = sharedLimiter }) {
+  constructor({ token, userAgent = DEFAULT_USER_AGENT, fetchFn = undefined, limiter = sharedLimiter }) {
     this.token = token;
     this.userAgent = userAgent;
-    // Wrapped so `fetch` is never called as a method of this object (Workers: "Illegal invocation").
-    this.fetchFn = (...args) => fetchFn(...args);
+    // The wrapper calls the injected function (or the global fetch, bound) itself, so `fetch` is never a method of this object (Workers: "Illegal invocation").
+    this.rctx = workerRecipientContext(null, { fetchImpl: fetchFn });
     this.limiter = limiter;
   }
 
   get(path) {
     return this.limiter(async () => {
-      const res = await this.fetchFn(`${API}${path}`, {
+      // MPC-9885: only /user/<name>/... paths carry the account name (username); /api/v1/me carries none.
+      const res = await callRecipient('oauth-providers', { url: `${API}${path}`, sent: path.startsWith('/user/') ? ['username'] : [], init: {
         headers: { Authorization: `Bearer ${this.token}`, 'User-Agent': this.userAgent },
-      });
+      } }, this.rctx);
       // Message carries the status only: never the URL, token or body.
       if (!res.ok) throw new RedditAdapterError(res.status, `reddit api ${res.status}`);
       return res.json();

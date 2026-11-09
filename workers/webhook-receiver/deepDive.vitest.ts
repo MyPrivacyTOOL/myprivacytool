@@ -2,6 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
+import { osintProvidersOn } from './test-support/osint-providers-on.ts';
+
+osintProvidersOn();
 
 const SECRET = 'dd-secret';
 const WA = '85212345678';

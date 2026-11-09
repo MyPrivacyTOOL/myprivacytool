@@ -12,6 +12,8 @@ export const KEY_TYPES = [
   ['referral-invite-', 'referral-invite', 'REF-invite', 'referral'], ['referral-reward-', 'referral-reward', 'REF-reward', 'referral'],
   ['hk-spam-test-', 'hk-spam-test', 'HK-day10-test', 'hk-spam'], ['hk-spam-day', 'hk-spam-day10', 'HK-day10', 'hk-spam'],
   ['deep-research-code-', 'deep-research-code', 'SYS-deep-research-code', 'any'],
+  ['signin-', 'account-signin', 'SYS-account-signin', 'any'],   // MPC-9817
+  ['deletion-', 'deletion-countdown', 'SYS-deletion-countdown', 'web-scan'], ['deleted-', 'deletion-done', 'SYS-deletion-done', 'web-scan'],   // MPC-9890
 ];
 export function emailTypeFromKey(key) {
   const k = String(key || '');
@@ -27,10 +29,10 @@ export function emailMetaFromKey(key) {
 
 let warned = false;
 /** Never throws. Returns true when the row was written. */
-export async function recordSend(env, { messageId, idempotencyKey, to }, fetchImpl = fetch) {
+export async function recordSend(env, { messageId, idempotencyKey, to }, fetchImpl = undefined, rctx = undefined) {
   try {
     if (!messageId || !env.SUPABASE_SERVICE_ROLE_KEY || !env.SUPABASE_URL) return false;
-    await db(env, fetchImpl).insert('email_sends', { provider_message_id: String(messageId).slice(0, 200), email_type: emailTypeFromKey(idempotencyKey), ...(({ emailId, channel }) => ({ email_id: emailId, channel }))(emailMetaFromKey(idempotencyKey)), is_test: isTestAddress(to) });
+    await db(env, fetchImpl, rctx).insert('email_sends', { provider_message_id: String(messageId).slice(0, 200), email_type: emailTypeFromKey(idempotencyKey), ...(({ emailId, channel }) => ({ email_id: emailId, channel }))(emailMetaFromKey(idempotencyKey)), is_test: isTestAddress(to) });
     return true;
   } catch (e) {
     if (e?.status === 409) return false;   // already recorded (a retried send returns the same message id)

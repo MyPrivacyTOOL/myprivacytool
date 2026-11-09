@@ -13,20 +13,20 @@ function fake(handler: (c: Call) => { status?: number; body?: unknown } | Promis
     const r = await handler(c);
     return new Response(r.body === undefined ? "" : JSON.stringify(r.body), { status: r.status ?? 200 });
   }) as unknown as typeof fetch;
-  return { calls, store: new RestCaseStore({ baseUrl: "https://test.invalid", serviceKey: "k-test", fetchImpl }) };
+  return { calls, store: new RestCaseStore({ baseUrl: "https://test.supabase.co", serviceKey: "k-test", fetchImpl }) };
 }
 const ev: InboundEvent = { channel: "web", providerEventId: "e1", text: "hi", senderHandle: "v1", receivedAt: "2026-10-26T00:00:00Z" };
 
 describe("RestCaseStore", () => {
   it("rejects non-https base URLs and a missing key", () => {
     expect(() => new RestCaseStore({ baseUrl: "http://example.com", serviceKey: "k" })).toThrow();
-    expect(() => new RestCaseStore({ baseUrl: "https://x.test", serviceKey: "" })).toThrow();
+    expect(() => new RestCaseStore({ baseUrl: "https://x.supabase.co", serviceKey: "" })).toThrow();
   });
   it("calls the atomic intake RPC with service credentials and maps the case", async () => {
     const { store, calls } = fake(() => ({ body: { case: row, duplicate: false } }));
     const r = await store.createCaseFromEvent(ev, { ref: "SUP-ABCDEFGH", policyVersion: "p", now: "n" });
     expect(r.case.ref).toBe("SUP-ABCDEFGH"); expect(r.duplicate).toBe(false);
-    expect(calls[0].url).toBe("https://test.invalid/rest/v1/rpc/support_create_case_from_event");
+    expect(calls[0].url).toBe("https://test.supabase.co/rest/v1/rpc/support_create_case_from_event");
     const h = calls[0].init.headers as Record<string, string>;
     expect(h.apikey).toBe("k-test"); expect(h.Authorization).toBe("Bearer k-test");
     expect(JSON.parse(calls[0].init.body as string)).toMatchObject({ p_channel: "web", p_event_id: "e1", p_sender: "v1" });
@@ -34,10 +34,10 @@ describe("RestCaseStore", () => {
   it("uses the Supabase /rest/v1 prefix by default and honours restPrefix", async () => {
     const urls: string[] = [];
     const fetchImpl = (async (u: string) => { urls.push(u); return new Response("[]", { status: 200 }); }) as unknown as typeof fetch;
-    await new RestCaseStore({ baseUrl: "https://test.invalid", serviceKey: "k", fetchImpl }).getCase("c1");
-    await new RestCaseStore({ baseUrl: "https://test.invalid", serviceKey: "k", fetchImpl, restPrefix: "" }).getCase("c1");
-    expect(urls[0]).toBe("https://test.invalid/rest/v1/support_cases?id=eq.c1&limit=1");
-    expect(urls[1]).toBe("https://test.invalid/support_cases?id=eq.c1&limit=1");
+    await new RestCaseStore({ baseUrl: "https://test.supabase.co", serviceKey: "k", fetchImpl }).getCase("c1");
+    await new RestCaseStore({ baseUrl: "https://test.supabase.co", serviceKey: "k", fetchImpl, restPrefix: "" }).getCase("c1");
+    expect(urls[0]).toBe("https://test.supabase.co/rest/v1/support_cases?id=eq.c1&limit=1");
+    expect(urls[1]).toBe("https://test.supabase.co/support_cases?id=eq.c1&limit=1");
   });
   it("URL-encodes filter values so a hostile thread key cannot add filters", async () => {
     const { store, calls } = fake(() => ({ body: [] }));

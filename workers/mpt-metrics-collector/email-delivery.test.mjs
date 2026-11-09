@@ -4,7 +4,7 @@ import { dailyProperties } from './publishers/notion.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
-const ENV = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k' };
+const ENV = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' };
 const NOW = new Date('2026-11-05T16:15:00Z');   // 00:15 HKT on 6 Nov: the day to report is 5 Nov HKT
 const real = globalThis.fetch;
 const row = (email_type, sent, delivered, bounced, bounced_hard, complained, clicked) => ({ email_type, sent, delivered, bounced, bounced_hard, complained, clicked });

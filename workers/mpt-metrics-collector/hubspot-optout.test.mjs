@@ -4,7 +4,7 @@ import collector, { hashEmail } from './collectors/hubspot-optout.js';
 
 let failed = 0;
 const check = (ok, name) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`); if (!ok) failed++; };
-const ENV = { SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k', HUBSPOT_READONLY_TOKEN: 'h', HUBSPOT_PAUSE_MS: '0' };
+const ENV = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', HUBSPOT_READONLY_TOKEN: 'h', HUBSPOT_PAUSE_MS: '0' };
 const real = globalThis.fetch;
 const sha = (e) => createHash('sha256').update(e).digest('hex');
 check(await hashEmail('  Mixed.Case@Example.com ') === sha('mixed.case@example.com'), 'hash is SHA-256 of the trimmed, lower-cased address (same as email_suppressions)');
@@ -14,7 +14,7 @@ function stub({ pages, existing = [], writeStatus = 200 }) {
   globalThis.fetch = async (u, o = {}) => {
     u = String(u);
     if (u.startsWith('https://api.hubapi.com')) { calls.hubspot.push({ u, method: o.method, body: o.body }); const i = calls.hubspot.length - 1; return { ok: true, status: 200, json: async () => pages[i] }; }
-    if (u.startsWith('https://db.invalid/rest/v1/email_suppressions')) { const rows = JSON.parse(o.body); calls.writes.push(rows); return { ok: writeStatus === 200, status: writeStatus, json: async () => rows.filter((r) => !existing.includes(r.email_hash)) }; }
+    if (u.startsWith('https://x.supabase.co/rest/v1/email_suppressions')) { const rows = JSON.parse(o.body); calls.writes.push(rows); return { ok: writeStatus === 200, status: writeStatus, json: async () => rows.filter((r) => !existing.includes(r.email_hash)) }; }
     return { ok: false, status: 500, json: async () => ({}) };
   };
   return calls;

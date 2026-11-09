@@ -1,4 +1,5 @@
 // Is this visitor in Hong Kong? (MPC-7450)
+import { recipientFetch } from "@/lib/recipientClient";
 // Source of truth is Cloudflare's CF-IPCountry header, served by the Pages Function functions/api/hk-geo.ts.
 // A visitor with a Hong Kong number who is abroad (or on a VPN) can say so with the manual override, which is
 // remembered on their device only (localStorage). Nothing is sent to a server and no identifier is created.
@@ -31,7 +32,7 @@ export function hasHongKongOverride(): boolean {
 let geoCache: Promise<string | null> | undefined;
 
 function fetchCountry(): Promise<string | null> {
-  geoCache ??= fetch(HK_GEO_ENDPOINT, { cache: "no-store" })
+  geoCache ??= recipientFetch("hk-geo", HK_GEO_ENDPOINT, { cache: "no-store" }, [])
     .then((r) => (r.ok ? r.json() : null))
     .then((j: { country?: string | null } | null) => j?.country ?? null)
     .catch(() => null);

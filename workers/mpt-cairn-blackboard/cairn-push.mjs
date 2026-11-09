@@ -7,6 +7,8 @@
 //   INVESTIGATION_GOAL, CAIRN_PROJECT_ID (optional).
 // Safe to re-run: the bridge ignores facts and intents it already has. Prints counts only, never a fact, the seed email or the token.
 import { readFileSync } from 'node:fs';
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 
 const DEFAULT_URL = 'https://mpt-cairn-blackboard.myprivacytool.workers.dev';
 const BATCH = 10; // the bridge allows 25 per call and 30 writes a minute per session; small batches plus a pause stay well under both
@@ -57,6 +59,8 @@ export const sessionIdFor = (snapshot) => {
   return `mpt-cairn-${seconds}`;
 };
 
+const factValueItems = (facts) => [...new Set(facts.map((f) => (f.fact_type === 'email' || f.fact_type === 'phone' ? f.fact_type : null)).filter(Boolean))];
+
 const chunk = (list, n) => Array.from({ length: Math.ceil(list.length / n) }, (_, k) => list.slice(k * n, k * n + n));
 
 export async function push(snapshot, env, { sleep = (ms) => new Promise((r) => setTimeout(r, ms)), pauseMs = PAUSE_MS } = {}) {
@@ -68,14 +72,21 @@ export async function push(snapshot, env, { sleep = (ms) => new Promise((r) => s
   if (!facts.length && !intents.length) throw new Error('the snapshot has no facts or intents');
   const sessionId = env.SESSION_ID || sessionIdFor(snapshot);
   let sent = 0;
+  const rctx = workerRecipientContext(env);
 
   async function commit(action, payload) {
+    // Items in the payload: the seed email; fact values (email, and the raw phone the bridge hashes). Descriptions are free text.
+    const items = action === 'start_session' ? ['email'] : action === 'write_facts' ? factValueItems(payload.facts) : [];
     for (let attempt = 0; attempt < 4; attempt++) {
-      const res = await fetch(`${base}/api/cairn/blackboard/commit`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${env.CAIRN_TOKEN}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, action, payload }),
-      });
+      const res = await callRecipient('internal-workers', {
+        url: `${base}/api/cairn/blackboard/commit`,
+        init: {
+          method: 'POST',
+          headers: { authorization: `Bearer ${env.CAIRN_TOKEN}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, action, payload }),
+        },
+        sent: items,
+      }, rctx);
       if (res.status === 429 || res.status >= 500) { await sleep(Number(res.headers.get('retry-after') || 30) * 1000); continue; }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(`${action} -> HTTP ${res.status} ${body.error ?? ''}`.trim());

@@ -3,15 +3,17 @@
 // Reads only the aggregate public.mpt_machine_visits_daily (counts and paths, no IP, no person or unknown rows) and stores no raw rows.
 import { previousHkDay } from '../lib/hk.js';
 import { rollup, flags } from '../lib/machine-mirror.js';
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { recipientCtx } from '../lib/recipient-ctx.js';
 
 const DAY_MS = 86400000;
 
 async function aggregate(env, from, to) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/mpt_machine_visits_daily`, {
+  const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL}/rest/v1/rpc/mpt_machine_visits_daily`, init: {
     method: 'POST',
     headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_from: from.toISOString(), p_to: to.toISOString() }),
-  });
+  }, sent: [] }, recipientCtx(env));
   if (!res.ok) throw new Error(`mpt_machine_visits_daily failed: HTTP ${res.status}`);
   return res.json();
 }

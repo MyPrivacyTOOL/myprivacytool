@@ -13,6 +13,8 @@ import { saveConversationState, getConversationState, purgeExpiredState, takeSta
 import { messagingEnabled, graphVersion, messengerEvents, decide, messengerMessage, whatsappMessage, notifyHandoff, PAYLOAD } from './meta-chat.js';
 import { createHubSpotContact } from './hubspot-client.js';
 import { sendJson } from './send.js';
+import { recipientFetcher } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 import { recordEngagement } from './supabase-client.js';
 import {
   verifyTelegram, verifyMeta, verifyTwilio, verifySharedSecret, escapeHtml, escapeXml, clip,
@@ -134,7 +136,9 @@ async function handleTelegram(request, env) {
 
 async function sendTelegram(env, chatId, text) {
   const key = env.TELEGRAM_BOT_KEY;
-  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' });
+  // MPC-9885: the chat id identifies the person (username); the text can carry their name and handle (message_text).
+  const f = recipientFetcher('telegram', ['message_text', 'username'], workerRecipientContext(env));
+  return sendJson('telegram', `https://api.telegram.org/bot${key}/sendMessage`, { 'Content-Type': 'application/json' }, { chat_id: chatId, text, parse_mode: 'HTML' }, f);
 }
 
 // ─── FACEBOOK MESSENGER ──────────────────────────────────────────────────────
@@ -170,12 +174,15 @@ async function sendMessenger(env, recipientId, message) {
   if (!env.META_PAGE_ACCESS_KEY) return;
   const msg = typeof message === 'string' ? { text: message } : message;
   // MPC-7350: bearer header, not a query string (URLs end up in logs and proxies).
-  return sendJson('messenger', `https://graph.facebook.com/${graphVersion(env)}/me/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { messaging_type: 'RESPONSE', recipient: { id: recipientId }, message: msg });
+  return sendJson('messenger', `https://graph.facebook.com/${graphVersion(env)}/me/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { messaging_type: 'RESPONSE', recipient: { id: recipientId }, message: msg },
+    // MPC-9885: the page-scoped user id (username) and the reply text (message_text).
+    recipientFetcher('meta-graph', ['message_text', 'username'], workerRecipientContext(env)));
 }
 
 async function sendMessengerAction(env, recipientId, action) {
   if (!env.META_PAGE_ACCESS_KEY) return;
-  return sendJson('messenger', `https://graph.facebook.com/${graphVersion(env)}/me/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, sender_action: action });
+  return sendJson('messenger', `https://graph.facebook.com/${graphVersion(env)}/me/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, sender_action: action },
+    recipientFetcher('meta-graph', ['username'], workerRecipientContext(env)));
 }
 
 // ─── INSTAGRAM DM ────────────────────────────────────────────────────────────
@@ -247,7 +254,9 @@ async function sendWhatsApp(env, to, message) {
   // Requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_KEY
   if (!env.META_WHATSAPP_KEY || !env.WHATSAPP_PHONE_NUMBER_ID) return;
   const body = typeof message === 'string' ? { type: 'text', text: { body: message } } : message;   // CK-9837: plain string or a prebuilt message
-  return sendJson('whatsapp', `https://graph.facebook.com/${graphVersion(env)}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, ...body });
+  return sendJson('whatsapp', `https://graph.facebook.com/${graphVersion(env)}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, ...body },
+    // MPC-9885: `to` is the recipient's phone number; the body is the reply text.
+    recipientFetcher('meta-graph', ['message_text', 'phone'], workerRecipientContext(env)));
 }
 
 // ─── SMS / TWILIO ─────────────────────────────────────────────────────────────

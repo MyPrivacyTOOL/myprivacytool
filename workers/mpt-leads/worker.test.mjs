@@ -9,6 +9,12 @@ globalThis.fetch = async (url, opts) => {
     if (tok==='wronghost') return {ok:true,status:200,json:async()=>({success:true,hostname:'evil.example'}),text:async()=>''};
     return {ok:true,status:200,json:async()=>tok==='good'?{success:true,hostname:'myprivacytool.io'}:{success:false,'error-codes':['invalid-input-response']},text:async()=>''};
   }
+  if (String(url).includes('/auth/v1/user')) { // MPC-9914: fake Supabase Auth. Token "ok:<email>" = a confirmed sign-in for that email; "unconfirmed:<email>" = not confirmed; anything else = invalid.
+    const t=String(opts?.headers?.Authorization||'').replace('Bearer ','');
+    if (t.startsWith('ok:')) return {ok:true,status:200,json:async()=>({email:t.slice(3),email_confirmed_at:'2026-11-08T00:00:00Z'}),text:async()=>''};
+    if (t.startsWith('unconfirmed:')) return {ok:true,status:200,json:async()=>({email:t.slice(12)}),text:async()=>''};
+    return {ok:false,status:401,json:async()=>({}),text:async()=>''};
+  }
   if (String(url).includes('mpt_score_baselines') && versionedRows) {
     // MPC-7471-F4: the table after the proposed migration: unique on (email_hash, score_version), old rows default to 'legacy'.
     if (opts?.method==='POST') { const b=JSON.parse(opts.body); const v=b.score_version??'legacy';
@@ -27,8 +33,11 @@ globalThis.fetch = async (url, opts) => {
   return {ok:true,status:200,text:async()=>'',json:async()=>({results:[],has_more:false})};
 };
 const env={NOTION_TOKEN:'n',LEADS_DB_ID:'abc-def',SUPABASE_SERVICE_ROLE_KEY:'k',HUBSPOT_TOKEN:'h',RESEND_API_KEY:'r',SLACK_BOT_TOKEN:'s'};
-async function run(body, e=env){ calls=[]; const waits=[]; const req=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io'},body:JSON.stringify(body)});
-  const res=await worker.fetch(req,e,{waitUntil:p=>waits.push(p)}); await Promise.all(waits); return {status:res.status, json:await res.json(), supa:calls.filter(c=>c.url.includes('supabase.co')&&!c.url.includes('mpt_score_baselines'))}; }
+// MPC-9914: a request must carry consent (default here: yes) and, when it sends a riskScore, a confirmed-email Bearer (default here: the body's own email). opts.auth overrides; opts.auth===null sends none.
+async function run(body, e=env, opts={}){ calls=[]; const waits=[]; const headers={'content-type':'application/json',Origin:'https://myprivacytool.io'};
+  const auth = 'auth' in opts ? opts.auth : (body.riskScore!==undefined ? 'ok:'+String(body.email).toLowerCase() : null); if (auth) headers.Authorization='Bearer '+auth;
+  const req=new Request('https://x/webhook/leads',{method:'POST',headers,body:JSON.stringify('consent' in body ? body : {consent:true,...body})});
+  const res=await worker.fetch(req,e,{waitUntil:p=>waits.push(p)}); await Promise.all(waits); return {status:res.status, json:await res.json(), supa:calls.filter(c=>c.url.includes('supabase.co')&&!c.url.includes('mpt_score_baselines')&&!c.url.includes('/auth/v1/user'))}; }
 let ok=true; const check=(c,m)=>{console.log((c?'PASS':'FAIL'),m); if(!c) ok=false;};
 let r=await run({email:'a@b.co',riskScore:42,confirmedCount:3,source:'web_scan'});
 check(r.status===200&&r.json.success,'modal path returns success');
@@ -42,8 +51,11 @@ r=await run({email:'x@healthcheck.io'}); check(r.json.note==='healthcheck'&&r.su
 const hs=()=>calls.filter(c=>c.url.includes('api.hubapi.com/crm/v3/objects/contacts')).map(c=>JSON.parse(c.body).properties);
 await run({email:'c@d.co',consent:true,consent_source:'web_scan_summary'});
 let hp=hs()[0]; check(hp&&/^\d{4}-\d{2}-\d{2}$/.test(hp.consent_given_at)&&hp.consent_source==='web_scan_summary','explicit consent => consent_given_at (date) + consent_source sent to HubSpot');
-await run({email:'c@d.co',riskScore:5,source:'web_scan'}); hp=hs()[0]; check(hp&&!('consent_given_at' in hp)&&!('consent_source' in hp),'no consent flag => consent fields NOT sent');
-await run({email:'c@d.co',consent:'false'}); hp=hs()[0]; check(hp&&!('consent_given_at' in hp),'consent="false" => not treated as consent');
+// MPC-9914: no consent flag / consent="false" => 400, and NOTHING is written or sent anywhere
+const outbound=()=>calls.filter(c=>!c.url.includes('challenges.cloudflare.com'));
+for (const body of [{email:'c@d.co',riskScore:5,source:'web_scan',consent:undefined},{email:'c@d.co',consent:'false'},{email:'c@d.co',consent:false},{email:'c@d.co',consent:'yes'}]) {
+  r=await run(body); check(r.status===400&&r.json.error==='Consent required'&&/not saved anything/.test(r.json.message)&&outbound().length===0,'consent '+JSON.stringify(body.consent)+' => 400 with honest copy, 0 outbound calls (no Supabase/Notion/HubSpot/Slack/Resend)');
+}
 await run({email:'c@d.co',consent:true,consent_source:'bad value<script>'}); hp=hs()[0]; check(hp&&hp.consent_source==='badvaluescript','consent_source is sanitised');
 // MPC-7120: Notion failure must not block the engagement row
 notionFail=true; r=await run({email:'n@f.co',riskScore:9}); notionFail=false;
@@ -77,7 +89,7 @@ check(r.json.baseline?.comparable===false&&r.json.baseline.delta===null&&r.json.
 versionedRows=null;
 // MPC-7350: security hardening
 const raw=async(body,{origin='https://myprivacytool.io',headers={},e=env}={})=>{ calls=[]; const waits=[]; const h={'content-type':'application/json',...headers}; if(origin) h.Origin=origin;
-  const res=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:h,body:typeof body==='string'?body:JSON.stringify(body)}),e,{waitUntil:p=>waits.push(p)}); await Promise.all(waits); return {status:res.status, json:await res.json(), cors:res.headers.get('access-control-allow-origin')}; };
+  const res=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:h,body:typeof body==='string'?body:JSON.stringify(body&&typeof body==='object'&&!('consent' in body)?{consent:true,...body}:body)}),e,{waitUntil:p=>waits.push(p)}); await Promise.all(waits); return {status:res.status, json:await res.json(), cors:res.headers.get('access-control-allow-origin')}; };
 r=await raw({email:'a@b.co'},{origin:'https://evil.example'}); check(r.status===403&&calls.length===0,'foreign browser Origin => 403, nothing written');
 r=await raw({email:'not-an-email'}); check(r.status===400,'malformed email => 400');
 r=await raw({email:'a@b.co'.padEnd(400,'x')+'.com'}); check(r.status===400,'oversized email => 400');
@@ -92,7 +104,7 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
 // CK-7721 fix 4: Slack carries no IP address or city; the Notion lead page is archived after 24 months, once a day.
 {
   const slackCalls=()=>calls.filter(c=>c.url.includes('slack.com'));
-  calls=[]; const waits=[]; const sreq=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'203.0.113.7'},body:JSON.stringify({email:'s@t.co',name:'S T',phone:'+85291234567'})});
+  calls=[]; const waits=[]; const sreq=new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'203.0.113.7'},body:JSON.stringify({consent:true,email:'s@t.co',name:'S T',phone:'+85291234567'})});
   await worker.fetch(sreq,env,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
   const slackText=JSON.parse(slackCalls()[0].body).text;
   check(!slackText.includes('203.0.113.7')&&!/\bIP:/.test(slackText)&&!/City/i.test(slackText)&&!slackText.includes('s@t.co')&&!slackText.includes('S T')&&!slackText.includes('91234567')&&!/(Email|Name|Phone):/.test(slackText)&&slackText.includes('Total Leads')&&slackText.includes('Open Notion Leads DB'),'Slack lead post carries no name, email, phone, IP address or city, but keeps the count and the Notion link');
@@ -130,14 +142,14 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
   r=await ts('wronghost',enf); check(r.status===403,'enforce: token issued for another hostname => 403');
   {
     const lines=[]; const rw=console.warn; console.warn=(...a)=>{ lines.push(a.join(' ')); };
-    calls=[]; const w=[]; const b403=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'198.51.100.9'},body:JSON.stringify({email:'secret@leak.co',riskScore:5,'cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w.push(p)}); await Promise.all(w);
+    calls=[]; const w=[]; const b403=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io','CF-Connecting-IP':'198.51.100.9'},body:JSON.stringify({consent:true,email:'secret@leak.co',riskScore:5,'cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w.push(p)}); await Promise.all(w);
     console.warn=rw;
     const tl=lines.find(l=>l.startsWith('TURNSTILE_FAILED ')); const j=tl&&JSON.parse(tl.slice('TURNSTILE_FAILED '.length));
     check(b403.status===403&&j&&j.ip==='198.51.100.0/24'&&/^\d{4}-\d\d-\d\dT/.test(j.ts)&&j.action==='blocked_403'&&j.reason.startsWith('rejected:')&&j.origin==='https://myprivacytool.io','enforce: a 403 logs one TURNSTILE_FAILED line with ip, ISO timestamp, reason, origin and action');
     check(tl&&!tl.includes('secret@leak.co')&&!tl.includes('"bad"'),'the TURNSTILE_FAILED log line carries no email and no token');
     check(tl&&!tl.includes('198.51.100.9'),'the TURNSTILE_FAILED log line never carries the full IPv4 address');
     const ipOf=async(ipHeader)=>{ const L=[]; const keep=console.warn; console.warn=(...a)=>{ L.push(a.join(' ')); }; const w2=[];
-      await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io',...(ipHeader?{'CF-Connecting-IP':ipHeader}:{})},body:JSON.stringify({email:'m@m.co','cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w2.push(p)}); await Promise.all(w2); console.warn=keep;
+      await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{'content-type':'application/json',Origin:'https://myprivacytool.io',...(ipHeader?{'CF-Connecting-IP':ipHeader}:{})},body:JSON.stringify({consent:true,email:'m@m.co','cf-turnstile-response':'bad'})}),enf,{waitUntil:p=>w2.push(p)}); await Promise.all(w2); console.warn=keep;
       const line=L.find(l=>l.startsWith('TURNSTILE_FAILED ')); return line&&JSON.parse(line.slice('TURNSTILE_FAILED '.length)).ip; };
     check(await ipOf('2001:db8:85a3:8a2e:370:7334:1234:5678')==='2001:db8:85a3::/48','IPv6 is cut to its /48 prefix');
     check(await ipOf('::ffff:203.0.113.77')==='203.0.113.0/24','IPv4-mapped IPv6 is cut to the IPv4 /24');
@@ -152,9 +164,19 @@ r=await raw({email:'a@b.co',referrer:'javascript:alert(1)'}); const nb=calls.fin
   r=await ts('down',enf); check(r.status===200,'enforce: siteverify HTTP 500 fails open');
   r=await run({email:'x@healthcheck.io'},enf); check(r.json.note==='healthcheck'&&sv().length===0,'enforce: watchdog health check needs no token');
   // form-encoded submits carry the token too
-  calls=[]; const waits=[]; const fd=new FormData(); fd.set('email','f@f.co'); fd.set('cf-turnstile-response','good');
+  calls=[]; const waits=[]; const fd=new FormData(); fd.set('email','f@f.co'); fd.set('consent','on'); fd.set('cf-turnstile-response','good');
   const fr=await worker.fetch(new Request('https://x/webhook/leads',{method:'POST',headers:{Origin:'https://myprivacytool.io'},body:fd}),enf,{waitUntil:p=>waits.push(p)}); await Promise.all(waits);
   check(fr.status===200&&sv().length===1,'form-encoded submit: token read from cf-turnstile-response');
 }
 
+
+// MPC-9914 (EXT-03): baseline ownership. A bare email (or its hash) never authenticates.
+baselineRow=null;
+r=await run({email:'own@er.co',riskScore:50},env,{auth:null}); check(r.status===401&&outbound().length===0,'riskScore without a Bearer => 401, nothing written');
+r=await run({email:'own@er.co',riskScore:50},env,{auth:'garbage'}); check(r.status===401&&outbound().filter(c=>!c.url.includes('/auth/v1/user')).length===0,'invalid Bearer => 401, nothing written');
+r=await run({email:'own@er.co',riskScore:50},env,{auth:'unconfirmed:own@er.co'}); check(r.status===401&&bl().length===0,'Bearer for an unconfirmed address => 401, no baseline');
+r=await run({email:'victim@er.co',riskScore:1},env,{auth:'ok:attacker@er.co'}); check(r.status===403&&bl().length===0&&outbound().filter(c=>!c.url.includes('/auth/v1/user')).length===0,'valid Bearer for ANOTHER email => 403, victim baseline untouched, nothing written');
+r=await run({email:'Own@Er.co',riskScore:50},env,{auth:'ok:own@er.co'}); check(r.status===200&&r.json.baseline?.is_first===true&&r.json.baseline.overall_score===50,'confirmed owner (case-insensitive) => baseline created');
+r=await run({email:'own@er.co',riskScore:30}); check(r.json.baseline?.delta===-20&&r.json.baseline.is_first===false,'confirmed owner re-scan => compared with own baseline');
+r=await run({email:'own@er.co',name:'No Score'}); check(r.status===200&&!('baseline' in r.json),'consented lead with no riskScore needs no Bearer and gets no baseline');
 process.exit(ok?0:1);

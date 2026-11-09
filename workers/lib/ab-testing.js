@@ -10,6 +10,10 @@
  * - Allows instant kill switch via D1 flag without deploy
  */
 
+// MPC-9885: the GA4 call goes through the recipient wrapper (key "ga4").
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 /**
  * Assign a visitor to a variant based on their email (hashed, privacy-safe).
  * 
@@ -76,9 +80,10 @@ export async function getKillSwitch(db) {
  * @param {string} variant - "A" or "B"
  * @param {string} gaPropertyId - GA4 property ID (e.g. G-XXXXXXXX)
  * @param {string} clientId - Anonymous GA4 client ID (from Turnstile or random)
+ * @param {object} [rctx] - recipient context (workerRecipientContext); built here when the caller has none
  * @returns {Promise<void>}
  */
-export async function recordVariantEvent(variant, gaPropertyId, clientId) {
+export async function recordVariantEvent(variant, gaPropertyId, clientId, rctx = workerRecipientContext(undefined)) {
   if (!gaPropertyId || !clientId) {
     console.warn('recordVariantEvent: missing gaPropertyId or clientId; event not sent');
     return;
@@ -100,13 +105,15 @@ export async function recordVariantEvent(variant, gaPropertyId, clientId) {
     };
 
     // Send to GA4 Measurement Protocol
-    const response = await fetch(
-      `https://www.google-analytics.com/mp/collect?api_secret=${process.env.GA4_API_SECRET}&measurement_id=${gaPropertyId}`,
-      {
+    // sent: [] - the payload is an anonymous client id, the variant letter and the test name (no email, IP or other visitor data).
+    const response = await callRecipient('ga4', {
+      url: `https://www.google-analytics.com/mp/collect?api_secret=${process.env.GA4_API_SECRET}&measurement_id=${gaPropertyId}`,
+      init: {
         method: 'POST',
         body: JSON.stringify(payload),
-      }
-    );
+      },
+      sent: [],
+    }, rctx);
 
     if (!response.ok) {
       console.warn(`GA4 event failed (${response.status}):`, await response.text());

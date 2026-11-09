@@ -8,7 +8,7 @@ import { decide, messengerEvents, messagingEnabled, graphVersion, messengerMessa
 const SECRET = 'app-secret-xyz';
 const TOKEN = 'page-token-SECRET-123';
 const WA_TOKEN = 'wa-token-SECRET-456';
-const ENV = { META_APP_SECRET: SECRET, META_PAGE_ACCESS_KEY: TOKEN, META_WHATSAPP_KEY: WA_TOKEN, WHATSAPP_PHONE_NUMBER_ID: '999', SUPABASE_SERVICE_ROLE_KEY: 'k', SUPABASE_URL: 'https://db.invalid', MESSAGING_ENABLED: 'true' };
+const ENV = { META_APP_SECRET: SECRET, META_PAGE_ACCESS_KEY: TOKEN, META_WHATSAPP_KEY: WA_TOKEN, WHATSAPP_PHONE_NUMBER_ID: '999', SUPABASE_SERVICE_ROLE_KEY: 'k', MESSAGING_ENABLED: 'true' };
 
 let store, sends, hubspot, hooks;
 beforeEach(() => {
@@ -17,8 +17,8 @@ beforeEach(() => {
     url = String(url);
     if (url.startsWith('https://graph.facebook.com')) { sends.push({ url, headers: init.headers, body: JSON.parse(init.body) }); return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; }
     if (url.includes('hubapi.com')) { hubspot++; return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; }
-    if (url.startsWith('https://hooks.slack.test')) { hooks.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; }
-    if (url.startsWith('https://db.invalid/rest/v1/mpt_conversation_state')) {
+    if (url.startsWith('https://slack.com/api/chat.postMessage')) { hooks.push(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({}), text: async () => '' }; }
+    if (url.startsWith('https://xmdmkumwxpgahmlweuug.supabase.co/rest/v1/mpt_conversation_state')) {
       const u = new URL(url); const key = decodeURIComponent((u.searchParams.get('key') || '').replace(/^eq\./, ''));
       if (init.method === 'POST') { const b = JSON.parse(init.body); store.set(b.key, b.state); return { ok: true, status: 201, json: async () => [], text: async () => '' }; }
       if (init.method === 'DELETE') { const had = store.has(key); const st = store.get(key); store.delete(key); return { ok: true, status: 200, json: async () => (had ? [{ state: st }] : []), text: async () => '' }; }
@@ -83,7 +83,7 @@ describe('Messenger flow', () => {
   });
 
   it('"I agree" saves consent time and policy version, sends the approved line once and flags ONE handoff; later messages get no automatic reply', async () => {
-    const env = { ...ENV, HANDOFF_SLACK_WEBHOOK_URL: 'https://hooks.slack.test/x' };
+    const env = { ...ENV, SLACK_BOT_TOKEN: 'xoxb-test', HANDOFF_SLACK_CHANNEL_ID: 'C123' };
     await post('/webhook/messenger', msgr('u1', 'hello'), env); await post('/webhook/messenger', tap('u1', PAYLOAD.person), env); sends.length = 0;
     await post('/webhook/messenger', tap('u1', PAYLOAD.yes), env);
     expect(messages()).toEqual([{ text: 'Thanks 🙌 A higher consciousness will reply within 24 hours.' }]);
@@ -184,6 +184,6 @@ describe('meta-chat helpers', () => {
   });
   it('notifyHandoff without a target only logs; a failing target does not throw', async () => {
     expect(await notifyHandoff({}, 'messenger', 'u1')).toEqual({ notified: false });
-    expect(await notifyHandoff({ HANDOFF_SLACK_WEBHOOK_URL: 'https://x' }, 'messenger', 'u1', async () => { throw new Error('down'); })).toEqual({ notified: false });
+    expect(await notifyHandoff({ SLACK_BOT_TOKEN: 'xoxb-test', HANDOFF_SLACK_CHANNEL_ID: 'C123' }, 'messenger', 'u1', async () => { throw new Error('down'); })).toEqual({ notified: false });
   });
 });

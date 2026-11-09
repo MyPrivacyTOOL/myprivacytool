@@ -1,15 +1,14 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import FeatureStatus from "@/components/FeatureStatus";
 import { hexTileV2Enabled } from '@/config/hexagonTile';
-import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1 } from '@/lib/scanCopy';
+import { HERO_TILES_LINE1, HERO_TILES_LINE2, HERO_DASHBOARD_LINE2, heroDashboardLine1, countSentence } from '@/lib/scanCopy';
 import { HEXAGON_COUNT } from '../../shared/hexagon-registry/registry.js';
 import HexagonGrid from '@/components/HexagonGrid';
 import { WebScanDashboard } from '@/components/dashboard/WebScanDashboard';
 import { honeycombDashboardEnabled } from '@/config/honeycombDashboard';
 import { deviceHeroEnabled } from '@/config/deviceHero';
 import ShadowHands from '@/components/ShadowHands';
-import DeviceReveal from '@/components/DeviceReveal';
-import UnknownDeviceHero from '@/components/UnknownDeviceHero';
+import DeviceRevealScreen from '@/components/DeviceRevealScreen';
 import { identifyDevice, hedgeDeviceHexagon, readDeviceSignalsWithModel, type DeviceIdentity } from '@/lib/deviceIdentity';
 import FederatedLearningModal, { shouldShowFederatedModal } from '@/components/FederatedLearningModal';
 import { captureDeviceData, generateHexagonsAsync, HexagonData, DeviceData } from '@/lib/deviceDetection';
@@ -29,13 +28,15 @@ import {
 } from '@/lib/analytics';
 import { afterFirstPaint } from '@/lib/idle';
 import { hasConsent, onConsentChange } from '@/lib/cookieConsent';
-import { markScanStarted, rememberCompletedScan, trackResults } from '@/lib/webScan';
+import { markScanStarted, rememberCompletedScan, trackResults, writeFootprintScan } from '@/lib/webScan';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
+import ScanRecipientsPanel from '@/components/ScanRecipientsPanel';   // MPC-9893
 import WelcomeBack from '@/components/WelcomeBack';
 import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
+import { recipientScript } from '@/lib/recipientClient';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -45,6 +46,8 @@ const Index = () => {
   const [showFederatedModal, setShowFederatedModal] = useState(false);
   // null until the signals are read; then certain (carousel) or unknown (hexagon path)
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
+  // The full-screen reveal is shown until the visitor continues (or presses Escape)
+  const [revealDone, setRevealDone] = useState(false);
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
@@ -56,6 +59,7 @@ const Index = () => {
     if (loading || hexagons.length === 0 || scanRemembered.current) return;
     scanRemembered.current = true;
     rememberCompletedScan(hexagons);
+    writeFootprintScan(hexagons); // MPC-9898: the visitor's own values for /footprint/ (this browser only)
   }, [loading, hexagons]);
 
   // MPC-7493: funnel steps for a saved scan. The scan starts when the page opens; once the results are on screen we report "results viewed" and the
@@ -172,18 +176,18 @@ const Index = () => {
   // Load HubSpot embed script only after cookie consent (Cookie Policy: HubSpot runs after consent)
   useEffect(() => {
     const scriptId = 'hs-forms-embed';
+    let requested = false; // the wrapper adds the <script> a tick later; this stops a second consent event starting a second load
     const load = () => {
-      if (!hasConsent() || document.getElementById(scriptId)) return;
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://js-na2.hsforms.net/forms/embed/246502821.js';
-      script.defer = true;
-      document.body.appendChild(script);
+      if (!hasConsent() || requested || document.getElementById(scriptId)) return;
+      requested = true;
+      // MPC-9886: through the registry ("hubspot", basis user_action). Same consent test as before.
+      void recipientScript('hubspot', 'https://js-na2.hsforms.net/forms/embed/246502821.js', { id: scriptId, defer: '' }).catch(() => { requested = false; });
     };
     load();
     const unsubscribe = onConsentChange(load);
     return () => {
       unsubscribe();
+      requested = false;
       const existing = document.getElementById(scriptId);
       if (existing) existing.remove();
     };
@@ -287,27 +291,27 @@ const Index = () => {
               </p>
             </>
           )}
+          <p className="mt-2 text-xs sm:text-sm text-muted-foreground">{countSentence()}.</p>
         </section>
 
-        {/* Live Device Tracking Hero: hidden while the experience is reworked (src/config/deviceHero.ts) */}
-        {deviceHeroEnabled() && (
-          <section className="py-4 sm:py-8 px-4" aria-label="Real-time device tracking">
-            <div className="max-w-[280px] sm:max-w-sm mx-auto">
-              {identity?.certain && (
-                <DeviceReveal
-                  identity={identity}
-                  rotationAngle={orientation.angle}
-                  beta={motion.beta}
-                  gamma={motion.gamma}
-                  motionPrompt={motionPermission === 'unknown'}
-                  onEnableMotion={() => { void requestMotionPermission(); }}
-                />
-              )}
-              {identity && !identity.certain && (
-                <UnknownDeviceHero spotlightId="browser" spotlightLabel="Browser" canJump={!honeycombDashboardEnabled()} />
-              )}
-            </div>
-          </section>
+        {/* Device reveal: a full-screen opening moment, hidden while the experience is reworked (src/config/deviceHero.ts) */}
+        {deviceHeroEnabled() && !revealDone && (
+          <DeviceRevealScreen
+            identity={identity}
+            rotationAngle={orientation.angle}
+            beta={motion.beta}
+            gamma={motion.gamma}
+            motionPrompt={motionPermission === 'unknown'}
+            onEnableMotion={() => { void requestMotionPermission(); }}
+            onDone={(jumpToSpotlight) => {
+              setRevealDone(true);
+              if (jumpToSpotlight && !honeycombDashboardEnabled()) {
+                window.setTimeout(() => {
+                  document.getElementById('hexagon-browser')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 60);
+              }
+            }}
+          />
         )}
 
         {/* Hexagon Grid Section */}
@@ -343,6 +347,7 @@ const Index = () => {
               <WelcomeBack hexagons={hexagons} />
               <TelegramHandoffNotice />
               <ScanNumberNotice />
+              <ScanRecipientsPanel />
             </>
           )}
         </section>
@@ -372,7 +377,7 @@ const Index = () => {
               Get clean before you go agentic
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
-              Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" />
+              Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" state="in_build" />
             </p>
             <Button asChild>
               <Link to="/journey">See your journey</Link>
@@ -411,9 +416,8 @@ const Index = () => {
             </div>
 
             <p className="text-xs text-muted-foreground mt-4 max-w-md mx-auto">
-              The scan runs in your browser and its results aren't stored on our
-              servers, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. We only store what you choose to submit, such as your email
-              address, and we use analytics only with your consent.<FeatureStatus feature="F8" />{" "}
+              The scan runs in your browser. We save a scan only if you tick &ldquo;save my scan&rdquo;; we then keep it for 12 months, and you can have it deleted at any time by quoting your scan number. We only store what you choose to submit, such as your email
+              address, and we use analytics only with your consent.{" "}
               <a href="/privacy" className="underline hover:text-foreground">
                 Privacy Policy
               </a>

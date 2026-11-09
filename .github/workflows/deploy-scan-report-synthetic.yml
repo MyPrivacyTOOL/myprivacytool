@@ -14,6 +14,9 @@ on:
       - 'shared/test-records.js'
       - 'src/data/optOutGuides.json'
       - '.github/workflows/deploy-scan-report-synthetic.yml'
+      - '.github/workflows/f1-live-check.yml'
+      - 'scripts/f1-live-check/**'
+      - 'shared/recipients/**'   # MPC-9885: the Workers bundle the recipient wrapper, so a change to it must redeploy them
   workflow_dispatch:
 
 concurrency:
@@ -58,6 +61,34 @@ jobs:
             value="${!name}"
             if [ -n "$value" ]; then
               printf '%s' "$value" | npx --yes wrangler@3 secret put "$name" --config wrangler.synthetic.toml >/dev/null && echo "set $name"
+            else
+              echo "skipped $name (no GitHub secret)"
+            fi
+          done
+      # MPC-9813: the second synthetic Worker (email confirm gate + listing check ON) used by the automated live check .github/workflows/f1-live-check.yml.
+      # Same code, same secrets, separate name: the nightly chain keeps using mpt-scan-report-synthetic, which has the gate OFF.
+      - name: Deploy the F1 synthetic Worker
+        uses: cloudflare/wrangler-action@v3
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: 'true'
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: workers/scan-report
+          command: deploy --config wrangler.synthetic-f1.toml
+      - name: Sync F1 synthetic Worker secrets from GitHub secrets
+        working-directory: workers/scan-report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          UNSUBSCRIBE_SECRET: ${{ secrets.SCAN_REPORT_UNSUBSCRIBE_SECRET }}
+        run: |
+          for name in RESEND_API_KEY SUPABASE_SERVICE_ROLE_KEY UNSUBSCRIBE_SECRET; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --yes wrangler@3 secret put "$name" --config wrangler.synthetic-f1.toml >/dev/null && echo "set $name"
             else
               echo "skipped $name (no GitHub secret)"
             fi

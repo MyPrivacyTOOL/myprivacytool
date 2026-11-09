@@ -70,12 +70,12 @@ export async function readToken(env, token, now = Date.now()) {
 
 export function buildCodeEmail(code) {
   const subject = 'Your MyPrivacyTOOL verification code';
-  const text = `Your MyPrivacyTOOL verification code is ${code}.\n\nIt works for 10 minutes. We send it so only the owner of this address can run Deep Research checks on it.\nIf you did not ask for this, ignore this email. No one can see results for this address without this code.\n\nAlice\nYour Dedicated MyPrivacyTOOL AI`;
+  const text = `Your MyPrivacyTOOL verification code is ${code}.\n\nIt works for 10 minutes. We send it so only the owner of this address can run Deep Research checks on it.\nIf you did not ask for this, ignore this email. No one can see results for this address without this code.\n\nAlice, MyPrivacyTOOL\nOur AI guide. This email was written with AI assistance.`;
   const inner = `<p style="margin:0 0 14px 0;font-size:16px;line-height:24px">Your verification code is:</p>
 <p style="margin:0 0 14px 0;font-size:32px;line-height:40px;font-weight:700;letter-spacing:6px">${code}</p>
 <p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">It works for 10 minutes. We send it so only the owner of this address can run Deep Research checks on it.</p>
 <p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">If you did not ask for this, ignore this email. No one can see results for this address without this code.</p>
-<p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">Alice<br>Your Dedicated MyPrivacyTOOL AI</p>`;
+<p style="margin:0 0 14px 0;font-size:14px;line-height:22px;color:#374151">Alice, MyPrivacyTOOL<br>Our AI guide. This email was written with AI assistance.</p>`;
   const footer = 'This is a one-time security email, not marketing. Questions, or want your data deleted? Reply to this email or write to hello@myprivacytool.io.';
   return { subject, text, html: shell(subject, `Your code is ${code}`, inner, null, { footer }) };
 }
@@ -96,7 +96,7 @@ const errText = (e) => String((e && e.message) || e);
 
 // POST /api/deep-research/start
 export async function handleDeepResearchStart(env, request, origin, json, deps) {
-  const { sb, allowed = () => true, fetchImpl = fetch } = deps;
+  const { sb, allowed = () => true, fetchImpl = undefined } = deps;
   const refused = await gate(env, request, origin, json, { ...deps, prefix: 'deep-start:' });
   if (refused) return refused;
   const { body, refused: bad } = await readBody(request, 2048, json);

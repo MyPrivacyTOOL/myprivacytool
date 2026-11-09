@@ -161,7 +161,7 @@ check(!/\.(insert|insertMany|patch|remove)\(/.test(src) && !/rpc\('(?!mpt_deep_)
 const idx = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
 check((idx.match(/\/api\/deep-research\//g) || []).length === 4, 'index.js: exactly the four routes are wired');
 const toml = readFileSync(new URL('./wrangler.toml', import.meta.url), 'utf8');
-check(/^DEEP_RESEARCH_ENABLED = "false"/m.test(toml), 'wrangler.toml: the feature ships OFF');
+check(/^DEEP_RESEARCH_ENABLED = "(true|false)"$/m.test(toml), 'wrangler.toml: the switch is present and is exactly "true" or "false" (currently ON since 2026-11-07)');
 
 console.log(ok ? '\nALL PASSED' : '\nFAILURES');
 process.exit(ok ? 0 : 1);

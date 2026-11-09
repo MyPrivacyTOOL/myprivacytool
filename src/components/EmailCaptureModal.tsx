@@ -15,6 +15,8 @@ import ScanNumberNotice from '@/components/ScanNumberNotice';
 import { canOfferScanSave } from '@/lib/webScan';
 import { ReportRequestError, REPORT_FAILED_MESSAGE, REPORT_WAIT_MESSAGE, requestScanReport, type ReportOutcome } from '@/lib/scanReport';
 import { trackReportFailed, trackReportRequested } from '@/lib/analytics';
+import ListingCheckFields from '@/components/ListingCheckFields';
+import { emptyListingFields, hasListingFields, listingPayload, listingProblem } from '@/lib/listingFields';
 
 interface EmailCaptureModalProps {
   /** The shared exposure score (MPC-7471-F4); null when nothing could be checked. */
@@ -59,6 +61,7 @@ export default function EmailCaptureModal({
   // The save box exists only while saving is on AND this browser holds the finished scan. Separate from the report consent, unticked, optional.
   const [offerSave] = useState(() => canOfferScanSave());
   const [saveConsent, setSaveConsent] = useState(false);
+  const [listingFields, setListingFields] = useState(emptyListingFields);   // MPC-9813: optional, kept with the saved scan
   const [outcome, setOutcome] = useState<ReportOutcome | null>(null);
   const [tries, setTries] = useState(0);
   const requestId = useRef<string | undefined>(newRequestId());
@@ -125,6 +128,11 @@ export default function EmailCaptureModal({
       return;
     }
 
+    if (hasListingFields(listingFields)) {
+      const problem = listingProblem(listingFields) || (offerSave && saveConsent ? '' : 'To check a page you show us, tick "save my scan" too: the details are kept with your saved scan and deleted with it. Or clear those fields to go on without them.');
+      if (problem) { setErrorMsg(problem); return; }
+    }
+
     // The widget is rendered but has not produced a token yet (normally under a second): ask the visitor to retry rather than
     // sending a request the Worker may reject. No widget at all (blocked script, offline) falls through and submits.
     if (turnstileWidget.current && !turnstileToken) {
@@ -138,7 +146,7 @@ export default function EmailCaptureModal({
 
     try {
       const saving = offerSave && saveConsent;
-      const result = await requestScanReport(trimmed, saving, false, turnstileToken, { consentSource: 'web_scan_summary', requestId: requestId.current });
+      const result = await requestScanReport(trimmed, saving, false, turnstileToken, { consentSource: 'web_scan_summary', requestId: requestId.current, listing: listingPayload(listingFields) });
       setOutcome(result);
       trackReportRequested('scan_summary', saving);
       setStatus('success');
@@ -153,7 +161,7 @@ export default function EmailCaptureModal({
       setTurnstileToken('');
       setTries((n) => n + 1);
       setStatus('error');
-      setErrorMsg(err instanceof ReportRequestError && err.kind === 'rate_limited' ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE);
+      setErrorMsg(err instanceof ReportRequestError && err.kind === 'allowance' && err.detail ? err.detail : err instanceof ReportRequestError && err.kind === 'rate_limited' ? REPORT_WAIT_MESSAGE : REPORT_FAILED_MESSAGE);
     } finally {
       submitting.current = false;
     }
@@ -232,7 +240,7 @@ export default function EmailCaptureModal({
             {[
               'Your browser findings, replayed with what each one found',
               'What your email address reveals',
-              'A first email straight away, then your report within a few minutes',
+              'A confirmation email within a minute. Press its button, and your report arrives within about 5 minutes',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-sm text-foreground">
                 <ChevronRight className="w-4 h-4 text-brand shrink-0 mt-0.5" />
@@ -252,7 +260,7 @@ export default function EmailCaptureModal({
               ) : (
                 <>
                   <p className="font-semibold text-risk-low">Your report is on its way.</p>
-                  <p className="text-sm text-muted-foreground">Check your inbox: a first email comes straight away and your report follows within a few minutes.</p>
+                  <p className="text-sm text-muted-foreground">Check your inbox and spam folder. A confirmation email arrives within a minute; press its button and your report follows within about 5 minutes.</p>
                 </>
               )}
               {outcome?.scanSaved && outcome.scanNumber ? (
@@ -302,6 +310,8 @@ export default function EmailCaptureModal({
                 onChange={(v) => { setConsent(v); setErrorMsg(''); }}
                 disabled={status === 'loading'}
               />
+
+              {offerSave && <ListingCheckFields idSuffix="popup" value={listingFields} onChange={setListingFields} disabled={status === 'loading'} />}
 
               {offerSave && (
                 <>

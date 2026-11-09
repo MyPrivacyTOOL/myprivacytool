@@ -1,0 +1,66 @@
+name: F1 live check
+
+# MPC-9813: automated, no-human live check of the email click-to-confirm gate and the "show us your listing" check, against the DEPLOYED system.
+# Runs after every successful deploy of the synthetic Workers (so after every scan-report change merged to main) and on demand. Design, limits and what it can not prove:
+# scripts/f1-live-check/run.mjs. Uses the F1 synthetic Worker (Cloudflare's public Turnstile TEST secret, gate + listing switches ON, test-mailbox allowlist); production's
+# Turnstile is never bypassed. Writes only test records for testingnt69+f1-* aliases and deletes them at the end. Needs the same repo secrets as the nightly chain; a missing one is
+# reported as NOT CONFIGURED (exit 2), never as a pass. The signing key is a throwaway made per run (no repo secret for it).
+
+on:
+  workflow_run:
+    workflows: ['Deploy scan-report synthetic Worker']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f1-live-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: F1 live check
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+      RESEND_API_KEY: ${{ secrets.SCAN_REPORT_RESEND_API_KEY }}
+      RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The synthetic listing page is a static file on the site; the site deploys separately (Cloudflare Pages), so wait until it is being served.
+      - name: Wait for the synthetic listing page to be served
+        run: |
+          for i in $(seq 1 40); do
+            code="$(curl -sL -o /tmp/fixture.html -w '%{http_code}' https://www.myprivacytool.io/test-fixtures/listing-synthetic || true)"
+            echo "attempt $i: HTTP $code"
+            # 200 alone is not enough (the site answers 200 with its app shell for an unknown path): the page must be the fixture itself.
+            if [ "$code" = "200" ] && grep -q 'SYNTHETIC TEST FIXTURE' /tmp/fixture.html && grep -q 'Zelda Quillfeather' /tmp/fixture.html; then exit 0; fi
+            sleep 15
+          done
+          echo "::error::the synthetic listing page is not being served (last HTTP $code)"; exit 1
+      # No long-lived signing secret is needed (and none exists in the repo): like the weekly nightly-chain run (MPC-8748), each run makes a throwaway key, puts it on the F1
+      # SYNTHETIC Worker only (the same Cloudflare token the deploy workflows use) and signs the confirm token with it. Production's UNSUBSCRIBE_SECRET is never read or set.
+      - name: Set a throwaway signing key on the F1 synthetic Worker
+        working-directory: workers/scan-report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          key="$(openssl rand -hex 32)"
+          echo "::add-mask::$key"
+          printf '%s' "$key" | npx --yes wrangler@3 secret put UNSUBSCRIBE_SECRET --config wrangler.synthetic-f1.toml >/dev/null
+          echo "F1_KEY=$key" >> "$GITHUB_ENV"
+          echo "set UNSUBSCRIBE_SECRET on mpt-scan-report-synthetic-f1 (throwaway)"
+      - name: Run the F1 live check
+        env:
+          UNSUBSCRIBE_SECRET: ${{ env.F1_KEY }}
+        run: node scripts/f1-live-check/run.mjs

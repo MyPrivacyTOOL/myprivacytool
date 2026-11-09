@@ -1,6 +1,8 @@
 // Every answer here is limited to what the code does (src/lib/deviceDetection.ts, EmailCaptureModal.tsx,
 // index.html) or to the published Privacy Policy (sections 2.4 and 6). Encryption and audit claims are deliberately absent: see the MPC-6545 PR notes.
 // Never say "open source": the repo is public to read but has no licence (CK-7721).
+import { REPLY_PROMISE } from "../../shared/reply-wording.js";
+
 export const FAQS: { q: string; a: string }[] = [
   {
     q: "What is MyPrivacyTOOL?",
@@ -56,7 +58,12 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Who or what is Alice?",
-    a: "Alice is an AI guide. Her lines are scripted and are read aloud by your own device's voice. There is no chat, and nothing you do with her voice is sent to us.",
+    a: "Alice is MyPrivacyTOOL's AI guide. On the site her lines are scripted and are read aloud by your own device's voice, and nothing you do with her voice is sent to us. There is no live chat with her on the site today. In email, a person on the team answers your replies, with her help. A conversation with Alice herself is coming (Planned).",
+  },
+  // MPC-9826 (F7a): the same sentences as the confirmation and report emails (shared/reply-wording.js); faqs.reply.test.ts fails if they drift.
+  {
+    q: "Can I reply to my report email?",
+    a: `Yes. ${REPLY_PROMISE} We do not promise a reply time.`,
   },
   {
     q: "What happens if I save my scan?",
@@ -110,6 +117,10 @@ export const FAQS: { q: string; a: string }[] = [
   {
     q: "What do you record about bots and AI crawlers?",
     a: "When anyone loads a page we keep a log entry: time, page, the program name the visitor reported, IP address, country and network, and a few technical headers. We sort visits into person, other bot, AI crawler or unknown. For bots and AI crawlers we keep the full entry. If you were wrongly sorted as a bot, contact us and we will delete it.",
+  },
+  {
+    q: "How long do you keep the record of my report?",
+    a: "The delivery record for a scan is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan.",
   },
   {
     q: "What happens to my IP address?",

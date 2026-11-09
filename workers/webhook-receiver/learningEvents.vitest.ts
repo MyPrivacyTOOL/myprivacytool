@@ -6,13 +6,13 @@ import { validateLearningEvent } from './learningEvents.ts';
 
 const ON = { LEARNING_EVENTS_ENABLED: 'true', SUPABASE_SERVICE_ROLE_KEY: 'svc' };
 const web = { Origin: 'https://myprivacytool.io', 'Content-Type': 'application/json' };
-const good = { event_type: 'answer', person_key: 'abcdefghijklmnop', scan_window: 'w1', hexagon_id: 'location', source: 'web-scan', tile_kind: 'our_guess', confidence_at_display: 0.95, config_version: 0, answer: 'not_me' };
+const good = { event_type: 'answer', hexagon_id: 'location', answer: 'not_me' };
 let stored: any[]; let status: number;
 
 beforeEach(() => {
   stored = []; status = 201;
   vi.stubGlobal('fetch', async (input: any, init: any = {}) => {
-    if (String(input).includes('/rest/v1/mpt_hexagon_events')) { stored.push(JSON.parse(init.body)); return new Response('', { status }); }
+    if (String(input).includes('/rest/v1/rpc/mpt_learning_count_tile_event')) { stored.push(JSON.parse(init.body)); return new Response('', { status }); }
     throw new Error('unexpected fetch ' + input);
   });
 });
@@ -27,11 +27,18 @@ describe('POST /api/learning/event', () => {
     expect((await call(good, web, { ...ON, LEARNING_EVENTS_ENABLED: 'yes' })).status).toBe(404);
     expect(stored).toEqual([]);
   });
-  it('stores a valid answer with only the allowed fields, and says 202', async () => {
+  it('counts a valid answer with only the three allowed arguments, and says 202', async () => {
     const r = await call({ ...good, finding_value: 'London', email: 'a@b.c' });
     expect(r.status).toBe(202);
-    expect(stored).toEqual([{ ...good, source: 'web-scan' }]);
+    expect(stored).toEqual([{ p_hexagon_id: 'location', p_event: 'answer', p_answer: 'not_me' }]);
     expect(JSON.stringify(stored)).not.toMatch(/London|a@b\.c/);
+  });
+  it('MPC-9892: no person key reaches the database, even from an older cached page that still sends one', async () => {
+    const r = await call({ ...good, person_key: 'abcdefghijklmnop', scan_window: 'w1', tile_kind: 'our_guess', confidence_at_display: 0.9, config_version: 0, source: 'web-scan' });
+    expect(r.status).toBe(202);
+    expect(JSON.stringify(stored)).not.toMatch(/abcdefghijklmnop|person|scan_window|w1|our_guess/);
+    expect(Object.keys(stored[0]).sort()).toEqual(['p_answer', 'p_event', 'p_hexagon_id']);
+    expect((await call({ event_type: 'shown', hexagon_id: 'location' })).status).toBe(202);   // a body without a person key is the normal shape now
   });
   it('is browser-origin only: no Origin or a foreign one is refused, a preflight is answered', async () => {
     expect((await call(good, { 'Content-Type': 'application/json' })).status).toBe(403);
@@ -43,9 +50,8 @@ describe('POST /api/learning/event', () => {
     expect((await call('x'.repeat(5000))).status).toBe(413);
     expect((await call('{nope')).status).toBe(400);
     for (const bad of [
-      { ...good, person_key: 'short' }, { ...good, hexagon_id: 'not-a-hexagon' }, { ...good, answer: 'maybe' }, { ...good, answer: null },
-      { ...good, event_type: 'shown' /* shown cannot carry an answer */ }, { ...good, confidence_at_display: 1.5 }, { ...good, tile_kind: 'free text' },
-      { ...good, source: 'other' }, { ...good, config_version: -1 }, { ...good, scan_window: 'has spaces' },
+      { ...good, hexagon_id: 'not-a-hexagon' }, { ...good, answer: 'maybe' }, { ...good, answer: null },
+      { ...good, event_type: 'shown' /* shown cannot carry an answer */ }, { hexagon_id: 'location' }, { event_type: 'answer', answer: 'kept' },
     ]) expect((await call(bad)).status).toBe(400);
     expect(stored).toEqual([]);
   });
@@ -54,12 +60,12 @@ describe('POST /api/learning/event', () => {
     expect((await call(good, { ...web, 'Content-Length': '999999' })).status).toBe(413);
     expect(stored).toEqual([]);
   });
-  it('logs a failed write without the database error text, which can quote the row', async () => {
+  it('logs a failed count without the database error text, which can quote the arguments', async () => {
     status = 409;
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect((await call({ ...good, event_type: 'shown', answer: undefined })).status).toBe(202);
-    expect(err.mock.calls.flat().join(' ')).toMatch(/insert failed: 409$/);
+    expect(err.mock.calls.flat().join(' ')).toMatch(/rpc mpt_learning_count_tile_event failed: 409$/);
   });
   it('is rate limited per address: 429 with Retry-After and nothing stored; no binding, or one that errors, fails open', async () => {
     const seen: string[] = [];

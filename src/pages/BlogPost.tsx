@@ -6,6 +6,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Share2, Copy } from 'lucide-react';
+import { HEXAGONS, HEXAGON_GROUPS, HEXAGON_COUNT, HEXAGON_ALWAYS_COUNT } from '../../shared/hexagon-registry/registry.js';
+import { countSentence } from '../../shared/hexagon-registry/countSentence.js';
 import blogPosts from '@/data/blogPosts.json';
 import { guides } from '@/content/guides';
 import { trackBlogCtaClick, trackBlogPostView, trackBlogScrollDepth } from '@/lib/analytics';
@@ -24,67 +26,24 @@ const blogContent: { [key: string]: React.ReactNode } = {
         <p>Your digital footprint is likely larger than you think. Your personal data is collected, packaged, sold, and used in ways you may not have agreed to, and you can take control of it.</p>
         
         <h2>The 54 Privacy Vectors Exposing Your Data</h2>
-        <p>54 run in the scan, 368 in the catalogue. We've identified distinct sources where your personal information is currently exposed:<FeatureStatus feature="F9" /></p>
+        <p>{countSentence()}. We've identified distinct sources where your personal information is currently exposed:<FeatureStatus feature="F9" /></p>
         
-        <h3>Data Broker Networks (12)</h3>
-        <ul>
-          <li>PeopleFinder, TruthFinder, Spokeo</li>
-          <li>WhitePages Pro, Instant Checkmate</li>
-          <li>People.com, FastBackgroundCheck</li>
-          <li>MyLife, ZoomInfo, Apollo</li>
-          <li>Hunter.io, Lusha</li>
-          <li>Clearbit (corporate)</li>
-        </ul>
-        
-        <h3>Social Media & Public Records (8)</h3>
-        <ul>
-          <li>LinkedIn (scraped by dozens of B2B brokers)</li>
-          <li>Facebook (through Meta's advertiser network)</li>
-          <li>Twitter/X (public archive APIs)</li>
-          <li>Public records databases (criminal, property, marriage)</li>
-          <li>Court records (civil litigation)</li>
-          <li>Voter registration data</li>
-          <li>DMV & driver's license records</li>
-          <li>Property tax assessor records</li>
-        </ul>
-        
-        <h3>AI & Machine Learning Training (7)</h3>
-        <ul>
-          <li>OpenAI's GPT training corpus (Common Crawl)</li>
-          <li>Google's Gemini dataset</li>
-          <li>Anthropic's Claude training</li>
-          <li>Meta's LLaMA models</li>
-          <li>Mistral AI datasets</li>
-          <li>Stability AI image training</li>
-          <li>Academic AI research repositories</li>
-        </ul>
-        
-        <h3>Advertising Networks & Trackers (10)</h3>
-        <ul>
-          <li>Google Analytics (on 80% of the web)</li>
-          <li>Meta Pixel (on 25% of sites)</li>
-          <li>Third-party cookies (still present on 70% of sites)</li>
-          <li>Behavioral targeting networks</li>
-          <li>Email tracking (Superhuman, Mailchimp, HubSpot)</li>
-          <li>Mobile app SDKs collecting location</li>
-          <li>WiFi network data collection</li>
-          <li>Inferential targeting (predicting behavior from browsing)</li>
-          <li>Lookalike audiences (targeting based on your type)</li>
-          <li>Cross-device tracking</li>
-        </ul>
-        
-        <h3>Forgotten Accounts & Unused Services (9)</h3>
-        <ul>
-          <li>Old email accounts (with recovery data still linked)</li>
-          <li>Social platforms you haven't used in 5+ years</li>
-          <li>Fitness trackers with location history</li>
-          <li>Smart home device accounts</li>
-          <li>Streaming service accounts</li>
-          <li>Financial app connections</li>
-          <li>Job search platforms</li>
-          <li>Dating apps (sometimes never deleted)</li>
-          <li>Beta testing accounts</li>
-        </ul>
+        {/* MPC-9832: the real 54 web-scan hexagons, grouped by the registry's own groups. Rendered from the registry so the
+            list and its counts cannot drift from the scan again (the old hand-written lists added up to 46). */}
+        {HEXAGON_GROUPS.map((group) => {
+          const items = HEXAGONS.filter((h) => h.group === group);
+          return (
+            <React.Fragment key={group}>
+              <h3>{group} ({items.length})</h3>
+              <ul>
+                {items.map((h) => (
+                  <li key={h.id}>{h.label}</li>
+                ))}
+              </ul>
+            </React.Fragment>
+          );
+        })}
+        <p>{HEXAGON_ALWAYS_COUNT} of the {HEXAGON_COUNT} run on every scan; the other {HEXAGON_COUNT - HEXAGON_ALWAYS_COUNT} run only when your device offers them.</p>
         
         <h2>Why This Matters</h2>
         <p>The combination of these 54 vectors creates a complete digital shadow profile of you. Advertisers, employers, landlords, and others can use it to:</p>
@@ -97,7 +56,7 @@ const blogContent: { [key: string]: React.ReactNode } = {
         </ul>
         
         <h2>What You Can Do Right Now</h2>
-        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 54 vectors for you, then give you step-by-step removal instructions for each one.<FeatureStatus feature="F9" /></p>
+        <p>Check your exposure with MyPrivacyTOOL to see where your data is. We'll map all 54 vectors for you, then give you step-by-step removal instructions for each one.<FeatureStatus feature="F9" state="in_build" /></p>
         
         <p>The map changes weekly as new brokers emerge and existing ones evolve. A one-time fix isn't enough, so ongoing monitoring and regular removal rounds help keep your footprint small.</p>
       </div>

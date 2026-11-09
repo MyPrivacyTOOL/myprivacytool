@@ -1,0 +1,68 @@
+# MPC-9813: a SECOND synthetic deployment, for the automated live check of the email click-to-confirm gate and the "show us your listing" check (scripts/f1-live-check).
+# Same code and same safety properties as wrangler.synthetic.toml (no cron, no HubSpot token, test-mailbox allowlist, Cloudflare's public always-passes Turnstile TEST secret),
+# but with the two F1 switches ON. It is separate on purpose: turning the gate on in mpt-scan-report-synthetic would make the nightly chain wait for a click it never makes.
+# Its confirmation email goes only to the test mailbox. The report for a confirmed scan is sent by the production cron, to the same test alias.
+# Deploy: .github/workflows/deploy-scan-report-synthetic.yml (second deploy step). Remove: delete the Worker mpt-scan-report-synthetic-f1 in the Cloudflare dashboard.
+# MPC-7557: the SYNTHETIC-TEST deployment of the scan-report Worker. Same code as production (main = index.js), a different Worker name.
+#
+# WHY IT EXISTS: production's POST /api/scan enforces Cloudflare Turnstile (MPC-8430) and must never be bypassed. The nightly chain test therefore sends its scan
+# request here. This Worker holds Cloudflare's public TEST secret, so the test token "XXXX.DUMMY.TOKEN.XXXX" passes; it holds NO real secret for the production widget.
+# It writes to the SAME production database, so the production cron (the real one, every 5 minutes) picks up the scan and sends the real report through the real
+# provider. Only the Turnstile widget is substituted.
+#
+# WHAT KEEPS IT SAFE:
+#  - no [triggers]: it never runs the report, follow-up or HK jobs, so it cannot send to anyone on its own schedule;
+#  - RECIPIENT_ALLOWLIST is the test mailbox: even if someone found the URL, it could email only that inbox (the allowlist ignores the +alias);
+#  - no HUBSPOT_TOKEN is ever set on it (the deploy workflow does not sync one): no HubSpot contact is created, so test runs never reach the CRM or its KPIs;
+#  - every feature switch other than saving the scan is off;
+#  - the Origin check, rate limit and consent rules are the production code, unchanged.
+# Deploy: .github/workflows/deploy-scan-report-synthetic.yml. Remove: Actions -> "Deploy scan-report synthetic Worker" is the only thing that creates it; delete the Worker in
+# the Cloudflare dashboard (Workers & Pages -> mpt-scan-report-synthetic -> Settings -> Delete), then the nightly run reports the step "scan_request" as failed.
+name = "mpt-scan-report-synthetic-f1"
+main = "index.js"
+compatibility_date = "2024-09-23"
+workers_dev = true
+
+[vars]
+SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
+HUBSPOT_LEAD_SOURCE = "synthetic_test"
+RECIPIENT_ALLOWLIST = "testingnt69@gmail.com"
+ALLOW_PARTIAL_REPORT = "true"
+HK_SPAM_ENABLED = "false"
+HK_SPAM_EMAILS_LIVE = "false"
+EMAIL_GITHUB_COMMITS_ENABLED = "false"
+WEB_SCAN_SAVE_ENABLED = "true"
+REPORT_REQUEST_ID_ENABLED = "true"
+RECOGNITION_ENABLED = "false"
+REFERRALS_ENABLED = "false"
+REFERRAL_AB_REPORT_BLOCK = "false"
+REFERRAL_AB_INVITE_SUBJECT = "false"
+EMAIL_DOMAIN_CHECK = "true"
+# Cloudflare's public always-passes TEST secret (documented at developers.cloudflare.com/turnstile/troubleshooting/testing). Public by design; it is not a credential.
+TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA"
+TURNSTILE_ENFORCE = "true"
+
+EMAIL_CONFIRM_GATE_ENABLED = "true"
+LISTING_CHECK_ENABLED = "true"
+# MPC-9817: accounts and sign-in, for the synthetic live check (testingnt69+ aliases only: the allowlist above still applies).
+ACCOUNTS_ENABLED = "true"
+# MPC-9818: scan allowances, for the synthetic live check (Free account's second scan refused, service-role bump to Basic allows).
+SCAN_ALLOWANCE_ENABLED = "true"
+# MPC-9816: a Free address never triggers the breach lookup (third-party cost): the breach section is NOT CHECKED. "false" + redeploy is the rollback.
+BREACH_GATE_ENABLED = "true"
+
+[observability]
+enabled = true
+
+# Account-unique rate-limit namespaces (MPC-9813), same limits as production.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "9813001"
+simple = { limit = 5, period = 60 }
+
+[[unsafe.bindings]]
+name = "LIVE_LIMITER"
+type = "ratelimit"
+namespace_id = "9813002"
+simple = { limit = 40, period = 60 }

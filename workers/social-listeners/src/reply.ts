@@ -11,8 +11,9 @@ import fr from "../../../locales/fr/main.json";
 import pt from "../../../locales/pt/main.json";
 import ar from "../../../locales/ar/main.json";
 import type { EventLog } from "./event-log";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 import { telegramCaptureEnabled } from "./telegram-capture";
 
 // MPC-7641: tagged so GA4 and leads can attribute clicks, scans and sign-ups to this channel (utm_medium=channel_osint, utm_source = platform).
@@ -82,12 +83,16 @@ export async function sendTelegramReply(env: Env, update: unknown, brain: Respon
     const timer = setTimeout(() => ctl.abort(), TELEGRAM_TIMEOUT_MS);
     const request = { chat_id: chatId, text: escapeUrlUnderscores(reply), parse_mode: "Markdown" };
     try {
-      const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
-        signal: ctl.signal,
-      });
+      const res = await callRecipient("telegram", {
+        url: `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        init: {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request),
+          signal: ctl.signal,
+        },
+        sent: ["message_text", "username"], // the reply text and the chat id it goes to
+      }, recipientCtx(env));
       if (!res.ok) log.error("telegram_send_rejected", { status: res.status });
       if (events) events.out("sendMessage", request, { status: res.status, response: await res.json().catch(() => null) });
     } catch (err) {

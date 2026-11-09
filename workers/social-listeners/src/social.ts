@@ -1,8 +1,9 @@
 // MPC-7628: the X activity feed. Every follow, DM, like, share or mention by a person is one row in public.social_contacts /
 // social_events (Supabase), which syncs into HubSpot (the CRM). We keep the platform user id and public @handle only: never message
 // text. A "delete my data" DM erases the person (eraseContact). Failures only mean one uncounted event; they never block a reply.
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
-import { type Env, pick } from "./shared";
+import { type Env, pick, recipientCtx } from "./shared";
 import { deleteFromHubSpot, syncToHubSpot } from "./hubspot-sync";
 import { type HexagonData, cleanData, eventTime, userFields } from "./x-hexagons";
 
@@ -10,12 +11,16 @@ export type SocialEvent = "dm" | "follow" | "like" | "share" | "mention" | "mirr
 
 export const rpc = async (env: Env, fn: string, body: Record<string, unknown>): Promise<Response | null> => {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) return null;
-  return fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`, {
-    method: "POST",
-    headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(3000),
-  });
+  return callRecipient("supabase", {
+    url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/${fn}`,
+    init: {
+      method: "POST",
+      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(3000),
+    },
+    sent: ["username", "name", "message_text"], // user key and handle; hexagon values (name, text) only when capture is on
+  }, recipientCtx(env));
 };
 
 /** Where an event came from, as the platform reported it (CK-8502). All optional: DMs and older shapes carry none. */

@@ -55,5 +55,6 @@ export const HERO_TILES_LINE2 = 'Tap a hexagon to see your footprint as of right
 // always checked plus up to 13 that depend on the browser, so the claim is "up to". N comes from the registry, never typed by hand.
 // Line 1 follows the brand name, which the page sets in its own colour.
 export const heroDashboardLine1 = (n: number): string => ` looks at up to ${n} things your browser and connection already tell every website.`;
+export { countSentence } from '../../shared/hexagon-registry/countSentence.js';
 export const HERO_DASHBOARD_LINE2 = 'Purple hexagons are our best guesses. Tap one to say if we got it right.';
 export const SUMMARY_LABELS = { clear: 'clear', fixing: 'need fixing', toldUs: 'you told us', notYet: 'not checked yet' } as const;

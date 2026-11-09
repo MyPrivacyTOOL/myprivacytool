@@ -7,6 +7,8 @@
 // B lookup (confirmed against api_userinfo): GET https://api.weixin.qq.com/cgi-bin/user/info?access_token=&openid= (certified accounts only): subscribe and subscribe_time, subscribe_scene, qr_scene,
 // qr_scene_str. Needs WECHAT_ACCESS_TOKEN (we do not fetch or refresh one here); it must finish inside WeChat's 5-second window, so it has a 3-second limit and a failure is not_checked.
 // Off unless WECHAT_EXTRAS=on; allow-listed OpenIDs only (WECHAT_PROBE_OPENIDS). Not built: cross-app ID (Verify).
+import { recipientFetcher } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import { createLogger } from "./logger";
 import { type Env, readRawBody, timingSafeEqual } from "./shared";
 import { allowedId, extrasReply, filled, toStates, type ExtraDef } from "./extras-common";
@@ -65,16 +67,16 @@ export function passiveReply(toUser: string, fromUser: string, text: string, now
   return `<xml><ToUserName>${cdata(toUser)}</ToUserName><FromUserName>${cdata(fromUser)}</FromUserName><CreateTime>${now}</CreateTime><MsgType>${cdata("text")}</MsgType><Content>${cdata(text)}</Content></xml>`;
 }
 
-export async function wechatLookup(openid: string, token: string | undefined, fetchImpl: typeof fetch = fetch): Promise<Record<string, unknown> | null> {
+export async function wechatLookup(openid: string, token: string | undefined, fetchImpl?: typeof fetch): Promise<Record<string, unknown> | null> {
   if (!token) return null;
   try {
-    const r = await fetchImpl(`https://api.weixin.qq.com/cgi-bin/user/info?access_token=${encodeURIComponent(token)}&openid=${encodeURIComponent(openid)}`, { signal: AbortSignal.timeout(3000) });
+    const r = await recipientFetcher("platform-replies", ["username"], workerRecipientContext(undefined, { fetchImpl }))(`https://api.weixin.qq.com/cgi-bin/user/info?access_token=${encodeURIComponent(token)}&openid=${encodeURIComponent(openid)}`, { signal: AbortSignal.timeout(3000) });
     const j = r.ok ? ((await r.json()) as Record<string, unknown>) : null;
     return j && typeof j === "object" && j.errcode === undefined ? j : null;
   } catch { return null; }
 }
 
-export async function handleWechatExtras(request: Request, env: Env, fetchImpl: typeof fetch = fetch): Promise<Response> {
+export async function handleWechatExtras(request: Request, env: Env, fetchImpl?: typeof fetch): Promise<Response> {
   if (env.WECHAT_EXTRAS !== "on") return new Response("Not Found", { status: 404 });
   const url = new URL(request.url);
   if (!(await signed(url, env))) { log.warn("signature_invalid"); return new Response("Unauthorized", { status: 401 }); }

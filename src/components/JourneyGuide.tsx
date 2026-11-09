@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import JourneyStepStatus from "@/components/JourneyStepStatus";
+import type { JourneyStepId } from "@/config/featureStatus";
 
-type Status = "Live" | "Coming soon" | "Roadmap";
 type Lane = "you" | "agents";
 
 interface Cta {
@@ -17,7 +18,6 @@ interface Step {
   lane: Lane;
   name: string;
   tagline: string;
-  status: Status;
   happens: string;
   youDo: string;
   youGet: string;
@@ -30,7 +30,6 @@ const STEPS: Step[] = [
     lane: "you",
     name: "Know",
     tagline: "See what you look like online",
-    status: "Live",
     happens:
       "The free scan checks what your browser and device already reveal about you, so you can see your digital shadow the way a stranger would.",
     youDo: "Check your exposure and confirm which data points are really you.",
@@ -42,7 +41,6 @@ const STEPS: Step[] = [
     lane: "you",
     name: "Baseline",
     tagline: "Save a starting score",
-    status: "Coming soon",
     happens:
       "Your results are scored across the hexagons and saved as a dated snapshot, so there is a fixed starting point to measure against.",
     youDo: "Save your first snapshot after a scan.",
@@ -54,7 +52,6 @@ const STEPS: Step[] = [
     lane: "you",
     name: "Erase",
     tagline: "Remove what you don't want out there",
-    status: "Live",
     happens:
       "Step-by-step guides walk you through opting out of data brokers and people-search sites. Guided removal comes first; automation follows.",
     youDo: "Follow the opt-out guides for the sites that hold your data.",
@@ -66,7 +63,6 @@ const STEPS: Step[] = [
     lane: "you",
     name: "Clean baseline",
     tagline: "Get low-risk and keep it that way",
-    status: "Coming soon",
     happens:
       "You re-scan until your risk is low, then ongoing monitoring flags anything new that appears.",
     youDo: "Re-scan after cleanup and turn on monitoring.",
@@ -78,7 +74,6 @@ const STEPS: Step[] = [
     lane: "agents",
     name: "Go agentic",
     tagline: "Connect AI tools with the least access",
-    status: "Coming soon",
     happens:
       "Every agent you launch inherits your footprint. With a clean baseline, you connect AI tools with only the access they need, each one registered against you.",
     youDo: "Check what your AI tools can already reach, then connect new ones sparingly.",
@@ -90,7 +85,6 @@ const STEPS: Step[] = [
     lane: "agents",
     name: "Agent footprint",
     tagline: "See what each agent leaves behind",
-    status: "Coming soon",
     happens:
       "The same Know, Baseline and Erase loop is applied to each agent: what it can access, what it has shared, and how exposed it is.",
     youDo: "Review each agent's footprint and revoke access you don't need.",
@@ -102,7 +96,6 @@ const STEPS: Step[] = [
     lane: "agents",
     name: "Agent passport",
     tagline: "Prove who your agent works for",
-    status: "Roadmap",
     happens:
       "Your verified, low-risk baseline becomes the root of trust for credentials issued to your agents, so others can see who stands behind them.",
     youDo: "Verify yourself once, then issue credentials to your agents.",
@@ -114,7 +107,6 @@ const STEPS: Step[] = [
     lane: "agents",
     name: "Agent trust",
     tagline: "Check other agents before you deal with them",
-    status: "Roadmap",
     happens:
       "Platforms and agents can check a credential and its trust score before transacting, without every check passing through a central gatekeeper.",
     youDo: "Nothing extra. Your agents use it on your behalf.",
@@ -128,29 +120,11 @@ const LANES: { id: Lane; label: string }[] = [
   { id: "agents", label: "For your agents" },
 ];
 
-const STATUS_STYLE: Record<Status, string> = {
-  Live: "bg-[hsl(var(--risk-low-soft))] text-foreground border-[hsl(var(--risk-low)/0.3)]",
-  "Coming soon":
-    "bg-[hsl(var(--risk-mid-soft))] text-[hsl(var(--risk-mid))] border-[hsl(var(--risk-mid)/0.3)]",
-  Roadmap: "bg-muted text-muted-foreground border-border",
-};
-
 const readHash = (): number => {
   const m = /^#step-(\d+)$/.exec(window.location.hash);
   const n = m ? Number(m[1]) : 1;
   return n >= 1 && n <= STEPS.length ? n : 1;
 };
-
-const StatusPill = ({ status }: { status: Status }) => (
-  <span
-    className={cn(
-      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-      STATUS_STYLE[status],
-    )}
-  >
-    {status}
-  </span>
-);
 
 const JourneyGuide = () => {
   const [current, setCurrent] = useState<number>(() => readHash());
@@ -202,6 +176,7 @@ const JourneyGuide = () => {
                         {s.id}
                       </span>
                       <span className="block text-sm font-semibold text-foreground">{s.name}</span>
+                      <JourneyStepStatus step={s.id as JourneyStepId} className="mt-2" />
                     </button>
                   </li>
                 );
@@ -220,7 +195,7 @@ const JourneyGuide = () => {
           <p className="text-sm text-muted-foreground">
             Step {step.id} of {STEPS.length}
           </p>
-          <StatusPill status={step.status} />
+          <JourneyStepStatus step={step.id as JourneyStepId} />
         </div>
         <h3 id="journey-step-title" className="text-2xl sm:text-3xl font-bold text-foreground">
           {step.name}

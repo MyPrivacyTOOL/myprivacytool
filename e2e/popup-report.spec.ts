@@ -8,7 +8,7 @@ import worker from "../workers/scan-report/index.js";
 
 const ORIGIN = "https://myprivacytool.io";   // the Worker only accepts the production origins
 const SCAN_NUMBER_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
-const KNOWN_HOSTS = ["stub.supabase.test", "api.resend.com", "api.hubapi.com", "cloudflare-dns.com", "haveibeenpwned.com", "gravatar.com", "libravatar.org", "rdap.org"];
+const KNOWN_HOSTS = ["stub.supabase.co", "api.resend.com", "api.hubapi.com", "cloudflare-dns.com", "haveibeenpwned.com", "gravatar.com", "libravatar.org", "rdap.org"];
 
 type Row = Record<string, unknown>;
 function backends() {
@@ -79,7 +79,7 @@ async function wireWorker(page: Page, opts: { loseFirstAnswer?: boolean; refuseF
     globalThis.fetch = be.fetchImpl as unknown as typeof fetch;
     try {
       const workerReq = new Request("https://mpt-scan-report.example.workers.dev/api/scan", { method: "POST", headers: { "Content-Type": "application/json", Origin: ORIGIN }, body: req.postData() ?? "" });
-      const env = { SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HUBSPOT_TOKEN: "stub", UNSUBSCRIBE_SECRET: "stub-secret", WEB_SCAN_SAVE_ENABLED: "true", REPORT_REQUEST_ID_ENABLED: "true", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false" };
+      const env = { SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", HUBSPOT_TOKEN: "stub", UNSUBSCRIBE_SECRET: "stub-secret", WEB_SCAN_SAVE_ENABLED: "true", REPORT_REQUEST_ID_ENABLED: "true", RECIPIENT_ALLOWLIST: "", EMAIL_DOMAIN_CHECK: "false" };
       const out = await worker.fetch(workerReq, env, { waitUntil: (p: Promise<unknown>) => { pending.push(p); } });
       await Promise.all(pending);
       const text = await out.text();
@@ -111,7 +111,7 @@ async function finishScan(page: Page) {
 const fill = async (page: Page, email: string, { save }: { save: boolean }) => {
   await page.getByPlaceholder("your@email.com").fill(email);
   await page.getByLabel(/email me my results and occasional privacy tips/i).check();
-  const saveBox = page.getByLabel(/save my scan result with my email/i);
+  const saveBox = page.getByLabel(/(save my scan result with my email|keep my scan and create my free account)/i);   // MPC-9817: the production build carries the one-step wording while VITE_ACCOUNTS_ENABLED is on
   await expect(saveBox).not.toBeChecked();                     // unticked by default
   if (save) await saveBox.check();
 };
@@ -137,7 +137,7 @@ test.describe("post-scan popup -> report pipeline (stubbed API, real Worker code
     const t = be.tables;
     expect([t.users.length, t.leads.length, t.scans.length, t.web_scans.length, t.web_scan_contacts.length]).toEqual([1, 1, 1, 1, 1]);
     expect(t.web_scan_contacts[0]).toMatchObject({ channel: "email", contact_id: t.scans[0].id, web_scan_id: t.web_scans[0].id });
-    expect(t.web_scan_contacts[0].save_consent_version).toBe("2026-10-12-v1");
+    expect(t.web_scan_contacts[0].save_consent_version).toBe("2026-11-08-v1")   // MPC-9817: the one-step wording version (the build in this test has the accounts flag on);
     expect(t.scans[0].request_id).toBe(seen[0].sent.request_id);
     expect(shown).toBe(t.web_scans[0].id);                     // the popup shows the stored scan's id, not one made in the browser
     expect(be.mails).toHaveLength(1);

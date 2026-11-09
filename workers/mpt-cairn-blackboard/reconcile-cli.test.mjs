@@ -67,7 +67,7 @@ function makeWorld() {
 // Notion returns plain_text on read; the stand-in stores what was sent, so mirror that shape.
 const shape = (props) => Object.fromEntries(Object.entries(props).map(([k, v]) => [k, v.title ? { title: v.title.map((t) => ({ plain_text: t.text.content })) } : v.rich_text ? { rich_text: v.rich_text.map((t) => ({ plain_text: t.text.content })) } : v]));
 
-const env = { NOTION_TOKEN: 'ntn_test', NOTION_CAIRN_SESSIONS_DB: SESS_DB, NOTION_CAIRN_FACTS_DB: FACT_DB, NOTION_CAIRN_INTENTS_DB: INTENT_DB, SUPABASE_URL: 'https://example.supabase.test', SUPABASE_KEY: 'sb_test' };
+const env = { NOTION_TOKEN: 'ntn_test', NOTION_CAIRN_SESSIONS_DB: SESS_DB, NOTION_CAIRN_FACTS_DB: FACT_DB, NOTION_CAIRN_INTENTS_DB: INTENT_DB, SUPABASE_URL: 'https://example.supabase.co', SUPABASE_KEY: 'sb_test' };
 const page = (id, db, title, parent) => ({ id, db, archived: false, properties: { [TITLE[db]]: { title: [{ text: { content: title } }] }, ...(parent ? { Session: { relation: [{ id: parent }] } } : {}) } });
 const left = (w, db) => w.pages.filter((p) => p.db === db && !p.archived).length;
 
@@ -99,7 +99,7 @@ assert.ok(!w.notionCalls.slice(before).some((c) => c.method === 'PATCH'), 'no wr
 // 4. Supabase unreachable: nothing is archived and the run fails loudly
 w = makeWorld(); w.pages.push(page('s-x', SESS_DB, 'mpt-cairn-1729000003'));
 const inner = globalThis.fetch;
-globalThis.fetch = async (url, init) => (String(url).includes('example.supabase.test') ? new Response('boom', { status: 503 }) : inner(url, init));
+globalThis.fetch = async (url, init) => (String(url).includes('example.supabase.co') ? new Response('boom', { status: 503 }) : inner(url, init));
 await assert.rejects(() => run(env), /supabase GET cairn_sessions -> HTTP 503/);
 assert.equal(left(w, SESS_DB), 1); console.log('ok 4 - with Supabase down nothing is archived and the run errors');
 globalThis.fetch = inner;

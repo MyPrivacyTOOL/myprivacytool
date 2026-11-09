@@ -4,6 +4,8 @@
 // 'error' (siteverify unreachable: fails open so a Cloudflare hiccup never drops a real request). Blocking is opt-in via
 // TURNSTILE_ENFORCE = "true"; until then a 'failed' result is only logged.
 // Privacy: the TURNSTILE_FAILED log keeps a coarse network prefix (IPv4 /24, IPv6 /48), never the visitor's full address, email or token.
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { rcx } from './recipients.js';
 export const TURNSTILE_HOSTS = ['myprivacytool.io', 'www.myprivacytool.io', 'wwwmyprivacytool.pages.dev'];
 const clip = (v, n) => String(v ?? '').slice(0, n);
 // MPC-7557: Cloudflare's public "always passes" TEST secret (https://developers.cloudflare.com/turnstile/troubleshooting/testing/). It is used ONLY by the
@@ -23,7 +25,7 @@ export function maskIp(ip) {
   return '';
 }
 
-export async function turnstileState(env, request, token, info = {}, fetchImpl = fetch) {
+export async function turnstileState(env, request, token, info = {}, fetchImpl = undefined, rctx = undefined) {
   if (!env.TURNSTILE_SECRET_KEY) return 'absent';
   if (typeof token !== 'string' || !token) { info.reason = 'missing_token'; return 'failed'; }
   if (token.length > 2048) { info.reason = 'token_too_long'; return 'failed'; }
@@ -33,7 +35,8 @@ export async function turnstileState(env, request, token, info = {}, fetchImpl =
     fd.append('response', token);
     const ip = request.headers.get('CF-Connecting-IP');
     if (ip) fd.append('remoteip', ip);
-    const res = await fetchImpl('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: fd });
+    // The siteverify call carries the visitor's token and, when Cloudflare gave us one, their IP (remoteip). No user agent is sent.
+    const res = await callRecipient('cloudflare-turnstile', { url: 'https://challenges.cloudflare.com/turnstile/v0/siteverify', sent: ip ? ['ip'] : [], init: { method: 'POST', body: fd } }, rcx(env, fetchImpl, rctx));
     if (!res.ok) { console.warn('turnstile siteverify http', res.status); return 'error'; }
     const out = await res.json();
     if (!out.success) { info.reason = 'rejected:' + (out['error-codes'] || []).join(',').slice(0, 100); return 'failed'; }
@@ -46,9 +49,9 @@ export async function turnstileState(env, request, token, info = {}, fetchImpl =
 }
 
 /** Runs the check and writes the TURNSTILE_FAILED log line. Returns true when the request must be refused (403). */
-export async function turnstileBlocks(env, request, token, origin, fetchImpl = fetch) {
+export async function turnstileBlocks(env, request, token, origin, fetchImpl = undefined, rctx = undefined) {
   const info = {};
-  if (await turnstileState(env, request, token, info, fetchImpl) !== 'failed') return false;
+  if (await turnstileState(env, request, token, info, fetchImpl, rctx) !== 'failed') return false;
   const enforce = String(env.TURNSTILE_ENFORCE).toLowerCase() === 'true';
   console.warn('TURNSTILE_FAILED ' + JSON.stringify({
     ts: new Date().toISOString(),

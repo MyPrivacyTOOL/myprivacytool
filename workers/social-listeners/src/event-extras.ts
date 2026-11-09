@@ -7,10 +7,11 @@
 // A "blocked" event cannot be answered (we are blocked), so it is stored and the person is told only when they unblock. Nothing is logged from the payload.
 // Outside every score and count. Delete-my-data (STOP) removes the flags (mpt_delete_event_flags).
 import { baselineScanEnabled } from "./baseline-scan";
+import { callRecipient } from "../../../shared/recipients/outbound";
 import type { Logger } from "./logger";
 import { call, probeIds } from "./probe-reader";
 import { senderKey } from "./sender-key";
-import type { Env } from "./shared";
+import { type Env, recipientCtx } from "./shared";
 
 const TIMEOUT_MS = 5000;
 const DAY_MS = 86_400_000;
@@ -59,12 +60,16 @@ function retentionDays(env: Env): number {
 async function storeFlag(env: Env, e: EventExtra, log: Logger): Promise<boolean> {
   if (!env.SUPABASE_URL || !env.SUPABASE_KEY) { log.warn("event_flag_storage_unconfigured"); return false; }
   try {
-    const res = await fetch(`${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_record_event_flag`, {
-      method: "POST",
-      headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_sender_id: await senderKey(env, e.senderId), p_flag: e.flag, p_state: e.state, p_expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString() }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    const res = await callRecipient("supabase", {
+      url: `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1/rpc/mpt_record_event_flag`,
+      init: {
+        method: "POST",
+        headers: { apikey: env.SUPABASE_KEY, authorization: `Bearer ${env.SUPABASE_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_sender_id: await senderKey(env, e.senderId), p_flag: e.flag, p_state: e.state, p_expires_at: new Date(Date.now() + retentionDays(env) * DAY_MS).toISOString() }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+      sent: ["username"], // sender key plus a flag that something happened, never what was written
+    }, recipientCtx(env));
     if (!res.ok) log.warn("event_flag_save_failed", { status: res.status });
     return res.ok;
   } catch (err) {

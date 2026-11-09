@@ -11,6 +11,8 @@ export const PRIVACY_URL = `${SITE}/privacy`;
 export const DELETE_URL = `${SITE}/data-deletion`;
 export const PRIVACY_MAIL = 'privacy@myprivacytool.io';
 /** The Privacy Policy "Last updated" date the person agreed to. Change it when the policy changes. */
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
 export const NOTICE_VERSION = '2026-10-12';
 export const DEFAULT_IMAGE = `${SITE}/og-image.jpg`;
 
@@ -120,17 +122,21 @@ export function whatsappMessage(step, env) {
 }
 
 /**
- * "Talk to a person" needs somewhere to go. If the Worker secret HANDOFF_SLACK_WEBHOOK_URL (a Slack incoming webhook) is set, post one line:
- * channel and a short hash of the conversation id so staff can find it in the Meta inbox. No message text and no name is sent.
- * Without it the request is only logged. ⚠️ Until a target is chosen and set, nobody is told: the "within 24 hours" line is not yet backed.
+ * "Ask a question" needs somewhere to go. If the Worker secrets SLACK_BOT_TOKEN and HANDOFF_SLACK_CHANNEL_ID are set, post one line via the
+ * registered "slack" recipient (MPC-9885): channel and a short hash of the conversation id so staff can find it in the Meta inbox.
+ * No message text, name or id is sent. Without them the request is only logged.
+ * ⚠️ Until a target is chosen and set, nobody is told: the "within 24 hours" line is not yet backed.
  */
-export async function notifyHandoff(env, channel, id, fetchImpl = fetch) {
+export async function notifyHandoff(env, channel, id, fetchImpl = undefined) {
   const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${channel}:${id}`)))].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
   console.log(`handoff_requested channel=${channel} ref=${hash}`);
-  if (!env?.HANDOFF_SLACK_WEBHOOK_URL) return { notified: false };
+  if (!env?.SLACK_BOT_TOKEN || !env?.HANDOFF_SLACK_CHANNEL_ID) return { notified: false };
   try {
-    const res = await fetchImpl(env.HANDOFF_SLACK_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: `:raising_hand: Someone asked a question on ${channel} (ref ${hash}). Open the Meta inbox and reply within 24 hours.` }) });
+    const res = await callRecipient('slack', { url: 'https://slack.com/api/chat.postMessage', sent: [], init: {
+      method: 'POST', headers: { Authorization: `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: env.HANDOFF_SLACK_CHANNEL_ID, unfurl_links: false, unfurl_media: false,
+        text: `:raising_hand: Someone asked a question on ${channel} (ref ${hash}). Open the Meta inbox and reply within 24 hours.` }) } },
+      workerRecipientContext(env, fetchImpl ? { fetchImpl } : undefined));
     return { notified: Boolean(res.ok) };
   } catch { return { notified: false }; }
 }

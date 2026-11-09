@@ -1,5 +1,6 @@
 import { getReferralCode } from "@/lib/referral";
 import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan";
+import { recipientFetch } from "@/lib/recipientClient";
 
 // MPC-6677: scan-report Worker (confirmation email + 48h report).
 // MPC-7385: defaults to the production Worker (SCAN_API_URL, src/lib/webScan.ts), like the other Worker endpoints in this app, so the site no longer
@@ -11,7 +12,9 @@ import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan
 // MPC-7535: the Worker's answer is never swallowed. A refusal or a network failure throws a ReportRequestError, and the page then shows an honest
 // message instead of the thank-you screen (the visitor must not be promised a report that was never requested).
 export class ReportRequestError extends Error {
-  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network", readonly status: number) {
+  // MPC-9818: kind "allowance" = the month's scan allowance for this address is used. `detail` is the Worker's own plain-text explanation (what happened, when it resets, what the
+  // next plan includes), shown to the visitor as is. It is never a price: prices live in the plans data.
+  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network" | "allowance", readonly status: number, readonly detail?: string) {
     super(`scan-report ${status || "no response"}`);
   }
 }
@@ -37,7 +40,7 @@ export async function requestScanReport(
   saveScan: boolean,
   recognise: boolean,
   turnstileToken = "",
-  opts: { consentSource?: string; requestId?: string } = {},
+  opts: { consentSource?: string; requestId?: string; listing?: Record<string, unknown> | null } = {},
 ): Promise<ReportOutcome> {
   const base = resolveScanApiUrl();
   if (!base) return {}; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
@@ -45,7 +48,7 @@ export async function requestScanReport(
   const ref = getReferralCode(); // MPC-7645: a friend's code, only while the referral switch is on
   let res: Response;
   try {
-    res = await fetch(`${base}/api/scan`, {
+    res = await recipientFetch("scan-report", `${base}/api/scan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -55,6 +58,7 @@ export async function requestScanReport(
         ...(opts.requestId ? { request_id: opts.requestId } : {}),
         ...(turnstileToken ? { "cf-turnstile-response": turnstileToken } : {}), // MPC-8430
         ...(saveScan ? scanSaveFields({ recognise }) : {}),
+        ...(saveScan && opts.listing ? { listing: opts.listing } : {}), // MPC-9813: kept with the saved scan, so only sent with it
         ...(ref ? { ref } : {}),
         utm_source: q.get("utm_source") ?? "",
         utm_medium: q.get("utm_medium") ?? "",
@@ -62,7 +66,7 @@ export async function requestScanReport(
         utm_content: q.get("utm_content") ?? "",
         referrer: document.referrer,
       }),
-    });
+    }, ["email", "utm", "referrer", ...(saveScan ? (["scan_result"] as const) : [])]);
   } catch {
     throw new ReportRequestError("network", 0);
   }
@@ -70,6 +74,10 @@ export async function requestScanReport(
     if (res.status === 400) {
       const refused = (await res.json().catch(() => null)) as { code?: unknown } | null;
       if (refused?.code === "bad_email_domain") throw new ReportRequestError("bad_email", 400);
+    }
+    if (res.status === 429) {
+      const refused = (await res.json().catch(() => null)) as { code?: unknown; message?: unknown } | null;
+      if (refused?.code === "scan_allowance_exhausted" && typeof refused.message === "string") throw new ReportRequestError("allowance", 429, refused.message.slice(0, 500));
     }
     throw new ReportRequestError(res.status === 429 ? "rate_limited" : res.status >= 500 ? "server" : "rejected", res.status);
   }

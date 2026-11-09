@@ -1,8 +1,13 @@
 // MPC-7490: build one raw visit row from a request and write it to Supabase. Observes only: never blocks, challenges or alters a
-// response, and every failure is swallowed. The IP is stored raw here; the database cuts it for person/unknown rows after the
-// retention period (public.edge_visit_retention).
-import { classify } from "./classify";
-import type { RequestFacts } from "./ruleset";
+// response, and every failure is swallowed.
+// MPC-9889 (edge capture split): a PERSON or UNKNOWN visit goes to the marketing visit log through the sink the middleware passes in
+// (functions/_visit-log.ts: IP shaped by country policy, fields only). It is NOT written to edge_visits any more. Only BOT and AI visits go to
+// edge_visits, the machine mirror, where the IP is kept for the raw window and the full header set serves bot forensics. With no sink a person
+// visit is dropped, not stored raw: the safe side.
+import { classify, treatAsPerson } from "./classify";
+import { callRecipient, type RecipientContext } from "../recipients/outbound";
+import { workerRecipientContext } from "../recipients/worker-ctx";
+import type { RequestFacts, VisitClass } from "./ruleset";
 
 export interface CaptureEnv {
   /** The switch. Anything other than 1/true/on/yes (including unset) means OFF. */
@@ -165,10 +170,15 @@ export function buildVisit(request: Request, status: number | null): VisitRow {
 }
 
 /** Writes one row. Resolves true on success, false on any failure; never throws. */
-export async function recordVisit(env: CaptureEnv, row: VisitRow, fetchImpl: typeof fetch = fetch): Promise<boolean> {
+export async function recordVisit(env: CaptureEnv, row: VisitRow, fetchImpl: typeof fetch | undefined = undefined, rctx?: RecipientContext): Promise<boolean> {
   try {
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return false;
-    const res = await fetchImpl(`${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/edge_visits`, {
+    // MPC-9889: bot / AI rows only (machine-mirror). Person / unknown visits take the visit-log path in functions/_visit-log.ts.
+    const ctx = rctx ?? workerRecipientContext(env as Record<string, unknown>, { fetchImpl, country: row.country });
+    const res = await callRecipient("machine-mirror", {
+      url: `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/edge_visits`,
+      sent: ["ip", "user_agent", "page_load", "country", "city"],
+      init: {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -178,17 +188,23 @@ export async function recordVisit(env: CaptureEnv, row: VisitRow, fetchImpl: typ
       },
       body: JSON.stringify(row),
       signal: AbortSignal.timeout(3000),
-    });
+    },
+    }, ctx);
     return res.ok;
   } catch {
     return false;
   }
 }
 
-/** Build and store the visit for a finished response. Always resolves. */
-export async function captureVisit(env: CaptureEnv, request: Request, status: number | null, fetchImpl?: typeof fetch): Promise<boolean> {
+/** Where a person / unknown visit goes (functions/_visit-log.ts recordPersonVisit). Resolves true if a row was stored. */
+export type PersonSink = (env: CaptureEnv, request: Request, fetchImpl?: typeof fetch) => Promise<boolean>;
+
+/** Build and store the visit for a finished response: bot / ai -> machine mirror, person / unknown -> the sink. Always resolves. */
+export async function captureVisit(env: CaptureEnv, request: Request, status: number | null, fetchImpl?: typeof fetch, personSink?: PersonSink): Promise<boolean> {
   try {
-    return await recordVisit(env, buildVisit(request, status), fetchImpl);
+    const row = buildVisit(request, status);
+    if (treatAsPerson(row.class as VisitClass)) return personSink ? await personSink(env, request, fetchImpl) : false;
+    return await recordVisit(env, row, fetchImpl);
   } catch {
     return false;
   }

@@ -5,10 +5,12 @@ import { completeReferral } from './lib/referral.js';
 import { fake } from './test-support/fake-backend.mjs';
 import { emailHash, isOptedOut, optOutEverywhere, suppressedAmong } from './lib/suppression.js';
 import { unsubscribeToken } from './lib/onboarding.js';
+import { enableHibpForTests } from './test-support/hibp-on.mjs';
+enableHibpForTests();   // MPC-9885: hibp is enabled:false in the registry; this suite's breach results need it on
 
 let ok = true; const check = (c, m) => { console.log(c ? 'PASS' : 'FAIL', m); if (!c) ok = false; };
 const EMAIL = 'optout+a@example.com';
-const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_URL: 'https://db.invalid', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 's3cret', REFERRALS_ENABLED: 'true', RECIPIENT_ALLOWLIST: EMAIL };
+const env = { EMAIL_DOMAIN_CHECK: 'false', SUPABASE_URL: 'https://db.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k', RESEND_API_KEY: 'r', HIBP_API_KEY: 'p', HIBP_MIN_INTERVAL_MS: '0', UNSUBSCRIBE_SECRET: 's3cret', REFERRALS_ENABLED: 'true', RECIPIENT_ALLOWLIST: EMAIL };
 const input = { email: EMAIL, consentSource: 'scan_page', ip: '1.2.3.4', utm: { source: '', medium: '', campaign: '', content: '', referrer: '' } };
 const sends = (F) => F.calls.filter((c) => c.url.includes('api.resend.com'));
 const sb = (F) => ({ rpc: async (fn, a) => (await F.f(`https://x/rest/v1/rpc/${fn}`, { method: 'POST', body: JSON.stringify(a) })).json(), select: (p) => F.f(`https://x/rest/v1/${p}`).then((r) => r.json()), patch: async (p, b) => (await F.f(`https://x/rest/v1/${p}`, { method: 'PATCH', body: JSON.stringify(b) })).json(), remove: async (p) => F.f(`https://x/rest/v1/${p}`, { method: 'DELETE' }), insert: async (t, row) => { const r = await F.f(`https://x/rest/v1/${t}`, { method: 'POST', body: JSON.stringify(row) }); if (!r.ok) { const e = new Error('x'); e.status = r.status; throw e; } return (await r.json())[0]; } });

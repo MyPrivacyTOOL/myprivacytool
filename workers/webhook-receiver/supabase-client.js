@@ -11,6 +11,9 @@
  * missing secret can never break a webhook reply.
  */
 
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+
 export const SUPABASE_DEFAULT_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
 const DEFAULT_URL = SUPABASE_DEFAULT_URL;
 
@@ -41,7 +44,8 @@ export async function insertMptRow(env, table, row) {
     return false;
   }
   try {
-    const res = await fetch(`${env.SUPABASE_URL || DEFAULT_URL}/rest/v1/${table}`, {
+    // MPC-9885: the rows hold session ids, funnel flags and (learning events) a random person_key: no personal data item is sent.
+    const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL || DEFAULT_URL}/rest/v1/${table}`, sent: [], init: {
       method: 'POST',
       headers: {
         apikey: env.SUPABASE_SERVICE_ROLE_KEY,
@@ -50,7 +54,7 @@ export async function insertMptRow(env, table, row) {
         Prefer: 'return=minimal',
       },
       body: JSON.stringify(row),
-    });
+    } }, workerRecipientContext(env));
     if (!res.ok) {
       // Learning events: Postgres error text can quote the row (person_key), so log only the status.
       const detail = table === 'mpt_hexagon_events' ? '' : ` ${(await res.text()).slice(0, 200)}`;
@@ -60,6 +64,28 @@ export async function insertMptRow(env, table, row) {
     return true;
   } catch (err) {
     console.error(`Supabase ${table} insert error:`, err);
+    return false;
+  }
+}
+
+/**
+ * MPC-9892: call one counter function (Postgres RPC). Only functions on this list may be called; each adds 1 to an anonymous daily counter.
+ * Returns true on success, false if skipped or failed (never throws). Error text is never logged: it can quote the arguments.
+ */
+const RPCS = new Set(['mpt_learning_count_tile_event']);
+export async function callMptRpc(env, fn, args) {
+  if (!RPCS.has(fn)) { console.error(`Supabase: refusing call to non-listed function "${fn}"`); return false; }
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.warn('Supabase not configured — skipping call'); return false; }
+  try {
+    const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL || DEFAULT_URL}/rest/v1/rpc/${fn}`, sent: [], init: {
+      method: 'POST',
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    } }, workerRecipientContext(env));
+    if (!res.ok) { console.error(`Supabase rpc ${fn} failed: ${res.status}`); return false; }
+    return true;
+  } catch {
+    console.error(`Supabase rpc ${fn} error`);
     return false;
   }
 }

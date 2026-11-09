@@ -5,6 +5,8 @@
 //   not_checked the check failed, timed out or could not run. Never a guess, never blocks the report.
 // `services` lists every outside service that received the address, or a hash of it (for the privacy policy, MPC-7470).
 // Free and public only: no paid service, and no other company's sign-up or login page is ever contacted.
+import { callRecipient } from '../../../shared/recipients/outbound.ts';
+import { rcx } from './recipients.js';
 
 const DOH = 'https://cloudflare-dns.com/dns-query';
 const GRAVATAR_AVATAR = 'https://gravatar.com/avatar';
@@ -86,8 +88,8 @@ const MX_PROVIDERS = [
   [/(mailgun\.org|sendgrid\.net)\.?$/, 'a bulk-mail service'],
 ];
 
-export function dohQuery(name, type, fetchImpl, signal) {
-  return fetchImpl(`${DOH}?name=${encodeURIComponent(name)}&type=${type}`, { headers: { accept: 'application/dns-json' }, signal })
+export function dohQuery(name, type, fetchImpl, signal, rctx = undefined) {
+  return callRecipient('cloudflare-doh', { url: `${DOH}?name=${encodeURIComponent(name)}&type=${type}`, sent: ['email_domain'], init: { headers: { accept: 'application/dns-json' }, signal } }, rcx(undefined, fetchImpl, rctx))
     .then(async (res) => {
       if (!res.ok) throw new Error(`DNS HTTP ${res.status}`);
       const j = await res.json();
@@ -96,7 +98,7 @@ export function dohQuery(name, type, fetchImpl, signal) {
     });
 }
 
-export async function checkProviderAndDomain(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+export async function checkProviderAndDomain(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, rctx = undefined } = {}) {
   const id = 'email-provider';
   const parts = splitEmail(email);
   if (!parts || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(parts.domain)) return notChecked(id, 'not a valid email address');
@@ -104,7 +106,7 @@ export async function checkProviderAndDomain(email, fetchImpl = fetch, { timeout
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const d = parts.domain;
-    const [mx, txt, dmarc] = await Promise.all([dohQuery(d, 'MX', fetchImpl, ctl.signal), dohQuery(d, 'TXT', fetchImpl, ctl.signal), dohQuery(`_dmarc.${d}`, 'TXT', fetchImpl, ctl.signal)]);
+    const [mx, txt, dmarc] = await Promise.all([dohQuery(d, 'MX', fetchImpl, ctl.signal, rctx), dohQuery(d, 'TXT', fetchImpl, ctl.signal, rctx), dohQuery(`_dmarc.${d}`, 'TXT', fetchImpl, ctl.signal, rctx)]);
     if (mx.nx) return result(id, 'found', { value: `The domain ${d} does not exist in public DNS, so mail to this address may not work.` });
     const hosts = mx.answers.map((a) => a.split(/\s+/).pop().toLowerCase());
     const provider = MX_PROVIDERS.find(([re]) => hosts.some((h) => re.test(h)))?.[1];
@@ -133,7 +135,7 @@ async function sha256Hex(s) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export async function checkPublicProfile(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+export async function checkPublicProfile(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, rctx = undefined } = {}) {
   const id = 'email-profile';
   const parts = splitEmail(email);
   if (!parts) return notChecked(id, 'not a valid email address');
@@ -141,7 +143,9 @@ export async function checkPublicProfile(email, fetchImpl = fetch, { timeoutMs =
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const hash = await sha256Hex(`${parts.local}@${parts.domain}`);        // Gravatar's documented key: SHA-256 of the trimmed, lower-cased address
-    const get = (url) => fetchImpl(url, { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal });
+    const ctx = rcx(undefined, fetchImpl, rctx);
+    // Gravatar sees only the SHA-256 of the address (email_hash), the caller's IP and our fixed user-agent string.
+    const get = (url) => callRecipient('gravatar', { url, sent: ['email_hash'], init: { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal } }, ctx);
     const [avatar, profile] = await Promise.all([get(`${GRAVATAR_AVATAR}/${hash}?d=404&s=1`), get(`${GRAVATAR_PROFILE}/${hash}`)]);
     if (avatar.status === 200 || profile.status === 200) {
       return result(id, 'found', { value: `A public ${profile.status === 200 ? 'Gravatar profile' : 'profile picture'} is linked to this address. Anyone who knows the address can see it.` });
@@ -157,7 +161,7 @@ export async function checkPublicProfile(email, fetchImpl = fetch, { timeoutMs =
 
 // ------------------------------------------------------------------ 5. second avatar service (Libravatar, hash only) - MPC-8452
 const LIBRAVATAR_AVATAR = 'https://seccdn.libravatar.org/avatar';
-export async function checkLibravatar(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+export async function checkLibravatar(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, rctx = undefined } = {}) {
   const id = 'email-libravatar';
   const parts = splitEmail(email);
   if (!parts) return notChecked(id, 'not a valid email address');
@@ -165,7 +169,7 @@ export async function checkLibravatar(email, fetchImpl = fetch, { timeoutMs = CH
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const hash = await sha256Hex(`${parts.local}@${parts.domain}`);
-    const res = await fetchImpl(`${LIBRAVATAR_AVATAR}/${hash}?d=404&s=1`, { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal });
+    const res = await callRecipient('gravatar', { url: `${LIBRAVATAR_AVATAR}/${hash}?d=404&s=1`, sent: ['email_hash'], init: { headers: { 'user-agent': 'MyPrivacyTOOL-scan-report' }, signal: ctl.signal } }, rcx(undefined, fetchImpl, rctx));
     if (res.status === 200) return result(id, 'found', { value: 'A public Libravatar profile picture is linked to this address. Anyone who knows the address can see it.' });
     if (res.status === 404) return result(id, 'clear');
     return notChecked(id, `Libravatar HTTP ${res.status}`);      // rate limited or erroring: not "clear"
@@ -185,7 +189,7 @@ const vcardText = (entity) => {
   const rows = Array.isArray(entity?.vcardArray) ? entity.vcardArray[1] || [] : [];
   return rows.filter((r) => ['fn', 'org', 'email', 'adr', 'tel'].includes(r[0])).map((r) => (Array.isArray(r[3]) ? r[3].join(' ') : String(r[3] || '')).trim()).filter(Boolean);
 };
-export async function checkDomainRecord(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS } = {}) {
+export async function checkDomainRecord(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, rctx = undefined } = {}) {
   const id = 'email-domain-record';
   const parts = splitEmail(email);
   if (!parts || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(parts.domain)) return notChecked(id, 'not a valid email address');
@@ -193,7 +197,7 @@ export async function checkDomainRecord(email, fetchImpl = fetch, { timeoutMs = 
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetchImpl(`${RDAP}/${encodeURIComponent(parts.domain)}`, { headers: { accept: 'application/rdap+json', 'user-agent': 'MyPrivacyTOOL-scan-report' }, redirect: 'follow', signal: ctl.signal });
+    const res = await callRecipient('rdap', { url: `${RDAP}/${encodeURIComponent(parts.domain)}`, sent: ['email_domain'], init: { headers: { accept: 'application/rdap+json', 'user-agent': 'MyPrivacyTOOL-scan-report' }, redirect: 'follow', signal: ctl.signal } }, rcx(undefined, fetchImpl, rctx));
     if (res.status === 404) return notChecked(id, 'no public registration record was available for this domain');   // unsupported registry or unknown domain: not "clear"
     if (!res.ok) return notChecked(id, `RDAP HTTP ${res.status}`);
     const j = await res.json();
@@ -216,7 +220,7 @@ export async function checkDomainRecord(email, fetchImpl = fetch, { timeoutMs = 
 // GitHub only indexes commits on a repository's default branch, so "no results" is never proof that the address appears nowhere: the wording says so.
 // The search is rate limited (about 10 a minute without a token): any non-200 answer, and any answer GitHub marks incomplete, is NOT CHECKED, never clear.
 const GITHUB_COMMIT_SEARCH = 'https://api.github.com/search/commits';
-export async function checkGithubCommits(email, fetchImpl = fetch, { timeoutMs = CHECK_TIMEOUT_MS, token = '' } = {}) {
+export async function checkGithubCommits(email, fetchImpl = undefined, { timeoutMs = CHECK_TIMEOUT_MS, token = '', rctx = undefined } = {}) {
   const id = GITHUB_COMMITS_ID;
   const parts = splitEmail(email);
   if (!parts || !/^[^\s@"<>]+$/.test(parts.local)) return notChecked(id, 'not a valid email address');
@@ -225,7 +229,8 @@ export async function checkGithubCommits(email, fetchImpl = fetch, { timeoutMs =
   try {
     const headers = { accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'MyPrivacyTOOL-scan-report', ...(token ? { authorization: `Bearer ${token}` } : {}) };
     const q = encodeURIComponent(`author-email:${parts.local}@${parts.domain}`);
-    const res = await fetchImpl(`${GITHUB_COMMIT_SEARCH}?q=${q}&per_page=1`, { headers, signal: ctl.signal });
+    // The search term is the PLAIN address (author-email:...), so this call carries the email itself.
+    const res = await callRecipient('github-commit-search', { url: `${GITHUB_COMMIT_SEARCH}?q=${q}&per_page=1`, sent: ['email'], init: { headers, signal: ctl.signal } }, rcx(undefined, fetchImpl, rctx));
     if (res.status !== 200) return notChecked(id, `GitHub HTTP ${res.status}`);      // 403/429 rate limited, 422 unsearchable, 5xx: not "clear"
     const j = await res.json();
     if (!j || typeof j.total_count !== 'number') return notChecked(id, 'GitHub answered in an unexpected shape');
@@ -243,7 +248,8 @@ export async function checkGithubCommits(email, fetchImpl = fetch, { timeoutMs =
 }
 
 // ------------------------------------------------------------------ run all (never throws, never exceeds the budget)
-export async function runEmailHexagons(email, env = {}, fetchImpl = fetch) {
+export async function runEmailHexagons(email, env = {}, fetchImpl = undefined, rctx = undefined) {
+  const ctx = rcx(env, fetchImpl, rctx);
   const budget = Number(env.EMAIL_HEXAGON_TIMEOUT_MS) || CHECK_TIMEOUT_MS;
   const guard = (id, p) => Promise.race([
     Promise.resolve(p).catch((e) => notChecked(id, `check failed: ${String(e).slice(0, 100)}`)),
@@ -251,11 +257,11 @@ export async function runEmailHexagons(email, env = {}, fetchImpl = fetch) {
   ]);
   return Promise.all([
     guard('email-name', checkNameInAddress(email)),
-    guard('email-provider', checkProviderAndDomain(email, fetchImpl, { timeoutMs: budget })),
-    guard('email-profile', checkPublicProfile(email, fetchImpl, { timeoutMs: budget })),
-    guard('email-libravatar', checkLibravatar(email, fetchImpl, { timeoutMs: budget })),
-    guard('email-domain-record', checkDomainRecord(email, fetchImpl, { timeoutMs: budget })),
-    ...(githubCommitsEnabled(env) ? [guard(GITHUB_COMMITS_ID, checkGithubCommits(email, fetchImpl, { timeoutMs: budget, token: String(env.GITHUB_SEARCH_TOKEN || '') }))] : []),
+    guard('email-provider', checkProviderAndDomain(email, fetchImpl, { timeoutMs: budget, rctx: ctx })),
+    guard('email-profile', checkPublicProfile(email, fetchImpl, { timeoutMs: budget, rctx: ctx })),
+    guard('email-libravatar', checkLibravatar(email, fetchImpl, { timeoutMs: budget, rctx: ctx })),
+    guard('email-domain-record', checkDomainRecord(email, fetchImpl, { timeoutMs: budget, rctx: ctx })),
+    ...(githubCommitsEnabled(env) ? [guard(GITHUB_COMMITS_ID, checkGithubCommits(email, fetchImpl, { timeoutMs: budget, rctx: ctx, token: String(env.GITHUB_SEARCH_TOKEN || '') }))] : []),
   ]);
 }
 

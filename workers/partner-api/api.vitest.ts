@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from './worker';
 import { OPENAPI } from './openapi';
 import { priceMonth } from './pricing';
+import { createFetchSpy } from '../../shared/recipients/fetch-spy';
 
 const KEY = 'mpt_live_' + 'a'.repeat(43);
 const HASH = createHash('sha256').update(KEY).digest('hex');
@@ -217,5 +218,17 @@ describe('public routes and spec', () => {
         expect([404, 405].includes(res.status) && (await res.json()).error.code === 'method_not_allowed').toBe(false);
       }
     }
+  });
+});
+
+// MPC-9885: partner-api reaches Supabase only, through the registered recipient.
+describe('recipient wrapper (fetch-spy)', () => {
+  it('every outbound call is the supabase recipient', async () => {
+    const spy = createFetchSpy({ respond: () => new Response('[]', { status: 200 }) });
+    vi.stubGlobal('fetch', spy.fetch);
+    await call('/v1/usage');
+    expect(spy.calls.length).toBeGreaterThan(0);
+    for (const c of spy.calls) expect(c.host.endsWith('.supabase.co')).toBe(true);
+    spy.assertAllRegistered();
   });
 });

@@ -1,3 +1,6 @@
+import { callRecipient } from '../recipients/outbound.ts';
+import { workerRecipientContext } from '../recipients/worker-ctx.ts';
+
 // MPC-9783: the alert a person sees. Metadata only: the function receives the triage RESULT and a case reference, never the message text, so the body or an address cannot leak into Slack.
 export function buildAlert(result, caseRef) {
   const tag = result.flagged ? ':rotating_light: PRIORITY' : result.queue === 'low_priority' ? 'low priority' : 'review';
@@ -13,13 +16,17 @@ export function buildAlert(result, caseRef) {
 export const alertConfigured = (env) => Boolean(env?.SLACK_BOT_TOKEN && env?.TRIAGE_SLACK_CHANNEL_ID);
 
 /** Posts to the triage channel. Never throws: returns false on any failure, and the caller keeps the message queued either way. */
-export async function postAlert(env, text, fetchImpl = fetch) {
+export async function postAlert(env, text, fetchImpl = undefined, rctx) {
   if (!alertConfigured(env)) return false;
   try {
-    const res = await fetchImpl('https://slack.com/api/chat.postMessage', {
-      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
-      body: JSON.stringify({ channel: env.TRIAGE_SLACK_CHANNEL_ID, text }),
-    });
+    // MPC-9885: metadata only (queue, owner, urgency, case ref), never the message, so no data items.
+    const res = await callRecipient('slack', {
+      url: 'https://slack.com/api/chat.postMessage', sent: [],
+      init: {
+        method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${env.SLACK_BOT_TOKEN}` },
+        body: JSON.stringify({ channel: env.TRIAGE_SLACK_CHANNEL_ID, text }),
+      },
+    }, rctx ?? workerRecipientContext(env, { fetchImpl }));
     const j = await res.json().catch(() => ({}));
     return Boolean(res.ok && j.ok);
   } catch { return false; }

@@ -1,3 +1,5 @@
+import { callRecipient, type RecipientContext } from "../../../shared/recipients/outbound";
+import { workerRecipientContext } from "../../../shared/recipients/worker-ctx";
 import type { Logger } from "./logger";
 
 export interface Env {
@@ -58,6 +60,8 @@ export interface Env {
   PROBE_RETENTION_DAYS?: string;
   /** Full event log (mode "on" only): comma-separated numeric Telegram ids of people who opted in, logged in addition to PROBE_TELEGRAM_IDS. */
   PROBE_LOG_OPTIN_IDS?: string;
+  /** MPC-9850 / CK-9912: comma-separated numeric Telegram ids of the SYNTHETIC check account (the owner's own test account). Only these ids get the full event log in ANY probe mode; everyone else is unchanged. Secret, never in the repo. */
+  SYNTHETIC_IDS?: string;
   /** Full event log: days until a row expires (default 90, clamped 1-365), or "forever" for no expiry. */
   PROBE_LOG_RETENTION_DAYS?: string;
   /** MPC-7891 Telegram baseline scan: "on" runs it for senders in PROBE_TELEGRAM_IDS after the consent Y; anything else (default) is off. */
@@ -88,6 +92,19 @@ export interface Env {
   /** Fallback: plain HTTP to core-brain when no service binding is configured. */
   CORE_BRAIN_URL?: string;
   CORE_BRAIN_TOKEN?: string;
+}
+
+/** MPC-9885: the recipient context for this Worker's outbound calls, built once per env object (flags are read from it by name). No scan id: nothing here runs inside a web scan, so no log rows are written. */
+const recipientContexts = new WeakMap<object, RecipientContext>();
+let envlessContext: RecipientContext | undefined;
+export function recipientCtx(env?: Env): RecipientContext {
+  if (!env) return (envlessContext ??= workerRecipientContext(undefined));
+  let ctx = recipientContexts.get(env);
+  if (!ctx) {
+    ctx = workerRecipientContext(env as unknown as Record<string, unknown>);
+    recipientContexts.set(env, ctx);
+  }
+  return ctx;
 }
 
 export const MAX_BODY_BYTES = 1_000_000;
@@ -136,20 +153,22 @@ export async function callCoreBrain(env: Env, envelope: ForwardEnvelope, log: Lo
   // MPC-8601: core-brain is also reachable on its public workers.dev address, so it authenticates every caller,
   // service binding included. CORE_BRAIN_TOKEN must equal core-brain's WEBHOOK_SECRET.
   if (env.CORE_BRAIN_TOKEN) headers.Authorization = `Bearer ${env.CORE_BRAIN_TOKEN}`;
-  let target: { fetch(r: Request): Promise<Response> };
+  let send: (url: string, init: RequestInit) => Promise<Response>;
   let url: string;
   if (env.CORE_BRAIN) {
-    target = env.CORE_BRAIN;
+    const binding = env.CORE_BRAIN;
+    send = (u, init) => binding.fetch(new Request(u, init)); // service binding: never leaves Cloudflare, not a recipient
     url = "https://core-brain/ingest/social";
   } else if (env.CORE_BRAIN_URL) {
-    target = { fetch: (r) => fetch(r) };
+    // MPC-9885: core-brain's public workers.dev address. The envelope is the verified platform payload, passed through untouched (never inspected here).
+    send = (u, init) => callRecipient("internal-workers", { url: u, init, sent: [] }, recipientCtx(env));
     url = new URL("/ingest/social", env.CORE_BRAIN_URL).toString();
   } else {
     log.error("core_brain_unconfigured", { source: envelope.source });
     return null;
   }
   try {
-    const res = await target.fetch(new Request(url, { method: "POST", headers, body: JSON.stringify(envelope) }));
+    const res = await send(url, { method: "POST", headers, body: JSON.stringify(envelope) });
     if (res.status === 429) {
       log.warn("core_brain_rate_limited", { source: envelope.source });
       return RATE_LIMITED;

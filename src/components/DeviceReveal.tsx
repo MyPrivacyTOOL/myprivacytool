@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import DeviceIcon from '@/components/DeviceIcon';
+import { firstSpinDelay, SPIN_SLOW_DOWN } from '@/lib/revealSpin';
 import { CAROUSEL_DEVICES, type DeviceCategory, type DeviceIdentity } from '@/lib/deviceIdentity';
 
 /** Which illustration represents each category. Computers share a neutral screen. */
@@ -26,10 +27,8 @@ interface DeviceRevealProps {
   gamma?: number | null;
   motionPrompt?: boolean;
   onEnableMotion?: () => void;
+  fullscreen?: boolean;
 }
-
-const START_DELAY_MS = 55;
-const SLOW_DOWN = 1.06;
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
@@ -40,7 +39,7 @@ const prefersReducedMotion = () =>
  * Spins through the devices we can recognise, decelerates, and locks onto the
  * visitor's. Only rendered for a certain identity — unknown never reaches here.
  */
-export default function DeviceReveal({ identity, rotationAngle, beta, gamma, motionPrompt, onEnableMotion }: DeviceRevealProps) {
+export default function DeviceReveal({ identity, rotationAngle, beta, gamma, motionPrompt, onEnableMotion, fullscreen }: DeviceRevealProps) {
   const targetIndex = useMemo(
     () => Math.max(0, CAROUSEL_DEVICES.findIndex((d) => d.category === identity.category)),
     [identity.category],
@@ -58,7 +57,7 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma, mot
     // One lap plus the distance to the target, slowing down as it goes.
     const steps = CAROUSEL_DEVICES.length + targetIndex;
     let step = 0;
-    let delay = START_DELAY_MS;
+    let delay = firstSpinDelay(steps);
     let timer: ReturnType<typeof setTimeout>;
 
     setIndex(0);
@@ -71,7 +70,7 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma, mot
         setLocked(true);
         return;
       }
-      delay *= SLOW_DOWN;
+      delay *= SPIN_SLOW_DOWN;
       timer = setTimeout(tick, delay);
     };
     timer = setTimeout(tick, delay);
@@ -92,6 +91,7 @@ export default function DeviceReveal({ identity, rotationAngle, beta, gamma, mot
       gamma={gamma}
       motionPrompt={motionPrompt && locked && HAS_MOTION_SENSORS.includes(identity.category)}
       onEnableMotion={onEnableMotion}
+      fullscreen={fullscreen}
     />
   );
 }

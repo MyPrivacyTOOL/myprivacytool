@@ -1,4 +1,8 @@
 import { enrichAndScore, HIGH_PRIORITY_THRESHOLD } from './lead-scoring.js';
+// MPC-9885: every outbound call goes through the recipient wrapper (key + declared data items). rctx is built once per request/job.
+import { callRecipient } from '../../shared/recipients/outbound.ts';
+import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { createBusinessRequest, markLate, postDigest, sendDelayNotices } from './business-requests.js';   // MPC-9825
 // MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
 import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
 
@@ -43,7 +47,7 @@ function maskIp(ip) {
   return '';
 }
 const TURNSTILE_HOSTS = ['myprivacytool.io', 'www.myprivacytool.io', 'wwwmyprivacytool.pages.dev'];
-async function turnstileState(env, request, token, info = {}) {
+async function turnstileState(env, request, token, info = {}, rctx = workerRecipientContext(env)) {
   if (!env.TURNSTILE_SECRET_KEY) return 'absent';
   if (typeof token !== 'string' || !token) { info.reason = 'missing_token'; return 'failed'; }
   if (token.length > 2048) { info.reason = 'token_too_long'; return 'failed'; }
@@ -53,7 +57,7 @@ async function turnstileState(env, request, token, info = {}) {
     fd.append('response', token);
     const ip = request.headers.get('CF-Connecting-IP');
     if (ip) fd.append('remoteip', ip);
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: fd });
+    const res = await callRecipient('cloudflare-turnstile', { url: 'https://challenges.cloudflare.com/turnstile/v0/siteverify', init: { method: 'POST', body: fd }, sent: ip ? ['ip'] : [] }, rctx);
     if (!res.ok) { console.warn('turnstile siteverify http', res.status); return 'error'; }
     const out = await res.json();
     if (!out.success) { info.reason = 'rejected:' + (out['error-codes'] || []).join(',').slice(0, 100); console.warn('turnstile rejected:', (out['error-codes'] || []).join(',').slice(0, 200)); return 'failed'; }
@@ -110,19 +114,21 @@ function whoamiExtra(request, cors, rlState) {
 // pages in its trash for 30 days, then deletes them). Counts only are logged: never a name or an email. Fail-soft; at most LEAD_PURGE_LIMIT per run.
 export const LEAD_RETENTION_MONTHS = 24;
 const LEAD_PURGE_LIMIT = 100;
-export async function purgeOldLeads(env, now = new Date(), fetchImpl = fetch) {
+export async function purgeOldLeads(env, now = new Date(), fetchImpl = undefined) {
   if (!env.NOTION_TOKEN || !env.LEADS_DB_ID) return { archived: 0, skipped: 'notion not configured' };
   const cutoff = new Date(now); cutoff.setUTCMonth(cutoff.getUTCMonth() - LEAD_RETENTION_MONTHS);
   const headers = { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' };
   let archived = 0;
+  const rctx = workerRecipientContext(env, { fetchImpl });
   try {
-    const q = await fetchImpl(`https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`, {
-      method: 'POST', headers,
-      body: JSON.stringify({ page_size: LEAD_PURGE_LIMIT, filter: { timestamp: 'created_time', created_time: { before: cutoff.toISOString() } } }),
-    });
+    const q = await callRecipient('notion', {
+      url: `https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`,
+      init: { method: 'POST', headers, body: JSON.stringify({ page_size: LEAD_PURGE_LIMIT, filter: { timestamp: 'created_time', created_time: { before: cutoff.toISOString() } } }) },
+      sent: [],
+    }, rctx);
     if (!q.ok) { console.error('lead purge query failed:', q.status); return { archived, failed: `query ${q.status}` }; }
     for (const page of (await q.json()).results || []) {
-      const r = await fetchImpl(`https://api.notion.com/v1/pages/${page.id}`, { method: 'PATCH', headers, body: JSON.stringify({ archived: true }) });
+      const r = await callRecipient('notion', { url: `https://api.notion.com/v1/pages/${page.id}`, init: { method: 'PATCH', headers, body: JSON.stringify({ archived: true }) }, sent: [] }, rctx);
       if (r.ok) archived++; else console.error('lead purge archive failed:', r.status);
     }
   } catch (e) { console.error('lead purge error:', String(e).slice(0, 200)); }
@@ -133,6 +139,10 @@ export async function purgeOldLeads(env, now = new Date(), fetchImpl = fetch) {
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweepPending(env).catch((e) => console.error('Sweep error:', String(e))));
+    // MPC-9825: Business 48-hour queue. Late sweep on every tick; the digest once a day on the 00:00 UTC tick (08:00 HKT).
+    ctx.waitUntil(markLate(env, new Date(event.scheduledTime ?? Date.now())).catch((e) => console.error('Business late sweep error:', String(e))));
+    ctx.waitUntil(sendDelayNotices(env, new Date(event.scheduledTime ?? Date.now())).catch((e) => console.error('Business delay notice error:', String(e))));
+    { const bt = new Date(event.scheduledTime ?? Date.now()); if (bt.getUTCHours() === 0 && bt.getUTCMinutes() < 5) ctx.waitUntil(postDigest(env, bt).catch((e) => console.error('Business digest error:', String(e)))); }
     // The cron runs every 5 minutes; the retention purge runs once a day, on the 19:00 UTC tick (03:00 HKT).
     const t = new Date(event.scheduledTime ?? Date.now());
     if (t.getUTCHours() === 19 && t.getUTCMinutes() < 5) ctx.waitUntil(purgeOldLeads(env, t).catch((e) => console.error('Lead purge error:', String(e))));
@@ -146,7 +156,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
     };
@@ -180,7 +190,16 @@ export default {
     if (Number(request.headers.get('content-length') || 0) > MAX_BODY_BYTES) return reject(413, 'Payload too large');
     if (await rateLimited(env, request)) return reject(429, 'Too many requests');
 
+    // MPC-9825: the /business form queues a staffed 48-hour request here (own route; the lead path below is unchanged). Same Origin check and rate limit as above.
+    if (new URL(request.url).pathname === '/business-request') {
+      let input; try { input = await request.json(); } catch (_) { return reject(400, 'Invalid request'); }
+      if (!input || typeof input !== 'object') return reject(400, 'Invalid request');
+      const out = await createBusinessRequest(env, input);
+      return new Response(JSON.stringify(out.body), { status: out.status, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
     try {
+      const rctx = workerRecipientContext(env);   // MPC-9885: one context per request
       let name = '', email = '', phone = '';
       let utm_source = '', utm_medium = '', utm_campaign = '', utm_content = '', referrer = '';
       let categoryScores = null; // MPC-7173: per-category risk scores for the baseline snapshot
@@ -233,9 +252,17 @@ export default {
         });
       }
 
+      // MPC-9914 (EXT-03): consent is checked BEFORE anything is written or sent anywhere (Supabase, Notion, HubSpot, Slack, Resend).
+      // Without it the request stops here with an honest 400 and nothing is stored. The flag used to only set HubSpot properties.
+      if (!consented) {
+        return new Response(JSON.stringify({ error: 'Consent required', message: 'We have not saved anything. Tick the consent box to share your email with us, then try again.' }), {
+          status: 400, headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+
       // MPC-8368: bot check. Runs after the watchdog health check (which has no browser and no token) and before any write.
       const tsInfo = {};
-      const ts = await turnstileState(env, request, turnstileToken, tsInfo);
+      const ts = await turnstileState(env, request, turnstileToken, tsInfo, rctx);
       if (ts === 'failed') {
         // MPC-8368: one structured line per failure (search the Worker logs for TURNSTILE_FAILED) so false positives can be
         // reviewed during the enforcement trial. Carries a truncated IP, timestamp, reason, country and Origin; never the email or token.
@@ -251,6 +278,17 @@ export default {
         if (enforce) return reject(403, 'Verification failed');
       }
 
+      // MPC-9914 (EXT-03): the baseline is owned by a proved email. A bare email (or its SHA-256) is a key, never authentication.
+      // A request that asks for a baseline (it sends a riskScore) must carry the Supabase access token of the signed-in, confirmed person
+      // whose email it is (checked after the bot check, still before any write). No token: 401. A token for a different address: 403. Either way nothing is written.
+      let baselineOwner = false;
+      if (riskScore !== null && riskScore !== '') {
+        const proof = await provedEmailFromBearer(env, request, rctx);
+        if (!proof) return reject(401, 'Sign in with your confirmed email to save or read a baseline');
+        if (proof !== email.toLowerCase()) return reject(403, 'This sign-in does not belong to that email');
+        baselineOwner = true;
+      }
+
       // Capture technical metadata from the request
       const ip = request.headers.get('CF-Connecting-IP') || '';
       const country = request.cf?.country || '';
@@ -264,11 +302,11 @@ export default {
       // BEFORE the Notion write and independent of it: a Notion failure must never block the engagement row.
       // Fail-soft and off the response path; stores no PII (random session id + funnel booleans).
       // MPC-7616: awaited (not just waitUntil) so the answer can say whether the row really landed. Still fail-soft: it never throws.
-      const engagementRecorded = await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null });
+      const engagementRecorded = await recordEngagement(env, crypto.randomUUID(), { full_scan_completed: riskScore !== null }, rctx);
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
-      const baseline = await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION);
+      const baseline = !baselineOwner ? null : await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION, rctx);
 
       // 1. Save to Notion
       const properties = {
@@ -278,7 +316,7 @@ export default {
         Source: { select: { name: 'Landing Page' } },
       };
       if (phone)        properties['Phone']        = { phone_number: phone };
-      if (ip)           properties['IP Address']   = { rich_text: [{ text: { content: ip } }] };
+      // MPC-9890 (Open Tracker rule 3): the IP address is no longer written to the Notion lead log. `ip` is still read for the bot check only.
       if (country)      properties['Country']      = { rich_text: [{ text: { content: country } }] };
       if (city)         properties['City']         = { rich_text: [{ text: { content: city } }] };
       if (browser)      properties['Browser']      = { rich_text: [{ text: { content: browser } }] };
@@ -290,15 +328,20 @@ export default {
       if (utm_content)  properties['UTM Content']  = { rich_text: [{ text: { content: utm_content } }] };
       if (referrer)     properties['Referrer']     = { url: referrer };
 
-      const nr = await fetch('https://api.notion.com/v1/pages', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.NOTION_TOKEN}`,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json',
+      // MPC-9885: the lead row carries the contact fields, country/city, browser/os/device, utm tags and referrer (read from `properties` above).
+      const nr = await callRecipient('notion', {
+        url: 'https://api.notion.com/v1/pages',
+        init: {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+            'Notion-Version': '2022-06-28',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ parent: { database_id: env.LEADS_DB_ID }, properties })
         },
-        body: JSON.stringify({ parent: { database_id: env.LEADS_DB_ID }, properties })
-      });
+        sent: ['email', 'name', 'phone', 'country', 'city', 'device_profile', 'utm', 'referrer'],
+      }, rctx);
 
       if (!nr.ok) {
         const e = await nr.text();
@@ -311,34 +354,42 @@ export default {
       // 2. Count total real leads (exclude healthcheck entries)
       let totalLeads = '?';
       try {
-        const countResp = await fetch(`https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${env.NOTION_TOKEN}`,
-            'Notion-Version': '2022-06-28',
-            'Content-Type': 'application/json',
+        const countResp = await callRecipient('notion', {
+          url: `https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`,
+          init: {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+              'Notion-Version': '2022-06-28',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              page_size: 100,
+              filter: {
+                and: [
+                  { property: 'Email', email: { does_not_contain: 'healthcheck.io' } },
+                  { property: 'Email', email: { does_not_contain: '@test.com' } },
+                ]
+              }
+            })
           },
-          body: JSON.stringify({
-            page_size: 100,
-            filter: {
-              and: [
-                { property: 'Email', email: { does_not_contain: 'healthcheck.io' } },
-                { property: 'Email', email: { does_not_contain: '@test.com' } },
-              ]
-            }
-          })
-        });
+          sent: [],   // fixed filter strings only
+        }, rctx);
         if (countResp.ok) {
           let count = 0;
           let cursor = null;
           do {
             const body = { page_size: 100, filter: { and: [{ property: 'Email', email: { does_not_contain: 'healthcheck.io' } }, { property: 'Email', email: { does_not_contain: '@test.com' } }] } };
             if (cursor) body.start_cursor = cursor;
-            const pageResp = await fetch(`https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
-              body: JSON.stringify(body)
-            });
+            const pageResp = await callRecipient('notion', {
+              url: `https://api.notion.com/v1/databases/${env.LEADS_DB_ID}/query`,
+              init: {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+              },
+              sent: [],
+            }, rctx);
             if (!pageResp.ok) break;
             const pageData = await pageResp.json();
             count += pageData.results ? pageData.results.length : 0;
@@ -379,11 +430,16 @@ export default {
         ].filter(l => l !== null).join('\n');
 
         side.push(
-          fetch('https://slack.com/api/chat.postMessage', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${slackToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channel: channelId, text: msgText, unfurl_links: false, unfurl_media: false })
-          }).catch(() => {})
+          // MPC-9885: the message text has country, browser/os/device, the inferred source + utm campaign/content, and the referrer URL (no name, email, phone, ip or city).
+          callRecipient('slack', {
+            url: 'https://slack.com/api/chat.postMessage',
+            init: {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${slackToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ channel: channelId, text: msgText, unfurl_links: false, unfurl_media: false })
+            },
+            sent: ['country', 'device_profile', 'utm', 'referrer'],
+          }, rctx).catch(() => {})
         );
       }
 
@@ -406,34 +462,43 @@ export default {
           // Fail-soft: an enrichment problem never blocks the contact write; the 5-minute cron sweep retries 'pending'.
           let scored = null;
           try {
-            scored = await enrichAndScore(env, email, country);
+            scored = await enrichAndScore(env, email, country, rctx);
             Object.assign(hsProps, scored.props);
           } catch (err) { console.error('Lead scoring error:', String(err)); }
           const hsHeaders = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
-          let r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-            method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps })
-          });
+          const hsSent = ['email', 'name', 'phone'];   // MPC-9885: hsProps = email, first/last name, phone, consent date/source, lead score (+ Hunter job title/company)
+          let r = await callRecipient('hubspot', {
+            url: 'https://api.hubapi.com/crm/v3/objects/contacts',
+            init: { method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps }) },
+            sent: hsSent,
+          }, rctx);
           // Safety net: if the mpt_lead_* custom properties are not created in HubSpot yet, HubSpot rejects the whole
           // write with 400 PROPERTY_DOESNT_EXIST. Retry without them so contact sync never regresses.
           if (r.status === 400 && scored && /mpt_lead_/.test(await r.clone().text())) {
             console.error('HubSpot missing mpt_lead_* properties; writing contact without score');
             for (const k of Object.keys(hsProps)) if (k.startsWith('mpt_lead_')) delete hsProps[k];
-            r = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-              method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps })
-            });
+            r = await callRecipient('hubspot', {
+              url: 'https://api.hubapi.com/crm/v3/objects/contacts',
+              init: { method: 'POST', headers: hsHeaders, body: JSON.stringify({ properties: hsProps }) },
+              sent: hsSent,
+            }, rctx);
           }
           if (r.status === 409) {
             const existing = await r.json();
             const vid = existing?.message?.match(/ID: (\d+)/)?.[1];
             if (vid) {
-              await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${vid}`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ properties: hsProps })
-              });
+              await callRecipient('hubspot', {
+                url: `https://api.hubapi.com/crm/v3/objects/contacts/${vid}`,
+                init: {
+                  method: 'PATCH',
+                  headers: { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ properties: hsProps })
+                },
+                sent: hsSent,
+              }, rctx);
             }
           }
-          if (scored) await alertHighPriority(env, { email, name, ...scored.result, props: scored.props });
+          if (scored) await alertHighPriority(env, { email, name, ...scored.result, props: scored.props }, rctx);
         })().catch(() => {}));
       }
 
@@ -442,16 +507,21 @@ export default {
       if (env.RESEND_API_KEY && env.CONFIRMATION_OWNER !== 'scan-report') {
         const emailHtml = buildConfirmationEmail(htmlEsc(firstName), source);
         side.push(
-          fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
-              to: [email],
-              subject: `${firstName.replace(/[\r\n]/g, ' ')}, your privacy scan is being prepared`,
-              html: emailHtml,
-            })
-          }).catch(() => {})
+          // MPC-9885: goes to the visitor's email address and greets them by first name (subject and body).
+          callRecipient('resend', {
+            url: 'https://api.resend.com/emails',
+            init: {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
+                to: [email],
+                subject: `${firstName.replace(/[\r\n]/g, ' ')}, your privacy scan is being prepared`,
+                html: emailHtml,
+              })
+            },
+            sent: ['email', 'name'],
+          }, rctx).catch(() => {})
         );
       }
 
@@ -476,7 +546,7 @@ export default {
 // MPC-7500: High Priority (score > 80) alert. Slack always (existing bot); email via Resend only when
 // ALERT_EMAIL is set. The HubSpot workflow (docs/lead-scoring-mpc-7500.md) is the system of record for alerts;
 // this is the in-Worker path that fires within seconds. Never throws.
-async function alertHighPriority(env, lead) {
+async function alertHighPriority(env, lead, rctx = workerRecipientContext(env)) {
   if (!(lead.score > HIGH_PRIORITY_THRESHOLD)) return;
   const role = lead.props?.jobtitle ? `Role: ${slackEsc(lead.props.jobtitle)}${lead.props.company ? ' @ ' + slackEsc(lead.props.company) : ''}` : null;
   const breakdown = `Breakdown: domain ${lead.parts.domain} / role ${lead.parts.role} / geo ${lead.parts.geo}`;
@@ -491,23 +561,31 @@ async function alertHighPriority(env, lead) {
   ].filter(Boolean).join('\n');
   const sends = [];
   if (env.SLACK_BOT_TOKEN) {
-    sends.push(fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text: slackText, unfurl_links: false }),
-    }));
+    sends.push(callRecipient('slack', {
+      url: 'https://slack.com/api/chat.postMessage',
+      init: {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${env.SLACK_BOT_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: env.SLACK_CHANNEL_ID || 'C0AR4TB6Y77', text: slackText, unfurl_links: false }),
+      },
+      sent: [],   // score, breakdown and the enriched job title/company only (no name or email)
+    }, rctx));
   }
   if (env.RESEND_API_KEY && env.ALERT_EMAIL) {
-    sends.push(fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
-        to: [env.ALERT_EMAIL],
-        subject: `High Priority lead (${lead.score}): ${String(lead.email).replace(/[\r\n]/g, ' ')}`,
-        html: `<pre>${htmlEsc(text.replace(/[*:]fire:/g, ''))}</pre>`,
-      }),
-    }));
+    sends.push(callRecipient('resend', {
+      url: 'https://api.resend.com/emails',
+      init: {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'MyPrivacyTOOL <hello@myprivacytool.io>',
+          to: [env.ALERT_EMAIL],
+          subject: `High Priority lead (${lead.score}): ${String(lead.email).replace(/[\r\n]/g, ' ')}`,
+          html: `<pre>${htmlEsc(text.replace(/[*:]fire:/g, ''))}</pre>`,
+        }),
+      },
+      sent: ['email', 'name'],   // the internal alert email names the lead and gives their address
+    }, rctx));
   }
   await Promise.allSettled(sends);
 }
@@ -519,7 +597,10 @@ async function sweepPending(env) {
   // MPC-102: no HUNTER_API_KEY is fine here: enrichAndScore then scores on domain and geo only.
   if (!env.HUBSPOT_TOKEN) return { retried: 0 };
   const hs = { 'Authorization': `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' };
-  const res = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
+  const rctx = workerRecipientContext(env);   // MPC-9885: one context per sweep
+  const res = await callRecipient('hubspot', {
+    url: 'https://api.hubapi.com/crm/v3/objects/contacts/search',
+    init: {
     method: 'POST', headers: hs,
     body: JSON.stringify({
       filterGroups: [
@@ -537,7 +618,9 @@ async function sweepPending(env) {
       ],
       properties: ['email', 'firstname', 'lastname'], limit: SWEEP_LIMIT,
     }),
-  });
+    },
+    sent: [],   // filters only; the contact fields are read back, not sent
+  }, rctx);
   if (!res.ok) { console.error('Sweep search failed:', res.status); return { retried: 0 }; }
   const { results = [] } = await res.json();
   let retried = 0;
@@ -545,14 +628,16 @@ async function sweepPending(env) {
     const email = c.properties?.email;
     if (!email) continue;
     try {
-      const { result, props } = await enrichAndScore(env, email, '');
-      const up = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${c.id}`, {
-        method: 'PATCH', headers: hs, body: JSON.stringify({ properties: props }),
-      });
+      const { result, props } = await enrichAndScore(env, email, '', rctx);
+      const up = await callRecipient('hubspot', {
+        url: `https://api.hubapi.com/crm/v3/objects/contacts/${c.id}`,
+        init: { method: 'PATCH', headers: hs, body: JSON.stringify({ properties: props }) },
+        sent: [],   // score properties (+ Hunter job title/company) only
+      }, rctx);
       if (up.ok) {
         retried++;
         if (props.mpt_lead_enrich_status === 'scored') {
-          await alertHighPriority(env, { email, name: [c.properties.firstname, c.properties.lastname].filter(Boolean).join(' '), ...result, props });
+          await alertHighPriority(env, { email, name: [c.properties.firstname, c.properties.lastname].filter(Boolean).join(' '), ...result, props }, rctx);
         }
       }
     } catch (err) { console.error('Sweep contact error:', String(err)); }
@@ -564,24 +649,30 @@ async function sweepPending(env) {
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
 const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+// The public publishable key (not a secret; the same one scan-report's accounts use). Supabase Auth needs an apikey on /auth/v1/user.
+const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV';
 // MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
 const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
-async function recordEngagement(env, sessionId, flags) {
+async function recordEngagement(env, sessionId, flags, rctx = workerRecipientContext(env)) {
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('Supabase not configured - skipping engagement write');
     return false;
   }
   try {
-    const res = await fetch(`${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_user_engagement`, {
-      method: 'POST',
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
+    const res = await callRecipient('supabase', {
+      url: `${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/mpt_user_engagement`,
+      init: {
+        method: 'POST',
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ session_id: sessionId, ...flags }),
       },
-      body: JSON.stringify({ session_id: sessionId, ...flags }),
-    });
+      sent: [],   // random session id + funnel booleans
+    }, rctx);
     if (!res.ok) {
       console.error('Supabase mpt_user_engagement insert failed:', res.status, supabaseHost(env), (await res.text()).slice(0, 200));
       return false;
@@ -593,13 +684,31 @@ async function recordEngagement(env, sessionId, flags) {
   }
 }
 
+// MPC-9914 (EXT-03): the confirmed email behind a Bearer access token, checked against Supabase Auth (signature, expiry, revocation),
+// lower-cased; null when there is no token, it is not valid, or the address was never confirmed. Same check as scan-report's accounts.
+async function provedEmailFromBearer(env, request, rctx) {
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token || token.length > 4096) return null;
+  try {
+    const res = await callRecipient('supabase', {
+      url: `${(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '')}/auth/v1/user`,
+      init: { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } },
+      sent: [],
+    }, rctx);
+    if (!res.ok) return null;
+    const u = await res.json();
+    if (!u || typeof u.email !== 'string' || !(u.email_confirmed_at || u.confirmed_at)) return null;
+    return u.email.trim().toLowerCase();
+  } catch (_) { return null; }
+}
+
 // MPC-7173: baseline snapshot. Keyed by SHA-256(lower-cased email); stores only scores, never the email.
 // MPC-7471-F4: every baseline carries the score version that produced it. Old rows are 'legacy' (the column default) and are kept as they are;
 // a score is only ever compared with a baseline of the SAME version, and a legacy and a versioned score are never subtracted.
 // BASELINE_SCORE_VERSION_COLUMN = "true" once supabase/proposed/20261026000000_mpc_7471_f4_baseline_score_version.sql is applied. Until then only
 // legacy submissions are stored (exactly as before) and a versioned score is not stored at all: it cannot be tagged, and an untagged row would be read as legacy.
 // Returns { overall_score, created_at, is_first, delta, score_version, comparable } (delta = this scan minus the baseline of the same version, else null) or null.
-async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion = LEGACY_SCORE_VERSION) {
+async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion = LEGACY_SCORE_VERSION, rctx = workerRecipientContext(env)) {
   const score = Number(riskScore);
   if (riskScore === null || riskScore === '' || !Number.isFinite(score) || score < 0 || score > 100) return null;
   if (!env.SUPABASE_SERVICE_ROLE_KEY) return null;
@@ -620,11 +729,16 @@ async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion 
     const headers = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' };
 
     // First scan of this version wins: insert and ignore the conflict if one exists, then read it back.
-    const ins = await fetch(base, {
-      method: 'POST',
-      headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
-      body: JSON.stringify({ email_hash: emailHash, overall_score: overall, category_scores: cats, ...(versioned ? { score_version: scoreVersion } : {}) }),
-    });
+    const baselineSent = ['email_hash', 'scan_result'];   // MPC-9885: SHA-256 of the email (never the email) + overall/category scores
+    const ins = await callRecipient('supabase', {
+      url: base,
+      init: {
+        method: 'POST',
+        headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=representation' },
+        body: JSON.stringify({ email_hash: emailHash, overall_score: overall, category_scores: cats, ...(versioned ? { score_version: scoreVersion } : {}) }),
+      },
+      sent: baselineSent,
+    }, rctx);
     if (!ins.ok) {
       console.error('Supabase mpt_score_baselines insert failed:', ins.status, (await ins.text()).slice(0, 200));
       return null;
@@ -633,7 +747,11 @@ async function saveBaseline(env, email, riskScore, categoryScores, scoreVersion 
     if (Array.isArray(created) && created.length) {
       return { overall_score: created[0].overall_score, created_at: created[0].created_at, is_first: true, delta: 0, score_version: scoreVersion, comparable: true };
     }
-    const sel = await fetch(`${base}?email_hash=eq.${emailHash}${versioned ? `&score_version=eq.${scoreVersion}` : ''}&select=overall_score,created_at${versioned ? ',score_version' : ''}&limit=1`, { headers });
+    const sel = await callRecipient('supabase', {
+      url: `${base}?email_hash=eq.${emailHash}${versioned ? `&score_version=eq.${scoreVersion}` : ''}&select=overall_score,created_at${versioned ? ',score_version' : ''}&limit=1`,
+      init: { headers },
+      sent: ['email_hash'],
+    }, rctx);
     if (!sel.ok) {
       console.error('Supabase mpt_score_baselines select failed:', sel.status);
       return null;

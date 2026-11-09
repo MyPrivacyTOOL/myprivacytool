@@ -6,6 +6,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { HEXAGON_CATALOGUE as ITEMS, CATALOGUE_CHANNELS as CHANNELS } from '../shared/hexagon-registry/catalogue.js';
+import { countSentence } from '../shared/hexagon-registry/countSentence.js';
 import { EXTRA_HEXAGON_IDS } from '../shared/hexagon-registry/channels.js';
 import { REVIEWED, REVIEWED_ON } from './hexagon-reviewed-copy.mjs';
 
@@ -145,7 +146,7 @@ export function masterPage() {
     title, desc, wide: true, canonical: `${SITE_URL}${BASE}/`,
     body: `<nav><a href="/footprint/">Footprint map</a> › All hexagons</nav>
 <div class="eyebrow">MyPrivacyTOOL · Master hexagon risk page</div><h1>${ITEMS.length} hexagons, ranked by risk</h1>
-<p style="color:var(--mute)">Every fact a channel can reveal about a person, worst first. Each one has its own page explaining the risk and what it could be used for.</p>
+<p style="color:var(--mute)">${countSentence()}. Every fact a channel can reveal about a person, worst first. Each one has its own page explaining the risk and what it could be used for.</p>
 <div class="tags"><span class="tag"><i class="dot high"></i> ${rc('high')} High</span><span class="tag"><i class="dot medium"></i> ${rc('medium')} Medium</span><span class="tag"><i class="dot low"></i> ${rc('low')} Low</span><span class="tag">${worst} high-risk facts arrive on first contact (A)</span></div>
 <div class="f"><input id="q" type="search" placeholder="Search hexagons" aria-label="Search"><select id="r" aria-label="Risk"><option value="">All risks</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><select id="a" aria-label="Arrival"><option value="">All arrival classes</option>${Object.entries(AR).map(([k, v]) => `<option value="${k}">${k} · ${v}</option>`).join('')}</select><select id="c" aria-label="Channel"><option value="">All channels</option>${chs.map((c) => `<option value="${c.key}">${esc(c.label)}</option>`).join('')}</select></div>
 <p id="n" style="color:var(--mute)"></p><div class="tw"><table><thead><tr><th>Risk</th><th>Hexagon</th><th>Channel</th><th>Arrival</th><th>What it reveals</th></tr></thead><tbody id="b">${rows}</tbody></table></div>
