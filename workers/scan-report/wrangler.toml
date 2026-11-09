@@ -112,7 +112,7 @@ ACCOUNTS_ENABLED = "true"
 # applied before this was merged). A consent_id sent with POST /api/scan is always checked against the store. "false" = a scan WITHOUT a consent id is still accepted,
 # because no visitor holds one until the consent block (MPC-9888) ships; MPC-9888 sets this to "true" in the same change, after the report queue has drained.
 # Only the exact string "true" enforces. When it is "true", every post_click call made for a scan is refused (CONSENT_REQUIRED / CONSENT_INVALID) unless the scan's consent is in the store.
-CONSENT_GATE_ENFORCED = "false"
+CONSENT_GATE_ENFORCED = "true"   # MPC-9888: on with the consent block; the report queue was checked for scans without a consent id first
 
 # MPC-9818 (F3): monthly scan allowances per plan, decided by Chris 2026-11-07: Free 1 / Basic 5 / Pro 25 / Executive unlimited (no cap, no fair-use text). POST /api/scan counts the scan
 # against the plan that owns the confirmed address (an account's plan, otherwise Free) BEFORE anything is saved or sent, and a refused request creates and sends nothing (HTTP 429, code

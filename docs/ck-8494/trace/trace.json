@@ -1,6 +1,6 @@
 {
   "label": "SYNTHETIC -- scripted fake RTCPeerConnection, fresh browser profile, no backend, not production, not a real user",
-  "recordedAt": "2026-11-08T10:43:02.673Z",
+  "recordedAt": "2026-11-09T03:26:18.436Z",
   "steps": [
     {
       "step": "1-2 observation shown with its explanation; first reading kept in this browser",
@@ -9,7 +9,7 @@
           "state": "found",
           "detectorVersion": "webrtc-state-1",
           "browser": "chrome",
-          "observedAt": "2026-11-08T10:42:57.750Z"
+          "observedAt": "2026-11-09T03:26:13.364Z"
         },
         "selfReport": null,
         "consent": {
@@ -22,7 +22,7 @@
       "step": "3 visitor says they did the step (self-report, not verified)",
       "evidence": {
         "selfReport": {
-          "at": "2026-11-08T10:42:58.163Z"
+          "at": "2026-11-09T03:26:13.846Z"
         },
         "baselineUnchanged": true
       }
@@ -34,13 +34,13 @@
           "state": "blocked",
           "detectorVersion": "webrtc-state-1",
           "browser": "chrome",
-          "observedAt": "2026-11-08T10:42:58.529Z"
+          "observedAt": "2026-11-09T03:26:14.258Z"
         },
         "comparison": {
           "outcome": "inconclusive",
           "reason": "The check could not finish or was blocked, which is not the same as finding nothing."
         },
-        "at": "2026-11-08T10:42:58.530Z"
+        "at": "2026-11-09T03:26:14.258Z"
       }
     },
     {
@@ -50,10 +50,10 @@
           "state": "found",
           "detectorVersion": "webrtc-state-1",
           "browser": "chrome",
-          "observedAt": "2026-11-08T10:42:57.750Z"
+          "observedAt": "2026-11-09T03:26:13.364Z"
         },
         "selfReport": {
-          "at": "2026-11-08T10:42:58.163Z"
+          "at": "2026-11-09T03:26:13.846Z"
         },
         "rechecks": [
           {
@@ -61,7 +61,7 @@
               "state": "blocked",
               "detectorVersion": "webrtc-state-1",
               "browser": "chrome",
-              "observedAt": "2026-11-08T10:42:58.529Z"
+              "observedAt": "2026-11-09T03:26:14.258Z"
             },
             "comparison": {
               "outcome": "inconclusive",
@@ -73,7 +73,7 @@
               "state": "none_found",
               "detectorVersion": "webrtc-state-1",
               "browser": "chrome",
-              "observedAt": "2026-11-08T10:43:02.129Z"
+              "observedAt": "2026-11-09T03:26:17.859Z"
             },
             "comparison": {
               "outcome": "improvement",

@@ -10,7 +10,7 @@ export interface Captured {
 // MPC-9888: the scan consent endpoint (POST/GET /api/consent) and the consent store rows the real Worker code reads while handling /api/scan.
 export const E2E_CONSENT_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 export const E2E_CONSENT_VERSION = "2026-11-v1";   // keep equal to shared/recipients/consent-config.ts
-const consentRow = (scanId = "11111111-1111-4111-8111-111111111111") => ({ id: E2E_CONSENT_ID, scan_id: scanId, consent_version: E2E_CONSENT_VERSION, consent_text_sha256: "0".repeat(64), locale: "en", registry_hash: "0".repeat(64), n_hours: 168, consented_at: "2026-11-08T00:00:00.000Z" });
+export const consentRow = (scanId = "11111111-1111-4111-8111-111111111111") => ({ id: E2E_CONSENT_ID, scan_id: scanId, consent_version: E2E_CONSENT_VERSION, consent_text_sha256: "0".repeat(64), locale: "en", registry_hash: "0".repeat(64), n_hours: 168, consented_at: "2026-11-08T00:00:00.000Z" });
 /** For the in-process fake Supabase backends: answers a select on scan_consents, or null when the URL is something else. */
 export function e2eConsentRows(url: string) {
   if (!/rest\/v1\/scan_consents/.test(url)) return null;

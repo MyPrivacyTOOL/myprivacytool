@@ -17,7 +17,7 @@ test("cold arrival: block + Scan me, no STUN or Cloudflare before the click; aft
   await expect(page.getByTestId("scan-me")).toBeVisible();
   await page.waitForTimeout(3500);
   expect(await page.evaluate(() => (window as unknown as { __ice: unknown[] }).__ice.length)).toBe(0);
-  expect(external.filter((h) => !/mpt-scan-report/.test(h)), "no outside host before the click").toEqual([]);
+  expect(external.filter((h) => !/^(api\.myprivacytool\.io\/whoami|www\.myprivacytool\.io\/api\/hk-geo)/.test(h)), "no outside host before the click").toEqual([]);
   expect(external.some((h) => /\/api\/consent/.test(h))).toBe(false);
   await page.screenshot({ path: "test-results/mpc-9888-before-click.png", fullPage: false });
 
