@@ -466,7 +466,7 @@ create temp table mm_dry as select public.mpt_machine_mirror_retention(true) as 
 select pg_temp.assert((select (j->>'ips_cut')::int = 2 and (j->>'headers_dropped')::int = 2 and (j->>'dry_run')::boolean from mm_dry) and (select count(*) from public.edge_visits where class in ('bot','ai') and ip is not null) = 2, 'machine mirror: dry run counts and changes nothing');
 create temp table mm_run as select public.mpt_machine_mirror_retention(false) as j;
 select pg_temp.assert((select (j->>'ips_cut')::int = 2 and (j->>'headers_dropped')::int = 2 from mm_run), 'machine mirror: cuts the old bot and ai IPs and headers');
-select pg_temp.assert((select count(*) from public.edge_visits where class in ('bot','ai') and (ip is not null or all_headers is not null or cf is not null)) = 0 and (select count(*) from public.edge_visits where class in ('bot','ai') and user_agent is not null and rule is not null) = 2, 'machine mirror: user agent and rule stay');
+select pg_temp.assert((select count(*) from public.edge_visits where class in ('bot','ai') and (ip is not null or all_headers <> '{}'::jsonb or cf <> '{}'::jsonb)) = 0 and (select count(*) from public.edge_visits where class in ('bot','ai') and user_agent is not null and rule is not null) = 2, 'machine mirror: user agent and rule stay');
 select pg_temp.assert(pg_temp.try_as('anon', $$select public.mpt_machine_mirror_retention(true)$$) = '42501', 'machine mirror: anon must not execute');
 reset role;
 

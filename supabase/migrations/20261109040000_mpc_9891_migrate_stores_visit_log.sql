@@ -53,13 +53,13 @@ begin
   if d is null then d := 7; end if;
   if p_dry_run then
     select count(*) into ips from public.edge_visits where ip is not null and class in ('bot', 'ai') and seen_at < now() - make_interval(days => d);
-    select count(*) into hdr from public.edge_visits where (all_headers is not null or cf is not null) and class in ('bot', 'ai') and seen_at < now() - interval '30 days';
+    select count(*) into hdr from public.edge_visits where (all_headers <> '{}'::jsonb or cf <> '{}'::jsonb) and class in ('bot', 'ai') and seen_at < now() - interval '30 days';
   else
     update public.edge_visits set ip = null, ip_cut_at = now()
      where ip is not null and class in ('bot', 'ai') and seen_at < now() - make_interval(days => d);
     get diagnostics ips = row_count;
-    update public.edge_visits set all_headers = null, cf = null
-     where (all_headers is not null or cf is not null) and class in ('bot', 'ai') and seen_at < now() - interval '30 days';
+    update public.edge_visits set all_headers = '{}'::jsonb, cf = '{}'::jsonb
+     where (all_headers <> '{}'::jsonb or cf <> '{}'::jsonb) and class in ('bot', 'ai') and seen_at < now() - interval '30 days';
     get diagnostics hdr = row_count;
   end if;
   return jsonb_build_object('dry_run', p_dry_run, 'ip_days', d, 'ips_cut', ips, 'headers_dropped', hdr, 'ran_at', now());
