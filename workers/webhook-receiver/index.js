@@ -9,7 +9,8 @@
  */
 
 import { generateFirstHexagon } from './first-hexagon.js';
-import { saveConversationState, getConversationState, purgeExpiredState } from './state-store.js';
+import { saveConversationState, getConversationState, purgeExpiredState, takeState } from './state-store.js';
+import { messagingEnabled, graphVersion, messengerEvents, decide, messengerMessage, whatsappMessage, notifyHandoff, PAYLOAD } from './meta-chat.js';
 import { createHubSpotContact } from './hubspot-client.js';
 import { sendJson } from './send.js';
 import { recipientFetcher } from '../../shared/recipients/outbound.ts';
@@ -148,25 +149,18 @@ async function handleMessenger(request, env) {
   try {
     const raw = await request.text();
     if (!(await verifyMeta(request, raw, env))) return unauthorized();   // MPC-7350
-    const body      = JSON.parse(raw);
-    const messaging = body.entry?.[0]?.messaging?.[0];
-    if (!messaging) return ok();
+    const body = JSON.parse(raw);
+    const events = messengerEvents(body);   // CK-9837: every real inbound message, not only the first; echoes and receipts skipped
+    if (!events.length) return ok();
+    if (!messagingEnabled(env)) { console.log('messenger_replies_disabled'); return ok(); }   // CK-9837: MESSAGING_ENABLED must be "true"
 
-    const senderId = messaging.sender.id;
-    const text     = messaging.message?.text || '';
-    const state    = await getConversationState(env, `messenger:${senderId}`);
-
-    if (!state || state.stage === 'new') {
-      const hexagon = generateFirstHexagon({ platform: 'messenger', userId: senderId });
-      await saveConversationState(env, `messenger:${senderId}`, {
-        stage: 'awaiting_confirmation', platform: 'messenger',
-        senderId, hexagonSent: true, ts: Date.now(),
-      });
-      await createHubSpotContact(env, { source: 'messenger', userId: senderId });
-      await sendMessenger(env, senderId, hexagon);
-    } else if (state.stage === 'awaiting_confirmation') {
-      const reply = await handleConfirmation(text, state, env, `messenger:${senderId}`);
-      await sendMessenger(env, senderId, reply);
+    for (const { senderId, text, payload } of events) {
+      const key = `messenger:${senderId}`;
+      const { steps, next, handoff } = decide({ text, payload, state: await getConversationState(env, key) });
+      if (next === 'delete') await takeState(env, key); else if (next) await saveConversationState(env, key, next);   // null: nothing is saved before consent
+      if (steps.length) await sendMessengerAction(env, senderId, 'typing_on');   // looks like a person typing, not a data dump
+      for (const step of steps) await sendMessenger(env, senderId, messengerMessage(step, env));
+      if (handoff) await notifyHandoff(env, 'messenger', senderId);
     }
     return ok();
   } catch (err) {
@@ -175,13 +169,20 @@ async function handleMessenger(request, env) {
   }
 }
 
-async function sendMessenger(env, recipientId, text) {
+async function sendMessenger(env, recipientId, message) {
   // Requires META_PAGE_ACCESS_KEY — stub until Meta App is approved
   if (!env.META_PAGE_ACCESS_KEY) return;
+  const msg = typeof message === 'string' ? { text: message } : message;
   // MPC-7350: bearer header, not a query string (URLs end up in logs and proxies).
-  return sendJson('messenger', 'https://graph.facebook.com/v19.0/me/messages', { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, message: { text } },
+  return sendJson('messenger', `https://graph.facebook.com/${graphVersion(env)}/me/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { messaging_type: 'RESPONSE', recipient: { id: recipientId }, message: msg },
     // MPC-9885: the page-scoped user id (username) and the reply text (message_text).
     recipientFetcher('meta-graph', ['message_text', 'username'], workerRecipientContext(env)));
+}
+
+async function sendMessengerAction(env, recipientId, action) {
+  if (!env.META_PAGE_ACCESS_KEY) return;
+  return sendJson('messenger', `https://graph.facebook.com/${graphVersion(env)}/me/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_PAGE_ACCESS_KEY}` }, { recipient: { id: recipientId }, sender_action: action },
+    recipientFetcher('meta-graph', ['username'], workerRecipientContext(env)));
 }
 
 // ─── INSTAGRAM DM ────────────────────────────────────────────────────────────
@@ -207,6 +208,7 @@ async function handleWhatsApp(request, env) {
 
     const from  = msg.from;
     const text  = msg.text?.body || '';
+    const payload = msg.interactive?.button_reply?.id || null;   // CK-9837: a tapped button arrives as an interactive reply
     // Proof of possession for the deep dive: Meta's contact record (name) and the time of the person's own message.
     const profileName = clip(body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0]?.profile?.name, 64);
     const inboundTs   = Number(msg.timestamp) || Math.floor(Date.now() / 1000);
@@ -214,7 +216,7 @@ async function handleWhatsApp(request, env) {
     // MPC-7902: STOP / DELETE revokes every proof of possession for this sender (restrictive only; consent handling proper is MPC-7904).
     // A message carrying a challenge code binds the web session that asked for it. Both run only after verifyMeta above.
     const word = text.trim().toUpperCase();
-    if (word === 'STOP' || word === 'DELETE') {
+    if (word === 'STOP' || word === 'DELETE' || payload === PAYLOAD.del) {
       const { revokePossession } = await import('./pop.ts');
       await revokePossession(env, from);
     } else if (/\bMPT-[A-Z0-9]{4}-[A-Z0-9]{4}\b/i.test(text)) {
@@ -234,21 +236,13 @@ async function handleWhatsApp(request, env) {
       return ok();
     }
 
-    const state = await getConversationState(env, `whatsapp:${from}`);
-
-    if (!state || state.stage === 'new') {
-      const hexagon = generateFirstHexagon({ platform: 'whatsapp', phone: from });
-      await saveConversationState(env, `whatsapp:${from}`, {
-        stage: 'awaiting_confirmation', platform: 'whatsapp',
-        phone: from, hexagonSent: true, ts: Date.now(),
-        profileName, inbound_message_timestamp: inboundTs,
-      });
-      await createHubSpotContact(env, { source: 'whatsapp', phone: from });
-      await sendWhatsApp(env, from, hexagon);
-    } else if (state.stage === 'awaiting_confirmation') {
-      const reply = await handleConfirmation(text, { ...state, profileName: profileName || state.profileName, inbound_message_timestamp: inboundTs }, env, `whatsapp:${from}`);
-      await sendWhatsApp(env, from, reply);
-    }
+    // CK-9837: honest automated reply, STOP deletes the saved conversation, no HubSpot contact before the person has agreed to anything.
+    if (!messagingEnabled(env)) { console.log('whatsapp_replies_disabled'); return ok(); }   // MESSAGING_ENABLED must be "true"
+    const key = `whatsapp:${from}`;
+    const { steps, next, handoff } = decide({ text, payload, state: await getConversationState(env, key) });
+    if (next === 'delete') await takeState(env, key); else if (next) await saveConversationState(env, key, next);   // null: nothing is saved before consent
+    for (const step of steps) await sendWhatsApp(env, from, whatsappMessage(step, env));
+    if (handoff) await notifyHandoff(env, 'whatsapp', from);
     return ok();
   } catch (err) {
     console.error('WhatsApp error:', err);
@@ -256,10 +250,11 @@ async function handleWhatsApp(request, env) {
   }
 }
 
-async function sendWhatsApp(env, to, text) {
+async function sendWhatsApp(env, to, message) {
   // Requires WHATSAPP_PHONE_NUMBER_ID + META_WHATSAPP_KEY
   if (!env.META_WHATSAPP_KEY || !env.WHATSAPP_PHONE_NUMBER_ID) return;
-  return sendJson('whatsapp', `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, type: 'text', text: { body: text } },
+  const body = typeof message === 'string' ? { type: 'text', text: { body: message } } : message;   // CK-9837: plain string or a prebuilt message
+  return sendJson('whatsapp', `https://graph.facebook.com/${graphVersion(env)}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, { 'Content-Type': 'application/json', Authorization: `Bearer ${env.META_WHATSAPP_KEY}` }, { messaging_product: 'whatsapp', to, ...body },
     // MPC-9885: `to` is the recipient's phone number; the body is the reply text.
     recipientFetcher('meta-graph', ['message_text', 'phone'], workerRecipientContext(env)));
 }
