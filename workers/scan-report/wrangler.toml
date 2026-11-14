@@ -113,7 +113,7 @@ ACCOUNTS_ENABLED = "true"
 # because no visitor holds one until the consent block (MPC-9888) ships; MPC-9888 sets this to "true" in the same change, after the report queue has drained.
 # Only the exact string "true" enforces. When it is "true", every post_click call made for a scan is refused (CONSENT_REQUIRED / CONSENT_INVALID) unless the scan's consent is in the store.
 # MPC-9888: scans created before this moment were requested before the consent block existed and are finished on the old rules.
-CONSENT_GATE_SINCE = "2026-11-09T05:00:00Z"
+CONSENT_GATE_SINCE = "2026-11-14T06:30:00Z"
 CONSENT_GATE_ENFORCED = "true"   # MPC-9888: on with the consent block; the report queue was checked for scans without a consent id first
 
 # MPC-9818 (F3): monthly scan allowances per plan, decided by Chris 2026-11-07: Free 1 / Basic 5 / Pro 25 / Executive unlimited (no cap, no fair-use text). POST /api/scan counts the scan
