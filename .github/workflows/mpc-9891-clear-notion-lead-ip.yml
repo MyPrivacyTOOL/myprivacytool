@@ -1,0 +1,54 @@
+name: MPC-9891 clear Notion lead log IP Address
+
+# One-shot (Open Tracker design 4.3, rule 5): empty the "IP Address" property on every row of the Notion lead log, using the repo secret
+# NOTION_TOKEN (the mpt-leads-worker integration, the one that owns the database). Counts only are printed: no row, email or IP is logged.
+# Runs on workflow_dispatch, or on a push to the branch ops/mpc-9891-notion-ip-clear (so a session that cannot dispatch can still start it).
+# Idempotent: a second run finds nothing to clear. The Worker stopped writing the property in MPC-9890.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['ops/mpc-9891-notion-ip-clear']
+
+permissions:
+  contents: read
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      V: '2022-06-28'
+    steps:
+      - name: Clear the IP Address property
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -n "${NOTION_TOKEN:-}" ] || { echo "::error::repo secret NOTION_TOKEN is not set"; exit 1; }
+          api() { curl -sS --fail-with-body -H "Authorization: Bearer $NOTION_TOKEN" -H "Notion-Version: $V" -H 'Content-Type: application/json' "$@"; }
+          dbs=$(api -X POST https://api.notion.com/v1/search -d '{"query":"Leads","filter":{"property":"object","value":"database"},"page_size":50}')
+          echo "databases visible to the integration matching 'Leads' (titles only):"
+          echo "$dbs" | jq -r '.results[] | "- " + ((.title // []) | map(.plain_text) | join(""))'
+          db=$(echo "$dbs" | jq -r '[.results[] | select(((.title // []) | map(.plain_text) | join("")) | test("^(MPT )?Leads?( log| Database)?$"; "i"))][0].id // empty')
+          [ -n "$db" ] || { echo "::error::lead log database not found by title"; exit 1; }
+          schema=$(api "https://api.notion.com/v1/databases/$db")
+          ptype=$(echo "$schema" | jq -r '.properties["IP Address"].type // empty')
+          if [ -z "$ptype" ]; then echo "no IP Address property on the lead log: nothing to clear"; echo "cleared=0 remaining=0"; exit 0; fi
+          echo "IP Address property type: $ptype"
+          case "$ptype" in
+            rich_text|title) empty='{"'$ptype'":[]}'; flt='{"property":"IP Address","'$ptype'":{"is_not_empty":true}}' ;;
+            url|email|phone_number) empty='{"'$ptype'":null}'; flt='{"property":"IP Address","'$ptype'":{"is_not_empty":true}}' ;;
+            *) echo "::error::unsupported property type $ptype"; exit 1 ;;
+          esac
+          cleared=0
+          for pass in 1 2 3 4 5 6 7 8 9 10; do
+            ids=$(api -X POST "https://api.notion.com/v1/databases/$db/query" -d "{\"filter\":$flt,\"page_size\":100}" | jq -r '.results[].id')
+            [ -n "$ids" ] || break
+            for id in $ids; do
+              api -X PATCH "https://api.notion.com/v1/pages/$id" -d "{\"properties\":{\"IP Address\":$empty}}" >/dev/null
+              cleared=$((cleared+1)); sleep 0.4
+            done
+          done
+          remaining=$(api -X POST "https://api.notion.com/v1/databases/$db/query" -d "{\"filter\":$flt,\"page_size\":100}" | jq '.results | length')
+          echo "cleared=$cleared remaining=$remaining"
+          [ "$remaining" = "0" ] || { echo "::error::rows with an IP Address remain"; exit 1; }

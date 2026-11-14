@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyPrivacyTOOL — Check Your Data Exposure</title>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1BWMDBJSPL"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-1BWMDBJSPL');
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1a2744 100%);
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            color: white;
+        }
+        header h1 {
+            font-size: clamp(28px, 6vw, 48px);
+            font-weight: 700;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        header p {
+            font-size: clamp(16px, 3vw, 20px);
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .hexagon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 20px;
+            margin: 40px 0;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .hexagon {
+            width: 120px;
+            height: 140px;
+            margin: 0 auto;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background: rgba(255,255,255,0.08);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 8px;
+            transition: all 0.3s ease;
+        }
+        .hexagon:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.4);
+            transform: translateY(-4px);
+        }
+        .hexagon-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+        .form-section {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 500px;
+            margin: 40px auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .form-section h2 {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+        .form-section p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #0f172a;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .consent-checkbox {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .consent-checkbox input {
+            margin-top: 2px;
+            width: 16px;
+            min-width: 16px;
+            height: 16px;
+        }
+        .consent-checkbox label {
+            margin: 0;
+            font-size: 12px;
+            font-weight: 400;
+            line-height: 1.4;
+        }
+        .cta-buttons {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        button {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #0f172a;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .variant-a .btn-primary::before { content: "Check My Exposure "; }
+        .variant-b .btn-primary::before { content: "Start Free Scan "; }
+        .variant-c .btn-primary::before { content: "See My Score "; }
+        .trust-footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+        @media (max-width: 600px) {
+            .form-section {
+                padding: 24px;
+            }
+            header h1 {
+                font-size: 24px;
+            }
+            .hexagon-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 See Your Data. Reclaim Your Privacy.</h1>
+            <p>MyPrivacyTOOL scans 26+ channels to show exactly where your personal data is exposed — and how to take it back.</p>
+        </header>
+
+        <div class="hexagon-grid">
+            <div class="hexagon"><span class="hexagon-icon">👤</span> Data Brokers</div>
+            <div class="hexagon"><span class="hexagon-icon">💬</span> Social Profiles</div>
+            <div class="hexagon"><span class="hexagon-icon">📧</span> Email Leaks</div>
+            <div class="hexagon"><span class="hexagon-icon">📱</span> Phone Numbers</div>
+            <div class="hexagon"><span class="hexagon-icon">🏢</span> Public Records</div>
+            <div class="hexagon"><span class="hexagon-icon">🔗</span> Forgotten Accounts</div>
+        </div>
+
+        <div class="form-section">
+            <h2>Start Your Free Scan</h2>
+            <p>See your exposure score. Get removal steps. Control your data.</p>
+            
+            <form id="signupForm" name="signupForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="channel">How did you hear about us?</label>
+                    <select id="channel" name="channel" style="width:100%; padding:12px; border:2px solid #e0e0e0; border-radius:8px; font-size:14px;">
+                        <option value="">Select channel...</option>
+                        <option value="discord">Discord</option>
+                        <option value="telegram">Telegram</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="twitter">Twitter/X</option>
+                        <option value="reddit">Reddit</option>
+                        <option value="web">Web Search</option>
+                        <option value="referral">Referral</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="consent-checkbox">
+                    <input type="checkbox" id="consent" name="consent" required>
+                    <label for="consent">I consent to MyPrivacyTOOL scanning my exposure across 26 channels in compliance with GDPR, CCPA, and PDPO. I understand my results are private and secure.</label>
+                </div>
+
+                <div class="cta-buttons variant-a">
+                    <button type="submit" class="btn-primary"></button>
+                    <button type="button" class="btn-secondary" onclick="window.location='/login'">Already have an account?</button>
+                </div>
+            </form>
+
+            <div class="trust-footer">
+                ✓ No credit card required &nbsp; • &nbsp; ✓ Privacy-first &nbsp; • &nbsp; ✓ GDPR & CCPA compliant
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GA4 event tracking
+        function trackEvent(eventName, eventData = {}) {
+            gtag('event', eventName, eventData);
+        }
+
+        // Track page view
+        trackEvent('page_view', {
+            page_title: 'Shared Landing — MyPrivacyTOOL',
+            page_location: window.location.href,
+            channel_source: new URLSearchParams(window.location.search).get('ch') || 'direct'
+        });
+
+        // Track scroll depth
+        let maxScroll = 0;
+        window.addEventListener('scroll', () => {
+            const scrollPercent = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
+            if (scrollPercent > maxScroll) {
+                maxScroll = scrollPercent;
+                if ([25, 50, 75, 100].includes(Math.floor(scrollPercent))) {
+                    trackEvent('scroll_depth', {
+                        scroll_percent: Math.floor(scrollPercent)
+                    });
+                }
+            }
+        });
+
+        // Track CTA clicks
+        document.querySelectorAll('.btn-primary').forEach(btn => {
+            btn.addEventListener('click', () => {
+                trackEvent('cta_click', {
+                    cta_text: btn.textContent,
+                    channel_source: new URLSearchParams(window.location.search).get('ch') || 'direct'
+                });
+            });
+        });
+
+        // Track form submission
+        document.getElementById('signupForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const channel = document.getElementById('channel').value;
+            
+            trackEvent('form_submit', {
+                email_domain: email.split('@')[1],
+                channel_source: channel || 'direct',
+                consent_given: document.getElementById('consent').checked
+            });
+
+            // Submit to backend (placeholder)
+            console.log('Form submitted:', { email, channel });
+            alert('Scan initiated! Check your email for results.');
+        });
+    </script>
+</body>
+</html>

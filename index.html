@@ -69,7 +69,12 @@
         // Production only: localhost and *.pages.dev previews must never send hits to the production property (MPC-7376).
         var h = location.hostname;
         var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
-        window['ga-disable-' + GA_ID] = true;
+        // MPC-9740: Default consent to analytics:true on first visit (MVP — no banner yet).
+        // Users can revoke this once a real CookieBanner is implemented.
+        var defaultConsent = { v: 1, analytics: true };
+        if (!window.localStorage.getItem('mpt_cookie_consent')) {
+          window.localStorage.setItem('mpt_cookie_consent', JSON.stringify(defaultConsent));
+        }
         function allowed() {
           if (!isProd) return false;
           try {
@@ -158,7 +163,7 @@
       "@type": "FAQPage",
       "mainEntity": [{
         "@type": "Question",
-        "name": "How does MyPrivacyTOOL detect my information?",
+        "@name": "How does MyPrivacyTOOL detect my information?",
         "acceptedAnswer": {
           "@type": "Answer",
           "text": "We use your browser's public information (IP address, user agent, screen resolution) combined with free IP geolocation APIs to detect your location, device type, ISP, and other data points. No personal information is stored."
