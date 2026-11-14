@@ -14,6 +14,7 @@ export const KEY_TYPES = [
   ['deep-research-code-', 'deep-research-code', 'SYS-deep-research-code', 'any'],
   ['signin-', 'account-signin', 'SYS-account-signin', 'any'],   // MPC-9817
   ['deletion-', 'deletion-countdown', 'SYS-deletion-countdown', 'web-scan'], ['deleted-', 'deletion-done', 'SYS-deletion-done', 'web-scan'],   // MPC-9890
+  ['biz-invite-', 'business-team-invite', 'SYS-business-team-invite', 'any'],   // MPC-9824
 ];
 export function emailTypeFromKey(key) {
   const k = String(key || '');
