@@ -1,0 +1,7 @@
+name = "mpt-shadow-audit-producer"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[[queues.producers]]
+queue = "mpt-shadow-audit-queue"
+binding = "AUDIT_QUEUE"
