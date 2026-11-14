@@ -1,6 +1,7 @@
 // Security and Privacy Vulnerability Detection
 // Detects critical security issues that could expose user data
 
+import { hasScanConsent } from '@/lib/scanConsent';
 import { parseIceCandidateAddress } from "./fingerprintDetection";
 import { recipientPeerConnection, webRtcAvailable } from '@/lib/recipientClient';
 
@@ -139,10 +140,9 @@ async function detectWebRTCLeak(): Promise<{ localIPs: string[], publicIP: strin
       return result;
     }
 
-    // MPC-9886: routed through the registry so the crawl and the per-scan panel can see it. Behaviour is unchanged: the same Google STUN server is
-    // still used before the visitor presses anything. Moving this inside the consent gate (iceServers: [] until the click) is MPC-9888.
+    // MPC-9888: Google STUN only after the Scan me click (design 2.4). Before it, iceServers is empty: host candidates only, nobody is contacted.
     const pc = await recipientPeerConnection('google-stun', {
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      iceServers: hasScanConsent() ? [{ urls: 'stun:stun.l.google.com:19302' }] : []
     });
 
     const candidates: string[] = [];

@@ -4,6 +4,7 @@
  * Detects various browser fingerprinting methods to help users
  * understand their privacy exposure.
  */
+import { hasScanConsent } from '@/lib/scanConsent';
 import { recipientPeerConnection, webRtcAvailable } from '@/lib/recipientClient';
 
 // Types
@@ -1137,10 +1138,10 @@ export async function detectWebRTCLeak(): Promise<WebRTCLeakResult> {
 
     // Create peer connection with STUN servers
     const config: RTCConfiguration = {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-      ],
+      // MPC-9888: Google STUN only after the Scan me click; before it, no server is named and nobody is contacted.
+      iceServers: hasScanConsent()
+        ? [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]
+        : [],
     };
 
     // MPC-9886: through the registry (crawl-visible). Same two Google STUN servers, same timing; the move inside the consent gate is MPC-9888.

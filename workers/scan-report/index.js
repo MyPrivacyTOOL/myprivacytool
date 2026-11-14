@@ -364,15 +364,19 @@ export async function runReportJob(env, fetchImpl = undefined, limit = 5) {
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
   }
   for (const job of queue) {
+    // MPC-9888: a scan requested BEFORE the consent block existed (created before CONSENT_GATE_SINCE) has no consent id and never could: it is finished on the old rules
+    // instead of being failed for lack of a consent nobody was ever shown. Every scan from the gate's start on needs its own.
+    const legacy = Boolean(env.CONSENT_GATE_SINCE) && !job.consent_id && Date.parse(job.created_at) < Date.parse(env.CONSENT_GATE_SINCE);
+    const jobEnv = legacy ? { ...env, CONSENT_GATE_ENFORCED: 'false' } : env;
     // MPC-9887: with the consent gate on, a scan that has no consent on record cannot have a report built (every post_click call would be refused). Take it out of the queue
     // with the reason on the row instead of letting each attempt fail half way. Written through the plain client: this write is ours, not a call made on the visitor's behalf.
-    if (consentEnforced(env) && !job.consent_id) {
+    if (consentEnforced(jobEnv) && !job.consent_id) {
       await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_last_error: 'consent: no consent on record for this scan' }).catch((e) => console.error(`could not mark scan ${job.id} (no consent):`, String(e)));
       out.failed++;
       continue;
     }
     // MPC-9885: one context per scan; its recipient calls are written to scan_recipient_log in one INSERT in the finally below.
-    const rctx = workerRecipientContext(env, { fetchImpl, scanId: job.id, consentId: job.consent_id });
+    const rctx = workerRecipientContext(jobEnv, { fetchImpl, scanId: job.id, consentId: job.consent_id });
     const sbj = db(env, fetchImpl, rctx);
     try {
       if (!job.confirmation_sent_at) await confirm(env, sbj, job.id, job.email_scanned, fetchImpl, undefined, awaitsConfirm(job), rctx);     // catch up a missed confirmation

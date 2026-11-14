@@ -69,12 +69,8 @@
         // Production only: localhost and *.pages.dev previews must never send hits to the production property (MPC-7376).
         var h = location.hostname;
         var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
-        // MPC-9740: Default consent to analytics:true on first visit (MVP — no banner yet).
-        // Users can revoke this once a real CookieBanner is implemented.
-        var defaultConsent = { v: 1, analytics: true };
-        if (!window.localStorage.getItem('mpt_cookie_consent')) {
-          window.localStorage.setItem('mpt_cookie_consent', JSON.stringify(defaultConsent));
-        }
+        // MPC-9888: no default consent. GA4 loads only after the visitor chose Accept analytics in the banner, or pressed Scan me (which counts as the choice).
+        // (MPC-9740 had written analytics:true on first visit; that put a third party on the page before any click, against Open Tracker rule 2.)
         function allowed() {
           if (!isProd) return false;
           try {

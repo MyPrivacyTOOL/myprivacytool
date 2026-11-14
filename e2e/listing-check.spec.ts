@@ -3,7 +3,7 @@
 //   -> confirmation email is the click-to-confirm -> nothing is sent or read before the click -> the click -> the page is read -> "Listings you showed us" on screen
 //   -> the report email carries the same block.
 // Nothing leaves the machine: the Worker's own outbound calls are answered here, including the listing page (served from e2e/fixtures-data). No real person's listing is fetched.
-import { test, expect } from "./fixtures";
+import { test, expect, consentRow } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import worker, { runReportJob } from "../workers/scan-report/index.js";
@@ -25,7 +25,7 @@ const ENV = {
 };
 
 function backend() {
-  const F = fake();
+  const F = fake(); F.db.scan_consents.push(consentRow());   // MPC-9888: the visitor already pressed the consent button
   const fixtureReads: string[] = [];
   const fetchImpl = async (input: unknown, init: RequestInit = {}) => {
     const url = String(input);

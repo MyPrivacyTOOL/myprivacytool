@@ -12,7 +12,7 @@ const { FOUND, CLEAR, NOT_CHECKED } = CAPTURE_STATUS;
 const PLACEHOLDERS = new Set([
   '', 'location detected', 'unknown', 'unknown isp', 'n/a', 'na', 'null', 'undefined', 'not available',
   'checking...', 'check failed', 'collecting...', 'collecting data...', 'building...',
-  'no input yet', 'no clicks yet', 'no scrolling yet', 'permission required', 'no devices', 'blocked', 'api blocked', 'inactive',
+  'no input yet', 'no clicks yet', 'no scrolling yet', 'permission required', 'no devices', 'blocked', 'api blocked', 'inactive', 'runs when you scan',
 ]);
 
 // Values that are real but only say "nothing seen", which the code cannot tell from a failed check (the registry flags these hexagons

@@ -21,11 +21,17 @@ import {
   type RecipientContext,
   type RecipientRegistry,
 } from "@/config/recipients";
+import { getConsentId, getScanId } from "@/lib/scanConsent";
 import { isLoopbackHost } from "../../shared/recipients/outbound";
 import { recordRecipient } from "@/lib/recipientLog";
 
-/** Interim marker, see the header. MPC-9888 deletes this constant when the real consent id exists. */
-export const INTERIM_CONSENT_ID = "interim-pre-gate:mpc-9886";
+/**
+ * MPC-9888: the interim marker is gone for scan-consent recipients. A recipient whose basis is scan_consent (STUN, the password range check) gets ONLY the
+ * real consent id the server issued at the Scan me click (src/lib/scanConsent.ts); with none, the wrapper refuses it. Recipients whose basis is a user's own
+ * action or the analytics choice (a form submit, the analytics banner) are not covered by the scan consent; they still carry this fixed marker, which is
+ * NOT evidence of consent and which nothing server-side may read as such.
+ */
+export const USER_ACTION_MARKER = "user-action:no-scan-consent";
 
 const pageHost = (): string => (typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "");
 
@@ -45,12 +51,18 @@ function withOwnHost(key: string, host: string, registry: RecipientRegistry): Re
 /** Build-time flags (VITE_*), so a registry entry's `flag` (check 2) reads the same variable the feature itself reads. */
 const buildFlag = (name: string): unknown => (import.meta.env as Record<string, unknown>)[name];
 
-export function browserContext(extra: Partial<RecipientContext> = {}): RecipientContext {
+export function browserContext(extra: Partial<RecipientContext> = {}, key?: string): RecipientContext {
+  const real = getConsentId();
+  // Only the scan's own outside-server checks need the real id. google-stun is the one such recipient the browser calls on its own; pwned-passwords is
+  // a separate, flag-gated feature the visitor starts by typing, so it keeps the marker (its behaviour is unchanged by this task).
+  const consentId = real ?? (key === "google-stun" ? null : USER_ACTION_MARKER);
   // MPC-9893: every browser call also lands in the in-tab record the per-scan "who saw what" panel renders (item names only, memory only).
-  return { consentId: INTERIM_CONSENT_ID, flags: buildFlag, log: recordRecipient, ...extra };
+  return { consentId, ...(real ? { scanId: getScanId() } : {}), flags: buildFlag, log: recordRecipient, ...extra };
 }
 
 export interface RecipientFetchOptions {
+  /** "none" only for the reads/writes of the consent store itself (the call that records the consent cannot require one). */
+  consentGate?: "enforce" | "none";
   /** Tests and dependency-injected callers pass their own fetch. */
   fetchImpl?: typeof fetch;
   /** MPC-9893: do not add this call to the in-tab "who saw what" record. Only the panel's own read of that record uses it, so the panel does not list itself. */
@@ -72,17 +84,17 @@ export function recipientFetch(key: string, url: string, init: RequestInit | und
   return fetchRecipient(
     key,
     { url: abs, init: { credentials: "same-origin", ...init }, sent },
-    browserContext({ ...(own ? { registry: withOwnHost(key, host, RECIPIENTS) } : {}), ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}), ...(opts.silent ? { log: undefined } : {}) }),
+    browserContext({ ...(own ? { registry: withOwnHost(key, host, RECIPIENTS) } : {}), ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}), ...(opts.consentGate ? { consentGate: opts.consentGate } : {}), ...(opts.silent ? { log: undefined } : {}) }, key),
   );
 }
 
 /** A <script> from a registered recipient. Resolves when it has loaded; rejects (never throws synchronously) if the registry refuses or the load fails. */
 export function recipientScript(key: string, src: string, attrs?: Record<string, string>, doc?: Document): Promise<HTMLScriptElement> {
-  return wrappedLoadRecipientScript(key, src, browserContext(), { ...(attrs ? { attrs } : {}), ...(doc ? { document: doc } : {}) });
+  return wrappedLoadRecipientScript(key, src, browserContext({}, key), { ...(attrs ? { attrs } : {}), ...(doc ? { document: doc } : {}) });
 }
 
 /** The STUN path. iceServers may only name stun hosts of `key`; an empty list contacts nobody. */
-export function recipientPeerConnection(key: string, config: RTCConfiguration, ctx: RecipientContext = browserContext()): Promise<RTCPeerConnection> {
+export function recipientPeerConnection(key: string, config: RTCConfiguration, ctx: RecipientContext = browserContext({}, key)): Promise<RTCPeerConnection> {
   return wrappedCreatePeerConnection(key, config, ctx);
 }
 

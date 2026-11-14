@@ -153,4 +153,19 @@ describe('a consented scan, end to end (gate on)', () => {
     expect(G.db.scans[0].report_status).toBe('failed');
     expect(G.db.scans[0].report_last_error).toBe('consent: no consent on record for this scan');
   });
+
+  it('MPC-9888: a scan created before CONSENT_GATE_SINCE is finished on the old rules; one created after it is failed', async () => {
+    const H = fake();
+    const spy = createFetchSpy({ respond: (url, init) => H.f(url, init) });
+    await handleScan({ ...env, CONSENT_GATE_ENFORCED: 'false' }, null, { email: 'legacy.person@example.org', consentSource: 'scan_page', ip: '203.0.113.9', utm: { source: '', medium: '', campaign: '', content: '', referrer: '' } }, spy.fetch);
+    const out = await runReportJob({ ...env, CONSENT_GATE_SINCE: new Date(Date.now() + 3600e3).toISOString() }, spy.fetch, 5);
+    expect(out.failed).toBe(0);
+    expect(out.sent).toBe(1);
+    expect(H.db.scans[0].report_status).toBe('sent');
+    const K = fake();
+    const spy2 = createFetchSpy({ respond: (url, init) => K.f(url, init) });
+    await handleScan({ ...env, CONSENT_GATE_ENFORCED: 'false' }, null, { email: 'new.person@example.org', consentSource: 'scan_page', ip: '203.0.113.9', utm: { source: '', medium: '', campaign: '', content: '', referrer: '' } }, spy2.fetch);
+    const out2 = await runReportJob({ ...env, CONSENT_GATE_SINCE: new Date(Date.now() - 3600e3).toISOString() }, spy2.fetch, 5);
+    expect(out2.failed).toBe(1);
+  });
 });
