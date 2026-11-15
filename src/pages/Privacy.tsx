@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import FeatureStatus from "@/components/FeatureStatus";
+import { PrivacyRecipients, VisitLogSentence } from "@/components/LegalRecipients";
+import { renderConsent } from "../../shared/recipients/consent-text";
+import { CONSENT_CONFIG } from "../../shared/recipients/consent-config";
 import Seo from "@/components/Seo";
 import { HK_POLICY_ANCHOR, HK_POLICY_EN, HK_POLICY_ZH, type HkPolicyCopy } from "@/data/hkSpamCopy";
 import pageMeta from "@/data/pageMeta.json";
@@ -39,6 +41,8 @@ const HkPolicyBlocks = ({ copy, id }: { copy: HkPolicyCopy; id: string }) => (
     </p>
   </div>
 );
+
+const CONSENT_DAYS = CONSENT_CONFIG.n_hours / 24;
 
 const Privacy = () => {
   // The consent line on /HongKongSpam links to #hk-stop-spam (or #hk-stop-spam-zh); the section renders after load, so scroll to it here.
@@ -123,7 +127,8 @@ const Privacy = () => {
                 <li>
                   <strong>Payment Information:</strong> We take no payments and
                   hold no payment details today. When paid plans open, we expect
-                  payments to be handled by Stripe, and we will update this
+                  payments to be handled by a payment processor (named as planned
+                  in section 5), and we will update this
                   policy before we collect any billing address or payment details
                 </li>
                 <li>
@@ -133,7 +138,7 @@ const Privacy = () => {
                 <li>
                   <strong>Newsletter & Waitlist Sign-ups:</strong> Email address
                   and the page or campaign you signed up from, stored in our CRM
-                  (HubSpot)
+                  (the CRM provider is named in section 5)
                 </li>
                 <li>
                   <strong>Scan Summary Submitted with Your Email:</strong> If you
@@ -214,14 +219,15 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
                   <strong>Device Information:</strong> Device type, operating
-                  system, browser type, IP address. To show you your IP address
-                  and approximate location, the scan asks two third-party
-                  services (ipify and ipapi.co) from your browser when the scan
-                  loads, so they receive your IP address<FeatureStatus feature="F8" />
+                  system, browser type, IP address. The scan shows you your own
+                  IP address and approximate location using our own service,
+                  which reads them from your connection and sends them back to
+                  you without storing them. Who receives your IP address, and
+                  when, is listed in section 5
                 </li>
                 <li>
                   <strong>Usage Analytics:</strong> Pages visited, time spent on
-                  pages, clicks, referrer source (via Google Analytics 4)
+                  pages, clicks, referrer source (through the analytics services named in section 5, only after you allow analytics)
                 </li>
                 <li>
                   <strong>Cookies & Similar Technologies:</strong> Session IDs,
@@ -238,44 +244,47 @@ const Privacy = () => {
                 </li>
               </ul>
 
-              {/* TODO(MPC-9789): the recipient list for the visitor's IP address (who receives it: Cloudflare, Google STUN, Turnstile, edge
-                  logging, raw-IP stores, and the ipify/ipapi.co sentences in 2.2 above and in Cookies 2.2) is BLOCKED on Chris's sign-off of the
-                  Data Recipients Map (MPC-9789). Do not edit those recipient sentences until it is signed. MPC-9828 pass 1 left them as they were. */}
               <h3 className="mt-6 text-xl font-semibold text-foreground">
-                2.3 Server Logs of Every Page Request
+                2.3 Visit Log and Bot Record
               </h3>
               <p className="text-muted-foreground">
-                When your browser or any other program asks our website for a
-                page, our servers keep a log entry of that request, as most
-                websites do. We keep it to protect the site, to tell people apart
-                from automated programs, and to understand which programs read
-                our site. We do not use this log to block or challenge anyone. The
-                entry holds: the time, the page address (without anything after a
-                question mark), the request type and our response code, the
-                browser or program name it reported (the user agent), your IP
-                address, the country and network your IP address belongs to, the
-                page you came from (site and page only), and a short list of
-                technical headers that browsers send (such as accepted languages
-                and browser hints). It never holds cookies or login details. Images,
-                fonts and other page files are not logged.
+                <VisitLogSentence />{" "}
+                The log is filed by the country your connection arrives from, so
+                a visitor using a VPN is filed under the VPN&rsquo;s country. For
+                each country we set whether the IP address is kept in full,
+                shortened (the last part removed) or not at all. Today it is kept
+                in full in Hong Kong and in countries we have not set a rule for,
+                shortened in the European Union and the United Kingdom, and in
+                every case removed after 7 days. Country, source, campaign tags
+                and device type stay for 2 years without an IP address. The log
+                holds no cookie, no scan number, no email address and no
+                browser string.
               </p>
               <p className="mt-4 text-muted-foreground">
-                We sort each request into one of four groups using a written list
-                of rules, which we version and improve over time: person, search
-                or other bot, AI crawler or AI agent, or unknown. The rules look at
-                the program name, the kind of network the request comes from, and
-                whether the request has the headers every ordinary browser sends.
-                Any request we cannot place is treated as a person. The sorting
-                is not perfect: a program can pretend to be a browser, and a
-                person who hides their browser details can look like a bot.
+                Separately, we keep a record of automated visitors, because a
+                machine is not a person. When we sort a visit as a bot or an AI
+                crawler or agent, we record the time, the page address (without
+                anything after a question mark), the program name it reported,
+                its IP address, the country and network it belongs to, the page
+                it came from (site and page only) and a short list of technical
+                headers. Its IP address is removed after 7 days, and the headers
+                and detailed network information after 30 days; the program name,
+                the page, the country and the result of the sorting stay, so we
+                can tell which programs read our site. The
+                record never holds cookies or login details, and images, fonts and
+                other page files are not logged. We do not use it to block or
+                challenge anyone.
               </p>
               <p className="mt-4 text-muted-foreground">
-                For bots and AI crawlers we record and keep the full entry,
-                because a machine is not a person. For people, and for requests we
-                could not place, we keep the entry but remove the IP address after
-                30 days; the rest of the entry then stays without it. If you think
-                a visit of yours was wrongly sorted as a bot, contact us and we
-                will delete it.
+                We sort each visit into person, search or other bot, AI crawler or
+                AI agent, or unknown, using a written list of rules that look at
+                the program name, the kind of network, and whether the request
+                has the headers every ordinary browser sends. Anything we cannot
+                place is treated as a person and goes to the visit log, not the
+                bot record. The sorting is not perfect: a program can pretend to
+                be a browser, and a person who hides their browser details can
+                look like a bot. If you think a visit of yours was wrongly sorted
+                as a bot, contact us and we will delete it.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
@@ -496,18 +505,21 @@ const Privacy = () => {
                 5. Data Sharing & Disclosure
               </h2>
               <p className="text-muted-foreground">
-                We do NOT sell your personal data. We may share information with:
+                We do NOT sell your personal data. Who receives your data is
+                listed below, written from the list the site checks every
+                outgoing call against; after it come the other cases in which we
+                share information.
               </p>
+              <PrivacyRecipients />
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                Other sharing
+              </h3>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground">
                 <li>
-                  <strong>Service Providers:</strong> Hosting and edge infrastructure (Cloudflare), databases (Supabase,
-                  Google Cloud), CRM and email (HubSpot), messaging platforms
-                  (Telegram), transactional email (Resend), internal task and
-                  notification tools (Notion, Slack), and analytics (Google Analytics 4, and Cloudflare
-                  Web Analytics, which counts page loads without cookies). When
-                  paid plans open, we expect to add a payment processor (planned:
-                  Stripe) and will name it here and in our DPA before it receives
-                  any data
+                  <strong>Email Breach Checks:</strong> We do not currently check
+                  whether your email address appears in data breaches. If we
+                  start, we will add the company to the list above and say what we
+                  send to it.
                 </li>
                 <li>
                   <strong>AI Model Providers:</strong> When you send us a message
@@ -531,33 +543,6 @@ const Privacy = () => {
                   Alice's spoken guidance do not send anything to an AI provider.
                 </li>
                 <li>
-                  <strong>Email Checks for Your Report:</strong> To prepare your
-                  report we send only the part of your email address after the @
-                  to Cloudflare and to the public domain-registration service
-                  (rdap.org and the registry it points to). We send a scrambled
-                  code made from your address (a SHA-256 hash), not the address
-                  itself, to Gravatar and to Libravatar, to see whether a public
-                  profile picture exists. We do not currently check whether
-                  your email address appears in data breaches. If we start, we will name the company here and say
-                  what we send to it. We also search public code changes
-                  (commits) on GitHub: your whole email address, not a scrambled
-                  code, goes to GitHub, in a search for public code changes that
-                  name it as the author, so we can tell you if your address is
-                  published in public code
-                </li>
-                <li>
-                  <strong>Password Check (only if you use it):</strong> The
-                  optional password check runs in your browser. It turns the
-                  password you type into a scrambled code (a SHA-1 hash) on your
-                  device and sends only the first 5 characters of that code to
-                  Have I Been Pwned (haveibeenpwned.com) to see whether the
-                  password appears in known data breaches. The password and the
-                  full code never leave your device, and we do not receive, store
-                  or log them. Because your browser contacts Have I Been Pwned
-                  directly, it can see your IP address and browser details, as
-                  any website you visit can.
-                </li>
-                <li>
                   <strong>Legal Authorities:</strong> When required by law or to
                   protect rights and safety
                 </li>
@@ -570,6 +555,44 @@ const Privacy = () => {
                 All service providers are bound by confidentiality agreements and
                 data processing addendums (DPA).
               </p>
+            </section>
+
+            <section className="mb-8" id="scan-consent">
+              <h2 className="text-2xl font-bold text-foreground">
+                5A. What You Agree To When You Press Scan me
+              </h2>
+              <p className="text-muted-foreground">
+                MyPrivacyTOOL does what trackers do, with your permission, in the
+                open, then shows you what it reveals and how to stop it. This is
+                the exact text above the Scan me button (wording version{" "}
+                {CONSENT_CONFIG.consent_version}). Pressing the button is the
+                agreement; there is no toggle and no second click:
+              </p>
+              <blockquote className="mt-4 border-l-4 border-surface-border pl-4 text-muted-foreground" data-testid="consent-text-a">
+                {renderConsent("en").plain}
+              </blockquote>
+              <p className="mt-4 text-muted-foreground">
+                We record that you agreed, with the version and a fingerprint of
+                the exact words you saw, against your scan number. The record
+                holds no IP address and no email address.
+              </p>
+              <ul className="mt-4 list-inside list-disc space-y-2 text-muted-foreground">
+                <li>
+                  Before you press Scan me, no outside service receives anything
+                  about you from the scan, except the services our own pages need
+                  to be delivered, which are listed above as run before you
+                  press.
+                </li>
+                <li>
+                  The bot check on the scan loads when you press Scan me, and the
+                  check of your public network address through your browser
+                  (WebRTC) runs inside the scan, not when the page loads.
+                </li>
+                <li>
+                  Our pages serve their fonts from our own site, not from an
+                  outside font service.
+                </li>
+              </ul>
             </section>
 
             <section className="mb-8">
@@ -603,15 +626,17 @@ const Privacy = () => {
                 <li>
                   <strong>Report Delivery Record:</strong> The delivery record
                   for a scan (the email address you gave and the status of your
-                  report) is kept 30 days, then deleted; from the Open Tracker
-                  release this becomes 7 days unless you keep your scan
+                  report) is kept 7 days after your report is delivered, then
+                  deleted, unless you keep your scan
                 </li>
                 <li>
                   <strong>Server Request Logs:</strong> The log of page requests
-                  (see section 2.3) keeps full entries for bots and AI crawlers.
-                  For people and requests we could not place, the IP address is
-                  removed after 30 days. To ask for earlier deletion of a visit,
-                  contact us with the approximate time and your IP address
+                  is split in two (see section 2.3). The visit log keeps the
+                  IP address for up to 7 days, and country, source, campaign tags
+                  and device type for 2 years without it. The bot and AI record
+                  keeps the IP address for 7 days and the headers for 30 days.
+                  To ask for earlier deletion of a visit, contact us with the
+                  approximate time and your IP address
                 </li>
                 <li>
                   <strong>Messaging Conversation State:</strong> Retained for 7
@@ -650,6 +675,39 @@ const Privacy = () => {
                 You may request deletion of your data at any time, subject to
                 legal retention requirements.
               </p>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
+                6A. Retention by Relationship
+              </h3>
+              <p className="text-muted-foreground">
+                Whatever personal data we hold about you without a relationship,
+                your scan or your IP address from a visit, is gone within{" "}
+                {CONSENT_DAYS} days. What we keep depends on what you choose:
+              </p>
+              <ul className="mt-4 list-inside list-disc space-y-2 text-muted-foreground" data-testid="retention-by-relationship">
+                <li>
+                  <strong>You ran a free scan and did not sign up:</strong> your
+                  personal record (the scan, the email address you gave, the
+                  delivery record and the list of who saw what during your scan)
+                  is deleted {CONSENT_DAYS} days after your report is delivered.
+                  You can delete it sooner, free, with your scan number. We
+                  email you 24 hours and 4 hours before, each time with a
+                  one-click link to keep your scan or sign up and the exact
+                  deletion time, and once more when it is done. After that we
+                  cannot tell whose it was. We keep only counts that contain no
+                  personal data, such as how many scans finished.
+                </li>
+                <li>
+                  <strong>You kept your scan or signed up:</strong> we keep it
+                  until you delete it. We do not store your IP address in it.
+                </li>
+                <li>
+                  <strong>You are a paying customer:</strong> paid plans are not
+                  open today. When they open, records for a paying customer are
+                  kept for as long as the plan runs, with the periods in this
+                  section.
+                </li>
+              </ul>
             </section>
 
             <section className="mb-8">
@@ -821,8 +879,8 @@ const Privacy = () => {
                   functionality
                 </li>
                 <li>
-                  <strong>Analytics Cookies:</strong> Track usage patterns (Google
-                  Analytics 4). Analytics events are only sent after you allow
+                  <strong>Analytics Cookies:</strong> Track usage patterns (through the
+                  analytics services named in section 5). Analytics events are only sent after you allow
                   analytics in our consent manager
                 </li>
                 <li>

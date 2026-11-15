@@ -14,11 +14,11 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Does the scan send my results to your servers?",
-    a: "The detection runs in your browser and the results are shown to you there. The scan code does not send them to a server we operate, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. Separately, where your cookie choices allow analytics, the site reports a summary of the scan to Google Analytics 4: device type, operating system, browser, approximate city and country, ISP, screen resolution, timezone and which hexagons you confirm. We also receive information you submit yourself, for example your email address to get a fix guide or join the newsletter.",
+    a: "The detection runs in your browser and the results are shown to you there. The scan code does not send them to a server we operate, unless you choose to save your scan with your email, in which case we keep it for 12 months, then delete it automatically. Separately, where your cookie choices allow analytics, the site reports a summary of the scan to our analytics service: device type, operating system, browser, approximate city and country, ISP, screen resolution, timezone and which hexagons you confirm. We also receive information you submit yourself, for example your email address to get a fix guide or join the newsletter.",
   },
   {
     q: "Does the scan contact any third parties?",
-    a: "Not to look up your IP address or location. We do that ourselves, using the approximate location data that our hosting provider, Cloudflare, attaches to every request, so no separate lookup service sees your IP address. Cloudflare necessarily sees your IP address, as it does for any visit to the site. Analytics and sign-up forms are covered in the questions below.",
+    a: "Not to look up your IP address or location. Our own service does that from the location data our hosting provider attaches to every request, and the hosting provider necessarily sees your IP address, as for any visit. When you press Scan me, the outside services you agree to by pressing it can see what they need, such as the bot check and a public network-address check. Each one is listed, with what it sees, on the What we see page.",
   },
   {
     q: "What do you receive if I enter my email address?",
@@ -26,7 +26,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Do you use cookies or analytics?",
-    a: "Yes. The site uses a cookie consent banner, Google Analytics 4 and HubSpot. You can change your choices at any time with 'Manage cookies' in the footer. The Cookie Policy lists the cookies and what they do.",
+    a: "Yes. The site uses a cookie consent banner, analytics and CRM services. You can change your choices at any time with 'Manage cookies' in the footer. The Cookie Policy lists the cookies and what they do.",
   },
   {
     q: "Is the scan free?",
@@ -96,7 +96,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Do you sell or share my data?",
-    a: "We do not sell your personal data. We share it only with the providers that run the product, such as hosting (Cloudflare), databases (Supabase), email (Resend, HubSpot) and analytics, as listed in the Privacy Policy. One check also sends your full email address to GitHub, to search public code changes. If you use help or messaging, message text may go to an AI provider after we remove email addresses and phone numbers.",
+    a: "We do not sell your personal data. We share it only with the outside services listed, with what each one sees, why and for how long, on the What we see page and in section 5 of the Privacy Policy. One check sends your full email address to GitHub, to search public code changes. If you use help or messaging, message text may go to an AI provider after we remove email addresses and phone numbers.",
   },
   {
     q: "What is the JSON file?",
@@ -108,22 +108,22 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "Is MyPrivacyTOOL tracking me?",
-    a: "The scan runs in your browser and does not save anything unless you ask for your report. We use Google Analytics 4 and HubSpot only if you accept them in the cookie banner. We do not recognise your device in the background, and we count visits without personal data otherwise.",
+    a: "In the open, yes: we do what trackers do, with your permission, then show you what it reveals and how to stop it. The scan runs only when you press Scan me, and analytics only if you accept them in the cookie banner. When you arrive we log your IP address for up to 7 days, apart from your scan and account. Every outside service is listed on the What we see page.",
   },
   {
-    q: "What does \"mirror, not tracker\" mean?",
-    a: "A tracker watches you without telling you. A mirror shows you what trackers can already see. Anything we compare or recognise happens in the open, only with your consent, and is shown to you with how it was done.",
+    q: "What does \"Open Tracker\" mean?",
+    a: "We do what trackers do, with your permission, in the open, then show you what it reveals and how to stop it. Every outside service that can receive your data is listed on the What we see page, and the site checks every outgoing call against that list.",
   },
   {
     q: "What do you record about bots and AI crawlers?",
-    a: "When anyone loads a page we keep a log entry: time, page, the program name the visitor reported, IP address, country and network, and a few technical headers. We sort visits into person, other bot, AI crawler or unknown. For bots and AI crawlers we keep the full entry. If you were wrongly sorted as a bot, contact us and we will delete it.",
+    a: "When anyone loads a page we keep a log entry. For people it holds the page that sent you, campaign tags, country, device type and your IP address for up to 7 days. For bots and AI crawlers we keep the time, page, program name, IP address, country and a few technical headers; the IP address goes after 7 days, the headers after 30. If you were wrongly sorted as a bot, contact us and we will delete it.",
   },
   {
     q: "How long do you keep the record of my report?",
-    a: "The delivery record for a scan is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan.",
+    a: "The delivery record for a scan is kept 7 days after your report is delivered, then deleted, unless you keep your scan. We email you 24 hours and 4 hours before, with a one-click link to keep it.",
   },
   {
     q: "What happens to my IP address?",
-    a: "For ordinary visits, the IP address is removed from the log after 30 days; the rest of the entry stays without it. If you save a scan, the IP address is part of the saved result for 12 months. It is never written into your report email body.",
+    a: "For ordinary visits, the IP address is kept for up to 7 days (in full in some countries, shortened or not at all in others), then removed; the country, source and device type stay without it. If you save a scan, the IP address is part of the saved result for 12 months. It is never written into your report email body.",
   },
 ];

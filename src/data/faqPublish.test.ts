@@ -1,4 +1,5 @@
 // MPC-7561 (FAQ part): the approved FAQ is published, within its word limit, and the report email's FAQ link lands on a real, indexed page.
+import { legalBlocks } from "@/lib/legalBlocks";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -20,7 +21,7 @@ describe("approved FAQ (MPC-7560 approved 2026-10-28)", () => {
     "What is the JSON file?",
     "Why did I get this email, and how do I stop them?",
     "Is MyPrivacyTOOL tracking me?",
-    'What does "mirror, not tracker" mean?',
+    'What does "Open Tracker" mean?',
     "What do you record about bots and AI crawlers?",
     "What happens to my IP address?",
   ];
@@ -36,7 +37,9 @@ describe("approved FAQ (MPC-7560 approved 2026-10-28)", () => {
   it("matches the Privacy Policy on the two email-address facts (breaches not currently checked; full address goes to GitHub)", () => {
     const privacy = readFileSync(resolve(root, "src/pages/Privacy.tsx"), "utf8").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
     expect(privacy).toContain("We do not currently check whether your email address appears in data breaches");
-    expect(privacy).toContain("your whole email address, not a scrambled code, goes to GitHub");
+    // MPC-9894: the GitHub sentence is generated from the registry; the whole address (not a hash) is its data item.
+    const gh = (legalBlocks().privacy.groups.flatMap((g) => g.items).find((i) => i.key === "github-commit-search"))!;
+    expect(gh.text).toContain("receives your email address");
     const checks = FAQS.find((f) => f.q === "What do you check about my email address?")!.a;
     expect(checks).toContain("do not currently check");
     expect(checks).toContain("GitHub");

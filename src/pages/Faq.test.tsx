@@ -45,9 +45,9 @@ describe("Thank-you page trust line", () => {
 
 // CK-9848: the FAQ states the retention of the scan delivery record.
 describe("FAQ: report delivery record retention (CK-9848)", () => {
-  it("states 30 days now and 7 days from the Open Tracker release", () => {
+  it("states 7 days after delivery unless you keep your scan (MPC-9894)", () => {
     renderPage(<Faq />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("The delivery record for a scan is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan.");
+    expect(text).toContain("The delivery record for a scan is kept 7 days after your report is delivered, then deleted, unless you keep your scan.");
   });
 });

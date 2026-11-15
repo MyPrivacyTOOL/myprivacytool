@@ -1,4 +1,5 @@
 // MPC-7470 (D12): the saved-scan wording of record. Changing it needs Chris's written approval.
+import { legalBlocks } from "@/lib/legalBlocks";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderPage } from "@/test/render";
@@ -30,29 +31,39 @@ describe("Privacy: saved scan", () => {
     expect(text).not.toMatch(/accepted the consent banner, we also save/i);
   });
 
-  it("keeps the email-check disclosure (Cloudflare: only the part after the @; Gravatar and Libravatar: a scrambled code, a SHA-256 hash, not the address)", () => {
+  // MPC-9894: the recipient sentences are generated from the registry (shared/recipients/recipients.json); these tests pin what each one must say.
+  const sentence = (key: string) => legalBlocks().privacy.groups.flatMap((g) => g.items).find((i) => i.key === key)!.text;
+
+  it("keeps the email-check disclosure (the domain only to the DNS and registration lookups; a scrambled fingerprint, not the address, to the avatar services)", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("we send only the part of your email address after the @ to Cloudflare");
-    expect(text).toContain("a scrambled code made from your address (a SHA-256 hash), not the address itself, to Gravatar and to Libravatar");
+    expect(text).toContain(sentence("cloudflare-doh"));
+    expect(sentence("cloudflare-doh")).toContain("the domain of your email address");
+    expect(sentence("rdap")).toContain("the domain of your email address");
+    expect(text).toContain(sentence("gravatar"));
+    expect(sentence("gravatar")).toContain("a scrambled fingerprint of your email address");
+    expect(sentence("gravatar")).not.toMatch(/receives your email address/);
   });
 
   // MPC-8452: the GitHub commit search sends the WHOLE address, and no breach check runs today. Both must stay stated plainly (wording check 2026-10-27).
   it("says the whole address goes to GitHub, and that no breach check runs", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("your whole email address, not a scrambled code, goes to GitHub");
+    expect(text).toContain(sentence("github-commit-search"));
+    expect(sentence("github-commit-search")).toMatch(/receives your email address/);
     expect(text).toContain("We do not currently check whether your email address appears in data breaches");
   });
 
-  // MPC-9776: the optional password check sends 5 hash characters to Have I Been Pwned from the visitor's browser; that must be named here (wording approved 2026-11-07).
+  // MPC-9776: the optional password check sends 5 hash characters to Have I Been Pwned from the visitor's browser; that must be named here.
   it("names Have I Been Pwned for the password check and says what is sent", () => {
     renderPage(<Privacy />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain("Password Check (only if you use it):");
-    expect(text).toContain("sends only the first 5 characters of that code to Have I Been Pwned (haveibeenpwned.com)");
-    expect(text).toContain("The password and the full code never leave your device, and we do not receive, store or log them");
-    expect(text).toContain("it can see your IP address and browser details");
+    const s = sentence("pwned-passwords");
+    expect(text).toContain(s);
+    expect(s).toContain("Have I Been Pwned");
+    expect(s).toContain("only the first 5 characters of a SHA-1 hash leave the page");
+    expect(s).toContain("never the password");
+    expect(s).toMatch(/your IP address/);
   });
 });
 
@@ -191,9 +202,10 @@ describe("Privacy: answers about a hexagon (2.4A)", () => {
 
 // CK-9848: the retention period of the scans (report delivery) record is stated, and the sentence is pinned.
 describe("Privacy: report delivery record retention (CK-9848)", () => {
-  it("states 30 days now and 7 days from the Open Tracker release", () => {
+  it("states 7 days after delivery unless you keep your scan (MPC-9894)", () => {
     renderPage(<Privacy />);
     const text = (document.body.textContent ?? "").replace(/\s+/g, " ");
-    expect(text).toContain("is kept 30 days, then deleted; from the Open Tracker release this becomes 7 days unless you keep your scan");
+    expect(text).toContain("is kept 7 days after your report is delivered, then deleted, unless you keep your scan");
+    expect(text).not.toMatch(/kept 30 days|after 30 days; the rest/);
   });
 });

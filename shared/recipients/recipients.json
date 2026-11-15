@@ -720,7 +720,7 @@
       "data_items": [
         "email"
       ],
-      "purpose": "B2B email enrichment (key optional).",
+      "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
       "party": "third",
       "retention": {
         "days": null,
@@ -844,7 +844,7 @@
     },
     {
       "key": "dashscope",
-      "name": "Alibaba DashScope (Qwen)",
+      "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
       "hosts": [
         "dashscope-intl.aliyuncs.com"
       ],
@@ -853,7 +853,7 @@
       "data_items": [
         "message_text"
       ],
-      "purpose": "Intent classifier for chat messages (emails and phones masked first).",
+      "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
       "party": "third",
       "retention": {
         "days": null,
@@ -1016,7 +1016,10 @@
       "country_overrides": {},
       "dpa_listed": false,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "disclosure": {
+        "en": "The public page whose address you paste for the listing check gets an ordinary page request from our Worker, which it sees as coming from us, not from you. Why: to see whether the page lists you. Kept: provider-side."
+      }
     },
     {
       "key": "stripe",
@@ -1030,7 +1033,7 @@
       "data_items": [
         "plan_name"
       ],
-      "purpose": "Starts a paid-plan Checkout session (gated by CHECKOUT_ENABLED; answers 503 and sends nothing until it is set).",
+      "purpose": "Hands you to a Checkout session to pay for a plan; switched off until paid plans open, and nothing is sent while it is off.",
       "party": "processor",
       "retention": {
         "days": null,
@@ -1048,14 +1051,16 @@
     },
     {
       "key": "pwned-passwords",
-      "name": "Pwned Passwords",
+      "name": "Have I Been Pwned (password check)",
       "hosts": [
         "api.pwnedpasswords.com"
       ],
       "host_kind": "fixed",
       "surface": "browser",
       "data_items": [
-        "password_hash_prefix"
+        "password_hash_prefix",
+        "ip",
+        "user_agent"
       ],
       "purpose": "Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password.",
       "party": "third",
@@ -1086,7 +1091,7 @@
         "username",
         "phone"
       ],
-      "purpose": "Delivers WhatsApp replies (live) and Messenger replies (the Messenger adapter is still a stub that sends nothing until META_PAGE_ACCESS_KEY is set).",
+      "purpose": "Delivers WhatsApp replies; the Messenger channel is not switched on and sends nothing.",
       "party": "platform",
       "retention": {
         "days": null,
@@ -1340,7 +1345,7 @@
       "party": "processor",
       "retention": {
         "days": null,
-        "text": "Provider-side (not verified in MPC-9885; MPC-9894 confirms before the DPA copy)"
+        "text": "Provider-side"
       },
       "consent_basis": "service",
       "phase": "post_click",
@@ -1440,7 +1445,7 @@
       "data_items": [
         "username"
       ],
-      "purpose": "Reads our own YouTube channel statistics for the metrics collector (no visitor data), and, when YOUTUBE_EXTRAS is on, the public channel of an allow-listed commenter (their channel id).",
+      "purpose": "Reads our own YouTube channel statistics for the metrics collector (no visitor data), and, when that extra is switched on, the public channel of an allow-listed commenter (their channel id).",
       "party": "third",
       "retention": {
         "days": null,

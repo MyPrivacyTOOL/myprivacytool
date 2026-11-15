@@ -2,7 +2,7 @@
 //   fail  schema invalid (validateRegistry: unique keys, vocabulary, pre_click only first-party or a named exception, disabled needs a flag or reason)
 //   fail  registry hash does not reproduce: the Supabase seed is generated from the file, so the rows must all carry the file's hash and parse back to it
 //   fail  an allowlist entry is older than 14 days (the list must shrink; see allowlist.mjs)
-//   warn  DPA.tsx does not list a dpa_listed entry (warning until the copy task MPC-9894 lands)
+//   FAIL  a dpa_listed entry is missing from the generated DPA list (MPC-9894: the DPA is generated from the registry)
 //   warn  an enabled entry has no call site the scan can find (a host literal or a wrapper call with its key)
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -58,9 +58,13 @@ export async function runHygiene({ registry, allowlist, today, root, seenHosts, 
     const age = entryAgeDays(e, today);
     if (age > MAX_AGE_DAYS) failures.push(`allowlist entry older than ${MAX_AGE_DAYS} days (${age}d, added ${e.added}): ${e.rule} ${e.file} ${e.detail} (${e.note})`);
   }
-  let dpaText = "";
-  try { dpaText = readFileSync(join(root, "src", "pages", "DPA.tsx"), "utf8"); } catch { failures.push("src/pages/DPA.tsx is missing"); }
-  for (const k of dpaCheck(registry, dpaText)) warnings.push(`DPA.tsx does not list dpa_listed recipient "${k}" (warning until MPC-9894)`);
+  // MPC-9894: the DPA sub-processor list is generated (scripts/render-privacy-from-registry.mjs), so a dpa_listed entry missing from it is a stale file, not a copy gap.
+  try {
+    const listed = new Set(JSON.parse(readFileSync(join(root, "src", "data", "legalBlocks.generated.json"), "utf8")).blocks.en.dpa.sub_processors.map((x) => x.key));
+    for (const r of registry.recipients) {
+      if (r.dpa_listed && r.party !== "first" && r.enabled && !r.until && !r.planned && !listed.has(r.key)) failures.push(`legal blocks: dpa_listed recipient "${r.key}" is not in src/data/legalBlocks.generated.json: run node scripts/render-privacy-from-registry.mjs`);
+    }
+  } catch { failures.push("src/data/legalBlocks.generated.json is missing: run node scripts/render-privacy-from-registry.mjs"); }
   for (const k of callSiteCheck(registry, seenHosts, seenKeys)) warnings.push(`enabled recipient "${k}" has no call site the static scan can find (host literal or wrapper call)`);
   return { failures, warnings, seed };
 }
