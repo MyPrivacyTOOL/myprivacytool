@@ -479,6 +479,12 @@ export const trackNewsletterSignup = (params?: Record<string, string>) => {
   attributedEvent('generate_lead', { method: 'newsletter', ...params });
 };
 
+// MPC-10616: /blog newsletter form. Fire only after the Worker confirmed the HubSpot write. Fixed params, NO email. Checks the visitor's analytics
+// choice itself (window.gtag exists before consent and only queues), like the password-check events above.
+export const trackBlogLeadCapture = (path: string) => {
+  if (hasConsent()) attributedEvent('blog_lead_capture', { form: 'blog_newsletter', page_path: path });
+};
+
 // ---------------------------------------------------------------------------
 // Business audit request (MPC-6977 follow-up B). Fire only after a confirmed
 // successful HubSpot submit.

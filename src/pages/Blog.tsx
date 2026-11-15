@@ -7,6 +7,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { trackBlogCtaClick, trackBlogListView, trackBlogPostClick } from "@/lib/analytics";
 import { blogCtaHref } from "@/lib/blogTracking";
+import BlogNewsletterForm from "@/components/BlogNewsletterForm";
 
 const categoryColors: { [key: string]: string } = {
   "Privacy Awareness": "bg-secondary text-foreground",
@@ -138,9 +139,7 @@ export default function Blog() {
         <div className="mt-8 bg-brand-soft border border-surface-border rounded-lg p-8 text-foreground text-center">
           <h2 className="text-2xl font-bold mb-2">Privacy Check</h2>
           <p className="mb-4 text-muted-foreground">Subscribe to Privacy Check, our newsletter, for privacy insights and practical steps you can act on</p>
-          <Button asChild size="lg">
-            <Link to="/newsletter">Subscribe Now</Link>
-          </Button>
+          <BlogNewsletterForm path="/blog" />
         </div>
       </div>
     </div>
