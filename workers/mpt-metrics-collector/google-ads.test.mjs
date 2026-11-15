@@ -36,7 +36,7 @@ calls = []; await listConversionActions({ ...env, GOOGLE_ADS_API_VERSION: 'v99',
 check(calls[1].url === 'https://googleads.googleapis.com/v99/customers/6271312111/googleAds:searchStream', 'version and customer id overrides apply (dashes stripped)');
 
 apiStatus = 400;
-try { await listConversionActions(env); check(false, 'API error should throw'); } catch (e) { check(e.message === 'google ads searchStream v24: HTTP 400' && !e.message.includes('rtok'), 'API error is status only, body not echoed'); }
+try { await listConversionActions(env); check(false, 'API error should throw'); } catch (e) { check(e.message === 'google ads searchStream v26: HTTP 400' && !e.message.includes('rtok'), 'API error is status only, body not echoed'); }
 apiStatus = 200; tokenStatus = 401;
 try { await accessToken(env); check(false, 'token error should throw'); } catch (e) { check(e.message === 'google ads oauth token: HTTP 401', 'token error is status only'); }
 
