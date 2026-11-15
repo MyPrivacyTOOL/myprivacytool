@@ -1,24 +1,10 @@
 import { Link } from "react-router-dom";
 import Seo from "@/components/Seo";
+import { DpaSubProcessors, TranslationNote } from "@/components/LegalRecipients";
 
 // MPC-6545: plain-language summary of how MyPrivacyTOOL processes personal data as a processor.
-// Sub-processors below are the services the repo actually calls (workers/, src/lib/, index.html).
-// Keep this list and Privacy.tsx section 5 in sync, and add a provider here BEFORE wiring it in.
-const SUB_PROCESSORS = [
-  { name: "Cloudflare", purpose: "Site hosting (Pages), edge Workers that receive forms and run the scan report" },
-  { name: "Supabase", purpose: "Database for lead, scan-summary and engagement records" },
-  { name: "HubSpot", purpose: "CRM for newsletter, waitlist and business enquiries; marketing email" },
-  { name: "Resend", purpose: "Transactional email (for example the scan summary you request)" },
-  { name: "Notion", purpose: "Internal task and lead log used by our team" },
-  { name: "Slack", purpose: "Internal notifications when a new lead or enquiry arrives" },
-  { name: "Telegram", purpose: "Messaging channel, only if you choose to talk to us there" },
-  { name: "Google (Analytics 4, Cloud APIs)", purpose: "Usage analytics (after consent) and Google-hosted services we use" },
-  {
-    name: "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
-    purpose:
-      "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data",
-  },
-];
+// MPC-9894: the sub-processor list is generated from shared/recipients/recipients.json (entries with dpa_listed) by scripts/render-privacy-from-registry.mjs;
+// nothing is typed here. To add or remove a sub-processor, change the registry BEFORE wiring the provider in.
 
 const DPA = () => {
   return (
@@ -117,6 +103,7 @@ const DPA = () => {
                 before adding a new one that touches customer personal data, and
                 business customers on a signed DPA can object to a change.
               </p>
+              <TranslationNote />
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-left text-sm text-muted-foreground">
                   <thead>
@@ -126,18 +113,13 @@ const DPA = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {SUB_PROCESSORS.map((sp) => (
-                      <tr key={sp.name} className="border-b border-border/60 align-top">
-                        <td className="py-2 pr-4 font-medium text-foreground">{sp.name}</td>
-                        <td className="py-2">{sp.purpose}</td>
-                      </tr>
-                    ))}
+                    <DpaSubProcessors />
                   </tbody>
                 </table>
               </div>
               <p className="mt-4 text-muted-foreground">
-                We will add a payment provider (planned: Stripe) here before paid
-                plans go live.
+                A provider switched off today (not yet open) is still listed above
+                with that status, so it is named here before it receives any data.
               </p>
             </section>
 

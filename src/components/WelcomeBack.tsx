@@ -4,7 +4,7 @@ import { deleteRecognisedRecord, recogniseReturningDevice, recognitionEnabled, t
 import { forgetScanNumber } from "@/lib/webScan";
 import { trackEvent } from "@/lib/analytics";
 
-// MPC-7494 (F5, the open mirror): "MyPrivacyTOOL is not a tracker, it is a mirror. It shows you what the tracker sees."
+// MPC-7494 (F5, the open mirror): Open Tracker: "We do what trackers do, with your permission, in the open, then show you what it reveals and how to stop it."
 // Shown after a returning visitor's scan finishes, only when saving and recognition are both on and this browser holds an earlier scan
 // number. Nothing is shown when there is no match (no error, no flash). The match is never stored or sent anywhere else; analytics events
 // are count-only (no scan number, signals or values) and, like every event here, reach GA4 only after the visitor accepted analytics.

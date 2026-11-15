@@ -58,9 +58,9 @@ describe("legal pages: Stripe and billing are never present tense before F3 is l
     expect(t).toMatch(/planned and not yet active/);
   });
 
-  it.each(["/terms", "/cookies"] as const)("%s carries no FeatureStatus marker except on the blocked IP sentence", (p) => {
-    renderPage(p === "/terms" ? <Terms /> : <Cookies />);
+  it.each(["/terms", "/cookies", "/privacy", "/dpa"] as const)("%s carries no FeatureStatus marker (MPC-9894: legal text is true today, no markers)", (p) => {
+    renderPage(p === "/terms" ? <Terms /> : p === "/cookies" ? <Cookies /> : p === "/privacy" ? <Privacy /> : <DPA />);
     const marks = [...document.querySelectorAll("[data-feature-status]")].map((e) => e.getAttribute("data-feature"));
-    expect(marks.filter((m) => m !== "F8")).toEqual([]);
+    expect(marks).toEqual([]);
   });
 });

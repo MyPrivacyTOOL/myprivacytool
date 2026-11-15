@@ -12,7 +12,7 @@ Claims this makes true when built: ledger C04, C05, C42 (and C24a for the broker
 2. **Full report from Basic.** Free users see free-source results in full; Basic and up see licensed results in full. There is no redacted or headline-only rendering. A source that did not run for the plan is `not_checked`, with a reason.
 3. **Three states, always.** Every broker in the registry gets exactly one of `listed`, `not_listed`, `not_checked`. `not_checked` is a normal result, never an error, and always says why.
 4. **Always honest, sometimes guessing, never lying.** Every result carries a `source` and, if it claims anything, a `confidence`. A fuzzy match is labelled a guess in the user's words.
-5. **Mirror, not tracker.** Only identifiers the submitter typed about themselves are used (section 5). Nothing is looked up in the background, and nothing for anyone else.
+5. **Open Tracker.** Only identifiers the submitter typed about themselves are used (section 5). Nothing is looked up in the background, and nothing for anyone else.
 6. **Cost cap per scan, not per account.** The licensed source stops when the scan's cap is reached; the remainder is `not_checked`.
 
 ## 2. What exists today (why this shape)
