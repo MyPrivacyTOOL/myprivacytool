@@ -31,6 +31,7 @@ export async function run(env, fetchImpl = fetch) {
   const sb = String(env.SUPABASE_URL).replace(/\/$/, '');
   const H = { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' };
   const sel = async (p) => { const r = await fetchImpl(`${sb}/rest/v1/${p}`, { headers: H }); if (!r.ok) throw new Error(`db read ${r.status} ${p.split('?')[0]}`); return r.json(); };
+  const inList = (...a) => `in.(${a.map((e) => `"${encodeURIComponent(e)}"`).join(',')})`;   // '+' in an address must be percent-encoded in a URL filter
   const del = (p) => fetchImpl(`${sb}/rest/v1/${p}`, { method: 'DELETE', headers: H }).catch(() => {});
   const post = async (path, body, token) => {
     const r = await fetchImpl(`${base}${path}`, { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body ?? {}) });
@@ -110,7 +111,7 @@ export async function run(env, fetchImpl = fetch) {
     const rows1 = await sel(`mpt_business_members?team_id=eq.${teamId}&select=*`);
     const third = rows1.find((m) => m.email === e3);
     step('7f_third_row_holds_no_data', third && third.results === null && third.checked_at === null && third.share_detail === false && third.consent_at === null, { status: third?.status });
-    const q1 = await sel(`mpt_business_requests?contact_email=in.(${[e1, e2].map((e) => `"${e}"`).join(',')})&select=source`);
+    const q1 = await sel(`mpt_business_requests?contact_email=${inList(e1, e2)}&select=source`);
     step('7g_two_employee_consent_rows', q1.length === 2 && q1.every((q) => q.source === 'employee_consent'), { rows: q1.length });
 
     // 8 what was typed is stored nowhere
@@ -136,9 +137,9 @@ export async function run(env, fetchImpl = fetch) {
     try {
       if ([admin, e1, e2, e3].every(isTestAddress)) {
         if (teamId) await post('/api/business/delete-team', { team_id: teamId, confirm: 'delete' }, null).catch(() => {});
-        await del(`mpt_business_requests?contact_email=in.(${[admin, e1, e2, e3].map((e) => `"${e}"`).join(',')})`);
+        await del(`mpt_business_requests?contact_email=${inList(admin, e1, e2, e3)}`);
         if (adminId) { await del(`mpt_business_teams?admin_account_id=eq.${adminId}`); await del(`accounts?id=eq.${adminId}`); await fetchImpl(`${sb}/auth/v1/admin/users/${adminId}`, { method: 'DELETE', headers: H }).catch(() => {}); }
-        const left = (await sel(`mpt_business_requests?contact_email=in.(${[admin, e1, e2, e3].map((e) => `"${e}"`).join(',')})&select=ref`).catch(() => [{}])).length;
+        const left = (await sel(`mpt_business_requests?contact_email=${inList(admin, e1, e2, e3)}&select=ref`).catch(() => [{}])).length;
         out.cleanup = left === 0 ? 'queue rows, team, account and sign-in identity of this run removed' : 'CLEANUP INCOMPLETE';
       }
     } catch { out.cleanup = 'CLEANUP FAILED'; }
