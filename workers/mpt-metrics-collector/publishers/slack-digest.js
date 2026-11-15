@@ -39,6 +39,8 @@ export function rowFromPage(page) {
     xThreads: numProp(pr['X Threads Posted']),
     agentPlan: grab('Plan'),
     decisions: grab('Decision'),
+    adCostPerScan: Number.parseFloat(grab('Ad cost per scan') ?? '') || null, // MPC-9972: only present when > 0
+    cac: Number.parseFloat(grab('CAC') ?? '') || null,
   };
 }
 
