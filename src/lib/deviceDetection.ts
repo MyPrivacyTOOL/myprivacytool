@@ -1,3 +1,4 @@
+import { hasScanConsent } from '@/lib/scanConsent';
 import { nicknameFromHash, friendlyGraphics } from './friendlyLabels';
 import { hexagonLabel } from '../../shared/hexagon-registry/registry.js';
 import {
@@ -656,7 +657,14 @@ export function determineUserProfile(data: DeviceData): {
 
 // Async version that includes battery info, user profile, and fingerprint hexagons
 let fingerprintScan: ReturnType<typeof scanFingerprints> | null = null;
-const runFingerprintScan = () => (fingerprintScan ??= scanFingerprints());
+// MPC-9888: the protection score uses STUN, so a scan computed before the Scan me click is redone once, after it.
+let scannedWithConsent = false;
+const runFingerprintScan = () => {
+  const now = hasScanConsent();
+  if (fingerprintScan && now && !scannedWithConsent) fingerprintScan = null;
+  scannedWithConsent = now;
+  return (fingerprintScan ??= scanFingerprints());
+};
 const scanFingerprints = () =>
   Promise.all([
     detectCanvasFingerprint().catch(() => null),
@@ -837,8 +845,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   }
   
   // Run advanced fingerprint detection in parallel
+  // MPC-9888: the WebRTC check contacts Google STUN, so it runs inside the scan (after the Scan me click); before it the hexagon says so.
   const [webrtcResult, batteryResult, mediaResult] = await Promise.all([
-    detectWebRTCLeak().catch(() => null),
+    hasScanConsent() ? detectWebRTCLeak().catch(() => null) : Promise.resolve(null),
     detectBatteryStatus().catch(() => null),
     detectMediaDevices().catch(() => null),
   ]);
@@ -851,7 +860,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // Advanced Fingerprint Hexagons
   
   // 1. WebRTC Leak Detection
-  if (webrtcResult) {
+  const webrtcAwaitingScan = !hasScanConsent();
+  if (webrtcResult || webrtcAwaitingScan) {
+    const wr = webrtcResult ?? { localIPs: [] as string[], publicIPs: [] as string[], isLeaking: false, vpnDetected: false, state: undefined, detectorVersion: undefined };
     let webrtcValue = 'Blocked';
     let webrtcRisk = 'WebRTC is blocked. Your real IP is protected.';
     const webrtcConfidence = 100;
@@ -859,24 +870,30 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     let webrtcHeadline = 'Your browser shared only some network details';
     let webrtcExplanation = 'Your browser let this page see some network details, but not a clear real address. This one needs investigation to know what else is visible.';
 
-    if (webrtcResult.localIPs.length === 0 && webrtcResult.publicIPs.length === 0) {
+    if (wr.localIPs.length === 0 && wr.publicIPs.length === 0) {
       webrtcValue = 'No Leak Detected';
       webrtcRisk = 'WebRTC is not leaking your IP address. Good for privacy!';
       webrtcHeadline = 'No address slipped out';
       webrtcExplanation = 'We could not see your network addresses from this page. Good. Some video-call sites may not work if your browser blocks this feature on purpose.';
-    } else if (webrtcResult.isLeaking) {
-      const leakedIPs = webrtcResult.publicIPs.slice(0, 2).join(', ');
+    } else if (wr.isLeaking) {
+      const leakedIPs = wr.publicIPs.slice(0, 2).join(', ');
       webrtcValue = `Leaking: ${leakedIPs.substring(0, 15)}${leakedIPs.length > 15 ? '...' : ''}`;
-      webrtcRisk = `CRITICAL: Your real IP (${webrtcResult.publicIPs[0]}) is exposed! ${webrtcResult.vpnDetected ? 'VPN detected but IP still leaking.' : 'Attackers can see your real location.'}`;
+      webrtcRisk = `CRITICAL: Your real IP (${wr.publicIPs[0]}) is exposed! ${wr.vpnDetected ? 'VPN detected but IP still leaking.' : 'Attackers can see your real location.'}`;
       webrtcHeadline = 'Your real address may be showing';
       webrtcExplanation = 'Your browser let this page see an internet address that may be your real one, even if you use a VPN. This can happen because browsers use a feature called WebRTC (made for video calls) that can share network details. This one needs investigation to know who else can see it. Switching off WebRTC in your browser settings, or using a VPN with leak protection, usually closes this.';
-    } else if (webrtcResult.vpnDetected) {
+    } else if (wr.vpnDetected) {
       webrtcValue = 'VPN Protected';
       webrtcRisk = 'VPN detected and working. Only local IPs visible.';
       webrtcHeadline = 'Your real address looks hidden';
       webrtcExplanation = 'The address we can see looks like it belongs to a VPN or similar service, so your own is likely hidden. We cannot be certain from here.';
     }
     
+    if (webrtcAwaitingScan) {   // MPC-9888: not checked yet; the Google STUN lookup runs when the visitor presses Scan me
+      webrtcValue = 'Runs when you scan';
+      webrtcRisk = 'Not checked yet: it runs when you press Scan me.';
+      webrtcHeadline = 'Runs when you scan';
+      webrtcExplanation = 'This check asks an outside server (Google) which address your browser shows. We do not do that until you press Scan me.';
+    }
     fingerprintHexagons.push({
       id: 'webrtc-leak',
       label: 'WebRTC Leak',
@@ -888,10 +905,11 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       risk: webrtcRisk,
       confirmed: false,
       category: 'fingerprint',
-      observation: { state: webrtcResult.state, detectorVersion: webrtcResult.detectorVersion },
+      observation: webrtcAwaitingScan ? undefined : { state: webrtcResult!.state, detectorVersion: webrtcResult!.detectorVersion },
     });
   }
   
+
   // 2. Hardware Profile
   fingerprintHexagons.push({
     id: 'hardware-profile',

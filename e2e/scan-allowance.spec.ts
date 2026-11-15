@@ -1,7 +1,7 @@
 // MPC-9818: a Free address's SECOND scan in a month is declined with an honest upgrade message, in a real browser. The production build is driven on /scan; its
 // POST /api/scan goes to the REAL Worker code (workers/scan-report/index.js) with SCAN_ALLOWANCE_ENABLED on, in this test process, with the shared in-memory backend behind it
 // (it applies the same allowance rules as the SQL; the SQL is proved in supabase/tests/mpc-9818-entitlements.test.sql). SYNTHETIC address (example.com) only.
-import { test, expect } from "./fixtures";
+import { test, expect, consentRow } from "./fixtures";
 import worker from "../workers/scan-report/index.js";
 import { fake } from "../workers/scan-report/test-support/fake-backend.mjs";
 
@@ -11,7 +11,7 @@ const ENV = { SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KE
 
 test.describe("scan allowance (Free: 1 a month)", () => {
   async function wireWorker(page: import("@playwright/test").Page) {
-    const F = fake();
+    const F = fake(); F.db.scan_consents.push(consentRow());   // MPC-9888: the visitor already pressed the consent button
     const seen: { status: number; body: Record<string, unknown> | null }[] = [];
     await page.route(/mpt-scan-report\.[^/]+\/api\/scan$/, async (route) => {
       const req = route.request();

@@ -37,6 +37,10 @@ import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
 import { recipientScript } from '@/lib/recipientClient';
+import ScanConsentText, { scanMeLabel } from '@/components/ScanConsentText';
+import { adoptExistingConsent, ConsentError, giveScanConsent, hasScanConsent, onScanConsent } from '@/lib/scanConsent';
+import { setChoice } from '@/lib/cookieConsent';
+import { loadTurnstile } from '@/lib/turnstile';
 
 const Index = () => {
   const [hexagons, setHexagons] = useState<HexagonData[]>([]);
@@ -51,6 +55,28 @@ const Index = () => {
   const federatedCheckDone = useRef(false);
   const footerRef = useRef<HTMLElement>(null);
   const footerTracked = useRef(false);
+  // MPC-9888: nothing leaves this page for an outside party until Scan me is pressed. The page still reads the browser's own signals on load
+  // (local only, nothing sent); the outside-server checks (Google STUN) and the analytics/Turnstile scripts start at the click.
+  const [consented, setConsented] = useState(() => hasScanConsent());
+  const [consenting, setConsenting] = useState(false);
+  const [consentError, setConsentError] = useState('');
+  useEffect(() => onScanConsent(() => setConsented(hasScanConsent())), []);
+  // Consent is portable: a link from a channel carries ?scan=<uuid>; a journey that already consented is not asked again.
+  useEffect(() => { void adoptExistingConsent(new URLSearchParams(window.location.search).get('scan')); }, []);
+  const handleScanMe = async () => {
+    if (consenting) return;
+    setConsenting(true);
+    setConsentError('');
+    try {
+      await giveScanConsent();
+      setChoice(true);          // Scan me also counts as the analytics choice (design 8.1); the banner stays for visitors who never scan
+      void loadTurnstile();     // Cloudflare's script loads now, at the click (design 8.2)
+    } catch (err) {
+      setConsentError(err instanceof ConsentError && err.kind === 'stale' ? 'This page is out of date. Please reload it and try again.' : 'We could not record your agreement just now, so nothing was scanned. Please press the button to try again.');
+    } finally {
+      setConsenting(false);
+    }
+  };
 
   // MPC-7470 (D12): when the scan first completes it is kept in this browser only (sessionStorage), never sent. It is saved on the server only
   // if the visitor reaches the contact step, gives an email and ticks the separate save box. Not on every live orientation refresh. Off unless VITE_SAVE_WEB_SCANS is "true".
@@ -103,7 +129,7 @@ const Index = () => {
     if (liveDeviceData && !loading) {
       generateHexagonsAsync(liveDeviceData).then(setHexagons);
     }
-  }, [liveDeviceData, loading]);
+  }, [liveDeviceData, loading, consented]);
 
   useEffect(() => {
     // Start session timer on mount
@@ -293,6 +319,17 @@ const Index = () => {
           )}
           <p className="mt-2 text-xs sm:text-sm text-muted-foreground">{countSentence()}.</p>
         </section>
+
+        {/* MPC-9888: the consent block. Pressing the button is the agreement (no toggle, no second click). */}
+        {!consented && (
+          <section className="text-center pb-6 px-4" aria-label="Scan consent">
+            <ScanConsentText className="mb-4" />
+            <Button size="lg" onClick={handleScanMe} disabled={consenting} data-testid="scan-me">
+              {consenting ? '…' : scanMeLabel()}
+            </Button>
+            {consentError && <p role="alert" className="mt-3 text-sm text-destructive">{consentError}</p>}
+          </section>
+        )}
 
         {/* Device reveal: a full-screen opening moment, hidden while the experience is reworked (src/config/deviceHero.ts) */}
         {deviceHeroEnabled() && !revealDone && (

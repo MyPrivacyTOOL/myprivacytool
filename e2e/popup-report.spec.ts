@@ -2,7 +2,7 @@
 // scan; its POST /api/scan goes to the REAL Worker code (workers/scan-report/index.js) running in this test process with an in-memory Supabase/Resend/HubSpot
 // behind it. Nothing leaves the machine: every outbound URL the Worker calls is answered here, and the test fails if it calls an unexpected host.
 // Synthetic users only (example.com). The assertions read the PERSISTED rows and the captured email bodies, not what the page says.
-import { test, expect } from "./fixtures";
+import { test, expect, e2eConsentRows } from "./fixtures";
 import type { Page } from "@playwright/test";
 import worker from "../workers/scan-report/index.js";
 
@@ -19,6 +19,7 @@ function backends() {
   const res = (status: number, body?: unknown) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? "" : JSON.stringify(body)), json: async () => body });
   const fetchImpl = async (input: unknown, init: RequestInit = {}) => {
     const url = String(input);
+    const consentRes = e2eConsentRows(url); if (consentRes) return consentRes;   // MPC-9888
     const host = new URL(url).host;
     if (!KNOWN_HOSTS.some((h) => host.endsWith(h))) { stray.push(host); return res(500, "blocked"); }
     if (host === "api.resend.com") { mails.push(JSON.parse(String(init.body))); return res(200, { id: `msg_${++n}` }); }

@@ -1,6 +1,7 @@
 import { getReferralCode } from "@/lib/referral";
 import { noteSaveResult, resolveScanApiUrl, scanSaveFields } from "@/lib/webScan";
 import { recipientFetch } from "@/lib/recipientClient";
+import { getConsentId, hasScanConsent } from "@/lib/scanConsent";
 
 // MPC-6677: scan-report Worker (confirmation email + 48h report).
 // MPC-7385: defaults to the production Worker (SCAN_API_URL, src/lib/webScan.ts), like the other Worker endpoints in this app, so the site no longer
@@ -14,7 +15,7 @@ import { recipientFetch } from "@/lib/recipientClient";
 export class ReportRequestError extends Error {
   // MPC-9818: kind "allowance" = the month's scan allowance for this address is used. `detail` is the Worker's own plain-text explanation (what happened, when it resets, what the
   // next plan includes), shown to the visitor as is. It is never a price: prices live in the plans data.
-  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network" | "allowance", readonly status: number, readonly detail?: string) {
+  constructor(readonly kind: "rate_limited" | "rejected" | "bad_email" | "server" | "network" | "allowance" | "consent", readonly status: number, readonly detail?: string) {
     super(`scan-report ${status || "no response"}`);
   }
 }
@@ -44,6 +45,8 @@ export async function requestScanReport(
 ): Promise<ReportOutcome> {
   const base = resolveScanApiUrl();
   if (!base) return {}; // VITE_SCAN_API_URL="off": the feature is deliberately switched off (HubSpot only)
+  // MPC-9888: no request leaves without the consent the person gave by pressing the button (design 2.1). The Worker checks the id again.
+  if (!hasScanConsent()) throw new ReportRequestError("consent", 0);
   const q = new URLSearchParams(window.location.search);
   const ref = getReferralCode(); // MPC-7645: a friend's code, only while the referral switch is on
   let res: Response;
@@ -54,6 +57,7 @@ export async function requestScanReport(
       body: JSON.stringify({
         email,
         consent: true, // only called after the consent checkbox is ticked
+        consent_id: getConsentId(), // MPC-9888: the scan consent issued by POST /api/consent
         consent_source: opts.consentSource ?? "scan_page",
         ...(opts.requestId ? { request_id: opts.requestId } : {}),
         ...(turnstileToken ? { "cf-turnstile-response": turnstileToken } : {}), // MPC-8430
