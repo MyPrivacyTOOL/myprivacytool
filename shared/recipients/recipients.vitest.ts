@@ -34,9 +34,9 @@ describe("bundler-safe module", () => {
 
 describe("seed (MPC-9883, design 1.5)", () => {
   const live = registry.recipients.filter((r) => r.enabled && r.host_kind !== "user_supplied");
-  it("pins 12 first-party (8 + account-service MPC-9817 + 3 MPC-9886) and 24 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus pwned-password MPC-9886, meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
+  it("pins 13 first-party (8 + account-service MPC-9817 + 3 MPC-9886 + business-team-service MPC-9824) and 24 third-party/processor/platform live recipients (the Map's 21, less hibp, switched off by MPC-9885 until MPC-9904, plus pwned-password MPC-9886, meta-graph and stripe, switched on by MPC-9885: WhatsApp replies are live and checkout is gated by CHECKOUT_ENABLED)", () => {
     expect(registry.recipients.find((r) => r.key === "hibp")).toMatchObject({ enabled: false });
-    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(12);
+    expect(live.filter((r) => r.party === "first" && !MPC_9885_ADDED.includes(r.key))).toHaveLength(13);
     expect(live.filter((r) => r.party !== "first" && !MPC_9885_ADDED.includes(r.key) && !MPC_9915_ADDED.includes(r.key))).toHaveLength(24);
     expect(MPC_9915_ADDED.every((k) => registry.recipients.find((r) => r.key === k)?.enabled === true)).toBe(true);
   });
@@ -50,7 +50,7 @@ describe("seed (MPC-9883, design 1.5)", () => {
     const planned = registry.recipients.filter((r) => r.planned);
     expect(planned).toHaveLength(9);
     expect(planned.every((r) => !r.enabled)).toBe(true);
-    expect(registry.recipients).toHaveLength(60);
+    expect(registry.recipients).toHaveLength(61);
   });
   it("validates cleanly, and every live key from design 1.5 is present", () => {
     expect(validateRegistry(data)).toEqual([]);

@@ -31,6 +31,7 @@ import { attachReferral, completeReferral, ensureReferralCode, handleReferralInv
 import { referralBlock } from './lib/referralEmail.js';
 import { abOn, abVariant } from './lib/referralAb.js';
 import { followupStateEnabled, reportState, loadFindings, buildFollowUpEmailV2, handleFixed, fixedUrl } from './lib/followup.js';
+import { BUSINESS_ROUTES } from './lib/business.js';   // MPC-9824
 import { handleKeep, runFreeRecordJob } from './lib/freeRecord.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
@@ -94,6 +95,10 @@ export default {
       const acct = { '/api/account/signin': handleSignIn, '/api/account/verify': handleVerify, '/api/account/me': handleMe, '/api/account/link-scan': handleLinkScan, '/api/account/scan': handleOpenScan,
         '/api/account/delete': handleDelete, '/api/account/refresh': handleRefresh, '/api/account/signout': handleSignOut, '/api/account/can': handleCan, '/api/account/export': handleExportIssue }[url.pathname];
       if (acct && (request.method === 'POST' || url.pathname === '/api/account/me')) return acct(env, ctx, request, origin, json, ctx2);
+    }
+    // MPC-9824 (F6): business teams. Admin routes use the account session; employee routes use the token from the invite email. 404 unless BUSINESS_TEAMS_ENABLED and ACCOUNTS_ENABLED are "true".
+    if (request.method === 'POST' && url.pathname.startsWith('/api/business/') && BUSINESS_ROUTES[url.pathname]) {
+      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
     }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".

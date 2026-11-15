@@ -13,6 +13,8 @@ const TelegramDashboard = lazy(() => import("./pages/TelegramDashboard"));
 const DeepDive = lazy(() => import("./pages/DeepDive"));
 const Report = lazy(() => import("./pages/Report"));
 const Business = lazy(() => import("./pages/Business"));
+const BusinessTeam = lazy(() => import("./pages/BusinessTeam"));
+const BusinessJoin = lazy(() => import("./pages/BusinessJoin"));
 const Enterprise = lazy(() => import("./pages/Enterprise"));
 const Start = lazy(() => import("./pages/Start"));
 const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
@@ -74,6 +76,9 @@ const App = () => (
             <Route path="/scan/deep-dive" element={<DeepDive />} />
             <Route path="/report" element={<Report />} />
             <Route path="/business" element={<Business />} />
+            {/* MPC-9824: business teams. Off unless VITE_BUSINESS_TEAMS_ENABLED and VITE_ACCOUNTS_ENABLED are "true"; noindex. */}
+            <Route path="/business/team" element={<BusinessTeam />} />
+            <Route path="/business/join" element={<BusinessJoin />} />
             <Route path="/enterprise" element={<Enterprise />} />
             {/* Messaging / First Hexagon entry point */}
             <Route path="/start" element={<Start />} />
