@@ -52,18 +52,18 @@ const Terms = () => {
                 3.1 Account Registration
               </h3>
               <p className="text-muted-foreground">
-                There are no user accounts today; the free scan and waitlist need
-                none. When paid plans open, you will need to create an account and
-                provide accurate, complete and current information, and you will
-                be responsible for keeping your password and credentials
-                confidential.
+                A free account is optional: the free scan and waitlist need none.
+                If you create one, you sign in with an emailed link and must give
+                an email address you control. When paid plans open, you will need
+                an account for them and must provide accurate, complete and
+                current information.
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
                 3.2 Account Responsibility
               </h3>
               <p className="text-muted-foreground">
-                Once accounts exist, you will be responsible for all activity
+                You are responsible for all activity
                 under your account and must tell us immediately of any
                 unauthorised use or breach of security. We will not be
                 responsible for loss or damage resulting from your failure to
@@ -74,10 +74,11 @@ const Terms = () => {
                 3.3 Account Termination
               </h3>
               <p className="text-muted-foreground">
-                Once accounts exist, we may suspend or terminate an account that
+                We may suspend or terminate an account that
                 violates these Terms or is used for fraudulent, abusive or
-                illegal activity, and you will be able to delete your account at
-                any time by contacting support@myprivacytool.io.
+                illegal activity. You can delete your account and all linked
+                scans at any time with "Delete my account and all scans" on
+                /account, or by contacting support@myprivacytool.io.
               </p>
             </section>
 
@@ -170,8 +171,9 @@ const Terms = () => {
                 6.2 Paid Plans (Not Yet Open)
               </h3>
               <p className="text-muted-foreground">
-                Paid plans are not open today. There is no billing, no
-                subscription and no account to cancel. When paid plans open, we
+                Paid plans are not open today. There is no billing and no
+                subscription to cancel. A free account, if you have one, can be
+                deleted at any time. When paid plans open, we
                 plan to offer Free (1 scan), Basic ($7.99 a month, 5 scans), Pro
                 ($14.99 a month, 25 scans) and Executive ($49.99 a month,
                 unlimited scans), with the full report from Basic. Prices and
