@@ -2,6 +2,7 @@ import { enrichAndScore, HIGH_PRIORITY_THRESHOLD } from './lead-scoring.js';
 // MPC-9885: every outbound call goes through the recipient wrapper (key + declared data items). rctx is built once per request/job.
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { blogSubscribe } from './blog-subscribe.js';   // MPC-10616
 import { createBusinessRequest, markLate, postDigest, sendDelayNotices } from './business-requests.js';   // MPC-9825
 // MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
 import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
@@ -195,6 +196,13 @@ export default {
       let input; try { input = await request.json(); } catch (_) { return reject(400, 'Invalid request'); }
       if (!input || typeof input !== 'object') return reject(400, 'Invalid request');
       const out = await createBusinessRequest(env, input);
+      return new Response(JSON.stringify(out.body), { status: out.status, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // MPC-10616: the /blog newsletter form: one HubSpot contact write (create, or update on repeat), nothing else. Same Origin check and rate limit as above.
+    if (new URL(request.url).pathname === '/blog-subscribe') {
+      let input; try { input = await request.json(); } catch (_) { return reject(400, 'Invalid request'); }
+      const out = await blogSubscribe(env, input);
       return new Response(JSON.stringify(out.body), { status: out.status, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
