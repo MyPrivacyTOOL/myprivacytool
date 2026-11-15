@@ -177,6 +177,37 @@
       "note": "MPC-9817. You type your own address into the sign-in form and press the button; the sign-in email itself goes out through the resend entry and the login through the supabase entry."
     },
     {
+      "key": "business-team-service",
+      "name": "Business team invitations and employee-authorised checks",
+      "hosts": [
+        "mpt-scan-report.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "name",
+        "phone",
+        "city",
+        "country"
+      ],
+      "purpose": "An admin invites employees by email; each employee chooses to authorise their own check, and the admin sees counts for the authorised people only.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Invitation expires after 30 days; results are deleted when the employee withdraws, the admin removes them, or the team is deleted. The name, city and phone typed for a check are used once and never stored."
+      },
+      "consent_basis": "user_action",
+      "phase": "pre_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-15",
+      "until": null,
+      "note": "MPC-9824 (F6). The invitation email goes out through the resend entry, the database through supabase; the broker/listing check reads only pages the employee pastes (user-pasted-listing). Nothing about an employee is read until that employee presses Authorise."
+    },
+    {
       "key": "leads",
       "name": "Lead and newsletter capture",
       "hosts": [

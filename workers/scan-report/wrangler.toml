@@ -108,6 +108,11 @@ LISTING_CHECK_ENABLED = "true"
 # was switched on). Anything but the exact string "true" is off and every route answers 404; "false" is the rollback (existing accounts are untouched). No Stripe, no allowances.
 ACCOUNTS_ENABLED = "true"
 
+# MPC-9824 (F6, business teams): a Business admin invites employees; each authorises their own scan; the admin sees counts for the authorised only. Routes POST /api/business/*
+# (lib/business.js). Needs migrations 20261108160000_mpc_9824_business_teams.sql and 20261115000000_mpc_9824_summary_member_id.sql (both applied). BOTH this and ACCOUNTS_ENABLED
+# must be the exact string "true", else every route answers 404. "false" is the rollback (existing rows are untouched).
+BUSINESS_TEAMS_ENABLED = "true"
+
 # MPC-9887: the server-side consent gate. POST /api/consent stores one consent per scan id (public.scan_consents, migration 20261108150000_mpc_9887_scan_consents.sql,
 # applied before this was merged). A consent_id sent with POST /api/scan is always checked against the store. "false" = a scan WITHOUT a consent id is still accepted,
 # because no visitor holds one until the consent block (MPC-9888) ships; MPC-9888 sets this to "true" in the same change, after the report queue has drained.

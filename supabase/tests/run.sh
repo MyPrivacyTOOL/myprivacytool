@@ -288,5 +288,12 @@ echo "== entitlements and scan allowances (MPC-9818)"
 psql_ "$TEST_URL" -f supabase/migrations/20261108140000_mpc_9818_entitlements_and_scan_allowances.sql
 psql_ "$TEST_URL" -At -f supabase/tests/mpc-9818-entitlements.test.sql
 
+# MPC-9824: business teams. Applied by the loop above; the summary fix is applied again to prove it is idempotent, then the assertions (RLS closed, no IP column,
+# data-only-when-authorised, summary excludes non-authorised, revoke clears results, remove by member_id, delete team).
+echo "== business teams (MPC-9824)"
+psql_ "$TEST_URL" -f supabase/migrations/20261108160000_mpc_9824_business_teams.sql
+psql_ "$TEST_URL" -f supabase/migrations/20261115000000_mpc_9824_summary_member_id.sql
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-9824-business-teams.test.sql
+
 psql_ "$ADMIN_URL" -c "drop database if exists $TEST_DB"
 echo "OK: Supabase integration tests passed ($rows RLS rows + schema assertions)"

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
+import { businessTeamsEnabled } from "@/lib/businessTeam";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
 import { trackBusinessLead } from "@/lib/analytics";
@@ -158,6 +159,11 @@ const Business = () => {
                 <p className="text-muted-foreground text-xs text-center">
                   No payment required. Results in 48 hours.
                 </p>
+                {businessTeamsEnabled() && (
+                  <p className="text-muted-foreground text-xs text-center" data-testid="team-check-link">
+                    Want each person to check their own data? <Link to="/business/team" className="underline hover:text-foreground">Run a team check</Link>. Nobody is checked unless they authorise it themselves.
+                  </p>
+                )}
                 <p className="text-muted-foreground text-xs text-center">
                   We use your details only to prepare and send your audit. See our{" "}
                   <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.

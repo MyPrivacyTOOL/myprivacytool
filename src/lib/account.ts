@@ -65,6 +65,16 @@ const readAllowance = (raw: unknown): Allowance | null => {
   return { limit: typeof x.limit === "number" ? x.limit : null, used: x.used, remaining: typeof x.remaining === "number" ? x.remaining : null, resetsAt: typeof x.resets_at === "string" ? x.resets_at : null };
 };
 
+/** MPC-9824: refreshes the saved session once (an expired access token). null = not signed in any more. */
+export async function refreshSession(): Promise<Session | null> {
+  const s = loadSession(); if (!s) return null;
+  const rr = await call("refresh", { refresh_token: s.refreshToken });
+  const ns = toSession(rr.json?.session as Record<string, unknown> | undefined);
+  if (rr.status !== 200 || !ns) { clearSession(); return null; }
+  saveSession(ns);
+  return ns;
+}
+
 /** Loads the account, refreshing the session once if the access token has expired. null = not signed in. */
 export async function loadMe(): Promise<Me | "error" | null> {
   let s = loadSession();
