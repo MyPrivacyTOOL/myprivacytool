@@ -42,7 +42,7 @@ try { await accessToken(env); check(false, 'token error should throw'); } catch 
 
 
 // ---- MPC-9972: daily account collector -------------------------------------------------------------------------------------------
-const NOW = new Date('2026-11-10T00:30:00+08:00'); // previous HK day = 2026-11-09
+const NOW = new Date('2026-11-10T00:30:00Z'); // previous account (UK) day = 2026-11-09
 apiStatus = 200; tokenStatus = 200; calls = [];
 let queries = [];
 const campaignResults = [{ campaign: { name: 'Brand', status: 'ENABLED' }, metrics: { impressions: '1000', clicks: '40', costMicros: '12500000', conversions: 5, conversionsValue: 0 } }, { campaign: { name: 'Generic', status: 'PAUSED' }, metrics: { impressions: '500', clicks: '10', costMicros: '2500000', conversions: 1, conversionsValue: 0 } }];
@@ -61,7 +61,7 @@ globalThis.fetch = async (url, opts = {}) => {
 };
 let out = await collector.collect(env, NOW);
 const sm = out.payload.summary;
-check(out.payload.day === '2026-11-09' && out.period_start === '2026-11-08T16:00:00.000Z' && out.period_end === '2026-11-09T16:00:00.000Z', 'previous full Hong Kong day');
+check(out.payload.day === '2026-11-09' && out.period_start === '2026-11-09T00:00:00.000Z' && out.period_end === '2026-11-10T00:00:00.000Z' && out.payload.account_time_zone === 'GMT+00:00', 'previous full day in the account time zone (UK), not Hong Kong');
 check(collector.source === 'google-ads' && collector.report === 'account_daily', 'collector is google-ads / account_daily');
 check(sm.campaigns === 2 && sm.impressions === 1500 && sm.clicks === 50 && sm.cost === 15 && sm.conversions === 6, 'campaign totals summed, cost_micros converted to currency units');
 check(sm.scan_started === 6 && sm.paid_conversions === 1 && out.payload.currency === 'GBP' && out.payload.conversion_actions.length === 2, 'conversion-action breakdown gives scan_started and paid counts');

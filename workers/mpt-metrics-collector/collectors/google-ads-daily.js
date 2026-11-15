@@ -3,8 +3,10 @@
 // One row per run: the previous full day, aggregates only (MPC-8659): per-campaign totals and per-conversion-action totals, never a click, a user or a search term.
 // Empty result (no campaigns yet) => an ok row with zeros. Secrets missing => an ok row with payload.configured=false and no network call.
 // Calls per run: 1 token + 2 searchStream queries = 3 (the conversion_action segment cannot share a query with impressions/cost).
-// The query date is the Hong Kong calendar day; the Google Ads account's own time zone decides what segments.date means, and the MPT account is set to Asia/Hong_Kong.
-import { previousHkDay } from '../lib/hk.js';
+// segments.date is in the Google Ads ACCOUNT's time zone, and the MPT account (627-131-2111) is on UK time (GMT+00:00, Strategy §4, irreversible), not Hong Kong.
+// So the row covers the previous full UTC/UK calendar day (the account's day), labelled by that date; period_start/period_end are that day's real instants.
+const DAY_MS = 86400000;
+const previousAccountDay = (now) => { const end = new Date(Math.floor(now.getTime() / DAY_MS) * DAY_MS); const start = new Date(end.getTime() - DAY_MS); return { start, end, day: start.toISOString().slice(0, 10) }; };
 import { accessToken, searchStream, missing } from './google-ads.js';
 
 const num = (v) => (v === undefined || v === null || v === '' || !Number.isFinite(Number(v)) ? 0 : Number(v));
@@ -20,7 +22,7 @@ export default {
   source: 'google-ads',
   report: 'account_daily',
   async collect(env, now = new Date()) {
-    const { start, end, day } = previousHkDay(now);
+    const { start, end, day } = previousAccountDay(now);
     const period = { period_start: start.toISOString(), period_end: end.toISOString() };
     const miss = missing(env);
     if (miss.length) return { ...period, payload: { configured: false, day, missing: miss } };
@@ -46,7 +48,7 @@ export default {
     return {
       ...period,
       payload: {
-        configured: true, day, currency,
+        configured: true, day, account_time_zone: 'GMT+00:00', currency,
         summary: {
           campaigns: campaigns.length, impressions: sum('impressions'), clicks: sum('clicks'), cost: Math.round(sum('cost') * 1e6) / 1e6,
           conversions: sum('conversions'), conversions_value: sum('conversions_value'),
