@@ -139,6 +139,9 @@ export async function run(env, fetchImpl = fetch) {
         if (teamId) await post('/api/business/delete-team', { team_id: teamId, confirm: 'delete' }, null).catch(() => {});
         await del(`mpt_business_requests?contact_email=${inList(admin, e1, e2, e3)}`);
         if (adminId) { await del(`mpt_business_teams?admin_account_id=eq.${adminId}`); await del(`accounts?id=eq.${adminId}`); await fetchImpl(`${sb}/auth/v1/admin/users/${adminId}`, { method: 'DELETE', headers: H }).catch(() => {}); }
+        // sweep: leftovers of earlier synthetic runs (same alias family only, each address checked with isTestAddress before its row is deleted)
+        const stale = await sel('mpt_business_requests?contact_email=like.testingnt69%2Bbiz-*&select=ref,contact_email').catch(() => []);
+        for (const q of stale) if (isTestAddress(q.contact_email)) await del(`mpt_business_requests?ref=eq.${encodeURIComponent(q.ref)}`);
         const left = (await sel(`mpt_business_requests?contact_email=${inList(admin, e1, e2, e3)}&select=ref`).catch(() => [{}])).length;
         out.cleanup = left === 0 ? 'queue rows, team, account and sign-in identity of this run removed' : 'CLEANUP INCOMPLETE';
       }
