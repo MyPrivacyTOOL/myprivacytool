@@ -8,7 +8,7 @@ import { callRecipient } from '../../../shared/recipients/outbound.ts';
 import { recipientCtx } from '../lib/recipient-ctx.js';
 
 export const DEFAULT_CUSTOMER_ID = '6271312111'; // MyPrivacyTOOL client account 627-131-2111 (read directly, no login-customer-id needed)
-export const DEFAULT_API_VERSION = 'v24'; // v22 is deprecated and v21/v20 return 404 (checked 2026-11-09); override with GOOGLE_ADS_API_VERSION
+export const DEFAULT_API_VERSION = 'v26'; // v24 proven live 2026-11-15 (MPC-9972); v22 is deprecated and v21/v20 return 404 (checked 2026-11-09); override with GOOGLE_ADS_API_VERSION
 export const REQUIRED = ['GOOGLE_ADS_OAUTH_CLIENT_ID', 'GOOGLE_ADS_OAUTH_CLIENT_SECRET', 'GOOGLE_ADS_REFRESH_TOKEN'];
 
 export const missing = (env) => REQUIRED.filter((k) => !env[k]);
