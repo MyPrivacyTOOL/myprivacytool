@@ -27,7 +27,7 @@ export type BrokerRow = {
   also: { state: string; evidenceUrl: string | null }[];
   guide: { slug: string; timeNeeded: string | null } | null; noGuideText: string | null;
 };
-export type BrokerPanel = { pending: boolean; pasteAvailable: boolean; intro: string; rows: BrokerRow[]; others: BrokerRow[]; regionNote: string; coverageNote: string };
+export type BrokerPanel = { pending: boolean; pasteAvailable: boolean; intro: string; rows: BrokerRow[]; others: BrokerRow[]; regionNote: string; coverageNote: string; upgrade: string };
 export type LiveSnapshot = {
   items: LiveItem[]; done: boolean; reportSent: boolean; verified: boolean;
   /** MPC-9813: present only while the email-confirm gate is on. */
@@ -119,7 +119,7 @@ export function readBrokerPanel(raw: unknown): BrokerPanel | null {
   const rows = (p.rows as Record<string, unknown>[]).flatMap(readRow);
   if (!rows.length) return null;
   const others = Array.isArray(p.others) ? (p.others as Record<string, unknown>[]).flatMap(readRow) : [];
-  return { pending: p.pending === true, pasteAvailable: p.paste_available !== false, intro: p.intro.slice(0, 500), rows, others, regionNote: str(p.region_note, 600) ?? "", coverageNote: str(p.coverage_note, 300) ?? "" };
+  return { pending: p.pending === true, pasteAvailable: p.paste_available !== false, intro: p.intro.slice(0, 500), rows, others, regionNote: str(p.region_note, 600) ?? "", coverageNote: str(p.coverage_note, 300) ?? "", upgrade: str(p.upgrade, 600) ?? "" };
 }
 
 /** MPC-9813: the click-to-confirm. POST /api/scan/confirm with the key from the email link (header, never the URL). confirmed = the Worker confirmed the address.

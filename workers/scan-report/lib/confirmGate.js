@@ -12,6 +12,7 @@ import { readVerifyToken } from './live.js';
 import { checkListingPages } from './listingCheck.js';
 import { guideFor } from './brokers.js';
 import { accountTokenForConfirm } from './accounts.js';
+import { confirmScan } from './entitlements.js';
 
 export const confirmGateEnabled = (env) => env.EMAIL_CONFIRM_GATE_ENABLED === 'true';
 export const listingCheckEnabled = (env) => env.LISTING_CHECK_ENABLED === 'true' && confirmGateEnabled(env);
@@ -99,6 +100,7 @@ export async function handleConfirm(env, ctx, request, origin, json, { allowedOr
     if (!scan.email_confirmed_at) {
       await sb.patch(`scans?id=eq.${scanId}&email_confirmed_at=is.null`, { email_confirmed_at: new Date().toISOString() });
     }
+    await confirmScan(env, sb, scanId);   // MPC-9818: the click proves the inbox, so this scan now counts for the whole month (idempotent; never throws)
     if (listingCheckEnabled(env)) {
       const job = runStoredListingChecks(env, sb, scanId, scan.email_scanned);
       if (ctx?.waitUntil) ctx.waitUntil(job); else await job;

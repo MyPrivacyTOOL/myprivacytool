@@ -34,6 +34,13 @@ simple = { limit = 30, period = 60 }
 [vars]
 LEARNING_EVENTS_ENABLED = "true"
 
+# ─── MESSENGER / WHATSAPP REPLIES SWITCH ─────────────────────────────────────
+# CK-9837: OFF. While it is not exactly "true" the Worker still authenticates Meta webhooks but sends and stores nothing for Messenger and
+# WhatsApp first-contact messages (the deep-dive code paths are unaffected). To test with app admins and testers: set to "true" and merge.
+# Public use also needs Meta Business verification, App Review and a Privacy Policy that covers these channels. Top level on purpose, like the
+# switch above: a value set in the dashboard would be replaced by the next `wrangler deploy`.
+MESSAGING_ENABLED = "false"
+
 # ─── OBSERVABILITY ───────────────────────────────────────────────────────────
 [observability]
 enabled = true

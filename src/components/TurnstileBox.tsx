@@ -8,10 +8,12 @@ interface TurnstileBoxProps {
   onRendered?: (rendered: boolean) => void;
   /** Change this number to reset the widget (a token is single use). */
   resetSignal?: number;
+  /** MPC-9888: false = do not load Cloudflare's script yet (the scan form arms it at the button click, so nothing third-party runs before it). Default true. */
+  armed?: boolean;
 }
 
 /** MPC-8430: Cloudflare Turnstile widget ("interaction-only": shows nothing unless Cloudflare needs the visitor). If the script is blocked it renders nothing. */
-export default function TurnstileBox({ sitekey, onToken, onRendered, resetSignal = 0 }: TurnstileBoxProps) {
+export default function TurnstileBox({ sitekey, onToken, onRendered, resetSignal = 0, armed = true }: TurnstileBoxProps) {
   const box = useRef<HTMLDivElement>(null);
   const api = useRef<TurnstileApi>();
   const widget = useRef<string>();
@@ -19,6 +21,7 @@ export default function TurnstileBox({ sitekey, onToken, onRendered, resetSignal
   cb.current = { onToken, onRendered };
 
   useEffect(() => {
+    if (!armed) return;
     let cancelled = false;
     loadTurnstile().then((ts) => {
       if (cancelled || !ts || !box.current) return;
@@ -40,7 +43,7 @@ export default function TurnstileBox({ sitekey, onToken, onRendered, resetSignal
         cb.current.onRendered?.(false);
       }
     };
-  }, [sitekey]);
+  }, [sitekey, armed]);
 
   useEffect(() => {
     if (resetSignal && widget.current) api.current?.reset(widget.current);

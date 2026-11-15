@@ -199,4 +199,14 @@ check(row.status === 'error' && /YOUTUBE_API_KEY not set/.test(row.error), 'miss
   globalThis.fetch = realFetch;
 }
 
+// MPC-9930: POST /check/google-ads — bearer-guarded, read-only, reports missing secret NAMES instead of calling Google.
+{
+  const req = (auth) => new Request('https://w/check/google-ads', { method: 'POST', headers: auth ? { authorization: auth } : {} });
+  const noAuth = await worker.fetch(req(null), env);
+  check(noAuth.status === 401, '/check/google-ads without the bearer token is 401');
+  const res = await worker.fetch(req('Bearer tok'), env);
+  const body = await res.json();
+  check(res.status === 200 && body.check === 'google-ads' && body.result.configured === false && body.result.missing.length === 3 && body.result.missing.includes('GOOGLE_ADS_REFRESH_TOKEN'), '/check/google-ads with no Google Ads secrets reports the three missing names, calls nothing');
+}
+
 process.exit(ok ? 0 : 1);

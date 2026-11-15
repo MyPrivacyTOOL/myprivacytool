@@ -78,7 +78,8 @@ const real = globalThis.fetch;
 
     // can(): Free values only
     r = await run(S, post('/api/account/can', { key: 'report.score' }, bearer(at))); check((await r.json()).allowed === true, 'can: a free capability is allowed');
-    r = await run(S, post('/api/account/can', { key: 'report.export_pdf' }, bearer(at))); const cp = await r.json(); check(cp.allowed === false && cp.reason === 'unknown_capability', 'can: a paid capability is not wired (MPC-9818): denied');
+    r = await run(S, post('/api/account/can', { key: 'report.export_pdf' }, bearer(at))); const cp = await r.json(); check(cp.allowed === false && cp.reason === 'tier_too_low' && cp.min_tier === 'basic', 'can: a paid capability (MPC-9818 data) is denied to a Free account as tier_too_low, with the tier that has it');
+    r = await run(S, post('/api/account/can', { key: 'report.no_such_key' }, bearer(at))); const cu = await r.json(); check(cu.allowed === false && cu.reason === 'unknown_capability', 'can: an unknown key is denied as unknown_capability');
     check((await can({ rpc: async () => { throw new Error('must not call'); } }, 'x', 'Not A Key!')).allowed === false, 'can: a malformed key is denied without a database call');
 
     // refresh + signout

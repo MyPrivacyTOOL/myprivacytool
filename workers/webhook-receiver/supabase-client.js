@@ -68,6 +68,28 @@ export async function insertMptRow(env, table, row) {
   }
 }
 
+/**
+ * MPC-9892: call one counter function (Postgres RPC). Only functions on this list may be called; each adds 1 to an anonymous daily counter.
+ * Returns true on success, false if skipped or failed (never throws). Error text is never logged: it can quote the arguments.
+ */
+const RPCS = new Set(['mpt_learning_count_tile_event']);
+export async function callMptRpc(env, fn, args) {
+  if (!RPCS.has(fn)) { console.error(`Supabase: refusing call to non-listed function "${fn}"`); return false; }
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) { console.warn('Supabase not configured — skipping call'); return false; }
+  try {
+    const res = await callRecipient('supabase', { url: `${env.SUPABASE_URL || DEFAULT_URL}/rest/v1/rpc/${fn}`, sent: [], init: {
+      method: 'POST',
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    } }, workerRecipientContext(env));
+    if (!res.ok) { console.error(`Supabase rpc ${fn} failed: ${res.status}`); return false; }
+    return true;
+  } catch {
+    console.error(`Supabase rpc ${fn} error`);
+    return false;
+  }
+}
+
 /** Record one engagement funnel step for a channel session. Flags default to false in the DB. */
 export function recordEngagement(env, sessionId, flags = {}) {
   return insertMptRow(env, 'mpt_user_engagement', { session_id: sessionId, ...flags });

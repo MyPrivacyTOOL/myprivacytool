@@ -11,10 +11,14 @@ import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
-import { SCAN_TURNSTILE_SITE_KEY } from "@/lib/turnstile";
+import { SCAN_TURNSTILE_SITE_KEY, loadTurnstile } from "@/lib/turnstile";
+import ScanConsentText from "@/components/ScanConsentText";
+import { ConsentError, giveScanConsent, hasScanConsent } from "@/lib/scanConsent";
+import { setChoice } from "@/lib/cookieConsent";
 import LiveScanPanel from "@/components/LiveScanPanel";
 import ShareButtons from "@/components/ShareButtons";
 import ScanNumberNotice from "@/components/ScanNumberNotice";
+import ScanRecipientsPanel from "@/components/ScanRecipientsPanel";   // MPC-9893
 import { trackStartSignup, trackReportRequested, trackReportFailed } from "@/lib/analytics";
 import { canOfferScanSave, recognitionEnabled, reportStep } from "@/lib/webScan";
 import { referralsEnabled, rememberReferralCode } from "@/lib/referral";
@@ -50,6 +54,8 @@ const Scan = () => {
   const [tsToken, setTsToken] = useState("");
   const [tsReset, setTsReset] = useState(0);
   const tsWidgets = useRef(0);
+  // MPC-9888: Cloudflare's script loads at the button click, not on page load (design 8.2). Armed once the click has been made.
+  const [tsArmed, setTsArmed] = useState(() => hasScanConsent());
   // MPC-8453: the address we already asked "did you mean ...?" about; pressing the button again with the same address sends it.
   const typoAsked = useRef("");
   // The visitor pressed the button before Cloudflare finished: the request is sent by itself the moment the token arrives (no "try again" round trip).
@@ -67,7 +73,7 @@ const Scan = () => {
     if (referralsEnabled()) rememberReferralCode(new URLSearchParams(window.location.search).get("ref"));
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // The save box is optional: unticked = the report is still requested, the scan is just not saved.
     if (!email.trim() || !consent || submitting || waitingForToken) return;
@@ -81,10 +87,25 @@ const Scan = () => {
       const problem = listingProblem(listingFields) || (offerSave && saveConsent ? "" : "To check a page you show us, tick \"save my scan\" too: the details are kept with your saved scan and deleted with it. Or clear those fields to go on without them.");
       if (problem) { setErrorMsg(problem); return; }
     }
-    if (tsWidgets.current > 0 && !tsToken) {
-      setErrorMsg("");
-      setWaitingForToken(true);
+    // MPC-9888: pressing the button is the agreement shown above it. Record it first; nothing else starts if it cannot be recorded.
+    setSubmitting(true);
+    try {
+      await giveScanConsent();
+    } catch (err) {
+      setSubmitting(false);
+      setErrorMsg(err instanceof ConsentError && err.kind === "stale" ? "This page is out of date. Please reload it and try again." : "We could not record your agreement just now, so nothing has been sent. Please press the button to try again.");
       return;
+    }
+    setChoice(true);   // pressing the button also counts as the analytics choice for a visitor who never scanned (design 8.1)
+    setSubmitting(false);
+    if (!tsToken) {
+      const ts = await Promise.race([loadTurnstile(), new Promise<undefined>((r) => setTimeout(() => r(undefined), 4000))]);   // the script loads now, at the click; a blocked or slow script never holds the form
+      if (ts) {
+        setTsArmed(true);
+        setErrorMsg("");
+        setWaitingForToken(true);   // the effect below sends the report the moment the token arrives
+        return;
+      }
     }
     void sendReport(tsToken);
   };
@@ -109,7 +130,7 @@ const Scan = () => {
         const status = reportErr instanceof ReportRequestError ? reportErr.status : 0;
         console.error("Scan report request failed", kind, status);
         trackReportFailed("scan_page", kind, status);
-        setErrorMsg(kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
+        setErrorMsg(reportErr instanceof ReportRequestError && reportErr.kind === "allowance" && reportErr.detail ? reportErr.detail : kind === "rate_limited" ? REPORT_WAIT_MESSAGE : kind === "bad_email" ? BAD_EMAIL_MESSAGE : REPORT_FAILED_MESSAGE); // no thank-you screen: the email stays in the box for a retry
         setTsToken(""); // a Turnstile token is single use: get a fresh one for the retry
         setTsReset((n) => n + 1);
         return;
@@ -145,6 +166,7 @@ const Scan = () => {
         required
         className="h-12 text-base"
       />
+      <ScanConsentText className="w-full" />
       <Button
         type="submit"
         disabled={submitting || waitingForToken}
@@ -157,6 +179,7 @@ const Scan = () => {
         onToken={setTsToken}
         onRendered={(on) => { tsWidgets.current += on ? 1 : -1; }}
         resetSignal={tsReset}
+        armed={tsArmed}
       />
       <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
       {offerSave && <ListingCheckFields idSuffix={idSuffix} value={listingFields} onChange={setListingFields} disabled={submitting} />}
@@ -180,6 +203,7 @@ const Scan = () => {
         We'll email <span className="text-foreground">{email}</span> with your next steps.
       </p>
       <ScanNumberNotice />
+      <ScanRecipientsPanel />
       {liveToken && <LiveScanPanel token={liveToken} />}
     </div>
   );

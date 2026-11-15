@@ -75,6 +75,10 @@
     "title": "How to delete your data | MyPrivacyTOOL",
     "description": "How to ask MyPrivacyTOOL to delete the personal data we hold about you: by email, in Telegram, or for a website scan. Free, any time."
   },
+  "/what-we-see": {
+    "title": "What We See, and Who Else Does | MyPrivacyTOOL",
+    "description": "Every outside party that can receive data from MyPrivacyTOOL: what each one sees, why, for how long, on what basis, and whether it runs on page load or only after you press Scan me."
+  },
   "/trust": {
     "title": "Trust & Legal | MyPrivacyTOOL",
     "description": "How MyPrivacyTOOL handles your data: privacy policy, terms, cookie policy and data processing summary in one place."

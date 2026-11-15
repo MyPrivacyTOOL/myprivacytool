@@ -11,6 +11,7 @@ export const BANDS: readonly { key: Band; from: number; to: number }[];
 export const BAND_LABEL: Readonly<Record<Band, string>>;
 export const CATEGORY_WEIGHTS: Readonly<Record<WeightCategory, number>>;
 export const WEIGHT_TOTAL: 100;
+export const WEIGHTS_LABEL: string;
 export const CATEGORY_OF: Readonly<Record<string, WeightCategory>>;
 export const SEVERITY_OF_SENSITIVITY: Readonly<Record<'low' | 'medium' | 'high', number>>;
 export const SCORABLE_IDS: readonly string[];

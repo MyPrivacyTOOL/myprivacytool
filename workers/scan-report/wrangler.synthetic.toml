@@ -23,6 +23,8 @@ SUPABASE_URL = "https://xmdmkumwxpgahmlweuug.supabase.co"
 HUBSPOT_LEAD_SOURCE = "synthetic_test"
 RECIPIENT_ALLOWLIST = "testingnt69@gmail.com"
 ALLOW_PARTIAL_REPORT = "true"
+# MPC-9816: a Free address never triggers the breach lookup (third-party cost): the breach section is NOT CHECKED. "false" + redeploy is the rollback.
+BREACH_GATE_ENABLED = "true"
 HK_SPAM_ENABLED = "false"
 HK_SPAM_EMAILS_LIVE = "false"
 EMAIL_GITHUB_COMMITS_ENABLED = "false"

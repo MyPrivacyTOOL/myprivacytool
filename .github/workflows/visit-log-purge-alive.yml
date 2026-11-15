@@ -1,0 +1,27 @@
+name: Visit-log purge alive check
+
+# MPC-9889: the visit-log purge (pg_cron, 19:20 UTC) must have run in the last 26 hours (design 3.4). Read-only; red run when late. Script and tests: scripts/visit-log-purge-alive/.
+
+on:
+  schedule:
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alive:
+    name: Visit-log purge alive
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Purge ran in the last 26 hours
+        run: node scripts/visit-log-purge-alive/check.mjs

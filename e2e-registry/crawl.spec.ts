@@ -19,7 +19,10 @@ const CONCURRENCY = Number(process.env.CRAWL_CONCURRENCY ?? 6);
 const LIMIT = Number(process.env.CRAWL_LIMIT ?? 0);
 // Routes where the app runs its own on-load work (device scan, STUN, Turnstile): given time to finish so a delayed call is not missed.
 const DEEP_ROUTES = new Set((process.env.CRAWL_DEEP_ROUTES ?? "/,/scan,/start,/footprint,/pricing,/contact,/newsletter,/privacy").split(","));
-const CLICK_SELECTOR = process.env.CRAWL_CLICK_SELECTOR ?? "";
+// MPC-9888: the real consent button on the home page.
+const CLICK_SELECTOR = process.env.CRAWL_CLICK_SELECTOR ?? '[data-testid="scan-me"]';
+// Pages where NOTHING third-party may run before the click, the Turnstile exception included (it loads at the click here).
+const ZERO_THIRD_PARTY_PRECLICK = ["/", "/scan"];
 
 type Obs = { phase: "pre_click" | "post_click"; host: string; url?: string; route?: string; kind?: "request" | "ice"; scheme?: string };
 
@@ -98,8 +101,8 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
     if (await email.count()) {
       await email.fill("crawl-check@example.com").catch(() => {});
       for (const box of await page.locator('input[type="checkbox"], [role="checkbox"]').all()) await box.check({ force: true, timeout: 1000 }).catch(() => box.click({ force: true, timeout: 1000 }).catch(() => {}));
-      const button = CLICK_SELECTOR ? page.locator(CLICK_SELECTOR).first() : page.locator('form button[type="submit"]').first();
-      if (await button.count()) { await button.click({ force: true, timeout: 3000 }).catch(() => {}); action = `clicked ${CLICK_SELECTOR || "form submit"}`; }
+      const button = page.locator('form button[type="submit"]').first();
+      if (await button.count()) { await button.click({ force: true, timeout: 3000 }).catch(() => {}); action = "clicked form submit"; }
     } else if (CLICK_SELECTOR && (await page.locator(CLICK_SELECTOR).count())) {
       await page.locator(CLICK_SELECTOR).first().click({ force: true, timeout: 3000 }).catch(() => {}); action = `clicked ${CLICK_SELECTOR}`;
     }
@@ -121,7 +124,13 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
   const crawlList = { ...allow, entries: (allow.entries as { rule: string }[]).filter((e) => e.rule.startsWith("crawl-")) };
   const today = new Date().toISOString().slice(0, 10);
   const r = applyAllowlist(findings, crawlList as never, today);
+  // MPC-9888 (5): zero non-first-party hosts before the click on the scan pages. Turnstile (a registered pre_click exception elsewhere) must not appear here.
+  const firstPartyKeys = new Set(registry.recipients.filter((r: { party: string }) => r.party === "first").map((r: { key: string }) => r.key));
+  const thirdPartyPre = obs.filter((o) => o.phase === "pre_click" && ZERO_THIRD_PARTY_PRECLICK.includes((o.route ?? "").replace(/(.)\/$/, "$1")) && o.host && !/^(127\.0\.0\.1|localhost)$/.test(o.host)
+    && !registry.recipients.some((r: { key: string; hosts: string[] }) => firstPartyKeys.has(r.key) && r.hosts.some((h) => h === o.host)));
+  const zeroProblems = thirdPartyPre.map((o) => `PRE-CLICK third-party host on ${o.route}: ${o.kind === "ice" ? `${o.scheme}:` : ""}${o.host}`);
   const problems = [
+    ...zeroProblems,
     ...r.violations.map((f: { message: string }) => `NEW: ${f.message}`),
     ...r.stale.map((e: { rule: string; detail: string; note: string }) => `STALE allowlist entry (no longer contacted), delete it: ${e.rule} ${e.detail} (${e.note})`),
   ];

@@ -13,6 +13,8 @@ const TelegramDashboard = lazy(() => import("./pages/TelegramDashboard"));
 const DeepDive = lazy(() => import("./pages/DeepDive"));
 const Report = lazy(() => import("./pages/Report"));
 const Business = lazy(() => import("./pages/Business"));
+const BusinessTeam = lazy(() => import("./pages/BusinessTeam"));
+const BusinessJoin = lazy(() => import("./pages/BusinessJoin"));
 const Enterprise = lazy(() => import("./pages/Enterprise"));
 const Start = lazy(() => import("./pages/Start"));
 const AIAccessCheck = lazy(() => import("./pages/AIAccessCheck"));
@@ -34,6 +36,7 @@ const AcceptableUse = lazy(() => import("./pages/AcceptableUse"));
 const DPA = lazy(() => import("./pages/DPA"));
 const DataDeletion = lazy(() => import("./pages/DataDeletion"));
 const Trust = lazy(() => import("./pages/Trust"));
+const WhatWeSee = lazy(() => import("./pages/WhatWeSee"));   // MPC-9893
 // MPC-9829: two legal pages that existed but were never routed (live /accessibility and /gdpr-rights rendered the 404 page).
 const Accessibility = lazy(() => import("./pages/Accessibility"));
 const GDPRRights = lazy(() => import("./pages/GDPRRights"));
@@ -73,6 +76,9 @@ const App = () => (
             <Route path="/scan/deep-dive" element={<DeepDive />} />
             <Route path="/report" element={<Report />} />
             <Route path="/business" element={<Business />} />
+            {/* MPC-9824: business teams. Off unless VITE_BUSINESS_TEAMS_ENABLED and VITE_ACCOUNTS_ENABLED are "true"; noindex. */}
+            <Route path="/business/team" element={<BusinessTeam />} />
+            <Route path="/business/join" element={<BusinessJoin />} />
             <Route path="/enterprise" element={<Enterprise />} />
             {/* Messaging / First Hexagon entry point */}
             <Route path="/start" element={<Start />} />
@@ -100,6 +106,7 @@ const App = () => (
             <Route path="/dpa" element={<DPA />} />
             <Route path="/data-deletion" element={<DataDeletion />} />
             <Route path="/trust" element={<Trust />} />
+            <Route path="/what-we-see" element={<WhatWeSee />} />
             <Route path="/accessibility" element={<Accessibility />} />
             <Route path="/gdpr-rights" element={<GDPRRights />} />
             {/* Guides */}

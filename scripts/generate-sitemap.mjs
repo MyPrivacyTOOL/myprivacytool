@@ -39,6 +39,7 @@ const STATIC_ROUTES = [
   { path: "/dpa", file: "src/pages/DPA.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/data-deletion", file: "src/pages/DataDeletion.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/trust", file: "src/pages/Trust.tsx", priority: "0.4", changefreq: "yearly" },
+  { path: "/what-we-see", file: "src/pages/WhatWeSee.tsx", priority: "0.5", changefreq: "weekly" },   // MPC-9893
   { path: "/accessibility", file: "src/pages/Accessibility.tsx", priority: "0.3", changefreq: "yearly" },
   { path: "/gdpr-rights", file: "src/pages/GDPRRights.tsx", priority: "0.3", changefreq: "yearly" },
 ];

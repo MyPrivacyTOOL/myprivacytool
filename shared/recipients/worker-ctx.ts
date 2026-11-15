@@ -8,14 +8,21 @@
 // What gets logged (scan_recipient_log): scan id, recipient key, data item NAMES, time, status, HTTP status, error code. Never a value, a URL or a
 // header. A call made outside a scan (no scanId: cron collectors, ops notifications, the content pipeline) writes no row; there is no scan to hang it on.
 import { callRecipient, type RecipientContext, type RecipientLogEntry } from "./outbound.ts";
+import { makeConsentVerifier } from "./consent.ts";
 
 /**
- * Check 4 (consent id for post_click recipients). The server-side consent store is MPC-9887. Until it exists a Worker has no consent id to present and
- * must not invent one, so check 4 is skipped for Workers and Functions only: every other check (key, enabled, flag, country, host, declared items,
- * user_supplied rules) runs on every call. MPC-9887 flips this constant to true and supplies `verifyConsent`; a test pins both that it is a constant
- * and that no other code path turns check 4 off.
+ * Check 4 (consent id for post_click recipients), MPC-9887. The consent store (public.scan_consents) and its verifier now exist, so a call made INSIDE
+ * a scan (a scan id on the context) is checked against the store whenever either is true:
+ *   - the scan carries a consent id (the visitor's gate returned one): it must exist in the store, or the call is refused CONSENT_INVALID; or
+ *   - the Worker runs with CONSENT_GATE_ENFORCED = "true": a scan without a consent id is refused CONSENT_REQUIRED.
+ * CONSENT_GATE_ENFORCED stays "false" in every wrangler.toml until the consent block (MPC-9888) sends the id, because no visitor holds one before
+ * that; flipping it earlier would refuse every report. Calls outside a scan (cron collectors, ops notifications, the content pipeline) are not on
+ * a visitor's behalf and carry no consent. Every other check runs on every call either way.
  */
-export const CONSENT_GATE_ACTIVE = false;
+export const CONSENT_GATE_ACTIVE = true;
+
+/** True only for the exact string "true" (same rule as every other Worker switch). */
+export const consentGateEnforced = (env: Env): boolean => ((env ?? {}) as Record<string, unknown>).CONSENT_GATE_ENFORCED === "true";
 
 type Env = Record<string, unknown> | undefined | null;
 
@@ -25,7 +32,7 @@ export interface WorkerContextOptions {
   scanId?: string | null;
   /** Cloudflare cf.country of the visitor, if the call is on a visitor's behalf. */
   country?: string | null;
-  /** Consent id from the gate (MPC-9887). Ignored until CONSENT_GATE_ACTIVE. */
+  /** Consent id returned by the gate (POST /api/consent) and stored on the scan. With a scanId it is verified against scan_consents on every post_click call. */
   consentId?: string | null;
   verifyConsent?: RecipientContext["verifyConsent"];
   /** Overrides the sink (tests). Pass `null` to disable logging. */
@@ -75,7 +82,7 @@ export function createRecipientLogSink(env: Env, fetchImpl?: typeof fetch): Reci
           url: `${creds.url}/rest/v1/scan_recipient_log`,
           init: { method: "POST", headers: { apikey: creds.key, authorization: `Bearer ${creds.key}`, "content-type": "application/json", prefer: "return=minimal" }, body: JSON.stringify(rows) },
           sent: [],
-        }, { fetchImpl, consentGate: "pending_mpc_9887" });
+        }, { fetchImpl, consentGate: "none" });
         return res.ok ? rows.length : 0;
       } catch {
         return 0; // the log never breaks or changes the call it describes
@@ -85,16 +92,38 @@ export function createRecipientLogSink(env: Env, fetchImpl?: typeof fetch): Reci
   };
 }
 
+/**
+ * The store lookups behind check 4. They go through the wrapper too (key "supabase", no items) with consent skipped: reading the consent store cannot
+ * itself need a consent. No Supabase credentials, no verifier: then only the presence of the id can be checked.
+ */
+function defaultVerifier(env: Env, fetchImpl?: typeof fetch): RecipientContext["verifyConsent"] {
+  const creds = supabaseCredentials(env);
+  if (!creds) return undefined;
+  const headers = { apikey: creds.key, authorization: `Bearer ${creds.key}` };
+  const sb = {
+    async select(path: string) {
+      const res = await callRecipient("supabase", { url: `${creds.url}/rest/v1/${path}`, init: { headers }, sent: [] }, { fetchImpl, consentGate: "none" });
+      if (!res.ok) throw new Error(`consent store read failed: ${res.status}`);
+      return (await res.json()) as unknown[];
+    },
+    async insert(): Promise<null> { throw new Error("the verifier never writes"); },
+  };
+  return makeConsentVerifier(sb);
+}
+
 /** The context for converted Worker and Function call sites. Flags are read from `env` by name. */
 export function workerRecipientContext(env: Env, opts: WorkerContextOptions = {}): WorkerRecipientContext {
   const sink = opts.sink === undefined ? (opts.scanId ? createRecipientLogSink(env, opts.fetchImpl) : null) : opts.sink;
   const e = (env ?? {}) as Record<string, unknown>;
+  const carried = typeof opts.consentId === "string" ? opts.consentId.trim() : "";
+  const gated = Boolean(opts.scanId) && CONSENT_GATE_ACTIVE && (Boolean(carried) || consentGateEnforced(env));   // see CONSENT_GATE_ACTIVE
   const ctx: WorkerRecipientContext = {
     flags: (name: string) => e[name],
     ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
     ...(opts.scanId ? { scanId: opts.scanId } : {}),
     ...(opts.country ? { country: opts.country } : {}),
-    ...(CONSENT_GATE_ACTIVE ? { consentId: opts.consentId ?? null, verifyConsent: opts.verifyConsent, consentGate: "enforce" as const } : { consentGate: "pending_mpc_9887" as const }),
+    consentGate: gated ? ("enforce" as const) : ("none" as const),
+    ...(gated ? { consentId: carried || null, verifyConsent: opts.verifyConsent ?? defaultVerifier(env, opts.fetchImpl) } : {}),
     ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
     ...(opts.maxBytes ? { maxBytes: opts.maxBytes } : {}),
     ...(opts.beforeCall ? { beforeCall: opts.beforeCall } : {}),

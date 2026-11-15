@@ -6,16 +6,25 @@
 //   node scripts/sync-recipients.mjs              upsert every entry (needs SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)
 //   node scripts/sync-recipients.mjs --check      compare table to file, exit 1 on drift (the nightly drift check)
 //   node scripts/sync-recipients.mjs --hash       print the registry_hash of the file and exit
+//   node scripts/sync-recipients.mjs --emit-module regenerate shared/recipients/recipients.data.js (the bundler-safe copy the wrapper imports)
 //   node scripts/sync-recipients.mjs --emit-sql   print one INSERT .. ON CONFLICT statement per entry (for the Supabase connector, small statements)
 //
 // Runs on merge to main and nightly from .github/workflows/sync-recipients.yml. Never prints a key or any secret.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { canonicalJson, registryHash } from "../shared/recipients/canonical.js";
 
 const FILE = join(dirname(fileURLToPath(import.meta.url)), "..", "shared", "recipients", "recipients.json");
 const TABLE = "recipients_registry";
+
+const MODULE_FILE = join(dirname(fileURLToPath(import.meta.url)), "..", "shared", "recipients", "recipients.data.js");
+/** The registry as an ES module. Workers are bundled by wrangler 3.x (esbuild without JSON import attributes) and plain Node 22 needs the attribute, so the wrapper imports THIS file;
+ *  recipients.json stays the single edited source and `npm run recipients:module` regenerates it. CI (registry hygiene) fails when they differ. */
+export function moduleText(file) {
+  return `// GENERATED from shared/recipients/recipients.json by scripts/sync-recipients.mjs --emit-module. DO NOT EDIT: edit the JSON, then run \`npm run recipients:module\`.\nexport default ${JSON.stringify(file, null, 2)};\n`;
+}
+export const moduleInSync = (file, current) => current === moduleText(file);
 
 export function loadFile(path = FILE) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -60,6 +69,7 @@ async function main(argv) {
   const file = loadFile();
   const { hash, rows } = await buildRows(file);
   if (argv.includes("--hash")) { console.log(hash); return 0; }
+  if (argv.includes("--emit-module")) { writeFileSync(MODULE_FILE, moduleText(file)); console.log(`wrote ${MODULE_FILE}`); return 0; }
   if (argv.includes("--emit-sql")) { for (const r of rows) console.log(toSql(r)); return 0; }
   if (argv.includes("--check")) {
     const tableRows = await (await rest(`${TABLE}?select=key,body,registry_hash&limit=1000`)).json();

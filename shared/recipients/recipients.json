@@ -70,10 +70,7 @@
         "referrer",
         "utm",
         "country",
-        "device_profile",
-        "user_agent",
-        "page_load",
-        "city"
+        "device_profile"
       ],
       "purpose": "Traffic attribution only, kept apart from your scan and account and never joined to them.",
       "party": "first",
@@ -89,7 +86,7 @@
       "dpa_listed": true,
       "since": "2026-11-08",
       "until": null,
-      "note": "MPC-9885: shared/edge-capture/capture.ts writes ONE edge_visits row per request that serves both the visit log and the bot record: it also carries user_agent, the request path and host (page_load) and request.cf (city, region, coordinates, timezone, network); added user_agent, page_load, city. The query string (utm tags) is kept except credential-like values."
+      "note": "MPC-9889: person and unknown visits only (functions/_visit-log.ts). IP shaped by the country policy (raw / truncated / none) before it leaves the Worker; referrer host + path; utm tags; country; device class. No user agent, headers or request path: bots and AI go to machine-mirror. Same host also serves the policy read (mpt_visit_log_policy), which sends nothing."
     },
     {
       "key": "machine-mirror",
@@ -102,7 +99,9 @@
       "data_items": [
         "user_agent",
         "ip",
-        "page_load"
+        "page_load",
+        "country",
+        "city"
       ],
       "purpose": "Records which bots and AI crawlers visit, to classify automated traffic.",
       "party": "first",
@@ -117,7 +116,8 @@
       "country_overrides": {},
       "dpa_listed": true,
       "since": "2026-11-08",
-      "until": null
+      "until": null,
+      "note": "MPC-9889: bot and AI visits only (edge_visits). The row carries request.cf (country, city, network) and the header set for bot forensics; the raw IP window is cut by the retention tasks (MPC-9891)."
     },
     {
       "key": "scan-report",
@@ -175,6 +175,37 @@
       "since": "2026-11-08",
       "until": null,
       "note": "MPC-9817. You type your own address into the sign-in form and press the button; the sign-in email itself goes out through the resend entry and the login through the supabase entry."
+    },
+    {
+      "key": "business-team-service",
+      "name": "Business team invitations and employee-authorised checks",
+      "hosts": [
+        "mpt-scan-report.myprivacytool.workers.dev"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [
+        "email",
+        "name",
+        "phone",
+        "city",
+        "country"
+      ],
+      "purpose": "An admin invites employees by email; each employee chooses to authorise their own check, and the admin sees counts for the authorised people only.",
+      "party": "first",
+      "retention": {
+        "days": null,
+        "text": "Invitation expires after 30 days; results are deleted when the employee withdraws, the admin removes them, or the team is deleted. The name, city and phone typed for a check are used once and never stored."
+      },
+      "consent_basis": "user_action",
+      "phase": "pre_click",
+      "enabled": true,
+      "flag": null,
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-15",
+      "until": null,
+      "note": "MPC-9824 (F6). The invitation email goes out through the resend entry, the database through supabase; the broker/listing check reads only pages the employee pastes (user-pasted-listing). Nothing about an employee is read until that employee presses Authorise."
     },
     {
       "key": "leads",
@@ -1371,6 +1402,32 @@
       "since": "2026-11-08",
       "until": null,
       "note": "Added by MPC-9885: collector reads aggregate reports with our service-account token. The tag that sends visitor data to GA4 is the separate `ga4` entry. MPC-9885: flag corrected to GA4_SERVICE_ACCOUNT_JSON, the secret the collector requires (GA4_PROPERTY_ID is a constant in code, not an env var)."
+    },
+    {
+      "key": "google-ads-api",
+      "name": "Google Ads API (account reads)",
+      "hosts": [
+        "googleads.googleapis.com",
+        "oauth2.googleapis.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Reads our own Google Ads account configuration (conversion actions, later aggregate campaign stats) for the metrics collector; read-only, sends no visitor data.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": true,
+      "flag": "GOOGLE_ADS_REFRESH_TOKEN",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-09",
+      "until": null,
+      "note": "Added by MPC-9915. OAuth refresh-token exchange plus GoogleAdsService searchStream only; never a mutate call. Offline conversion upload (Stage C, gclid + timestamp) is a separate decision and would need its own data_items and consent gate (MPC-9882)."
     },
     {
       "key": "youtube-data-api",

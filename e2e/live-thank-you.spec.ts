@@ -3,7 +3,7 @@
 // the polling of GET /api/scan/live are handed to the REAL Worker code (workers/scan-report) running in this test process with an in-memory
 // Supabase/Resend/HubSpot behind it and the outside lookups (DNS, Gravatar, Libravatar, RDAP, GitHub) answered by stubs. What it cannot prove:
 // that Turnstile lets a real person through, that the real outside services answer, and that an email arrives. Those need a person.
-import { test, expect } from "./fixtures";
+import { test, expect, e2eConsentRows } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import worker from "../workers/scan-report/index.js";
@@ -12,7 +12,7 @@ import { makeLiveLink } from "../workers/scan-report/lib/live.js";
 const EMAIL = "e2e-live+mpc8452@example.com";
 const ORIGIN = "https://myprivacytool.io";   // the Worker only accepts the production origins
 const ENV = {
-  SUPABASE_URL: "https://stub.supabase.test", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "",
+  SUPABASE_URL: "https://stub.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "stub", RESEND_API_KEY: "stub", RECIPIENT_ALLOWLIST: "",
   UNSUBSCRIBE_SECRET: "e2e-secret", EMAIL_GITHUB_COMMITS_ENABLED: "true",
   EMAIL_DOMAIN_CHECK: "false",   // MPC-8453: the stubbed DNS answers nothing, so the new domain check would refuse the test address; popup-report.spec.ts switches it off the same way
 };
@@ -23,6 +23,7 @@ function fakeBackends() {
   const res = (status: number, body?: unknown) => ({ ok: status < 400, status, headers: { get: () => null }, text: async () => (body === undefined ? "" : JSON.stringify(body)), json: async () => body });
   const fetchImpl = async (input: unknown, init: RequestInit = {}) => {
     const url = String(input);
+    const consentRes = e2eConsentRows(url); if (consentRes) return consentRes;   // MPC-9888
     // outside services behind the email checks
     if (url.includes("cloudflare-dns.com")) return res(200, { Status: 0, Answer: [] });
     if (/gravatar\.com|libravatar\.org|rdap\.org/.test(url)) return res(404);

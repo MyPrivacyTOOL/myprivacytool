@@ -15,18 +15,24 @@ import { turnstileBlocks } from './lib/turnstile.js';
 import { checkDeliverableDomain } from './lib/emailDomain.js';
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext, flushQuietly } from './lib/recipients.js';
+import { handleConsent, gateScanRequest, consentEnforced } from './lib/consent.js';
+import { handleScanRecipients } from './lib/scanRecipients.js';   // MPC-9893
 import { handleLive, makeLiveLink, makeLiveToken, runLiveChecks } from './lib/live.js';
 import { loadWebScan } from './lib/webScanLoader.js';
 import { handleResendWebhook } from './lib/receipts.js';
 import { reportAttachment } from './lib/reportHex.js';
 import { MAX_WEB_SCAN_BYTES, parseRequestId, parseSaveRequest, readCappedJson, recordEvent, requestIdEnabled, saveWebScanForContact, validateStep, webScanEnabled } from './lib/webScan.js';
 import { handleRecognise, handleRecogniseDelete } from './lib/recognise.js';
-import { handleSignIn, handleVerify, handleMe, handleLinkScan, handleDelete, handleRefresh, handleSignOut, handleCan, handleOpenScan } from './lib/accounts.js';
+import { allowanceEnabled, consumeScan, dropRefusedScan, getEntitlements, refusalBody } from './lib/entitlements.js';
+import { handleSignIn, handleVerify, handleMe, handleLinkScan, handleDelete, handleRefresh, handleSignOut, handleCan, handleOpenScan, handleExportIssue, handleExportDownload } from './lib/accounts.js';
+import { breachGate, loadBasicPrice } from './lib/paidReport.js';
 import { handleDeepResearchStart, handleDeepResearchVerify, handleDeepResearchResults, handleDeepResearchDelete } from './lib/deepResearch.js';
 import { attachReferral, completeReferral, ensureReferralCode, handleReferralInvite, handleReferralStatus, manageUrl, referralsEnabled, referralTester, shareUrl } from './lib/referral.js';
 import { referralBlock } from './lib/referralEmail.js';
 import { abOn, abVariant } from './lib/referralAb.js';
 import { followupStateEnabled, reportState, loadFindings, buildFollowUpEmailV2, handleFixed, fixedUrl } from './lib/followup.js';
+import { BUSINESS_ROUTES } from './lib/business.js';   // MPC-9824
+import { handleKeep, runFreeRecordJob } from './lib/freeRecord.js';
 import { buildFollowUpEmail, FOLLOWUP_DELAYS_MS, nextFollowUp, unsubscribePageUrl, unsubscribeUrl, verifyUnsubscribe } from './lib/onboarding.js';
 
 const ALLOWED_ORIGINS = ['https://myprivacytool.io', 'https://www.myprivacytool.io'];
@@ -78,6 +84,8 @@ export default {
     if (request.method === 'POST' && url.pathname === '/api/deep-research/results') return handleDeepResearchResults(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'POST' && url.pathname === '/api/deep-research/delete') return handleDeepResearchDelete(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     // MPC-8452: the live view. Read-only, authorised by the short-lived stream token that POST /api/scan returned.
+    // MPC-9893: the per-scan "who saw what" panel reads this scan's scan_recipient_log rows (names only). Read-only, authorised by the scan number.
+    if (request.method === 'GET' && url.pathname === '/api/scan/recipients') return handleScanRecipients(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method === 'GET' && url.pathname === '/api/scan/live') return handleLive(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, limited: liveLimited, sb: db(env) });
     // MPC-9813: the click-to-confirm. Authorised by the signed link in the confirmation email. 404 unless EMAIL_CONFIRM_GATE_ENABLED is "true".
     if (request.method === 'POST' && url.pathname === '/api/scan/confirm') return handleConfirm(env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
@@ -85,13 +93,22 @@ export default {
     if (url.pathname.startsWith('/api/account/') && (request.method === 'POST' || request.method === 'GET')) {
       const ctx2 = { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed };
       const acct = { '/api/account/signin': handleSignIn, '/api/account/verify': handleVerify, '/api/account/me': handleMe, '/api/account/link-scan': handleLinkScan, '/api/account/scan': handleOpenScan,
-        '/api/account/delete': handleDelete, '/api/account/refresh': handleRefresh, '/api/account/signout': handleSignOut, '/api/account/can': handleCan }[url.pathname];
+        '/api/account/delete': handleDelete, '/api/account/refresh': handleRefresh, '/api/account/signout': handleSignOut, '/api/account/can': handleCan, '/api/account/export': handleExportIssue }[url.pathname];
       if (acct && (request.method === 'POST' || url.pathname === '/api/account/me')) return acct(env, ctx, request, origin, json, ctx2);
+    }
+    // MPC-9824 (F6): business teams. Admin routes use the account session; employee routes use the token from the invite email. 404 unless BUSINESS_TEAMS_ENABLED and ACCOUNTS_ENABLED are "true".
+    if (request.method === 'POST' && url.pathname.startsWith('/api/business/') && BUSINESS_ROUTES[url.pathname]) {
+      return BUSINESS_ROUTES[url.pathname](env, ctx, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env), allowed: recipientAllowed });
     }
     // CK-8503: Resend's signed delivery / bounce events for the report email. 404 unless RESEND_WEBHOOK_SECRET is set.
     // MPC-7554: "I have fixed this" (stops the follow-ups for one report; never an unsubscribe). 404 unless FOLLOWUP_STATE_ENABLED is "true".
+    if (request.method === 'GET' && url.pathname === '/api/export') return handleExportDownload(env, request, json, { sb: db(env) });   // MPC-9816
     if (url.pathname === '/api/fixed') return handleFixed(env, request, url, { sb: db(env) });
+    // MPC-9890: the one-click Keep link in the report and countdown emails. 404 unless FREE_RECORD_DELETION_ENABLED is "true". See lib/freeRecord.js.
+    if (url.pathname === '/api/keep') return handleKeep(env, request, url, { sb: db(env) });
     if (url.pathname === '/api/resend-webhook') return handleResendWebhook(env, request, json, { sb: db(env), optOut: (addr, source) => optOutEverywhere(db(env), addr, source), pushHubspot: (addr) => pushEmailOptOut(env, { email: addr }) });   // MPC-7556: hard bounce / complaint -> THE opt-out
+    // MPC-9887: the scan consent store. One consent per scan id; POST records it, GET asks whether a journey already has one. First-party, pre-click.
+    if (url.pathname === '/api/consent' && (request.method === 'POST' || request.method === 'GET')) return handleConsent(env, request, origin, json, { allowedOrigins: ALLOWED_ORIGINS, rateLimited, sb: db(env) });
     if (request.method !== 'POST' || url.pathname !== '/api/scan') return new Response('Not found', { status: 404 });
     // MPC-7350: refuse other browser origins, oversized bodies and bursts from one IP. No Origin header = non-browser caller, still allowed.
     if (origin && !ALLOWED_ORIGINS.includes(origin)) return json({ error: 'Forbidden origin' }, 403);
@@ -105,6 +122,10 @@ export default {
       const email = clip(b.email, 255).trim().toLowerCase();
       if (!EMAIL_RE.test(email)) return json({ error: 'Valid email required' }, 400);
       if (b.consent !== true) return json({ error: 'Consent required' }, 400);   // never default to consent
+      // MPC-9887 (the server-side gate, design 2.3): the scan consent recorded by POST /api/consent. A consent_id that is not in scan_consents is always refused;
+      // a request with none is refused only once CONSENT_GATE_ENFORCED is "true" (set with the consent block, MPC-9888). Checked before anything is stored or sent.
+      const gate = await gateScanRequest(env, b, db(env));
+      if (gate.refuse) return json({ error: gate.refuse.error, code: gate.refuse.code }, gate.refuse.status);
       // MPC-8430: bot check before anything is stored or sent (no-op until TURNSTILE_SECRET_KEY is set; blocks only when TURNSTILE_ENFORCE = "true").
       if (await turnstileBlocks(env, request, b['cf-turnstile-response'], origin)) return json({ error: 'Verification failed' }, 403);
       // MPC-8453: refuse an address whose domain cannot receive mail (typo or made-up domain) before anything is stored or sent. Fails open; EMAIL_DOMAIN_CHECK = "false" turns it off.
@@ -134,7 +155,9 @@ export default {
         save: save.hexagons ? save : null,
         requestId: rid.requestId,
         listing: listing.inputs ?? null,
+        scanConsent: gate.consent,
       });
+      if (result.refused) return json(refusalBody(result.refused), 429);   // MPC-9818: honest refusal, the same words everywhere (lib/entitlements.js)
       // MPC-7470: the scan is saved and linked to this contact, with the consent record, inside handleScan, BEFORE the first email goes out, so that email can carry the scan number.
       // Not for a repeat request within 24h (no new report, so a second copy of the visitor's technical details would serve no purpose). A failure to save never changes the answer
       // to the email request. A replay of the SAME request (same request_id) reports the original outcome instead.
@@ -145,7 +168,7 @@ export default {
       if (!result.duplicate && result.scanId && env.SUPABASE_SERVICE_ROLE_KEY) {
         live = await makeLiveToken(env, result.scanId);
         if (live) {
-          const lctx = workerRecipientContext(env, { scanId: result.scanId });   // MPC-9885: the live checks belong to this scan
+          const lctx = workerRecipientContext(env, { scanId: result.scanId, consentId: result.consentId });   // MPC-9885: the live checks belong to this scan
           const p = runLiveChecks(env, db(env, undefined, lctx), result.scanId, email, undefined, lctx).finally(() => flushQuietly(lctx));
           if (ctx?.waitUntil) ctx.waitUntil(p);
         }
@@ -162,7 +185,7 @@ export default {
     // slots (01:05 to 04:05 UTC) that tick runs only the HK job, to keep within the 50-subrequest limit; the report and follow-up jobs
     // run on every other tick, so a report waits at most 5 minutes longer.
     if (isHkSpamSlot(event?.scheduledTime ?? Date.now())) ctx.waitUntil(runHkSpamJob(env, undefined, undefined, event?.scheduledTime ?? Date.now()).catch((e) => console.error('hk spam job failed:', String(e).replace(/\S+@\S+/g, '[email]'))));
-    else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)));
+    else ctx.waitUntil(runReportJob(env).catch((e) => console.error('report job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))).then(() => runFollowUpJob(env)).then(() => runFreeRecordJob(env, undefined, { allowed: recipientAllowed })).catch((e) => console.error('free-record job crashed:', String(e).replace(/\S+@\S+/g, '[email]'))));
   },
 };
 
@@ -185,11 +208,12 @@ async function handleWebScanStep(env, request, origin, json) {
 export const runHkSpamJob = (env, fetchImpl = undefined, limit, when) => runHkSpamReminderJob(env, { fetchImpl, allowed: recipientAllowed, limit, when });
 
 // ------------------------------------------------------------------ submit path
-export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId, listing = null }, fetchImpl = undefined) {
+export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref, save = null, requestId, listing = null, scanConsent = null }, fetchImpl = undefined) {
   let sb = db(env, fetchImpl);
   const now = new Date();
   const retainUntil = new Date(now.getTime() + 3 * 365 * 24 * 3600 * 1000).toISOString();
-  const consent = { consent_given_at: now.toISOString(), consent_source: consentSource, ip_address: ip, retain_until: retainUntil };
+  // MPC-9890: no IP address is stored on users or leads (Open Tracker rule 3). `ip` stays a parameter for callers but is not written anywhere here.
+  const consent = { consent_given_at: now.toISOString(), consent_source: consentSource, retain_until: retainUntil };
 
   let user = (await sb.select(`users?email=eq.${encodeURIComponent(email)}&select=id&limit=1`))[0];
   let isNewUser = false;
@@ -213,23 +237,30 @@ export async function handleScan(env, ctx, { email, consentSource, ip, utm, ref,
   const created = await requestScan(sb, user.id, email, now, keyed && requestId ? requestId : null, keyed);
   if (created.duplicate) return keyed && requestId && String(created.requestId || '').toLowerCase() === String(requestId).toLowerCase() ? replayOutcome(sb, created.scanId) : { duplicate: true, scanId: created.scanId };
   const scan = { id: created.scanId };
+  // MPC-9818: the monthly allowance of the plan that owns this address (an account's plan, otherwise Free). Counted BEFORE anything is saved or sent, so a refused
+  // request costs nothing and creates nothing: the just-made request row is removed. A repeat within 24h (above) never reaches here, so it never counts twice.
+  const allowance = await consumeScan(env, sb, { scanId: scan.id, email, confirmed: !confirmGateEnabled(env) });
+  if (allowance.allowed === false) { await dropRefusedScan(sb, scan.id); return { refused: allowance }; }
   // MPC-9885: from here the scan id is known, so every recipient call is logged against it (names only) and written once at the end.
-  const rctx = workerRecipientContext(env, { fetchImpl, scanId: scan.id });
+  const rctx = workerRecipientContext(env, { fetchImpl, scanId: scan.id, consentId: scanConsent?.id });   // MPC-9887: post_click calls of this scan are checked against scan_consents
   sb = db(env, fetchImpl, rctx);
   let deferred = false;
   try {
+  // MPC-9887: remember which consent covers this scan, so the report job (a later cron tick, no request) can present it to the wrapper. Fails closed like the confirm mark below.
+  if (scanConsent) await sb.patch(`scans?id=eq.${scan.id}`, { consent_id: scanConsent.id });
   // MPC-9813: mark the scan as waiting for the click BEFORE anything is saved or sent. Fails closed: if it cannot be marked, the request fails and nothing goes out.
   if (confirmGateEnabled(env)) await applyConfirmGate(sb, scan.id);
   // MPC-7471-F3: save the scan BEFORE the first email, so the email can show its number. Never throws; a failed save only means no number.
   const saved = save?.hexagons
-    ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber })
+    ? await saveWebScanForContact(env, sb, { hexagons: save.hexagons, contactId: scan.id, version: save.version, recogniseVersion: save.recogniseVersion, startedMs: save.startedMs, previousScanNumber: save.previousScanNumber, scanConsent })
     : { saved: false };
   const listingSaved = listing && saved.saved ? await storeListingInputs(sb, { webScanId: saved.scanNumber, scanId: scan.id, listing }) : false;
-  const side = [syncHubSpot(env, email, consentSource, now, fetchImpl, rctx), confirm(env, sb, scan.id, email, fetchImpl, saved.scanNumber, undefined, rctx)];
+  // MPC-9890: no HubSpot contact is created for a user who has not signed up (syncHubSpot is not called here); sign-up is the relationship that earns one.
+  const side = [confirm(env, sb, scan.id, email, fetchImpl, saved.scanNumber, undefined, rctx)];
   const all = Promise.all(side.map((p) => p.catch((e) => console.error('side effect failed', String(e))))).then(() => flushQuietly(rctx));
   deferred = true;
   if (ctx?.waitUntil) ctx.waitUntil(all); else await all;
-  return { duplicate: false, scanId: scan.id, saved, listingSaved };
+  return { duplicate: false, scanId: scan.id, saved, listingSaved, consentId: scanConsent?.id };
   } finally {
     if (!deferred) await flushQuietly(rctx);
   }
@@ -269,15 +300,6 @@ async function replayOutcome(sb, scanId) {
   return { duplicate: true, replay: true, scanId, saved: scanNumber ? { saved: true, scanNumber } : { saved: false } };
 }
 
-async function syncHubSpot(env, email, consentSource, now, fetchImpl, rctx) {
-  if (!env.HUBSPOT_TOKEN) return;
-  const props = { email, lead_source_platform: env.HUBSPOT_LEAD_SOURCE || 'web_scan', consent_source: consentSource, consent_given_at: now.toISOString().slice(0, 10) };
-  const res = await callRecipient('hubspot', { url: 'https://api.hubapi.com/crm/v3/objects/contacts/batch/upsert', sent: ['email'], init: {
-    method: 'POST', headers: { Authorization: `Bearer ${env.HUBSPOT_TOKEN}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inputs: [{ idProperty: 'email', id: email, properties: props }] }),
-  } }, rctx ?? workerRecipientContext(env, { fetchImpl }));
-  if (!res.ok) console.error('HubSpot upsert failed', res.status, (await res.text()).slice(0, 200));
-}
 
 // Sends the confirmation exactly once per scan (Resend Idempotency-Key + confirmation_sent_at).
 // Signed one-click unsubscribe link for the Worker's own /api/unsubscribe; null when UNSUBSCRIBE_SECRET is not set.
@@ -312,7 +334,7 @@ async function nextReportJobs(env, sb, limit) {
     const gate = confirmGateEnabled(env);
     const pending = `or(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))`;
     const page = await sb.select(
-      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at,created_at${gate ? ',email_confirm_required,email_confirmed_at' : ''},users(email_opt_out_at)` +
+      `scans?select=id,user_id,email_scanned,confirmation_sent_at,report_status,report_attempts,report_due_at,created_at,consent_id${gate ? ',email_confirm_required,email_confirmed_at' : ''},users(email_opt_out_at)` +
       (gate ? `&and=(${pending},or(email_confirm_required.eq.false,email_confirmed_at.not.is.null,confirmation_sent_at.is.null))` : `&or=(report_status.eq.pending,and(report_status.eq.processing,report_claimed_at.lt.${encodeURIComponent(stale)}))`) +
       `&report_attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc,id.asc&limit=${size}&offset=${offset}`);
     for (const job of page) {
@@ -347,8 +369,19 @@ export async function runReportJob(env, fetchImpl = undefined, limit = 5) {
     await sb.patch(`scans?id=eq.${id}`, { report_status: 'failed', report_last_error: 'cancelled: unsubscribed before the report was sent' }).catch((e) => console.error(`could not cancel scan ${id}:`, String(e)));
   }
   for (const job of queue) {
+    // MPC-9888: a scan requested BEFORE the consent block existed (created before CONSENT_GATE_SINCE) has no consent id and never could: it is finished on the old rules
+    // instead of being failed for lack of a consent nobody was ever shown. Every scan from the gate's start on needs its own.
+    const legacy = Boolean(env.CONSENT_GATE_SINCE) && !job.consent_id && Date.parse(job.created_at) < Date.parse(env.CONSENT_GATE_SINCE);
+    const jobEnv = legacy ? { ...env, CONSENT_GATE_ENFORCED: 'false' } : env;
+    // MPC-9887: with the consent gate on, a scan that has no consent on record cannot have a report built (every post_click call would be refused). Take it out of the queue
+    // with the reason on the row instead of letting each attempt fail half way. Written through the plain client: this write is ours, not a call made on the visitor's behalf.
+    if (consentEnforced(jobEnv) && !job.consent_id) {
+      await sb.patch(`scans?id=eq.${job.id}`, { report_status: 'failed', report_last_error: 'consent: no consent on record for this scan' }).catch((e) => console.error(`could not mark scan ${job.id} (no consent):`, String(e)));
+      out.failed++;
+      continue;
+    }
     // MPC-9885: one context per scan; its recipient calls are written to scan_recipient_log in one INSERT in the finally below.
-    const rctx = workerRecipientContext(env, { fetchImpl, scanId: job.id });
+    const rctx = workerRecipientContext(jobEnv, { fetchImpl, scanId: job.id, consentId: job.consent_id });
     const sbj = db(env, fetchImpl, rctx);
     try {
       if (!job.confirmation_sent_at) await confirm(env, sbj, job.id, job.email_scanned, fetchImpl, undefined, awaitsConfirm(job), rctx);     // catch up a missed confirmation
@@ -376,10 +409,14 @@ export async function runReportJob(env, fetchImpl = undefined, limit = 5) {
 
 async function processScan(env, sb, job, fetchImpl, rctx) {
   const email = job.email_scanned;
-  const hibp = await checkBreaches(email, env, fetchImpl, rctx);
+  const entitlements = await getEntitlements(sb, { email });   // MPC-9818: the plan that owns this address decides which gated sections are built (never throws: a fault reads as Free)
+  // MPC-9816: the gate sits where the work is done. A Free address never triggers the breach lookup (a third-party cost): the section is NOT CHECKED, said so, never "clear".
+  const gate = breachGate(env, entitlements);
+  const hibp = gate.allowed ? await checkBreaches(email, env, fetchImpl, rctx) : { status: 'not_checked', reason: 'Not checked on the free report', gated: true };
   if (hibp.status === 'rate_limited') return { held: 'held: HIBP rate limited, retrying next run' };   // queue and retry later; never report it as "not checked"
-  if (hibp.status !== 'checked' && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
+  if (hibp.status !== 'checked' && !hibp.gated && env.ALLOW_PARTIAL_REPORT !== 'true') return { held: `held: ${hibp.reason}` };   // ALLOW_PARTIAL_REPORT=false holds reports until HIBP works
   const brokers = await checkBrokers(email, env);
+  const basicPrice = await loadBasicPrice();
   // MPC-9813: pages the person showed us, checked only after the click (this point is never reached before it). Reuses results the click already stored.
   const listings = listingCheckEnabled(env) && job.email_confirmed_at ? await runStoredListingChecks(env, sb, job.id, email, fetchImpl).then(() => loadListings(sb, job.id)) : null;
   const emailHex = await runEmailHexagons(email, env, fetchImpl, rctx).catch((e) => { console.error('email hexagons failed:', String(e)); return []; });   // MPC-7467: never throws, bounded by a timeout, never blocks the report
@@ -394,7 +431,7 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   const rows = [
     ...breaches.map((b) => ({ scan_id: job.id, category: 'email', signal_type: `breach:${clip(b.Name, 80)}`, severity: breachRisk(b) >= 8 ? 'high' : 'medium', data_source: 'Have I Been Pwned', check_status: 'found', details: clip(`${b.BreachDate || ''} exposed: ${(b.DataClasses || []).join(', ')}`, 500), removal_status: 'manual_only' })),
     ...(hibp.status === 'checked' && breaches.length === 0 ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:none', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'clear' }] : []),
-    ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
+    ...(hibp.status !== 'checked' ? [{ scan_id: job.id, category: 'email', signal_type: 'breach:not_checked', severity: 'low', data_source: hibp.gated ? 'Not checked (paid coverage)' : 'Have I Been Pwned', check_status: 'not_checked', details: clip(hibp.reason, 200) }] : []),
     ...emailHexagonSignalRows(job.id, emailHex),
     ...emailExtraSignalRows(job.id, emailExtras),
     ...brokers.map((b) => ({ scan_id: job.id, category: 'broker', signal_type: `${b.key}_profile`, severity: 'high', data_source: b.name, check_status: 'not_checked', details: clip(b.reason, 300), removal_status: 'manual_only', removal_url: b.removal_url, removal_instructions: b.steps ? b.steps.join('\n') : null })),
@@ -417,7 +454,7 @@ async function processScan(env, sb, job, fetchImpl, rctx) {
   // CK-8503: the person may have unsubscribed while this scan ran (HIBP calls are paced, so a run takes minutes). The queue read only saw the state at claim time: look once more right before sending.
   const optOutAt = (await sb.select(`users?id=eq.${job.user_id}&select=email_opt_out_at&limit=1`))[0]?.email_opt_out_at;
   if (optOutAt && Date.parse(optOutAt) > Date.parse(job.created_at)) return { cancelled: 'cancelled: unsubscribed before the report was sent' };
-  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
+  const mail = buildReportEmail({ liveLink: await makeLiveLink(env, job.id), fixedLink: followupStateEnabled(env) && env.UNSUBSCRIBE_SECRET ? await fixedUrl(env, job.id) : null, scan: { ...result, id: job.id }, breaches, breachStatus: hibp.status, brokers, listings, pasteAvailable: listingCheckEnabled(env), entitlements, basicPrice, breachGated: Boolean(hibp.gated), webScan, referral, emailChecks: emailHex.map((h) => ({ id: h.id, status: h.status, value: h.value, detail: { source: h.source, reason: h.reason || null } })), unsubscribeLink: links?.page });
   const sent = await sendEmail(env, { to: email, subject: mail.subject, html: mail.html, text: mail.text, attachments: [reportAttachment(mail.report)], idempotencyKey: `report-${job.id}`, headers: unsubHeaders(links), items: ['email', 'ip', 'scan_result'] }, fetchImpl, rctx);
   if (!sent.sent) throw new Error(`report email not sent: ${sent.reason}`);
   await sb.patch(`scans?id=eq.${job.id}`, {

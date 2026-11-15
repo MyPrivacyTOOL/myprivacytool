@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalJson, registryHash } from "../../shared/recipients/canonical.js";
-import { buildRows, diffMirror, toSql } from "../sync-recipients.mjs";
+import { buildRows, diffMirror, moduleInSync, toSql } from "../sync-recipients.mjs";
 import { MAX_AGE_DAYS, entryAgeDays, validateAllowlist } from "./allowlist.mjs";
 import { hostMatches, validateRegistry } from "./registry.mjs";
 
@@ -40,6 +40,9 @@ export async function seedCheck(registry, liveRows = null) {
     if (r.registry_hash !== hash) problems.push(`seed row ${r.key} carries a different hash`);
     if (!toSql(r).includes(canonicalJson(r.body).replace(/'/g, "''"))) problems.push(`seed SQL for ${r.key} does not embed its canonical body`);
   }
+  try {
+    if (!moduleInSync(registry, readFileSync(join(import.meta.dirname, "..", "..", "shared", "recipients", "recipients.data.js"), "utf8"))) problems.push("shared/recipients/recipients.data.js is out of date: run `npm run recipients:module`");
+  } catch { problems.push("shared/recipients/recipients.data.js is missing: run `npm run recipients:module`"); }
   if (liveRows) problems.push(...(await diffMirror(registry, liveRows)));
   return { hash, rows: rows.length, problems };
 }

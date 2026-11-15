@@ -2,6 +2,7 @@ import { enrichAndScore, HIGH_PRIORITY_THRESHOLD } from './lead-scoring.js';
 // MPC-9885: every outbound call goes through the recipient wrapper (key + declared data items). rctx is built once per request/job.
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
+import { blogSubscribe } from './blog-subscribe.js';   // MPC-10616
 import { createBusinessRequest, markLate, postDigest, sendDelayNotices } from './business-requests.js';   // MPC-9825
 // MPC-7471-F4: the score versions this Worker may store. The scoring itself runs in the browser (and, for saved scans, in scan-report) from the same shared contract.
 import { SCORE_VERSION, LEGACY_SCORE_VERSION } from '../../shared/hexagon-registry/score.js';
@@ -156,7 +157,7 @@ export default {
     const cors = {
       'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
       'Vary': 'Origin',
     };
@@ -195,6 +196,13 @@ export default {
       let input; try { input = await request.json(); } catch (_) { return reject(400, 'Invalid request'); }
       if (!input || typeof input !== 'object') return reject(400, 'Invalid request');
       const out = await createBusinessRequest(env, input);
+      return new Response(JSON.stringify(out.body), { status: out.status, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // MPC-10616: the /blog newsletter form: one HubSpot contact write (create, or update on repeat), nothing else. Same Origin check and rate limit as above.
+    if (new URL(request.url).pathname === '/blog-subscribe') {
+      let input; try { input = await request.json(); } catch (_) { return reject(400, 'Invalid request'); }
+      const out = await blogSubscribe(env, input);
       return new Response(JSON.stringify(out.body), { status: out.status, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
@@ -252,6 +260,14 @@ export default {
         });
       }
 
+      // MPC-9914 (EXT-03): consent is checked BEFORE anything is written or sent anywhere (Supabase, Notion, HubSpot, Slack, Resend).
+      // Without it the request stops here with an honest 400 and nothing is stored. The flag used to only set HubSpot properties.
+      if (!consented) {
+        return new Response(JSON.stringify({ error: 'Consent required', message: 'We have not saved anything. Tick the consent box to share your email with us, then try again.' }), {
+          status: 400, headers: { ...cors, 'Content-Type': 'application/json' }
+        });
+      }
+
       // MPC-8368: bot check. Runs after the watchdog health check (which has no browser and no token) and before any write.
       const tsInfo = {};
       const ts = await turnstileState(env, request, turnstileToken, tsInfo, rctx);
@@ -268,6 +284,17 @@ export default {
           action: enforce ? 'blocked_403' : 'allowed_report_only',
         }));
         if (enforce) return reject(403, 'Verification failed');
+      }
+
+      // MPC-9914 (EXT-03): the baseline is owned by a proved email. A bare email (or its SHA-256) is a key, never authentication.
+      // A request that asks for a baseline (it sends a riskScore) must carry the Supabase access token of the signed-in, confirmed person
+      // whose email it is (checked after the bot check, still before any write). No token: 401. A token for a different address: 403. Either way nothing is written.
+      let baselineOwner = false;
+      if (riskScore !== null && riskScore !== '') {
+        const proof = await provedEmailFromBearer(env, request, rctx);
+        if (!proof) return reject(401, 'Sign in with your confirmed email to save or read a baseline');
+        if (proof !== email.toLowerCase()) return reject(403, 'This sign-in does not belong to that email');
+        baselineOwner = true;
       }
 
       // Capture technical metadata from the request
@@ -287,7 +314,7 @@ export default {
 
       // MPC-7173: save the first completed scan as the user's baseline and report it back so the
       // site can show 'Your baseline: X (date)' / the delta on re-scans. Fail-soft, independent of Notion.
-      const baseline = await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION, rctx);
+      const baseline = !baselineOwner ? null : await saveBaseline(env, email, riskScore, categoryScores, scoreVersionRaw === SCORE_VERSION ? SCORE_VERSION : LEGACY_SCORE_VERSION, rctx);
 
       // 1. Save to Notion
       const properties = {
@@ -297,7 +324,7 @@ export default {
         Source: { select: { name: 'Landing Page' } },
       };
       if (phone)        properties['Phone']        = { phone_number: phone };
-      if (ip)           properties['IP Address']   = { rich_text: [{ text: { content: ip } }] };
+      // MPC-9890 (Open Tracker rule 3): the IP address is no longer written to the Notion lead log. `ip` is still read for the bot check only.
       if (country)      properties['Country']      = { rich_text: [{ text: { content: country } }] };
       if (city)         properties['City']         = { rich_text: [{ text: { content: city } }] };
       if (browser)      properties['Browser']      = { rich_text: [{ text: { content: browser } }] };
@@ -309,7 +336,7 @@ export default {
       if (utm_content)  properties['UTM Content']  = { rich_text: [{ text: { content: utm_content } }] };
       if (referrer)     properties['Referrer']     = { url: referrer };
 
-      // MPC-9885: the lead row carries the contact fields, ip, country/city, browser/os/device, utm tags and referrer (read from `properties` above).
+      // MPC-9885: the lead row carries the contact fields, country/city, browser/os/device, utm tags and referrer (read from `properties` above).
       const nr = await callRecipient('notion', {
         url: 'https://api.notion.com/v1/pages',
         init: {
@@ -321,7 +348,7 @@ export default {
           },
           body: JSON.stringify({ parent: { database_id: env.LEADS_DB_ID }, properties })
         },
-        sent: ['email', 'name', 'phone', 'ip', 'country', 'city', 'device_profile', 'utm', 'referrer'],
+        sent: ['email', 'name', 'phone', 'country', 'city', 'device_profile', 'utm', 'referrer'],
       }, rctx);
 
       if (!nr.ok) {
@@ -630,6 +657,8 @@ async function sweepPending(env) {
 // (the table has RLS forced and no anon/authenticated write access). Stores no PII:
 // only a random session id and funnel booleans. Never throws.
 const DEFAULT_SUPABASE_URL = 'https://xmdmkumwxpgahmlweuug.supabase.co';
+// The public publishable key (not a secret; the same one scan-report's accounts use). Supabase Auth needs an apikey on /auth/v1/user.
+const DEFAULT_PUBLISHABLE_KEY = 'sb_publishable_4Nn6HUiPhuUqCgS04tvU0Q_3Ua6R2tV';
 // MPC-7616: host only (never the key), so a SUPABASE_URL secret pointing at the wrong project shows up in the logs.
 const supabaseHost = (env) => { try { return new URL(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).host; } catch (_) { return 'invalid SUPABASE_URL'; } };
 async function recordEngagement(env, sessionId, flags, rctx = workerRecipientContext(env)) {
@@ -661,6 +690,24 @@ async function recordEngagement(env, sessionId, flags, rctx = workerRecipientCon
     console.error('Supabase mpt_user_engagement insert error:', supabaseHost(env), String(err));
     return false;
   }
+}
+
+// MPC-9914 (EXT-03): the confirmed email behind a Bearer access token, checked against Supabase Auth (signature, expiry, revocation),
+// lower-cased; null when there is no token, it is not valid, or the address was never confirmed. Same check as scan-report's accounts.
+async function provedEmailFromBearer(env, request, rctx) {
+  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (!token || token.length > 4096) return null;
+  try {
+    const res = await callRecipient('supabase', {
+      url: `${(env.SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '')}/auth/v1/user`,
+      init: { headers: { apikey: env.SUPABASE_PUBLISHABLE_KEY || DEFAULT_PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } },
+      sent: [],
+    }, rctx);
+    if (!res.ok) return null;
+    const u = await res.json();
+    if (!u || typeof u.email !== 'string' || !(u.email_confirmed_at || u.confirmed_at)) return null;
+    return u.email.trim().toLowerCase();
+  } catch (_) { return null; }
 }
 
 // MPC-7173: baseline snapshot. Keyed by SHA-256(lower-cased email); stores only scores, never the email.

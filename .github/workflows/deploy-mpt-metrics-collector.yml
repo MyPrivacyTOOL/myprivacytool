@@ -18,6 +18,7 @@ on:
       - 'workers/mpt-metrics-collector/**'
       - 'shared/test-records.js'
       - '.github/workflows/deploy-mpt-metrics-collector.yml'
+      - 'shared/recipients/**'   # MPC-9885: the Workers bundle the recipient wrapper, so a change to it must redeploy them
   workflow_dispatch:
 
 concurrency:

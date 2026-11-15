@@ -14,6 +14,7 @@ import emailDelivery from './collectors/email-delivery.js';
 import edgeMachines from './collectors/edge-machines.js';
 import channelOsint from './collectors/channel-osint.js';
 import metaAds from './collectors/meta-ads.js';
+import { listConversionActions as googleAdsConversionActions } from './collectors/google-ads.js';
 import { hkDayStart } from './lib/hk.js';
 import { publishAll, notionConfigured } from './publishers/notion.js';
 import { publishMachineMirror } from './publishers/machine-mirror.js';
@@ -255,6 +256,12 @@ export default {
       if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
       if (!notionConfigured(env)) return json({ error: 'not configured' }, 500);
       try { return json({ result: await publishKpiDashboard(env) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
+    }
+    // MPC-9930: Worker-side proof that the stored Google Ads OAuth secrets work. Read-only (conversion action names/ids/status), not scheduled,
+    // same bearer token. Returns {configured:false, missing:[names]} when a secret is absent so the check never guesses.
+    if (url.pathname === '/check/google-ads' && request.method === 'POST') {
+      if (!env.COLLECTOR_TRIGGER_TOKEN || request.headers.get('authorization') !== `Bearer ${env.COLLECTOR_TRIGGER_TOKEN}`) return json({ error: 'unauthorized' }, 401);
+      try { return json({ check: 'google-ads', result: await googleAdsConversionActions(env) }); } catch (e) { return json({ error: SAFE(e?.message, env) }, 502); }
     }
     // Manual digest for verification: POST /digest (posts to Slack, returns the permalink) or POST /digest?dry=1 (returns the text only).
     if (url.pathname === '/digest' && request.method === 'POST') {

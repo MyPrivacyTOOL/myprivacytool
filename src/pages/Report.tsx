@@ -1,180 +1,81 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
 import FeatureStatus from "@/components/FeatureStatus";
-import { Search, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Seo from "@/components/Seo";
 import HkStopSpamCard from "@/components/HkStopSpamCard";
 import pageMeta from "@/data/pageMeta.json";
-import type { FeatureId } from "@/config/featureStatus";
+import { PLAN_ROWS, formatMonthlyPrice } from "@/lib/plans";
+import { FEATURE_STATUS, type FeatureId } from "@/config/featureStatus";
+
+// MPC-9816 (F2, spec s5 "Option A", Chris 2026-11-07): the full exposure report is included from Basic. Every price is read from the plans data
+// (src/data/plans.generated.json via src/lib/plans.ts); none is typed here. A claim for something not yet live keeps its wording and carries its badge
+// (src/config/featureStatus.ts is the only place state is set; `pin` marks a part that is not live even when its feature is).
+const price = (slug: string): string => {
+  const p = PLAN_ROWS.find((r) => r.slug === slug);
+  return p ? formatMonthlyPrice(p.monthly_price_cents) : "";
+};
+
+type Item = { text: string; feature?: FeatureId; pin?: "in_build" | "planned" };
+
+const REPORT_CONTENTS: Item[] = [
+  { text: "Your score and up to 54 browser hexagons, each with its real value, source and confidence." },
+  { text: "Email checks." },
+  { text: "Data brokers: nine sites shown as listed, not listed or not checked, with the page as proof for any you showed us and an opt-out guide for each. Licensed coverage that searches for you is added with Basic.", feature: "F1", pin: "planned" },
+  { text: "Breaches: whether your email appears in known breaches.", feature: "F5", pin: "planned" },
+  { text: "Every scan kept for 12 months, with a before and after.", feature: "F2", pin: "planned" },
+  { text: "A PDF and JSON copy of your report.", feature: "F2", pin: "planned" },
+];
 
 const Report = () => {
-  const [selected, setSelected] = useState<string | null>(null);
-
-  const plans = [
-    {
-      id: "basic",
-      name: "Basic Scan",
-      price: "Free",
-      period: "",
-      features: [
-        { text: "See which brokers have your data", feature: "F1" },
-        { text: "Overview of data categories exposed" },
-        { text: "Removal priority list" },
-      ] as { text: string; feature?: FeatureId }[],
-      cta: "Check My Exposure",
-      highlight: false,
-    },
-    {
-      id: "full",
-      name: "Full Exposure Report",
-      price: "$7.99",
-      period: "/month (Basic)",
-      features: [
-        { text: "Everything in Basic" },
-        { text: "Detailed data per broker — exactly what they hold", feature: "F1" },
-        { text: "One-click removal requests", feature: "F4" },
-        { text: "Monthly re-scan (brokers re-add you)", feature: "F4" },
-        { text: "Breach monitoring (monthly re-check, email alert)", feature: "F5" },
-        { text: "Priority email support" },
-      ] as { text: string; feature?: FeatureId }[],
-      cta: "Get Full Report",
-      highlight: true,
-      badge: "Most Popular",
-    },
+  const ladder: { slug: string; label: string; items: Item[] }[] = [
+    { slug: "basic", label: "Basic", items: [{ text: "the full report, 5 scans a month." }] },
+    { slug: "pro", label: "Pro", items: [{ text: "adds a monthly re-scan, alerts and removal requests.", feature: "F4", pin: "planned" }] },
+    { slug: "executive", label: "Executive", items: [{ text: "adds managed removal and unlimited scans.", feature: "F4", pin: "planned" }] },
   ];
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Seo {...pageMeta["/report"]} path="/report" />
-      {/* Hero */}
-      <section className="max-w-3xl mx-auto px-6 pt-20 pb-12 text-center">
-        <div className="inline-block bg-brand-soft border border-brand/30 text-foreground text-xs font-semibold uppercase tracking-widest px-4 py-2 rounded-full mb-8">
-          Full Visibility · Active Removal · Continuous Protection
-        </div>
-
+      <section className="max-w-3xl mx-auto px-6 pt-20 pb-10 text-center">
         <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
-          See Everything.<br />
-          <span className="text-brand">
-            Remove Everything.
-          </span>
-          <FeatureStatus feature="F2" className="align-middle text-sm" />
+          See what is exposed. <span className="text-brand">Then take it back.</span>
         </h1>
-
-        <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed">
-          A free scan shows you where your data is. The Full Exposure Report gives you the
-          complete picture — every broker, every data point, every removal path.<FeatureStatus feature="F2" />
-        </p>
-        <p className="text-muted-foreground text-base mb-16 max-w-xl mx-auto">
-          And because brokers re-add you within weeks, we scan continuously.<FeatureStatus feature="F5" />
+        <p className="text-muted-foreground text-lg md:text-xl mb-4 max-w-2xl mx-auto leading-relaxed" data-testid="report-lead">
+          The free scan shows what your browser and email address give away. The full exposure report adds the rest. It is included from Basic, {price("basic")} a month.
         </p>
       </section>
 
-      {/* MPC-7446: Hong Kong visitors only; hidden until the /HongKongSpam launch flag is on */}
       <HkStopSpamCard placement="report" />
 
-      {/* What's Different */}
-      <section className="max-w-3xl mx-auto px-6 mb-16">
-        <div className="grid md:grid-cols-3 gap-4 text-center">
-          {[
-            { Icon: Search, title: "Deep Scan", desc: "Not just a surface check — we map every broker, every record, every data field they hold on you.", feature: "F1" as FeatureId },
-            { Icon: Mail, title: "Automated Removal", desc: "We send removal requests on your behalf. One click, not 4,000 manual opt-outs.", feature: "F4" as FeatureId },
-            { Icon: RefreshCw, title: "Continuous Monitoring", desc: "Brokers re-add removed data within 30–90 days. We re-scan every month and remove again.", feature: "F5" as FeatureId },
-          ].map(({ Icon, title, desc, feature }) => (
-            <div key={title} className="p-6 rounded-xl bg-surface border border-surface-border">
-              <Icon className="w-8 h-8 text-brand mx-auto mb-3" aria-hidden="true" />
-              <div className="font-bold text-foreground mb-2">{title}</div>
-              <div className="text-muted-foreground text-sm leading-relaxed">{desc}<FeatureStatus feature={feature} /></div>
-            </div>
+      <section className="max-w-3xl mx-auto px-6 mb-12">
+        <h2 className="text-2xl font-bold mb-4">What the full report contains</h2>
+        <ul className="space-y-2" data-testid="report-contents">
+          {REPORT_CONTENTS.map((f) => (
+            <li key={f.text} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <span className="text-brand mt-0.5 flex-shrink-0">✓</span>
+              <span>{f.text}{f.feature && <FeatureStatus feature={f.feature} state={f.pin} />}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
-      {/* Pricing */}
-      <section className="max-w-4xl mx-auto px-6 pb-16">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-          Choose your level of protection
-        </h2>
-        <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-          {plans.map((plan) => (
-            <div
-              key={plan.id}
-              onClick={() => setSelected(plan.id)}
-              className={`relative rounded-2xl border p-6 cursor-pointer transition-all duration-200 ${
-                plan.highlight
-                  ? "border-brand/60 bg-brand-soft shadow-lg"
-                  : selected === plan.id
-                  ? "border-brand/40 bg-muted"
-                  : "border-surface-border bg-surface hover:border-brand/40"
-              }`}
-            >
-              {plan.badge && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full">
-                  {plan.badge}
-                </div>
-              )}
-              <div className="mb-4">
-                <div className="text-muted-foreground text-sm font-semibold mb-1">{plan.name}{plan.id === "full" && <FeatureStatus feature="F2" />}</div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-foreground">{plan.price}</span>
-                  {plan.period && <span className="text-muted-foreground text-sm">{plan.period}</span>}
-                </div>
-              </div>
-              <ul className="space-y-2 mb-6">
-                {plan.features.map((f) => (
-                  <li key={f.text} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <span className="text-brand mt-0.5 flex-shrink-0">✓</span>
-                    <span>{f.text}{f.feature && <FeatureStatus feature={f.feature} />}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className={`w-full font-bold ${
-                  plan.highlight
-                    ? "bg-primary hover:bg-primary-hover hover:text-brand-white text-primary-foreground"
-                    : "bg-secondary hover:bg-muted text-foreground"
-                }`}
-                onClick={() => setSelected(plan.id)}
-              >
-                {plan.cta}
-              </Button>
-            </div>
+      <section className="max-w-3xl mx-auto px-6 mb-12">
+        <h2 className="text-2xl font-bold mb-4">The ladder</h2>
+        <ul className="space-y-2" data-testid="report-ladder">
+          {ladder.map((l) => (
+            <li key={l.slug} className="text-sm text-muted-foreground">
+              <strong className="text-foreground">{l.label}, {price(l.slug)}:</strong> {l.items[0].text}
+              {l.items[0].feature && <FeatureStatus feature={l.items[0].feature} state={l.items[0].pin} />}
+            </li>
           ))}
+        </ul>
+        <p className="mt-6 text-sm text-muted-foreground" data-testid="report-honest">
+          The free scan is free and stays free. It does not search data brokers or check breaches for you; anything it could not check is marked "not checked", never "clear".
+        </p>
+        <div className="mt-6">
+          <Button asChild className="font-bold"><Link to="/pricing">{FEATURE_STATUS.F3 === "live" ? "Get this plan" : "Join the list"}</Link></Button>
         </div>
       </section>
-
-      {/* Comparison Table */}
-      <section className="max-w-3xl mx-auto px-6 pb-16">
-        <h2 className="text-xl font-bold text-center mb-8 text-foreground">Free scan vs Full Report</h2>
-        <div className="rounded-xl overflow-hidden border border-surface-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-border">
-                <th className="text-left px-4 py-3 text-muted-foreground font-semibold">Feature</th>
-                <th className="px-4 py-3 text-muted-foreground font-semibold text-center">Free</th>
-                <th className="px-4 py-3 text-brand font-semibold text-center">Full Report</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ["Broker list (who has your data)", "✓", "✓", "F1"],
-                ["Category overview (what type)", "✓", "✓", ""],
-                ["Exact data fields per broker", "—", "✓", "F1"],
-                ["Automated removal requests", "—", "✓", "F4"],
-                ["Monthly re-scan", "—", "✓", "F4"],
-                ["Breach monitoring (monthly re-check, email alert)", "—", "✓", "F5"],
-                ["Removal confirmation", "—", "✓", "F4"],
-              ].map(([feature, free, paid, fid]) => (
-                <tr key={feature} className="border-b border-surface-border hover:bg-muted">
-                  <td className="px-4 py-3 text-muted-foreground">{feature}{fid && <FeatureStatus feature={fid as FeatureId} />}</td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">{free}</td>
-                  <td className="px-4 py-3 text-center text-brand font-semibold">{paid}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
     </div>
   );
 };
