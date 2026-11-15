@@ -106,7 +106,18 @@ export async function publishDaily(env, day, now = new Date()) {
   return { kind: 'daily', day, action: r.action, url: r.page.url };
 }
 
-export function weeklyProperties(weekOf, v, readAt, previousId) {
+// MPC-9972: weekly Google Ads efficiency from the stored google-ads/account_daily rows of the week (one latest row per HK day).
+// cost per scan = cost / scan_started, CAC = cost / paid conversions. null when the denominator is 0 or no cost: never estimated, only shown when > 0.
+export function adsEfficiency(rows) {
+  const byDay = new Map();
+  for (const r of rows ?? []) if (r?.payload?.configured && r.payload.summary) byDay.set(r.payload.day ?? r.period_start, r.payload.summary);
+  let cost = 0, scans = 0, paid = 0;
+  for (const s of byDay.values()) { cost += Number(s.cost) || 0; scans += Number(s.scan_started) || 0; paid += Number(s.paid_conversions) || 0; }
+  const ratio = (n, d) => (n > 0 && d > 0 ? Math.round((100 * n) / d) / 100 : null);
+  return { days: byDay.size, cost, scan_started: scans, paid_conversions: paid, cost_per_scan: ratio(cost, scans), cac: ratio(cost, paid) };
+}
+
+export function weeklyProperties(weekOf, v, readAt, previousId, ads = null) {
   const pct = num(v?.conversion_rate_pct);
   const src = (label, value, source) => (value === null ? `${label}: blank (${source} not collected or errored; not estimated)` : `${label}: ${value} (${source})`);
   const cumulative = num(v?.cumulative_scans);
@@ -122,6 +133,8 @@ export function weeklyProperties(weekOf, v, readAt, previousId) {
     src('GA4 Active Users', active, 'raw ga4 weekly_overview pull, property 515216281'),
     src('Blog Posts Published', blog, 'raw blog/posts_published pull'),
     src('X Threads Posted', xt, 'raw x/threads_posted pull'),
+    ...(ads?.cost_per_scan ? [`Ad cost per scan: ${ads.cost_per_scan} (Google Ads cost ${ads.cost} / ${ads.scan_started} scan_started, ${ads.days} days)`] : []),
+    ...(ads?.cac ? [`CAC: ${ads.cac} (Google Ads cost ${ads.cost} / ${ads.paid_conversions} paid conversions)`] : []),
     `Other signals, not merged into Cumulative Scans: engagement sessions ${num(v?.engagement_sessions) ?? 'blank'}, full scans ${num(v?.engagement_full_scans) ?? 'blank'}, GA4 scan events ${num(v?.ga4_scan_events) ?? 'blank'}.`,
   ].join('\n');
   return {
@@ -143,7 +156,9 @@ export async function publishWeekly(env, weekOf, now = new Date()) {
   const [view] = await supa(env, `mpt_weekly_metrics?week_of=eq.${weekOf}&select=*`);
   if (!view) return { kind: 'weekly', weekOf, action: 'skipped_no_data' };
   const [prev] = await findPage(env, ds, 'Week Of', addDays(weekOf, -7));
-  const properties = weeklyProperties(weekOf, view, readAt, prev?.id);
+  // Google Ads rows are optional: a read failure leaves the fields out, it never blocks the weekly row.
+  const ads = await supa(env, `mpt_raw_metrics?source=eq.google-ads&report=eq.account_daily&status=eq.ok&period_start=gte.${encodeURIComponent(hkDayStartOf(weekOf).toISOString())}&period_start=lt.${encodeURIComponent(hkDayStartOf(addDays(weekOf, 7)).toISOString())}&order=captured_at.asc&select=period_start,payload`).then(adsEfficiency).catch(() => null);
+  const properties = weeklyProperties(weekOf, view, readAt, prev?.id, ads);
   const r = await upsert(env, ds, {
     key: weekOf, keyProperty: 'Week Of', markerProperty: 'Agent Insights', titleProperty: 'Entry', title: `Week of ${weekOf}`,
     properties, createOnly: { 'Linked Objective': { multi_select: [{ name: OBJECTIVE }] } },
