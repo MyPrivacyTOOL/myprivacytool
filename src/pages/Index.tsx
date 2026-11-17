@@ -33,6 +33,7 @@ import ScanNumberNotice from '@/components/ScanNumberNotice';
 import ScanRecipientsPanel from '@/components/ScanRecipientsPanel';   // MPC-9893
 import WelcomeBack from '@/components/WelcomeBack';
 import TelegramHandoffNotice from '@/components/TelegramHandoffNotice';
+import FootprintPathHost from '@/components/FootprintPathHost';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import { useOrientation } from '@/hooks/useOrientation';
 import { useDeviceMotion } from '@/hooks/useDeviceMotion';
@@ -350,6 +351,9 @@ const Index = () => {
             }}
           />
         )}
+
+        {/* MPC-10614: the Footprint Path, behind VITE_FOOTPRINT_PATH / ?path=1; renders nothing while the switch is off */}
+        <FootprintPathHost />
 
         {/* Hexagon Grid Section */}
         <section id="how-it-works" className="pb-12" aria-label="Your detected data points">
