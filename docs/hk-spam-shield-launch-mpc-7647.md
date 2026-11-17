@@ -41,7 +41,7 @@ No phone numbers, call logs or SMS content are uploaded. Server stores only the 
 
 ## Implemented in this change
 - `src/config/hkShield.ts`: prices, plan ids, targets, `HK_SHIELD_ENABLED = false` launch switch (+ tests).
-- `supabase/migrations/20261013100000_mpc_7647_hk_shield_entitlements.sql`: service_role-only entitlements table.
+- `supabase/migrations/20261013100002_mpc_7647_hk_shield_entitlements.sql`: service_role-only entitlements table.
 
 ## Not done (needs owners)
 Android app, iOS app, store listings, accounts, billing webhook and entitlement API, pricing page copy, paid-conversion analytics events, churn dashboard.

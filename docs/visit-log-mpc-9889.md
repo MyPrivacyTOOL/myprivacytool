@@ -5,7 +5,7 @@ The task's Input Spec text ("default truncated, 30 days") predates those sign-of
 
 | Part | File |
 |---|---|
-| Schema, policy seed, partitions, write door, purge, apply_policy, pg_cron | `supabase/migrations/20261108160000_mpc_9889_visit_log.sql` |
+| Schema, policy seed, partitions, write door, purge, apply_policy, pg_cron | `supabase/migrations/20261108160001_mpc_9889_visit_log.sql` |
 | Pages middleware module (policy cache, IP shaping, fields) | `functions/_visit-log.ts` |
 | Edge capture split | `shared/edge-capture/capture.ts` (`captureVisit`), `functions/_middleware.ts` |
 | Isolation check (CI) + ESLint rule | `scripts/ci/check-visit-log-isolation.mjs`, `eslint.config.js` |

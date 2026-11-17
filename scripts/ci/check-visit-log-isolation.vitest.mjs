@@ -18,7 +18,7 @@ describe("visit-log isolation", () => {
     expect(main(repoRoot, () => {})).toBe(0);
   });
   it("allows the module, its migration, its database test", () => {
-    for (const ok of ["functions/_visit-log.ts", "functions/_visit-log.vitest.ts", "supabase/migrations/20261108160000_mpc_9889_visit_log.sql", "supabase/tests/visit-log.test.sql"]) expect(isAllowed(ok), ok).toBe(true);
+    for (const ok of ["functions/_visit-log.ts", "functions/_visit-log.vitest.ts", "supabase/migrations/20261108160001_mpc_9889_visit_log.sql", "supabase/tests/visit-log.test.sql"]) expect(isAllowed(ok), ok).toBe(true);
     for (const no of ["functions/_middleware.ts", "supabase/migrations/20261108999999_other.sql", "workers/mpt-leads/worker.js", "shared/edge-capture/capture.ts"]) expect(isAllowed(no), no).toBe(false);
   });
   it("fails on a Worker, a view, a migration, a test SQL file and a workflow that name the schema", () => {
