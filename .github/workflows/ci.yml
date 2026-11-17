@@ -327,10 +327,32 @@ jobs:
       - run: npm ci
       - run: node scripts/registry-ci/check.mjs hygiene
 
+  build-node18:
+    # MPC-9894 follow-up: Cloudflare Pages builds production on Node 18 (its build log said v18.20.8). A `prebuild` step that imports .ts modules
+    # passed here on Node 22 and then failed every Pages deploy for two days. This job runs the same `npm run build` (prebuild, vite, postbuild) on
+    # the Pages Node version so that cannot merge again. Keep the version in step with the Pages project's build image.
+    name: Production build on the Pages Node version (18)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18.20.8
+          cache: npm
+      - run: npm ci
+      - name: Build exactly as Cloudflare Pages does
+        run: npm run build
+      - name: Verify build output
+        run: |
+          for f in dist/index.html dist/privacy.html dist/sitemap.xml; do
+            [ -s "$f" ] || { echo "::error::$f missing or empty"; exit 1; }
+          done
+
   ci-gate:
     name: CI gate
     if: always()
-    needs: [unit, lint, db, support-rest, build, pages-functions, e2e, pipeline-guards, registry-scan, registry-crawl, registry-hygiene]
+    needs: [unit, lint, db, support-rest, build, build-node18, pages-functions, e2e, pipeline-guards, registry-scan, registry-crawl, registry-hygiene]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to have succeeded

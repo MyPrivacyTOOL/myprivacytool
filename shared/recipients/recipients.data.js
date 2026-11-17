@@ -398,7 +398,7 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null,
       "exception": "Turnstile exception (design 8.2): loaded at the Scan me click; forms keep it on their own submit click"
@@ -706,7 +706,7 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null
     },
@@ -732,7 +732,7 @@ export default {
       "enabled": true,
       "flag": "HUNTER_API_KEY",
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null
     },
@@ -787,7 +787,7 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null
     },
@@ -813,7 +813,7 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null
     },
@@ -839,7 +839,7 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null
     },
@@ -892,7 +892,7 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null
     },
