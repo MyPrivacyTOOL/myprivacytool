@@ -423,6 +423,12 @@
             "retention": "Provider-side"
           },
           {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "firestore",
             "name": "Google Firestore (conversation state)",
             "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
@@ -850,6 +856,12 @@
             "key": "slack",
             "name": "Slack",
             "purpose": "Internal lead notification (no IP or email).",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
             "retention": "Provider-side"
           },
           {
@@ -1283,6 +1295,12 @@
             "retention": "Provider-side"
           },
           {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "firestore",
             "name": "Google Firestore (conversation state)",
             "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
@@ -1710,6 +1728,12 @@
             "key": "slack",
             "name": "Slack",
             "purpose": "Internal lead notification (no IP or email).",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
             "retention": "Provider-side"
           },
           {
@@ -2143,6 +2167,12 @@
             "retention": "Provider-side"
           },
           {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "firestore",
             "name": "Google Firestore (conversation state)",
             "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
@@ -2570,6 +2600,12 @@
             "key": "slack",
             "name": "Slack",
             "purpose": "Internal lead notification (no IP or email).",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
             "retention": "Provider-side"
           },
           {
@@ -3003,6 +3039,12 @@
             "retention": "Provider-side"
           },
           {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "firestore",
             "name": "Google Firestore (conversation state)",
             "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
@@ -3430,6 +3472,12 @@
             "key": "slack",
             "name": "Slack",
             "purpose": "Internal lead notification (no IP or email).",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
             "retention": "Provider-side"
           },
           {
@@ -3863,6 +3911,12 @@
             "retention": "Provider-side"
           },
           {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "firestore",
             "name": "Google Firestore (conversation state)",
             "purpose": "Stores per-conversation state for the chat channels so a reply can continue where it stopped.",
@@ -4290,6 +4344,12 @@
             "key": "slack",
             "name": "Slack",
             "purpose": "Internal lead notification (no IP or email).",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "meta-graph",
+            "name": "Meta Graph (Messenger, Instagram, WhatsApp)",
+            "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
             "retention": "Provider-side"
           },
           {
