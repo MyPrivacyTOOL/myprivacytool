@@ -1,6 +1,10 @@
 name: Deploy Supabase migrations
 
-# CK-006 (FLEET-TASK-V4.2): every merge to main runs `supabase db push` against the live MyPrivacyTOOL (MPT)
+# MPC-9896: AUTOMATIC DEPLOY IS SWITCHED OFF. This workflow runs ONLY by manual dispatch with an explicit
+# confirmation input (type DEPLOY). It never runs on push or merge. It is switched back on in Pass 2 of MPC-9896,
+# after the clean baseline migration is in place (Option B decided by Chris 2026-11-17).
+#
+# CK-006 (FLEET-TASK-V4.2): `supabase db push` against the live MyPrivacyTOOL (MPT)
 # Supabase project, so supabase/migrations/*.sql is the single source of schema truth.
 #
 # Repo secrets required (Settings -> Secrets and variables -> Actions); values are never printed:
@@ -12,9 +16,12 @@ name: Deploy Supabase migrations
 # `db push` is a no-op when nothing is pending. Rollback notes live at the bottom of each migration file.
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type DEPLOY to apply pending migrations to the LIVE database'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -33,6 +40,13 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
     steps:
+      - name: Require explicit confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "DEPLOY" ]; then
+            echo "::error::Confirmation input must be exactly DEPLOY. Nothing was run."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
