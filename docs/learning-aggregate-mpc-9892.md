@@ -40,4 +40,4 @@ The weekly Notion page (`workers/mpt-metrics-collector/publishers/learning-loop.
 * The canary seeds the email inside the scan's stored results. When MPC-9890 starts deleting `scans` / `leads` / `users`, extend the canary to seed those rows too.
 * A scan deleted before this migration is not counted (no backfill: the point is nothing is reconstructed).
 
-Rollback: see the header of `supabase/migrations/20261108210000_mpc_9892_learning_aggregate.sql`.
+Rollback: see the header of `supabase/migrations/20261108210001_mpc_9892_learning_aggregate.sql`.

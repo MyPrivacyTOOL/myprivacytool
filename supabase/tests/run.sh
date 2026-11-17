@@ -37,8 +37,8 @@ psql_ "$TEST_URL" -f supabase/sql/mpt-score-baselines.sql
 for f in $(ls supabase/migrations/*.sql | grep -v -e mpc_8671_kpi_views_hourly_counter -e mpc_8737_data_point_ledger_v1 -e mpc_8753_ledger_risk_axis -e mpc_8737_m3_ledger_erase_parity -e mpc_8689_brokers_rows | sort); do echo "   migration $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
 echo "   KPI view chain (supabase/sql), in the order production received it"
 for f in mpt-raw-metrics mpt-youtube-daily-metrics mpt-youtube-daily-join mpt-hk-days mpt-hubspot-daily mpt-cloudflare-daily-metrics mpt-cloudflare-daily-join; do echo "   sql $f.sql"; psql_ "$TEST_URL" -f "supabase/sql/$f.sql"; done
-echo "   migration 20261028120000_mpc_8671_kpi_views_hourly_counter.sql"
-psql_ "$TEST_URL" -f supabase/migrations/20261028120000_mpc_8671_kpi_views_hourly_counter.sql
+echo "   migration 20261028120001_mpc_8671_kpi_views_hourly_counter.sql"
+psql_ "$TEST_URL" -f supabase/migrations/20261028120001_mpc_8671_kpi_views_hourly_counter.sql
 # CK-8493: migrations proposed but not yet released (not read by deploy-supabase.yml). Tested here against the throwaway database only.
 # MPC-7471-F4 is excluded here: it drops mpt_score_baselines_email_hash_key, which schema.test.sql still needs, and it has its own stage further down.
 for f in $(ls supabase/proposed/*.sql 2>/dev/null | grep -v mpc_7471_f4_baseline_score_version | sort); do echo "   proposed $(basename "$f")"; psql_ "$TEST_URL" -f "$f"; done
@@ -122,7 +122,7 @@ psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8528-support-cases.test.sql
 echo "== proposed schema: support follow-up watchdog (MPC-8529)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8529-support-followup.test.sql
 
-# MPC-8673: the PROPOSED Flip Point schema (supabase/migrations/20261028110000_mpc_8673_flip_point_consents.sql, applied by the migrations loop above).
+# MPC-8673: the PROPOSED Flip Point schema (supabase/migrations/20261028110001_mpc_8673_flip_point_consents.sql, applied by the migrations loop above).
 echo "== proposed schema: Flip Point consents (MPC-8673)"
 psql_ "$TEST_URL" -At -f supabase/tests/proposed-mpc-8673-flip-point.test.sql
 

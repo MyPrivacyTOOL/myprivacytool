@@ -1,5 +1,5 @@
 -- MPC-8671: the KPI views read public.scan_hourly_counts, so purging public.scans leaves every KPI number unchanged.
--- supabase/tests/run.sh has already applied the views (supabase/sql chain + migration 20261028120000_mpc_8671_kpi_views_hourly_counter.sql) to the THROWAWAY database. Any failed assertion aborts.
+-- supabase/tests/run.sh has already applied the views (supabase/sql chain + migration 20261028120001_mpc_8671_kpi_views_hourly_counter.sql) to the THROWAWAY database. Any failed assertion aborts.
 \set ON_ERROR_STOP on
 
 create or replace function pg_temp.assert(ok boolean, msg text) returns void language plpgsql as $$ begin if not ok then raise exception 'FAIL: %', msg; end if; end $$;
