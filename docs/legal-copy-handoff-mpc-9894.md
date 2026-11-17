@@ -4,7 +4,7 @@ Written 2026-11-15 against `main` at e4bee903 plus this PR. Design: Open Tracker
 
 ## What is generated now (nothing in these places is typed by hand)
 
-`scripts/render-privacy-from-registry.mjs` (run by `prebuild`) calls `shared/recipients/legal-blocks.ts`, which calls `renderDisclosure` for every live entry in
+`scripts/render-privacy-from-registry.mjs` (run by hand) calls `shared/recipients/legal-blocks.ts`, which calls `renderDisclosure` for every live entry in
 `shared/recipients/recipients.json` and writes `src/data/legalBlocks.generated.json` (all ten locales). Components in `src/components/LegalRecipients.tsx` render it.
 
 | Where | Generated block |

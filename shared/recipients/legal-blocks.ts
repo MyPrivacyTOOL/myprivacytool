@@ -1,7 +1,7 @@
 // MPC-9894 (Open Tracker design section 5): the legal-page blocks that name who receives a visitor's data, generated from the registry and nothing else.
 // Privacy "Who receives your data", the Cookies recipient list and the DPA sub-processor list are all built HERE from shared/recipients/recipients.json
 // through renderDisclosure (shared/recipients/disclosure.ts, MPC-9893). No recipient sentence is typed in a page: add, switch off or end a recipient in
-// the registry and `node scripts/render-privacy-from-registry.mjs` (run by `prebuild`) rewrites src/data/legalBlocks.generated.json, which the pages render.
+// the registry and `node scripts/render-privacy-from-registry.mjs` (run by hand: `npm run legal-blocks`; CI fails on a stale file) rewrites src/data/legalBlocks.generated.json, which the pages render.
 // A test (src/data/legalBlocks.test.ts) fails if that file is out of date, or if a recipient host or provider name is typed in a legal page outside it.
 //
 // Pure: no DOM, no I/O, no clock. "Today" is the registry's own latest date (registryDate), so the same registry always gives the same file.
