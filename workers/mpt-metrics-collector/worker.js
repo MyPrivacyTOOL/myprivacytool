@@ -37,7 +37,7 @@ export const COLLECTORS = [supabaseCounts, cloudflareAnalytics, youtube, hubspot
 // call is a separate invocation with its own budget. Each stage must stay well under 50 requests (worker.test.mjs enforces a budget).
 // MPC-9168: the budget is enforced at run time (lib/budget.js: INVOCATION_BUDGET calls per stage, the last RESERVED_FOR_WRITE kept for the
 // insert and alerts) and checked by subrequest-budget.test.mjs against a deliberately heavy data set. Worst-case calls per stage:
-//   collect_core   supabase-counts 10, cloudflare 3, youtube 3, edge-machines 2, learning-loop 1, meta-ads 1, facebook <=10 (guard, page, insights, posts; 6 per-metric retries only if the batch is rejected), google-ads 3 (token + 2 searchStream)
+//   collect_core   supabase-counts 10, cloudflare 3, youtube 3, edge-machines 2, learning-loop 1, meta-ads 1, facebook <=11 (guard, token lookup, page, insights, posts; 6 per-metric retries only if the batch is rejected), google-ads 3 (token + 2 searchStream)
 //   collect_hubspot hubspot: variable (lifecycle stages, forms and their pages), alone so it gets a whole budget
 //   collect_email  scan-gap <=7 (one batched read), nightly-chain 2, hubspot-optout <=11, email-delivery 2, channel-osint 3
 //   collect_ga4    token + 6 reports (the channel-osint collector fetches its own GA4 token in its stage)

@@ -7,7 +7,7 @@
 //  * Not configured => an ok row with payload.configured=false and a "not configured" log line. It never throws, so the other collectors
 //    in the stage are unaffected and an unfinished setup raises no alarm (same convention as meta-ads.js).
 //  * Page guard. Before anything else the collector asks Graph which object the token is (GET /me). A Page token answers with the Page's
-//    own id. If that is not FACEBOOK_PAGE_ID, the row is status=error and nothing else is read.
+//    own id; a system-user token is exchanged for the configured Page's own token. Anything else => status=error, nothing else read.
 //  * Read-only and single-Page. facebookRead() refuses anything but GET and any path that is not /<FACEBOOK_PAGE_ID> or below it
 //    (the only other allowed path is /me for the guard).
 //  * Error text carries the HTTP status and Meta's numeric error code only, never a response body.
@@ -55,10 +55,10 @@ export async function facebookRead(env, pageId, token, path, label) {
 
 const qs = (o) => new URLSearchParams(o).toString();
 
-async function collectInsights(env, id, token, day, raw, failures) {
+async function collectInsights(env, id, pageToken, day, raw, failures) {
   const base = { period: 'day', since: day, until: day };
   try {
-    raw.insights = await facebookRead(env, id, token, `/${id}/insights?${qs({ ...base, metric: PAGE_METRICS.join(',') })}`, 'page insights');
+    raw.insights = await facebookRead(env, id, pageToken, `/${id}/insights?${qs({ ...base, metric: PAGE_METRICS.join(',') })}`, 'page insights');
     return;
   } catch (e) {
     if (e.status === 401 || e.metaCode === 190) throw e; // token problem: retrying metric by metric would repeat it
@@ -66,7 +66,7 @@ async function collectInsights(env, id, token, day, raw, failures) {
   }
   raw.insights_by_metric = {};
   for (const m of PAGE_METRICS) {
-    try { raw.insights_by_metric[m] = await facebookRead(env, id, token, `/${id}/insights?${qs({ ...base, metric: m })}`, `insight ${m}`); }
+    try { raw.insights_by_metric[m] = await facebookRead(env, id, pageToken, `/${id}/insights?${qs({ ...base, metric: m })}`, `insight ${m}`); }
     catch (e) { raw.insights_by_metric[m] = null; failures.push(e.message); }
   }
 }
@@ -97,11 +97,19 @@ export default {
     const blank = { configured: true, day, page_id: id, graph_version: version };
     const clean = (m) => String(m).replace(NO_TOKEN_WORDS, '[redacted]').split(token).join('[redacted]');
 
-    // Page guard: nothing else is read until the token is proven to be the configured Page's own token.
+    // Page guard: nothing else is read until the token is proven to act as the configured Page. A Page token answers GET /me with the Page's
+    // own id. A business system-user token answers with the system user's id instead; then the Page's own token is fetched from
+    // GET /<page id>?fields=id,access_token (a read of the configured Page, held in memory only) and that is used for every later call.
     let seen = null;
+    let pageToken = token;
+    let via = 'page_token';
     try {
       const me = await facebookRead(env, id, token, '/me?fields=id', 'page guard');
       seen = String(me?.id ?? '');
+      if (seen !== id) {
+        const pg = await facebookRead(env, id, token, `/${id}?fields=id,access_token`, 'page token lookup').catch(() => null);
+        if (pg && String(pg.id) === id && typeof pg.access_token === 'string' && pg.access_token) { pageToken = pg.access_token; seen = id; via = 'system_user_token'; }
+      }
     } catch (e) {
       const expired = e.status === 401 || e.metaCode === 190;
       return { ...period, payload: { ...blank, guard: { ok: false, page_id_seen: null, token_expired_or_invalid: expired } },
@@ -109,17 +117,17 @@ export default {
     }
     if (seen !== id) {
       return { ...period, payload: { ...blank, guard: { ok: false, page_id_seen: /^\d{5,25}$/.test(seen) ? seen : null } },
-        error: `page guard: token belongs to ${/^\d{5,25}$/.test(seen) ? `object ${seen}` : 'an unknown object'}, expected Page ${id}; nothing collected` };
+        error: `page guard: token does not act as Page ${id} (it is ${/^\d{5,25}$/.test(seen) ? `object ${seen}` : 'an unknown object'}, and no Page token for ${id} could be read with it); nothing collected` };
     }
 
-    const payload = { ...blank, guard: { ok: true, page_id_seen: seen }, as_of: now.toISOString() };
+    const payload = { ...blank, guard: { ok: true, page_id_seen: seen, via }, as_of: now.toISOString() };
     const raw = {};
     const failures = [];
-    try { raw.page = await facebookRead(env, id, token, `/${id}?${qs({ fields: PAGE_FIELDS })}`, 'page fields'); } catch (e) { failures.push(e.message); }
-    try { await collectInsights(env, id, token, day, raw, failures); } catch (e) { failures.push(e.message); }
+    try { raw.page = await facebookRead(env, id, pageToken, `/${id}?${qs({ fields: PAGE_FIELDS })}`, 'page fields'); } catch (e) { failures.push(e.message); }
+    try { await collectInsights(env, id, pageToken, day, raw, failures); } catch (e) { failures.push(e.message); }
     try {
       const fields = `id,created_time,permalink_url,insights.metric(${POST_METRICS})`;
-      raw.posts = await facebookRead(env, id, token, `/${id}/posts?${qs({ fields, since: day, until: day, limit: String(POST_LIMIT) })}`, 'posts');
+      raw.posts = await facebookRead(env, id, pageToken, `/${id}/posts?${qs({ fields, since: day, until: day, limit: String(POST_LIMIT) })}`, 'posts');
     } catch (e) { failures.push(e.message); }
 
     const posts = Array.isArray(raw.posts?.data) ? raw.posts.data : null;

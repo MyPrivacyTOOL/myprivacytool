@@ -52,9 +52,15 @@ check(out.error && /expired or invalid/.test(out.error) && /190/.test(out.error)
 
 // wrong Page ID: token belongs to another object
 calls = [];
-handler = (u) => (u.includes('/me?') ? { status: 200, body: { id: '9999999999999' } } : good(u));
+handler = (u) => (u.includes('/me?') ? { status: 200, body: { id: '9999999999999' } } : u.includes('access_token') ? { status: 403, body: { error: { code: 200 } } } : good(u));
 out = await collector.collect(ENV, NOW);
-check(out.error && /expected Page 1234567890123/.test(out.error) && out.payload.guard.ok === false && calls.length === 1 && out.payload.summary === undefined, 'wrong Page: error row, nothing else read');
+check(out.error && /does not act as Page 1234567890123/.test(out.error) && out.payload.guard.ok === false && calls.length === 2 && out.payload.summary === undefined, 'wrong Page: error row, nothing else read');
+
+// system-user token: /me is the system user; the Page's own token is fetched and used for the later reads
+calls = [];
+handler = (u) => (u.includes('/me?') ? { status: 200, body: { id: '5550001' } } : u.includes('access_token') ? { status: 200, body: { id: PAGE, access_token: 'derivedPAGEtoken' } } : good(u));
+out = await collector.collect(ENV, NOW);
+check(!out.error && out.payload.guard.via === 'system_user_token' && calls.length === 5 && calls.slice(2).every((c) => c.headers.Authorization === 'Bearer derivedPAGEtoken') && !JSON.stringify(out).includes('derivedPAGEtoken') && !JSON.stringify(out).includes(TOKEN), 'system-user token: Page token derived in memory, used for reads, never stored');
 
 // empty data
 calls = [];
