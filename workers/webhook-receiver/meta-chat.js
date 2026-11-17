@@ -13,7 +13,7 @@ export const PRIVACY_MAIL = 'privacy@myprivacytool.io';
 /** The Privacy Policy "Last updated" date the person agreed to. Change it when the policy changes. */
 import { callRecipient } from '../../shared/recipients/outbound.ts';
 import { workerRecipientContext } from '../../shared/recipients/worker-ctx.ts';
-export const NOTICE_VERSION = '2026-10-12';
+export const NOTICE_VERSION = '2026-11-17';
 export const DEFAULT_IMAGE = `${SITE}/og-image.jpg`;
 
 export const TEXT = {

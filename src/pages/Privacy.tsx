@@ -61,7 +61,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 12 October 2026
+              Last updated: 17 November 2026
             </p>
 
             <section className="mb-8">
@@ -153,7 +153,7 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>Messaging Channel Data:</strong> If you contact us through
-                  a messaging channel (currently Telegram and the web start page),
+                  a messaging channel (currently Telegram, Messenger, WhatsApp and the web start page),
                   we store your channel ID, display name, your replies, and your
                   conversation stage so we can continue the conversation. When you
                   message our Telegram bot we receive what you send (including
@@ -191,6 +191,35 @@ const Privacy = () => {
                   Telegram settings stay yours to change and we never change them
                   for you, and anything Telegram itself stores is outside our
                   control.
+                </li>
+                <li>
+                  <strong>Messenger and WhatsApp Chats:</strong> When you message
+                  our Facebook Page on Messenger, or our WhatsApp number, we
+                  receive what you send or tap (text and button taps), your
+                  Messenger page-scoped id or your WhatsApp phone number, and the
+                  time. Our first reply is a consent card. Until you tap &ldquo;I
+                  agree&rdquo; we send you nothing more than the menu and save
+                  nothing about you. If you tap &ldquo;Ask a question&rdquo; and
+                  agree, we save the time you agreed, the version of this policy
+                  you saw and that you asked to speak to us, and we tell our team
+                  that someone has asked a question (the channel and a short code,
+                  never your name, id or message). A person on our team then reads
+                  your message in the Messenger or WhatsApp inbox, where Meta keeps
+                  it under its own terms. In this chat we do not use an AI model to
+                  read or answer your messages, and we do not add you to our CRM. We
+                  keep what we save for at most 24 hours. You can delete it sooner
+                  by tapping &ldquo;Delete my data&rdquo;, by sending STOP or DELETE,
+                  or by writing to{" "}
+                  <a
+                    href="mailto:privacy@myprivacytool.io"
+                    className="text-brand underline hover:text-foreground"
+                  >
+                    privacy@myprivacytool.io
+                  </a>
+                  . Tapping &ldquo;No thanks&rdquo; deletes what we saved and we do
+                  not message you again until you start a new chat. Meta runs
+                  Messenger and WhatsApp itself and is named in section 5; we
+                  cannot delete what Meta holds in your own account.
                 </li>
                 <li>
                   <strong>Optional Contact Details:</strong> Where you choose to
