@@ -327,6 +327,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -369,9 +375,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -715,6 +757,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -757,9 +805,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -1103,6 +1187,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -1145,9 +1235,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -1491,6 +1617,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -1533,9 +1665,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -1879,6 +2047,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -1921,9 +2095,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -2267,6 +2477,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -2309,9 +2525,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -2655,6 +2907,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -2697,9 +2955,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -3043,6 +3337,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -3085,9 +3385,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -3431,6 +3767,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -3473,9 +3815,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
@@ -3819,6 +4197,12 @@
       "dpa": {
         "sub_processors": [
           {
+            "key": "cloudflare-turnstile",
+            "name": "Cloudflare Turnstile",
+            "purpose": "Bot check on the scan and on forms.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "cloudflare-edge",
             "name": "Cloudflare (serving and rate limits)",
             "purpose": "Serves the site and limits abuse.",
@@ -3861,9 +4245,45 @@
             "retention": "Provider-side"
           },
           {
+            "key": "github-commit-search",
+            "name": "GitHub commit search",
+            "purpose": "Email hexagon: looks up your email in public commit metadata.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "hunter",
+            "name": "Hunter.io",
+            "purpose": "Looks your email up in a business-contact enrichment service; used only where an API key is set.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "gravatar",
+            "name": "Gravatar / Libravatar",
+            "purpose": "Email hexagon: checks for a public avatar using a hash of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "rdap",
+            "name": "RDAP",
+            "purpose": "Email hexagon: looks up the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "cloudflare-doh",
+            "name": "Cloudflare DNS over HTTPS",
+            "purpose": "Email hexagon: DNS records for the domain of your email.",
+            "retention": "Provider-side"
+          },
+          {
             "key": "dashscope",
             "name": "AI model providers (any provider; currently Alibaba Cloud, Qwen models)",
             "purpose": "Language models used to work out what a message sent through a messaging channel is about, and to write replies to help requests made through the website HELP button, email or a messaging channel. They receive the message text and short approved help-article excerpts, with email addresses and phone numbers removed first. We may use other providers and models, open-source or closed-source, in any country, and this list is updated before a new one is used with customer personal data.",
+            "retention": "Provider-side"
+          },
+          {
+            "key": "telegram",
+            "name": "Telegram Bot API",
+            "purpose": "Delivers bot messages on Telegram.",
             "retention": "Provider-side"
           },
           {
