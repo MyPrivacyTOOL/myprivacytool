@@ -1103,10 +1103,10 @@ export default {
       "enabled": true,
       "flag": null,
       "country_overrides": {},
-      "dpa_listed": false,
+      "dpa_listed": true,
       "since": "2026-11-08",
       "until": null,
-      "note": "MPC-9885: switched ON because webhook-receiver sendWhatsApp already calls graph.facebook.com whenever META_WHATSAPP_KEY and WHATSAPP_PHONE_NUMBER_ID are set (it was seeded off as 'stubs'). Both senders self-gate on their own secrets, so no flag. phone added (WhatsApp `to`). MPC-9894: Privacy/Cookies must say WhatsApp is live. CK-9971: Messenger replies are live for people with a role on the Meta app (admin test); public use waits for Meta review. Purpose reworded from \"WhatsApp live, Messenger a stub\"."
+      "note": "MPC-9885: switched ON because webhook-receiver sendWhatsApp already calls graph.facebook.com whenever META_WHATSAPP_KEY and WHATSAPP_PHONE_NUMBER_ID are set (it was seeded off as 'stubs'). Both senders self-gate on their own secrets, so no flag. phone added (WhatsApp `to`). MPC-9894: Privacy/Cookies must say WhatsApp is live. CK-9971: Messenger replies are live for people with a role on the Meta app (admin test); public use waits for Meta review. Purpose reworded from \"WhatsApp live, Messenger a stub\". CK-9971: dpa_listed set true on 2026-11-17 (Chris: yes, Meta on the DPA)."
     },
     {
       "key": "platform-replies",

@@ -233,8 +233,10 @@ const Privacy = () => {
                   confirm you are 16 or older with a checkbox. Our Telegram bot is
                   for people aged 19 or over: it asks you to reply Y only if you
                   are, and it records nothing from your messages before you do. We
-                  cannot check your age, so this relies on your answer. We do not
-                  collect or store your date of birth
+                  cannot check your age, so this relies on your answer. Our Messenger
+                  and WhatsApp chats are for people aged 16 or over: please do not
+                  use them if you are younger, and we do not ask for your date of
+                  birth there. We do not collect or store your date of birth
                 </li>
                 <li>
                   <strong>Handles You Ask Us to Scan:</strong> Social media handles
