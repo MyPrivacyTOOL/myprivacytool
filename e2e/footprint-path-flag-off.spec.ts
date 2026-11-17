@@ -13,7 +13,9 @@ async function body(page: import("@playwright/test").Page, url: string): Promise
   await page.waitForTimeout(1500);
   return page.evaluate(() => {
     const root = document.body.cloneNode(true) as HTMLElement;
-    root.querySelectorAll("script,style,noscript,[data-fp-volatile]").forEach((n) => n.remove());
+    // The full-screen "Your device" reveal exists only in builds that switch the device hero on (CI's build does not; a local build may). It is not part of
+    // this feature, so it is left out of the comparison: the snapshot then holds the same in either build environment.
+    root.querySelectorAll("script,style,noscript,[data-testid=device-reveal-screen]").forEach((n) => n.remove());
     return root.innerHTML.replace(/>\s+</g, "><").replace(/\s+/g, " ").trim();
   });
 }
