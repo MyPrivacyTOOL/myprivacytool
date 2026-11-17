@@ -1,5 +1,5 @@
 // MPC-9894: renders the legal-page blocks (Privacy "who receives your data", Cookies recipient list, DPA sub-processors, the visit-log sentence) from
-// shared/recipients/recipients.json through renderDisclosure and writes src/data/legalBlocks.generated.json. Run by `prebuild`.
+// shared/recipients/recipients.json through renderDisclosure and writes src/data/legalBlocks.generated.json. Run by hand (npm run legal-blocks); the committed file is checked by src/data/legalBlocks.test.tsx. Not in `prebuild`: the Cloudflare Pages build runs Node 18, which cannot import the .ts shared modules.
 //   node scripts/render-privacy-from-registry.mjs          write the file
 //   node scripts/render-privacy-from-registry.mjs --check  exit 1 if the committed file differs from what the registry produces
 //   node scripts/render-privacy-from-registry.mjs --print  print the Privacy recipient section as plain text (for review)
