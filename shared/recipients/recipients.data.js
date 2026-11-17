@@ -1092,7 +1092,7 @@ export default {
         "username",
         "phone"
       ],
-      "purpose": "Delivers WhatsApp replies; the Messenger channel is not switched on and sends nothing.",
+      "purpose": "Delivers replies in Messenger and WhatsApp conversations: the consent card, the menu buttons and the short confirmations.",
       "party": "platform",
       "retention": {
         "days": null,
@@ -1106,7 +1106,7 @@ export default {
       "dpa_listed": false,
       "since": "2026-11-08",
       "until": null,
-      "note": "MPC-9885: switched ON because webhook-receiver sendWhatsApp already calls graph.facebook.com whenever META_WHATSAPP_KEY and WHATSAPP_PHONE_NUMBER_ID are set (it was seeded off as 'stubs'). Both senders self-gate on their own secrets, so no flag. phone added (WhatsApp `to`). MPC-9894: Privacy/Cookies must say WhatsApp is live."
+      "note": "MPC-9885: switched ON because webhook-receiver sendWhatsApp already calls graph.facebook.com whenever META_WHATSAPP_KEY and WHATSAPP_PHONE_NUMBER_ID are set (it was seeded off as 'stubs'). Both senders self-gate on their own secrets, so no flag. phone added (WhatsApp `to`). MPC-9894: Privacy/Cookies must say WhatsApp is live. CK-9971: Messenger replies are live for people with a role on the Meta app (admin test); public use waits for Meta review. Purpose reworded from \"WhatsApp live, Messenger a stub\"."
     },
     {
       "key": "platform-replies",
