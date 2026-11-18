@@ -61,7 +61,7 @@ const Privacy = () => {
               Privacy Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 17 November 2026
+              Last updated: 18 November 2026
             </p>
 
             <section className="mb-8">
@@ -266,8 +266,10 @@ const Privacy = () => {
                   pages, clicks, referrer source (through the analytics services named in section 5, only after you allow analytics)
                 </li>
                 <li>
-                  <strong>Cookies & Similar Technologies:</strong> Session IDs,
-                  preference settings, security tokens
+                  <strong>Cookies & Similar Technologies:</strong> Preference settings,
+                  your cookie choice and, if you sign in or connect an outside
+                  account, a session kept in your browser storage or in a cookie
+                  (each one is named in the Cookie Policy)
                 </li>
                 <li>
                   <strong>Engagement Records:</strong> For users of our scan
