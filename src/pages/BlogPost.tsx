@@ -5,7 +5,7 @@ import Seo from '@/components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Share2, Copy } from 'lucide-react';
+import { ArrowLeft, Share2, Copy, ShieldCheck } from 'lucide-react';
 import { HEXAGONS, HEXAGON_GROUPS, HEXAGON_COUNT, HEXAGON_ALWAYS_COUNT } from '../../shared/hexagon-registry/registry.js';
 import { countSentence } from '../../shared/hexagon-registry/countSentence.js';
 import blogPosts from '@/data/blogPosts.json';
@@ -494,6 +494,18 @@ export default function BlogPost() {
                 {post.readTime} min read
               </div>
             </div>
+
+            {/* MPC-6802: Google Preferred Sources verification badge */}
+            <a
+              href="https://www.google.com/webmasters/verify-origin-program"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="google-preferred-source-badge"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              <ShieldCheck className="w-4 h-4" aria-hidden="true" />
+              Google Preferred Source
+            </a>
           </div>
         </div>
       </div>
