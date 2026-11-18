@@ -76,7 +76,40 @@ describe("<ConnectGitHub />", () => {
   it("shows a service error (not the Connect button) when the Worker is unreachable", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "error" });
     renderAt();
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't reach/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn.t reach the connection service/i);
     expect(screen.queryByRole("link", { name: /connect github/i })).toBeNull();
+  });
+
+  // MPC-9796 (UX-040/041/042): a session that ended, a revoked token, no connection and an outage each say what they are.
+  it("a session that ended says the stored connection remains until disconnected, and offers Connect", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
+    renderAt();
+    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we still hold that connection until you disconnect it/i);
+    expect(screen.getByRole("link", { name: /connect github/i })).toBeInTheDocument();
+  });
+
+  it("a revoked token says GitHub no longer allows it and that our copy was deleted", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "reauthorize" });
+    renderAt();
+    expect(await screen.findByTestId("reauthorize")).toHaveTextContent(/revoked, or it expired.*deleted our copy of the access token/i);
+  });
+
+  it("no connection says so, without claiming anything about an earlier session", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "disconnected" });
+    renderAt();
+    expect(await screen.findByTestId("not-connected")).toHaveTextContent("No GitHub account is connected.");
+    expect(screen.queryByTestId("session-ended")).toBeNull();
+  });
+
+  it("an outage says it does not change the connection", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "error" });
+    renderAt();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/says nothing about your connection, which is unchanged/i);
+  });
+
+  it("when connected it says what is kept and for how long", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
+    renderAt();
+    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*24 hours.*7 days/i);
   });
 });

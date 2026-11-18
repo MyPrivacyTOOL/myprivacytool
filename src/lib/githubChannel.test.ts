@@ -22,8 +22,24 @@ describe("githubChannel client", () => {
     expect(fetchFn).toHaveBeenCalledWith(`${GITHUB_CHANNEL_URL}/channels/github/profile`, { credentials: "include" });
   });
 
-  it.each([401, 404])("treats %i (not connected / reauthorize) as disconnected", async (code) => {
-    const fetchFn = vi.fn().mockResolvedValue(res(code, { error: "reauthorize" }));
+  // MPC-9796: each way of "not connected" is its own status.
+  it("401 unauthenticated is a session that ended, not a disconnected account", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(401, { error: "unauthenticated" }));
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "session_ended" });
+  });
+
+  it("401 reauthorize is a token GitHub no longer accepts", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(401, { error: "reauthorize" }));
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "reauthorize" });
+  });
+
+  it("401 with no readable body is treated as a session that ended", async () => {
+    const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => { throw new Error("no body"); } });
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "session_ended" });
+  });
+
+  it("404 not_connected is disconnected", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(404, { error: "not_connected" }));
     expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "disconnected" });
   });
 
