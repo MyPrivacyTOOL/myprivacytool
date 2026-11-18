@@ -81,6 +81,27 @@ const DPA = () => {
                 Much of the device scan runs in the visitor&rsquo;s own browser; what is sent to
                 our servers is described in the Privacy Policy.
               </p>
+              <h3 className="mt-6 text-xl font-semibold text-foreground">Employee privacy checks</h3>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
+                <li>
+                  <strong>Authorisation:</strong> your administrator invites each employee by work email, and each employee agrees for themselves before
+                  any check about them runs. A list of emails from you is not an employee&rsquo;s consent. An employee can decline, or withdraw later,
+                  and withdrawing deletes their results.
+                </li>
+                <li>
+                  <strong>What you see:</strong> totals for the employees who agreed (how many were checked and how many have a listing that may be theirs).
+                  You see an individual employee&rsquo;s results only if that employee chooses to share them with you. An employee who was invited but has
+                  not agreed has no results, and nothing about them is counted in the results totals.
+                </li>
+                <li>
+                  <strong>What the employee sees:</strong> their own results first, with a link to each page checked.
+                </li>
+                <li>
+                  <strong>Matching:</strong> a check looks only at pages the employee shows us and compares them with the name, place and phone number the
+                  employee types for that check. Those typed details are used once and not stored. A result is an exact, probable or possible match, and a
+                  possible match is a guess.
+                </li>
+              </ul>
             </section>
 
             <section className="mb-8">
