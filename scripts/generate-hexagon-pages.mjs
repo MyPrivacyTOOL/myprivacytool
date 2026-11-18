@@ -120,7 +120,7 @@ export function hexagonPage(i) {
     ld: { '@context': 'https://schema.org', '@type': 'Article', headline: title, description: desc, url, publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL' } },
     body: `<nav><a href="${BASE}/">All hexagons</a> › ${esc(chLabel[i.channel])}</nav>
 <div class="eyebrow">MyPrivacyTOOL · Hexagon risk page</div><h1>${esc(i.label)}</h1>
-<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span>${REVIEWED[i.slug] ? `<span class="tag">Text reviewed ${REVIEWED_ON}</span>` : ''}<span class="tag">${extra ? 'Checked by MPT (extra check)' : mapped ? 'Built (capture switch)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
+<div class="tags"><span class="tag">${esc(chLabel[i.channel])}</span><span class="tag">${i.arrival} · ${AR[i.arrival]}</span>${REVIEWED[i.slug] ? (REVIEWED[i.slug].draft ? `<span class="tag">Text drafted ${REVIEWED[i.slug].on} (owner review pending)</span>` : `<span class="tag">Text reviewed ${REVIEWED_ON}</span>`) : ''}<span class="tag">${extra ? 'Checked by MPT (extra check)' : mapped ? 'Built (capture switch)' : checked ? 'Checked by MPT' : 'Not checked by MPT yet'}</span></div>
 <div class="risk"><div class="hexb ${i.risk}" aria-hidden="true">${RL[i.risk]}</div><div><b>${RN[i.risk]} risk</b><p>${RDEF[i.risk]}</p></div></div>
 <h2>What it reveals</h2><p>${esc(revealsText(i))}</p>
 <h2>How easily it can be obtained</h2><p><b>${i.arrival} · ${AR[i.arrival]}.</b> ${ARX[i.arrival]}</p>

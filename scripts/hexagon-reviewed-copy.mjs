@@ -143,4 +143,17 @@ export const REVIEWED = {
     ],
     todo: ['Treat a voice note as something that can be forwarded.', 'Use text for anything sensitive.', 'Check who is in the chat before you send one.'],
   },
+  // MPC-9791 (CONTENT-010): drafted 2026-11-18 by ClaudeKing, owner review pending. The generated text matched /phone/ inside "microphones" and gave Connected Devices SIM-swap fraud text.
+  'connected-devices': {
+    draft: true,
+    on: '2026-11-18',
+    heads: 'Count the cameras, microphones and speakers on your device',
+    uses: [
+      'A website can see how many cameras, microphones and speakers your browser reports, without turning any of them on.',
+      'The mix, for example two speakers and one headset microphone, is one more detail that makes your device recognisable.',
+      'Trackers can add it to your other browser details to recognise you across visits without cookies.',
+      'A count says nothing about what you do with them, but an unusual set makes you easier to single out.',
+    ],
+    todo: ['Check which sites have camera and microphone permission in your browser settings and remove the ones you do not use.', 'Block camera and microphone by default and allow them only for sites you trust.', 'Use a browser with fingerprint protection, which can hide or round off device lists.'],
+  },
 };

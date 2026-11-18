@@ -382,6 +382,12 @@ const getHexagonInsight = (hexagonData: HexagonData | null): string => {
       const location = locationMatch ? locationMatch[1] : 'your real location';
       return `I detected a DNS leak. Your DNS requests are going to your ISP's servers instead of your VPN's DNS. Your ISP can see the websites you visit, and websites can work out your real location at ${location}. Turning on DNS leak protection in your VPN settings fixes this.`;
     }
+    if (value.toLowerCase().includes('not checked')) {
+      return "I could not run the DNS leak check on your browser, so I am not saying anything either way. It needs a network test your browser may have blocked, or it waits until you press Scan me.";
+    }
+    if (value.toLowerCase().includes('no leak seen')) {
+      return "No real internet address leaked in this browser test. That is a WebRTC test: it does not show which DNS service answers your lookups.";
+    }
     if (value.toLowerCase().includes('vpn protected') || value.toLowerCase().includes('protected')) {
       return "Excellent—your VPN is properly protecting your DNS requests. No leak detected. Your DNS queries are being routed through secure servers, keeping your browsing history hidden from your ISP.";
     }
