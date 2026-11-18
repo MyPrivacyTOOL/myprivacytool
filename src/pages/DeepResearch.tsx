@@ -33,7 +33,7 @@ export default function DeepResearch() {
   return (
     <>
       <Seo
-        title="Deep Research | MyPrivacyTOOL.IO"
+        title="Deep Research | MyPrivacyTOOL"
         description="Deeper checks on how exposed your identity is. Some run now, the rest are coming soon."
         path="/deep-research"
         noindex
