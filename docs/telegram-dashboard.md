@@ -31,3 +31,6 @@ Merging to `main` auto-deploys the site and the `social-listeners` Worker: treat
 
 ## Tests
 `npx vitest run shared/dashboard shared/edge-capture src/pages/TelegramDashboard.test.tsx workers/social-listeners`; `DATABASE_URL=<throwaway postgres> bash supabase/tests/run.sh` (includes 8 concurrent redemptions on separate connections).
+
+## Test-account flag (MPC-10621)
+`/api/dashboard` adds `baseline.allow_listed_test_account` (boolean, only on an available baseline). It is true when the session's sender is in the bot's allow-list. The Pages project needs `PROBE_TELEGRAM_IDS` (same value as the Worker) and, if the Worker sets it, `TELEGRAM_ID_HMAC_KEY`, both as secrets. Without them the flag is false (a real user: four arrival prints). The list and ids are never returned. The Footprint Path shows five prints when the flag is true.
