@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { BASES, ENDPOINTS, LANG_LABEL, PAPIT_LIMITS, SNIPPETS, type Lang } from "./developerDocs";
+import { BASES, ENDPOINTS, LANG_LABEL, PAPIT_LIMITS, PAPIT_SCHEMA, SNIPPETS, type Lang } from "./developerDocs";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
@@ -132,5 +132,23 @@ describe("PaPIT limits wording", () => {
     expect(idx).toMatch(/SESSION_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
     expect(cache).toMatch(/CACHE_TTL_SECONDS = 24 \* 60 \* 60/);
     expect(readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8")).toMatch(/data_retention_days: 30/);
+  });
+});
+
+// MPC-9795 (TECH-011, TECH-012, COPY-017, DEV-006): window, caps, the 'skills' name and empty interests are published, and match the adapter.
+describe("PaPIT sampling wording", () => {
+  const text = PAPIT_LIMITS.map((l) => `${l.item} ${l.detail}`).join(" ");
+  it("publishes the 300-event / 90-day window, the page caps, the skills caveat and the empty-interests states", () => {
+    expect(text).toMatch(/at most 300 events from that window/);
+    expect(text).toMatch(/300 of your own public repos/);
+    expect(text).toMatch(/200 of your most recently starred/);
+    expect(text).toMatch(/does not measure skill/);
+    expect(text).toMatch(/no_stars/);
+    expect(text).toMatch(/stars_without_topics/);
+  });
+  it("the page caps stated match MAX_PAGES in the adapter (100 per page)", () => {
+    const m = /MAX_PAGES = \{ repos: (\d+), starred: (\d+), events: (\d+) \}/.exec(read("workers/github-channel/lib/adapter.js"))!;
+    expect(m.slice(1).map(Number)).toEqual([3, 2, 3]);
+    expect(PAPIT_SCHEMA).toContain("data_coverage");
   });
 });

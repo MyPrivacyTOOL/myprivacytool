@@ -103,11 +103,18 @@ export default function ConnectGitHub() {
             <span>GitHub connected</span>
           </div>
           <dl className="mb-6">
-            <Row label="Skills">{state.profile.core_identity.career.skills.join(", ") || "None found"}</Row>
+            <Row label="Main languages">{state.profile.core_identity.career.skills.join(", ") || "None found"}</Row>
             <Row label="Role">{state.profile.core_identity.career.primary_role}</Row>
             <Row label="Public projects">{state.profile.core_identity.career.public_projects_count}</Row>
             <Row label="Interests">{state.profile.behavioral.interests.join(", ") || "None found"}</Row>
             <Row label="Activity (90 days)">{state.profile.behavioral.activity_level}</Row>
+            {state.profile.data_coverage && (state.profile.data_coverage.repos_sampled || state.profile.data_coverage.starred_sampled || state.profile.data_coverage.events_capped) ? (
+              <Row label="Sample">
+                <span data-testid="profile-sampled">Large account: based on your most recent 300 public repos, 200 stars and 300 events, not everything.</span>
+              </Row>
+            ) : null}
+            {state.profile.data_coverage?.interests === "no_stars" ? <Row label="Interests note">You have not starred anything.</Row> : null}
+            {state.profile.data_coverage?.interests === "stars_without_topics" ? <Row label="Interests note">The repos you starred have no topics.</Row> : null}
             <Row label="Declared validity">{state.profile.privacy_boundaries.data_retention_days} days (not enforced)</Row>
             <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>

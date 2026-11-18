@@ -74,7 +74,7 @@ export async function sha256Hex(text) {
  * @param {{profile:object, repos:object[], starred:object[], events:{created_at:string}[]}} raw
  * @param {{now?: Date}} opts
  */
-export async function githubToPapit(raw, { now = new Date() } = {}) {
+export async function githubToPapit(raw, { now = new Date(), coverage = null } = {}) {
   const { profile = {}, repos = [], starred = [], events = [] } = raw || {};
   const own = repos.filter((r) => !r.fork && !r.private);
 
@@ -108,6 +108,13 @@ export async function githubToPapit(raw, { now = new Date() } = {}) {
       activity_level: activityLevel(recent),
     },
     privacy_boundaries: { data_retention_days: 30, revocable: true },
+    // MPC-9795 (DEV-006): how complete the inputs were, so an empty list is never read as "nothing exists". Booleans and a state word only.
+    data_coverage: {
+      repos_sampled: coverage ? coverage.repos_capped === true : null,
+      starred_sampled: coverage ? coverage.starred_capped === true : null,
+      events_capped: coverage ? coverage.events_capped === true : null,
+      interests: starred.length === 0 ? 'no_stars' : (starTopics.size === 0 ? 'stars_without_topics' : 'found'),
+    },
   };
 
   // Receipt = SHA-256 of the canonical (sorted-key) JSON of everything above, i.e. the sanitized payload.

@@ -37,7 +37,7 @@ test('PII is stripped: nothing identifying survives into the PaPIT JSON', async 
 test('output has exactly the PaPIT v1 shape', async () => {
   const p = await githubToPapit(raw(), { now: NOW });
   assert.deepEqual(Object.keys(p).sort(),
-    ['behavioral', 'core_identity', 'cryptographic_receipt', 'generated_at', 'privacy_boundaries', 'source_channel', 'version']);
+    ['behavioral', 'core_identity', 'cryptographic_receipt', 'data_coverage', 'generated_at', 'privacy_boundaries', 'source_channel', 'version']);
   assert.equal(p.version, '1.0');
   assert.equal(p.source_channel, 'github');
   assert.equal(p.generated_at, '2026-10-05T12:00:00.000Z');
@@ -99,4 +99,25 @@ test('empty account yields a valid low-activity profile', async () => {
   const p = await githubToPapit({ profile: {}, repos: [], starred: [], events: [] }, { now: NOW });
   assert.deepEqual(p.core_identity.career, { skills: [], primary_role: 'Unspecified', public_projects_count: 0 });
   assert.equal(p.behavioral.activity_level, 'low');
+});
+
+// MPC-9795 (TECH-011, TECH-012, DEV-006): how complete the inputs were, and why a list is empty.
+test('data_coverage: sampling flags come from the adapter; null when the adapter did not say', async () => {
+  const none = await githubToPapit(raw(), { now: NOW });
+  assert.deepEqual([none.data_coverage.repos_sampled, none.data_coverage.starred_sampled, none.data_coverage.events_capped], [null, null, null]);
+  const capped = await githubToPapit(raw(), { now: NOW, coverage: { repos_capped: true, starred_capped: false, events_capped: true } });
+  assert.deepEqual([capped.data_coverage.repos_sampled, capped.data_coverage.starred_sampled, capped.data_coverage.events_capped], [true, false, true]);
+});
+
+test('data_coverage.interests tells no stars, stars without topics and found apart', async () => {
+  const base = raw();
+  assert.equal((await githubToPapit({ ...base, starred: [] }, { now: NOW })).data_coverage.interests, 'no_stars');
+  assert.equal((await githubToPapit({ ...base, starred: [{ topics: [] }, {}] }, { now: NOW })).data_coverage.interests, 'stars_without_topics');
+  assert.equal((await githubToPapit({ ...base, starred: [{ topics: ['rust'] }] }, { now: NOW })).data_coverage.interests, 'found');
+});
+
+test('data_coverage is inside the receipt, so changing it breaks the checksum', async () => {
+  const p = await githubToPapit(raw(), { now: NOW });
+  assert.equal(await verifyReceipt(p), true);
+  assert.equal(await verifyReceipt({ ...p, data_coverage: { ...p.data_coverage, repos_sampled: true } }), false);
 });

@@ -50,24 +50,33 @@ export class GitHubAdapter extends SocialPlatformAdapter {
     return res.json();
   }
 
-  async paged(path, maxPages) {
-    const out = [];
+  /** Up to maxPages pages of 100. `capped` is true when the last page allowed was still full: there may be more that we did not read. */
+  async pagedCapped(path, maxPages) {
+    const items = [];
+    let capped = false;
     for (let page = 1; page <= maxPages; page++) {
       const sep = path.includes('?') ? '&' : '?';
-      const items = await this.get(`${path}${sep}per_page=100&page=${page}`);
-      out.push(...items);
-      if (items.length < 100) break;
+      const got = await this.get(`${path}${sep}per_page=100&page=${page}`);
+      items.push(...got);
+      if (got.length < 100) break;
+      if (page === maxPages) capped = true;
     }
-    return out;
+    return { items, capped };
   }
+
+  async paged(path, maxPages) { return (await this.pagedCapped(path, maxPages)).items; }
 
   async fetchIdentity() {
     const profile = await this.get('/user');
+    // MPC-9795: each list reports whether the page cap cut it short.
     const [repos, starred, events] = await Promise.all([
-      this.paged('/user/repos?visibility=public&affiliation=owner&sort=pushed', MAX_PAGES.repos),
-      this.paged('/user/starred', MAX_PAGES.starred),
-      this.paged(`/users/${encodeURIComponent(profile.login)}/events/public`, MAX_PAGES.events),
+      this.pagedCapped('/user/repos?visibility=public&affiliation=owner&sort=pushed', MAX_PAGES.repos),
+      this.pagedCapped('/user/starred', MAX_PAGES.starred),
+      this.pagedCapped(`/users/${encodeURIComponent(profile.login)}/events/public`, MAX_PAGES.events),
     ]);
-    return { profile, repos, starred, events };
+    return {
+      profile, repos: repos.items, starred: starred.items, events: events.items,
+      coverage: { repos_capped: repos.capped, starred_capped: starred.capped, events_capped: events.capped },
+    };
   }
 }

@@ -258,7 +258,7 @@ const Developers = () => (
               ))}
             </ul>
             <p className="text-gray-700">
-              Activity level is based on public events in the last 90 days: fewer than 5 is low, 5 to 50 medium, over 50
+              Activity level is based on public events in the last 90 days (GitHub's public events feed returns at most 300 of them): fewer than 5 is low, 5 to 50 medium, over 50
               high. Additive changes keep <code>version: "1.0"</code>; removing or re-typing a field bumps the major
               version.
             </p>
