@@ -57,7 +57,15 @@ const DataDeletion = () => {
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-bold text-foreground">3. What this does not cover</h2>
+              <h2 className="text-2xl font-bold text-foreground">3. Delete your free account yourself</h2>
+              <p className="text-muted-foreground">
+                If you have a free account, sign in at <a href="/account" className="underline hover:text-foreground">/account</a> and choose
+                &ldquo;Delete my account and all scans&rdquo;. It deletes the account, every scan saved to it and your sign-in. You do not need to email us.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-foreground">4. What this does not cover</h2>
               <p className="text-muted-foreground">
                 We delete only what we hold. Settings on Telegram, Facebook, Instagram, WhatsApp or any other service stay yours to change, and we
                 never change them for you. Messaging conversation state in our own system is kept for 7 days of inactivity and then removed.
