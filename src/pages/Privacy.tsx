@@ -863,15 +863,17 @@ const Privacy = () => {
                 </li>
                 <li>
                   <strong>At-Rest Encryption:</strong> Sensitive data encrypted
-                  in our databases
+                  in our databases (the database provider encrypts stored data
+                  at platform level)
                 </li>
                 <li>
                   <strong>Access Controls:</strong> Role-based access to
                   sensitive data
                 </li>
                 <li>
-                  <strong>Regular Audits:</strong> Security assessments and
-                  vulnerability testing
+                  <strong>Security Review:</strong> We reviewed our servers and
+                  database settings in October 2026 and fixed what we found. We
+                  have no fixed audit schedule
                 </li>
                 <li>
                   <strong>Incident Response:</strong> Procedures to detect and
