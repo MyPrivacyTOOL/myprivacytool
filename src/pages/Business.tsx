@@ -224,9 +224,9 @@ const Business = () => {
           <h2 className="text-2xl font-bold text-center mb-12">How the company audit works</h2>
           <div className="space-y-6">
             {[
-              { step: "01", title: "Submit your team list", desc: "Provide a list of employee names and work emails (or let us start with your leadership team)." },
-              { step: "02", title: "We run the full scan", desc: "We check data brokers for each team member: addresses, phone numbers, family, social profiles.", feature: "F6" as const },
-              { step: "03", title: "You get the exposure report", desc: "We send you a company privacy report within 48 hours: who's exposed, what data is visible, and your risk level." },
+              { step: "01", title: "Invite your team", desc: "Give us your employees' work emails and we send each person an invitation. Nothing is checked about anyone until that person agrees for themselves. A list of emails from you is not their consent." },
+              { step: "02", title: "We run the full scan", desc: "For each person who agrees, we check data brokers: addresses, phone numbers, family, social profiles.", feature: "F6" as const },
+              { step: "03", title: "You get a team summary", desc: "Within 48 hours we send you counts for the people who agreed: how many were checked and how many have a listing that may be theirs. Each person sees their own results first. You see one person's detail only if that person chooses to share it with you." },
               { step: "04", title: "We remove your team", desc: "On your approval, we send removal requests across all brokers. Most removals complete within 7–14 days.", feature: "F6" as const },
               { step: "05", title: "Monthly monitoring", desc: "Brokers re-add data over time. We scan monthly and send new removal requests, so your team stays in control of its footprint.", feature: "F6" as const },
             ].map(({ step, title, desc, feature }: { step: string; title: string; desc: string; feature?: "F6" }) => (
