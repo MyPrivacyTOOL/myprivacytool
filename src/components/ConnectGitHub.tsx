@@ -10,7 +10,7 @@ import {
   type PapitProfile,
 } from "@/lib/githubChannel";
 
-type State = { kind: "loading" } | { kind: "connected"; profile: PapitProfile } | { kind: "disconnected" } | { kind: "error" };
+type State = { kind: "loading" } | { kind: "connected"; profile: PapitProfile } | { kind: "disconnected" } | { kind: "session_ended" } | { kind: "reauthorize" } | { kind: "error" };
 
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="flex flex-col gap-1 py-3 border-b border-border last:border-0 sm:flex-row sm:items-baseline sm:gap-4">
@@ -64,11 +64,30 @@ export default function ConnectGitHub() {
 
       {state.kind === "error" && (
         <p role="alert" className="text-sm text-foreground">
-          We couldn't reach the connection service. Please try again in a moment.
+          We couldn&rsquo;t reach the connection service. This says nothing about your connection, which is unchanged. Please try again in a moment.
+        </p>
+      )}
+
+      {state.kind === "session_ended" && (
+        <p role="status" className="mb-4 text-sm text-foreground" data-testid="session-ended">
+          Your browser session ended (it lasts 7 days). If you connected GitHub before, we still hold that connection until you disconnect it.
+          Connect again to see it or to remove it.
+        </p>
+      )}
+
+      {state.kind === "reauthorize" && (
+        <p role="alert" className="mb-4 text-sm text-foreground" data-testid="reauthorize">
+          GitHub no longer lets us read your profile: access was revoked, or it expired. We deleted our copy of the access token. Connect again to continue.
         </p>
       )}
 
       {state.kind === "disconnected" && (
+        <p role="status" className="mb-4 text-sm text-foreground" data-testid="not-connected">
+          No GitHub account is connected.
+        </p>
+      )}
+
+      {(state.kind === "disconnected" || state.kind === "session_ended" || state.kind === "reauthorize") && (
         <Button asChild size="lg">
           <a href={GITHUB_START_URL}>
             <Github className="mr-2 h-5 w-5" aria-hidden="true" />
@@ -94,6 +113,10 @@ export default function ConnectGitHub() {
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>
           </dl>
+          <p className="mb-4 text-sm text-muted-foreground" data-testid="what-we-keep">
+            What we keep: an encrypted access token until you disconnect, and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
+            Disconnecting deletes the token, revokes our access at GitHub and clears the copy.
+          </p>
           <Button variant="outline" onClick={onDisconnect} disabled={busy}>
             <Unplug className="mr-2 h-4 w-4" aria-hidden="true" />
             {busy ? "Disconnecting…" : "Disconnect GitHub"}

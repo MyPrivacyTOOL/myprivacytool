@@ -24,8 +24,11 @@ export interface PapitProfile {
 
 export type ProfileResult =
   | { status: "connected"; profile: PapitProfile }
-  | { status: "disconnected" }
-  | { status: "error" };
+  // MPC-9796 (UX-040/041/042): the four ways "not connected" really differ, so the page can say which one it is.
+  | { status: "session_ended" }   // 401 unauthenticated: no browser session (it lasts 7 days). A stored connection may still exist until the person disconnects.
+  | { status: "reauthorize" }     // 401 reauthorize: GitHub no longer accepts the token (revoked or expired); the Worker already deleted its copy.
+  | { status: "disconnected" }    // 404 not_connected: a live session, nothing connected.
+  | { status: "error" };          // 5xx or network: an outage, says nothing about the connection.
 
 type FetchFn = typeof fetch;
 
@@ -33,8 +36,11 @@ export async function fetchGithubProfile(fetchFn?: FetchFn): Promise<ProfileResu
   try {
     const res = await recipientFetch("github-channel", `${GITHUB_CHANNEL_URL}/channels/github/profile`, { credentials: "include" }, ["username"], fetchFn ? { fetchImpl: fetchFn } : {});
     if (res.ok) return { status: "connected", profile: (await res.json()) as PapitProfile };
-    // 401 = no session or token revoked/expired (`reauthorize`), 404 = never connected: both mean "show Connect".
-    if (res.status === 401 || res.status === 404) return { status: "disconnected" };
+    if (res.status === 401) {
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      return { status: body?.error === "reauthorize" ? "reauthorize" : "session_ended" };
+    }
+    if (res.status === 404) return { status: "disconnected" };
     return { status: "error" };
   } catch {
     return { status: "error" };

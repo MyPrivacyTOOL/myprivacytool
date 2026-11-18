@@ -718,6 +718,31 @@ const Privacy = () => {
               </p>
 
               <h3 className="mt-6 text-xl font-semibold text-foreground">
+                6B. Connected accounts (GitHub, Reddit, Google)
+              </h3>
+              <ul className="list-inside list-disc space-y-2 text-muted-foreground" data-testid="connected-accounts">
+                <li>
+                  <strong>GitHub:</strong> when you connect, we ask GitHub for the <code>read:user</code> permission only and read your public profile
+                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect; a copy of the
+                  snapshot we derive for 24 hours; and a signed session cookie in your browser for 7 days. The snapshot holds derived values only
+                  (languages, topics, counts and a role label), not your email address, name, username, location, company or picture.
+                </li>
+                <li>
+                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect, a 24-hour copy of the derived snapshot and a 7-day
+                  session cookie.
+                </li>
+                <li>
+                  <strong>Google:</strong> after you agree, we use Google&rsquo;s token to read your verified email address and then revoke it. We keep only a
+                  signed session cookie for 1 hour. Nothing is stored on our servers.
+                </li>
+                <li>
+                  <strong>Your controls:</strong> disconnecting GitHub or Reddit deletes the stored token, revokes our access at the provider, clears the
+                  24-hour copy and ends the session. If the provider tells us you revoked access, we delete our copy of the token. The cookies are named in
+                  the Cookie Policy.
+                </li>
+              </ul>
+
+              <h3 className="mt-6 text-xl font-semibold text-foreground">
                 6A. Retention by Relationship
               </h3>
               <p className="text-muted-foreground">
