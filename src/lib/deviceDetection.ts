@@ -787,9 +787,9 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // Plugin/Extension Detection
   if (pluginsResult) {
     const extensionValue = pluginsResult.adBlocker 
-      ? 'Ad Blocker: Yes' 
+      ? 'Ad blocker likely' 
       : pluginsResult.pluginCount > 0 
-        ? `${pluginsResult.pluginCount} detected` 
+        ? `${pluginsResult.pluginCount} browser plug-in${pluginsResult.pluginCount === 1 ? '' : 's'} listed` 
         : 'None detected';
     fingerprintHexagons.push({
       id: 'extension-detection',
@@ -797,7 +797,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
       value: extensionValue,
       icon: '🧩',
       confidence: 85,
-      risk: 'Plugins and extensions. Browser extensions and plugins add to your unique fingerprint.',
+      risk: 'A guess from a decoy ad element and your browser\'s plug-in list. Websites cannot list your extensions this way, and neither can we.',
       confirmed: false,
       category: 'fingerprint',
     });

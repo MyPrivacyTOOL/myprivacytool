@@ -1155,7 +1155,7 @@ export const HEXAGONS = [
     "value_type": "text",
     "presence": "always",
     "user_can_check": "yes",
-    "example_value": "Ad Blocker: Yes",
+    "example_value": "Ad blocker likely",
     "truth": {
       "confidence": {
         "number": 85,
@@ -1164,7 +1164,7 @@ export const HEXAGONS = [
       },
       "risk": {
         "how": "fixed text in the code",
-        "text": "Plugins and extensions. Browser extensions and plugins add to your unique fingerprint."
+        "text": "A guess from a decoy ad element and your browser's plug-in list. Websites cannot list your extensions this way, and neither can we."
       },
       "sensitivity": "low",
       "level": "estimated",
