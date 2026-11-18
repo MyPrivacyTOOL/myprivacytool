@@ -13,7 +13,7 @@ const Cookies = () => {
               Cookie Policy
             </h1>
             <p className="mb-8 text-lg text-muted-foreground">
-              Last updated: 30 September 2026
+              Last updated: 18 November 2026
             </p>
 
             <section className="mb-8">
@@ -46,27 +46,45 @@ const Cookies = () => {
                 secure areas. These cookies do not track your personal information
                 and cannot be disabled.
               </p>
+              <p className="mt-4 text-muted-foreground">
+                Our own pages and services set no cookies of their own when you
+                browse, run the scan or read a report. We use your
+                browser&rsquo;s storage, and we set cookies only if you connect
+                an outside account. The analytics cookies in section 2.2 appear
+                only if you allow analytics. Requests that change something are
+                protected by checking where they come from, not by a cookie.
+              </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
-                  <strong>Session ID:</strong> Maintains your login session
+                  <strong>Consent Choice (browser storage, mpt_cookie_consent):</strong>{" "}
+                  Records your cookie choice (accept analytics, or essential
+                  only) and the date in your own browser storage so we do not
+                  ask again on every visit. It is not sent to us
                 </li>
                 <li>
-                  <strong>CSRF Token:</strong> Protects against cross-site request
-                  forgery attacks
+                  <strong>Scan journey (this tab only, mpt_scan_consent):</strong>{" "}
+                  Holds the number of your scan and the record that you pressed
+                  Scan me. It is sent to our service with the scan and is gone
+                  when you close the tab
                 </li>
                 <li>
-                  <strong>Consent Choice:</strong> Records your cookie choice
-                  (accept analytics, or essential only) and the date in your own
-                  browser storage so we do not ask again on every visit. It is
-                  not sent to us
+                  <strong>Sign-in session (browser storage, mpt_account_session):</strong>{" "}
+                  Only if you sign in to a free account. It keeps you signed in
+                  on this browser and is sent to our service to show it is you.
+                  Signing out removes it
                 </li>
                 <li>
                   <strong>User Preferences:</strong> Remembers your language and
-                  theme settings
+                  display settings in your browser storage
                 </li>
                 <li>
-                  <strong>Security Tokens:</strong> Used for authentication and
-                  authorization
+                  <strong>Connected-account cookies (only if you connect one):</strong>{" "}
+                  Connecting GitHub sets mpt_gh_oauth (10 minutes, while you
+                  sign in) and mpt_gh_session (7 days). Connecting Reddit sets
+                  mpt_rd_oauth (10 minutes) and mpt_rd_session (7 days).
+                  Connecting Google sets mpt_oauth (10 minutes) and
+                  mpt_oauth_session (1 hour). All are HttpOnly and Secure, and
+                  are removed when you disconnect
                 </li>
               </ul>
 
