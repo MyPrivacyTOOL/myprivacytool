@@ -55,3 +55,22 @@ describe('estimateDemographic', () => {
     expect(at(3, 'iOS 17', 'Safari', 'Mobile')).toBe('Adult (25-45)');
   });
 });
+
+// MPC-9791 (TECH-006): from a web page on myprivacytool.io only this site's cookies are visible, so "not signed in" is not evidence. These hexagons say NOT CHECKED
+// instead of "Not Detected" / "No Platforms" / "Not Linked", and the text makes no claim about the visitor's accounts.
+describe("account-detection hexagons make no claim without evidence", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("shows Not checked for Google, Meta, Microsoft, social platforms and cross-site identity when no sign-in cookie is visible", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ip: "203.0.113.7", city: "London", country_name: "United Kingdom", org: "Example ISP" }) }));
+    const { generateHexagonsAsync } = await import("./deviceDetection");
+    const hexes = await generateHexagonsAsync(await captureDeviceData());
+    for (const id of ["google-services", "meta-services", "microsoft-services", "social-platforms", "cross-site-identity"]) {
+      const h = hexes.find((x) => x.id === id);
+      expect(h, `${id} is in the scan`).toBeDefined();
+      expect(h!.value).toBe("Not checked");
+      expect(h!.risk).toMatch(/^Not checked: /);
+      expect(h!.risk).not.toMatch(/not linked|cannot (directly )?link|appear isolated|No (Google|Meta|Microsoft) login detected/i);
+    }
+  });
+});

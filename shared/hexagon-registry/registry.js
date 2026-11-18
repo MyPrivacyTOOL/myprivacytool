@@ -1769,7 +1769,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "Not Detected",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 100,
@@ -1816,7 +1816,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "Not Detected",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 100,
@@ -1863,7 +1863,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "Not Detected",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 100,
@@ -1910,7 +1910,7 @@ export const HEXAGONS = [
     "value_type": "count of platforms",
     "presence": "always",
     "user_can_check": "partly",
-    "example_value": "No Platforms",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 95,
@@ -1957,7 +1957,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "no",
-    "example_value": "Not Linked",
+    "example_value": "Not checked",
     "truth": {
       "confidence": {
         "number": 90,
@@ -2004,7 +2004,7 @@ export const HEXAGONS = [
     "value_type": "status",
     "presence": "always",
     "user_can_check": "no",
-    "example_value": "No Leak Detected",
+    "example_value": "No leak seen",
     "truth": {
       "confidence": {
         "number": 100,

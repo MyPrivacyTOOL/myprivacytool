@@ -1154,7 +1154,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   
   // 1. Google Services
   const googleValue = !googleResult.isLoggedIn 
-    ? 'Not Detected' 
+    ? 'Not checked' 
     : googleResult.services.length > 0 
       ? `${googleResult.services.length} services` 
       : 'Logged In';
@@ -1167,14 +1167,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 100,
     risk: googleResult.isLoggedIn 
       ? `Logged into Google: ${googleResult.services.join(', ')}. Google tracks your searches, location, and activity across the web.`
-      : 'No Google login detected. Your searches and browsing are not linked to a Google profile on this browser.',
+      : "Not checked: a web page cannot see whether you are signed in to Google, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
   
   // 2. Meta/Facebook Services
   const metaValue = !metaResult.isLoggedIn 
-    ? 'Not Detected' 
+    ? 'Not checked' 
     : metaResult.services.length > 0 
       ? `${metaResult.services.length} services` 
       : 'Logged In';
@@ -1187,14 +1187,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 100,
     risk: metaResult.isLoggedIn 
       ? `Logged into Meta: ${metaResult.services.join(', ')}. Facebook Pixel tracks you on millions of websites.`
-      : 'No Meta login detected. Facebook cannot directly link your browsing to your social profile.',
+      : "Not checked: a web page cannot see whether you are signed in to Facebook or Instagram, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
   
   // 3. Microsoft Services
   const microsoftValue = !microsoftResult.isLoggedIn 
-    ? 'Not Detected' 
+    ? 'Not checked' 
     : microsoftResult.services.length > 0 
       ? `${microsoftResult.services.length} services` 
       : 'Logged In';
@@ -1207,7 +1207,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 100,
     risk: microsoftResult.isLoggedIn 
       ? `Logged into Microsoft: ${microsoftResult.services.join(', ')}. Your Office 365 activity and Bing searches may be linked.`
-      : 'No Microsoft login detected on this browser.',
+      : "Not checked: a web page cannot see whether you are signed in to Microsoft, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
@@ -1215,7 +1215,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
   // 4. Social Media Platforms
   const connectedPlatforms = socialResult.platforms.filter(p => p.loggedIn);
   const socialValue = connectedPlatforms.length === 0 
-    ? 'No Platforms' 
+    ? 'Not checked' 
     : `${connectedPlatforms.length} platform${connectedPlatforms.length > 1 ? 's' : ''}`;
   
   socialHexagons.push({
@@ -1226,14 +1226,14 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 95,
     risk: connectedPlatforms.length > 0 
       ? `Connected to: ${connectedPlatforms.map(p => p.name).slice(0, 3).join(', ')}${connectedPlatforms.length > 3 ? '...' : ''}. Each platform builds a profile of your interests and connections.`
-      : 'No social media logins detected. Social platforms cannot link your browsing to your accounts.',
+      : "Not checked: a web page cannot see whether you are signed in to social platforms, because it only sees this site's own cookies. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
   
   // 5. Cross-Site Identity / Account Linking
   const crossSiteValue = !crossSiteResult.ssoDetected 
-    ? 'Not Linked' 
+    ? 'Not checked' 
     : crossSiteResult.linkedAccounts > 0 
       ? `${crossSiteResult.linkedAccounts} connections` 
       : 'Linked';
@@ -1246,7 +1246,7 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
     confidence: 90,
     risk: crossSiteResult.ssoDetected 
       ? `CRITICAL: SSO detected! ${crossSiteResult.trackingNetwork.join(', ')} can link your identity across websites. Your browsing creates a unified profile.`
-      : 'No cross-site identity linking detected. Your accounts appear isolated.',
+      : "Not checked: a web page cannot see tracking or single sign-on cookies that belong to other sites. No claim is made either way.",
     confirmed: false,
     category: 'social',
   });
@@ -1397,18 +1397,19 @@ export async function generateHexagonsAsync(data: DeviceData): Promise<HexagonDa
         dnsHexagon.headline = 'Your lookups may be going the long way';
         dnsHexagon.explanation = 'When you open a website, your device first asks a service where it lives (a DNS lookup). Yours may be asking your internet provider instead of your VPN, so they could see which sites you visit. This one needs investigation to know how much is visible. Your VPN app often has a DNS leak protection switch; our guide shows how.';
         dnsHexagon.risk = `CRITICAL: DNS leak detected! Your real location (${dnsResult.actualLocation}) is exposed. ${dnsResult.vpnDetected ? 'VPN is not protecting your DNS queries.' : 'ISP can see all your browsing.'}`;
-      } else if (dnsResult.vpnDetected) {
-        dnsHexagon.value = 'VPN Protected';
-        dnsHexagon.icon = '🔒';
-        dnsHexagon.headline = 'Your lookups appear to go through your VPN';
-        dnsHexagon.explanation = 'Your website lookups appear to go through your VPN, which is what you want.';
-        dnsHexagon.risk = 'DNS is routed through VPN. Your real location is hidden.';
+      } else if (!dnsResult.checked) {
+        // MPC-9791: a blocked, unavailable or consent-less probe is NOT CHECKED, never "no leak".
+        dnsHexagon.value = 'Not checked';
+        dnsHexagon.icon = '❔';
+        dnsHexagon.headline = 'We could not run this check';
+        dnsHexagon.explanation = 'This check needs your browser to answer a network test, and it did not (it may be blocked, switched off or waiting for your Scan me press). So we make no claim either way.';
+        dnsHexagon.risk = 'Not checked: the browser test did not run, so nothing is claimed about your lookups.';
       } else {
-        dnsHexagon.value = 'No Leak Detected';
+        dnsHexagon.value = 'No leak seen';
         dnsHexagon.icon = '✅';
-        dnsHexagon.headline = 'Your lookups look normal';
-        dnsHexagon.explanation = 'We did not see your lookups leaving through an unexpected route.';
-        dnsHexagon.risk = 'No DNS leak detected. Your DNS queries are not exposing your location.';
+        dnsHexagon.headline = 'No address leaked in this test';
+        dnsHexagon.explanation = 'This test looks for a real internet address your browser gives away through WebRTC. None showed. It does not test which DNS service answers your lookups.';
+        dnsHexagon.risk = 'No address leaked in the WebRTC test. This is not a test of your DNS service.';
       }
     }
   }).catch(() => {
