@@ -126,5 +126,15 @@
     "title": "Your Deep Dive",
     "description": "Confirm or dispute what we found for your number. Private link, expires after 24 hours.",
     "noindex": true
+  },
+  "/monitoring": {
+    "title": "Monitoring",
+    "description": "Continuous monitoring for Pro plans.",
+    "noindex": true
+  },
+  "/deep-research": {
+    "title": "Deep Research",
+    "description": "Deeper checks on how exposed your identity is. Some run now, the rest are coming soon.",
+    "noindex": true
   }
 }
