@@ -88,6 +88,9 @@ const CONFIRMATION_PARTS = [
 ];
 // MPC-9813: with the confirm gate on, this email is the click-to-confirm. The report and every check that uses details about the person wait for the button.
 const CONFIRM_LINE = 'We only check details you’ve confirmed are yours.';
+// MPC-9793 (PRIVACY-020): the attached JSON is the full record, not a redacted copy. Say so where the attachment is announced.
+export const ATTACHMENT_WARNING = 'The attached file is the full record, not a redacted copy. It can include your IP address, device details and the findings about you. Treat it like a password: do not forward it or post it, and delete it from your inbox when you are done.';
+
 export function buildConfirmationEmail({ unsubscribeLink, liveLink, scanNumber, confirmGate = false } = {}) {
   const subject = confirmGate ? 'Confirm your email to get your privacy report' : 'Your privacy scan is starting';
   // MPC-7471-F3: the same number, wording and deletion guidance as the report (MPC-7488), only when a scan was really saved with this request.
@@ -242,7 +245,7 @@ export function buildReportEmail({ scan, breaches = [], breachStatus, brokers = 
     'PART 2: YOUR EMAIL ADDRESS', `${tallyLine(et, 'hexagons')}.`, ...hexText(emailHexes),
     ...(breachGated ? [BREACH_FREE_TEXT] : []),
     ...breachRows.map((b) => `  - ${b.Name} (${(b.BreachDate || '').slice(0, 7) || 'date unknown'}): exposed ${(b.DataClasses || []).join(', ')}`), ...(breachMore ? [`  ...and ${breachMore} more (all of them are in the attached JSON file)`] : []), '',
-    'The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.', '',
+    'The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.', ATTACHMENT_WARNING, '',
     ...brokerSectionText(panel),
     `More removal guides: ${SITE}/opt-out`, '',
     `Questions about this report? Read the FAQ: ${SITE}/faq`, '',
@@ -262,7 +265,7 @@ ${h2('Part 1: your web scan, replayed')}${para(esc(part1Intro))}${scanNumberLine
 <div style="margin:26px 0 0 0;padding:14px 16px;border-left:4px solid ${BRAND};background:#f9fafb;font-size:16px;line-height:24px;font-weight:600;color:#111827">${esc(BRIDGE)}</div>
 ${h2('Part 2: your email address')}${para(esc(`${tallyLine(et, 'hexagons')}.`))}${hexGroups(emailHexes)}${breachGated ? para(esc(BREACH_FREE_TEXT)) : ''}
 ${breachRows.length ? `<ul style="margin:10px 0 12px 0;padding-left:20px;font-size:13px;line-height:19px;color:#374151">${breachRows.map((b) => `<li><strong>${esc(b.Name)}</strong> (${esc((b.BreachDate || '').slice(0, 7) || 'date unknown')}): exposed ${esc((b.DataClasses || []).join(', '))}</li>`).join('')}${breachMore ? `<li>&hellip;and ${breachMore} more (all of them are in the attached file)</li>` : ''}</ul>` : ''}
-${para('<strong>The full data is attached.</strong> The JSON file holds every hexagon with its full value and the technical detail that did not fit here, so you can open it, search it and analyse it yourself.')}
+${para('<strong>The full data is attached.</strong> The JSON file holds every hexagon with its full value and the technical detail that did not fit here, so you can open it, search it and analyse it yourself.')}${para(esc(ATTACHMENT_WARNING))}
 ${brokerSectionHtml(panel)}
 ${para(`<a href="${SITE}/opt-out" style="color:${BRAND}">More removal guides</a>`)}
 ${para(`Questions about this report? <a href="${SITE}/faq" style="color:${BRAND}">Read the FAQ</a>.`)}
