@@ -242,7 +242,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -319,7 +319,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -678,7 +678,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -755,7 +755,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -1114,7 +1114,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -1191,7 +1191,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -1550,7 +1550,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -1627,7 +1627,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -1986,7 +1986,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -2063,7 +2063,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -2422,7 +2422,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -2499,7 +2499,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -2858,7 +2858,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -2935,7 +2935,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -3294,7 +3294,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -3371,7 +3371,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -3730,7 +3730,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -3807,7 +3807,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []
@@ -4166,7 +4166,7 @@
               {
                 "key": "pwned-passwords",
                 "name": "Have I Been Pwned (password check)",
-                "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+                "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
               },
               {
                 "key": "ga4-data-api",
@@ -4243,7 +4243,7 @@
           {
             "key": "pwned-passwords",
             "name": "Have I Been Pwned (password check)",
-            "text": "Have I Been Pwned (password check) receives the first characters of a scrambled password check, your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
+            "text": "Have I Been Pwned (password check) receives a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it), your IP address, your browser and device string. Why: Optional password exposure check in the browser: only the first 5 characters of a SHA-1 hash leave the page (k-anonymity), never the password. Kept: Provider-side."
           }
         ],
         "switched_off": []

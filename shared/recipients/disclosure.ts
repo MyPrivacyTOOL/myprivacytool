@@ -44,7 +44,7 @@ const en: L10n = {
     ip: "your IP address", user_agent: "your browser and device string", email: "your email address", email_hash: "a scrambled fingerprint of your email address",
     email_domain: "the domain of your email address", name: "your name", phone: "your phone number", username: "usernames you typed", country: "your country",
     city: "your city", device_profile: "your device and browser details", utm: "the campaign tags on the link you came from", referrer: "the page that sent you",
-    scan_result: "your scan results", message_text: "the text of your message", plan_name: "your plan name", password_hash_prefix: "the first characters of a scrambled password check",
+    scan_result: "your scan results", message_text: "the text of your message", plan_name: "your plan name", password_hash_prefix: "a short lookup identifier made from your password (the first 5 characters of a one-way fingerprint of it)",
     page_load: "the fact that you opened a page",
   },
   party: { first: "Run by us", processor: "Holds data for us", third: "Independent company", platform: "Your own channel" },

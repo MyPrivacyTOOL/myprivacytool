@@ -25,11 +25,11 @@ describe("PasswordCheck", () => {
     expect(gtag).not.toHaveBeenCalled();
   });
 
-  it("shows the approved disclosure: 5 characters of the code, and that Have I Been Pwned sees the IP address", () => {
+  it("shows the disclosure: 5 characters of the one-way fingerprint, and that Have I Been Pwned sees the IP address", () => {
     vi.stubEnv("VITE_PASSWORD_CHECK", "true");
     view();
     const text = screen.getByTestId("password-check").textContent ?? "";
-    expect(text).toContain("send only the first 5 characters of that code to Have I Been Pwned");
+    expect(text).toContain("sends only the first 5 characters of that fingerprint to Have I Been Pwned");
     expect(text).toContain("Have I Been Pwned can see your IP address");
     expect(text).toContain("We do not see, store or log your password.");
   });
