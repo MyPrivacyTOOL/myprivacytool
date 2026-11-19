@@ -17,7 +17,7 @@
 // Usage: node scripts/sync-content-cache-to-kv.mjs [--dry-run]
 //
 // KV layout:
-//   schedule:<YYYY-MM-DD> -> {date, items:{pillar|blog|x|reddit|linkedin:[{text,qualifier}]}}
+//   schedule:<YYYY-MM-DD> -> {date, items:{pillar|blog|x|reddit|linkedin|image:[{text,qualifier}]}}
 //   schedule:index        -> {synced_at, count, dates:[...]}
 //   brand:guidelines      -> {synced_at, title, sections:[{heading,text}]}
 
@@ -33,6 +33,7 @@ const SECTIONS = [
   [/TWITTER|X THREADS/i, 'x'],
   [/REDDIT/i, 'reddit'],
   [/LINKEDIN/i, 'linkedin'],
+  [/IMAGE HEADLINES/i, 'image'], // Content System v1 phase 2: "- Nov 27: One fix: Remove yourself from Spokeo" -> the day's card
 ];
 
 /**

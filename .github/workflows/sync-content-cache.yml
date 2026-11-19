@@ -18,7 +18,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,8 +36,26 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KV_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/sync-content-cache-to-kv.mjs
+      # Content System v1 phase 2: render each day's card from its image headline (next 7 HKT days), upload to the public
+      # Supabase bucket mpt-brand-assets, and pass the manifest to the topic sync. A card failure never blocks the topics:
+      # a day with no card keeps the default brand image and the Slack approval message says so.
+      - name: Install card renderer (tools/social-cards)
+        id: cards_install
+        continue-on-error: true
+        working-directory: tools/social-cards
+        run: npm ci --no-audit --no-fund && node cards.test.mjs
+      - name: Render and upload today's cards
+        if: steps.cards_install.outcome == 'success'
+        continue-on-error: true
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://xmdmkumwxpgahmlweuug.supabase.co' }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.NEW_SUPABASE_SECRET_KEY || secrets.SCAN_REPORT_SUPABASE_SERVICE_ROLE_KEY }}
+          CARDS_MANIFEST: cards-manifest.json
+        run: node tools/social-cards/run.mjs
       - name: Sync brand topics (mpt-brand-topics)
         env:
+          CARDS_MANIFEST: cards-manifest.json
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_KV_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
