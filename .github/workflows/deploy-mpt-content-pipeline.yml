@@ -15,6 +15,7 @@ on:
       - 'workers/mpt-content-approval/**'
       - '.github/workflows/deploy-mpt-content-pipeline.yml'
       - 'shared/recipients/**'   # MPC-9885: the Workers bundle the recipient wrapper, so a change to it must redeploy them
+      - 'shared/content/**'      # Content System v1: the consumer bundles the claims check
   workflow_dispatch:
 
 concurrency:

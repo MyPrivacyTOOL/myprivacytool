@@ -1,0 +1,11 @@
+{
+  "name": "mpt-social-cards",
+  "private": true,
+  "type": "module",
+  "description": "Renders the per-post social cards (Content System v1, phase 2). Own package so the site's dependency tree is untouched.",
+  "dependencies": {
+    "@fontsource/inter": "5.2.8",
+    "satori": "0.12.2",
+    "sharp": "0.34.5"
+  }
+}
