@@ -44,6 +44,17 @@
     "guide": true
   },
   {
+    "slug": "card-testing-and-statement-monitoring",
+    "title": "Card Testing & Statement Monitoring: Catch Fraud Before It Scales",
+    "excerpt": "Card testing is how criminals verify stolen cards before larger fraud. Learn what it is, why you miss it, what actually stops it, and where your card data is exposed in the first place.",
+    "date": "November 19, 2026",
+    "updated": "November 19, 2026",
+    "author": "MyPrivacyTOOL Editorial Team",
+    "category": "Privacy Guides",
+    "readTime": 10,
+    "guide": true
+  },
+  {
     "slug": "how-exposed-are-you",
     "title": "How Exposed Are You? The 54 Things Tracking You Online",
     "excerpt": "Your digital footprint is larger than you think. Discover the 54 privacy vectors (54 run in the scan, 368 in the catalogue) exposing your personal data right now — from data brokers to AI training datasets.",
