@@ -1,0 +1,96 @@
+name: Deploy to Vercel
+
+# MPC-6804: deploy the frontend to Vercel production on every merge to main.
+# - Runs AFTER the CI gate passes (ci.yml), ensuring tests + build succeed first
+# - Uses the pre-built dist/ artifact to avoid rebuilding
+# - Smoke tests the live deployment to catch configuration errors immediately
+# - On smoke test failure: leaves deployment live but marks the job red so the merge is visible as problematic
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-vercel
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy frontend to Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Require Vercel credentials
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          [ -n "$VERCEL_TOKEN" ] || { echo "::error::VERCEL_TOKEN not set"; exit 1; }
+          [ -n "$VERCEL_ORG_ID" ] || { echo "::error::VERCEL_ORG_ID not set"; exit 1; }
+          [ -n "$VERCEL_PROJECT_ID" ] || { echo "::error::VERCEL_PROJECT_ID not set"; exit 1; }
+          echo "Vercel credentials verified."
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Build (production)
+        run: npm run build
+        env:
+          # Production build: all flags off except those needed for live
+          VITE_HUBSPOT_CONTACT_FORM_ID: ${{ secrets.VITE_HUBSPOT_CONTACT_FORM_ID || 'default-production-form' }}
+          VITE_SAVE_WEB_SCANS: "true"
+          VITE_RECHECK_JOURNEY: "false"
+          VITE_DEVICE_HERO: "true"
+
+      - name: Deploy to Vercel production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel deploy --prod --confirm \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_ORG_ID" \
+            > deployment-url.txt 2>&1 || {
+            cat deployment-url.txt
+            echo "::error::Vercel deployment failed"
+            exit 1
+          }
+          DEPLOYMENT_URL=$(cat deployment-url.txt | tail -1)
+          echo "Deployment URL: $DEPLOYMENT_URL"
+          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> "$GITHUB_ENV"
+
+      - name: Smoke test live deployment
+        id: smoke
+        timeout-minutes: 2
+        run: |
+          for i in $(seq 1 10); do
+            echo "Smoke test attempt $i/10..."
+            if curl -fsS "${{ env.DEPLOYMENT_URL }}" | grep -q "myprivacytool\|MyPrivacyTOOL"; then
+              echo "✓ Deployment is live and responding"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Smoke test failed — deployment not responding after 100 seconds"
+          exit 1
+
+      - name: Post deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Vercel Deployment"
+            echo "- **URL**: ${{ env.DEPLOYMENT_URL }}"
+            echo "- **Status**: $([ ${{ steps.smoke.outcome }} = success ] && echo 'Live ✓' || echo 'Deployed but smoke test failed ⚠️')"
+          } >> "$GITHUB_STEP_SUMMARY"
