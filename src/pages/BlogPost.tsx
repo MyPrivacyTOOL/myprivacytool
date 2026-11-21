@@ -406,9 +406,10 @@ export default function BlogPost() {
   const jsonLd: object[] = [
     {
       '@context': 'https://schema.org',
-      '@type': 'Article',
+      '@type': 'NewsArticle',
       headline: post.title,
       description: post.excerpt,
+      ...(post.image ? { image: [`${SITE_URL}${post.image}`] } : {}),
       author: { '@type': 'Organization', name: post.author },
       publisher: { '@type': 'Organization', name: 'MyPrivacyTOOL', url: SITE_URL },
       datePublished: toIsoDate(post.date),
