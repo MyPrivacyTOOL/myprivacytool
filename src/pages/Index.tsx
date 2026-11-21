@@ -294,6 +294,9 @@ const Index = () => {
 
         {/* Description Text */}
         <section className="text-center pb-4 sm:pb-6 px-4" aria-label="Introduction">
+          <p className="text-base sm:text-xl font-semibold text-foreground mb-3" data-testid="product-sentence">
+            MyPrivacyTOOL shows you what any website can learn about you from your browser and device, and what you can do about it.
+          </p>
           {hexTileV2Enabled() ? (
             <>
               <p className="text-sm sm:text-lg text-foreground">
@@ -415,7 +418,7 @@ const Index = () => {
         <section className="pb-12 px-4" aria-labelledby="journey-teaser-heading">
           <div className="max-w-2xl mx-auto text-center rounded-2xl border border-surface-border bg-brand-soft p-6 sm:p-8">
             <h2 id="journey-teaser-heading" className="text-xl sm:text-2xl font-bold text-foreground mb-2">
-              Get clean before you go agentic
+              See what&apos;s out there about you, and what an AI agent could find.
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground mb-5">
               Eight steps from seeing your footprint to bringing AI agents on board safely.<FeatureStatus feature="F9" state="in_build" />
