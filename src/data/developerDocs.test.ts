@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { BASES, ENDPOINTS, LANG_LABEL, SNIPPETS, type Lang } from "./developerDocs";
+import { BASES, ENDPOINTS, LANG_LABEL, PAPIT_LIMITS, SNIPPETS, type Lang } from "./developerDocs";
 
 const ROOT = path.resolve(__dirname, "../..");
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
@@ -106,5 +106,31 @@ describe("snippets", () => {
     const tampered = JSON.parse(JSON.stringify(papit));
     tampered.behavioral.activity_level = "high";
     expect(await verify(tampered)).toBe(false);
+  });
+});
+
+// MPC-9794 (CRYPTO-001, PRIVACY-023): the receipt is a checksum, not proof of origin, and the limits are published one by one.
+describe("PaPIT limits wording", () => {
+  it("says the receipt is a checksum that does not prove who produced the profile", () => {
+    const d = SNIPPETS.find((s) => s.id === "papit-verify")!.description;
+    expect(d).toMatch(/checksum, not a signature/);
+    expect(d).toMatch(/does not prove who produced/);
+    expect(d).not.toMatch(/detect any edit/i);
+  });
+  it("lists receipt, validity, cache, session, token and revocation, and says validity is not enforced and issued profiles cannot be recalled", () => {
+    const names = PAPIT_LIMITS.map((l) => l.item);
+    for (const n of ["Receipt", "Snapshot validity", "Cache", "Browser session", "Access token", "Revocation"]) expect(names).toContain(n);
+    const text = PAPIT_LIMITS.map((l) => l.detail).join(" ");
+    expect(text).toMatch(/nothing refuses a profile older than 30 days/);
+    expect(text).toMatch(/cannot be recalled/);
+    expect(text).toMatch(/24 hours/);
+    expect(text).toMatch(/7 days/);
+  });
+  it("the stated lifetimes match the Worker constants", () => {
+    const idx = readFileSync(path.join(ROOT, "workers/github-channel/index.js"), "utf8");
+    const cache = readFileSync(path.join(ROOT, "workers/github-channel/lib/cache.js"), "utf8");
+    expect(idx).toMatch(/SESSION_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
+    expect(cache).toMatch(/CACHE_TTL_SECONDS = 24 \* 60 \* 60/);
+    expect(readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8")).toMatch(/data_retention_days: 30/);
   });
 });
