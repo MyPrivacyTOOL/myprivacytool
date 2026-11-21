@@ -1,3 +1,4 @@
+import ListingCoverageNote from "@/components/ListingCoverageNote";
 import { useEffect, useRef, useState } from "react";
 import FeatureStatus, { ChannelStatus } from "@/components/FeatureStatus";
 import { CHANNEL_STATUS, type ChannelId } from "@/config/featureStatus";
@@ -131,6 +132,7 @@ export default function Start() {
           <p className="text-muted-foreground text-sm leading-relaxed">
             A free check of what your browser tells websites about you, plus what your email address reveals. We don't search broker sites for you yet — paste any page that lists you and we'll verify it. Paid plans will add coverage.<FeatureStatus feature="F1" />
           </p>
+          <ListingCoverageNote className="mt-4" />
         </div>
 
         {/* Hexagon Grid */}

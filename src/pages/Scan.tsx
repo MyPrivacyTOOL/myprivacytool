@@ -13,6 +13,7 @@ import ScanSavingNotice from "@/components/ScanSavingNotice";
 import TurnstileBox from "@/components/TurnstileBox";
 import { SCAN_TURNSTILE_SITE_KEY, loadTurnstile } from "@/lib/turnstile";
 import ScanConsentText from "@/components/ScanConsentText";
+import ListingCoverageNote from "@/components/ListingCoverageNote";
 import { ConsentError, giveScanConsent, hasScanConsent } from "@/lib/scanConsent";
 import { setChoice } from "@/lib/cookieConsent";
 import LiveScanPanel from "@/components/LiveScanPanel";
@@ -230,6 +231,7 @@ const Scan = () => {
           Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.<FeatureStatus feature="F1" />
         </p>
 
+        {!submitted && <ListingCoverageNote className="max-w-md mx-auto mb-6" />}
         {!submitted ? renderForm("top") : thanks}
         {waitingForToken && <p role="status" className="text-muted-foreground text-sm mt-3 text-left">Verifying you are human, this takes a moment. Your request is sent automatically as soon as it is done. If a box appears, please tick it.</p>}
         {errorMsg && <p role="alert" className="text-foreground text-sm mt-3 border-l-4 border-destructive pl-3 text-left">{errorMsg}</p>}
