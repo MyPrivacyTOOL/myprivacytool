@@ -11,7 +11,7 @@ interface PaPITProfile {
   cryptographic_receipt: string;        // lowercase hex SHA-256 (see below)
   core_identity: {
     career: {
-      skills: string[];                 // top <=10 languages across the user's own, non-fork, public repos, by repo count
+      skills: string[];                 // historical name: top <=10 languages across the user's own, non-fork, public repos we read, by repo count. Not a skill assessment
       primary_role: string;             // fixed keyword rules (below); "Unspecified" if no public projects
       public_projects_count: number;    // GitHub profile public_repos
     };
@@ -20,8 +20,14 @@ interface PaPITProfile {
     interests: string[];                // top <=15 topics across starred repos, as [a-z0-9-] slugs, by frequency
     activity_level: "low" | "medium" | "high";
   };
+  data_coverage?: {                     // added within v1.0 (MPC-9795)
+    repos_sampled: boolean | null;      // true: the 3-page cap (300 repos) was hit
+    starred_sampled: boolean | null;    // true: the 2-page cap (200 stars) was hit
+    events_capped: boolean | null;      // true: the 3-page cap (300 events) was hit
+    interests: 'found' | 'no_stars' | 'stars_without_topics';
+  };
   privacy_boundaries: {
-    data_retention_days: 30;            // validity of this PaPIT snapshot. NOT token retention
+    data_retention_days: 30;            // declared validity of this PaPIT snapshot (not enforced). NOT token retention
     revocable: true;
   };
 }
@@ -35,7 +41,7 @@ interface PaPITProfile {
 |---|---|
 | `activity_level` | Public events in the last 90 days: `< 5` low, `5-50` medium, `> 50` high. GitHub's public events feed returns at most 300 events / 90 days; that is enough to cross the 50 threshold. |
 | `primary_role` | Ordered keyword rules over the bio plus the top 3 languages and top 3 repo topics (word-bounded, case-insensitive): Security, Data/ML, DevOps/SRE, Mobile, Frontend, Backend, Full-Stack. Highest keyword count wins, rule order breaks ties. No match: `Software Developer` if the user has public repos, else `Unspecified`. No LLM. |
-| `cryptographic_receipt` | SHA-256 over `JSON.stringify` of the profile **without** `cryptographic_receipt`, with object keys sorted alphabetically at every depth (arrays keep order). Hex-encoded. Lets a consumer detect any edit to the profile. |
+| `cryptographic_receipt` | SHA-256 over `JSON.stringify` of the profile **without** `cryptographic_receipt`, with object keys sorted alphabetically at every depth (arrays keep order). Hex-encoded. Lets a consumer see whether the profile has changed, if the receipt arrived by a separate trusted channel. It is a checksum, not a signature: an editor can recompute it, so it does not prove who produced the profile. |
 
 ## Privacy guarantees
 
