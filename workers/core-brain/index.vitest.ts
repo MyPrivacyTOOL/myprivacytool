@@ -160,6 +160,27 @@ describe("intent -> response key", () => {
     expect(r.body).toMatchObject({ intent: "scan", locale: "ja" });
     expect(new URL(calls.find((c) => c.url.includes("conversation_states"))!.url).searchParams.get("sender_id")).toBe("eq.7");
   });
+
+  // MPC-10053 (re-scoped, build-and-test): the literal Telegram commands answer without error. Rules only (no Qwen key), test sender id, no network.
+  it("answers the literal /start, /help and /scan commands (and /start@Bot, /start scan) with the right keys and never errors", async () => {
+    const noQwen = { ...env, QWEN_API_KEY: undefined };
+    const cases: [string, string, string][] = [
+      ["/start", "scan", "bot.first_hexagon.title"],
+      ["/start scan", "scan", "bot.first_hexagon.title"],
+      ["/start@MyPrivacyTOOL_Bot", "scan", "bot.first_hexagon.title"],
+      ["/scan", "scan", "bot.first_hexagon.title"],
+      ["/help", "help", "bot.unknown.title"],
+      ["/help@MyPrivacyTOOL_Bot", "help", "bot.unknown.title"],
+    ];
+    for (const [text, intent, key] of cases) {
+      stub({});
+      const r = await post({ message: { chat: { id: 9001 }, text, entities: [{ offset: 0, length: text.split(" ")[0].length, type: "bot_command" }], from: { id: 9001, is_bot: false, language_code: "en" } } }, undefined, noQwen);
+      expect(r.status, text).toBe(200);
+      expect(r.body, text).toMatchObject({ intent, intent_source: "rules", response_key: key });
+      expect(r.body.error, text).toBeUndefined();
+    }
+    expect(calls.some((c) => c.url.includes("/chat/completions"))).toBe(false);
+  });
 });
 
 describe("degradation and privacy", () => {
