@@ -83,7 +83,7 @@ export async function runCheck(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       if (res.status === 404) throw new Error('F1 synthetic Worker not deployed (HTTP 404)');
       if (!res.ok) throw new Error(`POST /api/scan HTTP ${res.status}${out.error ? ': ' + out.error : ''}`);
       if (out.duplicate) throw new Error('answered "duplicate" for a fresh alias');
-      if (!out.success || !out.scan_saved || !out.scan_number) throw new Error('answer lacks success / scan_saved / scan_number');
+      if (!out.success || !out.scan_saved || !out.scan_number) throw new Error(`answer lacks success / scan_saved / scan_number (HTTP ${res.status}; fields: ${Object.keys(out).slice(0, 12).join(',') || 'none'}; code: ${scrub(out.code ?? '')}; error: ${scrub(out.error ?? '')})`);
       if (out.confirm_required !== true) throw new Error('answer does not say confirm_required: the gate flag is off on the F1 Worker');
       if (out.listing_saved !== true) throw new Error('answer does not say listing_saved: the listing flag is off or the details were not stored');
       ctx.scanNumber = out.scan_number;
