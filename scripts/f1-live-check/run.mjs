@@ -13,7 +13,8 @@
 // WHAT THIS CAN NOT PROVE (stated in every run's summary): the real Turnstile widget in a real browser, delivery into a real inbox and how a mail client renders it.
 // Exit code: 0 every step passed, 1 a step failed, 2 not configured (never reported as a pass).
 import { pathToFileURL } from 'node:url';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { isTestAddress } from '../../shared/test-records.js';
 import { fixtureScan } from '../nightly-chain/checks.mjs';
 import { makeLiveLink } from '../../workers/scan-report/lib/live.js';
@@ -22,6 +23,9 @@ import { f1Body, checkConfirmationEmail, checkStoredResult, checkReportBlock, FI
 const DEFAULT_SCAN_URL = 'https://mpt-scan-report-synthetic-f1.myprivacytool.workers.dev';
 const ORIGIN = 'https://www.myprivacytool.io';
 const scrub = (s) => String(s ?? '').replace(/[^\s"'<>]+@[^\s"'<>]+/g, '[email]').replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f-]{23}/gi, '[id]').replace(/[A-Za-z0-9_-]{20,}\.\d{10,15}\.[A-Za-z0-9_-]{20,}/g, '[token]').slice(0, 400);
+
+/** The wording version the Worker accepts, read from the one place it lives (shared/recipients/consent-config.ts), so a wording change needs no edit here. */
+const consentVersion = () => readFileSync(new URL('../../shared/recipients/consent-config.ts', import.meta.url), 'utf8').match(/consent_version:\s*"([^"]+)"/)?.[1] ?? (() => { throw new Error('consent_version not found in consent-config.ts'); })();
 
 class Supabase {
   constructor(env, f) { this.base = String(env.SUPABASE_URL).replace(/\/$/, ''); this.key = env.SUPABASE_SERVICE_ROLE_KEY; this.f = f; }
@@ -68,7 +72,13 @@ export async function runCheck(env, { fetchImpl = fetch, sleep = (ms) => new Pro
       return 'confirm-gate columns and web_scan_listing_checks present';
     },
     async scan_request() {
-      const res = await post('/api/scan', {}, f1Body(email, fixtureScan()));
+      // MPC-9887/9888: the production cron that sends the report fails any scan with no consent_id ("consent: no consent on record"). The synthetic Worker accepts
+      // a scan without one, so the check only broke at report_sent. Record a test consent for this run first, as the site's consent block does; it is deleted
+      // with the scan (the purge and delete-by-scan-number triggers remove scan_consents).
+      const consent = await post('/api/consent', {}, { scan_id: randomUUID(), consent_version: consentVersion(), consent_text_sha256: createHash('sha256').update('f1-live-check synthetic consent').digest('hex'), locale: 'en' });
+      const consentOut = await consent.json().catch(() => ({}));
+      if (!consent.ok || !consentOut.consent_id) throw new Error(`POST /api/consent HTTP ${consent.status}${consentOut.error ? ': ' + consentOut.error : ''}`);
+      const res = await post('/api/scan', {}, { ...f1Body(email, fixtureScan()), consent_id: consentOut.consent_id });
       const out = await res.json().catch(() => ({}));
       if (res.status === 404) throw new Error('F1 synthetic Worker not deployed (HTTP 404)');
       if (!res.ok) throw new Error(`POST /api/scan HTTP ${res.status}${out.error ? ': ' + out.error : ''}`);
