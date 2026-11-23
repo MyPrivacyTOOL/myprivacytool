@@ -108,7 +108,17 @@ function defaultVerifier(env: Env, fetchImpl?: typeof fetch): RecipientContext["
     },
     async insert(): Promise<null> { throw new Error("the verifier never writes"); },
   };
-  return makeConsentVerifier(sb);
+  // A Worker invocation has a small subrequest budget (50), and this verifier is built once per scan context but asked on EVERY post_click call, the Worker's own
+  // database calls included. Without a cache the report job spent roughly half its budget re-reading the same consent row and died with "Too many subrequests"
+  // (F1 live check, 2026-11-24). A consent that checked out once is not asked again for the life of this context; a failed or negative check is never cached.
+  const verify = makeConsentVerifier(sb);
+  const confirmed = new Set<string>();
+  return async (consentId: string) => {
+    if (confirmed.has(consentId)) return true;
+    const ok = await verify(consentId);
+    if (ok) confirmed.add(consentId);
+    return ok;
+  };
 }
 
 /** The context for converted Worker and Function call sites. Flags are read from `env` by name. */
