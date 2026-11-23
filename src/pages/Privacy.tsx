@@ -901,8 +901,10 @@ const Privacy = () => {
                   have no fixed audit schedule
                 </li>
                 <li>
-                  <strong>Incident Response:</strong> Procedures to detect and
-                  respond to breaches
+                  <strong>Incident Response:</strong> We keep a short written
+                  checklist for investigating a problem and rolling back a bad
+                  release. We do not yet have a full incident response plan or
+                  run practice drills
                 </li>
               </ul>
               <p className="mt-4 text-muted-foreground">

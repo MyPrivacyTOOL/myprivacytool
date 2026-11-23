@@ -209,3 +209,12 @@ describe("Privacy: report delivery record retention (CK-9848)", () => {
     expect(text).not.toMatch(/kept 30 days|after 30 days; the rest/);
   });
 });
+
+describe("Privacy: security section (MPC-10805)", () => {
+  it("claims only the incident checklist that exists, not a breach detection and response process", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("Incident Response: We keep a short written checklist for investigating a problem and rolling back a bad release. We do not yet have a full incident response plan or run practice drills");
+    expect(text).not.toContain("Procedures to detect and respond to breaches");
+  });
+});
