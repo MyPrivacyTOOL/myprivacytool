@@ -6,8 +6,8 @@
       "file": "src/lib/osintLookup.ts",
       "line": 244,
       "detail": "fetch",
-      "added": "2026-11-08",
-      "note": "pending MPC-9886"
+      "added": "2026-11-23",
+      "note": "pending MPC-9886 (renewed 2026-11-23, owner decision: still open)"
     }
   ]
 }
