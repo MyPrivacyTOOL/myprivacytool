@@ -7,6 +7,7 @@ import Seo from "@/components/Seo";
 import pageMeta from "@/data/pageMeta.json";
 import { submitHubSpotForm, consentFields } from "@/lib/hubspot";
 import ConsentCheckbox from "@/components/ConsentCheckbox";
+import { REPORT_CONSENT_LABEL } from "@/lib/consentWording";
 import SaveScanConsentCheckbox from "@/components/SaveScanConsentCheckbox";
 import RecogniseConsentCheckbox from "@/components/RecogniseConsentCheckbox";
 import ScanSavingNotice from "@/components/ScanSavingNotice";
@@ -182,7 +183,7 @@ const Scan = () => {
         resetSignal={tsReset}
         armed={tsArmed}
       />
-      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} />
+      <ConsentCheckbox id={`scan-consent-${idSuffix}`} checked={consent} onChange={setConsent} disabled={submitting} label={REPORT_CONSENT_LABEL} />
       {offerSave && <ListingCheckFields idSuffix={idSuffix} value={listingFields} onChange={setListingFields} disabled={submitting} />}
       {offerSave && (
         <>

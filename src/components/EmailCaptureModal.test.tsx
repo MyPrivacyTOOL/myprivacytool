@@ -14,7 +14,7 @@ import type { HexagonData } from "@/lib/deviceDetection";
 
 const SCAN_NUMBER = "0f2b6c1e-8a3d-4e57-9b10-6c2d4f8a1e93";
 const EMAIL = "mpc7471f3+unit@example.com";
-const REPORT_BOX = /email me my results and occasional privacy tips/i;
+const REPORT_BOX = /email me my results and follow-ups about them/i;
 const UUID4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });

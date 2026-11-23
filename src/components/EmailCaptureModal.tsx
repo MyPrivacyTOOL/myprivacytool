@@ -9,6 +9,7 @@ import { percentHalfUp } from '../../shared/hexagon-registry/score.js';
 import { scanCountsLine, type ScanCounts } from '../../shared/hexagon-registry/counts.js';
 import { loadTurnstile, SCAN_TURNSTILE_SITE_KEY, type TurnstileApi } from '@/lib/turnstile';
 import ConsentCheckbox from '@/components/ConsentCheckbox';
+import { REPORT_CONSENT_LABEL } from "@/lib/consentWording";
 import SaveScanConsentCheckbox from '@/components/SaveScanConsentCheckbox';
 import ScanSavingNotice from '@/components/ScanSavingNotice';
 import ScanNumberNotice from '@/components/ScanNumberNotice';
@@ -306,6 +307,7 @@ export default function EmailCaptureModal({
 
               <ConsentCheckbox
                 id="popup-report-consent"
+                label={REPORT_CONSENT_LABEL}
                 checked={consent}
                 onChange={(v) => { setConsent(v); setErrorMsg(''); }}
                 disabled={status === 'loading'}

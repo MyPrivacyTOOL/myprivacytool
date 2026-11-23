@@ -30,7 +30,7 @@ describe("Scan form consent", () => {
     expect(hasScanConsent()).toBe(false);
     const user = userEvent.setup();
     await user.type(screen.getAllByLabelText("Email address")[0], "a@example.com");
-    await user.click(screen.getAllByLabelText(/email me my results and occasional privacy tips/i)[0]);
+    await user.click(screen.getAllByLabelText(/email me my results and follow-ups about them/i)[0]);
     await user.click(screen.getAllByRole("button", { name: /check my exposure/i })[0]);
     await waitFor(() => expect(hasScanConsent()).toBe(true));
     await waitFor(() => expect(loadTs).toHaveBeenCalled());
