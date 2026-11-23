@@ -5,6 +5,7 @@ import { supabaseStore } from "./store";
 import { handleData, handleLanding, handleRedeem } from "./handlers";
 import { sha256Hex, SESSION_COOKIE } from "./crypto";
 import type { DashboardStore, DeepJobRow, DeepResultRow, Read, SessionRow, SnapshotRow } from "./store";
+import { senderKey } from "../../workers/social-listeners/src/sender-key";
 import { baselineView, enhancedView, finalView, valuesOf, NOT_KEPT, NOT_RETURNED_EXPLAIN, NOT_CHECKED_DEFAULT } from "./view";
 
 const ENV = { DASHBOARD_ENABLED: "1", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_KEY: "svc" };
@@ -197,6 +198,25 @@ describe("data (GET /api/dashboard)", () => {
     expect(body.cta.href).toBe("/scan");
     expect(body.deep_reminder).toMatch(/does not run it/);
     expect(JSON.stringify(body.cta)).not.toMatch(/111|username|bio/);
+  });
+  it("MPC-10621: says only yes/no whether the sender is an allow-listed test account, never the list", async () => {
+    const run = async (env: typeof ENV & { PROBE_TELEGRAM_IDS?: string; TELEGRAM_ID_HMAC_KEY?: string }, sender = "111") => {
+      const mem = memoryStore({ snaps: [snap({ id: "s1", sender_id: sender })], links: await seedLink(TOKEN, sender) });
+      const res = await handleData(dataReq(await session(mem)), env, { store: mem.store });
+      return { text: await res.text() };
+    };
+    const flag = (r: { text: string }) => JSON.parse(r.text).baseline.allow_listed_test_account;
+    const listed = await run({ ...ENV, PROBE_TELEGRAM_IDS: "111, 222" });
+    expect(flag(listed)).toBe(true);
+    expect(listed.text).not.toMatch(/222/);
+    expect(flag(await run({ ...ENV, PROBE_TELEGRAM_IDS: "999" }))).toBe(false);
+    expect(flag(await run(ENV))).toBe(false);
+    expect(flag(await run({ ...ENV, PROBE_TELEGRAM_IDS: "" }))).toBe(false);
+    // hashed stored sender id still matches the same allow-list
+    const key = "k".repeat(32);
+    const hashed = await senderKey({ TELEGRAM_ID_HMAC_KEY: key } as never, "111");
+    expect(flag(await run({ ...ENV, PROBE_TELEGRAM_IDS: "111", TELEGRAM_ID_HMAC_KEY: key }, hashed))).toBe(true);
+    expect(flag(await run({ ...ENV, PROBE_TELEGRAM_IDS: "111" }, hashed))).toBe(false);
   });
   it("partial failures: each view degrades on its own", async () => {
     const mem = memoryStore({ snaps: [snap({ id: "s1", sender_id: "111" })], links: await seedLink(), fail: new Set(["job", "later"]) });
