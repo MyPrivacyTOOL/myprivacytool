@@ -134,7 +134,7 @@ describe("Privacy: referral programme section", () => {
     renderPage(<Privacy />);
     expect(screen.getByRole("heading", { name: "16. Inviting Friends (Referral Programme)" })).toBeInTheDocument();
     const t = flat(document.getElementById("referrals")?.textContent ?? "");
-    expect(t).toContain("We keep only a SHA-256 hash of the address, never the address itself");
+    expect(t).toContain("On our servers we keep only a SHA-256 hash of the address, not the address itself");
     expect(t).toContain("send no reminders");
     expect(t).toContain("unsubscribe link");
     expect(t).toContain("up to 10 people in total");
