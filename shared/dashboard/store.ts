@@ -37,6 +37,8 @@ export interface DashboardStore {
 export interface DashboardEnv {
   DASHBOARD_ENABLED?: string; // "1" to serve; anything else answers 503 and redeems nothing
   FOOTPRINT_HANDOFF?: string; // MPC-8689: "1" to serve /f/<uuid> and /api/footprint; anything else answers 503 and redeems nothing
+  PROBE_TELEGRAM_IDS?: string; // MPC-10621: the bot's allow-list of test accounts; read only to answer a yes/no, never returned
+  TELEGRAM_ID_HMAC_KEY?: string; // MPC-10621: so a hashed stored sender id can be matched to the allow-list
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string; // the edge capture uses this name; either one works here

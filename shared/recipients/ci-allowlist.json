@@ -1,13 +1,4 @@
 {
   "schema_version": 1,
-  "entries": [
-    {
-      "rule": "forbidden-api",
-      "file": "src/lib/osintLookup.ts",
-      "line": 244,
-      "detail": "fetch",
-      "added": "2026-11-08",
-      "note": "pending MPC-9886"
-    }
-  ]
+  "entries": []
 }

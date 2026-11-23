@@ -1,6 +1,6 @@
 // node workers/mpt-content-consumer/worker.test.mjs  (producer + consumer + approval; stubbed KV / D1 / fetch, no network)
 import assert from 'node:assert/strict';
-import consumer, { parseDraft, buildPrompt, guardrails, topicFor, slackBlocks } from './worker.js';
+import consumer, { parseDraft, buildPrompt, guardrails, topicFor, slackBlocks, claimViolations, scanLink, CLAIMS_RULES } from './worker.js';
 import producer, { hktDate, buildMessage } from '../mpt-content-producer/worker.js';
 import approval, { scheduledTime } from '../mpt-content-approval/worker.js';
 import { parseSchedule, toSections } from '../../scripts/sync-content-cache-to-kv.mjs';
@@ -67,8 +67,28 @@ assert.throws(() => parseDraft('x', JSON.stringify({ copy: 'a'.repeat(300) })), 
 assert.throws(() => parseDraft('pinterest', JSON.stringify({ copy: 'b' })), /title/); passed++;
 check(parseDraft('linkedin', `ok\n${JSON.stringify({ copy: 'hello' })}`).cta === 'Check your exposure', 'parseDraft tolerates prose, adds CTA');
 
+// ---- phase 1: scan link + claims ----
+check(pr.user.includes(scanLink('pinterest', '2026-10-20')) && scanLink('x', 'd').startsWith('https://myprivacytool.io/scan?utm_source=x&'), 'prompt links to /scan');
+check(pr.system.indexOf(CLAIMS_RULES) >= 0 && pr.system.indexOf(CLAIMS_RULES) < pr.system.indexOf('GUARD'), 'claims list comes before the brand text');
+check(buildPrompt('x', 'T', 'd', 'g'.repeat(9000)).system.includes('BLOCKED'), 'claims list survives a long brand page');
+const ok = 'Opt out of Spokeo with our free guide at myprivacytool.io/opt-out-guides. We never sell your data. Check your exposure: https://myprivacytool.io/scan?utm_source=x';
+check(claimViolations({ copy: ok }).length === 0, 'approved copy passes');
+for (const [bad, why] of [
+  ['We remove your data from 600+ brokers.', 'removal + count'],
+  ['Results are not stored.', 'storage'],
+  ['Dark web scan included.', 'dark web'],
+  ['Pro is $14.99 a month.', 'price'],
+  ['78% of people are exposed.', 'statistic'],
+  ['100% private.', '100%'],
+  ['Our founder has 20+ years of experience in security.', 'credentials'],
+  ['Fastest privacy tool, no sign-up.', 'blocked phrase'],
+]) check(claimViolations({ copy: `${bad} ${ok}` }).length > 0, `blocked: ${why}`);
+check(claimViolations({ copy: 'Check your exposure: https://myprivacytool.io?utm_source=x' }).some((r) => /scan/.test(r)), 'homepage-only link fails');
+check(claimViolations({ copy: ok, slides: ['We delete your data'] }).length > 0, 'slides are checked too');
+
 // ---- consumer end to end ----
-const goodFor = (platform) => (platform === 'pinterest' ? { copy: 'body', title: 'T' } : platform === 'youtube' ? { copy: 'desc', title: 'T', script: 'spoken' } : platform === 'instagram' ? { copy: 'cap', slides: ['s1'] } : { copy: `${platform} copy` });
+const L = ' Check your exposure: https://myprivacytool.io/scan?utm_source=p';
+const goodFor = (platform) => (platform === 'pinterest' ? { copy: `body${L}`, title: 'T' } : platform === 'youtube' ? { copy: `desc${L}`, title: 'T', script: 'spoken' } : platform === 'instagram' ? { copy: `cap${L}`, slides: ['s1'] } : { copy: `${platform} copy${L}` });
 const env = {
   AGENT_LOGS: makeDb(),
   CONTENT_CACHE: { get: async (k) => (k === 'schedule:2026-10-20' ? schedule : brand) },
@@ -121,7 +141,7 @@ slackPosts.length = 0;
 const res = await approval.fetch(post({ action: 'approve_all', drafted_content_id: taskId, timestamp: '2026-10-20T22:15:00Z' }, { authorization: 'Bearer tok' }), aenv, ctx);
 check(res.status === 200 && makeCalls.length === 1 && makeCalls[0].posts.length === 6, 'approve_all posts one envelope with 6 posts to Make');
 const li = makeCalls[0].posts.find((c) => c.platform === 'linkedin');
-check(li.body === 'linkedin copy' && li.title && li.link_url && li.asset_url && li.cta && li.publish_timestamp.endsWith('+08:00') && makeCalls[0].approved_by === 'chris' && makeCalls[0].approval_timestamp === '2026-10-21T06:15:00+08:00', 'envelope carries approver, HKT timestamps and per-post fields');
+check(li.body === `linkedin copy${L}` && li.link_url.startsWith('https://myprivacytool.io/scan?utm_source=linkedin') && li.title && li.link_url && li.asset_url && li.cta && li.publish_timestamp.endsWith('+08:00') && makeCalls[0].approved_by === 'chris' && makeCalls[0].approval_timestamp === '2026-10-21T06:15:00+08:00', 'envelope carries approver, HKT timestamps and per-post fields');
 check(makeCalls[0].posts.find((c) => c.platform === 'youtube').script === 'spoken', 'youtube script passes through');
 check(env.AGENT_LOGS.metrics.length === 0 && env.AGENT_LOGS.logs.some((r) => r.status === 'handed_off') && !env.AGENT_LOGS.logs.some((r) => r.status === 'published'), 'CK-8482: a Make 200 logs handed_off, never published, and seeds no metrics');
 check(slackPosts.length === 1 && slackPosts[0].thread_ts === '1.1' && /^✅ \*HANDED OFF\*: approved by chris at \d\d:\d\d HKT\. Make\.com accepted the hand-off \(HTTP 200\) for 6 posts: X, LinkedIn, IG, FB, Pinterest, YouTube\./.test(slackPosts[0].text), 'thread reply says HANDED OFF and names platforms');

@@ -12,6 +12,7 @@ import {
   LANG_LABEL,
   LIMITATIONS,
   PAPIT_SCHEMA,
+  PAPIT_LIMITS,
   QUICK_START_STEPS,
   RATE_ROWS,
   SNIPPETS,
@@ -166,7 +167,7 @@ const Developers = () => (
                 (preview, browser flow).
               </li>
               <li>
-                <strong>PaPIT receipts</strong>: verify that a profile you received has not been edited.
+                <strong>PaPIT receipts</strong>: a checksum that shows a profile has not changed since it was produced, if the receipt reached you by a separate trusted channel. It does not prove who produced it.
               </li>
             </ul>
             <p className="mt-3 text-gray-700">
@@ -248,6 +249,14 @@ const Developers = () => (
               username, location, company, avatar, URL or bio text.
             </p>
             <CodeBlock code={PAPIT_SCHEMA} label="PaPIT schema" />
+            <h3 className="mt-4 text-lg font-semibold" id="papit-limits">What the receipt and the lifetimes mean</h3>
+            <ul className="list-inside list-disc space-y-2 text-gray-700" data-testid="papit-limits">
+              {PAPIT_LIMITS.map((l) => (
+                <li key={l.item}>
+                  <strong>{l.item}</strong>: {l.detail}
+                </li>
+              ))}
+            </ul>
             <p className="text-gray-700">
               Activity level is based on public events in the last 90 days: fewer than 5 is low, 5 to 50 medium, over 50
               high. Additive changes keep <code>version: "1.0"</code>; removing or re-typing a field bumps the major

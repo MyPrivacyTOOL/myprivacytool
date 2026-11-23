@@ -108,8 +108,8 @@ export default function ConnectGitHub() {
             <Row label="Public projects">{state.profile.core_identity.career.public_projects_count}</Row>
             <Row label="Interests">{state.profile.behavioral.interests.join(", ") || "None found"}</Row>
             <Row label="Activity (90 days)">{state.profile.behavioral.activity_level}</Row>
-            <Row label="Snapshot valid for">{state.profile.privacy_boundaries.data_retention_days} days</Row>
-            <Row label="Integrity receipt">
+            <Row label="Declared validity">{state.profile.privacy_boundaries.data_retention_days} days (not enforced)</Row>
+            <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>
           </dl>
