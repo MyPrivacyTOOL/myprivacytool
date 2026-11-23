@@ -16,6 +16,16 @@ describe("Contact (HubSpot form configured)", () => {
   beforeEach(() => { vi.resetModules(); vi.stubEnv("VITE_HUBSPOT_CONTACT_FORM_ID", "contact-guid"); });
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
+  it("says the box is unsubscribe-only and offers no marketing opt-in (MPC-10831)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({})));
+    const { default: Contact } = await import("./Contact");
+    renderPage(<Contact />);
+    const label = screen.getByRole("checkbox").closest("label")!.textContent ?? "";
+    expect(label).toMatch(/unsubscribe at any time/i);
+    expect(label).toMatch(/no separate marketing opt-in/i);
+    expect(label).not.toMatch(/privacy tips|my results/i);
+  });
+
   it("submits the expected fields to HubSpot and shows the success state", async () => {
     const f = vi.fn(async () => jsonResponse({}));
     vi.stubGlobal("fetch", f);
