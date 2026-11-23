@@ -31,14 +31,16 @@ globalThis.fetch = async (url, opts = {}) => {
 
 const wed = new Date('2026-10-13T16:15:00Z'); // 00:15 HKT Wednesday 2026-10-14
 let r = await runAll(mkEnv(), ga4Reports, wed);
-check(r.every((x) => x.stored) && inserts.length === 5, 'Wednesday: five daily reports stored (no weekly)');
-check(['daily_overview', 'daily_events', 'daily_source_medium', 'daily_country', 'daily_landing_page'].every((n) => inserts.some((i) => i.source === 'ga4' && i.report === n)), 'overview, events, source/medium, country, landing page present');
+check(r.every((x) => x.stored) && inserts.length === 6, 'Wednesday: six daily reports stored (no weekly)');
+check(['daily_overview', 'daily_events', 'daily_source_medium', 'daily_country', 'daily_landing_page', 'daily_landing_source_device'].every((n) => inserts.some((i) => i.source === 'ga4' && i.report === n)), 'overview, events, source/medium, country, landing page present');
 check(gaCalls.every((c) => c.url.includes(`/properties/${GA4_PROPERTY_ID}:runReport`) && c.auth === 'Bearer tok-abc'), 'only property 515216281 queried, bearer token used');
 check(tokenCalls === 1, 'one access token shared by all reports');
 check(gaCalls.every((c) => c.body.dateRanges[0].startDate === '2026-10-13' && c.body.dateRanges[0].endDate === '2026-10-13'), 'reports cover the last complete Hong Kong day');
 const ov = inserts.find((i) => i.report === 'daily_overview');
 check(['sessions', 'activeUsers', 'screenPageViews', 'eventCount'].every((m) => gaCalls[0].body.metrics.some((x) => x.name === m)) && gaCalls[0].body.dimensions[0].name === 'date', 'overview asks sessions, activeUsers, screenPageViews, eventCount by date');
 check(gaCalls.some((c) => c.body.dimensions?.[0]?.name === 'eventName'), 'events by eventName requested');
+const lsd = gaCalls.find((c) => c.body.dimensions?.length === 3);
+check(lsd && ['landingPage', 'sessionSource', 'deviceCategory'].every((d) => lsd.body.dimensions.some((x) => x.name === d)) && ['sessions', 'bounceRate', 'averageSessionDuration'].every((m) => lsd.body.metrics.some((x) => x.name === m)), 'landing page x source x device with bounceRate and averageSessionDuration requested');
 check(ov.status === 'ok' && ov.period_start === '2026-10-12T16:00:00.000Z' && ov.payload.metricHeaders[1].name === 'activeUsers' && ov.payload.rows[0].metricValues[1].value === '9', 'payload is the untouched API response, period_start = reported day');
 check(!JSON.stringify(inserts).includes('PRIVATE KEY') && !JSON.stringify(inserts).includes('tok-abc'), 'no key or token in stored rows');
 
@@ -46,14 +48,14 @@ inserts = []; gaCalls = []; tokenCalls = 0;
 const mon = new Date('2026-10-11T16:15:00Z'); // 00:15 HKT Monday 2026-10-12
 await runAll(mkEnv(), ga4Reports, mon);
 const wk = inserts.find((i) => i.report === 'weekly_overview');
-check(inserts.length === 6 && wk && wk.period_start === '2026-10-04T16:00:00.000Z' && wk.period_end === '2026-10-11T15:59:59.999Z', 'Monday: weekly_overview covers previous Mon..Sun');
+check(inserts.length === 7 && wk && wk.period_start === '2026-10-04T16:00:00.000Z' && wk.period_end === '2026-10-11T15:59:59.999Z', 'Monday: weekly_overview covers previous Mon..Sun');
 check(lastWeek(mon).startDate === '2026-10-05' && lastWeek(mon).endDate === '2026-10-11' && yesterday(mon).startDate === '2026-10-11', 'date helpers (HKT)');
 // 23:59 UTC Sunday is already Monday in Hong Kong; 15:59 UTC Sunday is still Sunday there
 inserts = []; await runAll(mkEnv(), ga4Reports, new Date('2026-10-11T15:59:00Z'));
-check(!inserts.some((i) => i.report === 'weekly_overview') && inserts.length === 5, 'Sunday 23:59 HKT: no weekly report yet');
+check(!inserts.some((i) => i.report === 'weekly_overview') && inserts.length === 6, 'Sunday 23:59 HKT: no weekly report yet');
 // property timezone guard
 inserts = []; apiTz = 'America/Los_Angeles'; await runAll(mkEnv(), ga4Reports, wed); apiTz = 'Asia/Hong_Kong';
-check(inserts.length === 5 && inserts.every((i) => i.status === 'error' && /timezone is America\/Los_Angeles, expected Asia\/Hong_Kong/.test(i.error) && Object.keys(i.payload).length === 0), 'GA4 property not on Hong Kong time => error rows, nothing stored');
+check(inserts.length === 6 && inserts.every((i) => i.status === 'error' && /timezone is America\/Los_Angeles, expected Asia\/Hong_Kong/.test(i.error) && Object.keys(i.payload).length === 0), 'GA4 property not on Hong Kong time => error rows, nothing stored');
 
 // failure: no estimates, status=error, empty payload
 for (const [label, mutate, re] of [
@@ -62,11 +64,11 @@ for (const [label, mutate, re] of [
 ]) {
   inserts = []; gaFail = false; tokenFail = false; mutate();
   await runAll(mkEnv(), ga4Reports, wed);
-  check(inserts.length === 5 && inserts.every((i) => i.status === 'error' && re.test(i.error) && Object.keys(i.payload).length === 0), `${label}: status=error, empty payload, nothing estimated`);
+  check(inserts.length === 6 && inserts.every((i) => i.status === 'error' && re.test(i.error) && Object.keys(i.payload).length === 0), `${label}: status=error, empty payload, nothing estimated`);
 }
 gaFail = false; tokenFail = false; inserts = [];
 await runAll({ ...mkEnv(), GA4_SERVICE_ACCOUNT_JSON: undefined }, ga4Reports, wed);
-check(inserts.length === 5 && inserts.every((i) => i.status === 'error' && /not set/.test(i.error)), 'missing secret => error rows');
+check(inserts.length === 6 && inserts.every((i) => i.status === 'error' && /not set/.test(i.error)), 'missing secret => error rows');
 inserts = [];
 await runAll({ ...mkEnv(), GA4_SERVICE_ACCOUNT_JSON: 'not json' }, ga4Reports, wed);
 check(inserts.every((i) => i.status === 'error' && !i.error.includes('not json')) && inserts[0].error.includes('not valid JSON'), 'invalid JSON secret => clear error, value not echoed');

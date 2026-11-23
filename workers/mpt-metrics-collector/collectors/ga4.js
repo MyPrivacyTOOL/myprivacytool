@@ -102,6 +102,10 @@ export const reports = [
   report('daily_source_medium', (p) => ({ dateRanges: range(p), dimensions: dims('sessionSource', 'sessionMedium'), metrics: metrics('sessions'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   report('daily_country', (p) => ({ dateRanges: range(p), dimensions: dims('country'), metrics: metrics('sessions', 'activeUsers'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   report('daily_landing_page', (p) => ({ dateRanges: range(p), dimensions: dims('landingPage'), metrics: metrics('sessions'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
+  // MPC-11111: landing page x source x device with bounce and duration, so a bounce spike (e.g. 2026-11-20, 11 sessions from Facebook)
+  // can be split into crawler/prefetch traffic vs a broken page without a second manual pull.
+  // Stored untouched, like every other report.
+  report('daily_landing_source_device', (p) => ({ dateRanges: range(p), dimensions: dims('landingPage', 'sessionSource', 'deviceCategory'), metrics: metrics('sessions', 'bounceRate', 'averageSessionDuration'), orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] })),
   // Mondays (HKT) only: previous Mon..Sun active users (the weekly view reads this).
   report('weekly_overview', (p) => ({ dateRanges: range(p), metrics: metrics('activeUsers') }), { period: lastWeek, only: (now) => hkWeekday(now) === 1 }),
 ];
