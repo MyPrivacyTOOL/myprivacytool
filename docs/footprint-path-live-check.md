@@ -28,4 +28,12 @@ The bot Worker (`social-listeners`) and the Pages project (`wwwmyprivacytool`) e
 
 ## Finding a test account's id
 
-Send `/start` to `@userinfobot` from that account and copy the number after **Id:**. The bot's own `/probeid` only answers while the Worker has `PROBE_MODE=on`.
+Send `/start` to `@userinfobot` from that account and copy the number after **Id:**. The bot's own `/probeid` only answers while the Worker has `PROBE_MODE=on`. The Worker runs `PROBE_MODE=all` by an approved decision (D-A, see `docs/channel-probe.md`), and that mode does not handle `/probeid`, so it stays silent. Do not change the mode just to get an id.
+
+## Tile colour (MPC-10621)
+
+Behind-you tiles that carry a print are filled with that print's S1-S5 shade, like the scan (owner decision 2026-11-23, replacing "tiles are never coloured" from brief v1). Grey not-returned, dashed ahead and the thick current tile stay unfilled outlines. Pips and the shade word are always on the tile, so colour is never the only clue.
+
+## Secrets: no HMAC key today
+
+The Worker has no `TELEGRAM_ID_HMAC_KEY` (checked 2026-11-23), so Pages needs none. If one is ever added to the Worker, add the same value to Pages and retry the Production deployment.
