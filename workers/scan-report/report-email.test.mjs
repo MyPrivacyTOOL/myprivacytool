@@ -80,7 +80,7 @@ for (const r of [none, worst, real]) {
   check((r.text.match(/Not checked\. We don't search broker sites for you\./g) || []).length >= 8 && !/PEOPLE-SEARCH SITES|have not searched these sites/i.test(r.text + r.html), 'no pasted page: each site reads "Not checked", and no sentence implies a search');
   check((r.text.match(/How to remove it:/g) || []).length === 9, 'every one of the 9 sites carries its guide');
 }
-check(/Hong Kong and Singapore/.test(none.text) && /Paid coverage .* is coming\. It is not live yet/.test(none.text), 'HK/SG honest line and the paid-coverage note are present');
+check(!/Hong Kong|Singapore/.test(none.text) && /Paid coverage .* is coming\. It is not live yet/.test(none.text), 'no HK/SG region line (MPC-10827); the paid-coverage note is present');
 check(/Alice/.test(real.html) && real.html.includes('/email/alice/alice-peek.gif'), 'Alice is kept');
 
 // text in step with HTML
