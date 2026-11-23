@@ -3,6 +3,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "./index";
 import { createFetchSpy } from "../../shared/recipients/fetch-spy";
+import recipientsData from "../../shared/recipients/recipients.data.js";
+import { parseRegistry } from "../../shared/recipients/registry";
+import { setBundledRegistryForTests } from "../../shared/recipients/outbound";
 
 const env = {
   SUPABASE_URL: "https://proj.supabase.co",
@@ -580,5 +583,48 @@ describe("recipient wrapper (fetch-spy)", () => {
     const keys = new Set(spy.calls.map((c) => (c.host.endsWith(".supabase.co") ? "supabase" : c.recipient)));
     expect([...keys].sort()).toEqual(["dashscope", "supabase"]);
     spy.assertAllRegistered();
+  });
+});
+
+// MPC-11111: dm_received, the first stage of the GA4 flow check. Ships off; carries the channel name and nothing else.
+describe("GA4 dm_received (MPC-11111)", () => {
+  const ga4On = { ...env, GA4_SERVER_EVENTS_ENABLED: "true", GA4_API_SECRET: "test-secret-not-real" };
+  const ga4Calls = () => calls.filter((c) => c.url.includes("google-analytics.com"));
+  const enableRegistry = () => {
+    const reg = parseRegistry(JSON.parse(JSON.stringify(recipientsData)));
+    reg.recipients.find((r) => r.key === "ga4-measurement-protocol")!.enabled = true;
+    return setBundledRegistryForTests(reg);
+  };
+  it("sends nothing in the shipped state, even with the env switch and secret set (the registry entry is disabled)", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const r = await post(msg("scan me"), undefined, ga4On);
+    expect(r.status).toBe(200);
+    expect(ga4Calls()).toHaveLength(0);
+  });
+  it("with every gate open sends one dm_received with the channel only: no sender id, no text", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const restore = enableRegistry();
+    try {
+      const r = await post(msg("my secret question about jane@example.com", { platform: "Telegram" }), undefined, ga4On);
+      expect(r.status).toBe(200);
+      const sent = ga4Calls();
+      expect(sent).toHaveLength(1);
+      const wire = String(sent[0].init?.body);
+      expect(JSON.parse(wire).events).toEqual([{ name: "dm_received", params: { channel: "telegram" } }]);
+      expect(wire).not.toContain("42");              // the sender id
+      expect(wire).not.toContain("secret question"); // the text
+      expect(wire).not.toContain("jane@");
+    } finally { restore(); }
+  });
+  it("never changes the reply when GA4 fails", async () => {
+    stub({ qwen: { intent: "scan", confidence: 0.9 } });
+    const restore = enableRegistry();
+    try {
+      const failing = vi.fn(async (url: string, init?: RequestInit) => { if (String(url).includes("google-analytics.com")) throw new Error("GA4 down"); return Response.json([]); });
+      vi.stubGlobal("fetch", failing);
+      const r = await post(msg("scan me"), undefined, ga4On);
+      expect(r.status).toBe(200);
+      expect(failing.mock.calls.some((c) => String(c[0]).includes("google-analytics.com"))).toBe(true);
+    } finally { restore(); }
   });
 });

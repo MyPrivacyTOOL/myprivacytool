@@ -25,6 +25,7 @@
 import { createLogger, errorResponse, json, MptError, missingEnv, type Logger } from "@mpt/utils";
 // MPC-9885: every outbound call goes through the recipient wrapper; one context per request (built in respond()).
 import { callRecipient } from "../../shared/recipients/outbound.ts";
+import { ga4ServerEventsOn, sendGa4ServerEvent } from "../../shared/ga4-server-events.ts";
 import { workerRecipientContext, type WorkerRecipientContext } from "../../shared/recipients/worker-ctx.ts";
 
 type Env = {
@@ -38,6 +39,11 @@ type Env = {
   /** Workers Rate Limiting bindings (wrangler.toml [[ratelimits]]). Optional: absent means no limit (fail open). */
   RATE_LIMITER?: RateLimiter;
   RATE_LIMITER_GLOBAL?: RateLimiter;
+  /** MPC-11111: server-side GA4 flow events. All three are off unless set (and the registry entry ga4-measurement-protocol is enabled). */
+  GA4_SERVER_EVENTS_ENABLED?: string;
+  GA4_API_SECRET?: string;
+  GA4_MEASUREMENT_ID?: string;
+  GA4_DEBUG_MODE?: string;
 };
 
 type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> };
@@ -345,6 +351,11 @@ async function respond(msg: Inbound, env: Env, log: Logger, ctx?: ExecutionConte
     return json({ error: { code: "rate_limited", message: "Too many requests" } }, 429, { "retry-after": RATE_LIMIT_RETRY_AFTER_SECONDS });
   }
   const rctx = workerRecipientContext(env);
+  // MPC-11111: "a message arrived" for the GA4 flow check. Channel name only, never the sender or the text. A no-op unless switched on; never throws.
+  if (ga4ServerEventsOn(env)) {
+    const dmEvent = sendGa4ServerEvent(env, "dm_received", { params: { channel: msg.platform.toLowerCase().replace(/-/g, "_") }, rctx });
+    if (ctx?.waitUntil) ctx.waitUntil(dmEvent); else await dmEvent;
+  }
   const st = await lookupState(msg, env, log, rctx);
 
   // A bare Y/N while a confirmation is pending needs no LLM: skip the call (latency, cost, privacy).

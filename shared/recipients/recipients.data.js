@@ -1736,6 +1736,32 @@ export default {
       "planned": true,
       "reason": "Off by decision (Director, MPC-9885): the WhatsApp deep-dive provider is a paid-tier vendor whose host is set by an env variable and is named nowhere in the repo. Stays off until the vendor and host are chosen, listed here with its hosts, and put in the DPA and Privacy copy (MPC-9894).",
       "note": "MPC-9885: webhook-receiver/deepDive.ts called an unregistered host built from env. Paid tier, scan_consent basis, sends the WhatsApp number (phone). While off, the deep-dive reports this provider as not checked."
+    },
+    {
+      "key": "ga4-measurement-protocol",
+      "name": "Google Analytics Measurement Protocol (server events)",
+      "hosts": [
+        "www.google-analytics.com"
+      ],
+      "host_kind": "fixed",
+      "surface": "worker",
+      "data_items": [],
+      "purpose": "Would send three server-side flow events (a message arrived, the email link was confirmed, the report email was delivered) to our own GA4 property so the funnel can be measured. Each event carries only its name, the channel or email type, and a random anonymous id. No email, handle, message text, IP or scan result.",
+      "party": "third",
+      "retention": {
+        "days": null,
+        "text": "Provider-side"
+      },
+      "consent_basis": "service",
+      "phase": "post_click",
+      "enabled": false,
+      "flag": "GA4_SERVER_EVENTS_ENABLED",
+      "country_overrides": {},
+      "dpa_listed": false,
+      "since": "2026-11-23",
+      "until": null,
+      "reason": "Disabled until Chris approves it and the privacy text covers it (rule 7). Needs the GA4_API_SECRET Worker secret, which only Chris creates.",
+      "note": "MPC-11111: built switched off. Turning it on needs three things together: enabled true here, GA4_SERVER_EVENTS_ENABLED=true on the Workers, and the GA4_API_SECRET secret."
     }
   ]
 };

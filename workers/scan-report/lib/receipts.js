@@ -5,6 +5,9 @@
 // Signature: header svix-id, svix-timestamp, svix-signature ("v1,<base64>" space-separated). Signed content is `${id}.${timestamp}.${rawBody}`,
 // HMAC-SHA256 with the base64 part of the secret ("whsec_<base64>"). The body is read raw, size-capped, and checked BEFORE it is parsed.
 // Only the provider message id and event type are used. No address, subject or body is stored or logged.
+import { sendGa4ServerEvent, ga4ServerEventsOn } from '../../../shared/ga4-server-events.ts';
+import { workerRecipientContext } from './recipients.js';
+
 export const MAX_RECEIPT_BYTES = 64 * 1024;
 export const TIMESTAMP_TOLERANCE_S = 5 * 60;
 export const EVENT_STATUS = { 'email.clicked': 'clicked', 'email.sent': 'sent', 'email.delivery_delayed': 'delivery_delayed', 'email.delivered': 'delivered', 'email.bounced': 'bounced', 'email.failed': 'failed', 'email.complained': 'complained' };
@@ -56,11 +59,11 @@ export async function handleResendWebhook(env, request, json, { sb, optOut, push
   const when = Number.isFinite(at) ? new Date(at).toISOString() : new Date().toISOString();
   const bounce = status === 'bounced' ? known(bounceKind(event)) : null;
   let receiptPending = false;
+  let onScan = 0;   // declared outside the try so the MPC-11111 GA4 step below can read it
   try {
     // 1. the report email's own row (CK-8503); a click is not a delivery state, so it skips this
     // 404 = the CK-8503 migration is not applied yet. Keep going so the per-send row and the bounce/complaint opt-out below are not blocked by it, then answer 500 at the end so Resend
     // retries and the report row (scans.delivery_status) is filled once the migration lands. Steps 2 and 3 are idempotent, so the retries are harmless.
-    let onScan = 0;
     if (status !== 'clicked') {
       try { onScan = await sb.rpc('mpt_record_email_receipt', { p_message_id: messageId, p_status: status, p_at: when }); }
       catch (e) { if (e.status !== 404) throw e; receiptPending = true; console.warn('report receipt not stored on the scan: migration 20261026220000_ck_8503_scan_receipts_and_dedupe not applied'); }
@@ -73,6 +76,14 @@ export async function handleResendWebhook(env, request, json, { sb, optOut, push
   } catch (e) {
     console.error('resend receipt not recorded:', e.status || 'error');   // 404 here = CK-8503 migration not applied yet; Resend retries
     return json({ error: 'Unavailable' }, 500);
+  }
+  // MPC-11111: the provider says the REPORT email was delivered (onScan > 0 means this event moved a scan row, so a retried or repeated event sends nothing twice).
+  // Carries no identifier; the scan id only seeds an anonymous id. A no-op unless switched on; never throws, never changes the answer to Resend.
+  if (status === 'delivered' && onScan > 0 && ga4ServerEventsOn(env)) {
+    try {
+      const scanRow = (await sb.select(`scans?resend_message_id=eq.${encodeURIComponent(messageId)}&select=id&limit=1`))?.[0];
+      await sendGa4ServerEvent(env, 'report_delivered', { flowId: scanRow?.id, rctx: workerRecipientContext(env) });
+    } catch { /* GA4 events never break the receipt */ }
   }
   // 3. a hard bounce or a complaint ends non-transactional email to that address. Idempotent, so Resend's retries are harmless.
   const endsEmail = bounce === 'permanent' || status === 'complained';
