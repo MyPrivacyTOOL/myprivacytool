@@ -13,6 +13,8 @@ import { checkListingPages } from './listingCheck.js';
 import { guideFor } from './brokers.js';
 import { accountTokenForConfirm } from './accounts.js';
 import { confirmScan } from './entitlements.js';
+import { ga4ServerEventsOn, sendGa4ServerEvent } from '../../../shared/ga4-server-events.ts';
+import { workerRecipientContext } from './recipients.js';
 
 export const confirmGateEnabled = (env) => env.EMAIL_CONFIRM_GATE_ENABLED === 'true';
 export const listingCheckEnabled = (env) => env.LISTING_CHECK_ENABLED === 'true' && confirmGateEnabled(env);
@@ -99,6 +101,11 @@ export async function handleConfirm(env, ctx, request, origin, json, { allowedOr
     if (!scan) return json({ error: 'Invalid or expired' }, 401);
     if (!scan.email_confirmed_at) {
       await sb.patch(`scans?id=eq.${scanId}&email_confirmed_at=is.null`, { email_confirmed_at: new Date().toISOString() });
+      // MPC-11111: the click is the "email confirmed" stage of the GA4 flow check. Sent only the first time (this branch), carries no identifier; a no-op unless switched on.
+      if (ga4ServerEventsOn(env)) {
+        const confirmedEvent = sendGa4ServerEvent(env, 'email_confirmed', { flowId: scanId, rctx: workerRecipientContext(env) });
+        if (ctx?.waitUntil) ctx.waitUntil(confirmedEvent); else await confirmedEvent;
+      }
     }
     await confirmScan(env, sb, scanId);   // MPC-9818: the click proves the inbox, so this scan now counts for the whole month (idempotent; never throws)
     if (listingCheckEnabled(env)) {
