@@ -11,6 +11,8 @@ Checked 2026-11-18 against main HEAD 63f8a15 and the live site. Rule (Chris, 202
 | Regular Audits: security assessments and vulnerability testing | One review: docs/security-audit-mpc-7350.md, 2026-10-06, covering four Workers and the Supabase project | One dated review; the same document says the live site and Workers could not be probed and that live headers and CORS are unverified. No schedule exists | none | none | FALSE as written ("regular"). Softened to "We reviewed ... in October 2026 and fixed what we found. We have no fixed audit schedule" |
 | Procedures to detect and respond to breaches (Incident Response) | Not found in the repo | No incident-response document found under docs/ | none | none | NOT EVIDENCED. Left unchanged here; Chris to decide whether to name an owner or soften it (filed with the follow-ups on MPC-9808) |
 
+**Update 2026-11-23 (MPC-10805, Chris: soften to what exists today):** /privacy section 8 now says only that there is a short written checklist for investigating a problem and rolling back a release (`docs/RUNBOOK.md` section 7) and that there is no full incident response plan and no drills. The earlier claim of procedures to detect and respond to breaches is gone. Naming an owner and writing a real plan is a separate task.
+
 Other findings from the same check, not changed here:
 
 - The sign-in email footer says "Questions, or want your data deleted? Write to hello@myprivacytool.io" (workers/scan-report/lib/accounts.js lines 83 and 89). The deletion page names privacy@. Five mailboxes are in use (privacy@, dpo@, legal@, accessibility@, support@) plus hello@; nothing in the repo shows which are monitored (docs/support-ai-backend-mpc-8528.md section 7).
