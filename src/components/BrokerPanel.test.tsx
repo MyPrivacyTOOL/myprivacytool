@@ -16,7 +16,7 @@ const show = (items: unknown[], opts = { pasteAvailable: true }) => {
 const li = (root: HTMLElement, key: string) => root.querySelector(`[data-broker="${key}"]`) as HTMLElement;
 
 describe("broker section", () => {
-  it("no page pasted: all nine in registry order, each Not checked with the plain reason and its guide; HK/SG and coverage lines", () => {
+  it("no page pasted: all nine in registry order, each Not checked with the plain reason and its guide; coverage line, no HK/SG region note (MPC-10827)", () => {
     const root = show([]);
     const rows = [...root.querySelectorAll("li")];
     expect(rows.map((r) => r.getAttribute("data-broker"))).toEqual(["spokeo", "whitepages", "beenverified", "truthfinder", "fastpeoplesearch", "mylife", "intelius", "whitepages_au", "truecaller"]);
@@ -27,7 +27,8 @@ describe("broker section", () => {
     }
     expect(li(root, "spokeo").textContent).toContain("Not checked. We don't search broker sites for you. Paste a page that lists you, or paid coverage (coming) will check for you.");
     expect(li(root, "truecaller").textContent).toMatch(/needs you to sign in/);
-    expect(screen.getByTestId("broker-region-note").textContent).toMatch(/Hong Kong and Singapore/);
+    expect(screen.queryByTestId("broker-region-note")).toBeNull();
+    expect(root.textContent).not.toMatch(/Hong Kong|Singapore/);
     expect(root.textContent).toMatch(/Paid coverage .* is coming\. It is not live yet\./);
     expect(root.textContent).not.toMatch(/we (searched|found you)/i);
   });

@@ -14,7 +14,6 @@ export const NOT_CHECKED_SIGN_IN = "Not checked. A Truecaller lookup needs you t
 export const PANEL_INTRO = "We check a broker site only when you paste the address of a page that lists you. We search no broker site for you, and we use only details you typed about yourself and confirmed.";
 export const PANEL_INTRO_NO_PASTE = "We search no broker site for you. Each site below has an opt-out guide you can follow yourself.";
 export const NO_GUIDE_TEXT = "No guide yet for this site. Here is the general method: find its privacy or \"do not sell\" page, send its opt-out or deletion request for your listing, then look again in a few weeks.";
-export const REGION_NOTE = "Hong Kong and Singapore: we know of no people-search site there that we can lawfully read, so nothing is checked for you in those places. The guides are still yours to use: they cover the do-not-call registers and your legal opt-out rights.";
 export const COVERAGE_NOTE = "Paid coverage that checks these sites for you is coming. It is not live yet.";
 // MPC-9818: the same section for a reader whose plan HAS the licensed coverage (Basic and up) while that coverage is not built. Never fake content: it says so.
 export const NOT_CHECKED_INCLUDED = "Not checked. We don't search broker sites for you. Paste a page that lists you. The coverage that checks for you is included in your plan and is not live yet.";
@@ -98,7 +97,7 @@ export function buildBrokerPanel(listings, { pasteAvailable = true, entitlements
     return also.length ? { ...row, also } : row;
   });
   const others = items.filter((r) => r && !BROKER_SITES.some((d) => d.key === r.key)).map((r) => build(r, null));
-  return { pending: listings?.pending === true, paste_available: pasteAvailable, intro: pasteAvailable ? PANEL_INTRO : PANEL_INTRO_NO_PASTE, rows, others, region_note: REGION_NOTE,
+  return { pending: listings?.pending === true, paste_available: pasteAvailable, intro: pasteAvailable ? PANEL_INTRO : PANEL_INTRO_NO_PASTE, rows, others, region_note: '',
     coverage_note: sec.state === 'content' ? null : included ? COVERAGE_NOTE_INCLUDED : COVERAGE_NOTE,
     upgrade: upgradeSentence(entitlements, basicPrice),   // MPC-9816: the one Free-to-Basic sentence (null for Basic and up)
     coverage: { state: sec.state, min_tier: sec.min_tier ?? null, min_plan: sec.min_tier ? planName(sec.min_tier) : null } };
