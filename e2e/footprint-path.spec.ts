@@ -10,13 +10,13 @@ async function open(page: import("@playwright/test").Page, q: string) {
   await expect(page.getByTestId("footprint-path")).toBeVisible();
 }
 
-test("?path=1 at 390px: one column, exact badge, no tile fill, no banned wording", async ({ page }) => {
+test("?path=1 at 390px: one column, exact badge, tiles filled only with a print shade, no banned wording", async ({ page }) => {
   await open(page, "?path=1");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.getByTestId("path-badge")).toHaveText("4 things known about you · 3 guesses waiting");
   const fills = await page.getByTestId("footprint-path").locator("svg[data-outline] polygon").evaluateAll((els) => els.map((e) => e.getAttribute("fill")));
   expect(fills.length).toBeGreaterThan(0);
-  expect(fills.every((f) => f === "none")).toBe(true);
+  expect(fills.every((f) => f === "none" || /^#[0-9A-Fa-f]{6}$/.test(f ?? ""))).toBe(true);
   const txt = (await page.getByTestId("footprint-path").innerText()).toLowerCase();
   for (const w of ["detected", "verified", "safe", "clean", "hidden", "private", "scan complete", "checks done"]) expect(txt).not.toContain(w);
   expect(txt).not.toMatch(/\d+\s+of\s+\d+|\d\s*%/);

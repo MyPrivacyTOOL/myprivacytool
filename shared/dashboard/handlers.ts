@@ -6,6 +6,7 @@ import { isUuidV4, randomSessionValue, sha256Hex, FOOTPRINT_COOKIE, SESSION_COOK
 import { HEXAGON_CATALOGUE } from "../hexagon-registry/catalogue.js";
 import { TELEGRAM_EXTRA_IDS } from "../hexagon-registry/channels.js";
 import { supabaseStore, type DashboardEnv, type DashboardStore } from "./store";
+import { isAllowListedSender } from "./testAccount";
 import { baselineView, enhancedView, finalView } from "./view";
 
 export interface Deps { store?: DashboardStore | null; now?: Date; sessionValue?: () => string }
@@ -87,6 +88,9 @@ function readCookie(request: Request, name: string): string | null {
   return null;
 }
 
+/** MPC-10621: a yes/no on an available baseline; the allow-list itself is never in the response. */
+const withTestFlag = <T extends { state: string }>(b: T, allowListed: boolean) => (b.state === "available" ? { ...b, allow_listed_test_account: allowListed } : b);
+
 export async function handleData(request: Request, env: DashboardEnv, deps: Deps = {}): Promise<Response> {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
   if (!enabled(env)) return unavailable();
@@ -109,7 +113,7 @@ export async function handleData(request: Request, env: DashboardEnv, deps: Deps
   const results = job.ok && job.value ? await store.deepResults(job.value.id) : null;
   return json({
     generated_at: (deps.now ?? new Date()).toISOString(),
-    baseline: baselineView(snap.ok ? snap.value : null, snap.ok),
+    baseline: withTestFlag(baselineView(snap.ok ? snap.value : null, snap.ok), await isAllowListedSender(env, sender)),
     enhanced: enhancedView(job, results),
     final: snap.ok ? finalView(snap.value, later) : { state: "unavailable", note: "The re-check could not be loaded just now." },
     cta: { href: "/scan", label: "Run a full scan on the website" },
