@@ -363,6 +363,13 @@
       animation: none;
       filter: drop-shadow(0 0 10px hsl(var(--brand-ink) / 0.7));
     }
+    /* MPC-9805: the home hero hands and the "live" ping dots were still moving with reduced motion on (measured live, 4 infinite animations).
+       They are decoration: stop them and park the hands mid-way. The spinner is left alone: it tells the visitor something is loading. */
+    .animate-hand-push-left { animation: none; transform: translateY(10px); }
+    .animate-hand-push-center { animation: none; transform: translateX(-50%) translateY(5px); }
+    .animate-hand-push-right { animation: none; }
+    /* !important: Tailwind's own .animate-ping utility is emitted after this rule and would otherwise win. */
+    .animate-ping { animation: none !important; opacity: 0; }
   }
 }
 /* MPC-7200: iOS Safari zooms the page when a focused field has a font-size under 16px. Keep form fields at

@@ -99,8 +99,10 @@ const Accessibility = () => {
               </h3>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>
-                  <strong>Full Keyboard Access:</strong> All functionality is
-                  available from the keyboard
+                  <strong>Keyboard use:</strong> We aim to make every function
+                  available from the keyboard. We have not yet completed and
+                  recorded a keyboard-only test of every page, so some parts may
+                  not work without a mouse
                 </li>
                 <li>
                   <strong>Visible Focus Indicators:</strong> Clear visual indication
@@ -284,10 +286,13 @@ const Accessibility = () => {
                 Browser & Assistive Technology Support
               </h2>
               <p className="text-muted-foreground">
-                MyPrivacyTOOL is tested with and supports the following:
+                We aim to support the following browsers and assistive
+                technologies. We have not yet completed and recorded tests with
+                each of them, so treat this list as our target, not as a result.
+                If something does not work for you, please tell us.
               </p>
               <p className="mt-4 text-muted-foreground font-semibold">
-                Browsers:
+                Browsers we aim to support:
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>Chrome (latest)</li>
@@ -296,7 +301,7 @@ const Accessibility = () => {
                 <li>Edge (latest)</li>
               </ul>
               <p className="mt-4 text-muted-foreground font-semibold">
-                Assistive Technologies:
+                Assistive technologies we aim to support:
               </p>
               <ul className="list-inside list-disc space-y-2 text-muted-foreground mt-4">
                 <li>NVDA (Windows screen reader)</li>

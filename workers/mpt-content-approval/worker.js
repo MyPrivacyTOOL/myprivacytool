@@ -17,6 +17,8 @@ const PLATFORM_NAMES = { x: 'X', linkedin: 'LinkedIn', instagram: 'IG', facebook
 const PUBLISH_HKT = { x: '12:00', linkedin: '08:30', instagram: '18:30', facebook: '13:00', pinterest: '20:00', youtube: '17:00', reddit: '19:00' };
 const CAMPAIGN = 'mpc-7033-daily';
 const SITE = 'https://myprivacytool.io';
+// Content System v1, phase 1: link cards open the free scan. Must match SCAN_URL in mpt-content-consumer.
+const SCAN_URL = `${SITE}/scan`;
 const MAKE_TIMEOUT_MS = 10_000;
 const REQUEST_LOG_CHARS = 2000;
 const RESPONSE_LOG_CHARS = 500;
@@ -83,7 +85,7 @@ export function buildMakePayload(drafts, { taskId, approvedBy, approvalTimestamp
         cta: d.cta || 'Check your exposure',
         content_type: d.content_type || contentTypeOf(assetUrl),
         asset_url: assetUrl,
-        link_url: `${SITE}?utm_source=${d.platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
+        link_url: `${SCAN_URL}?utm_source=${d.platform}&utm_medium=social&utm_campaign=${CAMPAIGN}&utm_content=${date}`,
         publish_timestamp: scheduledTime(date, d.platform, new Date(approvalTimestamp)),
         ...(d.platform === 'reddit' ? { subreddit: d.subreddit || 'r/privacy' } : {}),
         ...(imageKey ? { image_key: imageKey } : {}),

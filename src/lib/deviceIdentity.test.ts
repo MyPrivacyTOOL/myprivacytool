@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { identifyDevice, hedgeDeviceHexagon, type DeviceSignals } from './deviceIdentity';
+import { identifyDevice, hedgeDeviceHexagon, labelAndroidModel, type DeviceSignals } from './deviceIdentity';
 import type { HexagonData } from './deviceDetection';
 
 const base: DeviceSignals = {
@@ -83,6 +83,47 @@ describe('identifyDevice', () => {
   it('is unknown for unrecognised signals', () => {
     expect(identifyDevice({ ...base, userAgent: 'curl/8.0', platform: '' }).certain).toBe(false);
     expect(identifyDevice({ ...base, userAgent: '', platform: '' }).certain).toBe(false);
+  });
+});
+
+describe('labelAndroidModel', () => {
+  it('labels a Samsung model code with the code in brackets', () => {
+    expect(labelAndroidModel('SM-S918B')).toBe('Samsung phone (SM-S918B)');
+  });
+
+  it('drops the dual-SIM /DS suffix but keeps the base code', () => {
+    expect(labelAndroidModel('SM-S918B/DS')).toBe('Samsung phone (SM-S918B)');
+  });
+
+  it('leaves other vendors exactly as reported', () => {
+    expect(labelAndroidModel('Pixel 8')).toBe('Pixel 8');
+  });
+
+  it('needs letters or digits after SM-, so a bare prefix stays as reported', () => {
+    expect(labelAndroidModel('SM-')).toBe('SM-');
+  });
+
+  it('is case-sensitive, so a lowercase code stays as reported', () => {
+    expect(labelAndroidModel('sm-s918b')).toBe('sm-s918b');
+  });
+
+  it('matches the whole string, so prefixed or padded codes stay as reported', () => {
+    expect(labelAndroidModel('XSM-S918B')).toBe('XSM-S918B');
+    expect(labelAndroidModel('SM-S918B extra')).toBe('SM-S918B extra');
+  });
+
+  it('returns a missing or non-string model unchanged instead of throwing', () => {
+    expect(labelAndroidModel(undefined)).toBeUndefined();
+    expect(labelAndroidModel(null)).toBeNull();
+    expect(labelAndroidModel(42)).toBe(42);
+  });
+
+  it('feeds the reveal label while keeping the exact reported model', () => {
+    const r = identifyDevice({
+      ...base, userAgent: UA.androidPhone, platform: 'Linux armv8l', maxTouchPoints: 5,
+      uaData: { platform: 'Android', mobile: true, model: 'SM-S918B/DS' },
+    });
+    expect(r).toMatchObject({ certain: true, category: 'android-phone', label: 'Samsung phone (SM-S918B)', model: 'SM-S918B/DS' });
   });
 });
 
