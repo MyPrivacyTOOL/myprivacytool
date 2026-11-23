@@ -21,7 +21,7 @@ interface PaPITProfile {
     activity_level: "low" | "medium" | "high";
   };
   privacy_boundaries: {
-    data_retention_days: 30;            // validity of this PaPIT snapshot. NOT token retention
+    data_retention_days: 30;            // declared validity of this PaPIT snapshot (not enforced). NOT token retention
     revocable: true;
   };
 }
@@ -35,7 +35,7 @@ interface PaPITProfile {
 |---|---|
 | `activity_level` | Public events in the last 90 days: `< 5` low, `5-50` medium, `> 50` high. GitHub's public events feed returns at most 300 events / 90 days; that is enough to cross the 50 threshold. |
 | `primary_role` | Ordered keyword rules over the bio plus the top 3 languages and top 3 repo topics (word-bounded, case-insensitive): Security, Data/ML, DevOps/SRE, Mobile, Frontend, Backend, Full-Stack. Highest keyword count wins, rule order breaks ties. No match: `Software Developer` if the user has public repos, else `Unspecified`. No LLM. |
-| `cryptographic_receipt` | SHA-256 over `JSON.stringify` of the profile **without** `cryptographic_receipt`, with object keys sorted alphabetically at every depth (arrays keep order). Hex-encoded. Lets a consumer detect any edit to the profile. |
+| `cryptographic_receipt` | SHA-256 over `JSON.stringify` of the profile **without** `cryptographic_receipt`, with object keys sorted alphabetically at every depth (arrays keep order). Hex-encoded. Lets a consumer see whether the profile has changed, if the receipt arrived by a separate trusted channel. It is a checksum, not a signature: an editor can recompute it, so it does not prove who produced the profile. |
 
 ## Privacy guarantees
 
