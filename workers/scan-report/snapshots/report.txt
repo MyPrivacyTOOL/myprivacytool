@@ -23,6 +23,7 @@ YOUR EMAIL ADDRESS
 ⬡ Public code changes [NOT CHECKED]
 
 The full scan data, including technical detail that did not fit here, is attached as a JSON file you can open, search and analyse.
+The attached file is the full record, not a redacted copy. It can include your IP address, device details and the findings about you. Treat it like a password: do not forward it or post it, and delete it from your inbox when you are done.
 
 BROKER SITES
 We check a broker site only when you paste the address of a page that lists you. We search no broker site for you, and we use only details you typed about yourself and confirmed.

@@ -100,7 +100,7 @@ export const FAQS: { q: string; a: string }[] = [
   },
   {
     q: "What is the JSON file?",
-    a: "It is attached to your report. It holds every hexagon with its full value and the technical detail that did not fit in the email, so you can open it, search it and analyse it yourself. It is your own data.",
+    a: "It is attached to your report. It holds every hexagon with its full value and the technical detail that did not fit in the email, so you can open it, search it and analyse it yourself. It is your own data and the full record, not a redacted copy: it can include your IP address and device details. Do not forward or post it, and delete it from your inbox when done.",
   },
   {
     q: "Why did I get this email, and how do I stop them?",

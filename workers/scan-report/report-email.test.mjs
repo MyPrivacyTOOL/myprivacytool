@@ -1,7 +1,7 @@
 // MPC-7468: two-part report email. Size limit, honest status, escaping, JSON attachment, no saved web scan.
 // Run: node workers/scan-report/report-email.test.mjs   (set REPORT_RENDER_DIR=<dir> to also write the rendered HTML/text/JSON for review)
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { buildReportEmail, BRIDGE } from './lib/email.js';
+import { buildReportEmail, BRIDGE, ATTACHMENT_WARNING } from './lib/email.js';
 import { computeScore } from './lib/score.js';
 import { WEB_HEXAGONS, EMAIL_HEXAGONS, reportAttachment, MAX_VALUE } from './lib/reportHex.js';
 import { loadWebScan } from './lib/webScanLoader.js';
@@ -157,6 +157,10 @@ check(bytes(worstRated.html) < HARD_LIMIT, `MPC-7487: worst case with saved stat
   check(!/203\.0\.113\.7|2001:db8/.test(ipMail.html + ipMail.text) && ipMail.html.includes('IP address hidden here') && ipMail.text.includes('IP address hidden here'), 'IP addresses never appear in the email body (HTML or text)');
   check(/203\.0\.113\.7/.test(leak.value) && /2001:db8::1/.test(leak.value), 'the full IP values stay in the attached JSON');
 }
+
+// MPC-9793 (PRIVACY-020): the email that announces the JSON attachment warns, in both parts, that it is the full record and not to forward it.
+check(real.text.includes(ATTACHMENT_WARNING) && real.html.includes('not a redacted copy') && /do not forward it/i.test(real.html), 'the attachment is announced with a warning: full record, not redacted, do not forward (text and html)');
+check(real.text.indexOf(ATTACHMENT_WARNING) > real.text.indexOf('attached as a JSON file'), 'the warning sits right after the line that announces the attachment');
 
 if (process.env.REPORT_RENDER_DIR) {
   mkdirSync(process.env.REPORT_RENDER_DIR, { recursive: true });
