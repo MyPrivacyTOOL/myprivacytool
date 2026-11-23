@@ -57,25 +57,48 @@ function PrintMark({ print, size, land }: { print: Print; size: number; land: bo
   );
 }
 
-const SOURCE_TAG: Record<Print['source'], string> = { taken: 'taken', checked: 'checked', given: 'given' };
+// MPC-10621 layout: the same interlocking honeycomb as the web scan (icon, name and value inside the hexagon), in the path's one 390px column.
+// Tiles stay uncoloured outlines (brief rule); only the S1-S5 print carries colour. Rows alternate 3 and 2 hexagons so the rows lock together.
+const HW = 112, HH = Math.round(HW * 1.1547), GAP = 2, PER_ROW = 3, ROW_STEP = Math.round(HH * 0.75 + GAP * 0.87);
+const ICONS: Record<string, string> = { username: '🏷️', name: '👤', language: '🌐', numeric_id: '🔢', profile: '🪪' };
 
-function BehindTile({ print, land }: { print: Print | null; land: boolean }) {
+function honeyPos(i: number): { left: number; top: number } {
+  let row = 0, start = 0, cap = PER_ROW;
+  while (i >= start + cap) { start += cap; row += 1; cap = row % 2 === 0 ? PER_ROW : PER_ROW - 1; }
+  const x0 = ((PER_ROW - cap) * (HW + GAP)) / 2;
+  return { left: Math.round(x0 + (i - start) * (HW + GAP)), top: row * ROW_STEP };
+}
+
+/** A flat <ol> whose <li> children sit in honeycomb positions. */
+function Honeycomb({ count, testid, label, children }: { count: number; testid: string; label: string; children: React.ReactNode }) {
+  const last = count ? honeyPos(count - 1) : { left: 0, top: 0 };
+  return (
+    <ol className="relative mx-auto mt-3" style={{ width: PER_ROW * (HW + GAP) - GAP, height: last.top + HH }} aria-label={label} data-testid={testid}>
+      {children}
+    </ol>
+  );
+}
+
+function BehindTile({ print, land, index }: { print: Print | null; land: boolean; index: number }) {
   // print === null renders the "nothing returned" tile (thin grey, solid): see-through never means safe, so it says so in words.
   const lab = print ? shadeLabel(print.shade) : null;
+  const pos = honeyPos(index);
   return (
-    <li className="flex w-[110px] flex-col items-center text-center" data-testid={print ? `print-${print.key}` : 'print-not-returned'} data-print={print ? print.key : undefined}>
-      <div className="relative" style={{ width: 74, height: 85 }}>
-        <Outline w={74} h={85} kind={print ? 'ink' : 'grey'} />
-        {print && <div className="absolute inset-0 flex items-center justify-center"><PrintMark print={print} size={36} land={land} /></div>}
+    <li className="absolute" style={{ width: HW, height: HH, left: pos.left, top: pos.top }} data-testid={print ? `print-${print.key}` : 'print-not-returned'} data-print={print ? print.key : undefined}>
+      <Outline w={HW} h={HH} kind={print ? 'ink' : 'grey'} />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-px px-5 pb-1 pt-2 text-center">
+        <div className="flex items-center gap-1">
+          <span className="text-base leading-none" aria-hidden="true">{print ? ICONS[print.key] ?? '👣' : '🔍'}</span>
+          {print && <PrintMark print={print} size={20} land={land} />}
+        </div>
+        <span className="text-[9px] font-semibold uppercase leading-[1.1] tracking-wide text-foreground">{print ? print.label : 'Public profile'}</span>
+        {print ? (
+          <>
+            {print.value && <span className="max-w-full break-all text-[9px] leading-tight text-foreground" data-testid={`print-value-${print.key}`}>{print.value}</span>}
+            <span className="whitespace-nowrap text-[8px] leading-tight text-foreground" data-testid={`print-shade-${print.key}`}>{lab!.text} <span aria-label={`${print.shade} pips`}>{lab!.pips}</span></span>
+          </>
+        ) : <span className="text-[9px] italic leading-tight text-muted-foreground">not returned to this bot</span>}
       </div>
-      <span className="mt-1 text-xs font-medium leading-tight text-foreground">{print ? print.label : 'Public profile'}</span>
-      {print ? (
-        <>
-          {print.value && <span className="break-all text-xs text-foreground" data-testid={`print-value-${print.key}`}>{print.value}</span>}
-          <span className="text-[11px] text-muted-foreground">{SOURCE_TAG[print.source]}</span>
-          <span className="text-[11px] text-foreground" data-testid={`print-shade-${print.key}`}>{lab!.text} <span aria-label={`${print.shade} pips`}>{lab!.pips}</span></span>
-        </>
-      ) : <span className="text-[11px] text-muted-foreground">not returned to this bot</span>}
     </li>
   );
 }
@@ -84,18 +107,22 @@ const Chip = ({ children, testid }: { children: React.ReactNode; testid?: string
   <span className="inline-block rounded border border-foreground px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-foreground" data-testid={testid}>{children}</span>
 );
 
-function AheadTile({ tile }: { tile: PathTile }) {
+function AheadTile({ tile, index }: { tile: PathTile; index: number }) {
+  const pos = honeyPos(index);
   return (
-    <li className="flex w-[100px] flex-col items-center text-center" data-testid={`ahead-${tile.n}`}>
-      <div className="relative" style={{ width: 74, height: 85 }}>
-        <Outline w={74} h={85} kind="dashed" />
-        {/* a ghost print: dashed, no fill, so it reads as "what you would see", never as a colour */}
-        <svg width="36" height="41" viewBox="0 0 36 41" className="absolute left-[19px] top-[22px] text-muted-foreground" aria-hidden="true" focusable="false">
-          <polygon points={HEX(36, 41, 1)} fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3" />
-        </svg>
+    <li className="absolute" style={{ width: HW, height: HH, left: pos.left, top: pos.top }} data-testid={`ahead-${tile.n}`}>
+      <Outline w={HW} h={HH} kind="dashed" />
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-px px-5 pb-1 pt-2 text-center">
+        <div className="flex items-center gap-1">
+          <span className="text-base leading-none" aria-hidden="true">👣</span>
+          {/* a ghost print: dashed, no fill, so it reads as "what you would see", never as a colour */}
+          <svg width="18" height="21" viewBox="0 0 18 21" className="text-muted-foreground" aria-hidden="true" focusable="false">
+            <polygon points={HEX(18, 21, 1)} fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
+          </svg>
+        </div>
+        <span className="text-[9px] font-semibold uppercase leading-[1.1] tracking-wide text-foreground">{tile.shortLabel}</span>
+        <span className="text-[8px] leading-tight text-muted-foreground">{tile.kind} · {tile.status}</span>
       </div>
-      <span className="mt-1 text-xs font-medium text-foreground">{tile.shortLabel}</span>
-      <span className="text-[11px] text-muted-foreground">{tile.kind} · {tile.status}</span>
     </li>
   );
 }
@@ -150,11 +177,13 @@ export default function FootprintPath({ hexagons, allowListedTestAccount, sample
       <p className="mt-2 text-base font-semibold text-foreground" data-testid="path-badge" role="status">{badgeText(n, m)}</p>
 
       <h2 className="mt-6 text-sm font-semibold uppercase tracking-wider text-foreground">Behind you</h2>
-      <ol className="mt-3 flex flex-wrap justify-center gap-x-2 gap-y-4 border-l-2 border-dotted border-muted-foreground/50 pl-3" aria-label="Footprints you have left, newest last" data-testid="path-behind">
-        {arrival.map((p) => <BehindTile key={p.key} print={p} land={land} />)}
-        {allowListedTestAccount && !arrival.some((p) => p.key === 'profile') && <BehindTile print={null} land={land} />}
-        {stepPrints.map((p) => <BehindTile key={p.key} print={p} land={land} />)}
-      </ol>
+      <Honeycomb count={arrival.length + (allowListedTestAccount && !arrival.some((p) => p.key === 'profile') ? 1 : 0) + stepPrints.length} testid="path-behind" label="Footprints you have left, newest last">
+        {[
+          ...arrival.map((p) => ({ k: p.key, p })),
+          ...(allowListedTestAccount && !arrival.some((p) => p.key === 'profile') ? [{ k: 'not-returned', p: null as Print | null }] : []),
+          ...stepPrints.map((p) => ({ k: p.key, p })),
+        ].map((t, i) => <BehindTile key={t.k} print={t.p} land={land} index={i} />)}
+      </Honeycomb>
 
       {stepPrints.length > 0 && (() => {
         const last = stepPrints[stepPrints.length - 1];
@@ -192,9 +221,9 @@ export default function FootprintPath({ hexagons, allowListedTestAccount, sample
       ) : <p className="mt-3 text-sm text-muted-foreground" data-testid="path-no-current">Nothing waiting right now.</p>}
 
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wider text-foreground">Ahead</h2>
-      <ol className="mt-3 flex justify-center gap-2" aria-label="Hexagons ahead" data-testid="path-ahead">
-        {ahead.map((t) => <AheadTile key={t.n} tile={t} />)}
-      </ol>
+      <Honeycomb count={ahead.length} testid="path-ahead" label="Hexagons ahead">
+        {ahead.map((t, i) => <AheadTile key={t.n} tile={t} index={i} />)}
+      </Honeycomb>
 
       <details className="mt-8 rounded-md border border-border" data-testid="path-technical">
         <summary className="cursor-pointer px-3 py-3 text-sm font-medium text-foreground">Technical details</summary>
