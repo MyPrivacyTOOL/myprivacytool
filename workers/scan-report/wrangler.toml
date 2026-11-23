@@ -82,7 +82,7 @@ REFERRAL_AB_INVITE_SUBJECT = "false"
 # MPC-8430: Cloudflare Turnstile on POST /api/scan. Needs the Worker secret TURNSTILE_SECRET_KEY (the widget created for this Worker; no secret = off).
 # TURNSTILE_ENFORCE "false" = report-only: a missing/invalid token is logged (TURNSTILE_FAILED, truncated IP) but the request goes through.
 # "true" = a failed check answers 403 and nothing is stored or sent. Rollback: set back to "false" and redeploy.
-TURNSTILE_ENFORCE = "false"   # MPC-10445: TEMPORARILY report-only so testing is not blocked by the CAPTCHA. Restore to "true" and merge once testing ends.
+TURNSTILE_ENFORCE = "true"
 
 # MPC-7554: follow-ups chosen by what was found for each report, for every user (not only the first 100), and the "I have fixed this" link. OFF until Chris approves the copy and
 # migration 20261028150000_mpc_7554_followup_state.sql (scans.fixed_at, scans.followup_ended) is applied. Anything but "true" keeps the earlier calendar follow-ups. Rollback: "false".
