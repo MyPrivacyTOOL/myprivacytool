@@ -19,6 +19,7 @@ export interface PapitProfile {
     career: { skills: string[]; primary_role: string; public_projects_count: number };
   };
   behavioral: { interests: string[]; activity_level: "low" | "medium" | "high" };
+  data_coverage?: { repos_sampled: boolean | null; starred_sampled: boolean | null; events_capped: boolean | null; interests: "found" | "no_stars" | "stars_without_topics" };
   privacy_boundaries: { data_retention_days: number; revocable: boolean };
 }
 

@@ -47,6 +47,19 @@ describe("<ConnectGitHub />", () => {
     expect(screen.queryByRole("link", { name: /connect github/i })).toBeNull();
   });
 
+  it("MPC-9795: says when the profile is a sample, and why interests are empty; shows neither for a complete profile", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
+    const first = renderAt();
+    await screen.findByText("TypeScript, Go");
+    expect(screen.queryByTestId("profile-sampled")).toBeNull();
+    first.unmount();
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile: { ...profile, behavioral: { interests: [], activity_level: "high" }, data_coverage: { repos_sampled: true, starred_sampled: false, events_capped: true, interests: "no_stars" } } });
+    renderAt();
+    expect(await screen.findByTestId("profile-sampled")).toHaveTextContent(/300 public repos/);
+    expect(screen.getByText("You have not starred anything.")).toBeInTheDocument();
+    expect(screen.getByText("Main languages")).toBeInTheDocument();
+  });
+
   it("disconnect returns to the Connect state", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     vi.mocked(api.disconnectGithub).mockResolvedValue(true);

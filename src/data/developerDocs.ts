@@ -544,7 +544,7 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
   cryptographic_receipt: string;        // lowercase hex SHA-256
   core_identity: {
     career: {
-      skills: string[];                 // top <=10 languages, by repo count
+      skills: string[];                 // the field name is historical: top <=10 languages of the repos we read, by repo count. Not an assessment of skill.
       primary_role: string;             // fixed keyword rules, "Unspecified" if none
       public_projects_count: number;
     };
@@ -552,6 +552,12 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
   behavioral: {
     interests: string[];                // top <=15 topic slugs ([a-z0-9-]) from starred repos
     activity_level: "low" | "medium" | "high";
+  };
+  data_coverage?: {                     // added within v1.0; absent on older cached profiles
+    repos_sampled: boolean | null;      // true: more than the 300 repos we read may exist
+    starred_sampled: boolean | null;    // true: more than the 200 stars we read may exist
+    events_capped: boolean | null;      // true: the 300-event feed limit was reached
+    interests: "found" | "no_stars" | "stars_without_topics";
   };
   privacy_boundaries: {
     data_retention_days: 30;            // declared validity of this snapshot (not enforced), not token retention
@@ -561,6 +567,10 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
 
 // MPC-9794 (CRYPTO-001, PRIVACY-023): the lifetimes and limits of a PaPIT profile, stated one by one. Each row is what the code does today.
 export const PAPIT_LIMITS = [
+  { item: "Activity window", detail: "activity_level counts public events from the last 90 days. GitHub's public events feed returns at most 300 events from that window, which is enough to cross the 50-event threshold; it is not a full history." },
+  { item: "How much we read", detail: "At most 300 of your own public repos (most recently pushed first), 200 of your most recently starred repos and 300 events, 100 per request. data_coverage says when a list was cut short. A large account is therefore a sample, not a full count." },
+  { item: "skills", detail: "The field name is historical. It holds the top 10 programming languages by number of your own, non-fork, public repos among those we read. It does not measure skill. public_projects_count is GitHub's total of public repos, forks included, so the two can differ." },
+  { item: "Empty interests", detail: "interests is empty for two different reasons, told apart by data_coverage.interests: no_stars (you have starred nothing) or stars_without_topics (the repos you starred have no topics). A failed or unavailable GitHub request is never an empty list: the profile call returns an error instead (401 reauthorize, or 5xx)." },
   { item: "Receipt", detail: "An unkeyed SHA-256 checksum (workers/github-channel/lib/papit.js). It shows a profile has not changed only if the receipt reached you by a separate trusted channel. It does not prove who produced it: an editor can recompute it. Signing is planned, not built." },
   { item: "Sanitization receipt", detail: "Also a hash, not a signature and not a zero-knowledge proof. It records which rules ran and ties the output to the profile's receipt." },
   { item: "Snapshot validity", detail: "data_retention_days is 30. That number is declared in the profile; nothing refuses a profile older than 30 days. Check generated_at yourself." },

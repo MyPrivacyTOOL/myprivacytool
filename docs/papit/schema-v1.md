@@ -11,7 +11,7 @@ interface PaPITProfile {
   cryptographic_receipt: string;        // lowercase hex SHA-256 (see below)
   core_identity: {
     career: {
-      skills: string[];                 // top <=10 languages across the user's own, non-fork, public repos, by repo count
+      skills: string[];                 // historical name: top <=10 languages across the user's own, non-fork, public repos we read, by repo count. Not a skill assessment
       primary_role: string;             // fixed keyword rules (below); "Unspecified" if no public projects
       public_projects_count: number;    // GitHub profile public_repos
     };
@@ -19,6 +19,12 @@ interface PaPITProfile {
   behavioral: {
     interests: string[];                // top <=15 topics across starred repos, as [a-z0-9-] slugs, by frequency
     activity_level: "low" | "medium" | "high";
+  };
+  data_coverage?: {                     // added within v1.0 (MPC-9795)
+    repos_sampled: boolean | null;      // true: the 3-page cap (300 repos) was hit
+    starred_sampled: boolean | null;    // true: the 2-page cap (200 stars) was hit
+    events_capped: boolean | null;      // true: the 3-page cap (300 events) was hit
+    interests: 'found' | 'no_stars' | 'stars_without_topics';
   };
   privacy_boundaries: {
     data_retention_days: 30;            // declared validity of this PaPIT snapshot (not enforced). NOT token retention
