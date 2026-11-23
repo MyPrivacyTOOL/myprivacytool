@@ -99,3 +99,26 @@ describe("test seam", () => {
     expect(await codeOf(callRecipient("hibp", { url: "https://haveibeenpwned.com/api/v3/x", sent: ["email"] }, { fetchImpl: okFetch(), consentGate: "none" }))).toBe("DISABLED");
   });
 });
+
+describe("consent check is made once per scan context (subrequest budget)", () => {
+  const ID = "5b0c0c3e-6c1e-4c53-9d0a-0f6f5a0b7a11";
+  const env = { CONSENT_GATE_ENFORCED: "true", SUPABASE_URL: "https://x.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "k" };
+  const row = { id: ID, scan_id: "s1", consent_version: "v", consent_text_sha256: "a".repeat(64), locale: "en", registry_hash: "h", n_hours: 168, consented_at: "2026-11-24T00:00:00Z" };
+  it("reads the consent row once however many post_click calls follow", async () => {
+    const calls: string[] = [];
+    const f = vi.fn(async (url: RequestInfo | URL) => { const u = String(url); calls.push(u); return new Response(u.includes("scan_consents") ? JSON.stringify([row]) : "{}", { status: 200 }); }) as unknown as typeof fetch;
+    setBundledRegistryForTests(registry);
+    const ctx = workerRecipientContext(env, { scanId: "s1", consentId: ID, fetchImpl: f, sink: null });
+    for (let i = 0; i < 4; i++) await callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["email"] }, ctx);
+    expect(calls.filter((u) => u.includes("scan_consents")).length).toBe(1);
+    expect(calls.filter((u) => u.includes("api.resend.com")).length).toBe(4);
+  });
+  it("does not cache a refusal: an unknown consent is checked again each time", async () => {
+    const calls: string[] = [];
+    const f = vi.fn(async (url: RequestInfo | URL) => { calls.push(String(url)); return new Response("[]", { status: 200 }); }) as unknown as typeof fetch;
+    const ctx = workerRecipientContext(env, { scanId: "s1", consentId: ID, fetchImpl: f, sink: null });
+    expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["email"] }, ctx))).toBe("CONSENT_INVALID");
+    expect(await codeOf(callRecipient("resend", { url: "https://api.resend.com/emails", sent: ["email"] }, ctx))).toBe("CONSENT_INVALID");
+    expect(calls.filter((u) => u.includes("scan_consents")).length).toBe(2);
+  });
+});
