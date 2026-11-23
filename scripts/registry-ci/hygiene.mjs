@@ -2,6 +2,7 @@
 //   fail  schema invalid (validateRegistry: unique keys, vocabulary, pre_click only first-party or a named exception, disabled needs a flag or reason)
 //   fail  registry hash does not reproduce: the Supabase seed is generated from the file, so the rows must all carry the file's hash and parse back to it
 //   fail  an allowlist entry is older than 14 days (the list must shrink; see allowlist.mjs)
+//   warn  an allowlist entry is 10 or more days old (MPC-10621: a heads-up before it fails)
 //   FAIL  a dpa_listed entry is missing from the generated DPA list (MPC-9894: the DPA is generated from the registry)
 //   warn  an enabled entry has no call site the scan can find (a host literal or a wrapper call with its key)
 import { readFileSync } from "node:fs";
@@ -9,6 +10,7 @@ import { join } from "node:path";
 import { canonicalJson, registryHash } from "../../shared/recipients/canonical.js";
 import { buildRows, diffMirror, moduleInSync, toSql } from "../sync-recipients.mjs";
 import { MAX_AGE_DAYS, entryAgeDays, validateAllowlist } from "./allowlist.mjs";
+const EXPIRY_WARN_DAYS = 4;
 import { hostMatches, validateRegistry } from "./registry.mjs";
 
 const norm = (s) => s.toLowerCase();
@@ -57,6 +59,8 @@ export async function runHygiene({ registry, allowlist, today, root, seenHosts, 
   for (const e of allowlist.entries ?? []) {
     const age = entryAgeDays(e, today);
     if (age > MAX_AGE_DAYS) failures.push(`allowlist entry older than ${MAX_AGE_DAYS} days (${age}d, added ${e.added}): ${e.rule} ${e.file} ${e.detail} (${e.note})`);
+    // MPC-10621: a heads-up before the calendar expiry turns every PR red (it did on 2026-11-22). Warns from day 10; still fails only after day 14.
+    else if (age >= MAX_AGE_DAYS - EXPIRY_WARN_DAYS) warnings.push(`allowlist entry expires in ${MAX_AGE_DAYS - age + 1} day(s) (${age}d old, added ${e.added}): ${e.rule} ${e.file} ${e.detail} (${e.note})`);
   }
   // MPC-9894: the DPA sub-processor list is generated (scripts/render-privacy-from-registry.mjs), so a dpa_listed entry missing from it is a stale file, not a copy gap.
   try {

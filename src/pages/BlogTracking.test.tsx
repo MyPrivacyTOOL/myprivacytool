@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Blog from "./Blog";
 import BlogPost from "./BlogPost";
+import blogPosts from "@/data/blogPosts.json";
 
 const analytics = vi.hoisted(() => ({
   trackBlogListView: vi.fn(),
@@ -34,7 +35,7 @@ describe("blog GA4 tracking wiring", () => {
   it("reports one list view and a post click with the card position", () => {
     renderBlog("/blog");
     expect(analytics.trackBlogListView).toHaveBeenCalledTimes(1);
-    expect(analytics.trackBlogListView).toHaveBeenCalledWith(8);
+    expect(analytics.trackBlogListView).toHaveBeenCalledWith(blogPosts.length);
 
     fireEvent.click(screen.getAllByRole("link", { name: /read article/i })[1]);
     expect(analytics.trackBlogPostClick).toHaveBeenCalledTimes(1);

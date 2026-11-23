@@ -38,26 +38,37 @@ describe('badge', () => {
   });
 });
 
-describe('tiles are never coloured; only footprints are', () => {
+describe('colour sits on footprints: a print tile is filled with its shade, every other hexagon is an unfilled outline', () => {
+  const shadeHexes: string[] = Object.values(SHADES).map((s) => s.hex);
   const check = () => {
     const root = screen.getByTestId('footprint-path');
-    // no background utility class anywhere on the path, and no colour in any inline style
+    // no background utility class anywhere on the path, and no colour in any inline style (a fill is an SVG attribute, never a style)
     expect(root.querySelectorAll('[class*="bg-"]').length).toBe(0);
     root.querySelectorAll('[style]').forEach((el) => expect(el.getAttribute('style'), 'inline style may size a tile, never colour it').not.toMatch(/background|color|fill|border|outline/i));
     expect(root.matches('[class*="bg-"]')).toBe(false);
-    // every hexagon outline has no fill
-    const outlines = root.querySelectorAll('svg[data-outline] polygon');
+    // hexagon outlines: only an ink (print) tile may be filled, and only with one of the five shades; grey, dashed and thick outlines stay unfilled
+    const outlines = root.querySelectorAll('svg[data-outline]');
     expect(outlines.length).toBeGreaterThan(0);
-    outlines.forEach((p) => expect(p.getAttribute('fill')).toBe('none'));
-    // the only filled polygons are inside a footprint, and carry one of the five shades
+    outlines.forEach((svg) => {
+      const fill = svg.querySelector('polygon')!.getAttribute('fill');
+      if (svg.getAttribute('data-outline') === 'ink') { expect(fill === 'none' || shadeHexes.includes(fill!)).toBe(true); }
+      else expect(fill).toBe('none');
+    });
+    // any other filled polygon is inside a footprint mark and carries one of the five shades
     root.querySelectorAll('polygon').forEach((p) => {
-      if (p.getAttribute('fill') === 'none') return;
+      if (p.getAttribute('fill') === 'none' || p.closest('svg[data-outline]')) return;
       const print = p.closest('svg[data-print-fill]');
       expect(print).not.toBeNull();
-      expect(Object.values(SHADES).map((s) => s.hex)).toContain(print!.getAttribute('data-print-fill'));
+      expect(shadeHexes).toContain(print!.getAttribute('data-print-fill'));
     });
     return root;
   };
+  it('a print tile is filled with its shade, and the grey not-returned tile is not', () => {
+    rendered({ allowListedTestAccount: true, hexagons: REAL });
+    const u = screen.getByTestId('print-username').querySelector('svg[data-outline]')!;
+    expect(u.getAttribute('data-tile-fill')).toBe(SHADES[4].hex);
+    expect(screen.getByTestId('print-not-returned').querySelector('svg[data-outline]')!.getAttribute('data-tile-fill')).toBeNull();
+  });
   it('in light mode', () => { rendered({ allowListedTestAccount: true, hexagons: WITH_PROFILE, initialAnswers: { 1: 'yes', 2: 'yes', 3: 'done' } }); check(); });
   it('in dark mode', () => { document.documentElement.classList.add('dark'); rendered({ allowListedTestAccount: true, hexagons: WITH_PROFILE, initialAnswers: { 1: 'yes' } }); check(); });
   it('every footprint has its shade number as pips and the shade word, so colour is never the only clue', () => {

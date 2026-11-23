@@ -116,12 +116,13 @@ const Content = () => (
         more than 50.
       </li>
       <li>
-        <strong>Integrity receipt.</strong> A SHA-256 fingerprint of the whole profile, so any later edit is
-        detectable.
+        <strong>Checksum receipt.</strong> A SHA-256 fingerprint of the whole profile. It shows the profile has not
+        changed if you got the receipt by a separate trusted channel. It is not a signature and does not prove who
+        produced the profile.
       </li>
     </ul>
     <p>
-      The profile also states its own limits in plain data: it is valid for 30 days and it is revocable.
+      The profile also states its own limits in plain data: it declares 30 days of validity (not enforced by us), and you can disconnect at any time. A copy you already shared cannot be recalled.
     </p>
 
     <h2 id="storage-and-control">Step 5: How your token is stored, and how to leave</h2>

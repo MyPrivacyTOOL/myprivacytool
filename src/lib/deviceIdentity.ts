@@ -56,10 +56,24 @@ export const CAROUSEL_DEVICES: { category: DeviceCategory; label: string }[] = [
 const IPHONE_MAX_SHORT_SIDE = 500;
 const IPAD_MIN_SHORT_SIDE = 700;
 
+/** Samsung model codes (SM-S918B) and their dual-SIM form (SM-S918B/DS). */
+const SAMSUNG_MODEL_CODE = /^(SM-[A-Z0-9]+)(?:\/DS)?$/;
+
 const unknown = (reason: string): DeviceIdentity => ({ certain: false, reason });
 
 const touchFact = (n: number) =>
   n === 0 ? 'no touch screen' : `${n} touch point${n === 1 ? '' : 's'}`;
+
+/**
+ * Samsung reports Android models as a bare code; show "Samsung phone (SM-S918B)"
+ * and drop the dual-SIM "/DS" suffix. Any other model — and any non-string,
+ * such as a missing model — is returned unchanged.
+ */
+export function labelAndroidModel<T>(model: T): T | string {
+  if (typeof model !== 'string') return model;
+  const code = SAMSUNG_MODEL_CODE.exec(model);
+  return code ? `Samsung phone (${code[1]})` : model;
+}
 
 export function identifyDevice(s: DeviceSignals): DeviceIdentity {
   const ua = s.userAgent || '';
@@ -116,7 +130,7 @@ export function identifyDevice(s: DeviceSignals): DeviceIdentity {
     return {
       certain: true,
       category: phone ? 'android-phone' : 'android-tablet',
-      label: model || (phone ? 'Android phone' : 'Android tablet'),
+      label: labelAndroidModel(model) || (phone ? 'Android phone' : 'Android tablet'),
       model,
       evidence: [model ? `Model reported: ${model}` : 'Android', touchFact(s.maxTouchPoints), screenFact],
     };
