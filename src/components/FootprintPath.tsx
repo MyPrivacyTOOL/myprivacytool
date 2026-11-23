@@ -8,7 +8,8 @@ import {
 
 // MPC-10614: the Footprint Path (design brief v1, Telegram arrival; signed off 2026-11-09). Behind the VITE_FOOTPRINT_PATH switch / ?path=1 (src/config/footprintPath.ts).
 // Hard rules from the brief, kept here in the markup:
-//  - A tile is NEVER coloured, in light or dark. Every hexagon outline is an SVG polygon with fill="none"; only a footprint (a print) carries colour, S1-S5, always with pips and the word.
+//  - MPC-10621 (owner decision, 2026-11-23, reverses brief v1 "tiles never coloured"): a Behind-you tile that carries a print is filled with that print's S1-S5 shade, like the scan. Every other hexagon
+//    (grey not-returned, dashed ahead, thick current) stays an unfilled outline. Colour is never the only clue: pips and the shade word are always on the tile.
 //  - Outlines: behind with a print = solid ink; behind with nothing returned = thin grey solid; ahead = dashed; current = thick ink.
 //  - The path has no end: no total, no ratio, no percentage, no bar, no score, no "complete" wording. The badge is the only count.
 //  - A tile whose check does not run today renders disabled with its Live / In build / Planned marker. Only keys in LIVE_HANDLERS are wired to something real.
@@ -34,24 +35,24 @@ const HEX = (w: number, h: number, inset = 2) => {
   return [[x, inset], [w - inset, q + inset / 2], [w - inset, 3 * q - inset / 2], [x, h - inset], [inset, 3 * q - inset / 2], [inset, q + inset / 2]].map((p) => p.join(',')).join(' ');
 };
 
-/** A hexagon outline. fill is ALWAYS none: the tile has no colour. */
-function Outline({ w, h, kind }: { w: number; h: number; kind: 'ink' | 'grey' | 'dashed' | 'thick' }) {
+/** A hexagon outline. fill is none unless a Behind-you tile passes its print's shade colour. */
+function Outline({ w, h, kind, fill }: { w: number; h: number; kind: 'ink' | 'grey' | 'dashed' | 'thick'; fill?: string }) {
   const stroke = kind === 'grey' ? 'text-muted-foreground' : 'text-foreground';
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={`absolute inset-0 ${stroke}`} aria-hidden="true" focusable="false" data-outline={kind}>
-      <polygon points={HEX(w, h)} fill="none" stroke="currentColor" strokeWidth={kind === 'thick' ? 4 : kind === 'grey' ? 1 : 2}
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={`absolute inset-0 ${stroke}`} aria-hidden="true" focusable="false" data-outline={kind} data-tile-fill={fill}>
+      <polygon points={HEX(w, h)} fill={fill ?? 'none'} stroke="currentColor" strokeWidth={kind === 'thick' ? 4 : kind === 'grey' ? 1 : 2}
         strokeDasharray={kind === 'dashed' ? '6 5' : undefined} strokeLinejoin="round" />
     </svg>
   );
 }
 
-function PrintMark({ print, size, land }: { print: Print; size: number; land: boolean }) {
+function PrintMark({ print, size, land, onFilled = false }: { print: Print; size: number; land: boolean; onFilled?: boolean }) {
   const sh = SHADES[print.shade];
   const h = size * 1.15;
   return (
     <svg width={size} height={h} viewBox={`0 0 ${size} ${h}`} className={land ? 'fp-land' : undefined} aria-hidden="true" focusable="false" data-print-fill={sh.hex} data-accepted={print.accepted ? 'yes' : undefined}>
       {/* a footprint: the one place colour is used. "You accepted this" is an outline with no fill (brief decision 2). */}
-      <polygon points={HEX(size, h, 1)} fill={print.accepted ? 'none' : sh.hex} stroke={print.accepted ? 'currentColor' : sh.hex} strokeWidth="2" />
+      <polygon points={HEX(size, h, 1)} fill={print.accepted || onFilled ? 'none' : sh.hex} stroke={print.accepted || onFilled ? 'currentColor' : sh.hex} strokeWidth="2" />
       <text x="50%" y="55%" textAnchor="middle" dominantBaseline="middle" fontSize={size * 0.3} fontWeight="700" fill={print.accepted ? 'currentColor' : sh.dark ? '#ffffff' : '#1a1a1a'}>{`S${print.shade}`}</text>
     </svg>
   );
@@ -80,24 +81,28 @@ function Honeycomb({ count, testid, label, children }: { count: number; testid: 
 }
 
 function BehindTile({ print, land, index }: { print: Print | null; land: boolean; index: number }) {
-  // print === null renders the "nothing returned" tile (thin grey, solid): see-through never means safe, so it says so in words.
+  // print === null renders the "nothing returned" tile (thin grey, solid, unfilled): see-through never means safe, so it says so in words.
   const lab = print ? shadeLabel(print.shade) : null;
   const pos = honeyPos(index);
+  const filled = !!print && !print.accepted; // "you accepted this" stays an unfilled outline (brief decision 2)
+  const sh = print ? SHADES[print.shade] : null;
+  const tone = filled && sh ? (sh.dark ? 'text-white' : 'text-neutral-900') : 'text-foreground';
+  const muted = filled ? tone : 'text-muted-foreground';
   return (
     <li className="absolute" style={{ width: HW, height: HH, left: pos.left, top: pos.top }} data-testid={print ? `print-${print.key}` : 'print-not-returned'} data-print={print ? print.key : undefined}>
-      <Outline w={HW} h={HH} kind={print ? 'ink' : 'grey'} />
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-px px-5 pb-1 pt-2 text-center">
+      <Outline w={HW} h={HH} kind={print ? 'ink' : 'grey'} fill={filled && sh ? sh.hex : undefined} />
+      <div className={`absolute inset-0 flex flex-col items-center justify-center gap-px px-5 pb-1 pt-2 text-center ${tone}`}>
         <div className="flex items-center gap-1">
           <span className="text-base leading-none" aria-hidden="true">{print ? ICONS[print.key] ?? '👣' : '🔍'}</span>
-          {print && <PrintMark print={print} size={20} land={land} />}
+          {print && <PrintMark print={print} size={20} land={land} onFilled={filled} />}
         </div>
-        <span className="text-[9px] font-semibold uppercase leading-[1.1] tracking-wide text-foreground">{print ? print.label : 'Public profile'}</span>
+        <span className={`text-[9px] font-semibold uppercase leading-[1.1] tracking-wide ${tone}`}>{print ? print.label : 'Public profile'}</span>
         {print ? (
           <>
-            {print.value && <span className="max-w-full break-all text-[9px] leading-tight text-foreground" data-testid={`print-value-${print.key}`}>{print.value}</span>}
-            <span className="whitespace-nowrap text-[8px] leading-tight text-foreground" data-testid={`print-shade-${print.key}`}>{lab!.text} <span aria-label={`${print.shade} pips`}>{lab!.pips}</span></span>
+            {print.value && <span className={`max-w-full break-all text-[9px] leading-tight ${tone}`} data-testid={`print-value-${print.key}`}>{print.value}</span>}
+            <span className={`whitespace-nowrap text-[8px] leading-tight ${tone}`} data-testid={`print-shade-${print.key}`}>{lab!.text} <span aria-label={`${print.shade} pips`}>{lab!.pips}</span></span>
           </>
-        ) : <span className="text-[9px] italic leading-tight text-muted-foreground">not returned to this bot</span>}
+        ) : <span className={`text-[9px] italic leading-tight ${muted}`}>not returned to this bot</span>}
       </div>
     </li>
   );
