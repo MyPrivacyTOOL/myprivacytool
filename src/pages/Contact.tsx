@@ -29,6 +29,9 @@ const DIRECT_CONTACTS = [
   { icon: Accessibility, label: "Accessibility", email: "accessibility@myprivacytool.io" },
 ];
 
+// MPC-10831 (Chris, 2026-11-23): one box, unsubscribe-only. No marketing is sent from this form; a separate marketing opt-in comes only when a marketing send exists.
+const CONTACT_CONSENT_LABEL = "Email me a reply to my message and any follow-up about it. I can unsubscribe at any time. This form has no separate marketing opt-in.";
+
 const Contact = () => {
   const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ name: "", email: "", topic: TOPICS[0], message: hkSpamContactPrefill(searchParams) });
@@ -164,6 +167,7 @@ const Contact = () => {
             <div ref={consentRef}>
               <ConsentCheckbox
                 id="contact-consent"
+                label={CONTACT_CONSENT_LABEL}
                 checked={consent}
                 onChange={(v) => {
                   setConsent(v);
