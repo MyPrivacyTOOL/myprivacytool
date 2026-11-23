@@ -10,6 +10,7 @@
  * - The API key is passed in by the caller (Worker env); this module never reads process.env.
  * - 24h cache keyed by SHA-256 of type+value; the raw value is never stored or echoed in errors.
  */
+import { recipientFetch } from '@/lib/recipientClient';
 
 // Types
 export type InputType = 'email' | 'phone' | 'handle' | 'domain';
@@ -241,7 +242,9 @@ export async function osintLookup(
     if (cached) return cached;
   }
 
-  const fetchImpl = options.fetchImpl ?? fetch;
+  // MPC-9886: no raw fetch. A caller that injects its own fetch (tests) keeps it; otherwise the call goes through the recipient registry, which refuses a recipient that is not enabled.
+  const recipientKey = (provider as BreachProvider) === 'xposedornot' ? 'xposedornot' : 'hibp';
+  const fetchImpl: typeof fetch = options.fetchImpl ?? (((input: RequestInfo | URL, init?: RequestInit) => recipientFetch(recipientKey, String(input), init, ['email'])) as typeof fetch);
   let result: OsintLookupResult;
   try {
     let breaches: HibpBreach[];
