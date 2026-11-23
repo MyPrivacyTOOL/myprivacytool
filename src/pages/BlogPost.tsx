@@ -495,16 +495,16 @@ export default function BlogPost() {
               </div>
             </div>
 
-            {/* MPC-6802: Google Preferred Sources verification badge */}
+            {/* MPC-6802: invite readers to add us as a Google preferred source */}
             <a
-              href="https://www.google.com/webmasters/verify-origin-program"
+              href="https://www.google.com/preferences/source?q=myprivacytool.io"
               target="_blank"
               rel="noopener noreferrer"
-              data-testid="google-preferred-source-badge"
+              data-testid="google-preferred-source-link"
               className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
             >
               <ShieldCheck className="w-4 h-4" aria-hidden="true" />
-              Google Preferred Source
+              Add us as a preferred source on Google
             </a>
           </div>
         </div>
