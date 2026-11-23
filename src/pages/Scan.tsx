@@ -228,7 +228,7 @@ const Scan = () => {
           Data brokers and people-search sites can list your name, address and phone number without you knowing.
         </p>
         <p className="text-muted-foreground text-base mb-12 max-w-xl mx-auto">
-          Check your exposure to see where your information may be listed, then follow our step-by-step guides to remove it.<FeatureStatus feature="F1" />
+          We do not search broker sites for you yet. If you show us a page that lists you, we check it, and our step-by-step guides show how to have it removed.<FeatureStatus feature="F1" />
         </p>
 
         {!submitted && <ListingCoverageNote className="max-w-md mx-auto mb-6" />}
