@@ -28,7 +28,7 @@ Follow-up of MPC-9794 (`docs/papit-limits-mpc-9794.md`). Builds on main 5e37037.
 
 ## Decisions I made inside the approval (change them if you disagree)
 
-1. **Where "refuse" lives.** Profiles are produced on request and nothing takes one back in, so there was nowhere to refuse a stale one. I added the stateless `POST /papit/verify`. It stores nothing, reads no secrets and logs nothing; like the rest of the Worker it has no request rate limit (see `docs/developer-portal.md` limitation 2).
+1. **Where "refuse" lives.** Profiles are produced on request and nothing takes one back in, so there was nowhere to refuse a stale one. I added the stateless `POST /papit/verify`. It stores nothing, reads no secrets and logs nothing; since 2026-11-24 it is covered by the zone's Cloudflare rate-limiting rule (5 per 10 s per IP and location, approximate on the Free plan; see `docs/channels/github.md` "Rate limits").
 2. **Re-consent does not delete.** After 90 days the Worker stops using the token and says so; it does not delete the row or revoke the grant (deleting user data is a held item). Connecting again replaces it; Disconnect removes it.
 3. **Reachability.** The 7-day session cookie is only issued at connect, so with real cookies a request is always within 7 days of consent and the 90-day check cannot fire today. It is a backstop. The control that would bound a token at rest is an automatic purge of rows past 90 days; that is a deletion and needs Chris's go-ahead (not built).
 4. **Not a security boundary.** The receipt is unkeyed. Editing both dates and recomputing the receipt passes verify. Signing remains deferred.
