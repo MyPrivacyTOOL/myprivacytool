@@ -345,7 +345,8 @@
 
             // Submit to backend (placeholder)
             console.log('Form submitted:', { email, channel });
-            alert('Scan initiated! Check your email for results.');
+            // MPC-10790: this form is a placeholder and sends nothing, so it must not say a scan started or that an email is coming.
+            alert('This page is a preview: nothing was sent and no scan was started. To run a real free scan, go to myprivacytool.io and use Scan me.');
         });
     </script>
 </body>

@@ -29,7 +29,7 @@ describe('FinalSummaryPanel with tiles', () => {
     expect(text).not.toMatch(/Risk Score|Exposure score|Overall exposure score|Coverage|Uniqueness|Exposure|Export PDF/);
     expect(text).not.toMatch(/\d+%/);
     expect(text).not.toMatch(/\d+\/\d+/);
-    expect(text).not.toMatch(/Complete analysis|100% Local/);
+    expect(text).not.toMatch(/Complete analysis|100% Local|Nothing is transmitted/);
   });
 
   it('ignores taps and the raw values of tiles that make no claim', () => {
@@ -52,6 +52,7 @@ describe('FinalSummaryPanel with tiles', () => {
     expect(container.textContent).toMatch(/Exposure score/);
     expect(container.textContent).toMatch(/Coverage/);
     expect(container.textContent).toMatch(/Export PDF/);
-    expect(container.textContent).toMatch(/100% Local/);
+    expect(container.textContent).not.toMatch(/100% Local|Nothing is transmitted/);
+    expect(container.textContent).toMatch(/Where it ran:/);
   });
 });

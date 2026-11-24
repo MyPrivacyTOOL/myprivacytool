@@ -576,8 +576,8 @@ export default function LanguageIntelligencePanel({
                 <div className="flex items-center gap-2 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
                   <Lock className="w-4 h-4 text-risk-low" />
                   <p className="text-xs text-risk-low">
-                    <strong>Privacy Guarantee:</strong> All analysis runs locally in your browser. 
-                    No data is ever sent to our servers.
+                    <strong>Where it runs:</strong> The analysis runs in your browser. If you allow
+                    analytics cookies, the predicted profile and whether you said it was right are counted in our analytics.
                   </p>
                 </div>
               </div>
@@ -587,7 +587,7 @@ export default function LanguageIntelligencePanel({
           {/* Privacy Notice */}
           <div className="mt-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Lock className="w-3 h-3" />
-            <span>Feedback stored locally only – never sent to servers</span>
+            <span>Your answers stay in your browser, except a yes/no count if you allow analytics cookies</span>
           </div>
           
           {/* Dev Mode: Aggregate Stats */}

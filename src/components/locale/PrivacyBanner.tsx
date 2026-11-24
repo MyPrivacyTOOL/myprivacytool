@@ -14,10 +14,10 @@ export default function PrivacyBanner() {
         {/* Main Message */}
         <div className="flex-1 text-center md:text-left">
           <h3 className="text-lg font-bold text-foreground mb-2">
-            100% Privacy-Preserving
+            Your result stays in your browser
           </h3>
           <p className="text-sm text-muted-foreground">
-            All processing happens entirely in your browser. No data is sent to any server.
+            The scan reads your device in your browser and shows the result only to you. We save it only if you ask us to.
           </p>
         </div>
         
@@ -25,15 +25,15 @@ export default function PrivacyBanner() {
         <div className="flex flex-wrap justify-center md:justify-end gap-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Lock className="w-4 h-4 text-brand" />
-            <span>No API calls</span>
+            <span>Result not sent unless you save it</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Eye className="w-4 h-4 text-brand" />
-            <span>Client-side only</span>
+            <span>Runs in your browser</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Server className="w-4 h-4 text-brand" />
-            <span>No data storage</span>
+            <span>Saved only if you tick save</span>
           </div>
         </div>
       </div>
