@@ -18,11 +18,17 @@ const POST_CLICK_ROUTES = (process.env.CRAWL_POST_CLICK_ROUTES ?? "/,/scan,/star
 const CONCURRENCY = Number(process.env.CRAWL_CONCURRENCY ?? 6);
 const LIMIT = Number(process.env.CRAWL_LIMIT ?? 0);
 // Routes where the app runs its own on-load work (device scan, STUN, Turnstile): given time to finish so a delayed call is not missed.
-const DEEP_ROUTES = new Set((process.env.CRAWL_DEEP_ROUTES ?? "/,/scan,/start,/footprint,/pricing,/contact,/newsletter,/privacy").split(","));
+const DEEP_ROUTES = new Set((process.env.CRAWL_DEEP_ROUTES ?? "/,/scan,/start,/footprint,/pricing,/contact,/newsletter,/privacy,/deep-research").split(","));
 // MPC-9888: the real consent button on the home page.
 const CLICK_SELECTOR = process.env.CRAWL_CLICK_SELECTOR ?? '[data-testid="scan-me"]';
 // Pages where NOTHING third-party may run before the click, the Turnstile exception included (it loads at the click here).
 const ZERO_THIRD_PARTY_PRECLICK = ["/", "/scan"];
+// MPC-10790 (Open Tracker rule 2, decision A of 2026-11-24): on EVERY page, a cold visitor's pre-click visit must not load Turnstile, GA4 or Cloudflare Web Analytics.
+// The registry marks Turnstile pre_click (it is the one named exception) but its exception text is "loaded at the Scan me click; forms keep it on their own
+// submit click", and this crawl never clicks before the pre-click phase ends, so any pre-click contact with these keys' hosts is a regression.
+const NEVER_PRE_CLICK_KEYS = ["cloudflare-turnstile", "ga4", "cloudflare-web-analytics"];
+// Routes that hold a Turnstile form but are not in the sitemap (the sitemap lists indexable pages). The CI build turns VITE_DEEP_RESEARCH on, as production has it.
+const EXTRA_PRE_CLICK_ROUTES = (process.env.CRAWL_EXTRA_ROUTES ?? "/deep-research").split(",").filter(Boolean);
 
 type Obs = { phase: "pre_click" | "post_click"; host: string; url?: string; route?: string; kind?: "request" | "ice"; scheme?: string };
 
@@ -66,6 +72,7 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
   const sitemap = readFileSync("dist/sitemap.xml", "utf8");
   let routes = routesFromSitemap(sitemap);
   if (LIMIT > 0) routes = routes.slice(0, LIMIT);
+  routes = [...new Set([...routes, ...EXTRA_PRE_CLICK_ROUTES])];
   expect(routes.length, "dist/sitemap.xml has routes").toBeGreaterThan(10);
   const obs: Obs[] = [];
   const log: string[] = [];
@@ -129,7 +136,11 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
   const thirdPartyPre = obs.filter((o) => o.phase === "pre_click" && ZERO_THIRD_PARTY_PRECLICK.includes((o.route ?? "").replace(/(.)\/$/, "$1")) && o.host && !/^(127\.0\.0\.1|localhost)$/.test(o.host)
     && !registry.recipients.some((r: { key: string; hosts: string[] }) => firstPartyKeys.has(r.key) && r.hosts.some((h) => h === o.host)));
   const zeroProblems = thirdPartyPre.map((o) => `PRE-CLICK third-party host on ${o.route}: ${o.kind === "ice" ? `${o.scheme}:` : ""}${o.host}`);
+  const neverHosts = new Set(registry.recipients.filter((r: { key: string }) => NEVER_PRE_CLICK_KEYS.includes(r.key)).flatMap((r: { hosts: string[] }) => r.hosts));
+  const hostIsNever = (host: string) => [...neverHosts].some((h) => (h.startsWith("*.") ? host === h.slice(2) || host.endsWith(h.slice(1)) : host === h));
+  const neverProblems = obs.filter((o) => o.phase === "pre_click" && o.host && hostIsNever(o.host)).map((o) => `PRE-CLICK ${o.host} on ${o.route} (${NEVER_PRE_CLICK_KEYS.join(" / ")} wait for the click)`);
   const problems = [
+    ...neverProblems,
     ...zeroProblems,
     ...r.violations.map((f: { message: string }) => `NEW: ${f.message}`),
     ...r.stale.map((e: { rule: string; detail: string; note: string }) => `STALE allowlist entry (no longer contacted), delete it: ${e.rule} ${e.detail} (${e.note})`),
