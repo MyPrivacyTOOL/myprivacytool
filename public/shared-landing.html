@@ -321,8 +321,8 @@
             const email = document.getElementById('email').value;
             const channel = document.getElementById('channel').value;
             
+            // MPC-10790: no part of the email address (not even its domain) is sent to Google Analytics.
             trackEvent('form_submit', {
-                email_domain: email.split('@')[1],
                 channel_source: channel || 'direct',
                 consent_given: document.getElementById('consent').checked
             });

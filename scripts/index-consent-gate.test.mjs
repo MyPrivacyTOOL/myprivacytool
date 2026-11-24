@@ -106,3 +106,12 @@ test(`${FILE}: MPC-9886: goes through the registry key "ga4", and waits for the 
   assert.equal(p.gtagScripts().length, 1, 'still once');
 });
 }
+
+// MPC-10790: the static landing page must not put any part of the visitor's email address into a Google Analytics event.
+test('public/shared-landing.html: no email address or domain goes into a GA event', () => {
+  const page = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public/shared-landing.html'), 'utf8');
+  assert.ok(!/email_domain/.test(page), 'no email_domain parameter');
+  const submit = page.slice(page.indexOf("trackEvent('form_submit'"));
+  const call = submit.slice(0, submit.indexOf('});') + 3);
+  assert.ok(!/email/i.test(call), 'the form_submit event carries no email value');
+});
