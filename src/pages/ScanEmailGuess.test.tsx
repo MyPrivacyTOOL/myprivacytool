@@ -28,7 +28,7 @@ const worker = (answer: () => Response | Promise<Response>) => {
   vi.stubGlobal("fetch", f);
   return f;
 };
-const guessCalls = (f: ReturnType<typeof worker>) => f.mock.calls.filter((c) => String(c[0]).endsWith("/api/scan/guess"));
+const guessCalls = (f: ReturnType<typeof worker>) => (f.mock.calls as unknown[][]).filter((c) => String(c[0]).endsWith("/api/scan/guess"));
 const events = () => gtag.mock.calls.filter((c) => c[0] === "event").map((c) => ({ name: c[1] as string, params: c[2] as Record<string, unknown> }));
 const box = () => screen.getAllByLabelText("Email address")[0] as HTMLInputElement;
 
