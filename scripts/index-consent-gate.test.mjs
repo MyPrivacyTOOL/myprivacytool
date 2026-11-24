@@ -60,6 +60,15 @@ test(`${FILE}: fresh visit, no choice yet: no gtag request, hits disabled`, () =
   assert.equal(p.gtagScripts().length, 0);
   assert.equal(p.disabled(), true);
 });
+test(`${FILE}: a non-production host queues events (the tag can never load there, so nothing can flush), a production host does not`, () => {
+  const dev = load({ host: 'localhost' });
+  dev.ctx.gtag('event', 'x');
+  assert.equal(dev.ctx.dataLayer.length, 1);
+  assert.equal(dev.gtagScripts().length, 0);
+  const prod = load();
+  prod.ctx.gtag('event', 'x');
+  assert.equal(prod.ctx.dataLayer.length, 0);
+});
 test(`${FILE}: Essential only: no gtag request, hits stay disabled`, () => {
   const p = load();
   p.choose(REJECT);

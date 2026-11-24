@@ -102,6 +102,8 @@
     var loaded = false;
     var h = location.hostname;
     var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
+    // MPC-10790: on a non-production host the tag can never load (allowed() is false there), so nothing queued can flush; events keep queuing there so the e2e suite can read them.
+    mptGateOpen = !isProd;
     window['ga-disable-' + GA_ID] = true;
     function scanConsented() {
       try {
@@ -118,7 +120,7 @@
     }
     function sync() {
       var ok = allowed();
-      mptGateOpen = ok;
+      mptGateOpen = !isProd || ok;
       window['ga-disable-' + GA_ID] = !ok;
       if (!ok || loaded) return;
       // MPC-9886: the script load goes through the recipient registry (key "ga4", basis analytics_consent). The client (/recipient-client.min.js, deferred)
