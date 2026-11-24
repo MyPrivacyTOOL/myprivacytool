@@ -9,6 +9,12 @@ export const GITHUB_CHANNEL_URL: string =
   "https://channels.myprivacytool.io";
 
 export const GITHUB_START_URL = `${GITHUB_CHANNEL_URL}/oauth/github/start`;
+/**
+ * MPC-10825: remove a stored connection when the 7-day browser session has ended. A plain link: the Worker sends the
+ * person through the same GitHub sign-in, and that sign-in is the proof it is their account. It stores nothing and
+ * signs nobody in; it comes back to /connect/github?channel_removed=github.
+ */
+export const GITHUB_REMOVE_URL = `${GITHUB_CHANNEL_URL}/oauth/github/remove`;
 
 export interface PapitProfile {
   version: "1.0";
@@ -65,8 +71,18 @@ export function friendlyChannelError(code: string | null): string | null {
       return "You cancelled the GitHub connection. Nothing was saved.";
     case "invalid_state":
     case "missing_code":
-      return "That sign-in link expired. Please try connecting again.";
+      return "That sign-in link expired. Please try again.";
+    case "remove_access_denied":
+      return "You cancelled the GitHub sign-in. Nothing was removed.";
+    case "remove_failed":
+      return "We couldn't remove the stored connection just now. Please try again.";
     default:
       return "We couldn't finish connecting to GitHub. Please try again.";
   }
+}
+
+/** Reads the Worker's `?channel_removed=github&revoked=1|0` redirect after a remove-without-session sign-in. */
+export function removalNotice(channelRemoved: string | null, revoked: string | null): { revokedAtGithub: boolean } | null {
+  if (channelRemoved !== "github") return null;
+  return { revokedAtGithub: revoked === "1" };
 }
