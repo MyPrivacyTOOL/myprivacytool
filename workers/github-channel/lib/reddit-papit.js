@@ -9,6 +9,7 @@
  * keywords per subreddit and <=20 overall topics. No raw text, title, username or id leaves this function.
  */
 import { canonicalJson, sha256Hex, activityLevel, ACTIVITY_WINDOW_DAYS } from './papit.js';
+import { PAPIT_VALIDITY_DAYS, expiryFor } from './validity.js';
 
 const DAY = 86400;
 const MAX_TAGS_PER_SUB = 5;
@@ -137,7 +138,7 @@ export async function redditToPapit(a, { now = new Date(), username } = {}) {
         },
       },
     },
-    privacy_boundaries: { data_retention_days: 30, revocable: true, raw_content_stored: false },
+    privacy_boundaries: { data_retention_days: PAPIT_VALIDITY_DAYS, revocable: true, raw_content_stored: false, expires_at: expiryFor(now) },
   };
   return { ...payload, cryptographic_receipt: await sha256Hex(canonicalJson(payload)) };
 }

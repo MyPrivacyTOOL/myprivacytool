@@ -22,7 +22,8 @@ export interface PapitProfile {
   };
   behavioral: { interests: string[]; activity_level: "low" | "medium" | "high" };
   data_coverage?: { repos_sampled: boolean | null; starred_sampled: boolean | null; events_capped: boolean | null; interests: "found" | "no_stars" | "stars_without_topics" };
-  privacy_boundaries: { data_retention_days: number; revocable: boolean };
+  // expires_at (MPC-10833): generated_at + 30 days. Absent on a profile cached before it existed.
+  privacy_boundaries: { data_retention_days: number; revocable: boolean; expires_at?: string };
 }
 
 export type ProfileResult =
@@ -30,6 +31,7 @@ export type ProfileResult =
   // MPC-9796 (UX-040/041/042): the four ways "not connected" really differ, so the page can say which one it is.
   | { status: "session_ended" }   // 401 unauthenticated: no browser session (it lasts 7 days). A stored connection may still exist until the person disconnects.
   | { status: "reauthorize" }     // 401 reauthorize: GitHub no longer accepts the token (revoked or expired); the Worker already deleted its copy.
+  | { status: "reconsent" }       // 401 reconsent (MPC-10833): 90 days since the person last agreed; the Worker deleted the token and asks them to connect again.
   | { status: "disconnected" }    // 404 not_connected: a live session, nothing connected.
   | { status: "error" };          // 5xx or network: an outage, says nothing about the connection.
 
@@ -41,7 +43,9 @@ export async function fetchGithubProfile(fetchFn?: FetchFn): Promise<ProfileResu
     if (res.ok) return { status: "connected", profile: (await res.json()) as PapitProfile };
     if (res.status === 401) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      return { status: body?.error === "reauthorize" ? "reauthorize" : "session_ended" };
+      if (body?.error === "reauthorize") return { status: "reauthorize" };
+      if (body?.error === "reconsent") return { status: "reconsent" };
+      return { status: "session_ended" };
     }
     if (res.status === 404) return { status: "disconnected" };
     return { status: "error" };

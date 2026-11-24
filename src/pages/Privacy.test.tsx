@@ -62,6 +62,15 @@ describe("Privacy: saved scan", () => {
     expect(text).toContain("we keep nothing from that sign-in");
   });
 
+  // MPC-10833: 6B states the 90-day token limit and the 30-day snapshot expiry that the Worker now enforces.
+  it("6B states the 90-day token limit and the snapshot expiry", () => {
+    renderPage(<Privacy />);
+    const text = flat(document.body.textContent ?? "");
+    expect(text).toContain("until you disconnect, or until 90 days after you last agreed, whichever comes first");
+    expect(text).toContain("carries an expiry date 30 days after it was made, and we do not serve it after that");
+    expect(text).toContain("encrypted token until you disconnect or 90 days after you last agreed");
+  });
+
   // MPC-9776: the optional password check sends 5 hash characters to Have I Been Pwned from the visitor's browser; that must be named here.
   it("names Have I Been Pwned for the password check and says what is sent", () => {
     renderPage(<Privacy />);

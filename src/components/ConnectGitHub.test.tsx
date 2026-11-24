@@ -141,9 +141,25 @@ describe("<ConnectGitHub />", () => {
   it("when connected it says what is kept and for how long", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
-    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*24 hours.*7 days/i);
+    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect or for 90 days after you last agreed.*24 hours.*7 days/i);
     // MPC-10825: the row says "until you disconnect", not the declared 30 days.
     expect(screen.getByTestId("kept-until")).toHaveTextContent(/until you disconnect/i);
+    expect(screen.getByTestId("kept-until")).toHaveTextContent(/90 days after you last agreed/i);
     expect(document.body.textContent).not.toMatch(/30 days|not enforced|Declared validity/);
+  });
+
+  // MPC-10833: the profile's own expiry date is shown, and a 90-day-old agreement asks for a new one.
+  it("shows when the snapshot expires, from the profile's expires_at", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile: { ...profile, privacy_boundaries: { data_retention_days: 30, revocable: true, expires_at: "2026-11-05T09:58:30.738Z" } } });
+    renderAt();
+    expect(await screen.findByTestId("valid-until")).toHaveTextContent("2026-11-05 (UTC)");
+  });
+
+  it("says when 90 days have passed since the person agreed, that the token was deleted, and offers Connect", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "reconsent" });
+    renderAt();
+    expect(await screen.findByTestId("reconsent")).toHaveTextContent(/90 days since you last agreed.*deleted the stored access token/i);
+    expect(screen.getByRole("link", { name: /connect github/i })).toBeInTheDocument();
+    expect(screen.queryByTestId("session-ended")).toBeNull();
   });
 });

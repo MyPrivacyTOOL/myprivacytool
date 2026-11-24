@@ -28,7 +28,9 @@ const PROVIDER = 'github';
 // AAD binds a ciphertext to its provider, account and column, so a row copied to another account/provider fails to decrypt.
 const aad = (subjectId, column, provider = PROVIDER) => `${provider}:${subjectId}:${column}`;
 
-export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, provider = PROVIDER }, fetchFn = undefined) {
+// MPC-10833: `consentedAt` (ISO) is passed ONLY by the OAuth callback, when the person agrees. A token refresh leaves it out, and the
+// merge-duplicates upsert then keeps the stored value, so a refresh can never extend the 90 days.
+export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, consentedAt, provider = PROVIDER }, fetchFn = undefined) {
   const version = Number(env.ENCRYPTION_KEY_VERSION || 1);
   const key = keyForVersion(env, version);
   const row = {
@@ -42,19 +44,21 @@ export async function saveToken(env, { subjectId, accessToken, refreshToken, sco
     scope: scope || '',
     expires_at: expiresIn ? new Date(Date.now() + Number(expiresIn) * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
+    ...(consentedAt ? { consented_at: consentedAt } : {}),
   };
   await sb(env, 'POST', 'channel_tokens?on_conflict=user_id,provider', row, fetchFn,
     { Prefer: 'resolution=merge-duplicates,return=minimal' });
 }
 
-/** @returns {Promise<{accessToken: string, refreshToken: string|null}|null>} */
+/** @returns {Promise<{accessToken: string, refreshToken: string|null, consentedAt: string|null}|null>} */
 export async function loadTokens(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   const rows = await sb(env, 'GET',
-    `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version&limit=1`,
+    `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version,consented_at&limit=1`,
     undefined, fetchFn);
   if (!rows?.length) return null;
   const key = keyForVersion(env, rows[0].key_version);
   return {
+    consentedAt: rows[0].consented_at ?? null,
     accessToken: await decryptToken(rows[0].access_token_enc, key, { aad: aad(subjectId, 'access', provider) }),
     refreshToken: rows[0].refresh_token_enc
       ? await decryptToken(rows[0].refresh_token_enc, key, { aad: aad(subjectId, 'refresh', provider) })

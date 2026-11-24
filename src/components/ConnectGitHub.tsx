@@ -11,7 +11,7 @@ import {
   type PapitProfile,
 } from "@/lib/githubChannel";
 
-type State = { kind: "loading" } | { kind: "connected"; profile: PapitProfile } | { kind: "disconnected" } | { kind: "session_ended" } | { kind: "reauthorize" } | { kind: "error" };
+type State = { kind: "loading" } | { kind: "connected"; profile: PapitProfile } | { kind: "disconnected" } | { kind: "session_ended" } | { kind: "reauthorize" } | { kind: "reconsent" } | { kind: "error" };
 
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="flex flex-col gap-1 py-3 border-b border-border last:border-0 sm:flex-row sm:items-baseline sm:gap-4">
@@ -100,13 +100,19 @@ export default function ConnectGitHub() {
         </p>
       )}
 
+      {state.kind === "reconsent" && (
+        <p role="status" className="mb-4 text-sm text-foreground" data-testid="reconsent">
+          It has been 90 days since you last agreed to connect GitHub, so we deleted the stored access token. Connect again if you want to continue.
+        </p>
+      )}
+
       {state.kind === "disconnected" && !removed && (
         <p role="status" className="mb-4 text-sm text-foreground" data-testid="not-connected">
           No GitHub account is connected.
         </p>
       )}
 
-      {(state.kind === "disconnected" || state.kind === "session_ended" || state.kind === "reauthorize") && (
+      {(state.kind === "disconnected" || state.kind === "session_ended" || state.kind === "reauthorize" || state.kind === "reconsent") && (
         <Button asChild size="lg">
           <a href={GITHUB_START_URL}>
             <Github className="mr-2 h-5 w-5" aria-hidden="true" />
@@ -135,14 +141,21 @@ export default function ConnectGitHub() {
             {state.profile.data_coverage?.interests === "no_stars" ? <Row label="Interests note">You have not starred anything.</Row> : null}
             {state.profile.data_coverage?.interests === "stars_without_topics" ? <Row label="Interests note">The repos you starred have no topics.</Row> : null}
             <Row label="How long we keep it">
-              <span data-testid="kept-until">Until you disconnect. The copy of this snapshot we hold is refreshed every 24 hours.</span>
+              <span data-testid="kept-until">
+                Until you disconnect, or 90 days after you last agreed, whichever comes first. The copy of this snapshot we hold is refreshed every 24 hours.
+              </span>
             </Row>
+            {state.profile.privacy_boundaries.expires_at ? (
+              <Row label="Snapshot valid until">
+                <span data-testid="valid-until">{state.profile.privacy_boundaries.expires_at.slice(0, 10)} (UTC)</span>
+              </Row>
+            ) : null}
             <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>
           </dl>
           <p className="mb-4 text-sm text-muted-foreground" data-testid="what-we-keep">
-            What we keep: an encrypted access token until you disconnect, and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
+            What we keep: an encrypted access token until you disconnect or for 90 days after you last agreed, whichever comes first, and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
             Disconnecting deletes the token, revokes our access at GitHub and clears the copy.
           </p>
           <Button variant="outline" onClick={onDisconnect} disabled={busy}>

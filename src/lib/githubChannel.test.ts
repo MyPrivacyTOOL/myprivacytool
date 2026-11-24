@@ -33,6 +33,11 @@ describe("githubChannel client", () => {
     expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "reauthorize" });
   });
 
+  it("401 reconsent (MPC-10833) means 90 days have passed since the person agreed", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(res(401, { error: "reconsent" }));
+    expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "reconsent" });
+  });
+
   it("401 with no readable body is treated as a session that ended", async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => { throw new Error("no body"); } });
     expect(await fetchGithubProfile(fetchFn as unknown as typeof fetch)).toEqual({ status: "session_ended" });

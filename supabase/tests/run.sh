@@ -60,6 +60,9 @@ echo "== schema assertions"
 psql_ "$TEST_URL" -At -f supabase/tests/schema.test.sql
 
 
+echo "== channel token consent and stale-token purge (MPC-10833)"
+psql_ "$TEST_URL" -At -f supabase/tests/mpc-10833-channel-tokens-consent.test.sql
+
 echo "== visit log, country policy and purge (MPC-9889)"
 psql_ "$TEST_URL" -At -f supabase/tests/visit-log.test.sql
 

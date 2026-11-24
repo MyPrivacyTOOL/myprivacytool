@@ -32,7 +32,8 @@ function fakeNetwork({ githubStatus = 200 } = {}) {
       return ok({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN, scope: 'read:user', token_type: 'bearer' });
     }
     if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, r); return new Response(null, { status: 201 }); }
+      // merge-duplicates: columns the request leaves out (consented_at on a token refresh) keep their stored value
+      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, { ...rows.get(r.user_id), ...r }); return new Response(null, { status: 201 }); }
       if (init.method === 'GET') { const id = decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1]); return ok(rows.has(id) ? [rows.get(id)] : []); }
       if (init.method === 'DELETE') { rows.delete(decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])); return new Response(null, { status: 204 }); }
     }
@@ -355,4 +356,64 @@ test('remove: logs carry no tokens or PII', async () => {
   const all = lines.join('\n');
   assert.ok(lines.some((l) => l.includes('removed_without_session')));
   for (const s of [ACCESS_TOKEN, REFRESH_TOKEN, 'octo', 'Real Name', 'p@example.com', 'csec', '4242']) assert.ok(!all.includes(s), s);
+});
+
+// MPC-10833: a stored token lasts 90 days from the last agreement, not from the last refresh.
+const DAY = 86_400_000;
+test('90 days after the person agreed: token deleted, copy dropped, grant revoked, client told to re-consent', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { session } = await connect(env, net);
+  assert.ok(net.rows.get('4242').consented_at, 'callback records when the person agreed');
+  clock.t += 91 * DAY;
+  try {
+    const sess = await sign({ sub: '4242', exp: clock.t + 60_000 }, env.STATE_SIGNING_KEY); // a live session (only possible if one outlived 7 days)
+    const res = await handle(profileReq(sess), env, { fetchFn: net.fetchFn, now });
+    assert.equal(res.status, 401);
+    assert.equal((await res.json()).error, 'reconsent');
+    assert.equal(net.rows.size, 0, 'token row deleted');
+    assert.equal(net.log.revoked, 1, 'grant revoked at GitHub');
+  } finally { clock.t -= 91 * DAY; }
+  assert.ok(session);
+});
+
+test('89 days after agreeing the token is still used', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  clock.t += 89 * DAY;
+  try {
+    const sess = await sign({ sub: '4242', exp: clock.t + 60_000 }, env.STATE_SIGNING_KEY);
+    const res = await handle(profileReq(sess), env, { fetchFn: net.fetchFn, now });
+    assert.equal(res.status, 200);
+    assert.equal(net.rows.size, 1);
+  } finally { clock.t -= 89 * DAY; }
+});
+
+test('a token refresh does not extend the 90 days (consented_at is only written by the callback)', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  const agreed = net.rows.get('4242').consented_at;
+  const { saveToken } = await import('../lib/store.js');
+  await saveToken(env, { subjectId: 4242, accessToken: 'gho_new', refreshToken: 'ghr_new', scope: 'read:user', expiresIn: 28800 }, net.fetchFn);
+  assert.equal(net.rows.get('4242').consented_at, agreed);
+});
+
+test('connecting again after expiry starts a new 90 days', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  clock.t += 100 * DAY;
+  try {
+    await connect(env, net);
+    const sess = await sign({ sub: '4242', exp: clock.t + 60_000 }, env.STATE_SIGNING_KEY);
+    assert.equal((await handle(profileReq(sess), env, { fetchFn: net.fetchFn, now })).status, 200);
+  } finally { clock.t -= 100 * DAY; }
+});
+
+test('the cache never serves a profile past its own expires_at, even inside the 24h cache window', async () => {
+  const { putCached, getCached } = await import('../lib/cache.js');
+  const kv = baseEnv().PROFILE_CACHE;
+  const t0 = Date.parse('2026-10-05T12:00:00Z');
+  const profile = { generated_at: new Date(t0 - 29.9 * DAY).toISOString(), privacy_boundaries: { data_retention_days: 30, revocable: true, expires_at: new Date(t0 + 0.1 * DAY).toISOString() } };
+  await putCached(kv, 'u', profile, t0);
+  assert.ok(await getCached(kv, 'u', t0 + 0.05 * DAY), 'inside both windows');
+  assert.equal(await getCached(kv, 'u', t0 + 0.2 * DAY), null, 'expired profile dropped although the 24h cache entry is fresh');
 });

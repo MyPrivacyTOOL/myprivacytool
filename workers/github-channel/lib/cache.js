@@ -2,7 +2,10 @@
  * 24h PaPIT snapshot cache in Workers KV (MPC-115 decision C). Only the sanitized PaPIT profile is cached,
  * never tokens or raw GitHub responses. KV's expirationTtl does the eviction in production; `cachedAt`
  * is also checked on read so the TTL is enforced (and testable with a mocked clock) independent of KV.
+ * MPC-10833: a cached profile past its own expires_at is dropped too, so the 24h cache can never serve a profile older than its stated validity.
  */
+import { isProfileExpired } from './validity.js';
+
 export const CACHE_TTL_SECONDS = 24 * 60 * 60;
 const key = (subjectId, channel) => `papit:${channel}:${subjectId}`;
 
@@ -11,7 +14,7 @@ export async function getCached(kv, subjectId, now = Date.now(), channel = 'gith
   if (!raw) return null;
   try {
     const { cachedAt, profile } = JSON.parse(raw);
-    return now - cachedAt < CACHE_TTL_SECONDS * 1000 ? profile : null;
+    return now - cachedAt < CACHE_TTL_SECONDS * 1000 && !isProfileExpired(profile, now) ? profile : null;
   } catch {
     return null;
   }

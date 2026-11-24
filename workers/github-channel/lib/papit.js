@@ -8,6 +8,8 @@
  * like an email or a name.
  */
 
+import { PAPIT_VALIDITY_DAYS, expiryFor, isProfileExpired } from './validity.js';
+
 export const ACTIVITY_WINDOW_DAYS = 90;
 const DAY_MS = 86_400_000;
 
@@ -107,7 +109,8 @@ export async function githubToPapit(raw, { now = new Date(), coverage = null } =
       interests: topN(starTopics, 15).filter(Boolean),
       activity_level: activityLevel(recent),
     },
-    privacy_boundaries: { data_retention_days: 30, revocable: true },
+    // MPC-10833: expires_at = generated_at + 30 days; the Worker and verifyProfile() refuse a profile after it (lib/validity.js).
+    privacy_boundaries: { data_retention_days: PAPIT_VALIDITY_DAYS, revocable: true, expires_at: expiryFor(now) },
     // MPC-9795 (DEV-006): how complete the inputs were, so an empty list is never read as "nothing exists". Booleans and a state word only.
     data_coverage: {
       repos_sampled: coverage ? coverage.repos_capped === true : null,
@@ -125,4 +128,14 @@ export async function githubToPapit(raw, { now = new Date(), coverage = null } =
 export async function verifyReceipt(profile) {
   const { cryptographic_receipt: receipt, ...rest } = profile;
   return receipt === (await sha256Hex(canonicalJson(rest)));
+}
+
+/**
+ * MPC-10833: the check a consumer should run before using a profile: the receipt matches (a checksum, not proof of origin)
+ * AND the profile has not expired. Returns { ok, reason } where reason is 'bad_receipt' or 'expired' when not ok.
+ */
+export async function verifyProfile(profile, now = Date.now()) {
+  if (!(await verifyReceipt(profile))) return { ok: false, reason: 'bad_receipt' };
+  if (isProfileExpired(profile, now)) return { ok: false, reason: 'expired' };
+  return { ok: true };
 }

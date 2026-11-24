@@ -5,7 +5,7 @@
  *   GET    /oauth/github/start       redirect to GitHub consent (auth code + PKCE S256 + signed state cookie)
  *   GET    /oauth/github/callback    verify state, exchange code, store AES-256-GCM encrypted token, set session
  *   GET    /oauth/github/remove      MPC-10825: same sign-in, but the callback only removes the stored connection (no session needed)
- *   GET    /channels/github/profile  sanitized PaPIT v1 JSON (24h KV cache); needs the session cookie
+ *   GET    /channels/github/profile  sanitized PaPIT v1 JSON (24h KV cache); needs the session cookie; 401 reconsent once the person last agreed 90+ days ago (MPC-10833)
  *   DELETE /channels/github          revoke: delete token row, revoke grant at GitHub, clear cache + session
  *   GET    /health
  *
@@ -19,6 +19,7 @@ import { getCached, putCached, deleteCached } from './lib/cache.js';
 import { saveToken, loadTokens, loadAccessToken, deleteToken } from './lib/store.js';
 import { log, originAllowed, corsHeaders, json, readCookie, setCookie } from './lib/http.js';
 import { handleReddit } from './lib/reddit-routes.js';
+import { consentExpired } from './lib/validity.js';
 
 const STATE_COOKIE = 'mpt_gh_oauth';
 const SESSION_COOKIE = 'mpt_gh_session';
@@ -95,6 +96,7 @@ async function callback(request, url, env, fetchFn, now) {
     stage = 'store';
     await saveToken(env, {
       subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope, expiresIn: tokens.expires_in,
+      consentedAt: new Date(now()).toISOString(), // MPC-10833: starts the 90 days; a token refresh never sets it
     }, fetchFn);
 
     const session = await sign({ sub: String(me.id), exp: now() + SESSION_TTL_MS }, env.STATE_SIGNING_KEY);
@@ -163,6 +165,15 @@ async function profile(request, env, cors, fetchFn, now) {
 
     const tokens = await loadTokens(env, subjectId, fetchFn);
     if (!tokens) return json({ error: 'not_connected' }, 404, cors);
+    // MPC-10833: 90 days after the person last agreed, the stored token is no longer used. Delete it, drop the cached copy,
+    // revoke at GitHub (best effort), and ask them to agree again.
+    if (consentExpired(tokens.consentedAt, now())) {
+      await deleteToken(env, subjectId, fetchFn).catch(() => {});
+      await deleteCached(env.PROFILE_CACHE, subjectId).catch(() => {});
+      await revokeGrant({ accessToken: tokens.accessToken, clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET }, fetchFn).catch(() => false);
+      log('token_consent_expired');
+      return json({ error: 'reconsent' }, 401, cors);
+    }
 
     let raw;
     try {

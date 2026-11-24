@@ -46,7 +46,8 @@ function fakeNetwork({ refreshResponse } = {}) {
     }
     if (u === 'https://www.reddit.com/api/v1/revoke_token') { seen.revokeCalls.push(String(init.body)); return new Response(null, { status: 204 }); }
     if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
+      // merge-duplicates: columns the request leaves out (consented_at on a token refresh) keep their stored value
+      if (init.method === 'POST') { const r = JSON.parse(init.body); const k = `${r.provider}|${r.user_id}`; rows.set(k, { ...rows.get(k), ...r }); return new Response(null, { status: 201 }); }
       const key = () => `${/provider=eq\.([^&]+)/.exec(u)[1]}|${decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])}`;
       if (init.method === 'GET') return ok(rows.has(key()) ? [rows.get(key())] : []);
       if (init.method === 'DELETE') { rows.delete(key()); return new Response(null, { status: 204 }); }
@@ -213,7 +214,8 @@ test('GitHub and Reddit share one token table without interfering, even with the
   const env = baseEnv(); const rows = new Map();
   const fetchFn = async (u, init = {}) => {
     u = String(u);
-    if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
+    // merge-duplicates: columns the request leaves out (consented_at on a token refresh) keep their stored value
+      if (init.method === 'POST') { const r = JSON.parse(init.body); const k = `${r.provider}|${r.user_id}`; rows.set(k, { ...rows.get(k), ...r }); return new Response(null, { status: 201 }); }
     const k = `${/provider=eq\.([^&]+)/.exec(u)[1]}|${/user_id=eq\.([^&]+)/.exec(u)[1]}`;
     if (init.method === 'GET') return new Response(JSON.stringify(rows.has(k) ? [rows.get(k)] : []), { status: 200 });
     rows.delete(k); return new Response(null, { status: 204 });
@@ -281,4 +283,19 @@ test('remove: unconfigured Reddit still answers 503 on the remove route', async 
   const env = baseEnv(); delete env.REDDIT_CLIENT_ID;
   const res = await handle(new Request('https://w.test/oauth/reddit/remove'), env, { now });
   assert.equal(res.status, 503);
+});
+
+// MPC-10833: the same 90 days for Reddit.
+test('90 days after the person agreed: Reddit token deleted, copy dropped, revoked at Reddit, client told to re-consent', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  assert.ok(net.rows.get('reddit|r3dd1t').consented_at);
+  clock.t += 91 * 86_400_000;
+  try {
+    const sess = await sign({ sub: 'r3dd1t', exp: clock.t + 60_000 }, env.STATE_SIGNING_KEY);
+    const res = await get(env, net, behaviorReq(sess));
+    assert.equal(res.status, 401); assert.equal((await res.json()).error, 'reconsent');
+    assert.equal(net.rows.size, 0);
+    assert.equal(net.seen.revokeCalls.length, 1);
+  } finally { clock.t -= 91 * 86_400_000; }
 });

@@ -200,7 +200,7 @@ curl ${BASES.github}/channels/github/profile \\
   "cryptographic_receipt": "9f2c…64 hex chars…",
   "core_identity": { "career": { "skills": ["TypeScript", "Go"], "primary_role": "Backend Developer", "public_projects_count": 31 } },
   "behavioral": { "interests": ["privacy", "cloudflare-workers"], "activity_level": "medium" },
-  "privacy_boundaries": { "data_retention_days": 30, "revocable": true }
+  "privacy_boundaries": { "data_retention_days": 30, "revocable": true, "expires_at": "2026-11-04T12:00:00.000Z" }
 }`,
       },
       { status: "401", description: "No valid session.", body: `{ "error": "unauthenticated" }` },
@@ -424,7 +424,7 @@ func RequestScan(email string, userConsented bool) (*ScanResult, error) {
     id: "papit-verify",
     title: "Verify a PaPIT receipt",
     description:
-      "cryptographic_receipt is the SHA-256 of the profile without that field, serialised as compact JSON with object keys sorted at every depth. Recompute it and compare it with a receipt you got by a separate trusted channel to see whether the profile has changed. It is a checksum, not a signature: anyone who edits a profile can recompute the receipt, so it does not prove who produced the profile.",
+      "cryptographic_receipt is the SHA-256 of the profile without that field, serialised as compact JSON with object keys sorted at every depth. Recompute it and compare it with a receipt you got by a separate trusted channel to see whether the profile has changed. Then refuse the profile if privacy_boundaries.expires_at has passed (the receipt covers that date, so it cannot be moved without breaking the checksum). It is a checksum, not a signature: anyone who edits a profile can recompute the receipt, so it does not prove who produced the profile.",
     code: {
       typescript: `const sortKeys = (v: unknown): unknown =>
   Array.isArray(v)
@@ -560,7 +560,8 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
     interests: "found" | "no_stars" | "stars_without_topics";
   };
   privacy_boundaries: {
-    data_retention_days: 30;            // declared validity of this snapshot (not enforced), not token retention
+    data_retention_days: 30;            // validity of this snapshot in days, not token retention
+    expires_at: string;                 // ISO 8601, generated_at + 30 days. Refuse the profile once it has passed
     revocable: true;                    // the user can disconnect; an issued copy cannot be recalled (see limits)
   };
 }`;
@@ -573,10 +574,10 @@ export const PAPIT_LIMITS = [
   { item: "Empty interests", detail: "interests is empty for two different reasons, told apart by data_coverage.interests: no_stars (you have starred nothing) or stars_without_topics (the repos you starred have no topics). A failed or unavailable GitHub request is never an empty list: the profile call returns an error instead (401 reauthorize, or 5xx)." },
   { item: "Receipt", detail: "An unkeyed SHA-256 checksum (workers/github-channel/lib/papit.js). It shows a profile has not changed only if the receipt reached you by a separate trusted channel. It does not prove who produced it: an editor can recompute it. Signing is planned, not built." },
   { item: "Sanitization receipt", detail: "Also a hash, not a signature and not a zero-knowledge proof. It records which rules ran and ties the output to the profile's receipt." },
-  { item: "Snapshot validity", detail: "data_retention_days is 30. That number is declared in the profile; nothing refuses a profile older than 30 days. Check generated_at yourself." },
+  { item: "Snapshot validity", detail: "Every profile carries privacy_boundaries.expires_at, 30 days after generated_at, and it is inside the receipt. Our service stops serving a profile once that time has passed, and you should refuse one too: nothing can stop a copy you already hold from being used after it expires, so check expires_at yourself. A profile made before this field existed expires 30 days after generated_at." },
   { item: "Cache", detail: "We keep a copy of the derived profile for 24 hours, then fetch it again." },
   { item: "Browser session", detail: "The mpt_gh_session cookie lasts 7 days." },
-  { item: "Access token", detail: "Kept (encrypted) until the user disconnects. It has no automatic expiry yet." },
+  { item: "Access token", detail: "Kept (encrypted) until the user disconnects, or until 90 days after they last agreed, whichever comes first. After 90 days we stop using the token, delete it and ask the user to connect again. A token refresh does not extend the 90 days." },
   { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. After the 7-day session has ended, a user can still remove the stored connection by signing in with GitHub again at /oauth/github/remove, which deletes the token and the copy, revokes our access and stores nothing from that sign-in. A profile that was already issued cannot be recalled and there is no revocation list yet." },
 ];
 

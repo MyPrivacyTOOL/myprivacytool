@@ -27,7 +27,8 @@ interface PaPITProfile {
     interests: 'found' | 'no_stars' | 'stars_without_topics';
   };
   privacy_boundaries: {
-    data_retention_days: 30;            // declared validity of this PaPIT snapshot (not enforced). NOT token retention
+    data_retention_days: 30;            // validity of this PaPIT snapshot in days. NOT token retention
+    expires_at: string;                 // MPC-10833: ISO 8601, generated_at + 30 days; inside the receipt. Refuse the profile after it. Added within v1.0
     revocable: true;
   };
 }
@@ -42,6 +43,11 @@ interface PaPITProfile {
 | `activity_level` | Public events in the last 90 days: `< 5` low, `5-50` medium, `> 50` high. GitHub's public events feed returns at most 300 events / 90 days; that is enough to cross the 50 threshold. |
 | `primary_role` | Ordered keyword rules over the bio plus the top 3 languages and top 3 repo topics (word-bounded, case-insensitive): Security, Data/ML, DevOps/SRE, Mobile, Frontend, Backend, Full-Stack. Highest keyword count wins, rule order breaks ties. No match: `Software Developer` if the user has public repos, else `Unspecified`. No LLM. |
 | `cryptographic_receipt` | SHA-256 over `JSON.stringify` of the profile **without** `cryptographic_receipt`, with object keys sorted alphabetically at every depth (arrays keep order). Hex-encoded. Lets a consumer see whether the profile has changed, if the receipt arrived by a separate trusted channel. It is a checksum, not a signature: an editor can recompute it, so it does not prove who produced the profile. |
+
+## Validity and token lifetime (MPC-10833)
+
+- `privacy_boundaries.expires_at` = `generated_at` + 30 days. The Worker drops a cached profile past it and `verifyProfile()` (`lib/papit.js`) refuses it. A profile made before the field existed expires at `generated_at` + `data_retention_days`. A consumer must check it too: a copy already issued cannot be recalled.
+- A stored token lasts 90 days from the last time the person agreed (the OAuth callback sets `channel_tokens.consented_at`; a refresh does not). After that the Worker refuses and deletes it and answers `401 reconsent`.
 
 ## Privacy guarantees
 

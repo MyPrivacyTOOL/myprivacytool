@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { githubToPapit, activityLevel, canonicalJson, verifyReceipt, inferRole } from '../lib/papit.js';
+import { githubToPapit, activityLevel, canonicalJson, verifyReceipt, verifyProfile, inferRole } from '../lib/papit.js';
+import { isProfileExpired, profileExpiryMs, consentExpired, PAPIT_VALIDITY_DAYS, TOKEN_CONSENT_DAYS } from '../lib/validity.js';
 
 const NOW = new Date('2026-10-05T12:00:00Z');
 const daysAgo = (d) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -41,7 +42,8 @@ test('output has exactly the PaPIT v1 shape', async () => {
   assert.equal(p.version, '1.0');
   assert.equal(p.source_channel, 'github');
   assert.equal(p.generated_at, '2026-10-05T12:00:00.000Z');
-  assert.deepEqual(p.privacy_boundaries, { data_retention_days: 30, revocable: true });
+  // MPC-10833: expires_at = generated_at + 30 days, inside the receipt
+  assert.deepEqual(p.privacy_boundaries, { data_retention_days: 30, revocable: true, expires_at: '2026-11-04T12:00:00.000Z' });
   assert.match(p.cryptographic_receipt, /^[0-9a-f]{64}$/);
 });
 
@@ -120,4 +122,48 @@ test('data_coverage is inside the receipt, so changing it breaks the checksum', 
   const p = await githubToPapit(raw(), { now: NOW });
   assert.equal(await verifyReceipt(p), true);
   assert.equal(await verifyReceipt({ ...p, data_coverage: { ...p.data_coverage, repos_sampled: true } }), false);
+});
+
+// MPC-10833: the 30 days are enforced, not only declared.
+const DAYS = 86_400_000;
+test('expires_at is generated_at + 30 days and is inside the receipt', async () => {
+  const p = await githubToPapit(raw(), { now: NOW });
+  assert.equal(PAPIT_VALIDITY_DAYS, 30);
+  assert.equal(Date.parse(p.privacy_boundaries.expires_at) - Date.parse(p.generated_at), 30 * DAYS);
+  assert.equal(await verifyReceipt({ ...p, privacy_boundaries: { ...p.privacy_boundaries, expires_at: '2099-01-01T00:00:00.000Z' } }), false, 'extending the expiry breaks the checksum');
+});
+
+test('isProfileExpired: fresh until expires_at, expired from then on; missing or unreadable dates fail closed', async () => {
+  const p = await githubToPapit(raw(), { now: NOW });
+  const exp = Date.parse(p.privacy_boundaries.expires_at);
+  assert.equal(isProfileExpired(p, NOW.getTime()), false);
+  assert.equal(isProfileExpired(p, exp - 1), false);
+  assert.equal(isProfileExpired(p, exp), true);
+  assert.equal(isProfileExpired(p, exp + DAYS), true);
+  assert.equal(isProfileExpired({ ...p, privacy_boundaries: {}, generated_at: 'nope' }, NOW.getTime()), true);
+  assert.equal(isProfileExpired({}, NOW.getTime()), true);
+  assert.equal(isProfileExpired({ ...p, generated_at: new Date(NOW.getTime() + DAYS).toISOString() }, NOW.getTime()), true, 'generated in the future');
+});
+
+test('a profile made before expires_at existed expires 30 days after generated_at', () => {
+  const old = { generated_at: NOW.toISOString(), privacy_boundaries: { data_retention_days: 30, revocable: true } };
+  assert.equal(profileExpiryMs(old), NOW.getTime() + 30 * DAYS);
+  assert.equal(isProfileExpired(old, NOW.getTime() + 29 * DAYS), false);
+  assert.equal(isProfileExpired(old, NOW.getTime() + 31 * DAYS), true);
+});
+
+test('verifyProfile: receipt and expiry both have to hold', async () => {
+  const p = await githubToPapit(raw(), { now: NOW });
+  assert.deepEqual(await verifyProfile(p, NOW.getTime()), { ok: true });
+  assert.deepEqual(await verifyProfile(p, NOW.getTime() + 31 * DAYS), { ok: false, reason: 'expired' });
+  assert.deepEqual(await verifyProfile({ ...p, behavioral: { ...p.behavioral, activity_level: 'high' } }, NOW.getTime()), { ok: false, reason: 'bad_receipt' });
+});
+
+test('consentExpired: 90 days from the last agreement; a missing date fails closed', () => {
+  const agreed = NOW.toISOString();
+  assert.equal(TOKEN_CONSENT_DAYS, 90);
+  assert.equal(consentExpired(agreed, NOW.getTime() + 89 * DAYS), false);
+  assert.equal(consentExpired(agreed, NOW.getTime() + 90 * DAYS), true);
+  assert.equal(consentExpired(null, NOW.getTime()), true);
+  assert.equal(consentExpired('garbage', NOW.getTime()), true);
 });

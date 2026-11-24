@@ -53,7 +53,7 @@ test('transformer: raw text, username and PII never reach the PaPIT output', asy
   for (const leak of ['UNIQUE_RAW_BODY_MARKER', 'UNIQUE_RAW_TITLE_MARKER', 'Email me at', 'jane', 'example.com', '555', 'Springfield', 'secret_handle', 'someone']) {
     assert.ok(!dump.toLowerCase().includes(leak.toLowerCase()), `leaked: ${leak}`);
   }
-  assert.deepEqual(out.privacy_boundaries, { data_retention_days: 30, revocable: true, raw_content_stored: false });
+  assert.deepEqual(out.privacy_boundaries, { data_retention_days: 30, revocable: true, raw_content_stored: false, expires_at: new Date(NOW.getTime() + 30 * 86_400_000).toISOString() });
 });
 
 test('transformer: v1 envelope, GitHub-compatible base fields, Reddit detail under behavioral.reddit', async () => {

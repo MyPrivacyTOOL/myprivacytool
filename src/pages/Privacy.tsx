@@ -723,12 +723,14 @@ const Privacy = () => {
               <ul className="list-inside list-disc space-y-2 text-muted-foreground" data-testid="connected-accounts">
                 <li>
                   <strong>GitHub:</strong> when you connect, we ask GitHub for the <code>read:user</code> permission only and read your public profile
-                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect; a copy of the
+                  activity. We keep your GitHub account number and an encrypted access token (and refresh token) until you disconnect, or until 90 days after you last agreed, whichever comes first; a copy of the
                   snapshot we derive for 24 hours; and a signed session cookie in your browser for 7 days. The snapshot holds derived values only
-                  (languages, topics, counts and a role label), not your email address, name, username, location, company or picture.
+                  (languages, topics, counts and a role label), not your email address, name, username, location, company or picture. Each snapshot
+                  carries an expiry date 30 days after it was made, and we do not serve it after that. After 90 days we delete the stored token and you
+                  connect again if you want to continue; deleting our copy does not remove the permission from your GitHub settings, which you can do there at any time.
                 </li>
                 <li>
-                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect, a 24-hour copy of the derived snapshot and a 7-day
+                  <strong>Reddit:</strong> works the same way: encrypted token until you disconnect or 90 days after you last agreed, a 24-hour copy of the derived snapshot and a 7-day
                   session cookie.
                 </li>
                 <li>

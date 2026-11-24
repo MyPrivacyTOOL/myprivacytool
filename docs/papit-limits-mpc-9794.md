@@ -11,3 +11,11 @@ STEP 0 on main 136b24b, 2026-11-18. Decision Q9 (Chris, 2026-11-18): reword now,
 New `PAPIT_LIMITS` list on /developers; test pins the wording and the lifetimes against the Worker constants.
 
 Not done (follow-ups): ed25519-signed profiles; enforcing the 30-day validity (or dropping the field); token expiry. The `revocable: true` field value is left as is: it means the user can disconnect.
+
+## Update MPC-10833 (2026-11-24, Chris: "Y" to the recommendation)
+
+Row (c) is now enforced, not only stated:
+
+- Every profile has `privacy_boundaries.expires_at` (generated_at + 30 days, inside the receipt). The Worker's cache drops a profile past it and `verifyProfile()` refuses it; a profile made before the field existed expires 30 days after `generated_at`. A copy already issued still cannot be recalled, so consumers must check `expires_at` themselves.
+- A stored token is used for at most 90 days after the person last agreed. `channel_tokens.consented_at` is set by the OAuth callback only (a refresh does not move it). After 90 days the Worker deletes the token, revokes at the provider and answers `401 reconsent`. `mpt_purge_stale_channel_tokens()` (migration 20261124070000) deletes rows nobody will use again; it is not scheduled (deleting data needs Chris's go-ahead).
+- Deploy order: apply the migration first, then the Worker.
