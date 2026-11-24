@@ -1,0 +1,68 @@
+# OpenOSINT MCP Server Dockerfile
+# Deploys OpenOSINT v2.38.2 as MCP server for MyPrivacyTOOL Wave 0 exposure scanning
+#
+# Build: docker build -f docker/Dockerfile.openosint-mcp -t mpt-openosint-mcp:latest .
+# Run:   docker run -p 8000:8000 --env-file config/.env mpt-openosint-mcp:latest
+#
+# Features:
+# - OpenOSINT v2.38.2 with 21-tool OSINT framework
+# - MCP protocol server for Claude integration
+# - Passive-only mode by default (active tools require --allow-active)
+# - Statement-level provenance tracking
+# - 5s timeout per tool, concurrent limit: 5 tools
+
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY shadow-audit-api/requirements.txt .
+COPY shadow-audit-api/requirements-openosint.txt .
+
+# Install Python dependencies
+# Note: Include MCP, Anthropic SDK, and OpenOSINT
+RUN pip install --no-cache-dir \
+    -r requirements.txt \
+    -r requirements-openosint.txt \
+    openosint>=2.38.2 \
+    mcp>=1.0.0 \
+    anthropic>=0.40.0 \
+    uvicorn>=0.24.0 \
+    fastapi>=0.104.0
+
+# Create config directory
+RUN mkdir -p /app/config /app/logs
+
+# Copy app code
+COPY shadow-audit-api/app /app/app
+COPY .mcp.json /app/
+
+# Copy entry point
+COPY docker/entrypoint-openosint.sh /app/
+RUN chmod +x /app/entrypoint-openosint.sh
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# Expose MCP server port
+EXPOSE 8000
+
+# Default environment variables
+ENV OPENOSINT_MODE=mcp \
+    OPENOSINT_LOG_LEVEL=INFO \
+    OPENOSINT_TOOL_POLICY=passive_only \
+    OPENOSINT_ALLOW_ACTIVE=false \
+    PORT=8000
+
+# Start server
+ENTRYPOINT ["/app/entrypoint-openosint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
