@@ -4,12 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyPrivacyTOOL — Check Your Data Exposure</title>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1BWMDBJSPL"></script>
+    <!-- MPC-10790: the Google tag loads only after the visitor chose "Accept analytics" on the main site (same gate as index.html). This static page has
+         no banner of its own, so a visitor with no stored choice gets no Google request at all. -->
+    <script src="/recipient-client.min.js" defer></script>
     <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-1BWMDBJSPL');
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      (function () {
+        var GA_ID = 'G-1BWMDBJSPL';
+        var loaded = false;
+        var h = location.hostname;
+        var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
+        function allowed() {
+          if (!isProd) return false;
+          try {
+            var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
+            return !!(c && c.v === 1 && c.analytics === true);
+          } catch (e) { return false; }
+        }
+        function sync() {
+          var ok = allowed();
+          window['ga-disable-' + GA_ID] = !ok;
+          if (!ok || loaded) return;
+          var r = window.mptRecipients;
+          if (!r) return;
+          loaded = true;
+          r.script('ga4', 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID).catch(function () {});
+          gtag('js', new Date());
+          gtag('config', GA_ID);
+        }
+        window.addEventListener('mpt:consent', sync);
+        window.addEventListener('mpt:recipients-ready', sync);
+        sync();
+      })();
     </script>
     <style>
         * {
