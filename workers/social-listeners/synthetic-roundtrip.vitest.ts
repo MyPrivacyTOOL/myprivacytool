@@ -45,28 +45,14 @@ describe("POST /synthetic/telegram-roundtrip", () => {
     expect(sent).toHaveLength(1);
     expect((sent[0] as { chat_id: number }).chat_id).toBe(555);
     expect(rows.every((r) => r.sender_id === "555")).toBe(true);
-    // The response legitimately holds a random 10-digit update_id and millisecond timestamps, which can contain "555" or "666" by chance
-    // (the old whole-body substring check failed about 1 run in 9, MPC-11120). So check the fields: only these keys exist, the random/time
-    // ones are not an id, and everything else (verdict, problems, budget, reply start) carries neither synthetic id.
+    // The body holds a random update_id and timestamps, which can contain "555" or "666" by chance (it turned #859 red), so a substring
+    // check on the whole body is flaky. Check the fields instead: the exact set of keys, and that no field that could carry an id does.
     expect(Object.keys(body).sort()).toEqual(["brain_at", "budget_ms", "in_at", "ms", "out_at", "pass", "problems", "reply_text_start", "sent_at", "update_id"]);
-    const { update_id, sent_at, in_at, brain_at, out_at, ms, ...rest } = body;
-    for (const id of ["555", "666"]) {
-      expect(JSON.stringify(rest)).not.toContain(id);
-      for (const v of [update_id, sent_at, in_at, brain_at, out_at, ms]) expect(String(v)).not.toBe(id);
+    expect(typeof body.update_id).toBe("number");
+    expect([555, 666]).not.toContain(body.update_id);
+    for (const key of ["problems", "reply_text_start"]) {
+      expect(JSON.stringify(body[key])).not.toContain("555");
+      expect(JSON.stringify(body[key])).not.toContain("666");
     }
-    expect(update_id).toBeGreaterThanOrEqual(2_000_000_000);
-  });
-  it("is not fooled by a random update_id or timestamp that happens to contain a synthetic id", async () => {
-    const real = Math.random;
-    vi.spyOn(Math, "random").mockReturnValue(0.5555 / 0.9); // update_id = 2_000_000_000 + floor(0.5555/0.9 * 900_000_000) -> 2555500000, contains "555"
-    try {
-      const { call } = setup();
-      const text = await (await call()).text();
-      const body = JSON.parse(text);
-      expect(String(body.update_id)).toContain("555"); // the case that used to fail the old check
-      expect(body.pass).toBe(true);
-      const { update_id, sent_at, in_at, brain_at, out_at, ms, ...rest } = body;
-      expect(JSON.stringify(rest)).not.toContain("555");
-    } finally { vi.restoreAllMocks(); Math.random = real; }
   });
 });

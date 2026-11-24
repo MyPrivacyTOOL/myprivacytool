@@ -88,7 +88,8 @@ describe("legal pages: never say there are no accounts while free accounts are l
 // MPC-11242 (F8 pass 2, MPC-9907): the storage sentence is one constant used by the home page and /thank-you, and the
 // Hong Kong Stop Spam policy section (English and Chinese) obeys the same tense rules and matches the retention job.
 import ThankYou from "./ThankYou";
-import { STORAGE_NOTE } from "@/data/trustCopy";
+import { STORAGE_NOTE, RESULT_PRIVACY_NOTE } from "@/data/trustCopy";
+import { FAQS } from "@/data/faqs";
 import { HK_POLICY_EN, HK_POLICY_ZH, HK_RETENTION_DAYS } from "@/data/hkSpamCopy";
 
 describe("storage sentence: home page and /thank-you say the same thing", () => {
@@ -119,5 +120,53 @@ describe("HK Stop Spam policy copy (en and zh-HK)", () => {
     expect(b, "15.3 block").toBeTruthy();
     expect((b?.paragraphs ?? []).join(" ")).toContain(String(HK_RETENTION_DAYS));
     expect(HK_RETENTION_DAYS).toBe(90); // supabase/migrations/20261013000000_mpc_7538_hk_spam_consent_and_retention.sql: hk_spam_retention.days = 90
+  });
+});
+
+// MPC-9907 (F8 pass 2, items 1 and 2): what leaves the browser. Pressing Scan me sends a consent record to our Worker, the IP and location
+// come from our own /whoami lookup, and the WebRTC leak check asks an outside STUN service for the public address. So no page or panel may
+// say nothing leaves the browser. The scan RESULT does stay in the browser unless the visitor saves it, and that is still said.
+const NOTHING_LEAVES = /(no|nothing)[^.]{0,40}(is |was |ever )?(sent|transmitted)[^.]{0,30}(any|to our|externally)|never (sent|leaves)[^.]{0,20}(servers|your device)|100% (local|privacy)|no api calls|no data storage/i;
+
+describe("what leaves the browser (MPC-9907)", () => {
+  const faq = (q: string) => (FAQS.find((f) => f.q === q)?.a ?? "").replace(/\s+/g, " ");
+  it("Privacy 2.0 and 2.4 say the scan uses our servers and an outside service, and the result stays in the browser", () => {
+    renderPage(<Privacy />);
+    const t = (document.body.textContent ?? "").replace(/\s+/g, " ");
+    expect(t).toMatch(/Your IP address and approximate location come from a lookup on our own servers, which stores nothing/);
+    expect(t).toMatch(/When you press Scan me, your browser sends us a record of your agreement/);
+    expect(t).toMatch(/The finished result stays in your browser\. It is not sent to us unless you ask for your report/);
+    expect(t).not.toMatch(/detects device, browser and network characteristics directly in your browser/);
+    expect(t).not.toMatch(/If you leave without giving (us )?an email address, nothing from the scan is saved/);
+  });
+  it("the two FAQ answers do not claim the scan never contacts a server", () => {
+    const a = faq("Does the scan send my results to your servers?");
+    expect(a).toMatch(/not sent to us unless you choose to save your scan/);
+    expect(a).toMatch(/lookup on our own servers/);
+    expect(a).toMatch(/outside service/);
+    expect(a).not.toMatch(/does not send them to a server we operate/);
+    const b = faq("How can I check the scan stays in my browser?");
+    expect(b).toMatch(/requests to our servers|ones to our servers/);
+    expect(b).not.toMatch(/watch which requests the page makes\. Our source/);
+  });
+  it("the results-page note keeps the pinned phrases and makes no nothing-is-sent claim", () => {
+    expect(RESULT_PRIVACY_NOTE).toMatch(/or save your scan with your email/);
+    expect(RESULT_PRIVACY_NOTE).toMatch(/We store your scan result only if you tick the save box with your email\./);
+    expect(RESULT_PRIVACY_NOTE).toMatch(/lookup on our own servers/);
+    expect(RESULT_PRIVACY_NOTE).not.toMatch(NOTHING_LEAVES);
+  });
+  it.each([
+    "src/components/FinalSummaryPanel.tsx",
+    "src/components/locale/PrivacyBanner.tsx",
+    "src/components/LanguageIntelligencePanel.tsx",
+    "src/components/SecurityPanel.tsx",
+    "src/components/FederatedLearningModal.tsx",
+  ])("%s carries no false local-only claim", (file) => {
+    const src = readFileSync(resolve(process.cwd(), file), "utf8");
+    expect(src).not.toMatch(/100% Local|Nothing was transmitted|Nothing is transmitted unless|No data is (ever )?sent|No data is sent externally|never sent to servers|Only mathematical updates \(gradients\) are shared|No data collection|End-to-end privacy|No API calls|No data storage/);
+  });
+  it("VoiceDebugPanel's 'never leaves your device' stays true: it makes no network call", () => {
+    const src = readFileSync(resolve(process.cwd(), "src/components/VoiceDebugPanel.tsx"), "utf8");
+    expect(src).not.toMatch(/\bfetch\(|recipientFetch|sendBeacon|XMLHttpRequest|trackEvent|@\/lib\/analytics/);
   });
 });

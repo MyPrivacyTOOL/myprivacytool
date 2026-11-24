@@ -20,6 +20,7 @@ import { scanCounts, scanCountsLine, totalLabel, type ScanCounts } from '../../s
 import { captureContext } from '@/lib/webScan';
 import { riskProfile, type HexagonTile } from '@/lib/hexagonTile';
 import { SUMMARY_LABELS } from '@/lib/scanCopy';
+import { RESULT_PRIVACY_NOTE } from '@/data/trustCopy';
 import { signedReportEnabled } from '@/config/signedReport';
 import { requestSignedJson, requestPdfSignature, downloadBlob, signedReportMessage, SignedReportError } from '@/lib/signedReport';
 
@@ -674,13 +675,14 @@ export default function FinalSummaryPanel({
       pdf.setTextColor(...PDF.brand);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('🔒 100% Local Analysis', margin, yPos + 5);
+      pdf.text('Generated in your browser', margin, yPos + 5);
       
       pdf.setTextColor(...PDF.muted);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`All ${totalLabel(counts)} data points were analyzed in your browser. Nothing was transmitted to any server.`, margin, yPos + 12);
-      pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 18);
+      pdf.text(`This report was generated in your browser from ${totalLabel(counts)} data points.`, margin, yPos + 12);
+      pdf.text('We store your scan result only if you tick the save box with your email.', margin, yPos + 16);
+      pdf.text(`Report ID: ${Date.now().toString(36).toUpperCase()}`, margin, yPos + 20);
 
       // Save the PDF. A signed export saves the same bytes plus a detached signature over them (MPC-8281).
       const stamp = Date.now();
@@ -1056,11 +1058,7 @@ Test yours at: ${window.location.origin}`;
         <div className="flex items-center gap-3 p-3 bg-risk-low-soft rounded-lg border border-risk-low/20">
           <span className="text-xl">🔒</span>
           <p className="text-xs text-risk-low">
-            {tilesOn ? (
-              <><strong>Local:</strong> The scan ran in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
-            ) : (
-              <><strong>100% Local:</strong> All {totalLabel(counts)} data points were analyzed in your browser. Nothing is transmitted unless you choose to email yourself the fix guide or save your scan with your email. We store your scan result only if you tick the save box with your email.</>
-            )}
+            <strong>Where it ran:</strong> {RESULT_PRIVACY_NOTE}
           </p>
         </div>
       </CardContent>

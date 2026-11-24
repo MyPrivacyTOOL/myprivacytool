@@ -568,7 +568,7 @@ const SecurityPanel = ({ onClose }: SecurityPanelProps) => {
         {/* PRIVACY NOTICE */}
         <p className="text-xs text-center text-muted-foreground pt-2">
           <EyeOff className="w-3 h-3 inline mr-1" />
-          All security tests run locally in your browser. No data is sent externally.
+          The security tests run in your browser. The network leak test asks an outside service for the public address your connection shows, so it only starts after you press Scan me.
         </p>
       </CardContent>
     </Card>
