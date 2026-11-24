@@ -90,26 +90,35 @@
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <script src="/recipient-client.min.js" defer></script>
-<!-- Same consent-gated Google tag as index.html (Property 515216281 / G-1BWMDBJSPL). No request to googletagmanager.com
-     until the visitor accepts analytics; the choice is the shared localStorage key mpt_cookie_consent. -->
+<!-- Same consent-gated Google tag as index.html (Property 515216281 / G-1BWMDBJSPL). No request to googletagmanager.com, and no event queued, until the
+     visitor has accepted analytics (shared localStorage key mpt_cookie_consent) AND this tab's journey holds the scan consent of the Scan me click
+     (sessionStorage mpt_scan_consent), MPC-10790 decision A. This page has no Scan me button, so a first visit sends nothing to Google. -->
 <script>
   window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
+  var mptGateOpen = false;   // MPC-10790: while the gate is closed gtag() drops the call, so nothing is queued to flush later
+  function gtag(){ if (mptGateOpen) dataLayer.push(arguments); }
   (function () {
     var GA_ID = 'G-1BWMDBJSPL';
     var loaded = false;
     var h = location.hostname;
     var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
     window['ga-disable-' + GA_ID] = true;
+    function scanConsented() {
+      try {
+        var sc = JSON.parse(window.sessionStorage.getItem('mpt_scan_consent') || 'null');
+        return !!(sc && typeof sc.consentId === 'string' && sc.consentId.length > 0);
+      } catch (e) { return false; }
+    }
     function allowed() {
       if (!isProd) return false;
       try {
         var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
-        return !!(c && c.v === 1 && c.analytics === true);
+        return !!(c && c.v === 1 && c.analytics === true) && scanConsented();
       } catch (e) { return false; }
     }
     function sync() {
       var ok = allowed();
+      mptGateOpen = ok;
       window['ga-disable-' + GA_ID] = !ok;
       if (!ok || loaded) return;
       // MPC-9886: the script load goes through the recipient registry (key "ga4", basis analytics_consent). The client (/recipient-client.min.js, deferred)
@@ -122,6 +131,7 @@
       gtag('config', GA_ID);
     }
     window.addEventListener('mpt:consent', sync);
+    window.addEventListener('mpt:scan-consent', sync);
     window.addEventListener('mpt:recipients-ready', sync);
     window.__mptAnalyticsAllowed = allowed;
     sync();

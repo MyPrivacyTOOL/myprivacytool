@@ -53,16 +53,19 @@
     <!-- MPC-7200: ipify/ipapi preconnects removed (the scan now asks our own Worker, /whoami); they were unused and
          opened connections to third parties before any consent choice. Preconnect only what the home page really uses. -->
     <link rel="preconnect" href="https://api.myprivacytool.io" crossorigin />
-    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <!-- MPC-10790: the dns-prefetch for googletagmanager.com is gone: a DNS lookup for a third party before the Scan me click is itself a send. -->
 
     <!-- Google tag (gtag.js) — Property: 515216281 | Measurement ID: G-1BWMDBJSPL
-         Loaded only after consent: no request to googletagmanager.com / google-analytics.com
-         before the visitor chooses "Accept analytics" in our own cookie banner (src/components/CookieBanner.tsx, choice kept in
-         localStorage under mpt_cookie_consent, MPC-8450). Withdrawing consent sets the ga-disable flag so no further hits are sent. -->
+         Loaded only after the Scan me click (MPC-10790, decision A): no request to googletagmanager.com / google-analytics.com, and no event queued,
+         until the visitor has BOTH chosen "Accept analytics" (Scan me sets it; our own cookie banner, src/components/CookieBanner.tsx, choice kept in
+         localStorage under mpt_cookie_consent, MPC-8450) AND given the scan consent. Accept alone sends nothing. Withdrawing consent sets the ga-disable flag. -->
     <script src="/recipient-client.min.js" defer></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
+      // MPC-10790: while the gate below is closed gtag() drops the call: nothing is queued in dataLayer, so nothing can flush when the tag loads later.
+      // Events from before the consent point are never replayed; the app also checks consent itself before calling gtag (src/lib/analytics.ts).
+      var mptGateOpen = false;
+      function gtag(){ if (mptGateOpen) dataLayer.push(arguments); }
       (function () {
         var GA_ID = 'G-1BWMDBJSPL';
         var loaded = false;
@@ -71,15 +74,25 @@
         var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
         // MPC-9888: no default consent. GA4 loads only after the visitor chose Accept analytics in the banner, or pressed Scan me (which counts as the choice).
         // (MPC-9740 had written analytics:true on first visit; that put a third party on the page before any click, against Open Tracker rule 2.)
+        // MPC-10790 (decision A, 2026-11-24): BOTH must hold. The analytics choice alone (cookie banner "Accept analytics") sends nothing; the tag waits for the
+        // scan consent this journey got at the Scan me click (src/lib/scanConsent.ts keeps it in sessionStorage under mpt_scan_consent; Scan me also sets the
+        // analytics choice, design 8.1). The wording version is checked by the app, which only stores the id for the current wording.
+        function scanConsented() {
+          try {
+            var s = JSON.parse(window.sessionStorage.getItem('mpt_scan_consent') || 'null');
+            return !!(s && typeof s.consentId === 'string' && s.consentId.length > 0);
+          } catch (e) { return false; }
+        }
         function allowed() {
           if (!isProd) return false;
           try {
             var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
-            return !!(c && c.v === 1 && c.analytics === true);
+            return !!(c && c.v === 1 && c.analytics === true) && scanConsented();
           } catch (e) { return false; }
         }
         function sync() {
           var ok = allowed();
+          mptGateOpen = ok;
           window['ga-disable-' + GA_ID] = !ok;
           if (!ok || loaded) return;
           // MPC-9886: the script load goes through the recipient registry (key "ga4", basis analytics_consent). The client (/recipient-client.min.js, deferred)
@@ -92,6 +105,7 @@
           gtag('config', GA_ID);
         }
         window.addEventListener('mpt:consent', sync);
+        window.addEventListener('mpt:scan-consent', sync);
         window.addEventListener('mpt:recipients-ready', sync);
         sync();
       })();
