@@ -232,6 +232,29 @@ curl ${BASES.github}/channels/github/profile \\
     ],
   },
   {
+    id: "github-remove",
+    service: "GitHub channel (myprivacytool-github-channel)",
+    method: "GET",
+    path: "/oauth/github/remove",
+    base: BASES.github,
+    status: "preview",
+    summary:
+      "Removes a stored GitHub connection without a live session. The browser goes through the same GitHub sign-in; the signed state cookie carries intent=remove, so the callback deletes that account's stored token and cached copy and revokes the grant at GitHub instead of connecting.",
+    auth: "None to start. The proof of ownership is completing the GitHub sign-in as that account. Send the user's browser here; do not call it with fetch.",
+    source: "workers/github-channel/index.js",
+    curl: `# Open in a browser:
+${BASES.github}/oauth/github/remove`,
+    responses: [
+      { status: "302", description: "Redirect to github.com. Sets a signed, HttpOnly, 10-minute mpt_gh_oauth cookie holding the state, PKCE verifier and intent=remove." },
+      { status: "302", description: "After the sign-in (at /oauth/github/callback): redirect to SUCCESS_REDIRECT with ?channel_removed=github&revoked=1 (or revoked=0 if GitHub could not be reached; the local copy is deleted either way). The session cookie is cleared." },
+      { status: "302", description: "Failure: ?channel_error=<code>. Codes: remove_access_denied (cancelled at GitHub), invalid_state, missing_code, remove_failed (the stored copy could not be deleted, so nothing was removed; the page says so)." },
+    ],
+    notes: [
+      "It never stores the new token, never issues a session and reads no profile data. The token from this sign-in is revoked at GitHub in the same step.",
+      "Starting it needs no session, so a link to it can be followed by anyone. The worst case is that someone who is signed in to GitHub is sent through a sign-in that removes their own connection; it cannot read anything and cannot remove anyone else's.",
+    ],
+  },
+  {
     id: "oauth-google-start",
     service: "Google OAuth proof of concept (myprivacytool-oauth-poc)",
     method: "GET",
@@ -576,8 +599,9 @@ export const PAPIT_LIMITS = [
   { item: "Snapshot validity", detail: "data_retention_days is 30. That number is declared in the profile; nothing refuses a profile older than 30 days. Check generated_at yourself." },
   { item: "Cache", detail: "We keep a copy of the derived profile for 24 hours, then fetch it again." },
   { item: "Browser session", detail: "The mpt_gh_session cookie lasts 7 days." },
-  { item: "Access token", detail: "Kept (encrypted) until the user disconnects. It has no automatic expiry yet." },
+  { item: "Access token", detail: "Kept (encrypted) until the user disconnects. It has no automatic expiry yet. Person-facing pages say \"until you disconnect\"; the 30 in data_retention_days is the declared snapshot validity above, not how long we keep the connection." },
   { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. A profile that was already issued cannot be recalled and there is no revocation list yet." },
+  { item: "Revocation without a session", detail: "After the 7-day session ends, GET /oauth/github/remove (Reddit: /oauth/reddit/remove) runs the same provider sign-in; the signed state cookie carries intent=remove. A successful sign-in proves the account, and the Worker deletes that account's stored token and cached copy and revokes the grant. It stores nothing new, issues no session and reads no profile data. It redirects to /connect/github?channel_removed=github&revoked=1|0." },
 ];
 
 export const INTERNAL_SERVICES = [

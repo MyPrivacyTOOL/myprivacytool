@@ -16,7 +16,7 @@ Operating procedures for the same systems: `docs/RUNBOOK.md`.
 |---|---|---|
 | mpt-scan-report | `POST /api/scan` | Live |
 | mpt-leads | `POST /webhook/leads` (any path) | Live, first-party |
-| github-channel | `GET /oauth/github/start`, `GET /oauth/github/callback`, `GET /channels/github/profile`, `DELETE /channels/github` | Preview |
+| github-channel | `GET /oauth/github/start`, `GET /oauth/github/remove`, `GET /oauth/github/callback`, `GET /channels/github/profile`, `DELETE /channels/github` | Preview |
 | oauth-poc | `GET /oauth/google/start`, `GET /oauth/google/callback` | Preview (proof of concept) |
 | github-channel, oauth-poc | `GET /health` | Live |
 | telegram-webhook, webhook-receiver | inbound webhooks | Internal, listed only |
