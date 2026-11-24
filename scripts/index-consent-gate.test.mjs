@@ -113,3 +113,11 @@ test('public/shared-landing.html does not put the email address or its domain in
   assert.ok(!/email_domain/.test(page), 'no email_domain parameter');
   assert.ok(!/trackEvent\([^)]*email/s.test(page.replace(/\/\/[^\n]*/g, '')), 'no trackEvent call carries the email');
 });
+
+// MPC-10790: the placeholder form sends nothing, so the page must not claim a scan started or that an email will arrive.
+test('public/shared-landing.html: the placeholder form does not claim a scan started or an email is coming', () => {
+  const page = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public/shared-landing.html'), 'utf8');
+  assert.ok(!/Scan initiated/i.test(page), 'no "Scan initiated"');
+  assert.ok(!/Check your email for results/i.test(page), 'no "Check your email for results"');
+  assert.ok(/nothing was sent and no scan was started/.test(page), 'the alert says nothing was sent');
+});
