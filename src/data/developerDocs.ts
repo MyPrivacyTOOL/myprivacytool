@@ -234,9 +234,11 @@ curl ${BASES.github}/channels/github/profile \\
       { status: "422", description: "Not a PaPIT v1 profile, the receipt does not match, or expires_at is before generated_at or more than 30 days after it.", body: `{ "error": "invalid_profile" }` },
       { status: "400", description: "The body is not a JSON object.", body: `{ "error": "bad_request" }` },
       { status: "413", description: "The body is larger than 32 KB.", body: `{ "error": "too_large" }` },
+      { status: "429", description: "Too many requests from your IP address. This answer comes from Cloudflare's rate-limiting rule in front of the Worker, not from our code, so do not expect our JSON body. Wait 10 seconds and retry." },
     ],
     notes: [
       "A 200 means the profile is unchanged since it was produced, as far as an unkeyed checksum can tell. It does not prove who produced it.",
+      "Rate limit: one Cloudflare rule at the edge blocks an IP address for 10 seconds after about 5 POSTs in 10 seconds (counted per Cloudflare location, so approximate). It is set in Cloudflare, not in the Worker's code, and it slows abuse rather than being a hard cap. Send profiles one at a time, not in bursts.",
     ],
   },
   {
