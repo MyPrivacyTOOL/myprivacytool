@@ -1,0 +1,141 @@
+version: '3.9'
+
+# MyPrivacyTOOL Wave 0 — OpenOSINT MCP Integration Stack
+#
+# Services:
+#   - openosint-mcp: OpenOSINT v2.38.2 MCP server on port 8000
+#   - shadow-audit-api: FastAPI exposure scanning backend on port 8001
+#   - postgres: PostgreSQL 15 for scan results & findings cache
+#   - redis: Redis 7 for async task queue & result caching
+#
+# Quick start:
+#   docker-compose up -d
+#
+# Health checks:
+#   curl http://localhost:8000/api/v1/health          # OpenOSINT MCP
+#   curl http://localhost:8001/api/v1/health          # Exposure API
+#   curl http://localhost:8001/docs                    # Swagger UI
+#
+# Logs:
+#   docker-compose logs -f openosint-mcp
+#   docker-compose logs -f shadow-audit-api
+
+services:
+  # OpenOSINT MCP Server
+  # 21-tool OSINT framework with statement-level provenance
+  openosint-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.openosint-mcp
+    container_name: mpt-openosint-mcp
+    ports:
+      - "8000:8000"
+    environment:
+      OPENOSINT_MODE: mcp
+      OPENOSINT_LOG_LEVEL: ${OPENOSINT_LOG_LEVEL:-INFO}
+      OPENOSINT_TOOL_POLICY: ${OPENOSINT_TOOL_POLICY:-passive_only}
+      OPENOSINT_ALLOW_ACTIVE: ${OPENOSINT_ALLOW_ACTIVE:-false}
+      MCP_PORT: 8000
+      PYTHONUNBUFFERED: 1
+      # API keys (from .env)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SHODAN_API_KEY: ${SHODAN_API_KEY}
+      WHOIS_API_KEY: ${WHOIS_API_KEY}
+      URLHAUS_API_KEY: ${URLHAUS_API_KEY}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY}
+    volumes:
+      - ./logs/openosint:/app/logs
+      - ./.mcp.json:/app/.mcp.json:ro
+    networks:
+      - mpt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  # Exposure Scanning Backend
+  # FastAPI wrapper around OpenOSINT adapter with async scan execution
+  shadow-audit-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.exposure-api
+    container_name: mpt-shadow-audit-api
+    ports:
+      - "8001:8001"
+    environment:
+      FASTAPI_ENV: ${FASTAPI_ENV:-development}
+      OPENOSINT_MCP_URL: http://openosint-mcp:8000
+      OPENOSINT_MCP_PORT: 8000
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PYTHONUNBUFFERED: 1
+      PORT: 8001
+    volumes:
+      - ./logs/shadow-audit-api:/app/logs
+    networks:
+      - mpt-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    depends_on:
+      - openosint-mcp
+      - postgres
+      - redis
+
+  # PostgreSQL 15
+  # Scan results, findings, audit logs
+  postgres:
+    image: postgres:15-alpine
+    container_name: mpt-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mpt}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-myprivacytool}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - mpt-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mpt}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis 7
+  # Async task queue, result caching, rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: mpt-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password_change_me}
+    volumes:
+      - redis-data:/data
+    networks:
+      - mpt-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  mpt-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
