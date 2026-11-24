@@ -42,3 +42,7 @@ Everything above is covered by mocked tests (`test/reddit-core.test.mjs`, `test/
 ## Rollback
 Revert the commit and redeploy. Remove the rows: `delete from public.channel_tokens where provider = 'reddit';`. Revoke the app at
 reddit.com/prefs/apps and delete the `REDDIT_CLIENT_SECRET` secret.
+
+## Expiry and consent age (MPC-10833)
+
+Reddit profiles carry `expires_at` (generated_at + 30 days) like GitHub ones, and `POST /papit/verify` accepts them. `GET /channels/reddit/behavior` answers `401 reconsent_required` when the stored token's `consented_at` is 90 or more days old (same rule and same caveats as `docs/channels/github.md`, "Consent age").

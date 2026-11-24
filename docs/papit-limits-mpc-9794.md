@@ -11,3 +11,5 @@ STEP 0 on main 136b24b, 2026-11-18. Decision Q9 (Chris, 2026-11-18): reword now,
 New `PAPIT_LIMITS` list on /developers; test pins the wording and the lifetimes against the Worker constants.
 
 Not done (follow-ups): ed25519-signed profiles; enforcing the 30-day validity (or dropping the field); token expiry. The `revocable: true` field value is left as is: it means the user can disconnect.
+
+Update 2026-11-24: "enforcing the 30-day validity" and "token expiry" were done in MPC-10833 (docs/papit-expiry-mpc-10833.md); the wording in rows (c) above describes the state on 2026-11-18. ed25519 signing is still not built.

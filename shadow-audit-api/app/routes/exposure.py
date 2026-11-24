@@ -45,7 +45,7 @@ class EmailScanRequest(BaseModel):
     priority: Optional[str] = Field(
         default="normal",
         description="Scan priority: normal, high, urgent",
-        regex="^(normal|high|urgent)$"
+        pattern="^(normal|high|urgent)$"
     )
 
 
@@ -60,7 +60,7 @@ class UsernameScanRequest(BaseModel):
     priority: Optional[str] = Field(
         default="normal",
         description="Scan priority: normal, high, urgent",
-        regex="^(normal|high|urgent)$"
+        pattern="^(normal|high|urgent)$"
     )
 
 
@@ -75,7 +75,7 @@ class DomainScanRequest(BaseModel):
     priority: Optional[str] = Field(
         default="normal",
         description="Scan priority: normal, high, urgent",
-        regex="^(normal|high|urgent)$"
+        pattern="^(normal|high|urgent)$"
     )
 
 
@@ -115,8 +115,8 @@ async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTask
     
     OpenOSINT tools executed:
     - search_email: Check breach databases
-    - search_username: Extract & search username
-    - domain_lookup: Analyze domain registration
+    - search_breach: Breach exposure
+    - search_username: Search the address's local part as a username
     
     Args:
         request: EmailScanRequest with email and optional priority
@@ -132,7 +132,7 @@ async def scan_email(request: EmailScanRequest, background_tasks: BackgroundTask
     """
     scan_id = str(uuid.uuid4())
     
-    logger.info(f"Email scan initiated: {scan_id} for {request.email}")
+    logger.info(f"Email scan initiated: {scan_id}")
     
     # Create placeholder result (will be updated when scan completes)
     placeholder = ExposureResult(
@@ -165,7 +165,7 @@ async def scan_username(request: UsernameScanRequest, background_tasks: Backgrou
     
     OpenOSINT tools executed:
     - search_username: Cross-platform username search
-    - social_profile: Extract profile URLs
+    - search_footprint: Public footprint
     
     Args:
         request: UsernameScanRequest with username and optional priority
@@ -175,7 +175,7 @@ async def scan_username(request: UsernameScanRequest, background_tasks: Backgrou
     """
     scan_id = str(uuid.uuid4())
     
-    logger.info(f"Username scan initiated: {scan_id} for {request.username}")
+    logger.info(f"Username scan initiated: {scan_id}")
     
     placeholder = ExposureResult(
         target=request.username,
@@ -205,9 +205,7 @@ async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTa
     Initiate an exposure scan for a domain.
     
     OpenOSINT tools executed:
-    - domain_lookup: WHOIS, DNS, MX records
-    - subdomain_enum: Certificate transparency, common subdomains
-    - reputation_check: Blocklists, threat intelligence
+    - search_domain, search_whois, search_dns, search_rdap, search_footprint
     
     Args:
         request: DomainScanRequest with domain and optional priority
@@ -217,7 +215,7 @@ async def scan_domain(request: DomainScanRequest, background_tasks: BackgroundTa
     """
     scan_id = str(uuid.uuid4())
     
-    logger.info(f"Domain scan initiated: {scan_id} for {request.domain}")
+    logger.info(f"Domain scan initiated: {scan_id}")
     
     placeholder = ExposureResult(
         target=request.domain,
@@ -286,6 +284,7 @@ async def get_scan_result(scan_id: str) -> ScanResultResponse:
             "tools_executed": result.tools_executed,
             "tools_failed": result.tools_failed,
             "execution_time_seconds": result.execution_time_seconds,
+            "tool_errors": result.tool_errors,
         },
     )
 
