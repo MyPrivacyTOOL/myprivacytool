@@ -14,7 +14,7 @@ describe("FAQ", () => {
   it("states the save exception in the 'send my results' answer", () => {
     renderPage(<Faq />);
     const text = flat(document.body.textContent ?? "");
-    expect(text).toContain(`does not send them to a server we operate, ${EXCEPTION}`);
+    expect(text).toContain(`The finished result is not sent to us ${EXCEPTION}`);
   });
 
   it("has the four new items, using policy and code wording only", () => {
