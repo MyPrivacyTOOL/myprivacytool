@@ -55,4 +55,18 @@ describe("POST /synthetic/telegram-roundtrip", () => {
       expect(JSON.stringify(body[key])).not.toContain("666");
     }
   });
+  it("is not failed by a random update_id that happens to contain a synthetic id (the case that used to turn CI red)", async () => {
+    // update_id = 2_000_000_000 + floor(random * 900_000_000). 0.5555 / 0.9 gives 2_555_500_000, which contains "555".
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5555 / 0.9);
+    try {
+      const { call } = setup();
+      const body = JSON.parse(await (await call()).text());
+      expect(String(body.update_id)).toContain("555"); // proves the setup hits the old failure
+      expect(body.pass).toBe(true);
+      for (const key of ["problems", "reply_text_start"]) {
+        expect(JSON.stringify(body[key])).not.toContain("555");
+        expect(JSON.stringify(body[key])).not.toContain("666");
+      }
+    } finally { random.mockRestore(); }
+  });
 });

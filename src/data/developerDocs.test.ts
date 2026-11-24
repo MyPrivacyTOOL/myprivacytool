@@ -193,7 +193,7 @@ describe("PaPIT expiry and re-consent wording", () => {
   it("documents POST /papit/verify with 200, 410, 422, 400 and 413, and reconsent_required on the profile call", () => {
     const ep = ENDPOINTS.find((e) => e.path === "/papit/verify")!;
     expect(ep.method).toBe("POST");
-    expect(ep.responses.map((r) => r.status)).toEqual(["200", "410", "422", "400", "413"]);
+    expect(ep.responses.map((r) => r.status)).toEqual(["200", "410", "422", "400", "413", "429"]);
     const profile = ENDPOINTS.find((e) => e.path === "/channels/github/profile")!;
     expect(profile.responses.some((r) => r.body?.includes("reconsent_required"))).toBe(true);
     expect(new Set(ENDPOINTS.map((e) => e.id)).size).toBe(ENDPOINTS.length);
@@ -207,6 +207,13 @@ describe("PaPIT expiry and re-consent wording", () => {
     expect(read("workers/github-channel/index.js")).toMatch(/'\/papit\/verify' && request\.method === 'POST'/);
     const verify = read("workers/github-channel/lib/verify.js");
     expect(verify).toMatch(/MAX_VERIFY_BYTES = 32 \* 1024/);
+    // The rate limit is a Cloudflare zone rule (docs/channels/github.md "Rate limits", #877), so the published numbers are checked against that doc.
+    const gh = read("docs/channels/github.md");
+    expect(gh).toMatch(/block after 5 requests per 10 seconds per IP and Cloudflare location, for\s+10 seconds/);
+    const notes = ENDPOINTS.find((e) => e.path === "/papit/verify")!.notes!.join(" ");
+    expect(notes).toMatch(/after about 5 POSTs in 10 seconds/);
+    expect(notes).toMatch(/blocks an IP address for 10 seconds/);
+    expect(read("workers/github-channel/index.js")).not.toMatch(/ratelimit|RATE_LIMITER|VERIFY_LIMITER/i); // the Worker has no limiter of its own
     for (const code of ["410", "422", "400", "413"]) expect(verify).toContain(code);
   });
 });
