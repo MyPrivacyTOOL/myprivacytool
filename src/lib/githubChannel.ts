@@ -13,6 +13,7 @@ export const GITHUB_START_URL = `${GITHUB_CHANNEL_URL}/oauth/github/start`;
 export interface PapitProfile {
   version: "1.0";
   generated_at: string;
+  expires_at?: string; // absent on profiles issued before MPC-10833; treat as generated_at + 30 days
   source_channel: "github";
   cryptographic_receipt: string;
   core_identity: {
@@ -27,6 +28,7 @@ export type ProfileResult =
   | { status: "connected"; profile: PapitProfile }
   // MPC-9796 (UX-040/041/042): the four ways "not connected" really differ, so the page can say which one it is.
   | { status: "session_ended" }   // 401 unauthenticated: no browser session (it lasts 7 days). A stored connection may still exist until the person disconnects.
+  | { status: "reconsent" }       // 401 reconsent_required (MPC-10833): connected more than 90 days ago; we no longer use the stored token. Connect again.
   | { status: "reauthorize" }     // 401 reauthorize: GitHub no longer accepts the token (revoked or expired); the Worker already deleted its copy.
   | { status: "disconnected" }    // 404 not_connected: a live session, nothing connected.
   | { status: "error" };          // 5xx or network: an outage, says nothing about the connection.
@@ -39,6 +41,7 @@ export async function fetchGithubProfile(fetchFn?: FetchFn): Promise<ProfileResu
     if (res.ok) return { status: "connected", profile: (await res.json()) as PapitProfile };
     if (res.status === 401) {
       const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (body?.error === "reconsent_required") return { status: "reconsent" };
       return { status: body?.error === "reauthorize" ? "reauthorize" : "session_ended" };
     }
     if (res.status === 404) return { status: "disconnected" };

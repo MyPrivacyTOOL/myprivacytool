@@ -18,6 +18,7 @@ import { RedditAdapter, RedditAdapterError } from './reddit.js';
 import { bridgeReddit } from './bridge.js';
 import { getCached, putCached, deleteCached } from './cache.js';
 import { saveToken, loadTokens, deleteToken } from './store.js';
+import { consentExpired, consentUntilMs } from './papit.js';
 
 const PROVIDER = 'reddit';
 const STATE_COOKIE = 'mpt_rd_oauth';
@@ -87,6 +88,7 @@ async function callback(request, url, env, fetchFn, now, limiter) {
     stage = 'store';
     await saveToken(env, {
       provider: PROVIDER, subjectId: me.id, accessToken, refreshToken, scope: tokens.scope, expiresIn: tokens.expires_in,
+      consentedAt: new Date(now()).toISOString(), // MPC-10833: the 90 days start at this consent
     }, fetchFn);
 
     const session = await sign({ sub: String(me.id), exp: now() + SESSION_TTL_MS }, env.STATE_SIGNING_KEY);
@@ -125,6 +127,12 @@ async function behavior(request, env, cors, fetchFn, now, limiter) {
 
     const tokens = await loadTokens(env, subjectId, fetchFn, PROVIDER);
     if (!tokens) return json({ error: 'not_connected' }, 404, cors);
+    // MPC-10833: same 90-day rule as the GitHub channel; the stored token is kept until the person disconnects or connects again.
+    if (consentExpired(tokens.consentedAt, now())) {
+      await deleteCached(env.PROFILE_CACHE, subjectId, PROVIDER).catch(() => {});
+      log('reddit_reconsent_required');
+      return json({ error: 'reconsent_required' }, 401, cors);
+    }
 
     let raw;
     try {
@@ -148,7 +156,7 @@ async function behavior(request, env, cors, fetchFn, now, limiter) {
       raw = await new RedditAdapter({ token: fresh.access_token, userAgent: userAgent(env), fetchFn, limiter }).fetchActivity();
     }
     const { papit, sanitization_receipt: sanitizationReceipt } = await bridgeReddit(raw, { now: new Date(now()) });
-    await putCached(env.PROFILE_CACHE, subjectId, papit, now(), PROVIDER);
+    await putCached(env.PROFILE_CACHE, subjectId, papit, now(), PROVIDER, { consentUntil: consentUntilMs(tokens.consentedAt) });
     return json(papit, 200, { ...cors, 'X-Cache': 'MISS', 'X-PaPIT-Sanitization-Receipt': sanitizationReceipt });
   } catch (e) {
     if (e instanceof RedditAdapterError && e.status === 401) {

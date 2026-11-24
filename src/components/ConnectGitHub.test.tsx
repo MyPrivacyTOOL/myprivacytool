@@ -13,6 +13,7 @@ vi.mock("@/lib/githubChannel", async () => {
 const profile: api.PapitProfile = {
   version: "1.0",
   generated_at: "2026-10-06T09:58:30.738Z",
+  expires_at: "2026-11-05T09:58:30.738Z",
   source_channel: "github",
   cryptographic_receipt: "ab".repeat(32),
   core_identity: { career: { skills: ["TypeScript", "Go"], primary_role: "Backend Developer", public_projects_count: 7 } },
@@ -124,5 +125,27 @@ describe("<ConnectGitHub />", () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
     expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*24 hours.*7 days/i);
+  });
+
+  // MPC-10833: the profile shows the date it stops being valid, and a token past 90 days asks to connect again.
+  it("shows the date the profile is valid until, not a 'not enforced' note", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
+    renderAt();
+    expect(await screen.findByTestId("valid-until")).toHaveTextContent("2026-11-05");
+    expect(screen.queryByText(/not enforced/i)).toBeNull();
+  });
+
+  it("an older profile without expires_at falls back to the 30-day period in words", async () => {
+    const { expires_at: _drop, ...older } = profile;
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile: older });
+    renderAt();
+    expect(await screen.findByTestId("valid-until")).toHaveTextContent("30 days after it was made");
+  });
+
+  it("a connection older than 90 days says we stopped using the token and offers Connect", async () => {
+    vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "reconsent" });
+    renderAt();
+    expect(await screen.findByTestId("reconsent")).toHaveTextContent(/more than 90 days ago.*stopped using the stored access token/i);
+    expect(screen.getByRole("link", { name: /connect github/i })).toHaveAttribute("href", api.GITHUB_START_URL);
   });
 });

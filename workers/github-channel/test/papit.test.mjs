@@ -37,10 +37,11 @@ test('PII is stripped: nothing identifying survives into the PaPIT JSON', async 
 test('output has exactly the PaPIT v1 shape', async () => {
   const p = await githubToPapit(raw(), { now: NOW });
   assert.deepEqual(Object.keys(p).sort(),
-    ['behavioral', 'core_identity', 'cryptographic_receipt', 'data_coverage', 'generated_at', 'privacy_boundaries', 'source_channel', 'version']);
+    ['behavioral', 'core_identity', 'cryptographic_receipt', 'data_coverage', 'expires_at', 'generated_at', 'privacy_boundaries', 'source_channel', 'version']);
   assert.equal(p.version, '1.0');
   assert.equal(p.source_channel, 'github');
   assert.equal(p.generated_at, '2026-10-05T12:00:00.000Z');
+  assert.equal(p.expires_at, '2026-11-04T12:00:00.000Z'); // MPC-10833: generated_at + 30 days
   assert.deepEqual(p.privacy_boundaries, { data_retention_days: 30, revocable: true });
   assert.match(p.cryptographic_receipt, /^[0-9a-f]{64}$/);
 });

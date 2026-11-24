@@ -32,7 +32,8 @@ function fakeNetwork({ githubStatus = 200 } = {}) {
       return ok({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN, scope: 'read:user', token_type: 'bearer' });
     }
     if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, r); return new Response(null, { status: 201 }); }
+      // PostgREST merge-duplicates: columns absent from the payload keep their stored value (consented_at relies on it).
+      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, { created_at: new Date(clock.t).toISOString(), ...rows.get(r.user_id), ...r }); return new Response(null, { status: 201 }); }
       if (init.method === 'GET') { const id = decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1]); return ok(rows.has(id) ? [rows.get(id)] : []); }
       if (init.method === 'DELETE') { rows.delete(decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])); return new Response(null, { status: 204 }); }
     }
@@ -251,6 +252,7 @@ test('401 with a refresh token: refreshes once, saves the NEW pair encrypted, re
   assert.ok(seen.refreshBodies[0].includes(encodeURIComponent(REFRESH_TOKEN)), 'used the stored refresh token');
 
   const row = net.rows.get('4242');
+  assert.equal(row.consented_at, new Date(clock.t).toISOString(), 'MPC-10833: a token refresh does not renew consent');
   assert.notEqual(row.access_token_enc, before, 'row updated');
   assert.match(row.access_token_enc, /^v1\./);
   assert.match(row.refresh_token_enc, /^v1\./);
@@ -294,4 +296,86 @@ test('401 with no refresh token stored: reauthorize without calling the refresh 
   assert.equal((await res.json()).error, 'reauthorize');
   assert.equal(seen.refreshBodies.length, 0);
   assert.equal(net.rows.size, 0);
+});
+
+// MPC-10833: consent older than 90 days is not used; the person must connect again.
+const DAYS = 86_400_000;
+// The real session cookie lasts 7 days and is only issued at connect, so in production a request with a valid cookie always has consent
+// younger than 7 days. To exercise the 90-day rule (a backstop) these tests forge a cookie that outlives it.
+const longSession = (env) => sign({ sub: '4242', exp: clock.t + 400 * DAYS }, env.STATE_SIGNING_KEY);
+test('re-consent: day 89 still reads GitHub; day 91 gets 401 reconsent_required, no GitHub call, token row kept, cached copy dropped', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  clock.t = Date.parse('2026-10-05T12:00:00Z');
+  await connect(env, net);
+  const session = await longSession(env);
+  assert.equal(net.rows.get('4242').consented_at, '2026-10-05T12:00:00.000Z', 'the consent date is stored at connect');
+
+  clock.t += 89 * DAYS;
+  const ok = await handle(profileReq(session), env, { fetchFn: net.fetchFn, now });
+  assert.equal(ok.status, 200);
+  const body = await ok.json();
+  assert.equal(body.expires_at, new Date(clock.t + 30 * DAYS).toISOString(), 'served profile carries expires_at');
+  assert.ok(env.PROFILE_CACHE._store.size === 1);
+
+  clock.t += 2 * DAYS; // day 91 (the 24h cache from day 89 has also run out)
+  const callsBefore = net.log.github.length;
+  const res = await handle(profileReq(session), env, { fetchFn: net.fetchFn, now });
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { error: 'reconsent_required' });
+  assert.equal(net.log.github.length, callsBefore, 'the old token is not used');
+  assert.ok(net.rows.has('4242'), 'we do not delete the stored token behind the person\'s back');
+  assert.equal(env.PROFILE_CACHE._store.size, 0, 'cached copy dropped');
+});
+
+test('re-consent: a cached copy is not served past the 90 days, even inside its own 24h window', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  clock.t = Date.parse('2026-10-05T12:00:00Z');
+  await connect(env, net);
+  const session = await longSession(env);
+  clock.t += 90 * DAYS - 3600_000; // 1h before the 90 days are up
+  assert.equal((await handle(profileReq(session), env, { fetchFn: net.fetchFn, now })).status, 200);
+  clock.t += 1800_000; // 30 min later: cache entry is 30 min old, consent has 30 min left
+  assert.equal((await handle(profileReq(session), env, { fetchFn: net.fetchFn, now })).headers.get('X-Cache'), 'HIT');
+  clock.t += 1800_000; // exactly 90 days after consent, cache entry only 1h old
+  const res = await handle(profileReq(session), env, { fetchFn: net.fetchFn, now });
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, 'reconsent_required');
+});
+
+test('re-consent: connecting again starts a new 90 days and the profile works again', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  clock.t = Date.parse('2026-10-05T12:00:00Z');
+  await connect(env, net);
+  clock.t += 91 * DAYS;
+  assert.equal((await handle(profileReq(await longSession(env)), env, { fetchFn: net.fetchFn, now })).status, 401);
+  const again = await connect(env, net);
+  assert.equal(net.rows.get('4242').consented_at, new Date(clock.t).toISOString());
+  assert.equal((await handle(profileReq(again.session), env, { fetchFn: net.fetchFn, now })).status, 200);
+  clock.t += 89 * DAYS;
+  await env.PROFILE_CACHE.delete('papit:github:4242');
+  assert.equal((await handle(profileReq(await longSession(env)), env, { fetchFn: net.fetchFn, now })).status, 200);
+});
+
+test('re-consent: a row stored before the column existed counts from created_at; a row with neither is refused', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  clock.t = Date.parse('2026-10-05T12:00:00Z');
+  await connect(env, net);
+  const session = await longSession(env);
+  const row = net.rows.get('4242');
+  delete row.consented_at; row.created_at = new Date(clock.t - 10 * DAYS).toISOString();
+  assert.equal((await handle(profileReq(session), env, { fetchFn: net.fetchFn, now })).status, 200);
+  await env.PROFILE_CACHE.delete('papit:github:4242');
+  row.created_at = new Date(clock.t - 91 * DAYS).toISOString();
+  assert.equal((await handle(profileReq(session), env, { fetchFn: net.fetchFn, now })).status, 401);
+  delete row.created_at;
+  assert.equal((await handle(profileReq(session), env, { fetchFn: net.fetchFn, now })).status, 401, 'fails closed');
+});
+
+test('re-consent: the DB request for a token refresh does not carry consented_at', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const { saveToken } = await import('../lib/store.js');
+  await saveToken(env, { subjectId: '4242', accessToken: 'a', refreshToken: 'r' }, net.fetchFn);
+  assert.ok(!net.log.bodies.at(-1).includes('consented_at'));
+  await saveToken(env, { subjectId: '4242', accessToken: 'a', refreshToken: 'r', consentedAt: '2026-10-05T12:00:00.000Z' }, net.fetchFn);
+  assert.ok(net.log.bodies.at(-1).includes('"consented_at":"2026-10-05T12:00:00.000Z"'));
 });

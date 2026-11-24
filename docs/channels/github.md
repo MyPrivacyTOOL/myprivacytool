@@ -36,7 +36,8 @@ SPA                      Worker (github-channel)                  GitHub        
 |---|---|
 | `GET /oauth/github/start` | Redirect to GitHub. Scope `read:user`, PKCE S256. |
 | `GET /oauth/github/callback` | On success 302 to `SUCCESS_REDIRECT`; on failure 302 with `?channel_error=<code>` (`access_denied`, `invalid_state`, `missing_code`, `connect_failed`). If the token cannot be stored it is revoked at GitHub. |
-| `GET /channels/github/profile` | `200` PaPIT JSON, header `X-Cache: HIT|MISS`. `401 unauthenticated` (no session), `401 reauthorize` (token revoked at GitHub; our copy is deleted), `404 not_connected`, `502 upstream_error`. |
+| `GET /channels/github/profile` | `200` PaPIT JSON, header `X-Cache: HIT|MISS`. `401 unauthenticated` (no session), `401 reauthorize` (token revoked at GitHub; our copy is deleted), `401 reconsent_required` (the person last connected 90 or more days ago; the stored token is not used and not deleted; MPC-10833), `404 not_connected`, `502 upstream_error`. The profile carries `expires_at` (generated_at + 30 days). |
+| `POST /papit/verify` | MPC-10833. Stateless check of a profile the caller holds: `200 {valid,expires_at}`, `410 profile_expired`, `422 invalid_profile` (not v1, receipt mismatch, or `expires_at` outside generated_at..+30 days), `400 bad_request`, `413 too_large` (over 32 KB). No session, nothing stored or logged. |
 | `DELETE /channels/github` | User revoke: deletes the token row first, clears the cache, then revokes the grant at GitHub. |
 | `GET /health` | `{status:"ok"}` |
 
@@ -88,6 +89,17 @@ makes this rare, and the cost is one extra reconnect.
 GitHub allows 5,000 requests/hour per user token. A cold profile build costs at most 9 requests
 (`/user`, up to 3 pages of repos, 2 of starred, 3 of events). With a 24h cache one user uses about 9 requests per day.
 
+## Consent age (MPC-10833)
+
+`channel_tokens.consented_at` is set when the person completes the OAuth consent screen (the callback) and is not touched by a token refresh. When a profile is
+requested, a stored token whose `consented_at` is 90 or more days old is not used: `401 reconsent_required`, the cached copy is dropped, the row is kept. Connecting
+again writes a new `consented_at`. A row without the column falls back to `created_at`; a row with neither is refused. The Reddit channel follows the same rule.
+Needs `supabase/migrations/20261124120000_mpc_10833_channel_tokens_consented_at.sql` applied BEFORE this version of the Worker is deployed (the Worker selects and writes the column).
+
+Reachability: the session cookie lasts 7 days and is only issued at connect, so a request with a valid cookie always comes within 7 days of consent. The 90-day check is a backstop
+for a longer session or a changed cookie lifetime. What it does not do is clean up: a token the person never returns for stays stored (encrypted, unused) until they
+disconnect or connect again. An automatic purge would delete user data, so it is not built and needs Chris's go-ahead.
+
 ## Setup
 
 1. **GitHub OAuth App** (github.com/settings/developers): Authorization callback URL = `REDIRECT_URI`
@@ -115,12 +127,12 @@ select user_id, provider, left(access_token_enc, 12) as prefix, key_version, sco
 
 ## Tests
 
-`node --test workers/github-channel/test/*.test.mjs` (28 tests; no network). GitHub, Supabase and KV are mocked, the cache TTL
+`node --test workers/github-channel/test/*.test.mjs` (no network). GitHub, Supabase and KV are mocked, the cache TTL
 test advances a mocked clock past 24h.
 
 ## Rollback
 
 1. Revert the commit adding `workers/github-channel`, the workflow, migration and docs.
-2. `alter table public.channel_tokens drop column if exists key_version;` (do not drop the table: it predates this task and may hold other rows)
+2. Roll the Worker back first (it uses `consented_at`), then `alter table public.channel_tokens drop column if exists consented_at;` (MPC-10833) and `alter table public.channel_tokens drop column if exists key_version;` (do not drop the table: it predates this task and may hold other rows)
 3. Revoke test tokens: GitHub > Settings > Applications > Authorized OAuth Apps, or `DELETE /channels/github`.
 4. `npx wrangler delete` the Worker, delete the `PROFILE_CACHE` KV namespace, remove the OAuth App secrets.

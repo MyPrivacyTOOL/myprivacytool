@@ -46,7 +46,7 @@ function fakeNetwork({ refreshResponse } = {}) {
     }
     if (u === 'https://www.reddit.com/api/v1/revoke_token') { seen.revokeCalls.push(String(init.body)); return new Response(null, { status: 204 }); }
     if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
+      if (init.method === 'POST') { const r = JSON.parse(init.body); const k = `${r.provider}|${r.user_id}`; rows.set(k, { created_at: new Date().toISOString(), ...rows.get(k), ...r }); return new Response(null, { status: 201 }); }
       const key = () => `${/provider=eq\.([^&]+)/.exec(u)[1]}|${decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])}`;
       if (init.method === 'GET') return ok(rows.has(key()) ? [rows.get(key())] : []);
       if (init.method === 'DELETE') { rows.delete(key()); return new Response(null, { status: 204 }); }
@@ -213,7 +213,7 @@ test('GitHub and Reddit share one token table without interfering, even with the
   const env = baseEnv(); const rows = new Map();
   const fetchFn = async (u, init = {}) => {
     u = String(u);
-    if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(`${r.provider}|${r.user_id}`, r); return new Response(null, { status: 201 }); }
+    if (init.method === 'POST') { const r = JSON.parse(init.body); const k = `${r.provider}|${r.user_id}`; rows.set(k, { created_at: new Date().toISOString(), ...rows.get(k), ...r }); return new Response(null, { status: 201 }); }
     const k = `${/provider=eq\.([^&]+)/.exec(u)[1]}|${/user_id=eq\.([^&]+)/.exec(u)[1]}`;
     if (init.method === 'GET') return new Response(JSON.stringify(rows.has(k) ? [rows.get(k)] : []), { status: 200 });
     rows.delete(k); return new Response(null, { status: 204 });
@@ -250,4 +250,33 @@ test('connect failure at the store step revokes the freshly issued Reddit token 
   const loc = new URL(res.headers.get('Location'));
   assert.equal(loc.searchParams.get('channel_error'), 'connect_failed'); assert.equal(loc.searchParams.get('stage'), 'store');
   assert.equal(net.seen.revokeCalls.length, 1);
+});
+
+// MPC-10833: same 90-day re-consent rule as the GitHub channel.
+test('re-consent (Reddit): day 89 reads Reddit with expires_at; day 91 gets 401 reconsent_required, no Reddit call, token row kept; connecting again works', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  const t0 = clock.t;
+  await connect(env, net);
+  // The real cookie lasts 7 days; forge one that outlives the 90 days to exercise the backstop.
+  const session = await sign({ sub: 'r3dd1t', exp: t0 + 400 * 86_400_000 }, env.STATE_SIGNING_KEY);
+  assert.equal(net.rows.get('reddit|r3dd1t').consented_at, new Date(t0).toISOString());
+  clock.t = t0 + 89 * 86_400_000;
+  net.state.validToken = ACCESS;
+  const ok = await get(env, net, behaviorReq(session));
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).expires_at, new Date(clock.t + 30 * 86_400_000).toISOString());
+
+  clock.t = t0 + 91 * 86_400_000;
+  const calls = net.seen.redditAuth.length;
+  const res = await get(env, net, behaviorReq(session));
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { error: 'reconsent_required' });
+  assert.equal(net.seen.redditAuth.length, calls, 'the old token is not used');
+  assert.ok(net.rows.has('reddit|r3dd1t'));
+  assert.equal(env.PROFILE_CACHE._store.size, 0);
+
+  const again = await connect(env, net);
+  assert.equal((await get(env, net, behaviorReq(again.session))).status, 200);
+  assert.equal(net.rows.get('reddit|r3dd1t').consented_at, new Date(clock.t).toISOString());
+  clock.t = t0;
 });

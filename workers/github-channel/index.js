@@ -6,6 +6,7 @@
  *   GET    /oauth/github/callback    verify state, exchange code, store AES-256-GCM encrypted token, set session
  *   GET    /channels/github/profile  sanitized PaPIT v1 JSON (24h KV cache); needs the session cookie
  *   DELETE /channels/github          revoke: delete token row, revoke grant at GitHub, clear cache + session
+ *   POST   /papit/verify             MPC-10833: stateless check of a profile you hold: 200 fresh, 410 expired, 422 invalid
  *   GET    /health
  *
  * Rules (MPC-115): scope read:user only; tokens encrypted before they reach Supabase; logs carry event
@@ -18,6 +19,8 @@ import { getCached, putCached, deleteCached } from './lib/cache.js';
 import { saveToken, loadTokens, loadAccessToken, deleteToken } from './lib/store.js';
 import { log, originAllowed, corsHeaders, json, readCookie, setCookie } from './lib/http.js';
 import { handleReddit } from './lib/reddit-routes.js';
+import { consentExpired, consentUntilMs } from './lib/papit.js';
+import { verifyProfile } from './lib/verify.js';
 
 const STATE_COOKIE = 'mpt_gh_oauth';
 const SESSION_COOKIE = 'mpt_gh_session';
@@ -35,6 +38,7 @@ export async function handle(request, env, deps = {}) {
   if (url.pathname.startsWith('/oauth/reddit/') || url.pathname.startsWith('/channels/reddit')) {
     return handleReddit(request, url, env, { cors, fetchFn, now, limiter: deps.limiter });
   }
+  if (url.pathname === '/papit/verify' && request.method === 'POST') return verifyProfile(request, now);
   if (url.pathname === '/oauth/github/start' && request.method === 'GET') return start(env, now);
   if (url.pathname === '/oauth/github/callback' && request.method === 'GET') return callback(request, url, env, fetchFn, now);
   if (url.pathname === '/channels/github/profile' && request.method === 'GET') return profile(request, env, cors, fetchFn, now);
@@ -91,6 +95,7 @@ async function callback(request, url, env, fetchFn, now) {
     stage = 'store';
     await saveToken(env, {
       subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope, expiresIn: tokens.expires_in,
+      consentedAt: new Date(now()).toISOString(), // MPC-10833: the person has just consented; the 90 days start here
     }, fetchFn);
 
     const session = await sign({ sub: String(me.id), exp: now() + SESSION_TTL_MS }, env.STATE_SIGNING_KEY);
@@ -128,6 +133,13 @@ async function profile(request, env, cors, fetchFn, now) {
 
     const tokens = await loadTokens(env, subjectId, fetchFn);
     if (!tokens) return json({ error: 'not_connected' }, 404, cors);
+    // MPC-10833: consent older than 90 days is not used any more. We stop reading, forget the cached copy and ask for a fresh connect.
+    // The stored token is NOT deleted here (deleting is the person's call: Disconnect, or connecting again replaces it).
+    if (consentExpired(tokens.consentedAt, now())) {
+      await deleteCached(env.PROFILE_CACHE, subjectId).catch(() => {});
+      log('reconsent_required');
+      return json({ error: 'reconsent_required' }, 401, cors);
+    }
 
     let raw;
     try {
@@ -152,7 +164,7 @@ async function profile(request, env, cors, fetchFn, now) {
       raw = await new GitHubAdapter({ token: fresh.access_token, fetchFn }).fetchIdentity();
     }
     const { papit, sanitization_receipt: sanitizationReceipt } = await bridgeGithub(raw, { now: new Date(now()) });
-    await putCached(env.PROFILE_CACHE, subjectId, papit, now());
+    await putCached(env.PROFILE_CACHE, subjectId, papit, now(), 'github', { consentUntil: consentUntilMs(tokens.consentedAt) });
     return json(papit, 200, { ...cors, 'X-Cache': 'MISS', 'X-PaPIT-Sanitization-Receipt': sanitizationReceipt });
   } catch (e) {
     if (e instanceof GitHubAdapterError && e.status === 401) {
