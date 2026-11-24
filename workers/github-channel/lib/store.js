@@ -25,10 +25,19 @@ async function sb(env, method, path, body, fetchFn, extra = {}) {
 // Table shape (shared with the existing public.channel_tokens): user_id = the provider's stable user id
 // (text), provider = 'github' | 'reddit'. See supabase/migrations/20261006120000_channel_tokens_worker_columns.sql.
 const PROVIDER = 'github';
+
+// MPC-10833: the stored token is good for 90 days from the moment the person consented. A token refresh does not restart that clock.
+// channel_tokens.created_at is the consent time: only the OAuth callback writes it (consent: true), refreshes leave it alone.
+export const TOKEN_CONSENT_MAX_DAYS = 90;
+/** True when the consent is older than TOKEN_CONSENT_MAX_DAYS, or its date is missing or unreadable (fail closed). */
+export function consentExpired(consentedAt, nowMs = Date.now()) {
+  const t = Date.parse(consentedAt);
+  return !Number.isFinite(t) || nowMs - t >= TOKEN_CONSENT_MAX_DAYS * 86_400_000;
+}
 // AAD binds a ciphertext to its provider, account and column, so a row copied to another account/provider fails to decrypt.
 const aad = (subjectId, column, provider = PROVIDER) => `${provider}:${subjectId}:${column}`;
 
-export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, provider = PROVIDER }, fetchFn = undefined) {
+export async function saveToken(env, { subjectId, accessToken, refreshToken, scope, expiresIn, provider = PROVIDER, consent = false, nowMs = Date.now() }, fetchFn = undefined) {
   const version = Number(env.ENCRYPTION_KEY_VERSION || 1);
   const key = keyForVersion(env, version);
   const row = {
@@ -42,19 +51,21 @@ export async function saveToken(env, { subjectId, accessToken, refreshToken, sco
     scope: scope || '',
     expires_at: expiresIn ? new Date(Date.now() + Number(expiresIn) * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
+    ...(consent ? { created_at: new Date(nowMs).toISOString() } : {}),
   };
   await sb(env, 'POST', 'channel_tokens?on_conflict=user_id,provider', row, fetchFn,
     { Prefer: 'resolution=merge-duplicates,return=minimal' });
 }
 
-/** @returns {Promise<{accessToken: string, refreshToken: string|null}|null>} */
+/** @returns {Promise<{accessToken: string, refreshToken: string|null, consentedAt: string|null}|null>} */
 export async function loadTokens(env, subjectId, fetchFn = undefined, provider = PROVIDER) {
   const rows = await sb(env, 'GET',
-    `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version&limit=1`,
+    `channel_tokens?provider=eq.${provider}&user_id=eq.${encodeURIComponent(String(subjectId))}&select=access_token_enc,refresh_token_enc,key_version,created_at&limit=1`,
     undefined, fetchFn);
   if (!rows?.length) return null;
   const key = keyForVersion(env, rows[0].key_version);
   return {
+    consentedAt: rows[0].created_at ?? null,
     accessToken: await decryptToken(rows[0].access_token_enc, key, { aad: aad(subjectId, 'access', provider) }),
     refreshToken: rows[0].refresh_token_enc
       ? await decryptToken(rows[0].refresh_token_enc, key, { aad: aad(subjectId, 'refresh', provider) })

@@ -13,6 +13,7 @@ export const GITHUB_START_URL = `${GITHUB_CHANNEL_URL}/oauth/github/start`;
 export interface PapitProfile {
   version: "1.0";
   generated_at: string;
+  expires_at?: string; // MPC-10833: when the snapshot stops being valid; the Worker never serves one past this moment
   source_channel: "github";
   cryptographic_receipt: string;
   core_identity: {
@@ -27,7 +28,7 @@ export type ProfileResult =
   | { status: "connected"; profile: PapitProfile }
   // MPC-9796 (UX-040/041/042): the four ways "not connected" really differ, so the page can say which one it is.
   | { status: "session_ended" }   // 401 unauthenticated: no browser session (it lasts 7 days). A stored connection may still exist until the person disconnects.
-  | { status: "reauthorize" }     // 401 reauthorize: GitHub no longer accepts the token (revoked or expired); the Worker already deleted its copy.
+  | { status: "reauthorize" }     // 401 reauthorize: GitHub no longer accepts the token (revoked or expired), or the 90-day consent ended (MPC-10833); the Worker already deleted its copy.
   | { status: "disconnected" }    // 404 not_connected: a live session, nothing connected.
   | { status: "error" };          // 5xx or network: an outage, says nothing about the connection.
 

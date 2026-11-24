@@ -70,14 +70,14 @@ export default function ConnectGitHub() {
 
       {state.kind === "session_ended" && (
         <p role="status" className="mb-4 text-sm text-foreground" data-testid="session-ended">
-          Your browser session ended (it lasts 7 days). If you connected GitHub before, we still hold that connection until you disconnect it.
+          Your browser session ended (it lasts 7 days). If you connected GitHub before, we still hold that connection until you disconnect it, or until 90 days after you agreed, whichever comes first.
           Connect again to see it or to remove it.
         </p>
       )}
 
       {state.kind === "reauthorize" && (
         <p role="alert" className="mb-4 text-sm text-foreground" data-testid="reauthorize">
-          GitHub no longer lets us read your profile: access was revoked, or it expired. We deleted our copy of the access token. Connect again to continue.
+          We can no longer read your GitHub profile: access was revoked, it expired, or the 90 days you agreed to have ended. We deleted our copy of the access token. Connect again to continue.
         </p>
       )}
 
@@ -115,13 +115,13 @@ export default function ConnectGitHub() {
             ) : null}
             {state.profile.data_coverage?.interests === "no_stars" ? <Row label="Interests note">You have not starred anything.</Row> : null}
             {state.profile.data_coverage?.interests === "stars_without_topics" ? <Row label="Interests note">The repos you starred have no topics.</Row> : null}
-            <Row label="Declared validity">{state.profile.privacy_boundaries.data_retention_days} days (not enforced)</Row>
+            <Row label="Valid until">{state.profile.expires_at ? state.profile.expires_at.slice(0, 10) : `${state.profile.privacy_boundaries.data_retention_days} days from generation`}</Row>
             <Row label="Checksum (not a signature)">
               <code className="break-all text-xs">{state.profile.cryptographic_receipt}</code>
             </Row>
           </dl>
           <p className="mb-4 text-sm text-muted-foreground" data-testid="what-we-keep">
-            What we keep: an encrypted access token until you disconnect, and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
+            What we keep: an encrypted access token until you disconnect, or for 90 days after you agreed (then we delete it and ask you to connect again), and a copy of this snapshot for 24 hours. Your browser stays signed in for 7 days.
             Disconnecting deletes the token, revokes our access at GitHub and clears the copy.
           </p>
           <Button variant="outline" onClick={onDisconnect} disabled={busy}>

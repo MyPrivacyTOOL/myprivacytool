@@ -11,6 +11,15 @@
 export const ACTIVITY_WINDOW_DAYS = 90;
 const DAY_MS = 86_400_000;
 
+// MPC-10833: a profile states when it stops being valid (generated_at + data_retention_days) and the Worker refuses to serve it after that.
+export const PROFILE_VALIDITY_DAYS = 30;
+export const profileExpiry = (generatedAt) => new Date(generatedAt.getTime() + PROFILE_VALIDITY_DAYS * DAY_MS).toISOString();
+/** True when the profile has no readable expires_at (fail closed) or that moment has passed. Consumers can use the same rule. */
+export function isExpired(profile, nowMs = Date.now()) {
+  const t = Date.parse(profile?.expires_at);
+  return !Number.isFinite(t) || nowMs >= t;
+}
+
 // Decision G: fixed keyword rules (no LLM, $0). Order is the tie-breaker.
 const ROLE_RULES = [
   ['Security Engineer', ['security', 'infosec', 'pentest', 'cybersecurity', 'cryptography', 'appsec']],
@@ -90,6 +99,7 @@ export async function githubToPapit(raw, { now = new Date(), coverage = null } =
   const payload = {
     version: '1.0',
     generated_at: now.toISOString(),
+    expires_at: profileExpiry(now),
     source_channel: 'github',
     core_identity: {
       career: {
@@ -107,7 +117,7 @@ export async function githubToPapit(raw, { now = new Date(), coverage = null } =
       interests: topN(starTopics, 15).filter(Boolean),
       activity_level: activityLevel(recent),
     },
-    privacy_boundaries: { data_retention_days: 30, revocable: true },
+    privacy_boundaries: { data_retention_days: PROFILE_VALIDITY_DAYS, revocable: true },
     // MPC-9795 (DEV-006): how complete the inputs were, so an empty list is never read as "nothing exists". Booleans and a state word only.
     data_coverage: {
       repos_sampled: coverage ? coverage.repos_capped === true : null,

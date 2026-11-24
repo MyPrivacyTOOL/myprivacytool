@@ -17,6 +17,7 @@ const profile: api.PapitProfile = {
   cryptographic_receipt: "ab".repeat(32),
   core_identity: { career: { skills: ["TypeScript", "Go"], primary_role: "Backend Developer", public_projects_count: 7 } },
   behavioral: { interests: ["privacy"], activity_level: "high" },
+  expires_at: "2026-11-04T12:00:00.000Z",
   privacy_boundaries: { data_retention_days: 30, revocable: true },
 };
 
@@ -97,14 +98,14 @@ describe("<ConnectGitHub />", () => {
   it("a session that ended says the stored connection remains until disconnected, and offers Connect", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "session_ended" });
     renderAt();
-    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we still hold that connection until you disconnect it/i);
+    expect(await screen.findByTestId("session-ended")).toHaveTextContent(/we still hold that connection until you disconnect it, or until 90 days after you agreed/i);
     expect(screen.getByRole("link", { name: /connect github/i })).toBeInTheDocument();
   });
 
   it("a revoked token says GitHub no longer allows it and that our copy was deleted", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "reauthorize" });
     renderAt();
-    expect(await screen.findByTestId("reauthorize")).toHaveTextContent(/revoked, or it expired.*deleted our copy of the access token/i);
+    expect(await screen.findByTestId("reauthorize")).toHaveTextContent(/revoked, it expired, or the 90 days you agreed to have ended.*deleted our copy of the access token/i);
   });
 
   it("no connection says so, without claiming anything about an earlier session", async () => {
@@ -123,6 +124,6 @@ describe("<ConnectGitHub />", () => {
   it("when connected it says what is kept and for how long", async () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
-    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect.*24 hours.*7 days/i);
+    expect(await screen.findByTestId("what-we-keep")).toHaveTextContent(/encrypted access token until you disconnect, or for 90 days after you agreed.*24 hours.*7 days/i);
   });
 });

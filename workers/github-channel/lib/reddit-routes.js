@@ -17,7 +17,7 @@ import {
 import { RedditAdapter, RedditAdapterError } from './reddit.js';
 import { bridgeReddit } from './bridge.js';
 import { getCached, putCached, deleteCached } from './cache.js';
-import { saveToken, loadTokens, deleteToken } from './store.js';
+import { saveToken, loadTokens, deleteToken, consentExpired } from './store.js';
 
 const PROVIDER = 'reddit';
 const STATE_COOKIE = 'mpt_rd_oauth';
@@ -87,6 +87,7 @@ async function callback(request, url, env, fetchFn, now, limiter) {
     stage = 'store';
     await saveToken(env, {
       provider: PROVIDER, subjectId: me.id, accessToken, refreshToken, scope: tokens.scope, expiresIn: tokens.expires_in,
+      consent: true, nowMs: now(), // MPC-10833: this is the moment the 90-day token consent starts
     }, fetchFn);
 
     const session = await sign({ sub: String(me.id), exp: now() + SESSION_TTL_MS }, env.STATE_SIGNING_KEY);
@@ -125,6 +126,17 @@ async function behavior(request, env, cors, fetchFn, now, limiter) {
 
     const tokens = await loadTokens(env, subjectId, fetchFn, PROVIDER);
     if (!tokens) return json({ error: 'not_connected' }, 404, cors);
+
+    // MPC-10833: consent lasts 90 days. After that we delete the token, revoke it at Reddit and ask the person to connect again.
+    if (consentExpired(tokens.consentedAt, now())) {
+      await deleteToken(env, subjectId, fetchFn, PROVIDER).catch(() => {});
+      await deleteCached(env.PROFILE_CACHE, subjectId, PROVIDER).catch(() => {});
+      await revokeRedditToken(
+        { token: tokens.refreshToken || tokens.accessToken, hint: tokens.refreshToken ? 'refresh_token' : 'access_token', ...creds(env) }, fetchFn,
+      ).catch(() => {});
+      log('reddit_consent_expired');
+      return json({ error: 'reauthorize', reason: 'consent_expired' }, 401, cors);
+    }
 
     let raw;
     try {

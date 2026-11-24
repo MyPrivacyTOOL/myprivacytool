@@ -3,6 +3,8 @@
  * never tokens or raw GitHub responses. KV's expirationTtl does the eviction in production; `cachedAt`
  * is also checked on read so the TTL is enforced (and testable with a mocked clock) independent of KV.
  */
+import { isExpired } from './papit.js';
+
 export const CACHE_TTL_SECONDS = 24 * 60 * 60;
 const key = (subjectId, channel) => `papit:${channel}:${subjectId}`;
 
@@ -11,7 +13,8 @@ export async function getCached(kv, subjectId, now = Date.now(), channel = 'gith
   if (!raw) return null;
   try {
     const { cachedAt, profile } = JSON.parse(raw);
-    return now - cachedAt < CACHE_TTL_SECONDS * 1000 ? profile : null;
+    // MPC-10833: a profile past its own expires_at is never served, whatever the cache age says.
+    return now - cachedAt < CACHE_TTL_SECONDS * 1000 && !isExpired(profile, now) ? profile : null;
   } catch {
     return null;
   }

@@ -11,3 +11,11 @@ STEP 0 on main 136b24b, 2026-11-18. Decision Q9 (Chris, 2026-11-18): reword now,
 New `PAPIT_LIMITS` list on /developers; test pins the wording and the lifetimes against the Worker constants.
 
 Not done (follow-ups): ed25519-signed profiles; enforcing the 30-day validity (or dropping the field); token expiry. The `revocable: true` field value is left as is: it means the user can disconnect.
+
+## Update MPC-10833 (Chris, 2026-11-23: enforce the validity; give the token an expiry)
+
+- **Profile validity is enforced.** Every profile (GitHub and Reddit) carries `expires_at` = `generated_at` + 30 days, inside the checksum (editing it breaks the receipt). `getCached` (lib/cache.js) refuses a profile with no readable `expires_at` or one past it; `isExpired` (lib/papit.js) is the same rule for consumers. The 24 h cache is shorter than 30 days, so in practice a served profile is always valid; the check is the guarantee.
+- **The token has a 90-day consent.** `channel_tokens.created_at` is the consent time: only the OAuth callback writes it (`saveToken(..., consent: true)`); a token refresh does not (the upsert leaves the column alone), so a refresh does not restart the 90 days. When a profile is requested and the consent is 90 days old (or its date is missing or unreadable: fail closed), the Worker deletes the token row, revokes the grant at GitHub or Reddit, clears the cache and answers `401 {"error":"reauthorize","reason":"consent_expired"}`. The page already shows its reconnect prompt for `reauthorize`. Connecting again restarts the 90 days.
+- **Slack of up to 24 h.** The check runs when the token is read, which is on a cache miss. A profile cached just before day 90 is served for at most 24 hours longer; the token is deleted at the next miss.
+- **Existing connections.** Rows older than 90 days at deploy time are asked to reconnect on their next profile request.
+- **Not done.** No revocation list for issued profiles (a copy already shared cannot be recalled); signing is still planned.

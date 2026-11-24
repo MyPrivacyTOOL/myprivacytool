@@ -117,11 +117,14 @@ describe("PaPIT limits wording", () => {
     expect(d).toMatch(/does not prove who produced/);
     expect(d).not.toMatch(/detect any edit/i);
   });
-  it("lists receipt, validity, cache, session, token and revocation, and says validity is not enforced and issued profiles cannot be recalled", () => {
+  it("lists receipt, validity, cache, session, token and revocation, and says validity is enforced by expires_at and issued profiles cannot be recalled", () => {
     const names = PAPIT_LIMITS.map((l) => l.item);
     for (const n of ["Receipt", "Snapshot validity", "Cache", "Browser session", "Access token", "Revocation"]) expect(names).toContain(n);
     const text = PAPIT_LIMITS.map((l) => l.detail).join(" ");
-    expect(text).toMatch(/nothing refuses a profile older than 30 days/);
+    expect(text).toMatch(/expires_at, 30 days after generated_at/);
+    expect(text).toMatch(/never serves a profile past it/);
+    expect(text).toMatch(/90 days after they agreed/);
+    expect(text).not.toMatch(/nothing refuses a profile|no automatic expiry/);
     expect(text).toMatch(/cannot be recalled/);
     expect(text).toMatch(/24 hours/);
     expect(text).toMatch(/7 days/);
@@ -131,7 +134,8 @@ describe("PaPIT limits wording", () => {
     const cache = readFileSync(path.join(ROOT, "workers/github-channel/lib/cache.js"), "utf8");
     expect(idx).toMatch(/SESSION_TTL_MS = 7 \* 24 \* 60 \* 60 \* 1000/);
     expect(cache).toMatch(/CACHE_TTL_SECONDS = 24 \* 60 \* 60/);
-    expect(readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8")).toMatch(/data_retention_days: 30/);
+    expect(readFileSync(path.join(ROOT, "workers/github-channel/lib/papit.js"), "utf8")).toMatch(/PROFILE_VALIDITY_DAYS = 30/);
+    expect(readFileSync(path.join(ROOT, "workers/github-channel/lib/store.js"), "utf8")).toMatch(/TOKEN_CONSENT_MAX_DAYS = 90/);
   });
 });
 

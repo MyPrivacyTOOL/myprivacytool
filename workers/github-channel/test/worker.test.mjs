@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { handle } from '../index.js';
 import { sign } from '../lib/oauth.js';
-import { CACHE_TTL_SECONDS } from '../lib/cache.js';
+import { CACHE_TTL_SECONDS, getCached } from '../lib/cache.js';
+import { TOKEN_CONSENT_MAX_DAYS } from '../lib/store.js';
 
 const ACCESS_TOKEN = 'gho_PLAINTEXT_ACCESS_TOKEN_1234567890';
 const REFRESH_TOKEN = 'ghr_PLAINTEXT_REFRESH_TOKEN_1234567890';
@@ -32,7 +33,7 @@ function fakeNetwork({ githubStatus = 200 } = {}) {
       return ok({ access_token: ACCESS_TOKEN, refresh_token: REFRESH_TOKEN, scope: 'read:user', token_type: 'bearer' });
     }
     if (u.startsWith('https://x.supabase.co/rest/v1/channel_tokens')) {
-      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, r); return new Response(null, { status: 201 }); }
+      if (init.method === 'POST') { const r = JSON.parse(init.body); rows.set(r.user_id, { ...rows.get(r.user_id), ...r }); return new Response(null, { status: 201 }); }
       if (init.method === 'GET') { const id = decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1]); return ok(rows.has(id) ? [rows.get(id)] : []); }
       if (init.method === 'DELETE') { rows.delete(decodeURIComponent(/user_id=eq\.([^&]+)/.exec(u)[1])); return new Response(null, { status: 204 }); }
     }
@@ -294,4 +295,83 @@ test('401 with no refresh token stored: reauthorize without calling the refresh 
   assert.equal((await res.json()).error, 'reauthorize');
   assert.equal(seen.refreshBodies.length, 0);
   assert.equal(net.rows.size, 0);
+});
+
+// MPC-10833: the token is good for 90 days from consent; a refresh does not restart the clock; a stale cached profile is never served.
+const DAY = 86_400_000;
+const freshSession = (env, sub) => sign({ sub, exp: clock.t + 7 * DAY }, env.STATE_SIGNING_KEY);
+
+test('MPC-10833: consent date is written at connect; day 89 still reads, day 90 deletes the token, revokes the grant and asks to reconnect', async () => {
+  const t0 = clock.t;
+  try {
+    const env = baseEnv(); const net = fakeNetwork();
+    await connect(env, net);
+    assert.equal(net.rows.get('4242').created_at, new Date(t0).toISOString(), 'created_at is the consent time');
+    assert.equal(TOKEN_CONSENT_MAX_DAYS, 90);
+
+    clock.t = t0 + 89 * DAY;
+    const ok = await handle(profileReq(await freshSession(env, '4242')), env, { fetchFn: net.fetchFn, now });
+    assert.equal(ok.status, 200, 'day 89: still allowed');
+    assert.equal(net.log.revoked, 0);
+
+    clock.t = t0 + 90 * DAY;
+    await env.PROFILE_CACHE.delete('papit:github:4242'); // past the 24h copy, so the token check is reached
+    const res = await handle(profileReq(await freshSession(env, '4242')), env, { fetchFn: net.fetchFn, now });
+    assert.equal(res.status, 401);
+    assert.deepEqual(await res.json(), { error: 'reauthorize', reason: 'consent_expired' });
+    assert.equal(net.rows.size, 0, 'token row deleted');
+    assert.equal(env.PROFILE_CACHE._store.size, 0, 'cache cleared');
+    assert.equal(net.log.revoked, 1, 'grant revoked at GitHub');
+  } finally { clock.t = t0; }
+});
+
+test('MPC-10833: connecting again restarts the 90 days', async () => {
+  const t0 = clock.t;
+  try {
+    const env = baseEnv(); const net = fakeNetwork();
+    await connect(env, net);
+    clock.t = t0 + 80 * DAY;
+    await connect(env, net);
+    assert.equal(net.rows.get('4242').created_at, new Date(clock.t).toISOString());
+    clock.t = t0 + 150 * DAY; // 70 days after the second consent, 150 after the first
+    const res = await handle(profileReq(await freshSession(env, '4242')), env, { fetchFn: net.fetchFn, now });
+    assert.equal(res.status, 200);
+  } finally { clock.t = t0; }
+});
+
+test('MPC-10833: a token refresh does not restart the 90-day clock', async () => {
+  const t0 = clock.t;
+  try {
+    const env = baseEnv();
+    const { net, seen, fetchFn } = expiringNetwork({ access_token: NEW_ACCESS, refresh_token: NEW_REFRESH, expires_in: 28800, scope: 'read:user' });
+    await connect(env, { ...net, fetchFn });
+    const consentAt = net.rows.get('4242').created_at;
+    clock.t = t0 + 60 * DAY;
+    seen.connected = true; // the original access token has expired
+    const res = await handle(profileReq(await freshSession(env, '4242')), env, { fetchFn, now });
+    assert.equal(res.status, 200);
+    assert.equal(seen.refreshBodies.length, 1, 'refreshed');
+    assert.equal(net.rows.get('4242').created_at, consentAt, 'created_at untouched by the refresh');
+  } finally { clock.t = t0; }
+});
+
+test('MPC-10833: a row with no readable consent date fails closed', async () => {
+  const env = baseEnv(); const net = fakeNetwork();
+  await connect(env, net);
+  net.rows.get('4242').created_at = null;
+  await env.PROFILE_CACHE.delete('papit:github:4242');
+  const res = await handle(profileReq(await freshSession(env, '4242')), env, { fetchFn: net.fetchFn, now });
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).reason, 'consent_expired');
+});
+
+test('MPC-10833: the cache never serves a profile that is past (or has no) expires_at', async () => {
+  const kv = baseEnv().PROFILE_CACHE;
+  const put = (profile) => kv.put('papit:github:9', JSON.stringify({ cachedAt: clock.t, profile }));
+  await put({ generated_at: 'x', expires_at: new Date(clock.t + DAY).toISOString() });
+  assert.ok(await getCached(kv, '9', clock.t), 'valid profile served');
+  await put({ generated_at: 'x', expires_at: new Date(clock.t - 1).toISOString() });
+  assert.equal(await getCached(kv, '9', clock.t), null, 'expired profile refused');
+  await put({ generated_at: 'x' });
+  assert.equal(await getCached(kv, '9', clock.t), null, 'no expires_at: refused');
 });

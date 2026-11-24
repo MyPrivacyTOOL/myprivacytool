@@ -15,7 +15,7 @@ import { buildAuthUrl, exchangeCode, randomString, sign, verify, revokeGrant, re
 import { GitHubAdapter, GitHubAdapterError } from './lib/adapter.js';
 import { bridgeGithub } from './lib/bridge.js';
 import { getCached, putCached, deleteCached } from './lib/cache.js';
-import { saveToken, loadTokens, loadAccessToken, deleteToken } from './lib/store.js';
+import { saveToken, loadTokens, loadAccessToken, deleteToken, consentExpired } from './lib/store.js';
 import { log, originAllowed, corsHeaders, json, readCookie, setCookie } from './lib/http.js';
 import { handleReddit } from './lib/reddit-routes.js';
 
@@ -91,6 +91,7 @@ async function callback(request, url, env, fetchFn, now) {
     stage = 'store';
     await saveToken(env, {
       subjectId: me.id, accessToken, refreshToken: tokens.refresh_token, scope: tokens.scope, expiresIn: tokens.expires_in,
+      consent: true, nowMs: now(), // MPC-10833: this is the moment the 90-day token consent starts
     }, fetchFn);
 
     const session = await sign({ sub: String(me.id), exp: now() + SESSION_TTL_MS }, env.STATE_SIGNING_KEY);
@@ -128,6 +129,15 @@ async function profile(request, env, cors, fetchFn, now) {
 
     const tokens = await loadTokens(env, subjectId, fetchFn);
     if (!tokens) return json({ error: 'not_connected' }, 404, cors);
+
+    // MPC-10833: consent lasts 90 days. After that we delete the token, revoke the grant at GitHub and ask the person to connect again.
+    if (consentExpired(tokens.consentedAt, now())) {
+      await deleteToken(env, subjectId, fetchFn).catch(() => {});
+      await deleteCached(env.PROFILE_CACHE, subjectId).catch(() => {});
+      await revokeGrant({ accessToken: tokens.accessToken, clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET }, fetchFn).catch(() => {});
+      log('consent_expired');
+      return json({ error: 'reauthorize', reason: 'consent_expired' }, 401, cors);
+    }
 
     let raw;
     try {

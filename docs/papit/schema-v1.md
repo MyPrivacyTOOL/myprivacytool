@@ -7,6 +7,7 @@ PaPIT = Private and Portable Identity Tool profile. v1 is produced per channel; 
 interface PaPITProfile {
   version: "1.0";
   generated_at: string;                 // ISO 8601, UTC
+  expires_at: string;                   // generated_at + data_retention_days (30 days); the Worker never serves a profile past it (MPC-10833)
   source_channel: "github";             // or "reddit" (see below)
   cryptographic_receipt: string;        // lowercase hex SHA-256 (see below)
   core_identity: {
@@ -27,7 +28,7 @@ interface PaPITProfile {
     interests: 'found' | 'no_stars' | 'stars_without_topics';
   };
   privacy_boundaries: {
-    data_retention_days: 30;            // declared validity of this PaPIT snapshot (not enforced). NOT token retention
+    data_retention_days: 30;            // validity of this PaPIT snapshot: expires_at = generated_at + this. NOT token retention
     revocable: true;
   };
 }

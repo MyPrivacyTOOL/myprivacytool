@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { githubToPapit, activityLevel, canonicalJson, verifyReceipt, inferRole } from '../lib/papit.js';
+import { githubToPapit, activityLevel, canonicalJson, verifyReceipt, inferRole, isExpired } from '../lib/papit.js';
 
 const NOW = new Date('2026-10-05T12:00:00Z');
 const daysAgo = (d) => new Date(NOW.getTime() - d * 86_400_000).toISOString();
@@ -37,10 +37,11 @@ test('PII is stripped: nothing identifying survives into the PaPIT JSON', async 
 test('output has exactly the PaPIT v1 shape', async () => {
   const p = await githubToPapit(raw(), { now: NOW });
   assert.deepEqual(Object.keys(p).sort(),
-    ['behavioral', 'core_identity', 'cryptographic_receipt', 'data_coverage', 'generated_at', 'privacy_boundaries', 'source_channel', 'version']);
+    ['behavioral', 'core_identity', 'cryptographic_receipt', 'data_coverage', 'expires_at', 'generated_at', 'privacy_boundaries', 'source_channel', 'version']);
   assert.equal(p.version, '1.0');
   assert.equal(p.source_channel, 'github');
   assert.equal(p.generated_at, '2026-10-05T12:00:00.000Z');
+  assert.equal(p.expires_at, '2026-11-04T12:00:00.000Z', 'MPC-10833: generated_at + data_retention_days');
   assert.deepEqual(p.privacy_boundaries, { data_retention_days: 30, revocable: true });
   assert.match(p.cryptographic_receipt, /^[0-9a-f]{64}$/);
 });
@@ -120,4 +121,15 @@ test('data_coverage is inside the receipt, so changing it breaks the checksum', 
   const p = await githubToPapit(raw(), { now: NOW });
   assert.equal(await verifyReceipt(p), true);
   assert.equal(await verifyReceipt({ ...p, data_coverage: { ...p.data_coverage, repos_sampled: true } }), false);
+});
+
+test('MPC-10833: expires_at is inside the receipt, and isExpired refuses a stale, missing or unreadable one', async () => {
+  const p = await githubToPapit(raw(), { now: NOW });
+  assert.ok(await verifyReceipt(p));
+  assert.equal(await verifyReceipt({ ...p, expires_at: '2099-01-01T00:00:00.000Z' }), false, 'editing the expiry breaks the receipt');
+  const exp = Date.parse(p.expires_at);
+  assert.equal(isExpired(p, exp - 1), false);
+  assert.equal(isExpired(p, exp), true, 'expired at the stated moment');
+  assert.equal(isExpired({ ...p, expires_at: undefined }), true, 'missing: refused');
+  assert.equal(isExpired({ ...p, expires_at: 'not a date' }), true, 'unreadable: refused');
 });

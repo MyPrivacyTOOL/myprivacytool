@@ -8,7 +8,7 @@
  * addresses, "I live in ..." locations, u/ mentions, the user's own handle), then reduced to <=5 stopword-filtered
  * keywords per subreddit and <=20 overall topics. No raw text, title, username or id leaves this function.
  */
-import { canonicalJson, sha256Hex, activityLevel, ACTIVITY_WINDOW_DAYS } from './papit.js';
+import { canonicalJson, sha256Hex, activityLevel, ACTIVITY_WINDOW_DAYS, PROFILE_VALIDITY_DAYS, profileExpiry } from './papit.js';
 
 const DAY = 86400;
 const MAX_TAGS_PER_SUB = 5;
@@ -120,6 +120,7 @@ export async function redditToPapit(a, { now = new Date(), username } = {}) {
   const payload = {
     version: '1.0',
     generated_at: now.toISOString(),
+    expires_at: profileExpiry(now),
     source_channel: 'reddit',
     behavioral: {
       interests: topTopics,
@@ -137,7 +138,7 @@ export async function redditToPapit(a, { now = new Date(), username } = {}) {
         },
       },
     },
-    privacy_boundaries: { data_retention_days: 30, revocable: true, raw_content_stored: false },
+    privacy_boundaries: { data_retention_days: PROFILE_VALIDITY_DAYS, revocable: true, raw_content_stored: false },
   };
   return { ...payload, cryptographic_receipt: await sha256Hex(canonicalJson(payload)) };
 }

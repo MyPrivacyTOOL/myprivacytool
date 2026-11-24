@@ -22,7 +22,7 @@ export const faqs: { q: string; a: string }[] = [
   },
   {
     q: "How long is my data kept?",
-    a: "The profile snapshot is marked valid for 30 days and is cached for 24 hours so we do not call GitHub repeatedly. Your GitHub connection token is kept, encrypted, until you disconnect. Disconnecting deletes the token and revokes our access at GitHub.",
+    a: "The profile snapshot is valid for 30 days (it carries an expires_at, and we do not serve one past it) and is cached for 24 hours so we do not call GitHub repeatedly. Your GitHub connection token is kept, encrypted, until you disconnect or for 90 days after you agreed, whichever comes first; then we delete it and ask you to connect again. Disconnecting deletes the token and revokes our access at GitHub.",
   },
   {
     q: "How do I disconnect?",
@@ -122,15 +122,15 @@ const Content = () => (
       </li>
     </ul>
     <p>
-      The profile also states its own limits in plain data: it declares 30 days of validity (not enforced by us), and you can disconnect at any time. A copy you already shared cannot be recalled.
+      The profile also states its own limits in plain data: it carries an expires_at 30 days after it was made (we do not serve a profile past it; anyone who receives a copy should check it too), and you can disconnect at any time. A copy you already shared cannot be recalled.
     </p>
 
     <h2 id="storage-and-control">Step 5: How your token is stored, and how to leave</h2>
     <p>
       Your GitHub connection token is encrypted with AES-256-GCM before it is stored, so the database holds ciphertext
       only. The finished profile is cached for 24 hours to avoid calling GitHub repeatedly; the cache never contains
-      tokens or raw GitHub responses. The profile snapshot is valid for 30 days, but the token itself is kept until you
-      disconnect.
+      tokens or raw GitHub responses. The profile snapshot is valid for 30 days. The token is kept until you disconnect, or for
+      90 days after you agreed, whichever comes first.
     </p>
     <p>
       To leave, choose Disconnect GitHub on the connect page. We delete the stored token first, clear the cached

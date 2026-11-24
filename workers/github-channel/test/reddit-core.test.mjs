@@ -54,6 +54,7 @@ test('transformer: raw text, username and PII never reach the PaPIT output', asy
     assert.ok(!dump.toLowerCase().includes(leak.toLowerCase()), `leaked: ${leak}`);
   }
   assert.deepEqual(out.privacy_boundaries, { data_retention_days: 30, revocable: true, raw_content_stored: false });
+  assert.equal(out.expires_at, new Date(NOW.getTime() + 30 * 86_400_000).toISOString(), 'MPC-10833: generated_at + 30 days');
 });
 
 test('transformer: v1 envelope, GitHub-compatible base fields, Reddit detail under behavioral.reddit', async () => {

@@ -196,6 +196,7 @@ curl ${BASES.github}/channels/github/profile \\
         body: `{
   "version": "1.0",
   "generated_at": "2026-10-06T09:00:00.000Z",
+  "expires_at": "2026-11-05T09:00:00.000Z",
   "source_channel": "github",
   "cryptographic_receipt": "9f2c…64 hex chars…",
   "core_identity": { "career": { "skills": ["TypeScript", "Go"], "primary_role": "Backend Developer", "public_projects_count": 31 } },
@@ -540,6 +541,7 @@ export const QUICK_START_STEPS = [
 export const PAPIT_SCHEMA = `interface PaPITProfile {
   version: "1.0";
   generated_at: string;                 // ISO 8601, UTC
+  expires_at: string;                   // generated_at + 30 days; refuse the profile once this has passed (MPC-10833)
   source_channel: "github";             // later: "reddit", ...
   cryptographic_receipt: string;        // lowercase hex SHA-256
   core_identity: {
@@ -560,7 +562,7 @@ export const PAPIT_SCHEMA = `interface PaPITProfile {
     interests: "found" | "no_stars" | "stars_without_topics";
   };
   privacy_boundaries: {
-    data_retention_days: 30;            // declared validity of this snapshot (not enforced), not token retention
+    data_retention_days: 30;            // the snapshot is valid for 30 days: expires_at = generated_at + this. Not token retention
     revocable: true;                    // the user can disconnect; an issued copy cannot be recalled (see limits)
   };
 }`;
@@ -573,10 +575,10 @@ export const PAPIT_LIMITS = [
   { item: "Empty interests", detail: "interests is empty for two different reasons, told apart by data_coverage.interests: no_stars (you have starred nothing) or stars_without_topics (the repos you starred have no topics). A failed or unavailable GitHub request is never an empty list: the profile call returns an error instead (401 reauthorize, or 5xx)." },
   { item: "Receipt", detail: "An unkeyed SHA-256 checksum (workers/github-channel/lib/papit.js). It shows a profile has not changed only if the receipt reached you by a separate trusted channel. It does not prove who produced it: an editor can recompute it. Signing is planned, not built." },
   { item: "Sanitization receipt", detail: "Also a hash, not a signature and not a zero-knowledge proof. It records which rules ran and ties the output to the profile's receipt." },
-  { item: "Snapshot validity", detail: "data_retention_days is 30. That number is declared in the profile; nothing refuses a profile older than 30 days. Check generated_at yourself." },
+  { item: "Snapshot validity", detail: "A profile carries expires_at, 30 days after generated_at (data_retention_days is 30). Our Worker never serves a profile past it, and the receipt covers the field, so editing it breaks the checksum. A copy you already hold is yours to check: refuse it once expires_at has passed." },
   { item: "Cache", detail: "We keep a copy of the derived profile for 24 hours, then fetch it again." },
   { item: "Browser session", detail: "The mpt_gh_session cookie lasts 7 days." },
-  { item: "Access token", detail: "Kept (encrypted) until the user disconnects. It has no automatic expiry yet." },
+  { item: "Access token", detail: "Kept (encrypted) until the user disconnects, or for 90 days after they agreed. After 90 days the next profile request deletes the token, revokes our access at GitHub and answers 401 reauthorize, and the person is asked to connect again. A token refresh does not restart the 90 days; connecting again does." },
   { item: "Revocation", detail: "A user can disconnect (DELETE /channels/github): the token is deleted, our access is revoked at GitHub and the cached copy is cleared. A profile that was already issued cannot be recalled and there is no revocation list yet." },
 ];
 
