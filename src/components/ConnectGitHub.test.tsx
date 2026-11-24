@@ -194,6 +194,9 @@ describe("<ConnectGitHub />", () => {
     vi.mocked(api.fetchGithubProfile).mockResolvedValue({ status: "connected", profile });
     renderAt();
     expect(await screen.findByTestId("valid-until")).toHaveTextContent("2026-11-05");
+    // MPC-10833: only our own verify check refuses an expired copy; the page must not claim anyone holding a copy is forced to.
+    expect(screen.getByText(/our verify check refuses a copy after that date/)).toBeInTheDocument();
+    expect(screen.queryByText(/a copy of this profile is refused/)).toBeNull();
     expect(screen.queryByText(/not enforced/i)).toBeNull();
   });
 

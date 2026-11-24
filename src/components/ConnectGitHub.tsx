@@ -148,7 +148,7 @@ export default function ConnectGitHub() {
             {state.profile.data_coverage?.interests === "stars_without_topics" ? <Row label="Interests note">The repos you starred have no topics.</Row> : null}
             <Row label="Valid until">
               <span data-testid="valid-until">{(state.profile.expires_at ?? "").slice(0, 10) || "30 days after it was made"}</span>
-              {" "}(a copy of this profile is refused after that date)
+              {" "}(our verify check refuses a copy after that date)
             </Row>
             <Row label="Connection kept">Until you disconnect</Row>
             <Row label="Checksum (not a signature)">
