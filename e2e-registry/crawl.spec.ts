@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { applyAllowlist } from "../scripts/registry-ci/allowlist.mjs";
 import { classifyAll, iceObservations, routesFromSitemap } from "../scripts/registry-ci/crawl-core.mjs";
 import { ALLOWLIST_FILE, loadJson, loadNonOutbound, loadRegistry } from "../scripts/registry-ci/registry.mjs";
+import { CONSENT_CONFIG } from "../shared/recipients/consent-config";
 
 const registry = loadRegistry();
 const nonOutbound = loadNonOutbound();
@@ -146,4 +147,48 @@ test("every sitemap route pre-click, then the scan action post-click, contacts o
     ...r.stale.map((e: { rule: string; detail: string; note: string }) => `STALE allowlist entry (no longer contacted), delete it: ${e.rule} ${e.detail} (${e.note})`),
   ];
   expect(problems, problems.join("\n")).toEqual([]);
+});
+
+// MPC-10790 (decision A, 2026-11-24): "Accept analytics" alone sends nothing. GA4 only ever runs on the production host, so this test serves the built site
+// under www.myprivacytool.io (the page's requests for that host are answered from the local preview; every other host is recorded and aborted, as above).
+// The visitor starts with the analytics choice already stored and has NOT pressed Scan me: no Google host, nothing queued in dataLayer. Then Scan me is pressed
+// (the consent POST is answered with a stub): the tag is requested and the device profile queues only now.
+test("analytics accepted but Scan me not pressed: GA4 neither loads nor queues; after Scan me it does", async ({ browser, baseURL }) => {
+  test.setTimeout(90_000);
+  const PROD = "www.myprivacytool.io";
+  const seen: { phase: "before" | "after"; host: string; url: string }[] = [];
+  let phase: "before" | "after" = "before";
+  const context = await browser.newContext({ baseURL: `https://${PROD}` });
+  await context.addInitScript(() => {
+    try { localStorage.setItem("mpt_cookie_consent", JSON.stringify({ v: 1, analytics: true, at: "2026-11-24T00:00:00.000Z" })); } catch { /* ignore */ }
+  });
+  await context.route(/^https?:\/\/(?!127\.0\.0\.1|localhost)/, async (r) => {
+    const req = r.request();
+    const u = new URL(req.url());
+    if (u.hostname === PROD) {
+      const res = await r.fetch({ url: `${baseURL}${u.pathname}${u.search}` });
+      return r.fulfill({ response: res });
+    }
+    seen.push({ phase, host: u.hostname, url: req.url() });
+    if (u.pathname === "/api/consent") {   // the Scan me consent record, stubbed so the click can complete
+      const cors = { "access-control-allow-origin": `https://${PROD}`, "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" };
+      if (req.method() === "OPTIONS") return r.fulfill({ status: 204, headers: cors });
+      return r.fulfill({ status: 201, headers: { ...cors, "content-type": "application/json" }, body: JSON.stringify({ consent_id: "33333333-3333-4333-8333-333333333333", consent_version: CONSENT_CONFIG.consent_version, consented_at: new Date().toISOString() }) });
+    }
+    return r.abort("blockedbyclient");
+  });
+  const page = await context.newPage();
+  const google = (list: typeof seen) => list.filter((o) => /(^|\.)(googletagmanager|google-analytics)\.com$/.test(o.host));
+  const queued = () => page.evaluate(() => ((window as unknown as { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? []).map((a) => Array.from(a).slice(0, 2).join(":")));
+
+  await page.goto("/", { waitUntil: "load" });
+  await page.waitForTimeout(5000);   // long enough for the device scan and its device_profile event
+  expect(google(seen), "no Google request on Accept analytics alone").toEqual([]);
+  expect(await queued(), "nothing queued in dataLayer before Scan me").toEqual([]);
+
+  phase = "after";
+  await page.locator(CLICK_SELECTOR).first().click({ timeout: 10_000 });
+  await expect.poll(() => google(seen).length, { timeout: 15_000, message: "the tag is requested after Scan me" }).toBeGreaterThan(0);
+  await expect.poll(queued, { timeout: 15_000, message: "the device profile queues after Scan me" }).toContain("event:device_profile");
+  await context.close();
 });

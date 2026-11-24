@@ -4,26 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MyPrivacyTOOL — Check Your Data Exposure</title>
-    <!-- MPC-10790: the Google tag loads only after the visitor chose "Accept analytics" on the main site (same gate as index.html). This static page has
-         no banner of its own, so a visitor with no stored choice gets no Google request at all. -->
+    <!-- MPC-10790: the Google tag loads only after the Scan me click (decision A, 2026-11-24): the visitor must hold the analytics choice AND the scan consent of this
+         tab's journey (same gate as index.html). This static page has no Scan me button and no banner, so a first visit gets no Google request at all. -->
     <script src="/recipient-client.min.js" defer></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
+      // MPC-10790: while the gate below is closed gtag() drops the call: nothing is queued in dataLayer, so nothing can flush when the tag loads later.
+      // Events from before the consent point are never replayed; the app also checks consent itself before calling gtag (src/lib/analytics.ts).
+      var mptGateOpen = false;
+      function gtag(){ if (mptGateOpen) dataLayer.push(arguments); }
       (function () {
         var GA_ID = 'G-1BWMDBJSPL';
         var loaded = false;
         var h = location.hostname;
         var isProd = h === 'myprivacytool.io' || h === 'www.myprivacytool.io';
+        // MPC-10790: on a non-production host the tag can never load (allowed() is false there), so nothing queued can flush; events keep queuing there so the e2e suite can read them.
+        mptGateOpen = !isProd;
+        // MPC-10790 (decision A, 2026-11-24): BOTH must hold. The analytics choice alone (cookie banner "Accept analytics") sends nothing; the tag waits for the
+        // scan consent this journey got at the Scan me click (src/lib/scanConsent.ts keeps it in sessionStorage under mpt_scan_consent; Scan me also sets the
+        // analytics choice, design 8.1). The wording version is checked by the app, which only stores the id for the current wording.
+        function scanConsented() {
+          try {
+            var s = JSON.parse(window.sessionStorage.getItem('mpt_scan_consent') || 'null');
+            return !!(s && typeof s.consentId === 'string' && s.consentId.length > 0);
+          } catch (e) { return false; }
+        }
         function allowed() {
           if (!isProd) return false;
           try {
             var c = JSON.parse(window.localStorage.getItem('mpt_cookie_consent') || 'null');
-            return !!(c && c.v === 1 && c.analytics === true);
+            return !!(c && c.v === 1 && c.analytics === true) && scanConsented();
           } catch (e) { return false; }
         }
         function sync() {
           var ok = allowed();
+          mptGateOpen = !isProd || ok;
           window['ga-disable-' + GA_ID] = !ok;
           if (!ok || loaded) return;
           var r = window.mptRecipients;
@@ -34,6 +49,7 @@
           gtag('config', GA_ID);
         }
         window.addEventListener('mpt:consent', sync);
+        window.addEventListener('mpt:scan-consent', sync);
         window.addEventListener('mpt:recipients-ready', sync);
         sync();
       })();
